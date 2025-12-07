@@ -237,7 +237,7 @@ export default function CaseView() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SocialFeatures displayCaseId={parseInt(id || "0")} user={user || null} />
+        <SocialFeatures displayCaseId={parseInt(id || "0")} user={user || null} caseName={displayCase.name} />
       </div>
 
       <div className="border-t mt-16 py-12 bg-muted/30">

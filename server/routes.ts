@@ -620,6 +620,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.get("/api/display-cases/:id/likes", async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
+      const visitorId = req.query.visitorId;
+      
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid display case ID" });
       }
@@ -631,7 +633,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
       const count = await storage.getLikeCount(id);
       const userId = req.user?.claims?.sub;
-      const hasLiked = userId ? await storage.hasUserLiked(id, userId) : false;
+      const likeUserId = userId || (visitorId ? `visitor_${visitorId}` : null);
+      const hasLiked = likeUserId ? await storage.hasUserLiked(id, likeUserId) : false;
 
       res.json({ count, hasLiked });
     } catch (error) {
@@ -640,13 +643,18 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  app.post("/api/display-cases/:id/likes", isAuthenticated, async (req: any, res) => {
+  app.post("/api/display-cases/:id/likes", async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
+      const visitorId = req.body.visitorId;
+      const userId = req.user?.claims?.sub;
 
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid display case ID" });
+      }
+
+      if (!userId && !visitorId) {
+        return res.status(400).json({ error: "User ID or visitor ID required" });
       }
 
       const displayCase = await storage.getDisplayCase(id);
@@ -654,7 +662,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ error: "Display case not found" });
       }
 
-      const hasLiked = await storage.toggleLike(id, userId);
+      const likeUserId = userId || `visitor_${visitorId}`;
+      const hasLiked = await storage.toggleLike(id, likeUserId);
       const count = await storage.getLikeCount(id);
 
       res.json({ hasLiked, count });
