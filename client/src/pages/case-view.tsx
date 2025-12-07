@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,8 +11,17 @@ import {
   ImageIcon,
   Lock
 } from "lucide-react";
-import type { DisplayCaseWithCards } from "@shared/schema";
+import type { DisplayCaseWithCards, Card } from "@shared/schema";
 import { format } from "date-fns";
+import { CardDetailModal } from "@/components/card-detail-modal";
+
+const THEME_BACKGROUNDS: Record<string, string> = {
+  "classic": "",
+  "dark-wood": "bg-amber-950",
+  "velvet": "bg-red-950",
+  "midnight": "bg-slate-900",
+  "gallery": "bg-neutral-100 dark:bg-neutral-800",
+};
 
 function CardGridSkeleton() {
   return (
@@ -27,6 +37,7 @@ function CardGridSkeleton() {
 
 export default function CaseView() {
   const { id } = useParams<{ id: string }>();
+  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
 
   const { data: displayCase, isLoading, error } = useQuery<DisplayCaseWithCards>({
     queryKey: [`/api/display-cases/${id}/public`],
@@ -112,11 +123,13 @@ export default function CaseView() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {displayCase.cards?.map((card) => (
-              <div
+          <div className={`p-6 rounded-lg ${THEME_BACKGROUNDS[displayCase.theme || "classic"] || ""}`}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {displayCase.cards?.map((card) => (
+              <button
                 key={card.id}
-                className="group relative bg-card rounded-lg overflow-hidden border hover-elevate"
+                onClick={() => setSelectedCard(card)}
+                className="group relative bg-card rounded-lg overflow-hidden border hover-elevate text-left cursor-pointer w-full"
                 data-testid={`card-public-${card.id}`}
               >
                 <div className="aspect-square">
@@ -129,7 +142,7 @@ export default function CaseView() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
                     <p className="font-medium text-sm truncate">{card.title}</p>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-white/80">
+                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-white/80">
                       {card.year && <span>{card.year}</span>}
                       {card.set && <span>{card.set}</span>}
                       {card.grade && (
@@ -145,8 +158,9 @@ export default function CaseView() {
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
+              </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -167,6 +181,14 @@ export default function CaseView() {
           </a>
         </div>
       </div>
+
+      <CardDetailModal
+        card={selectedCard}
+        isOpen={!!selectedCard}
+        onClose={() => setSelectedCard(null)}
+        displayCaseId={parseInt(id || "0")}
+        canEdit={false}
+      />
     </div>
   );
 }

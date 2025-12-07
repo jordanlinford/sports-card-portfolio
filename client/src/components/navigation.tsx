@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LayoutGrid, LogOut, User, Crown } from "lucide-react";
+import { LayoutGrid, LogOut, User, Crown, Search } from "lucide-react";
 
 export function Navigation() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -110,6 +110,12 @@ export function Navigation() {
                       <Link href="/" className="flex items-center gap-2 cursor-pointer">
                         <LayoutGrid className="h-4 w-4" />
                         Dashboard
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/search" className="flex items-center gap-2 cursor-pointer">
+                        <Search className="h-4 w-4" />
+                        Search Cards
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

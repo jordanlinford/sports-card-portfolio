@@ -14,6 +14,7 @@ import CaseEdit from "@/pages/case-edit";
 import CaseView from "@/pages/case-view";
 import Upgrade from "@/pages/upgrade";
 import BillingSuccess from "@/pages/billing-success";
+import SearchPage from "@/pages/search";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -28,6 +29,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Dashboard} />
+          <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />
           <Route path="/cases/:id" component={CaseView} />

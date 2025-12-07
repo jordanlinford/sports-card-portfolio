@@ -16,6 +16,23 @@ import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   Form,
   FormControl,
   FormDescription,
@@ -46,11 +63,21 @@ import {
   X
 } from "lucide-react";
 import type { DisplayCaseWithCards, Card as CardType } from "@shared/schema";
+import { CardDetailModal } from "@/components/card-detail-modal";
+
+const DISPLAY_CASE_THEMES = [
+  { id: "classic", name: "Classic", bg: "bg-background", description: "Clean and minimal" },
+  { id: "dark-wood", name: "Dark Wood", bg: "bg-amber-950", description: "Rich wooden display" },
+  { id: "velvet", name: "Velvet", bg: "bg-red-950", description: "Luxurious velvet backdrop" },
+  { id: "midnight", name: "Midnight", bg: "bg-slate-900", description: "Sleek dark theme" },
+  { id: "gallery", name: "Gallery", bg: "bg-neutral-100 dark:bg-neutral-800", description: "Museum style" },
+] as const;
 
 const updateCaseSchema = z.object({
   name: z.string().min(1, "Name is required").max(255, "Name is too long"),
   description: z.string().max(1000, "Description is too long").optional(),
   isPublic: z.boolean(),
+  theme: z.string().optional(),
 });
 
 const addCardSchema = z.object({
@@ -65,20 +92,40 @@ const addCardSchema = z.object({
 type UpdateCaseFormData = z.infer<typeof updateCaseSchema>;
 type AddCardFormData = z.infer<typeof addCardSchema>;
 
-function CardTile({ card, onDelete }: { card: CardType; onDelete: () => void }) {
+function SortableCardTile({ card, onDelete, onClick }: { card: CardType; onDelete: () => void; onClick: () => void }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: card.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 1,
+  };
+
   return (
-    <div 
-      className="group relative bg-muted rounded-lg overflow-hidden"
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="group relative bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing touch-none"
       data-testid={`card-tile-${card.id}`}
     >
-      <div className="aspect-square">
+      <div className="aspect-square" onClick={onClick}>
         <img
           src={card.imagePath}
           alt={card.title}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover pointer-events-none"
         />
       </div>
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <p className="text-white text-sm font-medium truncate">{card.title}</p>
           {card.estimatedValue && (
@@ -87,8 +134,8 @@ function CardTile({ card, onDelete }: { card: CardType; onDelete: () => void }) 
         </div>
       </div>
       <button
-        onClick={onDelete}
-        className="absolute top-2 right-2 w-8 h-8 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="absolute top-2 right-2 w-8 h-8 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20"
         data-testid={`button-delete-card-${card.id}`}
       >
         <Trash2 className="h-4 w-4" />
@@ -105,6 +152,7 @@ export default function CaseEdit() {
   const [showAddCard, setShowAddCard] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -130,6 +178,7 @@ export default function CaseEdit() {
       name: "",
       description: "",
       isPublic: true,
+      theme: "classic",
     },
   });
 
@@ -151,6 +200,7 @@ export default function CaseEdit() {
         name: displayCase.name,
         description: displayCase.description || "",
         isPublic: displayCase.isPublic,
+        theme: displayCase.theme || "classic",
       });
     }
   }, [displayCase, form]);
@@ -260,6 +310,39 @@ export default function CaseEdit() {
       });
     },
   });
+
+  const reorderMutation = useMutation({
+    mutationFn: async (cardIds: number[]) => {
+      return await apiRequest("POST", `/api/display-cases/${id}/cards/reorder`, { cardIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+    },
+  });
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id && displayCase?.cards) {
+      const oldIndex = displayCase.cards.findIndex((c) => c.id === active.id);
+      const newIndex = displayCase.cards.findIndex((c) => c.id === over.id);
+
+      const newCards = arrayMove(displayCase.cards, oldIndex, newIndex);
+      const cardIds = newCards.map((c) => c.id);
+      reorderMutation.mutate(cardIds);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -430,6 +513,38 @@ export default function CaseEdit() {
                           data-testid="switch-edit-is-public"
                         />
                       </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="theme"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Display Theme</FormLabel>
+                      <FormDescription>
+                        Choose a background theme for your display case
+                      </FormDescription>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+                        {DISPLAY_CASE_THEMES.map((theme) => (
+                          <button
+                            key={theme.id}
+                            type="button"
+                            onClick={() => field.onChange(theme.id)}
+                            className={`relative p-4 rounded-lg border-2 text-left transition-colors ${
+                              field.value === theme.id
+                                ? "border-primary"
+                                : "border-transparent hover:border-muted-foreground/30"
+                            }`}
+                            data-testid={`button-theme-${theme.id}`}
+                          >
+                            <div className={`w-full h-12 rounded-md ${theme.bg} mb-2 border`} />
+                            <p className="text-sm font-medium">{theme.name}</p>
+                            <p className="text-xs text-muted-foreground">{theme.description}</p>
+                          </button>
+                        ))}
+                      </div>
                     </FormItem>
                   )}
                 />
@@ -667,19 +782,39 @@ export default function CaseEdit() {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {displayCase.cards.map((card) => (
-                  <CardTile
-                    key={card.id}
-                    card={card}
-                    onDelete={() => deleteCardMutation.mutate(card.id)}
-                  />
-                ))}
-              </div>
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={displayCase.cards.map((c) => c.id)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {displayCase.cards.map((card) => (
+                      <SortableCardTile
+                        key={card.id}
+                        card={card}
+                        onDelete={() => deleteCardMutation.mutate(card.id)}
+                        onClick={() => setSelectedCard(card)}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
             )}
           </CardContent>
         </Card>
       </div>
+
+      <CardDetailModal
+        card={selectedCard}
+        isOpen={!!selectedCard}
+        onClose={() => setSelectedCard(null)}
+        displayCaseId={parseInt(id || "0")}
+        canEdit={true}
+      />
     </div>
   );
 }

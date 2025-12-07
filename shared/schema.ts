@@ -49,6 +49,7 @@ export const displayCases = pgTable("display_cases", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   isPublic: boolean("is_public").default(true).notNull(),
+  theme: varchar("theme", { length: 50 }).default("classic").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -72,6 +73,7 @@ export const cards = pgTable("cards", {
   grade: varchar("grade", { length: 50 }),
   purchasePrice: real("purchase_price"),
   estimatedValue: real("estimated_value"),
+  notes: text("notes"),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });

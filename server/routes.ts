@@ -10,7 +10,7 @@ import Stripe from "stripe";
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2025-04-30.basil",
+    apiVersion: "2025-11-17.clover",
   });
 }
 
@@ -39,6 +39,25 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (error) {
       console.error("Error fetching display cases:", error);
       res.status(500).json({ message: "Failed to fetch display cases" });
+    }
+  });
+
+  app.get("/api/cards/search", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { q, set, year, grade } = req.query;
+      
+      const results = await storage.searchCards(userId, {
+        query: q as string || "",
+        set: set as string || undefined,
+        year: year ? parseInt(year as string) : undefined,
+        grade: grade as string || undefined,
+      });
+      
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching cards:", error);
+      res.status(500).json({ message: "Failed to search cards" });
     }
   });
 
@@ -216,6 +235,61 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     } catch (error) {
       console.error("Error deleting card:", error);
       res.status(500).json({ message: "Failed to delete card" });
+    }
+  });
+
+  app.patch("/api/display-cases/:displayCaseId/cards/:cardId", isAuthenticated, async (req: any, res) => {
+    try {
+      const displayCaseId = parseInt(req.params.displayCaseId);
+      const cardId = parseInt(req.params.cardId);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(displayCaseId) || isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid IDs" });
+      }
+
+      const existing = await storage.getDisplayCaseByIdAndUser(displayCaseId, userId);
+      if (!existing) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card || card.displayCaseId !== displayCaseId) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      const updatedCard = await storage.updateCard(cardId, req.body);
+      res.json(updatedCard);
+    } catch (error) {
+      console.error("Error updating card:", error);
+      res.status(500).json({ message: "Failed to update card" });
+    }
+  });
+
+  app.post("/api/display-cases/:displayCaseId/cards/reorder", isAuthenticated, async (req: any, res) => {
+    try {
+      const displayCaseId = parseInt(req.params.displayCaseId);
+      const userId = req.user.claims.sub;
+      const { cardIds } = req.body;
+
+      if (isNaN(displayCaseId)) {
+        return res.status(400).json({ message: "Invalid display case ID" });
+      }
+
+      if (!Array.isArray(cardIds)) {
+        return res.status(400).json({ message: "cardIds must be an array" });
+      }
+
+      const existing = await storage.getDisplayCaseByIdAndUser(displayCaseId, userId);
+      if (!existing) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      await storage.reorderCards(displayCaseId, cardIds);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error reordering cards:", error);
+      res.status(500).json({ message: "Failed to reorder cards" });
     }
   });
 

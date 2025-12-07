@@ -11,7 +11,7 @@ import {
   type DisplayCaseWithCards,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -212,6 +212,68 @@ export class DatabaseStorage implements IStorage {
     }
 
     return Math.max(...caseCards.map((c) => c.sortOrder));
+  }
+
+  async reorderCards(displayCaseId: number, cardIds: number[]): Promise<void> {
+    for (let i = 0; i < cardIds.length; i++) {
+      await db
+        .update(cards)
+        .set({ sortOrder: i })
+        .where(eq(cards.id, cardIds[i]));
+    }
+  }
+
+  async searchCards(
+    userId: string,
+    filters: { query?: string; set?: string; year?: number; grade?: string }
+  ): Promise<(Card & { displayCaseName: string; displayCaseId: number })[]> {
+    const userCases = await db
+      .select({ id: displayCases.id, name: displayCases.name })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+
+    if (userCases.length === 0) {
+      return [];
+    }
+
+    const caseIds = userCases.map((c) => c.id);
+    const caseNameMap = new Map(userCases.map((c) => [c.id, c.name]));
+
+    let allCards = await db
+      .select()
+      .from(cards)
+      .where(inArray(cards.displayCaseId, caseIds));
+
+    if (filters.query) {
+      const q = filters.query.toLowerCase();
+      allCards = allCards.filter(
+        (c) =>
+          c.title.toLowerCase().includes(q) ||
+          (c.set && c.set.toLowerCase().includes(q))
+      );
+    }
+
+    if (filters.set) {
+      allCards = allCards.filter(
+        (c) => c.set && c.set.toLowerCase().includes(filters.set!.toLowerCase())
+      );
+    }
+
+    if (filters.year) {
+      allCards = allCards.filter((c) => c.year === filters.year);
+    }
+
+    if (filters.grade) {
+      allCards = allCards.filter(
+        (c) => c.grade && c.grade.toLowerCase().includes(filters.grade!.toLowerCase())
+      );
+    }
+
+    return allCards.map((c) => ({
+      ...c,
+      displayCaseName: caseNameMap.get(c.displayCaseId) || "",
+      displayCaseId: c.displayCaseId,
+    }));
   }
 }
 
