@@ -116,6 +116,14 @@ export function CardDetailModal({
                 </div>
               )}
 
+              {card.variation && (
+                <div className="flex items-center gap-2 text-sm">
+                  <FileText className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-muted-foreground">Variation:</span>
+                  <Badge variant="outline" data-testid="badge-card-variation">{card.variation}</Badge>
+                </div>
+              )}
+
               {card.grade && (
                 <div className="flex items-center gap-2 text-sm">
                   <Award className="w-4 h-4 text-muted-foreground" />

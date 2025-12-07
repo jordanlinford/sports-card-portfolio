@@ -86,6 +86,7 @@ const addCardSchema = z.object({
   title: z.string().min(1, "Title is required").max(255, "Title is too long"),
   set: z.string().max(255).optional(),
   year: z.coerce.number().min(1800).max(new Date().getFullYear() + 1).optional().or(z.literal("")),
+  variation: z.string().max(255).optional(),
   grade: z.string().max(50).optional(),
   purchasePrice: z.coerce.number().min(0).optional().or(z.literal("")),
   estimatedValue: z.coerce.number().min(0).optional().or(z.literal("")),
@@ -192,6 +193,7 @@ export default function CaseEdit() {
       title: "",
       set: "",
       year: "",
+      variation: "",
       grade: "",
       purchasePrice: "",
       estimatedValue: "",
@@ -745,6 +747,24 @@ export default function CaseEdit() {
                           )}
                         />
                       </div>
+
+                      <FormField
+                        control={cardForm.control}
+                        name="variation"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Variation (optional)</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="Cracked Ice 1/10"
+                                {...field}
+                                data-testid="input-card-variation"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
                       <div className="grid grid-cols-3 gap-4">
                         <FormField
