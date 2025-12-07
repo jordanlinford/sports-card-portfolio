@@ -67,14 +67,21 @@ async function upsertUser(claims: any) {
   });
 }
 
-function getCanonicalDomain(): string {
+function getCanonicalDomain(requestHostname: string): string {
+  // In production, REPLIT_DEPLOYMENT_DOMAIN contains the .replit.app domain
+  if (process.env.REPLIT_DEPLOYMENT_DOMAIN) {
+    return process.env.REPLIT_DEPLOYMENT_DOMAIN;
+  }
+  // In development, use REPLIT_DEV_DOMAIN
   if (process.env.REPLIT_DEV_DOMAIN) {
     return process.env.REPLIT_DEV_DOMAIN;
   }
+  // Fallback to REPLIT_DOMAINS
   if (process.env.REPLIT_DOMAINS) {
     return process.env.REPLIT_DOMAINS.split(',')[0];
   }
-  return "";
+  // Last resort - use request hostname
+  return requestHostname;
 }
 
 export async function setupAuth(app: Express) {
@@ -84,7 +91,6 @@ export async function setupAuth(app: Express) {
   app.use(passport.session());
 
   const config = await getOidcConfig();
-  const canonicalDomain = getCanonicalDomain();
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
@@ -120,7 +126,9 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     const originalHost = req.hostname;
-    const authDomain = canonicalDomain || req.hostname;
+    const authDomain = getCanonicalDomain(req.hostname);
+    
+    console.log(`Login: originalHost=${originalHost}, authDomain=${authDomain}`);
     
     req.session.returnToHost = originalHost;
     req.session.save((err) => {
@@ -136,8 +144,10 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
-    const authDomain = canonicalDomain || req.hostname;
+    const authDomain = getCanonicalDomain(req.hostname);
     const returnToHost = req.session?.returnToHost || req.hostname;
+    
+    console.log(`Callback: authDomain=${authDomain}, returnToHost=${returnToHost}`);
     
     ensureStrategy(authDomain);
     passport.authenticate(`replitauth:${authDomain}`, (err: any, user: any, info: any) => {

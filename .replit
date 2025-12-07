@@ -31,6 +31,10 @@ localPort = 39277
 externalPort = 3003
 
 [[ports]]
+localPort = 46101
+externalPort = 5000
+
+[[ports]]
 localPort = 46729
 externalPort = 3002
 
@@ -60,3 +64,8 @@ waitForPort = 5000
 
 [agent]
 integrations = ["javascript_database:1.0.0", "javascript_object_storage:1.0.0", "javascript_log_in_with_replit:1.0.0", "stripe:2.0.0"]
+
+[userenv]
+
+[userenv.production]
+REPLIT_DEPLOYMENT_DOMAIN = "sports-card-analyze--jordanlinford.replit.app"
