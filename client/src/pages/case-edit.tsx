@@ -640,7 +640,7 @@ export default function CaseEdit() {
                     Add Card
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Add New Card</DialogTitle>
                     <DialogDescription>
@@ -648,7 +648,8 @@ export default function CaseEdit() {
                     </DialogDescription>
                   </DialogHeader>
                   <Form {...cardForm}>
-                    <form onSubmit={cardForm.handleSubmit(handleAddCard)} className="space-y-4">
+                    <form onSubmit={cardForm.handleSubmit(handleAddCard)} className="flex flex-col flex-1 overflow-hidden">
+                      <div className="flex-1 overflow-y-auto space-y-4 pr-1">
                       <div className="space-y-2">
                         <FormLabel>Card Image</FormLabel>
                         <div className="border-2 border-dashed rounded-lg p-4 text-center">
@@ -804,8 +805,9 @@ export default function CaseEdit() {
                           )}
                         />
                       </div>
+                      </div>
 
-                      <DialogFooter>
+                      <DialogFooter className="mt-4">
                         <Button
                           type="button"
                           variant="outline"
