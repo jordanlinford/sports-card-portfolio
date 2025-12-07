@@ -8,6 +8,12 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
+declare module 'express-session' {
+  interface SessionData {
+    returnToHost?: string;
+  }
+}
+
 const getOidcConfig = memoize(
   async () => {
     return await client.discovery(
@@ -31,10 +37,11 @@ export function getSession() {
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
     resave: false,
-    saveUninitialized: false,
+    saveUninitialized: true,
     cookie: {
       httpOnly: true,
       secure: true,
+      sameSite: "none",
       maxAge: sessionTtl,
     },
   });
@@ -60,6 +67,16 @@ async function upsertUser(claims: any) {
   });
 }
 
+function getCanonicalDomain(): string {
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    return process.env.REPLIT_DEV_DOMAIN;
+  }
+  if (process.env.REPLIT_DOMAINS) {
+    return process.env.REPLIT_DOMAINS.split(',')[0];
+  }
+  return "";
+}
+
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
@@ -67,6 +84,7 @@ export async function setupAuth(app: Express) {
   app.use(passport.session());
 
   const config = await getOidcConfig();
+  const canonicalDomain = getCanonicalDomain();
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
@@ -101,18 +119,50 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    const originalHost = req.hostname;
+    const authDomain = canonicalDomain || req.hostname;
+    
+    req.session.returnToHost = originalHost;
+    req.session.save((err) => {
+      if (err) {
+        console.error("Session save error:", err);
+      }
+      ensureStrategy(authDomain);
+      passport.authenticate(`replitauth:${authDomain}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    });
   });
 
   app.get("/api/callback", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+    const authDomain = canonicalDomain || req.hostname;
+    const returnToHost = req.session?.returnToHost || req.hostname;
+    
+    ensureStrategy(authDomain);
+    passport.authenticate(`replitauth:${authDomain}`, (err: any, user: any, info: any) => {
+      if (err) {
+        console.error("Auth error:", err);
+        return res.redirect("/api/login");
+      }
+      if (!user) {
+        console.error("No user from auth:", info);
+        return res.redirect("/api/login");
+      }
+      
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("Login error:", loginErr);
+          return res.redirect("/api/login");
+        }
+        
+        delete req.session.returnToHost;
+        
+        if (returnToHost !== req.hostname && returnToHost !== authDomain) {
+          return res.redirect(`https://${returnToHost}/`);
+        }
+        return res.redirect("/");
+      });
     })(req, res, next);
   });
 
