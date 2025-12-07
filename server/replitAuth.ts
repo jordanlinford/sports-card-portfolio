@@ -80,6 +80,14 @@ export async function setupAuth(app: Express) {
 
   const registeredStrategies = new Set<string>();
 
+  // Fix hostname - preview pane uses .repl.co but OIDC requires .replit.dev
+  const normalizeHostname = (hostname: string): string => {
+    if (hostname.endsWith('.repl.co')) {
+      return hostname.replace('.repl.co', '.replit.dev');
+    }
+    return hostname;
+  };
+
   const ensureStrategy = (domain: string) => {
     const strategyName = `replitauth:${domain}`;
     if (!registeredStrategies.has(strategyName)) {
@@ -101,17 +109,18 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    console.log("Login request - hostname:", req.hostname, "host header:", req.get("host"), "x-forwarded-host:", req.get("x-forwarded-host"));
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    const domain = normalizeHostname(req.hostname);
+    ensureStrategy(domain);
+    passport.authenticate(`replitauth:${domain}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    const domain = normalizeHostname(req.hostname);
+    ensureStrategy(domain);
+    passport.authenticate(`replitauth:${domain}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
