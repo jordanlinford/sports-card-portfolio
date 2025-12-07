@@ -101,6 +101,7 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    console.log("Login request - hostname:", req.hostname, "host header:", req.get("host"), "x-forwarded-host:", req.get("x-forwarded-host"));
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
