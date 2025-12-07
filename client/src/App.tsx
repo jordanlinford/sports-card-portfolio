@@ -24,6 +24,7 @@ function Router() {
       {isLoading || !isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
+          <Route path="/case/:id" component={CaseView} />
           <Route path="/cases/:id" component={CaseView} />
         </>
       ) : (
@@ -32,6 +33,7 @@ function Router() {
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />
+          <Route path="/case/:id" component={CaseView} />
           <Route path="/cases/:id" component={CaseView} />
           <Route path="/upgrade" component={Upgrade} />
           <Route path="/billing/success" component={BillingSuccess} />
