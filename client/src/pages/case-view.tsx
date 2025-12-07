@@ -9,7 +9,8 @@ import {
   ArrowLeft,
   Calendar,
   ImageIcon,
-  Lock
+  Lock,
+  DollarSign
 } from "lucide-react";
 import type { DisplayCaseWithCards, Card, User } from "@shared/schema";
 import { format } from "date-fns";
@@ -106,6 +107,7 @@ export default function CaseView() {
   }
 
   const cardCount = displayCase.cards?.length || 0;
+  const totalValue = displayCase.cards?.reduce((sum, card) => sum + (card.estimatedValue || 0), 0) || 0;
 
   return (
     <div className="min-h-screen">
@@ -125,6 +127,22 @@ export default function CaseView() {
                 <p className="text-muted-foreground text-lg max-w-2xl" data-testid="text-case-description">
                   {displayCase.description}
                 </p>
+              )}
+              {(displayCase.showCardCount || displayCase.showTotalValue) && (
+                <div className="flex items-center gap-4 mt-3 flex-wrap">
+                  {displayCase.showCardCount && (
+                    <Badge variant="secondary" className="text-sm gap-1.5 px-3 py-1">
+                      <ImageIcon className="h-4 w-4" />
+                      {cardCount} {cardCount === 1 ? "Card" : "Cards"}
+                    </Badge>
+                  )}
+                  {displayCase.showTotalValue && totalValue > 0 && (
+                    <Badge variant="secondary" className="text-sm gap-1.5 px-3 py-1">
+                      <DollarSign className="h-4 w-4" />
+                      ${totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Est. Value
+                    </Badge>
+                  )}
+                </div>
               )}
               <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">

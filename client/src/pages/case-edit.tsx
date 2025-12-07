@@ -78,6 +78,8 @@ const updateCaseSchema = z.object({
   description: z.string().max(1000, "Description is too long").optional(),
   isPublic: z.boolean(),
   theme: z.string().optional(),
+  showCardCount: z.boolean(),
+  showTotalValue: z.boolean(),
 });
 
 const addCardSchema = z.object({
@@ -179,6 +181,8 @@ export default function CaseEdit() {
       description: "",
       isPublic: true,
       theme: "classic",
+      showCardCount: false,
+      showTotalValue: false,
     },
   });
 
@@ -201,6 +205,8 @@ export default function CaseEdit() {
         description: displayCase.description || "",
         isPublic: displayCase.isPublic,
         theme: displayCase.theme || "classic",
+        showCardCount: displayCase.showCardCount ?? false,
+        showTotalValue: displayCase.showTotalValue ?? false,
       });
     }
   }, [displayCase, form]);
@@ -548,6 +554,61 @@ export default function CaseEdit() {
                     </FormItem>
                   )}
                 />
+
+                <Separator />
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium mb-1">Display Stats</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Show collection statistics as a sub-header below the title
+                    </p>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="showCardCount"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Show Card Count</FormLabel>
+                          <FormDescription>
+                            Display total number of cards in the collection
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-show-card-count"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="showTotalValue"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base">Show Total Value</FormLabel>
+                          <FormDescription>
+                            Display estimated total value of the collection
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-show-total-value"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <Button
                   type="submit"
