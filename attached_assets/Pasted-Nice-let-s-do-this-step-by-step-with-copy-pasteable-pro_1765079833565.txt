@@ -1,0 +1,332 @@
+Nice, let’s do this step-by-step with copy-pasteable prompts you can feed into Replit’s “What do you want to build?” / Ghostwriter chat.
+
+I’ll assume:
+
+New Repl name: mydisplaycase
+
+Stack: Node.js + Express + EJS + Prisma (SQLite) + Stripe
+
+Goal: MVP with auth, display cases, cards with images, simple paywall
+
+You’ll go in order:
+
+Paste Prompt 1 into “What do you want to build?”
+
+Once that’s done, open the Replit AI/chat again and paste Prompt 2, etc.
+
+🔹 Prompt 1 – Initial project setup
+
+Use this when Replit asks “What do you want to build?” in the new Repl:
+
+I want to build a Node.js web app called “mydisplaycase.com”. It should use:
+
+Express for the HTTP server
+
+EJS for server-side templates
+
+express-session for auth sessions
+
+bcryptjs for password hashing
+
+Prisma with SQLite for the database
+
+Multer for image uploads
+
+Please:
+
+Initialize package.json.
+
+Install dependencies: express, ejs, express-session, bcryptjs, body-parser, multer, @prisma/client, stripe and dev dependency prisma.
+
+Create a basic Express app in index.js that:
+
+sets the view engine to EJS
+
+serves static files from /public
+
+uses body-parser for urlencoded forms
+
+uses express-session with a SESSION_SECRET env variable
+
+has a simple GET / route that renders an index.ejs view.
+
+Create a views/layout.ejs and views/index.ejs using a minimal HTML5 layout with a header that says “MyDisplayCase” and a placeholder button that says “Get Started”.
+
+Create a public/styles.css file and link it in the layout, with some simple neutral styling (centered container, max-width, readable fonts).
+
+After it runs, make sure:
+
+index.js exists and starts the server.
+
+You see a basic landing page at /.
+
+🔹 Prompt 2 – Set up Prisma + database schema
+
+Once Prompt 1 is done, open the Replit AI/chat again and paste:
+
+Now set up Prisma with SQLite for this project.
+
+Initialize Prisma with npx prisma init --datasource-provider sqlite.
+
+In prisma/schema.prisma, define three models: User, DisplayCase, and Card:
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id                 Int           @id @default(autoincrement())
+  email              String        @unique
+  passwordHash       String
+  stripeCustomerId   String?
+  subscriptionStatus String        @default("FREE") // FREE or PRO
+  displayCases       DisplayCase[]
+  createdAt          DateTime      @default(now())
+}
+
+model DisplayCase {
+  id           Int      @id @default(autoincrement())
+  user         User     @relation(fields: [userId], references: [id])
+  userId       Int
+  name         String
+  description  String?
+  isPublic     Boolean  @default(true)
+  cards        Card[]
+  createdAt    DateTime @default(now())
+}
+
+model Card {
+  id             Int          @id @default(autoincrement())
+  displayCase    DisplayCase  @relation(fields: [displayCaseId], references: [id])
+  displayCaseId  Int
+  title          String
+  imagePath      String
+  set            String?
+  year           Int?
+  grade          String?
+  purchasePrice  Float?
+  estimatedValue Float?
+  sortOrder      Int          @default(0)
+}
+
+
+Run the migration (npx prisma migrate dev --name init) and generate the client (npx prisma generate).
+
+In index.js, import PrismaClient from @prisma/client, create a prisma instance, and make sure it’s available for routes.
+
+🔹 Prompt 3 – Add auth (signup / login / logout)
+
+After Prisma is wired up, ask Replit:
+
+Now add basic authentication with email + password.
+
+Install bcryptjs if it’s not installed.
+
+In index.js, import bcryptjs.
+
+Create routes and views for:
+
+GET /signup → renders signup.ejs with a form for email + password.
+
+POST /signup → hashes the password with bcrypt, creates a User via Prisma, stores { id, email, subscriptionStatus } in req.session.user, then redirects to /dashboard. If the email is taken, re-render signup with an error.
+
+GET /login → renders login.ejs with a form for email + password.
+
+POST /login → checks the user, compares password with bcrypt, on success sets req.session.user and redirects to /dashboard; on failure re-render with an error.
+
+POST /logout → destroys the session and redirects to /.
+
+Create a requireAuth middleware that checks req.session.user and redirects to /login if not logged in.
+
+Update layout.ejs so it shows:
+
+“Login / Signup” links when no user is logged in
+
+“Dashboard / Logout” when a user is logged in.
+
+🔹 Prompt 4 – Dashboard + DisplayCase CRUD (no cards yet)
+
+Now get the core “case” management in place:
+
+Add DisplayCase routes and views.
+
+Add a GET /dashboard route (protected by requireAuth) that:
+
+loads all DisplayCase records for req.session.user.id ordered by createdAt DESC
+
+renders dashboard.ejs showing a list of cases with name, created date, and links: “View”, “Edit”.
+
+Add:
+
+GET /cases/new (requireAuth) → renders case_new.ejs with fields: name, description, isPublic checkbox.
+
+POST /cases (requireAuth) → creates a DisplayCase for the current user with those fields. After creation, redirect to /cases/:id/edit.
+
+Add:
+
+GET /cases/:id/edit (requireAuth) → ensure the case belongs to the logged-in user, then render case_edit.ejs. For now just show the case name, description, public toggle, and an empty section where cards will later go.
+
+Add:
+
+GET /cases/:id (public) → fetch the DisplayCase by id, include its cards array, check isPublic === true; if not public or not found, return 404. Render case_show.ejs that will eventually be the public display case view (for now just show name + description + “no cards yet”).
+
+In dashboard.ejs, add:
+
+A button “Create new display case” linking to /cases/new.
+
+For each case row: link to /cases/:id (“View public page”) and /cases/:id/edit (“Edit”).
+
+🔹 Prompt 5 – Set up Multer for card image uploads
+
+Now get image uploads working.
+
+Add card creation with image upload using Multer.
+
+Install Multer if not already installed.
+
+In index.js, set up an /uploads folder:
+
+Import path and fs.
+
+Ensure a directory called uploads exists (create if missing).
+
+Serve it statically using app.use("/uploads", express.static(uploadDir));.
+
+Configure Multer disk storage:
+
+destination: uploads folder
+
+filename: use timestamp + random string + original extension
+
+In case_edit.ejs, add a form to create a new Card:
+
+method POST to /cases/:id/cards
+
+enctype="multipart/form-data"
+
+fields: cardImage (file), title, set, year, grade, purchasePrice, estimatedValue
+
+Add POST /cases/:id/cards (requireAuth) route that:
+
+verifies the DisplayCase belongs to the logged-in user
+
+uses upload.single("cardImage")
+
+builds imagePath as /uploads/<filename>
+
+finds the max sortOrder for that DisplayCase
+
+creates a Card with the submitted fields and sortOrder = max + 1
+
+redirects back to /cases/:id/edit.
+
+In case_edit.ejs, below the form, list existing cards in that case (title + small thumbnail using the imagePath).
+
+🔹 Prompt 6 – Beautiful public display case view
+
+Now make the public page look like an actual digital case.
+
+Improve case_show.ejs to display a nice grid of cards.
+
+In the GET /cases/:id route, ensure cards are loaded ordered by sortOrder ASC.
+
+In case_show.ejs, create a full-width grid layout:
+
+Show the DisplayCase name and description.
+
+Show the total number of cards.
+
+For each card:
+
+render the image
+
+show the title
+
+if estimatedValue is present, show “Est. $X.XX”.
+
+Add some CSS in public/styles.css:
+
+.card-grid as a responsive grid (e.g., auto-fit minmax(200px, 1fr))
+
+.card-tile with a dark background, small shadow, rounded corners
+
+images to be width: 100%; object-fit: contain;
+
+Make sure the public page looks good on mobile: padding, margin, and readable text.
+
+🔹 Prompt 7 – Implement free vs Pro limit (no Stripe yet)
+
+Before Stripe, enforce a simple free-tier limit.
+
+Add a basic free vs Pro limit on number of DisplayCases.
+
+In the POST /cases route, before creating a new case:
+
+Load the current user from Prisma including displayCases.
+
+If user.subscriptionStatus === "FREE" and displayCases.length >= 3, then:
+
+Do not create the case.
+
+Redirect to /upgrade.
+
+Add GET /upgrade (requireAuth) that renders upgrade.ejs, explaining:
+
+Free: up to 3 display cases.
+
+Pro ($12/mo): unlimited cases.
+
+A button “Upgrade to Pro”.
+
+In layout.ejs, add a small badge or text in the header showing the user’s current plan: FREE or PRO (for logged-in users).
+
+You can test hitting the limit by creating 3 cases and trying to add a 4th.
+
+🔹 Prompt 8 – Stripe checkout for upgrading to Pro
+
+Finally, wire payments.
+
+Integrate Stripe Checkout for upgrading to Pro.
+
+Make sure stripe is imported and configured in index.js using process.env.STRIPE_SECRET_KEY.
+
+Use an env variable STRIPE_PRICE_ID for the monthly subscription price.
+
+Add a POST /create-checkout-session (requireAuth) route that:
+
+Creates a Stripe Checkout Session in subscription mode.
+
+Uses the logged-in user’s email as customer_email.
+
+Uses STRIPE_PRICE_ID for the line item.
+
+Sets:
+
+success_url to ${process.env.BASE_URL}/billing/success?session_id={CHECKOUT_SESSION_ID}
+
+cancel_url to ${process.env.BASE_URL}/upgrade
+
+Redirects to session.url.
+
+In upgrade.ejs, add a form with method POST to /create-checkout-session and a submit button “Upgrade with Stripe”.
+
+Add GET /billing/success (requireAuth) route that:
+
+Uses the session_id from the query string.
+
+Fetches the Checkout Session from Stripe.
+
+Verifies the customer_details.email matches the logged-in user’s email.
+
+Updates the User’s subscriptionStatus to PRO and sets stripeCustomerId.
+
+Updates req.session.user.subscriptionStatus to PRO.
+
+Renders billing_success.ejs saying “You are now Pro! Unlimited display cases unlocked.”
+
+You can skip webhooks for now; use this success handler as the MVP.

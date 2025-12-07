@@ -1,0 +1,229 @@
+mydisplaycase.com
+
+A simple, beautiful way to create digital display cases for your card collection.
+
+Here’s how we organize it as a real software project with:
+
+folders
+
+phases
+
+naming
+
+structure
+
+deployment path
+
+a clean foundation you can manage easily
+
+This will give you clarity and help you avoid the chaos that happened with Club & Cover.
+
+⭐ PROJECT BLUEPRINT
+
+Project Name: mydisplaycase.com
+Working Folder (Replit): mydisplaycase
+Domain: mydisplaycase.com
+Stack: Node.js + Express + Prisma + EJS + Stripe
+
+⭐ RECOMMENDED PROJECT DIRECTORY STRUCTURE
+
+In your Replit for mydisplaycase, set up:
+
+mydisplaycase/
+│
+├── index.js               # main server entry
+├── package.json
+├── prisma/
+│   ├── schema.prisma      # DB models
+│   └── migrations/
+│
+├── views/                 # EJS templates
+│   ├── layout.ejs
+│   ├── index.ejs
+│   ├── signup.ejs
+│   ├── login.ejs
+│   ├── dashboard.ejs
+│   ├── case_new.ejs
+│   ├── case_edit.ejs
+│   ├── case_show.ejs
+│   ├── upgrade.ejs
+│   ├── billing_success.ejs
+│
+├── public/                # static assets
+│   ├── styles.css
+│   └── logo.png
+│
+├── uploads/               # card image uploads (gitignored)
+│
+└── README.md              # project overview
+
+
+You can copy/paste this folder structure into Replit.
+
+⭐ PROJECT SETUP IN REPLIT (CLEAN VERSION)
+1. Create a new Repl
+
+Click Create → Node.js
+
+Name it: mydisplaycase
+
+This becomes your clean workspace.
+
+2. Install dependencies (clean list)
+
+In Replit shell:
+
+npm init -y
+
+npm install express ejs express-session bcryptjs body-parser multer
+npm install @prisma/client
+npm install -D prisma
+
+npm install stripe dotenv
+
+3. Initialize Prisma
+npx prisma init --datasource-provider sqlite
+
+
+This creates:
+
+prisma/
+  schema.prisma
+.env
+
+4. Set Environment Variables (in Replit Secrets)
+
+Add:
+
+SESSION_SECRET
+
+STRIPE_SECRET_KEY
+
+STRIPE_PRICE_ID
+
+BASE_URL → https://mydisplaycase.yourreplusername.repl.co
+
+Don’t worry, when you point your domain, this will update.
+
+⭐ UPDATED PHASE PLAN FOR THIS CLEAN PROJECT
+
+Here’s the building roadmap again — but simplified into steps specific to mydisplaycase.com.
+
+⭐ PHASE 1 — CORE SETUP (Day 1)
+✔ Create project folder structure
+✔ Install dependencies
+✔ Configure Express + EJS + static assets
+✔ Add session middleware
+✔ Create layout.ejs
+✔ Create index.ejs (landing page placeholder)
+⭐ PHASE 2 — DATABASE & AUTH (Day 2–3)
+✔ Add Prisma models (User, DisplayCase, Card)
+✔ Migrate DB
+✔ Build signup logic
+✔ Build login logic
+✔ Build logout
+✔ Add requireAuth middleware
+
+This gets your user system stable.
+
+⭐ PHASE 3 — DISPLAY CASE SYSTEM (Day 3–5)
+✔ Create new case
+✔ Dashboard
+✔ Edit case
+✔ Add card (with image upload)
+✔ Public case view (beautiful grid)
+
+Minimal UI but functional.
+
+⭐ PHASE 4 — PAYMENT PLAN (Day 6–7)
+✔ Free tier (max 3 cases)
+✔ Upgrade page
+✔ Stripe checkout
+✔ Mark user as PRO
+
+Don’t overcomplicate billing. The MVP is:
+
+Free: Up to 3 cases
+Pro: Unlimited ($12/mo)
+
+That's it.
+
+⭐ PHASE 5 — POLISH + VISUAL DESIGN (Day 8)
+✔ Make the display case layout beautiful
+✔ Add background themes (1 or 2)
+✔ Add CSS animations
+✔ Add an example case for logged-out visitors
+
+Collectors will care about your aesthetic.
+
+⭐ PHASE 6 — LANDING PAGE + ONBOARDING (Day 9–10)
+✔ Build sexy landing page (index.ejs)
+✔ “Create a free display case” CTA
+✔ Add screenshots
+✔ Add sample case link
+
+You're basically at launch readiness.
+
+⭐ PHASE 7 — SOFT LAUNCH (Day 10–14)
+✔ Post teaser in card FB groups
+✔ Ask for beta testers (5–10 max)
+✔ Add early feature requests
+✔ Fix bugs and upgrade the grid layout
+
+Your early users will tell you EXACTLY what the next 10 features are.
+
+⭐ PHASE 8 — BUY DOMAIN + ROUTE TO REPLIT
+
+Go to your domain provider:
+
+Buy mydisplaycase.com
+
+Add DNS A record or CNAME (Replit’s settings will tell you exactly what to set)
+
+Then on Replit:
+
+Go to “Deployments → Web Server”
+
+Click “Add Custom Domain”
+
+Enter mydisplaycase.com
+
+And Replit will validate SSL automatically.
+
+⭐ OPTIONAL PHASE 9 — FIRST EXPANSIONS
+
+After launch, consider:
+
+image compression
+
+drag-and-drop card order
+
+export display cases as shareable images/PDF
+
+dark mode themes
+
+AI autofill for titles
+
+But none of this is needed on day one.
+
+⭐ WHAT YOU SHOULD DO NEXT
+
+Tell me which of these steps you want codified into code templates, and I’ll generate:
+
+the complete folder structure
+
+ready-to-paste boilerplate for index.js
+
+Prisma schema
+
+all EJS views starter templates
+
+a CSS starter file
+
+Stripe integration code
+
+upgrade flow
+
+migration scripts
+
+We can literally scaffold the whole project for you message by message.

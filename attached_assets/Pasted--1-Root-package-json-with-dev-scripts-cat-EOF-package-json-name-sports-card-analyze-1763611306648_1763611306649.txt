@@ -1,0 +1,197 @@
+# 1) Root package.json with dev scripts
+cat << 'EOF' > package.json
+{
+  "name": "sports-card-analyzer-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "npm run dev --prefix apps/api",
+    "dev:web": "npm run dev --prefix apps/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
+EOF
+
+# install root dev deps
+npm install
+
+# 2) Backend: Fastify API in apps/api
+mkdir -p apps/api
+
+cat << 'EOF' > apps/api/package.json
+{
+  "name": "sca-api",
+  "version": "1.0.0",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "dev": "node server.mjs"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.0",
+    "fastify": "^5.0.0"
+  }
+}
+EOF
+
+cat << 'EOF' > apps/api/server.mjs
+import Fastify from "fastify";
+import cors from "@fastify/cors";
+
+const server = Fastify({ logger: true });
+
+await server.register(cors, { origin: true });
+
+server.get("/api/health", async () => ({ status: "ok" }));
+
+server.post("/api/market/analyze", async (request, reply) => {
+  const { query } = request.body || {};
+  return {
+    query,
+    card: {
+      player: "Patrick Mahomes",
+      year: 2017,
+      set: "Prizm Silver",
+      grade: "PSA 10"
+    },
+    lastSales: [
+      { date: "2025-11-10", price: 1850 },
+      { date: "2025-11-14", price: 1920 },
+      { date: "2025-11-18", price: 2050 }
+    ],
+    trendScore: 8.7,
+    volatilityScore: 6.2,
+    liquidityScore: 9.1,
+    marketScore: 8.4,
+    recommendation: "Strong Buy",
+    notes: [
+      "Upward trend over last 3 sales",
+      "High liquidity: frequent recent sales",
+      "Moderate volatility: price swings but trending higher"
+    ]
+  };
+});
+
+const start = async () => {
+  try {
+    await server.listen({ port: 3001, host: "0.0.0.0" });
+    console.log("API running on http://localhost:3001");
+  } catch (err) {
+    server.log.error(err);
+    process.exit(1);
+  }
+};
+
+start();
+EOF
+
+# install API deps
+npm install --prefix apps/api
+
+# 3) Frontend: Vite + React in apps/web
+npm create vite@latest apps/web -- --template react
+
+# install web deps
+npm install --prefix apps/web
+
+# 4) Simple frontend that hits the API
+cat << 'EOF' > apps/web/src/App.jsx
+import { useState } from "react";
+
+function App() {
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleAnalyze = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch("http://localhost:3001/api/market/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query })
+      });
+      const data = await res.json();
+      setResult(data);
+    } catch (err) {
+      console.error(err);
+      alert("Error calling API – check console.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#020617", color: "white", display: "flex", justifyContent: "center", padding: "24px" }}>
+      <div style={{ width: "100%", maxWidth: "640px" }}>
+        <h1 style={{ fontSize: "32px", fontWeight: "bold", textAlign: "center", marginBottom: "8px" }}>
+          Sports Card Analyzer
+        </h1>
+        <p style={{ textAlign: "center", marginBottom: "16px", color: "#cbd5f5" }}>
+          Type a card (e.g. "2017 Prizm Silver Patrick Mahomes PSA 10") and get a mock market read.
+        </p>
+
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder='2017 Prizm Silver Patrick Mahomes PSA 10'
+            style={{ flex: 1, padding: "8px 10px", borderRadius: "12px", border: "1px solid #1e293b", background: "#020617", color: "white" }}
+          />
+          <button
+            onClick={handleAnalyze}
+            disabled={loading || !query}
+            style={{
+              padding: "8px 16px",
+              borderRadius: "12px",
+              border: "none",
+              background: loading || !query ? "#475569" : "#22c55e",
+              color: "black",
+              cursor: loading || !query ? "not-allowed" : "pointer"
+            }}
+          >
+            {loading ? "Analyzing..." : "Analyze"}
+          </button>
+        </div>
+
+        {result && (
+          <div style={{ borderRadius: "16px", border: "1px solid #1e293b", padding: "16px", marginTop: "16px" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: "600", marginBottom: "8px" }}>
+              {result.card.year} {result.card.set} {result.card.player} {result.card.grade}
+            </h2>
+            <p style={{ marginBottom: "8px" }}>
+              Market Score: <strong>{result.marketScore.toFixed(1)}/10</strong> – {result.recommendation}
+            </p>
+            <div style={{ marginBottom: "8px" }}>
+              <h3 style={{ fontWeight: "500" }}>Last 3 Sales</h3>
+              <ul style={{ fontSize: "14px", color: "#cbd5f5" }}>
+                {result.lastSales.map((s, i) => (
+                  <li key={i}>
+                    {s.date}: ${s.price}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3 style={{ fontWeight: "500" }}>Notes</h3>
+              <ul style={{ fontSize: "14px", color: "#cbd5f5" }}>
+                {result.notes.map((n, i) => (
+                  <li key={i}>{n}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default App;
+EOF
+
+echo "✅ Setup complete. Run: npm run dev"
