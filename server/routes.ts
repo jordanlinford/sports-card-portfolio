@@ -5,16 +5,9 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { insertDisplayCaseSchema, insertCardSchema } from "@shared/schema";
-import Stripe from "stripe";
-import fs from "fs";
-import path from "path";
-
-let stripe: Stripe | null = null;
-if (process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2025-11-17.clover",
-  });
-}
+import { runMigrations } from "stripe-replit-sync";
+import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
+import { WebhookHandlers } from "./webhookHandlers";
 
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
@@ -32,9 +25,75 @@ function isSocialCrawler(userAgent: string): boolean {
   return SOCIAL_CRAWLERS.some(crawler => userAgent.includes(crawler));
 }
 
+async function initStripe(app: Express) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.log('DATABASE_URL not found, skipping Stripe initialization');
+    return;
+  }
+
+  try {
+    console.log('Initializing Stripe schema...');
+    await runMigrations({ databaseUrl });
+    console.log('Stripe schema ready');
+
+    const stripeSync = await getStripeSync();
+
+    console.log('Setting up managed webhook...');
+    const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
+    if (replitDomains) {
+      const webhookBaseUrl = `https://${replitDomains}`;
+      const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
+        `${webhookBaseUrl}/api/stripe/webhook`,
+        {
+          enabled_events: ['*'],
+          description: 'Managed webhook for MyDisplayCase subscription sync',
+        }
+      );
+      console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
+    }
+
+    console.log('Syncing Stripe data in background...');
+    stripeSync.syncBackfill()
+      .then(() => console.log('Stripe data synced'))
+      .catch((err: Error) => console.error('Error syncing Stripe data:', err));
+  } catch (error) {
+    console.error('Failed to initialize Stripe:', error);
+  }
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
   // Auth middleware
   await setupAuth(app);
+
+  // Initialize Stripe webhooks and sync
+  await initStripe(app);
+
+  // Stripe webhook endpoint - uses rawBody captured in index.ts
+  app.post("/api/stripe/webhook/:uuid", async (req: any, res) => {
+    const signature = req.headers['stripe-signature'];
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature' });
+    }
+
+    try {
+      const sig = Array.isArray(signature) ? signature[0] : signature;
+      const { uuid } = req.params;
+      
+      // Use rawBody captured by express.json verify option
+      const payload = req.rawBody as Buffer;
+      if (!payload) {
+        console.error('STRIPE WEBHOOK ERROR: rawBody not found');
+        return res.status(500).json({ error: 'Webhook processing error' });
+      }
+
+      await WebhookHandlers.processWebhook(payload, sig, uuid);
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error('Webhook error:', error.message);
+      res.status(400).json({ error: 'Webhook processing error' });
+    }
+  });
 
   // Open Graph meta tags for social sharing of public display cases
   app.get("/case/:id", async (req, res, next) => {
@@ -458,15 +517,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(404).json({ message: "User not found" });
       }
 
-      if (!stripe || !process.env.STRIPE_PRICE_ID) {
-        return res.status(500).json({ message: "Stripe not configured. Please add STRIPE_SECRET_KEY and STRIPE_PRICE_ID." });
+      if (!process.env.STRIPE_PRICE_ID) {
+        return res.status(500).json({ message: "Stripe price not configured. Please add STRIPE_PRICE_ID." });
       }
 
+      const stripe = await getUncachableStripeClient();
       const baseUrl = process.env.BASE_URL || `https://${req.hostname}`;
+
+      // Create or retrieve customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email || undefined,
+          metadata: { userId },
+        });
+        customerId = customer.id;
+        await storage.updateUserSubscription(userId, user.subscriptionStatus, customerId);
+      }
 
       const session = await stripe.checkout.sessions.create({
         mode: "subscription",
-        customer_email: user.email || undefined,
+        customer: customerId,
         line_items: [
           {
             price: process.env.STRIPE_PRICE_ID,
@@ -496,10 +567,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(400).json({ success: false, message: "Session ID required" });
       }
 
-      if (!stripe) {
-        return res.status(500).json({ success: false, message: "Stripe not configured" });
-      }
-
+      const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       
       if (!session || session.payment_status !== "paid") {
@@ -512,7 +580,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
         return res.status(403).json({ success: false, message: "Session does not belong to user" });
       }
 
-      // Update user subscription
+      // Update user subscription (webhooks will also handle this but we do it immediately for UX)
       await storage.updateUserSubscription(
         userId,
         "PRO",
