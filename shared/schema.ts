@@ -86,6 +86,45 @@ export const cardsRelations = relations(cards, ({ one }) => ({
   }),
 }));
 
+// Comments table
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  displayCaseId: integer("display_case_id").notNull().references(() => displayCases.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+  displayCase: one(displayCases, {
+    fields: [comments.displayCaseId],
+    references: [displayCases.id],
+  }),
+  user: one(users, {
+    fields: [comments.userId],
+    references: [users.id],
+  }),
+}));
+
+// Likes table
+export const likes = pgTable("likes", {
+  id: serial("id").primaryKey(),
+  displayCaseId: integer("display_case_id").notNull().references(() => displayCases.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const likesRelations = relations(likes, ({ one }) => ({
+  displayCase: one(displayCases, {
+    fields: [likes.displayCaseId],
+    references: [displayCases.id],
+  }),
+  user: one(users, {
+    fields: [likes.userId],
+    references: [users.id],
+  }),
+}));
+
 // Schemas and Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -108,6 +147,17 @@ export const insertCardSchema = createInsertSchema(cards).omit({
 export type InsertCard = z.infer<typeof insertCardSchema>;
 export type Card = typeof cards.$inferSelect;
 
+export const insertCommentSchema = createInsertSchema(comments).omit({
+  id: true,
+  userId: true,
+  createdAt: true,
+});
+export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type Comment = typeof comments.$inferSelect;
+
+export type Like = typeof likes.$inferSelect;
+
 // Extended types with relations
 export type DisplayCaseWithCards = DisplayCase & { cards: Card[] };
 export type DisplayCaseWithUser = DisplayCase & { user: User };
+export type CommentWithUser = Comment & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> };
