@@ -115,37 +115,96 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       }
 
       const cardCount = displayCase.cards?.length || 0;
-      const firstCard = displayCase.cards?.[0];
-      const baseUrl = `https://${req.headers.host}`;
-      const imageUrl = firstCard?.imagePath 
-        ? `${baseUrl}${firstCard.imagePath}`
-        : `${baseUrl}/favicon.png`;
+      const cards = displayCase.cards || [];
       
-      const description = displayCase.description || `A collection of ${cardCount} cards`;
-      const title = `${displayCase.name} - MyDisplayCase`;
+      // Use production domain for consistent URLs
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
+        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
+        : `https://${req.headers.host}`;
+      
+      // Find the best card image (prefer graded cards or first card)
+      const sortedCards = [...cards].sort((a, b) => {
+        if (a.grade && !b.grade) return -1;
+        if (!a.grade && b.grade) return 1;
+        return 0;
+      });
+      const bestCard = sortedCards[0];
+      
+      // Build image URL - use card image or fallback
+      const imageUrl = bestCard?.imagePath 
+        ? `${baseUrl}${bestCard.imagePath}`
+        : `${baseUrl}/og-default.png`;
+      
+      // Get owner info for better description
+      const owner = await storage.getUser(displayCase.userId);
+      const ownerName = owner?.firstName 
+        ? `${owner.firstName}${owner.lastName ? ' ' + owner.lastName : ''}`
+        : 'A collector';
+      
+      // Calculate total value if cards have prices
+      const totalValue = cards.reduce((sum, card) => {
+        const price = card.estimatedValue || card.purchasePrice || 0;
+        return sum + Number(price);
+      }, 0);
+      
+      // Build compelling description
+      let description = displayCase.description || '';
+      if (!description) {
+        const valueText = totalValue > 0 ? ` worth $${totalValue.toLocaleString()}` : '';
+        const cardTypes = cards.slice(0, 3).map(c => c.title).filter(Boolean).join(', ');
+        description = `${ownerName}'s collection of ${cardCount} card${cardCount !== 1 ? 's' : ''}${valueText}. ${cardTypes ? `Featuring: ${cardTypes}` : 'View this amazing collection!'}`;
+      }
+      
+      // Truncate description to 160 chars for optimal preview
+      if (description.length > 160) {
+        description = description.substring(0, 157) + '...';
+      }
+      
+      // Build compelling title
+      const title = displayCase.name;
+      const fullTitle = `${title} | ${cardCount} Cards | MyDisplayCase`;
+      
+      // Alt text for image
+      const imageAlt = bestCard?.title 
+        ? `${bestCard.title} from ${displayCase.name}`
+        : `Card collection: ${displayCase.name}`;
 
       const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
+  <title>${fullTitle}</title>
   <meta name="description" content="${description}">
-  <meta property="og:title" content="${title}">
-  <meta property="og:description" content="${description}">
+  
+  <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:url" content="${baseUrl}/case/${id}">
+  <meta property="og:title" content="${fullTitle}">
+  <meta property="og:description" content="${description}">
   <meta property="og:image" content="${imageUrl}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="${imageAlt}">
   <meta property="og:site_name" content="MyDisplayCase">
+  <meta property="og:locale" content="en_US">
+  
+  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:url" content="${baseUrl}/case/${id}">
+  <meta name="twitter:title" content="${fullTitle}">
   <meta name="twitter:description" content="${description}">
   <meta name="twitter:image" content="${imageUrl}">
+  <meta name="twitter:image:alt" content="${imageAlt}">
+  
+  <!-- Additional SEO -->
+  <link rel="canonical" href="${baseUrl}/case/${id}">
 </head>
 <body>
   <h1>${displayCase.name}</h1>
   <p>${description}</p>
   <p>${cardCount} cards in this collection</p>
+  <p>View this collection at <a href="${baseUrl}/case/${id}">${baseUrl}/case/${id}</a></p>
 </body>
 </html>`;
 
