@@ -2,6 +2,8 @@ import {
   users,
   displayCases,
   cards,
+  comments,
+  likes,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -9,9 +11,13 @@ import {
   type Card,
   type InsertCard,
   type DisplayCaseWithCards,
+  type Comment,
+  type InsertComment,
+  type CommentWithUser,
+  type Like,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, or, ilike, inArray } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, inArray, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -36,6 +42,16 @@ export interface IStorage {
   updateCard(id: number, data: Partial<InsertCard>): Promise<Card | undefined>;
   deleteCard(id: number): Promise<void>;
   getMaxSortOrder(displayCaseId: number): Promise<number>;
+
+  // Comment operations
+  getComments(displayCaseId: number): Promise<CommentWithUser[]>;
+  createComment(displayCaseId: number, userId: string, content: string): Promise<Comment>;
+  deleteComment(id: number, userId: string): Promise<void>;
+
+  // Like operations
+  getLikeCount(displayCaseId: number): Promise<number>;
+  hasUserLiked(displayCaseId: number, userId: string): Promise<boolean>;
+  toggleLike(displayCaseId: number, userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -293,6 +309,86 @@ export class DatabaseStorage implements IStorage {
       displayCaseName: caseNameMap.get(c.displayCaseId) || "",
       displayCaseId: c.displayCaseId,
     }));
+  }
+
+  // Comment operations
+  async getComments(displayCaseId: number): Promise<CommentWithUser[]> {
+    const commentsData = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.displayCaseId, displayCaseId))
+      .orderBy(desc(comments.createdAt));
+
+    const commentsWithUsers: CommentWithUser[] = [];
+    for (const comment of commentsData) {
+      const [user] = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(users)
+        .where(eq(users.id, comment.userId));
+
+      commentsWithUsers.push({
+        ...comment,
+        user: user || { id: comment.userId, firstName: null, lastName: null, profileImageUrl: null },
+      });
+    }
+
+    return commentsWithUsers;
+  }
+
+  async createComment(displayCaseId: number, userId: string, content: string): Promise<Comment> {
+    const [comment] = await db
+      .insert(comments)
+      .values({
+        displayCaseId,
+        userId,
+        content,
+      })
+      .returning();
+    return comment;
+  }
+
+  async deleteComment(id: number, userId: string): Promise<void> {
+    await db
+      .delete(comments)
+      .where(and(eq(comments.id, id), eq(comments.userId, userId)));
+  }
+
+  // Like operations
+  async getLikeCount(displayCaseId: number): Promise<number> {
+    const likesList = await db
+      .select()
+      .from(likes)
+      .where(eq(likes.displayCaseId, displayCaseId));
+    return likesList.length;
+  }
+
+  async hasUserLiked(displayCaseId: number, userId: string): Promise<boolean> {
+    const [like] = await db
+      .select()
+      .from(likes)
+      .where(and(eq(likes.displayCaseId, displayCaseId), eq(likes.userId, userId)));
+    return !!like;
+  }
+
+  async toggleLike(displayCaseId: number, userId: string): Promise<boolean> {
+    const hasLiked = await this.hasUserLiked(displayCaseId, userId);
+
+    if (hasLiked) {
+      await db
+        .delete(likes)
+        .where(and(eq(likes.displayCaseId, displayCaseId), eq(likes.userId, userId)));
+      return false;
+    } else {
+      await db
+        .insert(likes)
+        .values({ displayCaseId, userId });
+      return true;
+    }
   }
 }
 

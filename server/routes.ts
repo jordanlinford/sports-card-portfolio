@@ -507,6 +507,123 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Comments routes
+  app.get("/api/display-cases/:id/comments", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid display case ID" });
+      }
+
+      const displayCase = await storage.getDisplayCase(id);
+      if (!displayCase || !displayCase.isPublic) {
+        return res.status(404).json({ error: "Display case not found" });
+      }
+
+      const comments = await storage.getComments(id);
+      res.json(comments);
+    } catch (error) {
+      console.error("Error getting comments:", error);
+      res.status(500).json({ error: "Failed to get comments" });
+    }
+  });
+
+  app.post("/api/display-cases/:id/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { content } = req.body;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid display case ID" });
+      }
+
+      if (!content || typeof content !== "string" || content.trim().length === 0) {
+        return res.status(400).json({ error: "Comment content is required" });
+      }
+
+      if (content.length > 1000) {
+        return res.status(400).json({ error: "Comment too long (max 1000 characters)" });
+      }
+
+      const displayCase = await storage.getDisplayCase(id);
+      if (!displayCase || !displayCase.isPublic) {
+        return res.status(404).json({ error: "Display case not found" });
+      }
+
+      const comment = await storage.createComment(id, userId, content.trim());
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Error creating comment:", error);
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  app.delete("/api/comments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid comment ID" });
+      }
+
+      await storage.deleteComment(id, userId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
+  // Likes routes
+  app.get("/api/display-cases/:id/likes", async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid display case ID" });
+      }
+
+      const displayCase = await storage.getDisplayCase(id);
+      if (!displayCase || !displayCase.isPublic) {
+        return res.status(404).json({ error: "Display case not found" });
+      }
+
+      const count = await storage.getLikeCount(id);
+      const userId = req.user?.claims?.sub;
+      const hasLiked = userId ? await storage.hasUserLiked(id, userId) : false;
+
+      res.json({ count, hasLiked });
+    } catch (error) {
+      console.error("Error getting likes:", error);
+      res.status(500).json({ error: "Failed to get likes" });
+    }
+  });
+
+  app.post("/api/display-cases/:id/likes", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid display case ID" });
+      }
+
+      const displayCase = await storage.getDisplayCase(id);
+      if (!displayCase || !displayCase.isPublic) {
+        return res.status(404).json({ error: "Display case not found" });
+      }
+
+      const hasLiked = await storage.toggleLike(id, userId);
+      const count = await storage.getLikeCount(id);
+
+      res.json({ hasLiked, count });
+    } catch (error) {
+      console.error("Error toggling like:", error);
+      res.status(500).json({ error: "Failed to toggle like" });
+    }
+  });
+
   // Stripe routes
   app.post("/api/create-checkout-session", isAuthenticated, async (req: any, res) => {
     try {
