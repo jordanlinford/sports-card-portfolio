@@ -6,6 +6,8 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { insertDisplayCaseSchema, insertCardSchema } from "@shared/schema";
 import Stripe from "stripe";
+import fs from "fs";
+import path from "path";
 
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
@@ -14,9 +16,86 @@ if (process.env.STRIPE_SECRET_KEY) {
   });
 }
 
+const SOCIAL_CRAWLERS = [
+  'facebookexternalhit',
+  'Facebot',
+  'Twitterbot',
+  'LinkedInBot',
+  'Pinterest',
+  'Slackbot',
+  'TelegramBot',
+  'WhatsApp',
+  'Discordbot',
+];
+
+function isSocialCrawler(userAgent: string): boolean {
+  return SOCIAL_CRAWLERS.some(crawler => userAgent.includes(crawler));
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
   // Auth middleware
   await setupAuth(app);
+
+  // Open Graph meta tags for social sharing of public display cases
+  app.get("/case/:id", async (req, res, next) => {
+    const userAgent = req.headers['user-agent'] || '';
+    
+    if (!isSocialCrawler(userAgent)) {
+      return next();
+    }
+
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return next();
+      }
+
+      const displayCase = await storage.getDisplayCase(id);
+      if (!displayCase || !displayCase.isPublic) {
+        return next();
+      }
+
+      const cardCount = displayCase.cards?.length || 0;
+      const firstCard = displayCase.cards?.[0];
+      const baseUrl = `https://${req.headers.host}`;
+      const imageUrl = firstCard?.imagePath 
+        ? `${baseUrl}${firstCard.imagePath}`
+        : `${baseUrl}/favicon.png`;
+      
+      const description = displayCase.description || `A collection of ${cardCount} cards`;
+      const title = `${displayCase.name} - MyDisplayCase`;
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <meta name="description" content="${description}">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="${baseUrl}/case/${id}">
+  <meta property="og:image" content="${imageUrl}">
+  <meta property="og:site_name" content="MyDisplayCase">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <meta name="twitter:image" content="${imageUrl}">
+</head>
+<body>
+  <h1>${displayCase.name}</h1>
+  <p>${description}</p>
+  <p>${cardCount} cards in this collection</p>
+</body>
+</html>`;
+
+      res.status(200).set({ "Content-Type": "text/html" }).end(html);
+    } catch (error) {
+      console.error("Error generating OG tags:", error);
+      next();
+    }
+  });
 
   // Auth routes
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {

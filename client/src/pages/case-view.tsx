@@ -15,12 +15,37 @@ import type { DisplayCaseWithCards, Card } from "@shared/schema";
 import { format } from "date-fns";
 import { CardDetailModal } from "@/components/card-detail-modal";
 
-const THEME_BACKGROUNDS: Record<string, string> = {
-  "classic": "",
-  "dark-wood": "bg-amber-950",
-  "velvet": "bg-red-950",
-  "midnight": "bg-slate-900",
-  "gallery": "bg-neutral-100 dark:bg-neutral-800",
+const THEME_STYLES: Record<string, { bg: string; frame: string; glass: string; mat: string }> = {
+  "classic": {
+    bg: "bg-gradient-to-b from-amber-100 to-amber-200 dark:from-amber-950 dark:to-amber-900",
+    frame: "bg-amber-800 dark:bg-amber-900 border-amber-900 dark:border-amber-950",
+    glass: "bg-white/10 dark:bg-white/5",
+    mat: "bg-amber-50 dark:bg-amber-950/50",
+  },
+  "dark-wood": {
+    bg: "bg-gradient-to-b from-amber-950 to-stone-950",
+    frame: "bg-stone-900 border-stone-950",
+    glass: "bg-white/5",
+    mat: "bg-stone-900/80",
+  },
+  "velvet": {
+    bg: "bg-gradient-to-b from-red-950 to-rose-950",
+    frame: "bg-stone-800 border-stone-900",
+    glass: "bg-white/5",
+    mat: "bg-red-950/50",
+  },
+  "midnight": {
+    bg: "bg-gradient-to-b from-slate-900 to-slate-950",
+    frame: "bg-slate-800 border-slate-900",
+    glass: "bg-white/5",
+    mat: "bg-slate-800/50",
+  },
+  "gallery": {
+    bg: "bg-gradient-to-b from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-900",
+    frame: "bg-neutral-300 dark:bg-neutral-700 border-neutral-400 dark:border-neutral-800",
+    glass: "bg-white/20 dark:bg-white/5",
+    mat: "bg-white dark:bg-neutral-800",
+  },
 };
 
 function CardGridSkeleton() {
@@ -123,45 +148,63 @@ export default function CaseView() {
             </p>
           </div>
         ) : (
-          <div className={`p-6 rounded-lg ${THEME_BACKGROUNDS[displayCase.theme || "classic"] || ""}`}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {displayCase.cards?.map((card) => (
-              <button
-                key={card.id}
-                onClick={() => setSelectedCard(card)}
-                className="group relative bg-card rounded-lg overflow-hidden border hover-elevate text-left cursor-pointer w-full"
-                data-testid={`card-public-${card.id}`}
-              >
-                <div className="aspect-square">
-                  <img
-                    src={card.imagePath}
-                    alt={card.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                    <p className="font-medium text-sm truncate">{card.title}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-white/80">
-                      {card.year && <span>{card.year}</span>}
-                      {card.set && <span>{card.set}</span>}
-                      {card.grade && (
-                        <Badge variant="secondary" className="text-xs">
-                          {card.grade}
-                        </Badge>
-                      )}
-                    </div>
-                    {card.estimatedValue && (
-                      <p className="mt-1 text-primary font-semibold">
-                        Est. ${card.estimatedValue.toFixed(2)}
-                      </p>
-                    )}
+          (() => {
+            const theme = THEME_STYLES[displayCase.theme || "classic"] || THEME_STYLES.classic;
+            return (
+              <div className={`relative rounded-lg ${theme.frame} border-4 p-1 shadow-2xl`}>
+                <div className={`absolute inset-0 rounded-md ${theme.glass} pointer-events-none`} />
+                <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-stone-400/50" />
+                <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-stone-400/50" />
+                <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-stone-400/50" />
+                <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-stone-400/50" />
+                
+                <div className={`${theme.bg} rounded-md p-6 sm:p-8`}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+                    {displayCase.cards?.map((card) => (
+                      <button
+                        key={card.id}
+                        onClick={() => setSelectedCard(card)}
+                        className="group relative text-left cursor-pointer w-full transition-transform duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                        data-testid={`card-public-${card.id}`}
+                      >
+                        <div className={`${theme.mat} rounded-lg p-2 shadow-lg`}>
+                          <div className="relative rounded overflow-hidden shadow-inner bg-black/20">
+                            <div style={{ paddingBottom: '140%' }} className="relative">
+                              <img
+                                src={card.imagePath}
+                                alt={card.title}
+                                className="absolute inset-0 w-full h-full object-contain"
+                              />
+                            </div>
+                            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none" />
+                          </div>
+                          
+                          <div className="mt-2 px-1">
+                            <p className="font-medium text-sm truncate text-foreground">{card.title}</p>
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              {card.year && (
+                                <span className="text-xs text-muted-foreground">{card.year}</span>
+                              )}
+                              {card.grade && (
+                                <Badge variant="secondary" className="text-xs">
+                                  {card.grade}
+                                </Badge>
+                              )}
+                            </div>
+                            {card.estimatedValue && (
+                              <p className="mt-1 text-xs text-primary font-semibold">
+                                ${card.estimatedValue.toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
-              </button>
-              ))}
-            </div>
-          </div>
+              </div>
+            );
+          })()
         )}
       </div>
 
