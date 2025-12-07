@@ -1,0 +1,87 @@
+// index.js
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static files (your built frontend, images, etc.)
+app.use(express.static("public"));
+app.use(express.static("dist")); // if you have a Vite/React build
+// Adjust folders as needed
+
+// TEMP: Fake case metadata store (replace with DB lookup)
+function getCaseMeta(id) {
+  // In real life, pull from Firestore, Supabase, etc.
+  const cases = {
+    "1": {
+      title: "Display Case #1 – Modern QBs",
+      description: "A curated display of modern quarterback grails and rare parallels.",
+      image: "https://sports-card-analyze--jordanlinford.replit.app/public/case-1-cover.png",
+    },
+    "2": {
+      title: "Display Case #2 – Vintage Legends",
+      description: "Iconic vintage NFL legends in pristine condition.",
+      image: "https://sports-card-analyze--jordanlinford.replit.app/public/case-2-cover.png",
+    },
+  };
+
+  return (
+    cases[id] || {
+      title: `Display Case #${id}`,
+      description: "A beautiful digital display case from MyDisplayCase.",
+      image: "https://sports-card-analyze--jordanlinford.replit.app/public/default-cover.png",
+    }
+  );
+}
+
+// Dynamic OG route for display cases
+app.get("/case/:id", (req, res) => {
+  const { id } = req.params;
+  const meta = getCaseMeta(id);
+  const fullUrl = `https://sports-card-analyze--jordanlinford.replit.app/case/${id}`;
+
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>${meta.title}</title>
+  <meta name="description" content="${meta.description}" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="${meta.title}" />
+  <meta property="og:description" content="${meta.description}" />
+  <meta property="og:image" content="${meta.image}" />
+  <meta property="og:url" content="${fullUrl}" />
+  <meta property="og:type" content="website" />
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${meta.title}" />
+  <meta name="twitter:description" content="${meta.description}" />
+  <meta name="twitter:image" content="${meta.image}" />
+
+  <!-- Load your frontend bundle -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+  <div id="root"></div>
+  <!-- If using Vite/React, adjust this to your entry file -->
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>`);
+});
+
+// Fallback for other routes (generic app shell)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+  // Or serve your built index.html from /dist if using Vite build
+});
+
+app.listen(PORT, () => {
+  console.log("Server running on port", PORT);
+});
