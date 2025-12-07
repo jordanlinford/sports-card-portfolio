@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LayoutGrid, LogOut, User, Crown, Search } from "lucide-react";
+import { LayoutGrid, LogOut, User, Crown, Search, Compass } from "lucide-react";
 
 export function Navigation() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -44,6 +44,12 @@ export function Navigation() {
           </Link>
 
           <div className="flex items-center gap-2">
+            <Link href="/explore">
+              <Button variant="ghost" size="sm" className="gap-2" data-testid="link-explore">
+                <Compass className="h-4 w-4" />
+                <span className="hidden sm:inline">Explore</span>
+              </Button>
+            </Link>
             <ThemeToggle />
 
             {isLoading ? (

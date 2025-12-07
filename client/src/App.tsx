@@ -18,6 +18,7 @@ import BillingSuccess from "@/pages/billing-success";
 import SearchPage from "@/pages/search";
 import TermsOfService from "@/pages/terms-of-service";
 import PrivacyPolicy from "@/pages/privacy-policy";
+import Explore from "@/pages/explore";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -26,6 +27,7 @@ function Router() {
     <Switch>
       <Route path="/terms" component={TermsOfService} />
       <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/explore" component={Explore} />
       {isLoading || !isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
