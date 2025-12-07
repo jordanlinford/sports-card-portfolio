@@ -208,11 +208,6 @@ export default function CaseView() {
                               {card.year && (
                                 <span className="text-xs text-muted-foreground">{card.year}</span>
                               )}
-                              {card.variation && (
-                                <Badge variant="outline" className="text-xs">
-                                  {card.variation}
-                                </Badge>
-                              )}
                               {card.grade && (
                                 <Badge variant="secondary" className="text-xs">
                                   {card.grade}

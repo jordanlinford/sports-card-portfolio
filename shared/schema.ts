@@ -74,7 +74,6 @@ export const cards = pgTable("cards", {
   imagePath: varchar("image_path").notNull(),
   set: varchar("set", { length: 255 }),
   year: integer("year"),
-  variation: varchar("variation", { length: 255 }),
   grade: varchar("grade", { length: 50 }),
   purchasePrice: real("purchase_price"),
   estimatedValue: real("estimated_value"),
