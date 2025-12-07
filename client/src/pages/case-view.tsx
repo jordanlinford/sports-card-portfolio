@@ -11,9 +11,10 @@ import {
   ImageIcon,
   Lock
 } from "lucide-react";
-import type { DisplayCaseWithCards, Card } from "@shared/schema";
+import type { DisplayCaseWithCards, Card, User } from "@shared/schema";
 import { format } from "date-fns";
 import { CardDetailModal } from "@/components/card-detail-modal";
+import { SocialFeatures } from "@/components/social-features";
 
 const THEME_STYLES: Record<string, { bg: string; frame: string; glass: string; mat: string }> = {
   "classic": {
@@ -66,6 +67,10 @@ export default function CaseView() {
 
   const { data: displayCase, isLoading, error } = useQuery<DisplayCaseWithCards>({
     queryKey: [`/api/display-cases/${id}/public`],
+  });
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
   });
 
   if (isLoading) {
@@ -206,6 +211,10 @@ export default function CaseView() {
             );
           })()
         )}
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <SocialFeatures displayCaseId={parseInt(id || "0")} user={user || null} />
       </div>
 
       <div className="border-t mt-16 py-12 bg-muted/30">
