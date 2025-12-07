@@ -52,6 +52,11 @@ export interface IStorage {
   getLikeCount(displayCaseId: number): Promise<number>;
   hasUserLiked(displayCaseId: number, userId: string): Promise<boolean>;
   toggleLike(displayCaseId: number, userId: string): Promise<boolean>;
+
+  // Public discovery operations
+  getRecentPublicDisplayCases(limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
+  searchPublicDisplayCases(query: string, limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
+  getPopularPublicDisplayCases(limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -389,6 +394,116 @@ export class DatabaseStorage implements IStorage {
         .values({ displayCaseId, userId });
       return true;
     }
+  }
+
+  // Public discovery operations
+  private async enrichPublicCases(cases: any[]): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]> {
+    const enrichedCases: (DisplayCaseWithCards & { ownerName: string; likeCount: number })[] = [];
+
+    for (const c of cases) {
+      const caseCards = await db
+        .select()
+        .from(cards)
+        .where(eq(cards.displayCaseId, c.id))
+        .orderBy(asc(cards.sortOrder));
+
+      const [owner] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, c.userId));
+
+      const likeCount = await this.getLikeCount(c.id);
+
+      const ownerName = owner
+        ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
+        : "Anonymous";
+
+      enrichedCases.push({
+        ...c,
+        cards: caseCards,
+        ownerName,
+        likeCount,
+      });
+    }
+
+    return enrichedCases;
+  }
+
+  async getRecentPublicDisplayCases(limit: number = 20): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]> {
+    const cases = await db
+      .select()
+      .from(displayCases)
+      .where(eq(displayCases.isPublic, true))
+      .orderBy(desc(displayCases.createdAt))
+      .limit(limit);
+
+    return this.enrichPublicCases(cases);
+  }
+
+  async searchPublicDisplayCases(query: string, limit: number = 20): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]> {
+    const searchPattern = `%${query}%`;
+    const cases = await db
+      .select()
+      .from(displayCases)
+      .where(
+        and(
+          eq(displayCases.isPublic, true),
+          or(
+            ilike(displayCases.name, searchPattern),
+            ilike(displayCases.description, searchPattern)
+          )
+        )
+      )
+      .orderBy(desc(displayCases.createdAt))
+      .limit(limit);
+
+    return this.enrichPublicCases(cases);
+  }
+
+  async getPopularPublicDisplayCases(limit: number = 20): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]> {
+    const publicCases = await db
+      .select()
+      .from(displayCases)
+      .where(eq(displayCases.isPublic, true));
+
+    const casesWithLikes = await Promise.all(
+      publicCases.map(async (c) => ({
+        ...c,
+        likeCount: await this.getLikeCount(c.id),
+      }))
+    );
+
+    casesWithLikes.sort((a, b) => b.likeCount - a.likeCount);
+
+    const topCases = casesWithLikes.slice(0, limit);
+
+    const enrichedCases: (DisplayCaseWithCards & { ownerName: string; likeCount: number })[] = [];
+
+    for (const c of topCases) {
+      const caseCards = await db
+        .select()
+        .from(cards)
+        .where(eq(cards.displayCaseId, c.id))
+        .orderBy(asc(cards.sortOrder));
+
+      const [owner] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, c.userId));
+
+      const ownerName = owner
+        ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
+        : "Anonymous";
+
+      enrichedCases.push({
+        ...c,
+        cards: caseCards,
+        ownerName,
+        likeCount: c.likeCount,
+      });
+    }
+
+    return enrichedCases;
   }
 }
 

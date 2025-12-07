@@ -180,6 +180,46 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
+  // Public discovery routes
+  app.get("/api/explore/recent", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const cases = await storage.getRecentPublicDisplayCases(limit);
+      res.json(cases);
+    } catch (error) {
+      console.error("Error fetching recent public cases:", error);
+      res.status(500).json({ message: "Failed to fetch recent cases" });
+    }
+  });
+
+  app.get("/api/explore/popular", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const cases = await storage.getPopularPublicDisplayCases(limit);
+      res.json(cases);
+    } catch (error) {
+      console.error("Error fetching popular cases:", error);
+      res.status(500).json({ message: "Failed to fetch popular cases" });
+    }
+  });
+
+  app.get("/api/explore/search", async (req, res) => {
+    try {
+      const query = (req.query.q as string) || "";
+      const limit = parseInt(req.query.limit as string) || 20;
+      
+      if (!query.trim()) {
+        return res.json([]);
+      }
+      
+      const cases = await storage.searchPublicDisplayCases(query, limit);
+      res.json(cases);
+    } catch (error) {
+      console.error("Error searching public cases:", error);
+      res.status(500).json({ message: "Failed to search cases" });
+    }
+  });
+
   app.get("/api/cards/search", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
