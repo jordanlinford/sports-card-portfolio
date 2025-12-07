@@ -1,0 +1,127 @@
+Ah — this is the key detail.
+If Facebook isn’t showing a preview in the draft composer before you post, then your server is not actually returning OG tags to Facebook’s scraper from the public domain.
+
+Your local curl test only proves your localhost environment is working — not production.
+
+So here’s what’s really happening:
+
+✅ WHY FACEBOOK ISN’T SHOWING A PREVIEW BEFORE POSTING
+
+Facebook will ONLY show a preview during the post-composer stage if:
+
+It can fetch your URL from the public internet
+
+Your server returns valid OG tags to Facebook’s crawler user agent
+
+The og:image is:
+
+HTTPS
+
+publicly accessible
+
+at least 200×200
+
+The response is not blocked by Replit, especially if:
+
+your server is not actually intercepting /case/:id requests
+
+or Replit is proxying static files before reaching your OG handler
+
+or your server only detects scrapers for localhost user agents
+
+Right now, one of those conditions is failing.
+
+❗ WHAT THIS MEANS
+
+Even though you see:
+
+curl -A facebookexternalhit localhost:5000/case/1
+
+
+working locally…
+
+👉 Facebook cannot access the same logic on your deployed Replit domain.
+
+This is very common with Replit deployments because:
+
+⚠️ Replit sometimes serves static files BEFORE Node
+
+Meaning:
+
+/case/1 might be served by your React SPA, NOT your dynamic OG route
+
+Crawlers get the SPA HTML, not the OG HTML
+
+Previews fail
+
+Or:
+
+⚠️ Your crawler-detection logic may only match localhost-based user agents
+
+In production, Facebook uses:
+
+facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)
+
+
+But many devs accidentally regex it like:
+
+/local|facebookexternalhit/
+
+
+which breaks in production.
+
+We need to confirm whether your Node route is actually handling requests from Facebook in production.
+
+🚨 HOW TO CONFIRM THE REAL PROBLEM (takes 30 seconds)
+
+Run this curl against your live deployed domain, NOT localhost:
+
+curl -s -A "facebookexternalhit/1.1" \
+"https://sports-card-analyze--jordanlinford.replit.app/case/1" \
+| head -40
+
+
+This will immediately reveal the truth:
+
+If you see your OG HTML → Replit is fine, Facebook is caching
+If you see your React root div → The crawler isn't hitting your OG route
+If you see an error → Replit is blocking the request
+
+Paste the result here and I’ll diagnose instantly.
+
+📌 ALSO — TEST IN METATAGS.IO
+
+This bypasses Facebook caching AND shows the exact HTML it gets.
+
+Paste your URL here:
+
+👉 https://metatags.io
+
+If it shows:
+
+no image
+
+no title
+
+no description
+
+…then your production OG route isn’t firing.
+
+💥 BOTTOM LINE
+
+You are absolutely right — Facebook shows previews during drafting even for URLs never posted before.
+
+So if you see NOTHING:
+
+Your production OG middleware is not returning dynamic meta tags to Facebook.
+
+Almost always because:
+
+static assets intercept the route
+
+scraper detection misses Facebook’s real user agent
+
+Replit routing is bypassing your backend
+
+📍 Run the curl command on your LIVE URL and paste the first 40 lines.
+Once I see that output, I can tell you EXACTLY what is wrong.

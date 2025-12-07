@@ -530,8 +530,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  // Object Storage routes
-  app.get("/objects/:objectPath(*)", isAuthenticated, async (req: any, res) => {
+  // Object Storage routes - allows public access for public objects
+  app.get("/objects/:objectPath(*)", async (req: any, res) => {
+    // Get userId if authenticated, but don't require authentication
     const userId = req.user?.claims?.sub;
     const objectStorageService = new ObjectStorageService();
     try {
