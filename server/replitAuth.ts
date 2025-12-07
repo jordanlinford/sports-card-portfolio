@@ -80,6 +80,14 @@ export async function setupAuth(app: Express) {
 
   const registeredStrategies = new Set<string>();
 
+  const getCallbackDomain = (requestHostname: string) => {
+    // In development, use REPLIT_DEV_DOMAIN for proper OIDC callback handling
+    if (process.env.REPLIT_DEV_DOMAIN && process.env.NODE_ENV === "development") {
+      return process.env.REPLIT_DEV_DOMAIN;
+    }
+    return requestHostname;
+  };
+
   const ensureStrategy = (domain: string) => {
     const strategyName = `replitauth:${domain}`;
     if (!registeredStrategies.has(strategyName)) {
@@ -101,16 +109,18 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    const domain = getCallbackDomain(req.hostname);
+    ensureStrategy(domain);
+    passport.authenticate(`replitauth:${domain}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
-    ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    const domain = getCallbackDomain(req.hostname);
+    ensureStrategy(domain);
+    passport.authenticate(`replitauth:${domain}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
