@@ -1,25 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Heart, MessageCircle, Trash2, Send, Share2, Link2, Check } from "lucide-react";
-import { SiX, SiFacebook } from "react-icons/si";
+import { Heart, MessageCircle, Trash2, Send } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CommentWithUser, User } from "@shared/schema";
-
-function getVisitorId(): string {
-  const key = "mydisplaycase_visitor_id";
-  let visitorId = localStorage.getItem(key);
-  if (!visitorId) {
-    visitorId = crypto.randomUUID();
-    localStorage.setItem(key, visitorId);
-  }
-  return visitorId;
-}
 
 interface LikeButtonProps {
   displayCaseId: number;
@@ -28,31 +17,17 @@ interface LikeButtonProps {
 
 export function LikeButton({ displayCaseId, user }: LikeButtonProps) {
   const { toast } = useToast();
-  const visitorId = getVisitorId();
 
   const { data: likeData, isLoading } = useQuery<{ count: number; hasLiked: boolean }>({
-    queryKey: ["/api/display-cases", displayCaseId, "likes", visitorId],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (!user) {
-        params.set("visitorId", visitorId);
-      }
-      const response = await fetch(`/api/display-cases/${displayCaseId}/likes?${params}`);
-      if (!response.ok) throw new Error("Failed to fetch likes");
-      return response.json();
-    },
+    queryKey: ["/api/display-cases", displayCaseId, "likes"],
   });
 
   const toggleLikeMutation = useMutation({
     mutationFn: async () => {
-      const body: { visitorId?: string } = {};
-      if (!user) {
-        body.visitorId = visitorId;
-      }
-      await apiRequest("POST", `/api/display-cases/${displayCaseId}/likes`, body);
+      await apiRequest("POST", `/api/display-cases/${displayCaseId}/likes`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/display-cases", displayCaseId, "likes", visitorId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases", displayCaseId, "likes"] });
     },
     onError: () => {
       toast({
@@ -64,6 +39,10 @@ export function LikeButton({ displayCaseId, user }: LikeButtonProps) {
   });
 
   const handleLike = () => {
+    if (!user) {
+      window.location.href = "/api/login";
+      return;
+    }
     toggleLikeMutation.mutate();
   };
 
@@ -86,81 +65,6 @@ export function LikeButton({ displayCaseId, user }: LikeButtonProps) {
       <Heart className={`h-4 w-4 ${hasLiked ? "fill-current" : ""}`} />
       <span data-testid="text-like-count">{count}</span>
     </Button>
-  );
-}
-
-interface ShareButtonsProps {
-  displayCaseId: number;
-  caseName: string;
-}
-
-export function ShareButtons({ displayCaseId, caseName }: ShareButtonsProps) {
-  const [copied, setCopied] = useState(false);
-  const { toast } = useToast();
-
-  const shareUrl = typeof window !== "undefined" 
-    ? `${window.location.origin}/case/${displayCaseId}`
-    : `/case/${displayCaseId}`;
-  
-  const shareText = `Check out "${caseName}" on MyDisplayCase!`;
-
-  const handleCopyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      toast({
-        title: "Link copied",
-        description: "Share link copied to clipboard.",
-      });
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast({
-        title: "Error",
-        description: "Failed to copy link.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleShareTwitter = () => {
-    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  const handleShareFacebook = () => {
-    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={handleCopyLink}
-        className="gap-2"
-        data-testid="button-copy-link"
-      >
-        {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-        {copied ? "Copied" : "Copy Link"}
-      </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={handleShareTwitter}
-        data-testid="button-share-twitter"
-      >
-        <SiX className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="outline"
-        size="icon"
-        onClick={handleShareFacebook}
-        data-testid="button-share-facebook"
-      >
-        <SiFacebook className="h-4 w-4" />
-      </Button>
-    </div>
   );
 }
 
@@ -342,16 +246,14 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
 interface SocialFeaturesProps {
   displayCaseId: number;
   user: User | null;
-  caseName?: string;
 }
 
-export function SocialFeatures({ displayCaseId, user, caseName = "Display Case" }: SocialFeaturesProps) {
+export function SocialFeatures({ displayCaseId, user }: SocialFeaturesProps) {
   return (
     <div className="border-t mt-12 pt-8">
       <div className="max-w-2xl mx-auto space-y-8">
-        <div className="flex items-center justify-center gap-4 flex-wrap">
+        <div className="flex justify-center">
           <LikeButton displayCaseId={displayCaseId} user={user} />
-          <ShareButtons displayCaseId={displayCaseId} caseName={caseName} />
         </div>
         <Comments displayCaseId={displayCaseId} user={user} />
       </div>
