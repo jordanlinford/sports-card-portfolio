@@ -96,6 +96,66 @@ function CardGridSkeleton() {
   );
 }
 
+interface CardItemProps {
+  card: Card;
+  theme: { bg: string; frame: string; glass: string; mat: string; text: string; textMuted: string };
+  onClick: () => void;
+  featured?: boolean;
+  compact?: boolean;
+}
+
+function CardItem({ card, theme, onClick, featured = false, compact = false }: CardItemProps) {
+  return (
+    <button
+      onClick={onClick}
+      className="group relative text-left cursor-pointer w-full transition-transform duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+      data-testid={`card-public-${card.id}`}
+    >
+      <div className={`${theme.mat} rounded-lg ${compact ? 'p-1.5' : 'p-2'} shadow-lg`}>
+        <div className="relative rounded overflow-hidden shadow-inner bg-black/20">
+          <div style={{ paddingBottom: '140%' }} className="relative">
+            <img
+              src={card.imagePath}
+              alt={card.title}
+              className="absolute inset-0 w-full h-full object-contain"
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none" />
+        </div>
+        
+        <div className={`mt-2 px-1 ${compact ? 'hidden sm:block' : ''}`}>
+          <p className={`font-medium ${compact ? 'text-xs' : 'text-sm'} truncate ${theme.text}`}>{card.title}</p>
+          {!compact && (
+            <div className="flex flex-wrap items-center gap-1 mt-1">
+              {card.year && (
+                <span className={`text-xs ${theme.textMuted}`}>{card.year}</span>
+              )}
+              {card.variation && (
+                <Badge variant="outline" className="text-xs">
+                  {card.variation}
+                </Badge>
+              )}
+              {card.grade && (
+                <Badge variant="secondary" className="text-xs">
+                  {card.grade}
+                </Badge>
+              )}
+            </div>
+          )}
+          {card.estimatedValue && !compact && (
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className="text-xs text-primary font-semibold">
+                ${card.estimatedValue.toFixed(2)}
+              </span>
+              <ValueChangeIndicator card={card} />
+            </div>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
 export default function CaseView() {
   const { id } = useParams<{ id: string }>();
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
@@ -272,56 +332,50 @@ export default function CaseView() {
                 <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-stone-400/50" />
                 
                 <div className={`${theme.bg} rounded-md p-6 sm:p-8`}>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-                    {displayCase.cards?.map((card) => (
-                      <button
-                        key={card.id}
-                        onClick={() => setSelectedCard(card)}
-                        className="group relative text-left cursor-pointer w-full transition-transform duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                        data-testid={`card-public-${card.id}`}
-                      >
-                        <div className={`${theme.mat} rounded-lg p-2 shadow-lg`}>
-                          <div className="relative rounded overflow-hidden shadow-inner bg-black/20">
-                            <div style={{ paddingBottom: '140%' }} className="relative">
-                              <img
-                                src={card.imagePath}
-                                alt={card.title}
-                                className="absolute inset-0 w-full h-full object-contain"
-                              />
-                            </div>
-                            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none" />
-                          </div>
-                          
-                          <div className="mt-2 px-1">
-                            <p className={`font-medium text-sm truncate ${theme.text}`}>{card.title}</p>
-                            <div className="flex flex-wrap items-center gap-1 mt-1">
-                              {card.year && (
-                                <span className={`text-xs ${theme.textMuted}`}>{card.year}</span>
-                              )}
-                              {card.variation && (
-                                <Badge variant="outline" className="text-xs">
-                                  {card.variation}
-                                </Badge>
-                              )}
-                              {card.grade && (
-                                <Badge variant="secondary" className="text-xs">
-                                  {card.grade}
-                                </Badge>
-                              )}
-                            </div>
-                            {card.estimatedValue && (
-                              <div className="mt-1 flex items-center gap-1.5">
-                                <span className="text-xs text-primary font-semibold">
-                                  ${card.estimatedValue.toFixed(2)}
-                                </span>
-                                <ValueChangeIndicator card={card} />
-                              </div>
-                            )}
-                          </div>
+                  {/* Grid Layout (default) */}
+                  {(!displayCase.layout || displayCase.layout === "grid") && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+                      {displayCase.cards?.map((card) => (
+                        <CardItem key={card.id} card={card} theme={theme} onClick={() => setSelectedCard(card)} />
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Row Layout - horizontal scrollable row */}
+                  {displayCase.layout === "row" && (
+                    <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 scrollbar-thin">
+                      {displayCase.cards?.map((card) => (
+                        <div key={card.id} className="flex-shrink-0 w-40 sm:w-48 md:w-56">
+                          <CardItem card={card} theme={theme} onClick={() => setSelectedCard(card)} />
                         </div>
-                      </button>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Showcase Layout - featured first card, grid for rest */}
+                  {displayCase.layout === "showcase" && displayCase.cards && displayCase.cards.length > 0 && (
+                    <div className="space-y-6">
+                      {/* Featured first card - larger */}
+                      <div className="flex justify-center">
+                        <div className="w-full max-w-sm">
+                          <CardItem 
+                            card={displayCase.cards[0]} 
+                            theme={theme} 
+                            onClick={() => setSelectedCard(displayCase.cards![0])} 
+                            featured
+                          />
+                        </div>
+                      </div>
+                      {/* Rest of cards in a grid */}
+                      {displayCase.cards.length > 1 && (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
+                          {displayCase.cards.slice(1).map((card) => (
+                            <CardItem key={card.id} card={card} theme={theme} onClick={() => setSelectedCard(card)} compact />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );

@@ -75,11 +75,18 @@ const DISPLAY_CASE_THEMES = [
   { id: "gallery", name: "Gallery", bg: "bg-neutral-100 dark:bg-neutral-800", description: "Museum style" },
 ] as const;
 
+const LAYOUT_OPTIONS = [
+  { id: "grid", name: "Grid", description: "Classic grid layout - cards displayed in rows and columns", icon: "grid" },
+  { id: "row", name: "Row", description: "Horizontal scrolling row - great for smaller collections", icon: "row" },
+  { id: "showcase", name: "Showcase", description: "Featured first card with smaller cards below", icon: "showcase" },
+] as const;
+
 const updateCaseSchema = z.object({
   name: z.string().min(1, "Name is required").max(255, "Name is too long"),
   description: z.string().max(1000, "Description is too long").optional(),
   isPublic: z.boolean(),
   theme: z.string().optional(),
+  layout: z.string().optional(),
   showCardCount: z.boolean(),
   showTotalValue: z.boolean(),
 });
@@ -184,6 +191,7 @@ export default function CaseEdit() {
       description: "",
       isPublic: true,
       theme: "classic",
+      layout: "grid",
       showCardCount: false,
       showTotalValue: false,
     },
@@ -209,6 +217,7 @@ export default function CaseEdit() {
         description: displayCase.description || "",
         isPublic: displayCase.isPublic,
         theme: displayCase.theme || "classic",
+        layout: displayCase.layout || "grid",
         showCardCount: displayCase.showCardCount ?? false,
         showTotalValue: displayCase.showTotalValue ?? false,
       });
@@ -609,6 +618,63 @@ export default function CaseEdit() {
                             <div className={`w-full h-12 rounded-md ${theme.bg} mb-2 border`} />
                             <p className="text-sm font-medium">{theme.name}</p>
                             <p className="text-xs text-muted-foreground">{theme.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="layout"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Card Layout</FormLabel>
+                      <FormDescription>
+                        Choose how your cards are arranged in the display case
+                      </FormDescription>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
+                        {LAYOUT_OPTIONS.map((layout) => (
+                          <button
+                            key={layout.id}
+                            type="button"
+                            onClick={() => field.onChange(layout.id)}
+                            className={`relative p-4 rounded-lg border-2 text-left transition-colors ${
+                              field.value === layout.id
+                                ? "border-primary bg-primary/5"
+                                : "border-muted hover:border-muted-foreground/30"
+                            }`}
+                            data-testid={`button-layout-${layout.id}`}
+                          >
+                            <div className="w-full h-12 rounded-md bg-muted mb-2 flex items-center justify-center">
+                              {layout.id === "grid" && (
+                                <div className="grid grid-cols-3 gap-1 p-2">
+                                  {[1,2,3,4,5,6].map(i => (
+                                    <div key={i} className="w-2 h-3 bg-foreground/30 rounded-sm" />
+                                  ))}
+                                </div>
+                              )}
+                              {layout.id === "row" && (
+                                <div className="flex gap-1 p-2">
+                                  {[1,2,3,4].map(i => (
+                                    <div key={i} className="w-3 h-4 bg-foreground/30 rounded-sm" />
+                                  ))}
+                                </div>
+                              )}
+                              {layout.id === "showcase" && (
+                                <div className="flex flex-col items-center gap-1 p-2">
+                                  <div className="w-4 h-5 bg-foreground/40 rounded-sm" />
+                                  <div className="flex gap-0.5">
+                                    {[1,2,3].map(i => (
+                                      <div key={i} className="w-2 h-2.5 bg-foreground/20 rounded-sm" />
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <p className="text-sm font-medium">{layout.name}</p>
+                            <p className="text-xs text-muted-foreground">{layout.description}</p>
                           </button>
                         ))}
                       </div>

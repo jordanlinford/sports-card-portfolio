@@ -52,6 +52,7 @@ export const displayCases = pgTable("display_cases", {
   description: text("description"),
   isPublic: boolean("is_public").default(true).notNull(),
   theme: varchar("theme", { length: 50 }).default("classic").notNull(),
+  layout: varchar("layout", { length: 50 }).default("grid").notNull(),
   showCardCount: boolean("show_card_count").default(false).notNull(),
   showTotalValue: boolean("show_total_value").default(false).notNull(),
   viewCount: integer("view_count").default(0).notNull(),
@@ -82,6 +83,7 @@ export const cards = pgTable("cards", {
   previousValue: real("previous_value"),
   valueUpdatedAt: timestamp("value_updated_at"),
   notes: text("notes"),
+  tags: text("tags").array(),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
