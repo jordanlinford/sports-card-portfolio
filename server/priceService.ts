@@ -22,12 +22,13 @@ interface PriceLookupResult {
   details?: string;
 }
 
-async function searchEbaySoldListings(query: string): Promise<any> {
+async function searchCardPrices(query: string): Promise<any> {
   const serperApiKey = process.env.SERPER_API_KEY;
   if (!serperApiKey) {
     throw new Error("SERPER_API_KEY not configured");
   }
 
+  // Search for prices from multiple sources - eBay, PSA, price guides, etc.
   const response = await fetch("https://google.serper.dev/search", {
     method: "POST",
     headers: {
@@ -35,8 +36,8 @@ async function searchEbaySoldListings(query: string): Promise<any> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      q: `${query} site:ebay.com sold`,
-      num: 10,
+      q: query,
+      num: 15, // Get more results for better price coverage
     }),
   });
 
@@ -47,71 +48,100 @@ async function searchEbaySoldListings(query: string): Promise<any> {
   return response.json();
 }
 
-function buildSearchQuery(card: CardInfo): string {
-  const parts: string[] = [];
-  
-  if (card.title) parts.push(card.title);
-  if (card.set) parts.push(card.set);
-  if (card.year) parts.push(String(card.year));
-  if (card.variation) parts.push(card.variation);
-  if (card.grade) parts.push(card.grade);
-  
-  return parts.join(" ");
+function cleanCardTitle(title: string): string {
+  // Remove card numbers like #190, #304, etc. - these are often not in eBay listings
+  let cleaned = title.replace(/#\d+/g, "").trim();
+  // Remove extra spaces
+  cleaned = cleaned.replace(/\s+/g, " ");
+  return cleaned;
 }
 
-export async function lookupCardPrice(card: CardInfo): Promise<PriceLookupResult> {
-  const searchQuery = buildSearchQuery(card);
+function buildSearchQueries(card: CardInfo): string[] {
+  const queries: string[] = [];
+  const cleanTitle = cleanCardTitle(card.title);
   
-  try {
-    const searchResults = await searchEbaySoldListings(searchQuery);
-    
-    const organicResults = searchResults.organic || [];
-    const relevantResults = organicResults.filter((result: any) => {
-      const title = (result.title || "").toLowerCase();
-      const snippet = (result.snippet || "").toLowerCase();
-      return title.includes("sold") || snippet.includes("sold") || 
-             result.link?.includes("/itm/") || result.link?.includes("ebay.com");
-    });
+  // Primary query: player name + set + year + grade + "value" or "price" for pricing info
+  const primaryParts: string[] = [];
+  if (cleanTitle) primaryParts.push(cleanTitle);
+  if (card.set) primaryParts.push(card.set);
+  if (card.year) primaryParts.push(String(card.year));
+  if (card.grade) primaryParts.push(card.grade);
+  queries.push(primaryParts.join(" ") + " value price");
+  
+  // Secondary query: search PSA auction prices specifically
+  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${card.grade || ""} auction price sold`);
+  
+  // Tertiary query: just player name + year + grade + "rookie card value"
+  queries.push(`${cleanTitle} ${card.year || ""} ${card.grade || ""} rookie card value`);
+  
+  // Fourth query: simpler version targeting price guides
+  queries.push(`${cleanTitle} ${card.set || ""} ${card.grade || ""} price guide`);
+  
+  return queries;
+}
 
-    if (relevantResults.length === 0) {
-      return {
-        estimatedValue: null,
-        source: "eBay (no sales found)",
-        searchQuery,
-        salesFound: 0,
-        confidence: "low",
-        details: "No recent sold listings found for this card.",
-      };
-    }
+function buildSearchQuery(card: CardInfo): string {
+  const queries = buildSearchQueries(card);
+  return queries[0]; // Return primary query for backward compatibility
+}
 
-    const searchContext = relevantResults
-      .slice(0, 5)
-      .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet || "N/A"}\nLink: ${r.link}`)
-      .join("\n\n");
+async function trySearchQuery(query: string, card: CardInfo): Promise<PriceLookupResult | null> {
+  const searchResults = await searchCardPrices(query);
+  
+  const organicResults = searchResults.organic || [];
+  // Filter for pricing-relevant results from eBay, PSA, price guides, etc.
+  const relevantResults = organicResults.filter((result: any) => {
+    const title = (result.title || "").toLowerCase();
+    const snippet = (result.snippet || "").toLowerCase();
+    const link = (result.link || "").toLowerCase();
+    // Include results that mention prices, sales, auctions, or are from relevant sites
+    return title.includes("price") || title.includes("sold") || title.includes("value") ||
+           title.includes("auction") || 
+           snippet.includes("$") || snippet.includes("price") || snippet.includes("sold") ||
+           link.includes("ebay.com") || link.includes("psacard.com") || 
+           link.includes("sportscardspro.com") || link.includes("130point.com") ||
+           link.includes("pricecharting.com");
+  });
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are a sports card pricing expert. Analyze eBay sold listing search results and extract the average sale price for a specific card.
+  if (relevantResults.length === 0) {
+    return null;
+  }
+
+  const searchContext = relevantResults
+    .slice(0, 8) // Use more results for better coverage
+    .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet || "N/A"}\nSource: ${r.link}`)
+    .join("\n\n");
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: `You are a sports card pricing expert. Analyze search results from various sources (eBay, PSA, price guides) and extract the market value for a specific card.
 
 Your task:
-1. Look at the search results snippets for sold listings
-2. Extract any visible prices from the titles or snippets
-3. Calculate an average of the last 3-5 sales if possible
-4. Return ONLY a JSON object with these fields:
-   - estimatedValue: number (the average price in dollars, or null if unable to determine)
-   - salesFound: number (how many sales you found prices for)
+1. Look at all the search results carefully - they may include eBay listings, PSA auction prices, price guides, etc.
+2. Extract ANY visible prices from the titles or snippets (look for $ amounts like "$299.00", "$400-600", etc.)
+3. Look for price ranges mentioned (e.g., "sells for $350-600")
+4. Calculate an average market value based on what you find
+5. Return ONLY a JSON object with these fields:
+   - estimatedValue: number (the average/typical price in dollars, or null if truly unable to determine)
+   - salesFound: number (how many price references you found)
    - confidence: "high" | "medium" | "low"
-   - details: string (brief explanation)
+   - details: string (brief explanation of where the prices came from)
 
-Be conservative - if prices are unclear or the listings don't match the card well, return null.
-Only include prices that clearly match the specific card being searched.`,
-        },
-        {
-          role: "user",
-          content: `Find the current market value for this card:
+IMPORTANT:
+- Look carefully for ANY dollar amounts in the snippets
+- Price ranges like "$400-$600" should be averaged to get $500
+- The grade (PSA 10, PSA 9, etc.) significantly affects value - only match same grade
+- PSA auction prices and price guide values are valid sources
+- eBay "Buy It Now" prices are less reliable than sold prices, but still useful as reference
+- Be AGGRESSIVE about finding prices - even a single price reference is valuable
+- If you see multiple prices, use the average`,
+      },
+      {
+        role: "user",
+        content: `Find the current market value for this card:
 Card: ${card.title}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
@@ -122,38 +152,59 @@ Search results from eBay sold listings:
 ${searchContext}
 
 Return a JSON object with estimatedValue, salesFound, confidence, and details.`,
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 500,
-    });
+      },
+    ],
+    temperature: 0.3,
+    max_tokens: 500,
+  });
 
-    const responseText = completion.choices[0]?.message?.content || "";
-    
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[0]);
+  const responseText = completion.choices[0]?.message?.content || "";
+  
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.estimatedValue && parsed.estimatedValue > 0) {
         return {
-          estimatedValue: parsed.estimatedValue || null,
-          source: "eBay Sold Listings (AI analyzed)",
-          searchQuery,
+          estimatedValue: parsed.estimatedValue,
+          source: "Market Data (AI analyzed)",
+          searchQuery: query,
           salesFound: parsed.salesFound || 0,
-          confidence: parsed.confidence || "low",
+          confidence: parsed.confidence || "medium",
           details: parsed.details || "",
         };
-      } catch {
-        console.error("Failed to parse GPT response as JSON:", responseText);
       }
+    } catch {
+      console.error("Failed to parse GPT response as JSON:", responseText);
+    }
+  }
+
+  return null;
+}
+
+export async function lookupCardPrice(card: CardInfo): Promise<PriceLookupResult> {
+  const queries = buildSearchQueries(card);
+  
+  try {
+    // Try each query until we get a result with a valid price
+    for (const query of queries) {
+      console.log(`Trying search query: ${query}`);
+      const result = await trySearchQuery(query, card);
+      if (result && result.estimatedValue) {
+        return result;
+      }
+      // Small delay between queries to avoid rate limiting
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
+    // If no queries returned a price, return a failure result
     return {
       estimatedValue: null,
-      source: "eBay (analysis failed)",
-      searchQuery,
-      salesFound: relevantResults.length,
+      source: "eBay (no sales found)",
+      searchQuery: queries[0],
+      salesFound: 0,
       confidence: "low",
-      details: "Unable to extract pricing from search results.",
+      details: `No recent sold listings found after trying ${queries.length} search variations.`,
     };
   } catch (error) {
     console.error("Price lookup error:", error);
