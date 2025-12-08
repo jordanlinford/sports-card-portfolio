@@ -184,11 +184,10 @@ export default function Dashboard() {
 
   const createTopCardsMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/display-cases/top-cards", {
+      return await apiRequest("POST", "/api/display-cases/top-cards", {
         limit: 12,
         name: "My Top Cards"
       });
-      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
