@@ -108,17 +108,29 @@ export default function CaseNew() {
       return response;
     },
     onSuccess: async (data: any) => {
+      let copyFailed = false;
       if (selectedCardIds.length > 0) {
-        await copyCardsMutation.mutateAsync({ caseId: data.id, cardIds: selectedCardIds });
+        try {
+          await copyCardsMutation.mutateAsync({ caseId: data.id, cardIds: selectedCardIds });
+        } catch (err) {
+          copyFailed = true;
+          toast({
+            title: "Cards could not be imported",
+            description: "Your display case was created but some cards failed to import. You can add them manually.",
+            variant: "destructive",
+          });
+        }
       }
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
-      toast({
-        title: "Display case created",
-        description: selectedCardIds.length > 0 
-          ? `Your display case is ready with ${selectedCardIds.length} imported card${selectedCardIds.length === 1 ? '' : 's'}!`
-          : "Your new display case is ready. Start adding cards!",
-      });
+      if (!copyFailed) {
+        toast({
+          title: "Display case created",
+          description: selectedCardIds.length > 0 
+            ? `Your display case is ready with ${selectedCardIds.length} imported card${selectedCardIds.length === 1 ? '' : 's'}!`
+            : "Your new display case is ready. Start adding cards!",
+        });
+      }
       setLocation(`/cases/${data.id}/edit`);
     },
     onError: (error: Error) => {
