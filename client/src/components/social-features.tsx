@@ -98,9 +98,8 @@ export function ShareButtons({ displayCaseId, caseName }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  const shareUrl = typeof window !== "undefined" 
-    ? `${window.location.origin}/case/${displayCaseId}`
-    : `/case/${displayCaseId}`;
+  const productionDomain = "https://mydisplaycase.io";
+  const shareUrl = `${productionDomain}/case/${displayCaseId}`;
   
   const shareText = `Check out "${caseName}" on MyDisplayCase!`;
 
