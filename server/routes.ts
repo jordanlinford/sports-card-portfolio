@@ -361,6 +361,11 @@ Allow: /
         return res.status(404).json({ message: "Display case not found" });
       }
 
+      // Increment view count (fire and forget - don't block the response)
+      storage.incrementViewCount(id).catch(err => {
+        console.error("Failed to increment view count:", err);
+      });
+
       res.json(displayCase);
     } catch (error) {
       console.error("Error fetching public display case:", error);
