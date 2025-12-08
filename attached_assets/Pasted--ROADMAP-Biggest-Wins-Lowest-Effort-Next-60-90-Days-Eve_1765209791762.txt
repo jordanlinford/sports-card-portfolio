@@ -1,0 +1,207 @@
+🚀 ROADMAP: Biggest Wins, Lowest Effort (Next 60–90 Days)
+
+Everything below is ranked by Impact → Effort and sequenced so you can build momentum.
+
+PHASE 1 — THE "WOW" FEATURES (Fast, Viral, Low Engineering)
+Goal: Get collectors sharing instantly. Growth without paid ads.
+✅ 1. Make Display Cases Look Absolutely Premium (LOW effort, HIGH reward)
+
+Collectors share only when it looks beautiful.
+
+Add quickly:
+
+Pre-made backgrounds: wood, velvet, neon, turf
+
+3 layout styles (grid, row, angled card spread)
+
+Hover animations for stats
+
+Optional title + subtitle (e.g., "My QB Grails")
+
+Why:
+This is uniquely YOUR space. No competitor does this.
+Shareable visuals = instant reach.
+
+✅ 2. Automatic OG Link Previews (You already have this, just polish)
+
+When a user shares a case on Facebook/Instagram/Discord, the preview image MUST look like:
+
+A beautiful digital shelf with 3–5 cards from the case.
+
+This one feature drives ~70% of virality for collector apps.
+
+Minimal engineering — just make sure your OG image generation is always clean and consistent.
+
+✅ 3. "One-Click Display Cases" from Tags (LOW effort, VERY high delight)
+
+You already have tagging in your collection → now let users:
+
+“Create Display Case from Tag”
+
+Instant cases of:
+
+PC Players
+
+Team sets
+
+PSA 10s
+
+Refractor showcase
+
+Chrome rookies
+
+All-time fantasy lineup
+
+Huge dopamine. Zero friction. Viral.
+
+✅ 4. Public Case URLs (you already have this—just emphasize it)
+
+Collectors want a “calling card” to share publicly.
+
+Add a simple toggle:
+
+Make Public → ON/OFF
+
+And show a copy link button:
+
+🔗 Copy Public URL
+
+This is the single easiest growth lever you have.
+
+✅ 5. Add Likes (no comments yet) (low effort, high retention)
+
+Likes = lightweight social.
+Comments = heavy social.
+
+Do likes first.
+
+Why it works:
+
+People love seeing feedback
+
+Makes display cases feel alive
+
+Adds the foundation for network effects
+
+This takes minutes with Firebase.
+
+PHASE 2 — FOUNDATION FOR VALUE (Moderate Effort, Big Competitive Edge)
+Goal: Give users a reason to return every day/week.
+✅ 6. Auto-Value Updates for Display Case Cards (you already have the logic)
+
+Just pull updated values weekly and show:
+
+“Case Value: $428 → $487 (+13%)”
+
+“Top riser: Josh Allen +22% this month”
+
+Collectors LOVE value tracking.
+This keeps them coming back.
+
+✅ 7. Simple Collection Manager (Don't overbuild)
+
+Just what you need:
+
+Add card
+
+Upload image
+
+Grading company + grade
+
+Estimated value
+
+Tags
+
+Notes
+
+That’s it.
+
+Do NOT add advanced analytics yet.
+Collectors just need a home base.
+
+✅ 8. Auto-Generate “Top Cards” Case (small feature, huge delight)
+
+One click:
+
+“Generate a Display Case of My Most Valuable 12 Cards”
+
+People LOVE this.
+They will screenshot it.
+They will share it.
+
+Total dev time: 1–2 hours.
+
+PHASE 3 — EARLY MONETIZATION (Low effort, clean)
+Goal: Simple revenue without heavy billing logic.
+💰 9. Premium Themes & Cases ($3–5/month)
+
+Free users get:
+
+3 backgrounds
+
+Basic layout
+
+Paid users get:
+
+15+ premium backgrounds
+
+Dynamic display animations
+
+Parallax case header
+
+Gradient glow
+
+Neon cases
+
+This is the lowest-effort way to monetize.
+
+💰 10. “Pro Collector Badge + Profile Page”
+
+Premium users can have:
+
+Custom username
+
+Public profile
+
+Their cases all displayed
+
+Bio + favorite player/team
+
+Verified collector badge
+
+Everyone wants status.
+This costs you nothing to maintain.
+
+PHASE 4 — KA-BOOM FEATURES (High impact, still low-ish effort)
+
+These features elevate the whole platform but are STILL in the “feasible” range.
+
+🚀 11. Auto-Generated Player Sets / Fantasy Teams
+
+Let users pick:
+
+"All-Time Fantasy Team"
+
+"Top 5 QB Grails"
+
+"Best Rookie Season Cards"
+
+"My Fantasy Football Draft Board"
+
+You already started this with your All-Time Fantasy Team idea.
+
+Collectors LOVE themed sets.
+
+🚀 12. Public Explore Page
+
+Showcase trending display cases:
+
+Most liked this week
+
+New this week
+
+QB displays
+
+PSA 10 showcases
+
+This is where the social flywheel begins.
