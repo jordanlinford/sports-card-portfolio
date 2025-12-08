@@ -67,10 +67,15 @@ async function upsertUser(claims: any) {
   });
 }
 
+// Custom domain for the application - can be overridden via CUSTOM_DOMAIN env var
+const CUSTOM_DOMAIN = process.env.CUSTOM_DOMAIN || "mydisplaycase.io";
+
 function getCanonicalDomain(requestHostname: string): string {
-  // In production, REPLIT_DEPLOYMENT_DOMAIN contains the .replit.app domain
-  if (process.env.REPLIT_DEPLOYMENT_DOMAIN) {
-    return process.env.REPLIT_DEPLOYMENT_DOMAIN;
+  // In production, prefer custom domain if it's configured
+  // The custom domain should be used for all auth callbacks
+  if (process.env.REPLIT_DEPLOYMENT_DOMAIN && CUSTOM_DOMAIN) {
+    // If we have a custom domain configured, use it instead of .replit.app
+    return CUSTOM_DOMAIN;
   }
   // In development, use REPLIT_DEV_DOMAIN
   if (process.env.REPLIT_DEV_DOMAIN) {
