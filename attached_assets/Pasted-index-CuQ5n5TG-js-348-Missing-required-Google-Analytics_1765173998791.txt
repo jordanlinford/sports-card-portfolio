@@ -1,0 +1,100 @@
+index-CuQ5n5TG.js:348 Missing required Google Analytics key: VITE_GA_MEASUREMENT_ID
+(anonymous) @ index-CuQ5n5TG.js:348
+yd @ index-CuQ5n5TG.js:40
+ii @ index-CuQ5n5TG.js:40
+ty @ index-CuQ5n5TG.js:40
+Qs @ index-CuQ5n5TG.js:38
+Xk @ index-CuQ5n5TG.js:40
+Js @ index-CuQ5n5TG.js:40
+G0 @ index-CuQ5n5TG.js:40
+j @ index-CuQ5n5TG.js:25
+O @ index-CuQ5n5TG.js:25Understand this warning
+index-CuQ5n5TG.js:48  GET https://mydisplaycase.io/api/admin/users 403 (Forbidden)
+(anonymous) @ index-CuQ5n5TG.js:48
+o @ index-CuQ5n5TG.js:48
+w @ index-CuQ5n5TG.js:48
+start @ index-CuQ5n5TG.js:48
+fetch @ index-CuQ5n5TG.js:48
+Ea @ index-CuQ5n5TG.js:48
+onSubscribe @ index-CuQ5n5TG.js:48
+subscribe @ index-CuQ5n5TG.js:48
+(anonymous) @ index-CuQ5n5TG.js:48
+v0 @ index-CuQ5n5TG.js:38
+yd @ index-CuQ5n5TG.js:40
+ii @ index-CuQ5n5TG.js:40
+Xk @ index-CuQ5n5TG.js:40
+Js @ index-CuQ5n5TG.js:40
+ty @ index-CuQ5n5TG.js:40
+Qs @ index-CuQ5n5TG.js:38
+(anonymous) @ index-CuQ5n5TG.js:40
+setTimeout
+s @ index-CuQ5n5TG.js:48
+a @ index-CuQ5n5TG.js:48
+batch @ index-CuQ5n5TG.js:48
+Lr @ index-CuQ5n5TG.js:48
+setData @ index-CuQ5n5TG.js:48
+onSuccess @ index-CuQ5n5TG.js:48
+f @ index-CuQ5n5TG.js:48
+Promise.then
+w @ index-CuQ5n5TG.js:48
+start @ index-CuQ5n5TG.js:48
+fetch @ index-CuQ5n5TG.js:48
+Ea @ index-CuQ5n5TG.js:48
+onSubscribe @ index-CuQ5n5TG.js:48
+subscribe @ index-CuQ5n5TG.js:48
+(anonymous) @ index-CuQ5n5TG.js:48
+v0 @ index-CuQ5n5TG.js:38
+yd @ index-CuQ5n5TG.js:40
+ii @ index-CuQ5n5TG.js:40
+ty @ index-CuQ5n5TG.js:40
+Qs @ index-CuQ5n5TG.js:38
+Xk @ index-CuQ5n5TG.js:40
+Js @ index-CuQ5n5TG.js:40
+G0 @ index-CuQ5n5TG.js:40
+j @ index-CuQ5n5TG.js:25
+O @ index-CuQ5n5TG.js:25Understand this error
+index-CuQ5n5TG.js:48  GET https://mydisplaycase.io/api/admin/display-cases 403 (Forbidden)
+(anonymous) @ index-CuQ5n5TG.js:48
+o @ index-CuQ5n5TG.js:48
+w @ index-CuQ5n5TG.js:48
+start @ index-CuQ5n5TG.js:48
+fetch @ index-CuQ5n5TG.js:48
+Ea @ index-CuQ5n5TG.js:48
+onSubscribe @ index-CuQ5n5TG.js:48
+subscribe @ index-CuQ5n5TG.js:48
+(anonymous) @ index-CuQ5n5TG.js:48
+v0 @ index-CuQ5n5TG.js:38
+yd @ index-CuQ5n5TG.js:40
+ii @ index-CuQ5n5TG.js:40
+Xk @ index-CuQ5n5TG.js:40
+Js @ index-CuQ5n5TG.js:40
+ty @ index-CuQ5n5TG.js:40
+Qs @ index-CuQ5n5TG.js:38
+(anonymous) @ index-CuQ5n5TG.js:40
+setTimeout
+s @ index-CuQ5n5TG.js:48
+a @ index-CuQ5n5TG.js:48
+batch @ index-CuQ5n5TG.js:48
+Lr @ index-CuQ5n5TG.js:48
+setData @ index-CuQ5n5TG.js:48
+onSuccess @ index-CuQ5n5TG.js:48
+f @ index-CuQ5n5TG.js:48
+Promise.then
+w @ index-CuQ5n5TG.js:48
+start @ index-CuQ5n5TG.js:48
+fetch @ index-CuQ5n5TG.js:48
+Ea @ index-CuQ5n5TG.js:48
+onSubscribe @ index-CuQ5n5TG.js:48
+subscribe @ index-CuQ5n5TG.js:48
+(anonymous) @ index-CuQ5n5TG.js:48
+v0 @ index-CuQ5n5TG.js:38
+yd @ index-CuQ5n5TG.js:40
+ii @ index-CuQ5n5TG.js:40
+ty @ index-CuQ5n5TG.js:40
+Qs @ index-CuQ5n5TG.js:38
+Xk @ index-CuQ5n5TG.js:40
+Js @ index-CuQ5n5TG.js:40
+G0 @ index-CuQ5n5TG.js:40
+j @ index-CuQ5n5TG.js:25
+O @ index-CuQ5n5TG.js:25Understand this error
+index-CuQ5n5TG.js:48  GET https://mydisplaycase.io/api/admin/stats 403 (Forbidden)
