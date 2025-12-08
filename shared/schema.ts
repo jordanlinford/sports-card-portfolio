@@ -79,6 +79,8 @@ export const cards = pgTable("cards", {
   grade: varchar("grade", { length: 50 }),
   purchasePrice: real("purchase_price"),
   estimatedValue: real("estimated_value"),
+  previousValue: real("previous_value"),
+  valueUpdatedAt: timestamp("value_updated_at"),
   notes: text("notes"),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow(),

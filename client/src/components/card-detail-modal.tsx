@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, FileText, Sparkles } from "lucide-react";
+import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles } from "lucide-react";
 import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -365,7 +365,31 @@ export function CardDetailModal({
                   <span className="font-medium" data-testid="text-estimated-value">
                     {formatCurrency(card.estimatedValue)}
                   </span>
+                  {card.previousValue && card.previousValue > 0 && card.estimatedValue && card.estimatedValue !== card.previousValue && (
+                    <Badge 
+                      variant={card.estimatedValue > card.previousValue ? "default" : "destructive"}
+                      className="gap-1"
+                      data-testid="badge-value-change"
+                    >
+                      {card.estimatedValue > card.previousValue ? (
+                        <TrendingUp className="h-3 w-3" />
+                      ) : (
+                        <TrendingDown className="h-3 w-3" />
+                      )}
+                      {card.estimatedValue > card.previousValue ? '+' : ''}
+                      {(((card.estimatedValue - card.previousValue) / card.previousValue) * 100).toFixed(1)}%
+                    </Badge>
+                  )}
                 </div>
+
+                {card.previousValue && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Previous Value:</span>
+                    <span className="font-medium text-muted-foreground" data-testid="text-previous-value">
+                      {formatCurrency(card.previousValue)}
+                    </span>
+                  </div>
+                )}
 
                 {profitLoss !== null && (
                   <div className="flex items-center gap-2 text-sm">

@@ -401,6 +401,56 @@ Allow: /
     }
   });
 
+  // Create a display case from the user's top valued cards
+  app.post("/api/display-cases/top-cards", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { limit = 12, name = "My Top Cards" } = req.body;
+      
+      // Check free tier limit
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        const caseCount = await storage.countDisplayCases(userId);
+        if (caseCount >= 3) {
+          return res.status(403).json({ 
+            message: "Free tier limit reached. Upgrade to Pro for unlimited cases." 
+          });
+        }
+      }
+
+      // Get user's top valued cards (this method already filters by user ownership)
+      const topCards = await storage.getTopValuedCards(userId, limit);
+      
+      if (topCards.length === 0) {
+        return res.status(400).json({ 
+          message: "No cards with values found. Add estimated values to your cards first." 
+        });
+      }
+
+      // Create a new display case
+      const displayCase = await storage.createDisplayCase(userId, {
+        name,
+        description: `Automatically generated showcase of my ${topCards.length} most valuable cards.`,
+        isPublic: true,
+        theme: "classic",
+        showCardCount: true,
+        showTotalValue: true,
+      });
+
+      // Copy the top cards to the new display case (cards are verified to belong to user via getTopValuedCards)
+      const cardIds = topCards.map(c => c.id);
+      await storage.copyCardsToDisplayCase(cardIds, displayCase.id);
+
+      // Fetch the complete display case with the newly copied cards
+      const completeCase = await storage.getDisplayCase(displayCase.id);
+      
+      res.status(201).json(completeCase);
+    } catch (error) {
+      console.error("Error creating top cards case:", error);
+      res.status(500).json({ message: "Failed to create top cards case" });
+    }
+  });
+
   app.patch("/api/display-cases/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -480,6 +530,14 @@ Allow: /
       const existing = await storage.getDisplayCaseByIdAndUser(displayCaseId, userId);
       if (!existing) {
         return res.status(404).json({ message: "Display case not found" });
+      }
+
+      // Verify user owns all the cards they're trying to copy
+      const userCards = await storage.getAllUserCards(userId);
+      const userCardIds = new Set(userCards.map(c => c.id));
+      const invalidCardIds = cardIds.filter((id: number) => !userCardIds.has(id));
+      if (invalidCardIds.length > 0) {
+        return res.status(403).json({ message: "You can only copy cards from your own collection" });
       }
 
       const copiedCards = await storage.copyCardsToDisplayCase(cardIds, displayCaseId);

@@ -62,8 +62,10 @@ Preferred communication style: Simple, everyday language.
 **Schema Design**:
 - `users` - User profiles with subscription status and Stripe customer ID
 - `sessions` - Express session storage
-- `display_cases` - User-created collections with name, description, and visibility settings
-- `cards` - Individual card items with image URLs, titles, descriptions, and sort order
+- `display_cases` - User-created collections with name, description, visibility settings, and view count tracking
+- `cards` - Individual card items with image URLs, titles, descriptions, sort order, and value tracking (estimatedValue, previousValue, valueUpdatedAt)
+- `comments` - User comments on display cases
+- `likes` - Like tracking for display cases
 
 **Database Access**: Drizzle ORM with type-safe query builder and schema definitions in `shared/schema.ts`
 
@@ -160,3 +162,22 @@ Preferred communication style: Simple, everyday language.
 - esbuild for server bundling
 - Vite for client bundling
 - tsx for TypeScript execution in development
+
+## Recent Features
+
+### Top Cards Case Generator
+- Dashboard includes "Create Top Cards Case" button
+- Automatically creates a display case from user's top 12 most valuable cards
+- Route: `POST /api/display-cases/top-cards`
+- Shows only when user has cards with estimated values
+
+### Value Change Tracking
+- Cards track `previousValue` and `valueUpdatedAt` when estimated value changes
+- Value change indicators (+/- percentage) displayed on:
+  - Card grid in case-view page
+  - Card detail modal
+- Automatically tracks when `estimatedValue` is updated
+
+### Admin Auto-Grant
+- Users with email `jordanlinford@gmail.com` automatically receive admin access and PRO subscription on login
+- Implemented in `upsertUser` function in `server/storage.ts`

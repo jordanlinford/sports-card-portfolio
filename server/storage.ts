@@ -39,6 +39,7 @@ export interface IStorage {
   getCards(displayCaseId: number): Promise<Card[]>;
   getCard(id: number): Promise<Card | undefined>;
   getAllUserCards(userId: string): Promise<(Card & { displayCaseName: string })[]>;
+  getTopValuedCards(userId: string, limit?: number): Promise<Card[]>;
   createCard(displayCaseId: number, data: InsertCard): Promise<Card>;
   copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]>;
   updateCard(id: number, data: Partial<InsertCard>): Promise<Card | undefined>;
@@ -258,6 +259,29 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getTopValuedCards(userId: string, limit: number = 12): Promise<Card[]> {
+    const userCases = await db.select({ id: displayCases.id })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+    
+    if (userCases.length === 0) return [];
+    
+    const caseIds = userCases.map(c => c.id);
+    
+    const topCards = await db.select()
+      .from(cards)
+      .where(
+        and(
+          inArray(cards.displayCaseId, caseIds),
+          sql`${cards.estimatedValue} IS NOT NULL AND ${cards.estimatedValue} > 0`
+        )
+      )
+      .orderBy(desc(cards.estimatedValue))
+      .limit(limit);
+    
+    return topCards;
+  }
+
   async copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]> {
     if (cardIds.length === 0) return [];
     
@@ -306,9 +330,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCard(id: number, data: Partial<InsertCard>): Promise<Card | undefined> {
+    // If estimatedValue is being updated, track the previous value
+    let updateData: any = { ...data };
+    
+    if ('estimatedValue' in data) {
+      const [existingCard] = await db.select().from(cards).where(eq(cards.id, id));
+      if (existingCard) {
+        const newValue = data.estimatedValue;
+        const oldValue = existingCard.estimatedValue;
+        
+        // Only track change if both values exist and are different
+        if (oldValue !== null && newValue !== null && oldValue !== newValue && oldValue > 0) {
+          updateData.previousValue = oldValue;
+          updateData.valueUpdatedAt = new Date();
+        } else if (newValue === null || newValue === oldValue) {
+          // Clear previous value tracking if value is removed or unchanged
+          updateData.previousValue = null;
+          updateData.valueUpdatedAt = null;
+        }
+      }
+    }
+    
     const [card] = await db
       .update(cards)
-      .set(data)
+      .set(updateData)
       .where(eq(cards.id, id))
       .returning();
     return card;

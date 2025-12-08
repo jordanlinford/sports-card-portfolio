@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -15,10 +15,13 @@ import {
   Calendar,
   ImageIcon,
   Crown,
-  FolderOpen
+  FolderOpen,
+  Sparkles,
+  TrendingUp
 } from "lucide-react";
 import type { DisplayCaseWithCards } from "@shared/schema";
 import { format } from "date-fns";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 function DashboardSkeleton() {
   return (
@@ -159,6 +162,7 @@ function DisplayCaseCard({ displayCase }: { displayCase: DisplayCaseWithCards })
 export default function Dashboard() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -178,10 +182,41 @@ export default function Dashboard() {
     enabled: isAuthenticated,
   });
 
+  const createTopCardsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/display-cases/top-cards", {
+        limit: 12,
+        name: "My Top Cards"
+      });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases", data.id] });
+      toast({
+        title: "Top Cards Case Created",
+        description: `Created a showcase of your ${data.cards?.length || 0} most valuable cards!`,
+      });
+      setLocation(`/cases/${data.id}/edit`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Could not create case",
+        description: error.message || "Failed to create top cards case",
+        variant: "destructive",
+      });
+    },
+  });
+
   const isLoading = authLoading || casesLoading;
   const caseCount = displayCases?.length || 0;
   const isPro = user?.subscriptionStatus === "PRO";
   const canCreate = isPro || caseCount < 3;
+  
+  // Check if user has any cards with values
+  const hasValuableCards = displayCases?.some(dc => 
+    dc.cards?.some(card => card.estimatedValue && card.estimatedValue > 0)
+  ) ?? false;
 
   if (isLoading) {
     return (
@@ -209,7 +244,7 @@ export default function Dashboard() {
             )}
           </p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           {!isPro && caseCount >= 3 && (
             <Link href="/upgrade">
               <Button variant="outline" className="gap-2" data-testid="button-upgrade-dashboard">
@@ -217,6 +252,18 @@ export default function Dashboard() {
                 Upgrade to Pro
               </Button>
             </Link>
+          )}
+          {canCreate && hasValuableCards && (
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              onClick={() => createTopCardsMutation.mutate()}
+              disabled={createTopCardsMutation.isPending}
+              data-testid="button-create-top-cards"
+            >
+              <Sparkles className="h-4 w-4" />
+              {createTopCardsMutation.isPending ? "Creating..." : "Create Top Cards Case"}
+            </Button>
           )}
           {canCreate && (
             <Link href="/cases/new">

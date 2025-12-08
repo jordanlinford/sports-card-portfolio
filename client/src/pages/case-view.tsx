@@ -10,12 +10,31 @@ import {
   Calendar,
   ImageIcon,
   Lock,
-  DollarSign
+  DollarSign,
+  TrendingUp,
+  TrendingDown
 } from "lucide-react";
 import type { DisplayCaseWithCards, Card, User } from "@shared/schema";
 import { format } from "date-fns";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { SocialFeatures } from "@/components/social-features";
+
+function ValueChangeIndicator({ card }: { card: Card }) {
+  if (!card.estimatedValue || !card.previousValue || card.previousValue <= 0) return null;
+  
+  const change = card.estimatedValue - card.previousValue;
+  if (Math.abs(change) < 0.01) return null;
+  
+  const percentChange = ((change / card.previousValue) * 100).toFixed(1);
+  const isPositive = change > 0;
+  
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+      {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+      {isPositive ? '+' : ''}{percentChange}%
+    </span>
+  );
+}
 
 const THEME_STYLES: Record<string, { bg: string; frame: string; glass: string; mat: string; text: string; textMuted: string }> = {
   "classic": {
@@ -230,9 +249,12 @@ export default function CaseView() {
                               )}
                             </div>
                             {card.estimatedValue && (
-                              <p className="mt-1 text-xs text-primary font-semibold">
-                                ${card.estimatedValue.toFixed(2)}
-                              </p>
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <span className="text-xs text-primary font-semibold">
+                                  ${card.estimatedValue.toFixed(2)}
+                                </span>
+                                <ValueChangeIndicator card={card} />
+                              </div>
                             )}
                           </div>
                         </div>
