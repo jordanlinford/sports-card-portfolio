@@ -54,6 +54,7 @@ export const displayCases = pgTable("display_cases", {
   theme: varchar("theme", { length: 50 }).default("classic").notNull(),
   showCardCount: boolean("show_card_count").default(false).notNull(),
   showTotalValue: boolean("show_total_value").default(false).notNull(),
+  viewCount: integer("view_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

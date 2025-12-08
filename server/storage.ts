@@ -63,6 +63,9 @@ export interface IStorage {
   getAllDisplayCases(): Promise<(DisplayCaseWithCards & { ownerName: string })[]>;
   getPlatformStats(): Promise<{ totalUsers: number; totalDisplayCases: number; totalCards: number; proUsers: number }>;
   isUserAdmin(userId: string): Promise<boolean>;
+
+  // View tracking
+  incrementViewCount(displayCaseId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -571,6 +574,13 @@ export class DatabaseStorage implements IStorage {
   async isUserAdmin(userId: string): Promise<boolean> {
     const [user] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, userId));
     return user?.isAdmin || false;
+  }
+
+  async incrementViewCount(displayCaseId: number): Promise<void> {
+    await db
+      .update(displayCases)
+      .set({ viewCount: sql`${displayCases.viewCount} + 1` })
+      .where(eq(displayCases.id, displayCaseId));
   }
 }
 
