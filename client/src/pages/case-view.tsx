@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,9 +12,14 @@ import {
   Lock,
   DollarSign,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  RefreshCw,
+  Loader2,
+  Edit
 } from "lucide-react";
 import type { DisplayCaseWithCards, Card, User } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { SocialFeatures } from "@/components/social-features";
@@ -94,6 +99,7 @@ function CardGridSkeleton() {
 export default function CaseView() {
   const { id } = useParams<{ id: string }>();
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const { toast } = useToast();
 
   const { data: displayCase, isLoading, error } = useQuery<DisplayCaseWithCards>({
     queryKey: [`/api/display-cases/${id}/public`],
@@ -101,6 +107,32 @@ export default function CaseView() {
 
   const { data: user } = useQuery<User>({
     queryKey: ["/api/auth/user"],
+  });
+
+  const isOwner = user?.id === displayCase?.userId;
+
+  const refreshAllPricesMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/display-cases/${id}/refresh-prices`);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
+      
+      const updatedCount = data.results?.filter((r: any) => r.oldValue !== r.newValue).length || 0;
+      toast({
+        title: "Values Refreshed",
+        description: `Processed ${data.cardsProcessed} cards. ${updatedCount} values updated.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Refresh Failed",
+        description: error.message || "Failed to refresh card values",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -149,9 +181,38 @@ export default function CaseView() {
 
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold mb-2" data-testid="text-case-title">
-                {displayCase.name}
-              </h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-3xl md:text-4xl font-bold" data-testid="text-case-title">
+                  {displayCase.name}
+                </h1>
+                {isOwner && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link href={`/cases/${id}/edit`}>
+                      <Button variant="outline" size="sm" className="gap-2" data-testid="button-edit-case">
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    </Link>
+                    {displayCase.cards && displayCase.cards.length > 0 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => refreshAllPricesMutation.mutate()}
+                        disabled={refreshAllPricesMutation.isPending}
+                        data-testid="button-refresh-all-prices"
+                      >
+                        {refreshAllPricesMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        {refreshAllPricesMutation.isPending ? "Refreshing..." : "Refresh Values"}
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
               {displayCase.description && (
                 <p className="text-muted-foreground text-lg max-w-2xl" data-testid="text-case-description">
                   {displayCase.description}
@@ -294,7 +355,7 @@ export default function CaseView() {
         isOpen={!!selectedCard}
         onClose={() => setSelectedCard(null)}
         displayCaseId={parseInt(id || "0")}
-        canEdit={false}
+        canEdit={isOwner}
       />
     </div>
   );

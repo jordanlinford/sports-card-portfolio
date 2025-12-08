@@ -178,6 +178,17 @@ Preferred communication style: Simple, everyday language.
   - Card detail modal
 - Automatically tracks when `estimatedValue` is updated
 
+### AI-Powered Price Lookups
+- Uses OpenAI GPT + Serper API to search eBay sold listings
+- Cost: ~$0.002 per card lookup
+- **Refresh buttons available in:**
+  - Case-view page: "Refresh Values" button next to Edit button (bulk update)
+  - Case-edit page: "Refresh All Values" button in Cards section header
+  - Card detail modal: "Refresh Value from eBay" button (single card)
+- Routes:
+  - `POST /api/cards/:id/lookup-price` - Single card price lookup
+  - `POST /api/display-cases/:id/refresh-prices` - Bulk price refresh
+
 ### Admin Auto-Grant
 - Users with email `jordanlinford@gmail.com` automatically receive admin access and PRO subscription on login
 - Implemented in `upsertUser` function in `server/storage.ts`
