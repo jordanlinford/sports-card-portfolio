@@ -129,9 +129,13 @@ function DisplayCaseCard({ displayCase }: { displayCase: DisplayCaseWithCards })
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            {cardCount} {cardCount === 1 ? "card" : "cards"}
-          </span>
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span>{cardCount} {cardCount === 1 ? "card" : "cards"}</span>
+            <span className="flex items-center gap-1" data-testid={`text-views-${displayCase.id}`}>
+              <Eye className="h-3 w-3" />
+              {displayCase.viewCount || 0} {displayCase.viewCount === 1 ? "view" : "views"}
+            </span>
+          </div>
           <div className="flex gap-2">
             <Link href={`/cases/${displayCase.id}`}>
               <Button variant="outline" size="sm" className="gap-1" data-testid={`button-view-case-${displayCase.id}`}>
