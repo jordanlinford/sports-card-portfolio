@@ -17,36 +17,46 @@ import { format } from "date-fns";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { SocialFeatures } from "@/components/social-features";
 
-const THEME_STYLES: Record<string, { bg: string; frame: string; glass: string; mat: string }> = {
+const THEME_STYLES: Record<string, { bg: string; frame: string; glass: string; mat: string; text: string; textMuted: string }> = {
   "classic": {
     bg: "bg-gradient-to-b from-amber-100 to-amber-200 dark:from-amber-950 dark:to-amber-900",
     frame: "bg-amber-800 dark:bg-amber-900 border-amber-900 dark:border-amber-950",
     glass: "bg-white/10 dark:bg-white/5",
     mat: "bg-amber-50 dark:bg-amber-950/50",
+    text: "text-stone-900 dark:text-amber-100",
+    textMuted: "text-stone-600 dark:text-amber-300/70",
   },
   "dark-wood": {
     bg: "bg-gradient-to-b from-amber-950 to-stone-950",
     frame: "bg-stone-900 border-stone-950",
     glass: "bg-white/5",
     mat: "bg-stone-900/80",
+    text: "text-amber-100",
+    textMuted: "text-amber-200/70",
   },
   "velvet": {
     bg: "bg-gradient-to-b from-red-950 to-rose-950",
     frame: "bg-stone-800 border-stone-900",
     glass: "bg-white/5",
     mat: "bg-red-950/50",
+    text: "text-rose-100",
+    textMuted: "text-rose-200/70",
   },
   "midnight": {
     bg: "bg-gradient-to-b from-slate-900 to-slate-950",
     frame: "bg-slate-800 border-slate-900",
     glass: "bg-white/5",
     mat: "bg-slate-800/50",
+    text: "text-slate-100",
+    textMuted: "text-slate-300/80",
   },
   "gallery": {
     bg: "bg-gradient-to-b from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-900",
     frame: "bg-neutral-300 dark:bg-neutral-700 border-neutral-400 dark:border-neutral-800",
     glass: "bg-white/20 dark:bg-white/5",
     mat: "bg-white dark:bg-neutral-800",
+    text: "text-neutral-900 dark:text-neutral-100",
+    textMuted: "text-neutral-500 dark:text-neutral-400",
   },
 };
 
@@ -203,10 +213,10 @@ export default function CaseView() {
                           </div>
                           
                           <div className="mt-2 px-1">
-                            <p className="font-medium text-sm truncate text-foreground">{card.title}</p>
+                            <p className={`font-medium text-sm truncate ${theme.text}`}>{card.title}</p>
                             <div className="flex flex-wrap items-center gap-1 mt-1">
                               {card.year && (
-                                <span className="text-xs text-muted-foreground">{card.year}</span>
+                                <span className={`text-xs ${theme.textMuted}`}>{card.year}</span>
                               )}
                               {card.variation && (
                                 <Badge variant="outline" className="text-xs">
