@@ -69,6 +69,32 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Initialize Stripe webhooks and sync
   await initStripe(app);
 
+  // Robots.txt - allow social media crawlers
+  app.get("/robots.txt", (req, res) => {
+    const robotsTxt = `User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: *
+Allow: /
+`;
+    res.type('text/plain').send(robotsTxt);
+  });
+
   // Stripe webhook endpoint - uses rawBody captured in index.ts
   app.post("/api/stripe/webhook/:uuid", async (req: any, res) => {
     const signature = req.headers['stripe-signature'];
