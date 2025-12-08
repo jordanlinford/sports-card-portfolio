@@ -450,6 +450,46 @@ Allow: /
     }
   });
 
+  // Get all user cards across all display cases
+  app.get("/api/cards", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cards = await storage.getAllUserCards(userId);
+      res.json(cards);
+    } catch (error) {
+      console.error("Error fetching user cards:", error);
+      res.status(500).json({ message: "Failed to fetch cards" });
+    }
+  });
+
+  // Copy cards to a display case
+  app.post("/api/display-cases/:id/copy-cards", isAuthenticated, async (req: any, res) => {
+    try {
+      const displayCaseId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { cardIds } = req.body;
+
+      if (isNaN(displayCaseId)) {
+        return res.status(400).json({ message: "Invalid display case ID" });
+      }
+
+      if (!Array.isArray(cardIds) || cardIds.length === 0) {
+        return res.status(400).json({ message: "No cards selected" });
+      }
+
+      const existing = await storage.getDisplayCaseByIdAndUser(displayCaseId, userId);
+      if (!existing) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      const copiedCards = await storage.copyCardsToDisplayCase(cardIds, displayCaseId);
+      res.status(201).json(copiedCards);
+    } catch (error) {
+      console.error("Error copying cards:", error);
+      res.status(500).json({ message: "Failed to copy cards" });
+    }
+  });
+
   // Cards routes
   app.post("/api/display-cases/:id/cards", isAuthenticated, async (req: any, res) => {
     try {

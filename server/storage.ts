@@ -38,7 +38,9 @@ export interface IStorage {
   // Card operations
   getCards(displayCaseId: number): Promise<Card[]>;
   getCard(id: number): Promise<Card | undefined>;
+  getAllUserCards(userId: string): Promise<(Card & { displayCaseName: string })[]>;
   createCard(displayCaseId: number, data: InsertCard): Promise<Card>;
+  copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]>;
   updateCard(id: number, data: Partial<InsertCard>): Promise<Card | undefined>;
   deleteCard(id: number): Promise<void>;
   getMaxSortOrder(displayCaseId: number): Promise<number>;
@@ -222,6 +224,61 @@ export class DatabaseStorage implements IStorage {
   async getCard(id: number): Promise<Card | undefined> {
     const [card] = await db.select().from(cards).where(eq(cards.id, id));
     return card;
+  }
+
+  async getAllUserCards(userId: string): Promise<(Card & { displayCaseName: string })[]> {
+    const userCases = await db.select({ id: displayCases.id, name: displayCases.name })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+    
+    if (userCases.length === 0) return [];
+    
+    const caseIds = userCases.map(c => c.id);
+    const caseNameMap = new Map(userCases.map(c => [c.id, c.name]));
+    
+    const allCards = await db.select()
+      .from(cards)
+      .where(inArray(cards.displayCaseId, caseIds))
+      .orderBy(asc(cards.displayCaseId), asc(cards.sortOrder));
+    
+    return allCards.map(card => ({
+      ...card,
+      displayCaseName: caseNameMap.get(card.displayCaseId) || 'Unknown'
+    }));
+  }
+
+  async copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]> {
+    if (cardIds.length === 0) return [];
+    
+    const sourcCards = await db.select()
+      .from(cards)
+      .where(inArray(cards.id, cardIds));
+    
+    const maxSortOrder = await this.getMaxSortOrder(targetDisplayCaseId);
+    
+    const newCards: Card[] = [];
+    for (let i = 0; i < sourcCards.length; i++) {
+      const sourceCard = sourcCards[i];
+      const [newCard] = await db
+        .insert(cards)
+        .values({
+          displayCaseId: targetDisplayCaseId,
+          title: sourceCard.title,
+          imagePath: sourceCard.imagePath,
+          set: sourceCard.set,
+          year: sourceCard.year,
+          variation: sourceCard.variation,
+          grade: sourceCard.grade,
+          purchasePrice: sourceCard.purchasePrice,
+          estimatedValue: sourceCard.estimatedValue,
+          notes: sourceCard.notes,
+          sortOrder: maxSortOrder + i + 1,
+        })
+        .returning();
+      newCards.push(newCard);
+    }
+    
+    return newCards;
   }
 
   async createCard(displayCaseId: number, data: InsertCard): Promise<Card> {
