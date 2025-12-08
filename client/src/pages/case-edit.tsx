@@ -319,6 +319,40 @@ export default function CaseEdit() {
     },
   });
 
+  const deleteCaseMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("DELETE", `/api/display-cases/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      toast({
+        title: "Display case deleted",
+        description: "Your display case has been permanently deleted.",
+      });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Error deleting display case",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   const reorderMutation = useMutation({
     mutationFn: async (cardIds: number[]) => {
       return await apiRequest("POST", `/api/display-cases/${id}/cards/reorder`, { cardIds });
@@ -623,6 +657,50 @@ export default function CaseEdit() {
                 </Button>
               </form>
             </Form>
+
+            <Separator className="my-6" />
+
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-medium text-destructive">Danger Zone</h3>
+                <p className="text-sm text-muted-foreground">
+                  Permanently delete this display case and all its cards
+                </p>
+              </div>
+              <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" className="gap-2" data-testid="button-delete-case">
+                    <Trash2 className="h-4 w-4" />
+                    Delete Display Case
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Delete Display Case</DialogTitle>
+                    <DialogDescription>
+                      Are you sure you want to delete "{displayCase?.name}"? This will permanently remove the display case and all {displayCase?.cards?.length || 0} cards. This action cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter className="gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDeleteConfirm(false)}
+                      data-testid="button-cancel-delete"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => deleteCaseMutation.mutate()}
+                      disabled={deleteCaseMutation.isPending}
+                      data-testid="button-confirm-delete"
+                    >
+                      {deleteCaseMutation.isPending ? "Deleting..." : "Delete Forever"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </CardContent>
         </Card>
 
