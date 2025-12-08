@@ -57,6 +57,12 @@ export interface IStorage {
   getRecentPublicDisplayCases(limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
   searchPublicDisplayCases(query: string, limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
   getPopularPublicDisplayCases(limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
+
+  // Admin operations
+  getAllUsers(): Promise<User[]>;
+  getAllDisplayCases(): Promise<(DisplayCaseWithCards & { ownerName: string })[]>;
+  getPlatformStats(): Promise<{ totalUsers: number; totalDisplayCases: number; totalCards: number; proUsers: number }>;
+  isUserAdmin(userId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -504,6 +510,67 @@ export class DatabaseStorage implements IStorage {
     }
 
     return enrichedCases;
+  }
+
+  // Admin operations
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async getAllDisplayCases(): Promise<(DisplayCaseWithCards & { ownerName: string })[]> {
+    const allCases = await db
+      .select()
+      .from(displayCases)
+      .orderBy(desc(displayCases.createdAt));
+
+    const enrichedCases: (DisplayCaseWithCards & { ownerName: string })[] = [];
+
+    for (const c of allCases) {
+      const caseCards = await db
+        .select()
+        .from(cards)
+        .where(eq(cards.displayCaseId, c.id))
+        .orderBy(asc(cards.sortOrder));
+
+      const [owner] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, c.userId));
+
+      const ownerName = owner
+        ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
+        : "Anonymous";
+
+      enrichedCases.push({
+        ...c,
+        cards: caseCards,
+        ownerName,
+      });
+    }
+
+    return enrichedCases;
+  }
+
+  async getPlatformStats(): Promise<{ totalUsers: number; totalDisplayCases: number; totalCards: number; proUsers: number }> {
+    const [userCount] = await db.select({ count: sql<number>`count(*)::int` }).from(users);
+    const [caseCount] = await db.select({ count: sql<number>`count(*)::int` }).from(displayCases);
+    const [cardCount] = await db.select({ count: sql<number>`count(*)::int` }).from(cards);
+    const [proCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(users)
+      .where(eq(users.subscriptionStatus, "PRO"));
+
+    return {
+      totalUsers: userCount?.count || 0,
+      totalDisplayCases: caseCount?.count || 0,
+      totalCards: cardCount?.count || 0,
+      proUsers: proCount?.count || 0,
+    };
+  }
+
+  async isUserAdmin(userId: string): Promise<boolean> {
+    const [user] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, userId));
+    return user?.isAdmin || false;
   }
 }
 

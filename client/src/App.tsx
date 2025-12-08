@@ -19,6 +19,7 @@ import SearchPage from "@/pages/search";
 import TermsOfService from "@/pages/terms-of-service";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import Explore from "@/pages/explore";
+import AdminDashboard from "@/pages/admin";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -45,6 +46,7 @@ function Router() {
           <Route path="/cases/:id" component={CaseView} />
           <Route path="/upgrade" component={Upgrade} />
           <Route path="/billing/success" component={BillingSuccess} />
+          <Route path="/admin" component={AdminDashboard} />
         </>
       )}
       <Route component={NotFound} />
