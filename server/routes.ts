@@ -8,6 +8,7 @@ import { insertDisplayCaseSchema, insertCardSchema } from "@shared/schema";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
+import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
 
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
@@ -656,6 +657,126 @@ Allow: /
     } catch (error) {
       console.error("Error reordering cards:", error);
       res.status(500).json({ message: "Failed to reorder cards" });
+    }
+  });
+
+  // Price lookup for a single card
+  app.post("/api/cards/:cardId/lookup-price", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      // Verify user owns this card via the display case
+      const displayCase = await storage.getDisplayCaseByIdAndUser(card.displayCaseId, userId);
+      if (!displayCase) {
+        return res.status(403).json({ message: "You don't have permission to update this card" });
+      }
+
+      const result = await lookupCardPrice({
+        title: card.title,
+        set: card.set,
+        year: card.year,
+        variation: card.variation,
+        grade: card.grade,
+      });
+
+      // If we got a value, update the card
+      if (result.estimatedValue !== null) {
+        await storage.updateCard(cardId, { estimatedValue: result.estimatedValue });
+      }
+
+      res.json({
+        ...result,
+        cardId,
+        updated: result.estimatedValue !== null,
+      });
+    } catch (error) {
+      console.error("Error looking up card price:", error);
+      res.status(500).json({ message: "Failed to lookup card price" });
+    }
+  });
+
+  // Bulk price lookup for all cards in a display case
+  app.post("/api/display-cases/:id/refresh-prices", isAuthenticated, async (req: any, res) => {
+    try {
+      const displayCaseId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(displayCaseId)) {
+        return res.status(400).json({ message: "Invalid display case ID" });
+      }
+
+      const displayCase = await storage.getDisplayCaseByIdAndUser(displayCaseId, userId);
+      if (!displayCase) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      const fullCase = await storage.getDisplayCase(displayCaseId);
+      if (!fullCase?.cards || fullCase.cards.length === 0) {
+        return res.status(400).json({ message: "No cards in this display case" });
+      }
+
+      const results: Array<{ cardId: number; title: string; oldValue: number | null; newValue: number | null; confidence: string; details?: string }> = [];
+
+      for (const card of fullCase.cards) {
+        try {
+          // Add delay between requests to avoid rate limiting
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+
+          const result = await lookupCardPrice({
+            title: card.title,
+            set: card.set,
+            year: card.year,
+            variation: card.variation,
+            grade: card.grade,
+          });
+
+          const oldValue = card.estimatedValue;
+          let newValue = oldValue;
+
+          if (result.estimatedValue !== null) {
+            await storage.updateCard(card.id, { estimatedValue: result.estimatedValue });
+            newValue = result.estimatedValue;
+          }
+
+          results.push({
+            cardId: card.id,
+            title: card.title,
+            oldValue,
+            newValue,
+            confidence: result.confidence,
+            details: result.details,
+          });
+        } catch (cardError) {
+          console.error(`Failed to lookup price for card ${card.id}:`, cardError);
+          results.push({
+            cardId: card.id,
+            title: card.title,
+            oldValue: card.estimatedValue,
+            newValue: card.estimatedValue,
+            confidence: "low",
+            details: "Lookup failed",
+          });
+        }
+      }
+
+      res.json({
+        displayCaseId,
+        cardsProcessed: results.length,
+        results,
+      });
+    } catch (error) {
+      console.error("Error refreshing prices:", error);
+      res.status(500).json({ message: "Failed to refresh prices" });
     }
   });
 

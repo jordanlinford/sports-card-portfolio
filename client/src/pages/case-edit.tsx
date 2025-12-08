@@ -60,7 +60,9 @@ import {
   Upload,
   ImageIcon,
   Save,
-  X
+  X,
+  RefreshCw,
+  Loader2
 } from "lucide-react";
 import type { DisplayCaseWithCards, Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
@@ -352,6 +354,29 @@ export default function CaseEdit() {
   });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const refreshAllPricesMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/display-cases/${id}/refresh-prices`);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      
+      const updatedCount = data.results?.filter((r: any) => r.oldValue !== r.newValue).length || 0;
+      toast({
+        title: "Values Refreshed",
+        description: `Processed ${data.cardsProcessed} cards. ${updatedCount} values updated.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Refresh Failed",
+        description: error.message || "Failed to refresh card values",
+        variant: "destructive",
+      });
+    },
+  });
 
   const reorderMutation = useMutation({
     mutationFn: async (cardIds: number[]) => {
@@ -706,20 +731,37 @@ export default function CaseEdit() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <CardTitle>Cards</CardTitle>
                 <CardDescription>
                   {displayCase.cards?.length || 0} cards in this display case
                 </CardDescription>
               </div>
-              <Dialog open={showAddCard} onOpenChange={setShowAddCard}>
-                <DialogTrigger asChild>
-                  <Button className="gap-2" data-testid="button-add-card">
-                    <Plus className="h-4 w-4" />
-                    Add Card
+              <div className="flex items-center gap-2 flex-wrap">
+                {displayCase.cards && displayCase.cards.length > 0 && (
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => refreshAllPricesMutation.mutate()}
+                    disabled={refreshAllPricesMutation.isPending}
+                    data-testid="button-refresh-all-prices"
+                  >
+                    {refreshAllPricesMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    {refreshAllPricesMutation.isPending ? "Refreshing..." : "Refresh All Values"}
                   </Button>
-                </DialogTrigger>
+                )}
+                <Dialog open={showAddCard} onOpenChange={setShowAddCard}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2" data-testid="button-add-card">
+                      <Plus className="h-4 w-4" />
+                      Add Card
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
                   <DialogHeader>
                     <DialogTitle>Add New Card</DialogTitle>
@@ -924,7 +966,8 @@ export default function CaseEdit() {
                     </form>
                   </Form>
                 </DialogContent>
-              </Dialog>
+                </Dialog>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

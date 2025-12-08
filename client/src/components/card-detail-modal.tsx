@@ -11,10 +11,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles } from "lucide-react";
+import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2 } from "lucide-react";
 import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation } from "@tanstack/react-query";
 
 interface CardDetailModalProps {
   card: Card | null;
@@ -45,6 +46,39 @@ export function CardDetailModal({
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  const refreshPriceMutation = useMutation({
+    mutationFn: async (cardId: number) => {
+      return await apiRequest("POST", `/api/cards/${cardId}/lookup-price`);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
+      if (data.updated) {
+        toast({
+          title: "Value Updated",
+          description: `Found ${data.salesFound} sales. New value: $${data.estimatedValue?.toFixed(2)} (${data.confidence} confidence)`,
+        });
+        setFormData(prev => ({
+          ...prev,
+          estimatedValue: data.estimatedValue?.toString() || prev.estimatedValue,
+        }));
+      } else {
+        toast({
+          title: "No Value Found",
+          description: data.details || "Could not find recent sales for this card.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Lookup Failed",
+        description: error.message || "Failed to lookup card price",
+        variant: "destructive",
+      });
+    },
+  });
   
   const [formData, setFormData] = useState<EditFormData>({
     title: "",
@@ -401,6 +435,24 @@ export function CardDetailModal({
                       {profitLoss >= 0 ? "+" : ""}{formatCurrency(profitLoss)}
                     </Badge>
                   </div>
+                )}
+
+                {canEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 mt-2"
+                    onClick={() => refreshPriceMutation.mutate(card.id)}
+                    disabled={refreshPriceMutation.isPending}
+                    data-testid="button-refresh-price"
+                  >
+                    {refreshPriceMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                    {refreshPriceMutation.isPending ? "Looking up..." : "Refresh Value from eBay"}
+                  </Button>
                 )}
               </div>
 
