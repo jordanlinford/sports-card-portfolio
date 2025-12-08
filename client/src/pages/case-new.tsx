@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,6 +13,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -22,8 +32,11 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ArrowLeft, LayoutGrid, Globe, Lock } from "lucide-react";
+import { ArrowLeft, LayoutGrid, Globe, Lock, Copy, Check } from "lucide-react";
 import { Link } from "wouter";
+import type { Card as CardType } from "@shared/schema";
+
+type CardWithCase = CardType & { displayCaseName: string };
 
 const createCaseSchema = z.object({
   name: z.string().min(1, "Name is required").max(255, "Name is too long"),
@@ -37,6 +50,13 @@ export default function CaseNew() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const [selectedCardIds, setSelectedCardIds] = useState<number[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const { data: allCards } = useQuery<CardWithCase[]>({
+    queryKey: ["/api/cards"],
+    enabled: isAuthenticated,
+  });
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -60,16 +80,44 @@ export default function CaseNew() {
     },
   });
 
+  const toggleCard = (cardId: number) => {
+    setSelectedCardIds(prev => 
+      prev.includes(cardId) 
+        ? prev.filter(id => id !== cardId)
+        : [...prev, cardId]
+    );
+  };
+
+  const groupedCards = allCards?.reduce((acc, card) => {
+    if (!acc[card.displayCaseName]) {
+      acc[card.displayCaseName] = [];
+    }
+    acc[card.displayCaseName].push(card);
+    return acc;
+  }, {} as Record<string, CardWithCase[]>) || {};
+
+  const copyCardsMutation = useMutation({
+    mutationFn: async ({ caseId, cardIds }: { caseId: number; cardIds: number[] }) => {
+      await apiRequest("POST", `/api/display-cases/${caseId}/copy-cards`, { cardIds });
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: CreateCaseFormData) => {
       const response = await apiRequest("POST", "/api/display-cases", data);
       return response;
     },
-    onSuccess: (data: any) => {
+    onSuccess: async (data: any) => {
+      if (selectedCardIds.length > 0) {
+        await copyCardsMutation.mutateAsync({ caseId: data.id, cardIds: selectedCardIds });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
       toast({
         title: "Display case created",
-        description: "Your new display case is ready. Start adding cards!",
+        description: selectedCardIds.length > 0 
+          ? `Your display case is ready with ${selectedCardIds.length} imported card${selectedCardIds.length === 1 ? '' : 's'}!`
+          : "Your new display case is ready. Start adding cards!",
       });
       setLocation(`/cases/${data.id}/edit`);
     },
@@ -176,6 +224,92 @@ export default function CaseNew() {
                   </FormItem>
                 )}
               />
+
+              {allCards && allCards.length > 0 && (
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-sm">Import existing cards</p>
+                      <p className="text-muted-foreground text-sm">
+                        Copy cards from your other display cases
+                      </p>
+                    </div>
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="sm"
+                          className="gap-2"
+                          data-testid="button-import-cards"
+                        >
+                          <Copy className="h-4 w-4" />
+                          Select Cards
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh]">
+                        <DialogHeader>
+                          <DialogTitle>Import Cards</DialogTitle>
+                          <DialogDescription>
+                            Select cards to copy into your new display case
+                          </DialogDescription>
+                        </DialogHeader>
+                        <ScrollArea className="h-[400px] pr-4">
+                          <div className="space-y-6">
+                            {Object.entries(groupedCards).map(([caseName, caseCards]) => (
+                              <div key={caseName} className="space-y-2">
+                                <h4 className="font-medium text-sm text-muted-foreground">{caseName}</h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                  {caseCards.map((card) => (
+                                    <div
+                                      key={card.id}
+                                      onClick={() => toggleCard(card.id)}
+                                      className={`relative cursor-pointer rounded-lg border p-2 transition-colors hover-elevate ${
+                                        selectedCardIds.includes(card.id) 
+                                          ? "border-primary bg-primary/5" 
+                                          : ""
+                                      }`}
+                                      data-testid={`card-select-${card.id}`}
+                                    >
+                                      {selectedCardIds.includes(card.id) && (
+                                        <div className="absolute top-1 right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
+                                          <Check className="h-3 w-3 text-primary-foreground" />
+                                        </div>
+                                      )}
+                                      <div className="aspect-[3/4] bg-muted rounded overflow-hidden mb-1">
+                                        <img
+                                          src={card.imagePath}
+                                          alt={card.title}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+                                      <p className="text-xs font-medium truncate">{card.title}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                        <div className="flex items-center justify-between pt-4 border-t">
+                          <p className="text-sm text-muted-foreground">
+                            {selectedCardIds.length} card{selectedCardIds.length !== 1 ? 's' : ''} selected
+                          </p>
+                          <Button onClick={() => setDialogOpen(false)} data-testid="button-done-selecting">
+                            Done
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                  {selectedCardIds.length > 0 && (
+                    <div className="flex items-center gap-2 text-sm text-primary">
+                      <Check className="h-4 w-4" />
+                      {selectedCardIds.length} card{selectedCardIds.length !== 1 ? 's' : ''} will be imported
+                    </div>
+                  )}
+                </div>
+              )}
 
               <FormField
                 control={form.control}
