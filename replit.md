@@ -192,3 +192,29 @@ Preferred communication style: Simple, everyday language.
 ### Admin Auto-Grant
 - Users with email `jordanlinford@gmail.com` automatically receive admin access and PRO subscription on login
 - Implemented in `upsertUser` function in `server/storage.ts`
+
+### Layout Styles (Phase 1)
+- Display cases support three layout styles: `grid` (default), `row`, and `showcase`
+- **Grid**: Traditional 4-column grid of card images
+- **Row**: Horizontal scrolling display of cards
+- **Showcase**: Angled/fanned card display for premium presentation
+- Layout selector available in case-edit page
+- Layout stored in `display_cases.layout` field
+
+### Card Tags (Phase 1)
+- Cards can have multiple tags for organization
+- Tags stored as PostgreSQL text array in `cards.tags` field
+- **Adding tags**: In card detail modal edit mode, use the tag input field
+  - Type tag name and press Enter/comma to add
+  - Click suggestion buttons for common tags
+  - Remove tags by clicking the X on badges
+- **Viewing tags**: Tags displayed as badges in card detail modal
+- Common tag suggestions: Vintage, Modern, Rare, Rookie, Autograph, Parallel, Insert, Numbered, Patch, Refractor, Gem Mint, PSA 10
+
+### Create Case from Tag (Phase 1)
+- Dashboard includes "Create from Tag" dropdown button (shows when user has tagged cards)
+- Automatically creates a display case containing all cards with a selected tag
+- Route: `POST /api/display-cases/from-tag` with `{ tag: string, name?: string }`
+- Route to fetch user's unique tags: `GET /api/tags`
+- Cards are copied (not moved) to preserve originals
+- Copy includes all card metadata including tags, values, and value history

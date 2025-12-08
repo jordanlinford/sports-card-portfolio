@@ -452,6 +452,72 @@ Allow: /
     }
   });
 
+  // Get user's unique tags from all their cards
+  app.get("/api/tags", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const tags = await storage.getUserTags(userId);
+      res.json(tags);
+    } catch (error) {
+      console.error("Error fetching user tags:", error);
+      res.status(500).json({ message: "Failed to fetch tags" });
+    }
+  });
+
+  // Create a display case from cards with a specific tag
+  app.post("/api/display-cases/from-tag", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { tag, name } = req.body;
+      
+      if (!tag || typeof tag !== 'string') {
+        return res.status(400).json({ message: "Tag is required" });
+      }
+      
+      // Check free tier limit
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        const caseCount = await storage.countDisplayCases(userId);
+        if (caseCount >= 3) {
+          return res.status(403).json({ 
+            message: "Free tier limit reached. Upgrade to Pro for unlimited cases." 
+          });
+        }
+      }
+
+      // Get user's cards with this tag
+      const taggedCards = await storage.getCardsByTag(userId, tag);
+      
+      if (taggedCards.length === 0) {
+        return res.status(400).json({ 
+          message: `No cards found with tag "${tag}".` 
+        });
+      }
+
+      // Create a new display case
+      const displayCase = await storage.createDisplayCase(userId, {
+        name: name || `${tag} Collection`,
+        description: `Collection of ${taggedCards.length} cards tagged with "${tag}".`,
+        isPublic: true,
+        theme: "classic",
+        showCardCount: true,
+        showTotalValue: true,
+      });
+
+      // Copy the tagged cards to the new display case
+      const cardIds = taggedCards.map(c => c.id);
+      await storage.copyCardsToDisplayCase(cardIds, displayCase.id);
+
+      // Fetch the complete display case with the newly copied cards
+      const completeCase = await storage.getDisplayCase(displayCase.id);
+      
+      res.status(201).json(completeCase);
+    } catch (error) {
+      console.error("Error creating case from tag:", error);
+      res.status(500).json({ message: "Failed to create case from tag" });
+    }
+  });
+
   app.patch("/api/display-cases/:id", isAuthenticated, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);

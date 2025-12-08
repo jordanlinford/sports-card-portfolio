@@ -40,6 +40,8 @@ export interface IStorage {
   getCard(id: number): Promise<Card | undefined>;
   getAllUserCards(userId: string): Promise<(Card & { displayCaseName: string })[]>;
   getTopValuedCards(userId: string, limit?: number): Promise<Card[]>;
+  getCardsByTag(userId: string, tag: string): Promise<Card[]>;
+  getUserTags(userId: string): Promise<string[]>;
   createCard(displayCaseId: number, data: InsertCard): Promise<Card>;
   copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]>;
   updateCard(id: number, data: Partial<InsertCard>): Promise<Card | undefined>;
@@ -282,6 +284,60 @@ export class DatabaseStorage implements IStorage {
     return topCards;
   }
 
+  async getCardsByTag(userId: string, tag: string): Promise<Card[]> {
+    const userCases = await db.select({ id: displayCases.id })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+    
+    if (userCases.length === 0) return [];
+    
+    const caseIds = userCases.map(c => c.id);
+    
+    // Find cards where the tags array contains the specified tag
+    const taggedCards = await db.select()
+      .from(cards)
+      .where(
+        and(
+          inArray(cards.displayCaseId, caseIds),
+          sql`${tag} = ANY(${cards.tags})`
+        )
+      )
+      .orderBy(asc(cards.sortOrder));
+    
+    return taggedCards;
+  }
+
+  async getUserTags(userId: string): Promise<string[]> {
+    const userCases = await db.select({ id: displayCases.id })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+    
+    if (userCases.length === 0) return [];
+    
+    const caseIds = userCases.map(c => c.id);
+    
+    // Get all cards with tags and extract unique tags
+    const cardsWithTags = await db.select({ tags: cards.tags })
+      .from(cards)
+      .where(
+        and(
+          inArray(cards.displayCaseId, caseIds),
+          sql`${cards.tags} IS NOT NULL AND array_length(${cards.tags}, 1) > 0`
+        )
+      );
+    
+    const tagSet = new Set<string>();
+    for (const card of cardsWithTags) {
+      if (card.tags) {
+        for (const tag of card.tags) {
+          tagSet.add(tag);
+        }
+      }
+    }
+    
+    return Array.from(tagSet).sort();
+  }
+
   async copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]> {
     if (cardIds.length === 0) return [];
     
@@ -306,7 +362,10 @@ export class DatabaseStorage implements IStorage {
           grade: sourceCard.grade,
           purchasePrice: sourceCard.purchasePrice,
           estimatedValue: sourceCard.estimatedValue,
+          previousValue: sourceCard.previousValue,
+          valueUpdatedAt: sourceCard.valueUpdatedAt,
           notes: sourceCard.notes,
+          tags: sourceCard.tags,
           sortOrder: maxSortOrder + i + 1,
         })
         .returning();

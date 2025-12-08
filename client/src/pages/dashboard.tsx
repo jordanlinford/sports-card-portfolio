@@ -17,8 +17,17 @@ import {
   Crown,
   FolderOpen,
   Sparkles,
-  TrendingUp
+  TrendingUp,
+  Tag
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { DisplayCaseWithCards } from "@shared/schema";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -182,6 +191,36 @@ export default function Dashboard() {
     enabled: isAuthenticated,
   });
 
+  const { data: userTags = [] } = useQuery<string[]>({
+    queryKey: ["/api/tags"],
+    enabled: isAuthenticated,
+  });
+
+  const createFromTagMutation = useMutation({
+    mutationFn: async (tag: string) => {
+      return await apiRequest("POST", "/api/display-cases/from-tag", {
+        tag,
+        name: `${tag} Collection`
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases", data.id] });
+      toast({
+        title: "Case Created from Tag",
+        description: `Created a collection of ${data.cards?.length || 0} cards!`,
+      });
+      setLocation(`/cases/${data.id}/edit`);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Could not create case",
+        description: error.message || "Failed to create case from tag",
+        variant: "destructive",
+      });
+    },
+  });
+
   const createTopCardsMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", "/api/display-cases/top-cards", {
@@ -251,6 +290,34 @@ export default function Dashboard() {
                 Upgrade to Pro
               </Button>
             </Link>
+          )}
+          {canCreate && userTags.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="gap-2"
+                  disabled={createFromTagMutation.isPending}
+                  data-testid="button-create-from-tag"
+                >
+                  <Tag className="h-4 w-4" />
+                  {createFromTagMutation.isPending ? "Creating..." : "Create from Tag"}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Select a tag</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {userTags.map((tag) => (
+                  <DropdownMenuItem
+                    key={tag}
+                    onClick={() => createFromTagMutation.mutate(tag)}
+                    data-testid={`dropdown-item-tag-${tag}`}
+                  >
+                    {tag}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {canCreate && hasValuableCards && (
             <Button 
