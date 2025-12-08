@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2 } from "lucide-react";
+import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag } from "lucide-react";
 import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -34,7 +34,14 @@ interface EditFormData {
   purchasePrice: string;
   estimatedValue: string;
   notes: string;
+  tags: string[];
 }
+
+const SUGGESTED_TAGS = [
+  "Rookie", "Auto", "Refractor", "Numbered", "Patch", "1/1", "SSP", 
+  "Insert", "Base", "Parallel", "Vintage", "Modern", "HOF", 
+  "Football", "Basketball", "Baseball", "Hockey", "Soccer"
+];
 
 export function CardDetailModal({ 
   card, 
@@ -89,7 +96,9 @@ export function CardDetailModal({
     purchasePrice: "",
     estimatedValue: "",
     notes: "",
+    tags: [],
   });
+  const [tagInput, setTagInput] = useState("");
 
   useEffect(() => {
     if (card) {
@@ -102,6 +111,7 @@ export function CardDetailModal({
         purchasePrice: card.purchasePrice?.toString() || "",
         estimatedValue: card.estimatedValue?.toString() || "",
         notes: card.notes || "",
+        tags: card.tags || [],
       });
     }
   }, [card]);
@@ -129,6 +139,7 @@ export function CardDetailModal({
         purchasePrice: formData.purchasePrice ? parseFloat(formData.purchasePrice) : null,
         estimatedValue: formData.estimatedValue ? parseFloat(formData.estimatedValue) : null,
         notes: formData.notes.trim() || null,
+        tags: formData.tags.length > 0 ? formData.tags : null,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
@@ -151,6 +162,7 @@ export function CardDetailModal({
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setIsEditing(false);
+      setTagInput("");
       if (card) {
         setFormData({
           title: card.title || "",
@@ -161,6 +173,7 @@ export function CardDetailModal({
           purchasePrice: card.purchasePrice?.toString() || "",
           estimatedValue: card.estimatedValue?.toString() || "",
           notes: card.notes || "",
+          tags: card.tags || [],
         });
       }
       onClose();
@@ -169,6 +182,7 @@ export function CardDetailModal({
 
   const handleCancel = () => {
     setIsEditing(false);
+    setTagInput("");
     if (card) {
       setFormData({
         title: card.title || "",
@@ -179,7 +193,27 @@ export function CardDetailModal({
         purchasePrice: card.purchasePrice?.toString() || "",
         estimatedValue: card.estimatedValue?.toString() || "",
         notes: card.notes || "",
+        tags: card.tags || [],
       });
+    }
+  };
+
+  const addTag = (tag: string) => {
+    const trimmedTag = tag.trim();
+    if (trimmedTag && !formData.tags.includes(trimmedTag)) {
+      setFormData({ ...formData, tags: [...formData.tags, trimmedTag] });
+    }
+    setTagInput("");
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setFormData({ ...formData, tags: formData.tags.filter(t => t !== tagToRemove) });
+  };
+
+  const handleTagKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      addTag(tagInput);
     }
   };
 
@@ -325,6 +359,53 @@ export function CardDetailModal({
                     data-testid="textarea-edit-notes"
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Tags</Label>
+                  <div className="flex flex-wrap gap-1.5 min-h-[32px] p-2 border rounded-md bg-background">
+                    {formData.tags.map((tag) => (
+                      <Badge
+                        key={tag}
+                        variant="secondary"
+                        className="gap-1 pr-1"
+                        data-testid={`badge-tag-${tag}`}
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          className="ml-1 rounded-full p-0.5 hover:bg-muted"
+                          data-testid={`button-remove-tag-${tag}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                    <Input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleTagKeyDown}
+                      onBlur={() => tagInput && addTag(tagInput)}
+                      placeholder={formData.tags.length === 0 ? "Add tags..." : ""}
+                      className="flex-1 min-w-[100px] border-0 p-0 h-6 focus-visible:ring-0"
+                      data-testid="input-tag"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="text-xs text-muted-foreground mr-1">Suggestions:</span>
+                    {SUGGESTED_TAGS.filter(t => !formData.tags.includes(t)).slice(0, 8).map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => addTag(tag)}
+                        className="text-xs text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+                        data-testid={`button-suggest-tag-${tag}`}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -455,6 +536,25 @@ export function CardDetailModal({
                   </Button>
                 )}
               </div>
+
+              {card.tags && card.tags.length > 0 && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Tag className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Tags:</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {card.tags.map((tag) => (
+                        <Badge key={tag} variant="outline" data-testid={`badge-card-tag-${tag}`}>
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
               {card.notes && (
                 <>
