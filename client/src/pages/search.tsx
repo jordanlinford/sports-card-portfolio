@@ -33,6 +33,13 @@ export default function SearchPage() {
   const [selectedCard, setSelectedCard] = useState<SearchResult | null>(null);
   const [activeQuery, setActiveQuery] = useState("");
 
+  const { data: user } = useQuery<{ subscriptionStatus: string }>({
+    queryKey: ["/api/auth/user"],
+    enabled: isAuthenticated,
+  });
+
+  const isPro = user?.subscriptionStatus === "PRO";
+
   const buildQueryString = () => {
     const params = new URLSearchParams();
     if (activeQuery) params.set("q", activeQuery);
@@ -239,6 +246,7 @@ export default function SearchPage() {
         onClose={() => setSelectedCard(null)}
         displayCaseId={selectedCard?.displayCaseId || 0}
         canEdit={true}
+        isPro={isPro}
       />
     </div>
   );

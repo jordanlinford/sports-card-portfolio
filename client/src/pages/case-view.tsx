@@ -253,7 +253,7 @@ export default function CaseView() {
                         Edit
                       </Button>
                     </Link>
-                    {displayCase.cards && displayCase.cards.length > 0 && (
+                    {user?.subscriptionStatus === "PRO" && displayCase.cards && displayCase.cards.length > 0 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -410,6 +410,7 @@ export default function CaseView() {
         onClose={() => setSelectedCard(null)}
         displayCaseId={parseInt(id || "0")}
         canEdit={isOwner}
+        isPro={user?.subscriptionStatus === "PRO"}
       />
     </div>
   );

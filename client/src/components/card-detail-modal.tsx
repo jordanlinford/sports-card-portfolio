@@ -23,6 +23,7 @@ interface CardDetailModalProps {
   onClose: () => void;
   displayCaseId: number;
   canEdit?: boolean;
+  isPro?: boolean;
 }
 
 interface EditFormData {
@@ -48,7 +49,8 @@ export function CardDetailModal({
   isOpen, 
   onClose, 
   displayCaseId,
-  canEdit = false 
+  canEdit = false,
+  isPro = false
 }: CardDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -518,7 +520,7 @@ export function CardDetailModal({
                   </div>
                 )}
 
-                {canEdit && (
+                {canEdit && isPro && (
                   <Button
                     variant="outline"
                     size="sm"

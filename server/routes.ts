@@ -726,11 +726,19 @@ Allow: /
     }
   });
 
-  // Price lookup for a single card
+  // Price lookup for a single card (Pro feature)
   app.post("/api/cards/:cardId/lookup-price", isAuthenticated, async (req: any, res) => {
     try {
       const cardId = parseInt(req.params.cardId);
       const userId = req.user.claims.sub;
+
+      // Check if user has Pro subscription
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        return res.status(403).json({ 
+          message: "AI price lookup is a Pro feature. Upgrade to Pro to automatically refresh card values from eBay." 
+        });
+      }
 
       if (isNaN(cardId)) {
         return res.status(400).json({ message: "Invalid card ID" });
@@ -771,11 +779,19 @@ Allow: /
     }
   });
 
-  // Bulk price lookup for all cards in a display case
+  // Bulk price lookup for all cards in a display case (Pro feature)
   app.post("/api/display-cases/:id/refresh-prices", isAuthenticated, async (req: any, res) => {
     try {
       const displayCaseId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
+
+      // Check if user has Pro subscription
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        return res.status(403).json({ 
+          message: "AI price lookup is a Pro feature. Upgrade to Pro to automatically refresh card values from eBay." 
+        });
+      }
 
       if (isNaN(displayCaseId)) {
         return res.status(400).json({ message: "Invalid display case ID" });

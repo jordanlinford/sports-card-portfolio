@@ -184,6 +184,13 @@ export default function CaseEdit() {
     enabled: isAuthenticated && !!id,
   });
 
+  const { data: user } = useQuery<{ id: string; subscriptionStatus: string }>({
+    queryKey: ["/api/auth/user"],
+    enabled: isAuthenticated,
+  });
+
+  const isPro = user?.subscriptionStatus === "PRO";
+
   const form = useForm<UpdateCaseFormData>({
     resolver: zodResolver(updateCaseSchema),
     defaultValues: {
@@ -805,7 +812,7 @@ export default function CaseEdit() {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                {displayCase.cards && displayCase.cards.length > 0 && (
+                {isPro && displayCase.cards && displayCase.cards.length > 0 && (
                   <Button
                     variant="outline"
                     className="gap-2"
@@ -1084,6 +1091,7 @@ export default function CaseEdit() {
         onClose={() => setSelectedCard(null)}
         displayCaseId={parseInt(id || "0")}
         canEdit={true}
+        isPro={isPro}
       />
     </div>
   );
