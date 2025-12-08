@@ -78,14 +78,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Admin emails that should automatically get admin access
+    const ADMIN_EMAILS = ['jordanlinford@gmail.com'];
+    
+    const isAdminEmail = userData.email && ADMIN_EMAILS.includes(userData.email.toLowerCase());
+    
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({
+        ...userData,
+        isAdmin: isAdminEmail ? true : false,
+        subscriptionStatus: isAdminEmail ? 'PRO' : 'FREE',
+      })
       .onConflictDoUpdate({
         target: users.id,
         set: {
           ...userData,
           updatedAt: new Date(),
+          // Always ensure admin emails have admin access
+          ...(isAdminEmail ? { isAdmin: true, subscriptionStatus: 'PRO' } : {}),
         },
       })
       .returning();
