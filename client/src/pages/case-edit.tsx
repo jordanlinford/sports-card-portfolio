@@ -66,14 +66,10 @@ import {
 } from "lucide-react";
 import type { DisplayCaseWithCards, Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
-
-const DISPLAY_CASE_THEMES = [
-  { id: "classic", name: "Classic", bg: "bg-background", description: "Clean and minimal" },
-  { id: "dark-wood", name: "Dark Wood", bg: "bg-amber-950", description: "Rich wooden display" },
-  { id: "velvet", name: "Velvet", bg: "bg-red-950", description: "Luxurious velvet backdrop" },
-  { id: "midnight", name: "Midnight", bg: "bg-slate-900", description: "Sleek dark theme" },
-  { id: "gallery", name: "Gallery", bg: "bg-neutral-100 dark:bg-neutral-800", description: "Museum style" },
-] as const;
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Crown, AlertTriangle } from "lucide-react";
+import { DISPLAY_CASE_THEMES } from "@/lib/themes";
 
 const LAYOUT_OPTIONS = [
   { id: "grid", name: "Grid", description: "Classic grid layout - cards displayed in rows and columns", icon: "grid" },
@@ -165,6 +161,7 @@ export default function CaseEdit() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
+  const [duplicateCheckTitle, setDuplicateCheckTitle] = useState("");
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -190,6 +187,17 @@ export default function CaseEdit() {
   });
 
   const isPro = user?.subscriptionStatus === "PRO";
+
+  // Duplicate detection - check when title changes
+  const { data: duplicates } = useQuery<CardType[]>({
+    queryKey: ["/api/cards/duplicates", duplicateCheckTitle],
+    queryFn: async () => {
+      const res = await fetch(`/api/cards/duplicates?title=${encodeURIComponent(duplicateCheckTitle)}`);
+      if (!res.ok) throw new Error("Failed to check duplicates");
+      return res.json();
+    },
+    enabled: isAuthenticated && duplicateCheckTitle.length >= 3,
+  });
 
   const form = useForm<UpdateCaseFormData>({
     resolver: zodResolver(updateCaseSchema),
@@ -609,25 +617,48 @@ export default function CaseEdit() {
                       <FormDescription>
                         Choose a background theme for your display case
                       </FormDescription>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
-                        {DISPLAY_CASE_THEMES.map((theme) => (
-                          <button
-                            key={theme.id}
-                            type="button"
-                            onClick={() => field.onChange(theme.id)}
-                            className={`relative p-4 rounded-lg border-2 text-left transition-colors ${
-                              field.value === theme.id
-                                ? "border-primary"
-                                : "border-transparent hover:border-muted-foreground/30"
-                            }`}
-                            data-testid={`button-theme-${theme.id}`}
-                          >
-                            <div className={`w-full h-12 rounded-md ${theme.bg} mb-2 border`} />
-                            <p className="text-sm font-medium">{theme.name}</p>
-                            <p className="text-xs text-muted-foreground">{theme.description}</p>
-                          </button>
-                        ))}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+                        {DISPLAY_CASE_THEMES.map((theme) => {
+                          const isLocked = theme.isPremium && !isPro;
+                          return (
+                            <button
+                              key={theme.id}
+                              type="button"
+                              onClick={() => !isLocked && field.onChange(theme.id)}
+                              disabled={isLocked}
+                              className={`relative p-3 rounded-lg border-2 text-left transition-colors ${
+                                field.value === theme.id
+                                  ? "border-primary"
+                                  : isLocked
+                                  ? "border-muted opacity-60 cursor-not-allowed"
+                                  : "border-transparent hover:border-muted-foreground/30"
+                              }`}
+                              data-testid={`button-theme-${theme.id}`}
+                            >
+                              {theme.isPremium && (
+                                <Badge 
+                                  variant="secondary" 
+                                  className="absolute -top-2 -right-2 text-xs gap-0.5 px-1.5 py-0.5"
+                                >
+                                  <Crown className="h-3 w-3" />
+                                  Pro
+                                </Badge>
+                              )}
+                              <div 
+                                className="w-full h-12 rounded-md mb-2 border"
+                                style={{ background: theme.preview }}
+                              />
+                              <p className="text-sm font-medium">{theme.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{theme.description}</p>
+                            </button>
+                          );
+                        })}
                       </div>
+                      {!isPro && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          <Link href="/upgrade" className="text-primary hover:underline">Upgrade to Pro</Link> to unlock premium themes
+                        </p>
+                      )}
                     </FormItem>
                   )}
                 />
@@ -828,7 +859,12 @@ export default function CaseEdit() {
                     {refreshAllPricesMutation.isPending ? "Refreshing..." : "Refresh All Values"}
                   </Button>
                 )}
-                <Dialog open={showAddCard} onOpenChange={setShowAddCard}>
+                <Dialog open={showAddCard} onOpenChange={(open) => {
+                  setShowAddCard(open);
+                  if (!open) {
+                    setDuplicateCheckTitle("");
+                  }
+                }}>
                   <DialogTrigger asChild>
                     <Button className="gap-2" data-testid="button-add-card">
                       <Plus className="h-4 w-4" />
@@ -894,10 +930,27 @@ export default function CaseEdit() {
                               <Input
                                 placeholder="Michael Jordan Rookie Card"
                                 {...field}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  setDuplicateCheckTitle(e.target.value);
+                                }}
                                 data-testid="input-card-title"
                               />
                             </FormControl>
                             <FormMessage />
+                            {duplicates && duplicates.length > 0 && (
+                              <Alert className="mt-2 py-2">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertDescription className="text-xs">
+                                  Possible duplicate: You already have {duplicates.length} card{duplicates.length > 1 ? 's' : ''} with a similar title
+                                  {duplicates.length <= 3 && (
+                                    <span className="block text-muted-foreground mt-1">
+                                      {duplicates.slice(0, 3).map(d => d.title).join(", ")}
+                                    </span>
+                                  )}
+                                </AlertDescription>
+                              </Alert>
+                            )}
                           </FormItem>
                         )}
                       />

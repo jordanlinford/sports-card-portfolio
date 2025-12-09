@@ -464,6 +464,24 @@ Allow: /
     }
   });
 
+  // Check for duplicate cards by title (for duplicate detection)
+  app.get("/api/cards/duplicates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, excludeId } = req.query;
+      
+      if (!title || typeof title !== 'string' || title.length < 3) {
+        return res.json([]);
+      }
+      
+      const duplicates = await storage.findDuplicateCards(userId, title, excludeId ? Number(excludeId) : undefined);
+      res.json(duplicates);
+    } catch (error) {
+      console.error("Error checking for duplicates:", error);
+      res.status(500).json({ message: "Failed to check for duplicates" });
+    }
+  });
+
   // Create a display case from cards with a specific tag
   app.post("/api/display-cases/from-tag", isAuthenticated, async (req: any, res) => {
     try {
@@ -1203,6 +1221,18 @@ Allow: /
     } catch (error) {
       console.error("Error checking admin status:", error);
       res.status(500).json({ message: "Failed to check admin status" });
+    }
+  });
+
+  // Portfolio Analytics
+  app.get("/api/analytics", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const analytics = await storage.getPortfolioAnalytics(userId);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
     }
   });
 

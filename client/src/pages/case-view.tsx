@@ -50,7 +50,15 @@ const THEME_STYLES: Record<string, { bg: string; frame: string; glass: string; m
     text: "text-stone-900 dark:text-amber-100",
     textMuted: "text-stone-600 dark:text-amber-300/70",
   },
-  "dark-wood": {
+  "midnight": {
+    bg: "bg-gradient-to-b from-slate-900 to-slate-950",
+    frame: "bg-slate-800 border-slate-900",
+    glass: "bg-white/5",
+    mat: "bg-slate-800/50",
+    text: "text-slate-100",
+    textMuted: "text-slate-300/80",
+  },
+  "wood": {
     bg: "bg-gradient-to-b from-amber-950 to-stone-950",
     frame: "bg-stone-900 border-stone-950",
     glass: "bg-white/5",
@@ -66,21 +74,37 @@ const THEME_STYLES: Record<string, { bg: string; frame: string; glass: string; m
     text: "text-rose-100",
     textMuted: "text-rose-200/70",
   },
-  "midnight": {
-    bg: "bg-gradient-to-b from-slate-900 to-slate-950",
-    frame: "bg-slate-800 border-slate-900",
+  "ocean": {
+    bg: "bg-gradient-to-b from-blue-950 to-cyan-950",
+    frame: "bg-blue-900 border-blue-950",
     glass: "bg-white/5",
-    mat: "bg-slate-800/50",
-    text: "text-slate-100",
-    textMuted: "text-slate-300/80",
+    mat: "bg-blue-900/50",
+    text: "text-cyan-100",
+    textMuted: "text-cyan-200/70",
   },
-  "gallery": {
-    bg: "bg-gradient-to-b from-neutral-100 to-neutral-200 dark:from-neutral-800 dark:to-neutral-900",
-    frame: "bg-neutral-300 dark:bg-neutral-700 border-neutral-400 dark:border-neutral-800",
-    glass: "bg-white/20 dark:bg-white/5",
-    mat: "bg-white dark:bg-neutral-800",
-    text: "text-neutral-900 dark:text-neutral-100",
-    textMuted: "text-neutral-500 dark:text-neutral-400",
+  "emerald": {
+    bg: "bg-gradient-to-b from-emerald-950 to-green-950",
+    frame: "bg-emerald-900 border-emerald-950",
+    glass: "bg-white/5",
+    mat: "bg-emerald-900/50",
+    text: "text-emerald-100",
+    textMuted: "text-emerald-200/70",
+  },
+  "gold": {
+    bg: "bg-gradient-to-b from-yellow-950 to-amber-950",
+    frame: "bg-yellow-900 border-yellow-950",
+    glass: "bg-white/5",
+    mat: "bg-yellow-900/50",
+    text: "text-yellow-100",
+    textMuted: "text-yellow-200/70",
+  },
+  "purple": {
+    bg: "bg-gradient-to-b from-purple-950 to-violet-950",
+    frame: "bg-purple-900 border-purple-950",
+    glass: "bg-white/5",
+    mat: "bg-purple-900/50",
+    text: "text-purple-100",
+    textMuted: "text-purple-200/70",
   },
 };
 

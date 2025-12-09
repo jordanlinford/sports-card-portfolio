@@ -218,3 +218,29 @@ Preferred communication style: Simple, everyday language.
 - Route to fetch user's unique tags: `GET /api/tags`
 - Cards are copied (not moved) to preserve originals
 - Copy includes all card metadata including tags, values, and value history
+
+### Portfolio Analytics (Phase 2)
+- New `/analytics` page with charts and collection insights
+- Shows total collection value, card count, and case count
+- Bar chart: Value breakdown by display case
+- Pie chart: Card distribution across cases
+- Top 10 most valuable cards list with images
+- Recent value changes with percentage indicators
+- Route: `GET /api/analytics`
+- Accessible from user dropdown menu
+
+### Premium Display Themes (Phase 2)
+- 8 display case themes available (2 free, 6 Pro-only)
+- **Free themes**: Classic, Midnight
+- **Pro themes**: Wood Grain, Velvet Red, Ocean Blue, Emerald, Gold Luxury, Royal Purple
+- Theme picker in case-edit page shows preview gradients
+- Pro themes display "Pro" badge and are locked for free users
+- Themes apply rich background gradients to case-view page
+- Theme configuration in `client/src/lib/themes.ts`
+
+### Duplicate Detection (Phase 2)
+- When adding a new card, similar titles are detected automatically
+- Warning alert shown if user already has cards with similar names
+- Checks trigger after typing 3+ characters in title field
+- Route: `GET /api/cards/duplicates?title=...&excludeId=...`
+- Helps prevent accidental duplicate uploads

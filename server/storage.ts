@@ -42,6 +42,7 @@ export interface IStorage {
   getTopValuedCards(userId: string, limit?: number): Promise<Card[]>;
   getCardsByTag(userId: string, tag: string): Promise<Card[]>;
   getUserTags(userId: string): Promise<string[]>;
+  findDuplicateCards(userId: string, title: string, excludeId?: number): Promise<Card[]>;
   createCard(displayCaseId: number, data: InsertCard): Promise<Card>;
   copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]>;
   updateCard(id: number, data: Partial<InsertCard>): Promise<Card | undefined>;
@@ -71,6 +72,19 @@ export interface IStorage {
 
   // View tracking
   incrementViewCount(displayCaseId: number): Promise<void>;
+
+  // Analytics operations
+  getPortfolioAnalytics(userId: string): Promise<{
+    totalValue: number;
+    totalCards: number;
+    totalCases: number;
+    topCards: Card[];
+    valueByCase: { caseName: string; totalValue: number; cardCount: number }[];
+    recentValueChanges: (Card & { displayCaseName: string })[];
+  }>;
+
+  // Duplicate detection
+  findSimilarCards(userId: string, title: string, excludeCardId?: number): Promise<Card[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -336,6 +350,33 @@ export class DatabaseStorage implements IStorage {
     }
     
     return Array.from(tagSet).sort();
+  }
+
+  async findDuplicateCards(userId: string, title: string, excludeId?: number): Promise<Card[]> {
+    const userCases = await db.select({ id: displayCases.id })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+    
+    if (userCases.length === 0) return [];
+    
+    const caseIds = userCases.map(c => c.id);
+    
+    // Find cards with similar titles (case-insensitive partial match)
+    const conditions = [
+      inArray(cards.displayCaseId, caseIds),
+      ilike(cards.title, `%${title}%`)
+    ];
+    
+    if (excludeId) {
+      conditions.push(sql`${cards.id} != ${excludeId}`);
+    }
+    
+    const duplicates = await db.select()
+      .from(cards)
+      .where(and(...conditions))
+      .limit(5);
+    
+    return duplicates;
   }
 
   async copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]> {
@@ -753,6 +794,115 @@ export class DatabaseStorage implements IStorage {
       .update(displayCases)
       .set({ viewCount: sql`${displayCases.viewCount} + 1` })
       .where(eq(displayCases.id, displayCaseId));
+  }
+
+  async getPortfolioAnalytics(userId: string): Promise<{
+    totalValue: number;
+    totalCards: number;
+    totalCases: number;
+    topCards: Card[];
+    valueByCase: { caseName: string; totalValue: number; cardCount: number }[];
+    recentValueChanges: (Card & { displayCaseName: string })[];
+  }> {
+    // Get user's display cases
+    const userCases = await db
+      .select()
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+
+    const caseIds = userCases.map(c => c.id);
+    
+    if (caseIds.length === 0) {
+      return {
+        totalValue: 0,
+        totalCards: 0,
+        totalCases: 0,
+        topCards: [],
+        valueByCase: [],
+        recentValueChanges: [],
+      };
+    }
+
+    // Get all user cards
+    const allCards = await db
+      .select()
+      .from(cards)
+      .where(inArray(cards.displayCaseId, caseIds));
+
+    // Calculate totals
+    const totalValue = allCards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
+    const totalCards = allCards.length;
+    const totalCases = userCases.length;
+
+    // Get top 10 cards by value
+    const topCards = [...allCards]
+      .filter(c => c.estimatedValue && c.estimatedValue > 0)
+      .sort((a, b) => (b.estimatedValue || 0) - (a.estimatedValue || 0))
+      .slice(0, 10);
+
+    // Calculate value by case
+    const valueByCase = userCases.map(c => {
+      const caseCards = allCards.filter(card => card.displayCaseId === c.id);
+      return {
+        caseName: c.name,
+        totalValue: caseCards.reduce((sum, card) => sum + (card.estimatedValue || 0), 0),
+        cardCount: caseCards.length,
+      };
+    }).filter(c => c.cardCount > 0);
+
+    // Get cards with recent value changes (has previousValue and valueUpdatedAt)
+    const recentValueChanges = allCards
+      .filter(c => c.previousValue !== null && c.valueUpdatedAt !== null)
+      .sort((a, b) => {
+        const aDate = a.valueUpdatedAt ? new Date(a.valueUpdatedAt).getTime() : 0;
+        const bDate = b.valueUpdatedAt ? new Date(b.valueUpdatedAt).getTime() : 0;
+        return bDate - aDate;
+      })
+      .slice(0, 10)
+      .map(c => {
+        const caseName = userCases.find(uc => uc.id === c.displayCaseId)?.name || "Unknown";
+        return { ...c, displayCaseName: caseName };
+      });
+
+    return {
+      totalValue,
+      totalCards,
+      totalCases,
+      topCards,
+      valueByCase,
+      recentValueChanges,
+    };
+  }
+
+  async findSimilarCards(userId: string, title: string, excludeCardId?: number): Promise<Card[]> {
+    // Get user's display case IDs first
+    const userCases = await db
+      .select({ id: displayCases.id })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+
+    const caseIds = userCases.map(c => c.id);
+    if (caseIds.length === 0) return [];
+
+    // Search for cards with similar titles (case-insensitive partial match)
+    const searchPattern = `%${title.toLowerCase()}%`;
+    
+    let query = db
+      .select()
+      .from(cards)
+      .where(
+        and(
+          inArray(cards.displayCaseId, caseIds),
+          ilike(cards.title, searchPattern)
+        )
+      );
+
+    const results = await query;
+    
+    // Exclude the current card if provided
+    return excludeCardId 
+      ? results.filter(c => c.id !== excludeCardId) 
+      : results;
   }
 }
 
