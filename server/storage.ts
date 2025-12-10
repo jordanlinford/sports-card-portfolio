@@ -11,6 +11,8 @@ import {
   userBadges,
   tradeOffers,
   follows,
+  conversations,
+  messages,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -34,6 +36,10 @@ import {
   type TradeOffer,
   type TradeOfferWithDetails,
   type Follow,
+  type Conversation,
+  type ConversationWithDetails,
+  type Message,
+  type MessageWithSender,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql } from "drizzle-orm";
@@ -151,6 +157,15 @@ export interface IStorage {
   getFollowing(userId: string): Promise<(Follow & { followed: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]>;
   getFollowerCount(userId: string): Promise<number>;
   getFollowingCount(userId: string): Promise<number>;
+
+  // Messaging operations
+  getOrCreateConversation(participantAId: string, participantBId: string): Promise<Conversation>;
+  getConversation(id: number, userId: string): Promise<Conversation | undefined>;
+  getUserConversations(userId: string): Promise<ConversationWithDetails[]>;
+  getConversationMessages(conversationId: number, limit?: number): Promise<MessageWithSender[]>;
+  createMessage(conversationId: number, senderId: string, content: string): Promise<Message>;
+  markMessagesAsRead(conversationId: number, userId: string): Promise<void>;
+  getUnreadMessageCount(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1456,6 +1471,201 @@ export class DatabaseStorage implements IStorage {
       .select({ count: sql<number>`count(*)` })
       .from(follows)
       .where(eq(follows.followerId, userId));
+    return Number(result[0]?.count || 0);
+  }
+
+  // Messaging operations
+  async getOrCreateConversation(participantAId: string, participantBId: string): Promise<Conversation> {
+    // Always store with smaller ID first to ensure uniqueness
+    const [smallerId, largerId] = [participantAId, participantBId].sort();
+    
+    // Check if conversation already exists
+    const existing = await db
+      .select()
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.participantAId, smallerId),
+          eq(conversations.participantBId, largerId)
+        )
+      );
+    
+    if (existing.length > 0) {
+      return existing[0];
+    }
+    
+    // Create new conversation
+    const [conversation] = await db
+      .insert(conversations)
+      .values({
+        participantAId: smallerId,
+        participantBId: largerId,
+      })
+      .returning();
+    
+    return conversation;
+  }
+
+  async getConversation(id: number, userId: string): Promise<Conversation | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.id, id),
+          or(
+            eq(conversations.participantAId, userId),
+            eq(conversations.participantBId, userId)
+          )
+        )
+      );
+    return conversation;
+  }
+
+  async getUserConversations(userId: string): Promise<ConversationWithDetails[]> {
+    const convos = await db
+      .select()
+      .from(conversations)
+      .where(
+        or(
+          eq(conversations.participantAId, userId),
+          eq(conversations.participantBId, userId)
+        )
+      )
+      .orderBy(desc(conversations.lastMessageAt));
+    
+    const result: ConversationWithDetails[] = [];
+    
+    for (const convo of convos) {
+      // Get the other user's info
+      const otherUserId = convo.participantAId === userId ? convo.participantBId : convo.participantAId;
+      const [otherUser] = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(users)
+        .where(eq(users.id, otherUserId));
+      
+      // Count unread messages in this conversation
+      const unreadResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(messages)
+        .where(
+          and(
+            eq(messages.conversationId, convo.id),
+            eq(messages.isRead, false),
+            sql`${messages.senderId} != ${userId}`
+          )
+        );
+      
+      if (otherUser) {
+        result.push({
+          ...convo,
+          otherUser,
+          unreadCount: Number(unreadResult[0]?.count || 0),
+        });
+      }
+    }
+    
+    return result;
+  }
+
+  async getConversationMessages(conversationId: number, limit: number = 50): Promise<MessageWithSender[]> {
+    const msgs = await db
+      .select()
+      .from(messages)
+      .where(eq(messages.conversationId, conversationId))
+      .orderBy(asc(messages.createdAt))
+      .limit(limit);
+    
+    const result: MessageWithSender[] = [];
+    
+    for (const msg of msgs) {
+      const [sender] = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(users)
+        .where(eq(users.id, msg.senderId));
+      
+      if (sender) {
+        result.push({ ...msg, sender });
+      }
+    }
+    
+    return result;
+  }
+
+  async createMessage(conversationId: number, senderId: string, content: string): Promise<Message> {
+    const [message] = await db
+      .insert(messages)
+      .values({
+        conversationId,
+        senderId,
+        content,
+      })
+      .returning();
+    
+    // Update conversation's last message info
+    await db
+      .update(conversations)
+      .set({
+        lastMessageAt: new Date(),
+        lastMessagePreview: content.substring(0, 100),
+      })
+      .where(eq(conversations.id, conversationId));
+    
+    return message;
+  }
+
+  async markMessagesAsRead(conversationId: number, userId: string): Promise<void> {
+    await db
+      .update(messages)
+      .set({ isRead: true })
+      .where(
+        and(
+          eq(messages.conversationId, conversationId),
+          sql`${messages.senderId} != ${userId}`,
+          eq(messages.isRead, false)
+        )
+      );
+  }
+
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    // First get all conversations the user is part of
+    const convos = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(
+        or(
+          eq(conversations.participantAId, userId),
+          eq(conversations.participantBId, userId)
+        )
+      );
+    
+    if (convos.length === 0) {
+      return 0;
+    }
+    
+    const convoIds = convos.map(c => c.id);
+    
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(messages)
+      .where(
+        and(
+          inArray(messages.conversationId, convoIds),
+          eq(messages.isRead, false),
+          sql`${messages.senderId} != ${userId}`
+        )
+      );
+    
     return Number(result[0]?.count || 0);
   }
 }
