@@ -29,41 +29,154 @@ import {
   Flame,
   BarChart3,
   Palette,
-  UserPlus
+  UserPlus,
+  Frame,
+  Handshake,
+  ArrowRight
 } from "lucide-react";
 
 export default function Landing() {
   return (
     <div className="flex flex-col min-h-screen">
-      <section className="relative py-20 md:py-32 overflow-hidden">
+      {/* Hero Section */}
+      <section className="relative py-16 md:py-24 lg:py-32 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/10" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center max-w-3xl mx-auto">
-            <Badge variant="secondary" className="mb-6">
-              <Sparkles className="h-3 w-3 mr-1" />
-              The home for your collection
-            </Badge>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-title">
-              A Simple, Beautiful Way to{" "}
-              <span className="text-primary">Showcase Your Collection</span>
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-subtitle">
-              Create stunning digital display cases for your sports cards, trading cards, and collectibles. 
-              Track values, organize with tags, and share your passion with the world.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <a href="/api/login">
-                <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-hero-cta">
-                  <LayoutGrid className="h-5 w-5" />
-                  Create Your Free Display Case
-                </Button>
-              </a>
-              <Link href="/explore">
-                <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2" data-testid="button-explore">
-                  <Globe className="h-5 w-5" />
-                  Explore Collections
-                </Button>
-              </Link>
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Left side - Copy */}
+            <div className="text-center lg:text-left">
+              <Badge variant="secondary" className="mb-6">
+                <Sparkles className="h-3 w-3 mr-1" />
+                The home for your collection
+              </Badge>
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-title">
+                Your Collection, Finally Displayed{" "}
+                <span className="text-primary">the Way It Deserves</span>
+              </h1>
+              <p className="text-lg md:text-xl text-muted-foreground mb-8" data-testid="text-hero-subtitle">
+                Build stunning display cases, track your portfolio's value, get real-time price updates, 
+                and trade with other collectors—all in one place.
+              </p>
+              
+              {/* Hero Bullets */}
+              <ul className="space-y-3 mb-8 text-left">
+                <li className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Frame className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-muted-foreground">Beautiful customizable display cases</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-muted-foreground">AI-powered price lookups & analytics</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Handshake className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-muted-foreground">Offers, trades, likes, comments & follows</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Search className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-muted-foreground">Discover display cases from collectors everywhere</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Trophy className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-muted-foreground">Earn badges & climb collector tiers</span>
+                </li>
+              </ul>
+
+              {/* CTAs */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <a href="/api/login">
+                  <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-hero-cta">
+                    Start Your Free Collection
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </a>
+                <Link href="/explore">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2" data-testid="button-explore">
+                    <Globe className="h-5 w-5" />
+                    See Public Display Cases
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Right side - Framed Mockup */}
+            <div className="relative lg:pl-8">
+              <div className="relative">
+                {/* Main frame */}
+                <div className="relative bg-card border rounded-xl shadow-2xl overflow-hidden">
+                  {/* Browser-style header */}
+                  <div className="flex items-center gap-2 px-4 py-3 bg-muted/50 border-b">
+                    <div className="flex gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-400" />
+                      <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                      <div className="w-3 h-3 rounded-full bg-green-400" />
+                    </div>
+                    <div className="flex-1 flex justify-center">
+                      <div className="px-4 py-1 bg-background rounded-md text-xs text-muted-foreground">
+                        mydisplaycase.com
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Mock dashboard content */}
+                  <div className="p-4 space-y-4">
+                    {/* Analytics preview */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-muted/30 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-primary">$12,450</div>
+                        <div className="text-xs text-muted-foreground">Total Value</div>
+                      </div>
+                      <div className="bg-muted/30 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold">156</div>
+                        <div className="text-xs text-muted-foreground">Cards</div>
+                      </div>
+                      <div className="bg-muted/30 rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-green-500">+8.2%</div>
+                        <div className="text-xs text-muted-foreground">This Month</div>
+                      </div>
+                    </div>
+                    
+                    {/* Mock card grid */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                        <div 
+                          key={i} 
+                          className="aspect-[2.5/3.5] bg-gradient-to-br from-muted to-muted/50 rounded-md flex items-center justify-center"
+                        >
+                          <LayoutGrid className="h-4 w-4 text-muted-foreground/50" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Floating badge card */}
+                <div className="absolute -bottom-4 -left-4 bg-card border rounded-lg shadow-lg p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#FFD700' }}>
+                    <Award className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">Gold Tier</div>
+                    <div className="text-xs text-muted-foreground">Top Collector</div>
+                  </div>
+                </div>
+
+                {/* Floating price update */}
+                <div className="absolute -top-2 -right-2 bg-card border rounded-lg shadow-lg p-2 flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-green-500" />
+                  <span className="text-xs font-medium text-green-500">+$45</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
