@@ -35,34 +35,38 @@ async function initStripe(app: Express) {
     return;
   }
 
-  try {
-    console.log('Initializing Stripe schema...');
-    await runMigrations({ databaseUrl });
-    console.log('Stripe schema ready');
+  // Run Stripe initialization in background to avoid blocking server startup
+  (async () => {
+    try {
+      console.log('Initializing Stripe schema...');
+      await runMigrations({ databaseUrl });
+      console.log('Stripe schema ready');
 
-    const stripeSync = await getStripeSync();
+      const stripeSync = await getStripeSync();
 
-    console.log('Setting up managed webhook...');
-    const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
-    if (replitDomains) {
-      const webhookBaseUrl = `https://${replitDomains}`;
-      const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
-        `${webhookBaseUrl}/api/stripe/webhook`,
-        {
-          enabled_events: ['*'],
-          description: 'Managed webhook for MyDisplayCase subscription sync',
-        }
-      );
-      console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
+      console.log('Setting up managed webhook...');
+      const replitDomains = process.env.REPLIT_DOMAINS?.split(',')[0];
+      if (replitDomains) {
+        const webhookBaseUrl = `https://${replitDomains}`;
+        const { webhook, uuid } = await stripeSync.findOrCreateManagedWebhook(
+          `${webhookBaseUrl}/api/stripe/webhook`,
+          {
+            enabled_events: ['*'],
+            description: 'Managed webhook for MyDisplayCase subscription sync',
+          }
+        );
+        console.log(`Webhook configured: ${webhook.url} (UUID: ${uuid})`);
+      }
+
+      console.log('Syncing Stripe data in background...');
+      stripeSync.syncBackfill()
+        .then(() => console.log('Stripe data synced'))
+        .catch((err: Error) => console.error('Error syncing Stripe data:', err));
+    } catch (error) {
+      console.error('Failed to initialize Stripe:', error);
+      console.log('Note: Checkout will still work, only webhook sync is affected');
     }
-
-    console.log('Syncing Stripe data in background...');
-    stripeSync.syncBackfill()
-      .then(() => console.log('Stripe data synced'))
-      .catch((err: Error) => console.error('Error syncing Stripe data:', err));
-  } catch (error) {
-    console.error('Failed to initialize Stripe:', error);
-  }
+  })();
 }
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
@@ -1205,9 +1209,10 @@ Allow: /
       });
 
       res.json({ url: session.url });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating checkout session:", error);
-      res.status(500).json({ message: "Failed to create checkout session" });
+      console.error("Stripe error details:", error?.message, error?.type, error?.code);
+      res.status(500).json({ message: "Failed to create checkout session", error: error?.message });
     }
   });
 
