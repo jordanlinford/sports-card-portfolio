@@ -428,6 +428,31 @@ export type MessageWithSender = Message & {
   sender: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>;
 };
 
+// Promo codes table
+export const promoCodes = pgTable("promo_codes", {
+  id: serial("id").primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  description: text("description"),
+  maxUses: integer("max_uses").notNull(),
+  usedCount: integer("used_count").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Track who has used promo codes
+export const promoCodeRedemptions = pgTable("promo_code_redemptions", {
+  id: serial("id").primaryKey(),
+  promoCodeId: integer("promo_code_id").notNull().references(() => promoCodes.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  redeemedAt: timestamp("redeemed_at").defaultNow(),
+}, (table) => [
+  unique("promo_code_user_unique").on(table.promoCodeId, table.userId),
+]);
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type PromoCodeRedemption = typeof promoCodeRedemptions.$inferSelect;
+
 // Prestige tiers for collectors
 export const COLLECTOR_TIERS = {
   bronze: { name: "Bronze", minScore: 0, color: "#CD7F32" },

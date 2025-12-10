@@ -1,13 +1,15 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { 
   ArrowLeft, 
   Check, 
@@ -15,13 +17,16 @@ import {
   Zap,
   Shield,
   Infinity,
-  Star
+  Star,
+  Gift,
+  Loader2
 } from "lucide-react";
 
 export default function Upgrade() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const [promoCode, setPromoCode] = useState("");
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -35,6 +40,31 @@ export default function Upgrade() {
       }, 500);
     }
   }, [isAuthenticated, authLoading, toast]);
+
+  const promoMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const response = await apiRequest("POST", "/api/promo/redeem", { code });
+      return response;
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Success!",
+        description: data.message || "Promo code redeemed! You now have Pro access.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setPromoCode("");
+      setTimeout(() => {
+        setLocation("/");
+      }, 1500);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Invalid promo code",
+        description: error.message || "Please check your code and try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const checkoutMutation = useMutation({
     mutationFn: async () => {
@@ -194,6 +224,53 @@ export default function Upgrade() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Promo Code Section */}
+      <Card className="max-w-md mx-auto mb-8">
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2 text-lg">
+            <Gift className="h-5 w-5 text-primary" />
+            Have a Promo Code?
+          </CardTitle>
+          <CardDescription>
+            Enter your code to unlock Pro features for free
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (promoCode.trim()) {
+                promoMutation.mutate(promoCode.trim());
+              }
+            }}
+            className="flex gap-2"
+          >
+            <div className="flex-1">
+              <Label htmlFor="promo-code" className="sr-only">Promo Code</Label>
+              <Input
+                id="promo-code"
+                placeholder="Enter promo code"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                disabled={promoMutation.isPending}
+                data-testid="input-promo-code"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={!promoCode.trim() || promoMutation.isPending}
+              data-testid="button-apply-promo"
+            >
+              {promoMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Apply"
+              )}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <div className="text-center text-sm text-muted-foreground">
         <p>

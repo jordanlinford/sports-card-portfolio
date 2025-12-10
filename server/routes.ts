@@ -1246,6 +1246,29 @@ Allow: /
     }
   });
 
+  // Promo code redemption route
+  app.post("/api/promo/redeem", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { code } = req.body;
+
+      if (!code || typeof code !== 'string') {
+        return res.status(400).json({ success: false, message: "Promo code is required" });
+      }
+
+      const result = await storage.redeemPromoCode(code.trim(), userId);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json(result);
+      }
+    } catch (error) {
+      console.error("Error redeeming promo code:", error);
+      res.status(500).json({ success: false, message: "Failed to redeem promo code" });
+    }
+  });
+
   // Admin middleware
   const isAdmin = async (req: any, res: any, next: any) => {
     if (!req.user?.claims?.sub) {
