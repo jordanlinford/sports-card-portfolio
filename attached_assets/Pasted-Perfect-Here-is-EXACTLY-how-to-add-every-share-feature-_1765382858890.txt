@@ -1,0 +1,278 @@
+Perfect.
+Here is EXACTLY how to add every share feature into your app — with clear UI, backend routes, data, and implementation details for:
+
+Share Menu inside every Display Case
+
+TikTok-Style Teaser Image
+
+Instagram Story Export
+
+Discord / OG Link Preview (multi-card)
+
+Brag Image Generator (Top Card / Total Value / Collector Tier)
+
+Bookmark → Traffic Loop
+
+Everything is spelled out so you can build it in manageable chunks.
+
+⭐ STEP 1 — Add a "Share" Button to Every Display Case
+
+You need a consistent, visible button on every case.
+
+UI Placement:
+Top-right corner of the display case page:
+
+[ Share ▾ ]
+
+
+When tapped → opens a modal with:
+
+Share Options:
+
+📱 Share Case Link (copy URL)
+
+🖼️ Download Teaser Image
+
+📲 Download Instagram Story
+
+💎 Download Brag Image (Top Card or Total Value)
+
+↗️ Post to Social (opens OS share menu) – optional
+
+⤴️ Share to Discord (copy rich embed) – optional
+
+This modal is your gateway to free traffic.
+
+⭐ STEP 2 — Generate Teaser Images Server-Side (THE KEY TO VIRALITY)
+
+Every share feature depends on the same mechanism:
+
+🔥 A backend endpoint that returns a pre-rendered PNG image.
+
+You will create this:
+
+GET /api/share/case/:caseId?format=teaser
+GET /api/share/case/:caseId?format=story
+GET /api/share/case/:caseId?format=brag
+
+You have 3 rendering options (choose ONE):
+Option A (Best Quality): Puppeteer HTML → PNG
+
+You already use Node, so this is very doable:
+
+Create an HTML template that displays:
+
+Case name
+
+First 3–5 cards in a row
+
+User name + tier
+
+Total value
+
+MyDisplayCase branding
+
+Puppeteer loads hidden HTML and screenshots it at a custom resolution.
+
+Pros: Perfect for TikTok, IG, Discord.
+Cons: Requires Puppeteer installed (you already wanted Puppeteer for scraping).
+
+Option B (Most Portable): Node Canvas
+
+Draw your image manually using node-canvas.
+
+Pros: No browser needed.
+Cons: More manual work.
+
+Option C (If you ever go Vercel): @vercel/og
+
+This is the easiest and fastest.
+
+⭐ STEP 3 — TikTok-Style Teaser Image
+
+This is the MOST viral asset.
+
+Image Layout (1080 × 1350 for vertical feed):
+
+Top: Case name
+
+Middle: 3–4 cards in a clean row (your first row only)
+
+Bottom-left:
+
+Collector name
+
+Collector tier badge
+
+Bottom-right:
+
+Total case value
+
+Card count
+
+Footer: subtle MyDisplayCase watermark
+
+Example layout:
+
+┌───────────────────────────────┐
+│  “My Charizard Masterpieces”   │
+│                               │
+│  [Card1] [Card2] [Card3] [Card4] │
+│                               │
+│  @Jordan • Diamond Tier        │
+│  Total Value: $24,680          │
+│  12 Cards                      │
+│                               │
+│        MyDisplayCase.io        │
+└───────────────────────────────┘
+
+
+Users will post this on TikTok WITHOUT ANY PROMPTING.
+Collectors love flexing.
+
+⭐ STEP 4 — Instagram Story Export
+
+Same backend endpoint, different layout:
+
+Story Resolution: 1080 × 1920
+Layout:
+
+Center: Large fanned showcase of top 5 cards
+
+Top: Case title
+
+Bottom:
+
+Case value
+
+Collector name
+
+Tier badge
+
+Bottom-center CTA:
+“View My Case → MyDisplayCase.io/case/123”
+
+Stories drive a TON of traffic.
+
+⭐ STEP 5 — Discord Embed Preview (multi-card OG image)
+
+Right now you only show one card in the preview.
+We fix that by changing your Open Graph image link:
+
+Replace your current og:image with the new generator:
+<meta property="og:image" content="https://mydisplaycase.io/api/share/case/{{id}}?format=teaser" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+
+
+This way:
+
+Discord
+
+iMessage
+
+Twitter (X)
+
+Facebook
+
+…all show the full teaser image instead of a single card.
+
+This alone will boost click-through by 2–3x.
+
+⭐ STEP 6 — Brag Image Generator
+
+This is where the dopamine hits.
+
+Generate an image like:
+
+Version A: “Top Card Flex”
+Top Card: 2020 Charizard VMAX (PSA 10)
+Estimated Value: $1,480
+
+
+Large card image centered
+Tier badge on top
+Name + tagline:
+
+"Highest Value Card in My Collection"
+
+Version B: “Total Portfolio Value”
+
+Huge number:
+
+$24,680
+My Total Collection Value
+
+
+Below it:
+
+of cards
+of cases
+
+Tier badge
+
+MyDisplayCase logo
+
+Users LOVE posting this.
+
+⭐ STEP 7 — Bookmark → Traffic Loop
+
+Add this simple UI:
+
+For every public card:
+
+⭐ Bookmark
+
+In collector dashboard:
+
+“Cards you’ve bookmarked” → with notifications when:
+
+The card’s price goes up
+
+The card receives a new offer
+
+The collector posts a new case
+
+The card gets moved between cases
+
+This gives you:
+
+Traffic → Notifications → Return Visits → More Shares → More Traffic
+
+A perfect loop.
+
+⭐ STEP 8 — PRIORITY IMPLEMENTATION ROADMAP
+
+Build these in this exact order:
+
+PHASE 1 (easy, fast win)
+
+Add Share button + Share modal
+
+Implement /api/share/case/:id?format=teaser
+
+Replace OG:image with teaser
+
+PHASE 2 (medium effort, big payoff)
+
+Build Instagram story generator
+
+Build brag image generator
+
+Add Share-to-social buttons
+
+PHASE 3 (notifications + viral loop)
+
+Add bookmark notifications
+
+Add “User posted a new case” notifications
+
+Add “New offer received” push
+
+PHASE 4 (viral optimizations)
+
+Auto-show share dialog after creating a new case
+
+Offer “Post this to TikTok now”
+
+Weekly recap images auto-generated (“Your week in collecting”)
