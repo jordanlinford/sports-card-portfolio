@@ -17,6 +17,7 @@ import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { MakeOfferModal } from "@/components/make-offer-modal";
 
 interface CardDetailModalProps {
   card: Card | null;
@@ -59,6 +60,7 @@ export function CardDetailModal({
 }: CardDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showOfferModal, setShowOfferModal] = useState(false);
   const { toast } = useToast();
 
   const { data: bookmarkStatus, refetch: refetchBookmark } = useQuery<{ hasBookmarked: boolean; bookmarkCount: number }>({
@@ -693,9 +695,14 @@ export function CardDetailModal({
                       )}
                     </div>
                     {isAuthenticated && (
-                      <p className="text-sm text-muted-foreground">
-                        Interested in this card? You can make an offer to the collector.
-                      </p>
+                      <Button 
+                        className="w-full gap-2"
+                        onClick={() => setShowOfferModal(true)}
+                        data-testid="button-make-offer"
+                      >
+                        <HandCoins className="h-4 w-4" />
+                        Make an Offer
+                      </Button>
                     )}
                   </div>
                 </>
@@ -704,6 +711,14 @@ export function CardDetailModal({
           )}
         </div>
       </DialogContent>
+
+      {card && (
+        <MakeOfferModal 
+          card={card}
+          open={showOfferModal}
+          onOpenChange={setShowOfferModal}
+        />
+      )}
     </Dialog>
   );
 }
