@@ -72,20 +72,11 @@ const CUSTOM_DOMAIN = process.env.CUSTOM_DOMAIN || "mydisplaycase.io";
 
 function getCanonicalDomain(requestHostname: string): string {
   // In production, prefer custom domain if it's configured
-  // The custom domain should be used for all auth callbacks
   if (process.env.REPLIT_DEPLOYMENT_DOMAIN && CUSTOM_DOMAIN) {
-    // If we have a custom domain configured, use it instead of .replit.app
     return CUSTOM_DOMAIN;
   }
-  // In development, use REPLIT_DEV_DOMAIN
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    return process.env.REPLIT_DEV_DOMAIN;
-  }
-  // Fallback to REPLIT_DOMAINS
-  if (process.env.REPLIT_DOMAINS) {
-    return process.env.REPLIT_DOMAINS.split(',')[0];
-  }
-  // Last resort - use request hostname
+  // In development, always use the request hostname to avoid domain mismatches
+  // This ensures cookies and session work correctly
   return requestHostname;
 }
 
