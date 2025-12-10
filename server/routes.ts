@@ -256,6 +256,31 @@ Allow: /
     }
   });
 
+  // Featured cards for landing page hero (public, no auth required)
+  app.get("/api/featured-cards", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 8;
+      const cases = await storage.getRecentPublicDisplayCases(5);
+      
+      // Flatten cards from all cases and take the first N with images
+      const featuredCards = cases
+        .flatMap(c => c.cards || [])
+        .filter(card => card.imagePath)
+        .slice(0, limit)
+        .map(card => ({
+          id: card.id,
+          title: card.title,
+          imagePath: card.imagePath,
+          estimatedValue: card.estimatedValue,
+        }));
+      
+      res.json(featuredCards);
+    } catch (error) {
+      console.error("Error fetching featured cards:", error);
+      res.status(500).json({ message: "Failed to fetch featured cards" });
+    }
+  });
+
   // Public discovery routes
   app.get("/api/explore/recent", async (req, res) => {
     try {

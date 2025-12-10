@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +36,19 @@ import {
   ArrowRight
 } from "lucide-react";
 
+type FeaturedCard = {
+  id: number;
+  title: string;
+  imagePath: string;
+  estimatedValue: number | null;
+};
+
 export default function Landing() {
+  // Fetch featured cards for hero section
+  const { data: featuredCards = [] } = useQuery<FeaturedCard[]>({
+    queryKey: ["/api/featured-cards"],
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+  });
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
@@ -146,16 +159,32 @@ export default function Landing() {
                       </div>
                     </div>
                     
-                    {/* Mock card grid */}
+                    {/* Card grid with real images */}
                     <div className="grid grid-cols-4 gap-2">
-                      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                        <div 
-                          key={i} 
-                          className="aspect-[2.5/3.5] bg-gradient-to-br from-muted to-muted/50 rounded-md flex items-center justify-center"
-                        >
-                          <LayoutGrid className="h-4 w-4 text-muted-foreground/50" />
-                        </div>
-                      ))}
+                      {featuredCards.length > 0 ? (
+                        featuredCards.slice(0, 8).map((card) => (
+                          <div 
+                            key={card.id} 
+                            className="aspect-[2.5/3.5] rounded-md overflow-hidden bg-gradient-to-br from-muted to-muted/50"
+                          >
+                            <img 
+                              src={card.imagePath}
+                              alt={card.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
+                        ))
+                      ) : (
+                        [1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                          <div 
+                            key={i} 
+                            className="aspect-[2.5/3.5] bg-gradient-to-br from-muted to-muted/50 rounded-md flex items-center justify-center"
+                          >
+                            <LayoutGrid className="h-4 w-4 text-muted-foreground/50" />
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
