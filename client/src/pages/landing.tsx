@@ -1,5 +1,4 @@
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,19 +35,19 @@ import {
   ArrowRight
 } from "lucide-react";
 
-type FeaturedCard = {
-  id: number;
-  title: string;
-  imagePath: string;
-  estimatedValue: number | null;
-};
+import heroCard1 from "@assets/Screenshot_2025-12-10_at_9.49.12_AM_1765385357760.png";
+import heroCard2 from "@assets/Screenshot_2025-12-10_at_9.49.37_AM_1765385383043.png";
+import heroCard3 from "@assets/PSA-98304469-front_1765385407925.jpg";
+import heroCard4 from "@assets/110043113-front_1765385918538.jpg";
+
+const heroCards = [
+  { id: 1, title: "Charizard PSA 10", image: heroCard1 },
+  { id: 2, title: "Mike Trout PSA 9", image: heroCard2 },
+  { id: 3, title: "Josh Allen PSA 10", image: heroCard3 },
+  { id: 4, title: "Kobe Bryant PSA 10", image: heroCard4 },
+];
 
 export default function Landing() {
-  // Fetch featured cards for hero section
-  const { data: featuredCards = [] } = useQuery<FeaturedCard[]>({
-    queryKey: ["/api/featured-cards"],
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
-  });
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
@@ -159,32 +158,20 @@ export default function Landing() {
                       </div>
                     </div>
                     
-                    {/* Card grid with real images - 2x2 layout */}
+                    {/* Card grid with static images - 2x2 layout */}
                     <div className="grid grid-cols-2 gap-3">
-                      {featuredCards.length > 0 ? (
-                        featuredCards.slice(0, 4).map((card) => (
-                          <div 
-                            key={card.id} 
-                            className="aspect-[2.5/3.5] rounded-lg overflow-hidden bg-gradient-to-br from-muted to-muted/50 shadow-md"
-                          >
-                            <img 
-                              src={card.imagePath}
-                              alt={card.title}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          </div>
-                        ))
-                      ) : (
-                        [1, 2, 3, 4].map((i) => (
-                          <div 
-                            key={i} 
-                            className="aspect-[2.5/3.5] bg-gradient-to-br from-muted to-muted/50 rounded-lg flex items-center justify-center"
-                          >
-                            <LayoutGrid className="h-5 w-5 text-muted-foreground/50" />
-                          </div>
-                        ))
-                      )}
+                      {heroCards.map((card) => (
+                        <div 
+                          key={card.id} 
+                          className="aspect-[2.5/3.5] rounded-lg overflow-hidden bg-gradient-to-br from-muted to-muted/50 shadow-md"
+                        >
+                          <img 
+                            src={card.image}
+                            alt={card.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
