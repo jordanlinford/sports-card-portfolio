@@ -159,13 +159,13 @@ export default function Landing() {
                       </div>
                     </div>
                     
-                    {/* Card grid with real images */}
-                    <div className="grid grid-cols-4 gap-2">
+                    {/* Card grid with real images - 2x2 layout */}
+                    <div className="grid grid-cols-2 gap-3">
                       {featuredCards.length > 0 ? (
-                        featuredCards.slice(0, 8).map((card) => (
+                        featuredCards.slice(0, 4).map((card) => (
                           <div 
                             key={card.id} 
-                            className="aspect-[2.5/3.5] rounded-md overflow-hidden bg-gradient-to-br from-muted to-muted/50"
+                            className="aspect-[2.5/3.5] rounded-lg overflow-hidden bg-gradient-to-br from-muted to-muted/50 shadow-md"
                           >
                             <img 
                               src={card.imagePath}
@@ -176,12 +176,12 @@ export default function Landing() {
                           </div>
                         ))
                       ) : (
-                        [1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                        [1, 2, 3, 4].map((i) => (
                           <div 
                             key={i} 
-                            className="aspect-[2.5/3.5] bg-gradient-to-br from-muted to-muted/50 rounded-md flex items-center justify-center"
+                            className="aspect-[2.5/3.5] bg-gradient-to-br from-muted to-muted/50 rounded-lg flex items-center justify-center"
                           >
-                            <LayoutGrid className="h-4 w-4 text-muted-foreground/50" />
+                            <LayoutGrid className="h-5 w-5 text-muted-foreground/50" />
                           </div>
                         ))
                       )}
