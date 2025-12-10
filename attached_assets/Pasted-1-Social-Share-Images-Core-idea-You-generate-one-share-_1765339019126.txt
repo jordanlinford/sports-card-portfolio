@@ -1,0 +1,424 @@
+1️⃣ Social & Share Images
+Core idea
+
+You generate one share image per display case that already looks like a TikTok/IG/Discord teaser:
+
+Case title
+
+Your username / avatar
+
+First row of 3–5 cards (grid)
+
+Total value, card count, maybe a “Pro” crown
+
+Then you use that same image for:
+
+og:image (link previews – Discord, X, FB, iMessage)
+
+“Download story image” button
+
+TikTok thumbnail / brag image exports
+
+Profile signature graphics
+
+Backend concept
+
+Use a “share image” endpoint that renders HTML to PNG:
+
+Option A: puppeteer
+ screenshotting a headless page
+
+Option B: node-canvas
+ and draw manually
+
+Option C (if you ever move to Vercel): @vercel/og / Satori
+
+Route sketch
+
+// GET /api/share-image/case/:caseId
+// returns image/png
+
+
+Steps inside handler:
+
+Load the display case + first N cards (e.g. 4–6).
+
+Render them in a hidden HTML template OR via node-canvas.
+
+Generate a PNG buffer and:
+
+either send directly (res.set('Content-Type','image/png').send(buffer))
+
+and/or upload to storage and cache the URL in cases.shareImageUrl.
+
+Then in your HTML for /case/:id:
+
+<meta property="og:image" content="https://mydisplaycase.io/api/share-image/case/123" />
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="og:title" content="Charizards Galore! • MyDisplayCase" />
+<meta property="og:description" content="8 Charizards • $27,680 top card • Total case value $104,389" />
+
+
+That single image is your:
+
+TikTok teaser (user downloads and uploads with a short clip)
+
+Instagram story export (1080x1920 version)
+
+Discord embed image
+
+Brag image
+
+On the frontend, just add buttons under each case:
+
+Copy Link (copies /case/:id)
+
+Download Share Image (hits /api/share-image/case/:id)
+
+Download Story Image (same endpoint but with ?format=story)
+
+2️⃣ Offers, Trade Mode, Bookmarks
+2.1 Data model
+// cards table (existing)
+open_to_offers boolean DEFAULT false,
+min_offer_amount numeric NULL
+
+// offers table
+id              uuid PK
+card_id         uuid FK -> cards
+from_user_id    uuid FK -> users
+to_user_id      uuid FK -> users  // owner of the card
+amount          numeric
+currency        text              // 'USD'
+message         text NULL
+is_anonymous    boolean DEFAULT false
+status          text              // 'pending' | 'accepted' | 'declined' | 'withdrawn'
+created_at      timestamptz
+updated_at      timestamptz
+
+// bookmarks table
+user_id         uuid FK -> users
+card_id         uuid FK -> cards
+created_at      timestamptz
+PRIMARY KEY (user_id, card_id)
+
+// trade_offers table (MVP)
+id              uuid PK
+from_user_id    uuid
+to_user_id      uuid
+offered_card_ids uuid[]           // JSONB if you like
+requested_card_ids uuid[]
+cash_adjustment numeric DEFAULT 0  // + = from_user adds cash
+message         text
+status          text              // pending/accepted/declined
+created_at      timestamptz
+
+2.2 “Open to Offers” UX
+
+On a card detail page:
+
+Toggle: “Open to Offers”
+
+Optional field: “Minimum Offer ($)”
+
+API
+
+// PATCH /api/cards/:cardId/offers-settings
+{ openToOffers: boolean, minOfferAmount?: number }
+
+2.3 Creating an Offer
+
+On someone else’s card:
+
+Button: “Make Offer”
+
+Amount field + optional message
+
+Checkbox: “Hide my name from the card owner (anonymous)” – front-end text.
+
+Backend still records from_user_id for abuse prevention; you just don’t show it.
+
+API
+
+// POST /api/cards/:cardId/offers
+{
+  amount: number;
+  message?: string;
+  isAnonymous?: boolean;
+}
+
+
+This creates a row in offers with status='pending'.
+
+2.4 Notifications
+
+Create a notifications table or re-use something similar:
+
+id           uuid PK
+user_id      uuid          // who receives it
+type         text          // 'offer_received' | 'offer_accepted' ...
+data         jsonb         // { cardId, offerId, amount }
+is_read      boolean DEFAULT false
+created_at   timestamptz
+
+
+When an offer is created:
+
+Insert a notification for to_user_id.
+
+Trigger an email / in-app bell count.
+
+Copy deck for UI:
+
+“You received an offer on Charizard – $120.00”
+
+“Your offer on Russell Wilson – $90.00 was accepted”
+
+2.5 Trade Mode (MVP)
+
+MVP version:
+
+On a card: “Propose Trade”
+
+Opens a modal where:
+
+You see your own collection, pick up to N cards.
+
+Optional cash kicker.
+
+Message.
+
+API
+
+// POST /api/trades
+{
+  toUserId: string;
+  offeredCardIds: string[];
+  requestedCardIds: string[];   // usually just [targetCardId]
+  cashAdjustment?: number;
+  message?: string;
+}
+
+
+Card owner sees:
+
+“Jordan wants to trade: [list of cards] + $X for your [card]”
+
+Buttons: Accept / Decline / Counter (counter = just a new trade referencing old one).
+
+You do not need full escrow to start; just DM-style negotiation with structured data.
+
+2.6 Bookmarks
+
+On a card:
+
+Icon: ⭐ “Save / Bookmark”
+
+API
+
+// POST /api/cards/:cardId/bookmark
+// DELETE /api/cards/:cardId/bookmark
+
+
+Card owner sees in analytics:
+
+“Bookmarked by 12 collectors”
+
+You can keep who bookmarked anonymous at first (just count), then later show usernames in a modal.
+
+Those three together create:
+
+“Is anyone interested in my case?” (bookmarks count)
+
+“Did I get a new offer?” (offers + notifications)
+
+“Can we work a trade?” (trade_offers)
+
+3️⃣ Prestige System (Ranks & Badges)
+
+Think: Collector Score + Badges + Titles
+
+3.1 Data model
+// badges
+id           serial PK
+key          text UNIQUE       // 'portfolio_10k', 'public_cases_5', etc.
+name         text
+description  text
+icon         text              // path or emoji
+category     text              // 'value' | 'social' | 'collection'
+threshold    numeric NULL      // simple badges
+
+// user_badges
+user_id      uuid
+badge_id     int
+earned_at    timestamptz
+PRIMARY KEY (user_id, badge_id)
+
+// users (new fields)
+collector_score int DEFAULT 0
+collector_tier  text          // 'Rookie' | 'All-Star' | 'Hall of Fame'
+
+3.2 Example badges
+
+“Rookie Collector” – first 5 cards added
+
+“Case Designer” – first public display case
+
+“Curator” – 5 public display cases
+
+“High Roller” – portfolio value > $10,000
+
+“Whale” – portfolio value > $100,000
+
+“Charizard King” – 5+ Charizard cards
+
+“Most Viewed Case – Weekly” – dynamic badge updated weekly
+
+“Influencer” – 100+ likes across cases
+
+3.3 Collector Score formula (simple starting point)
+
+On a regular cron or background job:
+
+collector_score =
+  floor(log10(total_portfolio_value + 1) * 100) +
+  (public_case_count * 10) +
+  (total_likes_received * 2) +
+  (days_active_last_30 * 3)
+
+
+Then map collector_score → tiers:
+
+0–99 → Rookie
+
+100–249 → Prospect
+
+250–499 → All-Star
+
+500–999 → Franchise Player
+
+1000+ → Hall of Fame
+
+Show this everywhere:
+
+On profile avatar: small badge ring + title.
+
+On case cards: “Owner: JL • Hall of Fame • 12 badges”.
+
+3.4 Awarding badges
+
+Create a small service class, e.g. PrestigeService:
+
+Called whenever key events occur:
+
+card added
+
+case created / made public
+
+portfolio value recalculated
+
+like received
+
+bookmark received
+
+case hit X views
+
+PrestigeService.checkBadges(userId):
+
+Load user stats (portfolio value, counts, likes, etc.).
+
+Compare against badge definitions.
+
+Insert into user_badges any badges not yet earned.
+
+Optionally push notifications (“New badge unlocked: High Roller 🤑”).
+
+4️⃣ “Number 1” – Social Proof Loops (Likes, Comments, Trending)
+
+(I’m assuming this is what you meant by #1; even if not, you’ll want this anyway.)
+
+4.1 Data model
+// case_likes
+user_id      uuid
+case_id      uuid
+created_at   timestamptz
+PRIMARY KEY (user_id, case_id)
+
+// case_comments
+id           uuid PK
+case_id      uuid
+user_id      uuid
+content      text
+created_at   timestamptz
+
+// follows
+follower_id  uuid
+followed_id  uuid
+created_at   timestamptz
+PRIMARY KEY (follower_id, followed_id)
+
+4.2 Basic endpoints
+
+POST /api/cases/:id/like → toggle like
+
+GET /api/cases/:id/likes → count + list (for owner / analytics)
+
+POST /api/cases/:id/comments
+
+GET /api/cases/:id/comments
+
+POST /api/users/:id/follow
+
+GET /api/users/:id/followers / following
+
+Use the same notifications system as offers:
+
+like_received
+
+comment_received
+
+new_follower
+
+4.3 Trending feed
+
+Create a simple score per case:
+
+score =
+  (likes_last_48h * 3) +
+  (comments_last_48h * 4) +
+  (views_last_48h * 0.5)
+
+
+Then your Explore feed:
+
+GET /api/feed/trending sorts public cases by score DESC.
+
+Cache scores every 10–15 minutes.
+
+On the frontend:
+
+“Trending” tab
+
+“New & Rising” tab (sort by created_at + score)
+
+Maybe a “Hall of Fame” tab (top all-time liked cases)
+
+If you want a super tight next step
+
+If I were you, I’d implement in this order:
+
+Likes & comments on cases (fast, immediately visible, powers prestige)
+
+Bookmarks + “open to offers” flag on cards (low friction, no money yet)
+
+Basic offers (no escrow, just structured DMs + notifications)
+
+Share-image endpoint for case link previews + story downloads
+
+Prestige / badges hooked into likes, value, cases, and offers
+
+If you want, next message I can:
+
+Draft exact table schemas for Postgres
+
+Or write sample TypeScript interfaces + API routes you can almost copy-paste into your repo.
