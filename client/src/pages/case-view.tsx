@@ -18,13 +18,19 @@ import {
   Edit,
   Share2,
   Link as LinkIcon,
-  Download
+  Download,
+  Instagram,
+  Smartphone,
+  Trophy,
+  Wallet
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import type { DisplayCaseWithCards, Card, User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -366,7 +372,7 @@ export default function CaseView() {
                   Share
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuItem 
                   onClick={() => {
                     const url = `${window.location.origin}/case/${id}`;
@@ -381,25 +387,30 @@ export default function CaseView() {
                   <LinkIcon className="h-4 w-4 mr-2" />
                   Copy Link
                 </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Download Images</DropdownMenuLabel>
+                
                 <DropdownMenuItem 
                   onClick={() => {
-                    const imageUrl = `/api/share-image/case/${id}`;
+                    const imageUrl = `/api/share-image/case/${id}?format=teaser`;
                     const link = document.createElement('a');
                     link.href = imageUrl;
-                    link.download = `${displayCase.name.replace(/[^a-zA-Z0-9]/g, '-')}-share.png`;
+                    link.download = `${displayCase.name.replace(/[^a-zA-Z0-9]/g, '-')}-teaser.png`;
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
                     toast({
                       title: "Downloading...",
-                      description: "Share image is being downloaded.",
+                      description: "TikTok/Instagram teaser image downloading.",
                     });
                   }}
-                  data-testid="button-download-share-image"
+                  data-testid="button-download-teaser"
                 >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Share Image
+                  <Smartphone className="h-4 w-4 mr-2" />
+                  Teaser Image (4:5)
                 </DropdownMenuItem>
+                
                 <DropdownMenuItem 
                   onClick={() => {
                     const imageUrl = `/api/share-image/case/${id}?format=story`;
@@ -411,13 +422,76 @@ export default function CaseView() {
                     document.body.removeChild(link);
                     toast({
                       title: "Downloading...",
-                      description: "Story image is being downloaded.",
+                      description: "Instagram Story image downloading.",
                     });
                   }}
-                  data-testid="button-download-story-image"
+                  data-testid="button-download-story"
+                >
+                  <Instagram className="h-4 w-4 mr-2" />
+                  Story Image (9:16)
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem 
+                  onClick={() => {
+                    const imageUrl = `/api/share-image/case/${id}`;
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = `${displayCase.name.replace(/[^a-zA-Z0-9]/g, '-')}-share.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    toast({
+                      title: "Downloading...",
+                      description: "Social share image downloading.",
+                    });
+                  }}
+                  data-testid="button-download-social"
                 >
                   <Download className="h-4 w-4 mr-2" />
-                  Download Story Image (9:16)
+                  Social Preview (16:9)
+                </DropdownMenuItem>
+                
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground">Brag Images</DropdownMenuLabel>
+                
+                <DropdownMenuItem 
+                  onClick={() => {
+                    const imageUrl = `/api/share-image/case/${id}?format=brag-card`;
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = `${displayCase.name.replace(/[^a-zA-Z0-9]/g, '-')}-top-card.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    toast({
+                      title: "Downloading...",
+                      description: "Top card brag image downloading.",
+                    });
+                  }}
+                  data-testid="button-download-brag-card"
+                >
+                  <Trophy className="h-4 w-4 mr-2" />
+                  Top Card Flex
+                </DropdownMenuItem>
+                
+                <DropdownMenuItem 
+                  onClick={() => {
+                    const imageUrl = `/api/share-image/case/${id}?format=brag-portfolio`;
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = `${displayCase.name.replace(/[^a-zA-Z0-9]/g, '-')}-portfolio.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    toast({
+                      title: "Downloading...",
+                      description: "Portfolio value image downloading.",
+                    });
+                  }}
+                  data-testid="button-download-brag-portfolio"
+                >
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Portfolio Value
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -4,7 +4,7 @@ import https from "https";
 import http from "http";
 
 interface ShareImageOptions {
-  format?: "social" | "story";
+  format?: "social" | "story" | "teaser" | "brag-card" | "brag-portfolio";
   width?: number;
   height?: number;
 }
@@ -78,8 +78,21 @@ export async function generateShareImage(
 ): Promise<Buffer> {
   const format = options.format || "social";
   
-  const width = format === "story" ? 1080 : 1200;
-  const height = format === "story" ? 1920 : 630;
+  // Dimensions for each format
+  const dimensions: Record<string, { width: number; height: number }> = {
+    social: { width: 1200, height: 630 },      // Discord/Twitter/Facebook
+    story: { width: 1080, height: 1920 },      // Instagram Story
+    teaser: { width: 1080, height: 1350 },     // TikTok/Instagram Feed (4:5)
+    "brag-card": { width: 1080, height: 1350 },     // Top Card Brag
+    "brag-portfolio": { width: 1080, height: 1350 }, // Portfolio Value Brag
+  };
+  
+  const { width, height } = dimensions[format] || dimensions.social;
+  
+  // Handle brag formats separately
+  if (format === "brag-card" || format === "brag-portfolio") {
+    return generateBragImage(displayCase, owner, baseUrl, format, width, height);
+  }
   
   const cards = displayCase.cards || [];
   const cardCount = cards.length;
@@ -288,4 +301,302 @@ function escapeXml(unsafe: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
+}
+
+async function generateBragImage(
+  displayCase: DisplayCaseWithCards,
+  owner: User,
+  baseUrl: string,
+  format: "brag-card" | "brag-portfolio",
+  width: number,
+  height: number
+): Promise<Buffer> {
+  const cards = displayCase.cards || [];
+  const ownerName = owner.firstName
+    ? `${owner.firstName}${owner.lastName ? " " + owner.lastName : ""}`
+    : "Collector";
+  const isPro = owner.subscriptionStatus === "PRO";
+
+  const gradientColors = getThemeGradient(displayCase.theme);
+  const composites: sharp.OverlayOptions[] = [];
+
+  // Background
+  const svgBackground = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${gradientColors.start};stop-opacity:1" />
+          <stop offset="100%" style="stop-color:${gradientColors.end};stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#bg)"/>
+    </svg>
+  `;
+
+  const backgroundBuffer = await sharp(Buffer.from(svgBackground)).png().toBuffer();
+
+  if (format === "brag-card") {
+    // Top Card Flex - show the highest value card
+    const topCard = cards.reduce((max, card) => {
+      const currentValue = card.estimatedValue || 0;
+      const maxValue = max?.estimatedValue || 0;
+      return currentValue > maxValue ? card : max;
+    }, cards[0]);
+
+    if (topCard) {
+      // Title
+      const titleSvg = `
+        <svg width="${width}" height="120" xmlns="http://www.w3.org/2000/svg">
+          <text x="${width / 2}" y="70" text-anchor="middle"
+                font-family="system-ui, -apple-system, sans-serif" 
+                font-size="36" font-weight="700" fill="white">
+            My Top Card
+          </text>
+          <text x="${width / 2}" y="105" text-anchor="middle"
+                font-family="system-ui, -apple-system, sans-serif" 
+                font-size="22" fill="rgba(255,255,255,0.7)">
+            Highest Value in My Collection
+          </text>
+        </svg>
+      `;
+      composites.push({
+        input: await sharp(Buffer.from(titleSvg)).png().toBuffer(),
+        top: 60,
+        left: 0,
+      });
+
+      // Large card image
+      const cardWidth = 400;
+      const cardHeight = 560;
+      const cardX = (width - cardWidth) / 2;
+      const cardY = 200;
+
+      const cardImageBuffer = await loadCardImage(
+        topCard.imagePath,
+        baseUrl,
+        cardWidth,
+        cardHeight
+      );
+
+      if (cardImageBuffer) {
+        const roundedImage = await sharp(cardImageBuffer)
+          .composite([
+            {
+              input: Buffer.from(`
+                <svg width="${cardWidth}" height="${cardHeight}">
+                  <rect x="0" y="0" width="${cardWidth}" height="${cardHeight}" 
+                        rx="16" ry="16" fill="white"/>
+                </svg>
+              `),
+              blend: "dest-in",
+            },
+          ])
+          .png()
+          .toBuffer();
+
+        composites.push({
+          input: roundedImage,
+          top: cardY,
+          left: cardX,
+        });
+      }
+
+      // Card info
+      const cardTitle = topCard.title.length > 35 
+        ? topCard.title.substring(0, 32) + "..." 
+        : topCard.title;
+      const cardValue = topCard.estimatedValue 
+        ? formatCurrency(topCard.estimatedValue) 
+        : "";
+
+      const infoSvg = `
+        <svg width="${width}" height="180" xmlns="http://www.w3.org/2000/svg">
+          <text x="${width / 2}" y="50" text-anchor="middle"
+                font-family="system-ui, -apple-system, sans-serif" 
+                font-size="28" font-weight="600" fill="white">
+            ${escapeXml(cardTitle)}
+          </text>
+          ${cardValue ? `
+          <text x="${width / 2}" y="95" text-anchor="middle"
+                font-family="system-ui, -apple-system, sans-serif" 
+                font-size="48" font-weight="700" fill="#22c55e">
+            ${cardValue}
+          </text>
+          ` : ""}
+          <text x="${width / 2}" y="${cardValue ? 140 : 95}" text-anchor="middle"
+                font-family="system-ui, -apple-system, sans-serif" 
+                font-size="22" fill="rgba(255,255,255,0.7)">
+            @${escapeXml(ownerName)}${isPro ? " ★ PRO" : ""}
+          </text>
+        </svg>
+      `;
+      composites.push({
+        input: await sharp(Buffer.from(infoSvg)).png().toBuffer(),
+        top: cardY + cardHeight + 30,
+        left: 0,
+      });
+    }
+  } else {
+    // Portfolio Value Brag
+    const totalValue = cards.reduce((sum, card) => sum + (card.estimatedValue || 0), 0);
+    const cardCount = cards.length;
+    const caseCount = 1; // Single case view
+
+    // Title
+    const titleSvg = `
+      <svg width="${width}" height="120" xmlns="http://www.w3.org/2000/svg">
+        <text x="${width / 2}" y="70" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="36" font-weight="700" fill="white">
+          My Collection Value
+        </text>
+        <text x="${width / 2}" y="105" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="22" fill="rgba(255,255,255,0.7)">
+          Portfolio on MyDisplayCase
+        </text>
+      </svg>
+    `;
+    composites.push({
+      input: await sharp(Buffer.from(titleSvg)).png().toBuffer(),
+      top: 100,
+      left: 0,
+    });
+
+    // Big value number
+    const valueSvg = `
+      <svg width="${width}" height="200" xmlns="http://www.w3.org/2000/svg">
+        <text x="${width / 2}" y="120" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="96" font-weight="800" fill="#22c55e">
+          ${formatCurrency(totalValue)}
+        </text>
+        <text x="${width / 2}" y="170" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="28" fill="rgba(255,255,255,0.7)">
+          Total Estimated Value
+        </text>
+      </svg>
+    `;
+    composites.push({
+      input: await sharp(Buffer.from(valueSvg)).png().toBuffer(),
+      top: 280,
+      left: 0,
+    });
+
+    // Stats row
+    const statsSvg = `
+      <svg width="${width}" height="120" xmlns="http://www.w3.org/2000/svg">
+        <text x="${width / 3}" y="50" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="48" font-weight="700" fill="white">
+          ${cardCount}
+        </text>
+        <text x="${width / 3}" y="85" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="20" fill="rgba(255,255,255,0.6)">
+          Cards
+        </text>
+        <text x="${(width * 2) / 3}" y="50" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="48" font-weight="700" fill="white">
+          ${caseCount}
+        </text>
+        <text x="${(width * 2) / 3}" y="85" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="20" fill="rgba(255,255,255,0.6)">
+          Display Case
+        </text>
+      </svg>
+    `;
+    composites.push({
+      input: await sharp(Buffer.from(statsSvg)).png().toBuffer(),
+      top: 550,
+      left: 0,
+    });
+
+    // Show top 4 cards in a row
+    const maxCardsToShow = 4;
+    const cardsToShow = cards
+      .sort((a, b) => (b.estimatedValue || 0) - (a.estimatedValue || 0))
+      .slice(0, maxCardsToShow);
+
+    if (cardsToShow.length > 0) {
+      const cardWidth = 180;
+      const cardHeight = 250;
+      const cardGap = 20;
+      const totalCardsWidth = cardsToShow.length * cardWidth + (cardsToShow.length - 1) * cardGap;
+      const cardStartX = (width - totalCardsWidth) / 2;
+      const cardStartY = 720;
+
+      for (let i = 0; i < cardsToShow.length; i++) {
+        const card = cardsToShow[i];
+        const cardX = cardStartX + i * (cardWidth + cardGap);
+
+        const cardImageBuffer = await loadCardImage(card.imagePath, baseUrl, cardWidth, cardHeight);
+
+        if (cardImageBuffer) {
+          const roundedImage = await sharp(cardImageBuffer)
+            .composite([
+              {
+                input: Buffer.from(`
+                  <svg width="${cardWidth}" height="${cardHeight}">
+                    <rect x="0" y="0" width="${cardWidth}" height="${cardHeight}" 
+                          rx="12" ry="12" fill="white"/>
+                  </svg>
+                `),
+                blend: "dest-in",
+              },
+            ])
+            .png()
+            .toBuffer();
+
+          composites.push({
+            input: roundedImage,
+            top: cardStartY,
+            left: cardX,
+          });
+        }
+      }
+    }
+
+    // Owner info
+    const ownerSvg = `
+      <svg width="${width}" height="80" xmlns="http://www.w3.org/2000/svg">
+        <text x="${width / 2}" y="40" text-anchor="middle"
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="24" fill="rgba(255,255,255,0.7)">
+          @${escapeXml(ownerName)}${isPro ? " ★ PRO" : ""}
+        </text>
+      </svg>
+    `;
+    composites.push({
+      input: await sharp(Buffer.from(ownerSvg)).png().toBuffer(),
+      top: 1020,
+      left: 0,
+    });
+  }
+
+  // Footer branding
+  const footerSvg = `
+    <svg width="${width}" height="80" xmlns="http://www.w3.org/2000/svg">
+      <text x="${width / 2}" y="50" text-anchor="middle"
+            font-family="system-ui, -apple-system, sans-serif" 
+            font-size="22" fill="rgba(255,255,255,0.5)">
+        MyDisplayCase.com
+      </text>
+    </svg>
+  `;
+  composites.push({
+    input: await sharp(Buffer.from(footerSvg)).png().toBuffer(),
+    top: height - 80,
+    left: 0,
+  });
+
+  const finalImage = await sharp(backgroundBuffer)
+    .composite(composites)
+    .png({ quality: 90 })
+    .toBuffer();
+
+  return finalImage;
 }

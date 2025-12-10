@@ -393,7 +393,12 @@ Allow: /
         return res.status(404).json({ message: "Owner not found" });
       }
 
-      const format = (req.query.format as string) === "story" ? "story" : "social";
+      const formatParam = req.query.format as string;
+      const validFormats = ["social", "story", "teaser", "brag-card", "brag-portfolio"] as const;
+      type ShareFormat = typeof validFormats[number];
+      const format: ShareFormat = validFormats.includes(formatParam as ShareFormat) 
+        ? (formatParam as ShareFormat) 
+        : "social";
       
       const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
         ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
