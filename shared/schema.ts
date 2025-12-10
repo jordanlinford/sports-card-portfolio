@@ -287,6 +287,51 @@ export const followsRelations = relations(follows, ({ one }) => ({
   }),
 }));
 
+// Conversations table - for direct messaging between users
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  participantAId: varchar("participant_a_id").notNull().references(() => users.id),
+  participantBId: varchar("participant_b_id").notNull().references(() => users.id),
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  lastMessagePreview: text("last_message_preview"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique("unique_conversation_participants").on(table.participantAId, table.participantBId),
+]);
+
+export const conversationsRelations = relations(conversations, ({ one, many }) => ({
+  participantA: one(users, {
+    fields: [conversations.participantAId],
+    references: [users.id],
+  }),
+  participantB: one(users, {
+    fields: [conversations.participantBId],
+    references: [users.id],
+  }),
+  messages: many(messages),
+}));
+
+// Messages table - individual messages within a conversation
+export const messages = pgTable("messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [messages.conversationId],
+    references: [conversations.id],
+  }),
+  sender: one(users, {
+    fields: [messages.senderId],
+    references: [users.id],
+  }),
+}));
+
 // Schemas and Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -346,6 +391,17 @@ export type TradeOffer = typeof tradeOffers.$inferSelect;
 
 export type Follow = typeof follows.$inferSelect;
 
+export type Conversation = typeof conversations.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  senderId: true,
+  isRead: true,
+  createdAt: true,
+});
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+
 export type Badge = typeof badges.$inferSelect;
 export type UserBadge = typeof userBadges.$inferSelect;
 export type UserBadgeWithBadge = UserBadge & { badge: Badge };
@@ -361,6 +417,15 @@ export type TradeOfferWithDetails = TradeOffer & {
   toUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; 
   offeredCards: Card[];
   requestedCards: Card[];
+};
+
+export type ConversationWithDetails = Conversation & {
+  otherUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>;
+  unreadCount: number;
+};
+
+export type MessageWithSender = Message & {
+  sender: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>;
 };
 
 // Prestige tiers for collectors
