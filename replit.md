@@ -313,3 +313,20 @@ Preferred communication style: Simple, everyday language.
 - Messages page at `/messages` shows conversation list
 - Auto-refresh every 30 seconds for unread count, 10 seconds for conversation view
 - Notifications sent when receiving new messages
+
+### Viral Share Features (Phase 5)
+- Share dropdown on case-view page with multiple export formats
+- **Copy Link**: Copies case URL to clipboard
+- **Download Image Formats**:
+  - Teaser Image (4:5, 1080x1350) - TikTok/Instagram feed format
+  - Story Image (9:16, 1080x1920) - Instagram/TikTok Stories
+  - Social Preview (16:9, 1200x630) - Discord/Twitter/iMessage OG image
+- **Brag Image Formats**:
+  - Top Card Flex - Highlights the highest value card in the case
+  - Portfolio Value - Shows total collection value with top 4 cards
+- Routes:
+  - `GET /api/share-image/case/:id?format=<format>` - Generate share image
+  - Formats: `social` (default), `story`, `teaser`, `brag-card`, `brag-portfolio`
+- Uses Sharp for image generation with theme-based gradient backgrounds
+- Images include card previews, owner name, value indicators, and branding
+- Implementation in `server/shareImageService.ts`
