@@ -82,6 +82,7 @@ export interface IStorage {
   getRecentPublicDisplayCases(limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
   searchPublicDisplayCases(query: string, limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
   getPopularPublicDisplayCases(limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]>;
+  getTrendingDisplayCases(limit?: number): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number; trendingScore: number })[]>;
 
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -791,6 +792,79 @@ export class DatabaseStorage implements IStorage {
     }
 
     return enrichedCases;
+  }
+
+  async getTrendingDisplayCases(limit: number = 20): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number; trendingScore: number })[]> {
+    const publicCases = await db
+      .select()
+      .from(displayCases)
+      .where(eq(displayCases.isPublic, true));
+
+    const now = Date.now();
+    const ONE_DAY = 24 * 60 * 60 * 1000;
+
+    const casesWithScores = await Promise.all(
+      publicCases.map(async (c) => {
+        const likeCount = await this.getLikeCount(c.id);
+        const commentCount = await this.getCommentCount(c.id);
+        
+        const ageInDays = c.createdAt ? (now - new Date(c.createdAt).getTime()) / ONE_DAY : 30;
+        const recencyBoost = Math.max(0, 30 - ageInDays) * 2;
+        
+        const trendingScore = 
+          (likeCount * 10) + 
+          (c.viewCount * 1) + 
+          (commentCount * 5) + 
+          recencyBoost;
+
+        return {
+          ...c,
+          likeCount,
+          trendingScore,
+        };
+      })
+    );
+
+    casesWithScores.sort((a, b) => b.trendingScore - a.trendingScore);
+
+    const topCases = casesWithScores.slice(0, limit);
+
+    const enrichedCases: (DisplayCaseWithCards & { ownerName: string; likeCount: number; trendingScore: number })[] = [];
+
+    for (const c of topCases) {
+      const caseCards = await db
+        .select()
+        .from(cards)
+        .where(eq(cards.displayCaseId, c.id))
+        .orderBy(asc(cards.sortOrder));
+
+      const [owner] = await db
+        .select({ firstName: users.firstName, lastName: users.lastName })
+        .from(users)
+        .where(eq(users.id, c.userId));
+
+      const ownerName = owner
+        ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
+        : "Anonymous";
+
+      enrichedCases.push({
+        ...c,
+        cards: caseCards,
+        ownerName,
+        likeCount: c.likeCount,
+        trendingScore: c.trendingScore,
+      });
+    }
+
+    return enrichedCases;
+  }
+
+  private async getCommentCount(displayCaseId: number): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(comments)
+      .where(eq(comments.displayCaseId, displayCaseId));
+    return result[0]?.count ?? 0;
   }
 
   // Admin operations

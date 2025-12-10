@@ -279,6 +279,17 @@ Allow: /
     }
   });
 
+  app.get("/api/explore/trending", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const cases = await storage.getTrendingDisplayCases(limit);
+      res.json(cases);
+    } catch (error) {
+      console.error("Error fetching trending cases:", error);
+      res.status(500).json({ message: "Failed to fetch trending cases" });
+    }
+  });
+
   app.get("/api/explore/search", async (req, res) => {
     try {
       const query = (req.query.q as string) || "";

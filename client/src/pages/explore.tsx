@@ -14,7 +14,8 @@ import {
   Heart, 
   ImageIcon,
   LayoutGrid,
-  ExternalLink
+  ExternalLink,
+  Flame
 } from "lucide-react";
 import type { DisplayCaseWithCards } from "@shared/schema";
 import { format } from "date-fns";
@@ -132,7 +133,7 @@ function EmptyState({ message }: { message: string }) {
 export default function Explore() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
-  const [activeTab, setActiveTab] = useState("recent");
+  const [activeTab, setActiveTab] = useState("trending");
 
   const { data: recentCases, isLoading: recentLoading } = useQuery<ExploreCase[]>({
     queryKey: ["/api/explore/recent"],
@@ -140,6 +141,10 @@ export default function Explore() {
 
   const { data: popularCases, isLoading: popularLoading } = useQuery<ExploreCase[]>({
     queryKey: ["/api/explore/popular"],
+  });
+
+  const { data: trendingCases, isLoading: trendingLoading } = useQuery<ExploreCase[]>({
+    queryKey: ["/api/explore/trending"],
   });
 
   const { data: searchResults, isLoading: searchLoading, isFetching: searchFetching } = useQuery<ExploreCase[]>({
@@ -216,6 +221,10 @@ export default function Explore() {
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="mb-6">
+              <TabsTrigger value="trending" className="gap-2" data-testid="tab-trending">
+                <Flame className="h-4 w-4" />
+                Trending
+              </TabsTrigger>
               <TabsTrigger value="recent" className="gap-2" data-testid="tab-recent">
                 <Clock className="h-4 w-4" />
                 Recent
@@ -225,6 +234,20 @@ export default function Explore() {
                 Popular
               </TabsTrigger>
             </TabsList>
+
+            <TabsContent value="trending">
+              {trendingLoading ? (
+                <CaseGridSkeleton />
+              ) : trendingCases && trendingCases.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {trendingCases.map((displayCase) => (
+                    <CaseCard key={displayCase.id} displayCase={displayCase} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState message="No trending collections yet. Engage with collections to see them trend!" />
+              )}
+            </TabsContent>
 
             <TabsContent value="recent">
               {recentLoading ? (
