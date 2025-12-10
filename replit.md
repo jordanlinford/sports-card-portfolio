@@ -244,3 +244,52 @@ Preferred communication style: Simple, everyday language.
 - Checks trigger after typing 3+ characters in title field
 - Route: `GET /api/cards/duplicates?title=...&excludeId=...`
 - Helps prevent accidental duplicate uploads
+
+### Bookmarks System (Phase 3)
+- Users can bookmark cards from any public display case
+- Bookmark button in card detail modal for authenticated users
+- Route: `POST /api/bookmarks` to add, `DELETE /api/bookmarks/:cardId` to remove
+- Route: `GET /api/bookmarks` to list all user's bookmarked cards
+- Bookmarks page accessible from user dropdown menu
+
+### Offers System (Phase 3)
+- Cards can be marked as "Open to Offers" with optional minimum amount
+- Fields: `cards.openToOffers` (boolean), `cards.minOfferAmount` (real)
+- "Make Offer" button appears in card detail modal for open-to-offer cards
+- Routes:
+  - `POST /api/offers` - Create new offer
+  - `GET /api/offers/received` - Get offers on user's cards
+  - `GET /api/offers/sent` - Get offers user has made
+  - `PATCH /api/offers/:id/accept` - Accept offer
+  - `PATCH /api/offers/:id/decline` - Decline offer
+- Offers inbox at `/offers` with received/sent tabs
+- Notifications sent when offers are accepted/declined
+
+### Prestige System (Phase 3)
+- Collector tiers based on prestige score:
+  - Bronze: 0+ points (color: #CD7F32)
+  - Silver: 100+ points (color: #C0C0C0)
+  - Gold: 500+ points (color: #FFD700)
+  - Platinum: 2000+ points (color: #E5E4E2)
+  - Diamond: 5000+ points (color: #B9F2FF)
+- 11 achievement badges:
+  - First Steps (create first case)
+  - Card Collector (own 10 cards)
+  - Serious Collector (own 50 cards)
+  - Master Collector (own 100 cards)
+  - Social Butterfly (receive 5 likes)
+  - Deal Maker (make first offer)
+  - Offer Accepted (have offer accepted)
+  - Community Helper (add 3 comments)
+  - Early Adopter (special)
+  - Trendsetter (create 5 public cases)
+  - Curator (add value to 10 cards)
+- Score calculation: cards (10 pts), cases (50 pts), public cases (25 pts), likes received (5 pts), offers (20 pts), bookmarks (10 pts)
+- Routes:
+  - `GET /api/prestige` - Current user's prestige stats
+  - `GET /api/prestige/:userId` - Specific user's prestige stats
+  - `GET /api/badges` - All available badges
+  - `GET /api/badges/user/:userId` - User's earned badges
+  - `POST /api/prestige/recalculate` - Recalculate user's score
+- PrestigeDisplay component shows tier badge and earned badges on case-view page
+- Tables: `badges` (definitions), `user_badges` (earned badges with unique constraint)
