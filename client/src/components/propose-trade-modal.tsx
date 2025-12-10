@@ -145,6 +145,7 @@ export function ProposeTradeModal({ targetCard, targetUserId, open, onOpenChange
                     >
                       <Checkbox 
                         checked={selectedCardIds.includes(card.id)}
+                        onClick={(e) => e.stopPropagation()}
                         onCheckedChange={() => toggleCardSelection(card.id)}
                       />
                       {card.imagePath && (
