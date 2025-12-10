@@ -97,7 +97,7 @@ export function ProposeTradeModal({ targetCard, targetUserId, open, onOpenChange
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 space-y-4">
+        <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
           <div className="p-3 border rounded-md bg-muted/50">
             <p className="text-sm font-medium">You want:</p>
             <div className="flex items-center gap-3 mt-2">
@@ -119,7 +119,7 @@ export function ProposeTradeModal({ targetCard, targetUserId, open, onOpenChange
             </div>
           </div>
 
-          <div className="flex-1 min-h-0">
+          <div>
             <Label className="mb-2 block">Your cards to offer:</Label>
             {isLoadingCases ? (
               <div className="flex items-center justify-center h-32">
@@ -130,7 +130,7 @@ export function ProposeTradeModal({ targetCard, targetUserId, open, onOpenChange
                 You don't have any cards in your collection yet.
               </div>
             ) : (
-              <ScrollArea className="h-48 border rounded-md p-2">
+              <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
                 <div className="grid grid-cols-2 gap-2">
                   {myCards.map(card => (
                     <div
@@ -165,15 +165,15 @@ export function ProposeTradeModal({ targetCard, targetUserId, open, onOpenChange
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
+            )}
+
+            {selectedCardIds.length > 0 && (
+              <div className="text-sm text-muted-foreground mt-2">
+                {selectedCardIds.length} card{selectedCardIds.length !== 1 ? 's' : ''} selected
+              </div>
             )}
           </div>
-
-          {selectedCardIds.length > 0 && (
-            <div className="text-sm text-muted-foreground">
-              {selectedCardIds.length} card{selectedCardIds.length !== 1 ? 's' : ''} selected
-            </div>
-          )}
 
           <div className="space-y-2">
             <Label htmlFor="cash-amount">Add cash (optional)</Label>

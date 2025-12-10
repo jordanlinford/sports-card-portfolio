@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { UserPlus, UserMinus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import type { User } from "@shared/schema";
 
 interface FollowButtonProps {
   userId: string;
@@ -14,8 +15,16 @@ export function FollowButton({ userId, compact = false }: FollowButtonProps) {
   const { toast } = useToast();
   const [optimisticFollowing, setOptimisticFollowing] = useState<boolean | null>(null);
 
-  const { data: followStatus, isLoading } = useQuery<{ isFollowing: boolean }>({
+  // Check if user is authenticated
+  const { data: currentUser } = useQuery<User | null>({
+    queryKey: ["/api/auth/user"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  const { data: followStatus, isLoading } = useQuery<{ isFollowing: boolean } | null>({
     queryKey: ["/api/users", userId, "is-following"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: !!currentUser,
   });
 
   const followMutation = useMutation({
@@ -82,6 +91,22 @@ export function FollowButton({ userId, compact = false }: FollowButtonProps) {
       <Button variant="outline" size={compact ? "sm" : "default"} disabled>
         <Loader2 className="h-4 w-4 animate-spin" />
       </Button>
+    );
+  }
+
+  // If user is not authenticated, show follow button that redirects to login
+  if (!currentUser) {
+    return (
+      <a href="/api/login">
+        <Button
+          size={compact ? "sm" : "default"}
+          className="gap-2"
+          data-testid="button-follow-login"
+        >
+          <UserPlus className="h-4 w-4" />
+          {!compact && "Follow"}
+        </Button>
+      </a>
     );
   }
 
