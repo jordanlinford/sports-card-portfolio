@@ -20,7 +20,16 @@ import {
   Rows,
   Layers,
   Search,
-  Globe
+  Globe,
+  Users,
+  Bookmark,
+  ArrowRightLeft,
+  Trophy,
+  Award,
+  Flame,
+  BarChart3,
+  Palette,
+  UserPlus
 } from "lucide-react";
 
 export default function Landing() {
@@ -143,6 +152,42 @@ export default function Landing() {
                 </CardDescription>
               </CardHeader>
             </Card>
+
+            <Card className="text-center">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Flame className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Trending Discovery</CardTitle>
+                <CardDescription>
+                  Explore trending collections, discover new collectors, and find inspiration for your own displays.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <BarChart3 className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Portfolio Analytics</CardTitle>
+                <CardDescription>
+                  See charts of your collection value, breakdown by case, and track your top cards over time.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            <Card className="text-center">
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Palette className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Premium Themes</CardTitle>
+                <CardDescription>
+                  Choose from 8 beautiful display themes including Wood Grain, Velvet, Ocean Blue, and more.
+                </CardDescription>
+              </CardHeader>
+            </Card>
           </div>
         </div>
       </section>
@@ -250,6 +295,131 @@ export default function Landing() {
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
+            <Badge variant="secondary" className="mb-4">
+              <Users className="h-3 w-3 mr-1" />
+              Community
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Connect, Trade, and Collect Together
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Join a community of collectors. Follow your favorites, make offers, and trade cards.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            <div className="text-center p-6">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <UserPlus className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Follow Collectors</h3>
+              <p className="text-sm text-muted-foreground">
+                Follow your favorite collectors and see their latest additions
+              </p>
+            </div>
+
+            <div className="text-center p-6">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <DollarSign className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Make Offers</h3>
+              <p className="text-sm text-muted-foreground">
+                See a card you want? Send an offer directly to the owner
+              </p>
+            </div>
+
+            <div className="text-center p-6">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <ArrowRightLeft className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Trade Cards</h3>
+              <p className="text-sm text-muted-foreground">
+                Propose card-for-card trades with other collectors
+              </p>
+            </div>
+
+            <div className="text-center p-6">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Bookmark className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Bookmark Cards</h3>
+              <p className="text-sm text-muted-foreground">
+                Save cards you love from any public collection
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 md:py-24 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <Badge variant="secondary" className="mb-4">
+              <Trophy className="h-3 w-3 mr-1" />
+              Prestige System
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Build Your Collector Reputation
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Earn prestige points and unlock collector tiers as you grow your collection.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap justify-center gap-6 mb-12">
+            <div className="text-center px-6 py-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#CD7F32', opacity: 0.2 }}>
+                <Award className="h-8 w-8" style={{ color: '#CD7F32' }} />
+              </div>
+              <h3 className="font-semibold">Bronze</h3>
+              <p className="text-xs text-muted-foreground">Getting Started</p>
+            </div>
+
+            <div className="text-center px-6 py-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#C0C0C0', opacity: 0.2 }}>
+                <Award className="h-8 w-8" style={{ color: '#C0C0C0' }} />
+              </div>
+              <h3 className="font-semibold">Silver</h3>
+              <p className="text-xs text-muted-foreground">100+ Points</p>
+            </div>
+
+            <div className="text-center px-6 py-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#FFD700', opacity: 0.2 }}>
+                <Award className="h-8 w-8" style={{ color: '#FFD700' }} />
+              </div>
+              <h3 className="font-semibold">Gold</h3>
+              <p className="text-xs text-muted-foreground">500+ Points</p>
+            </div>
+
+            <div className="text-center px-6 py-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#E5E4E2', opacity: 0.2 }}>
+                <Award className="h-8 w-8" style={{ color: '#A0A0A0' }} />
+              </div>
+              <h3 className="font-semibold">Platinum</h3>
+              <p className="text-xs text-muted-foreground">2000+ Points</p>
+            </div>
+
+            <div className="text-center px-6 py-4">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: '#B9F2FF', opacity: 0.2 }}>
+                <Award className="h-8 w-8" style={{ color: '#00CED1' }} />
+              </div>
+              <h3 className="font-semibold">Diamond</h3>
+              <p className="text-xs text-muted-foreground">5000+ Points</p>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <p className="text-muted-foreground mb-4">
+              Earn points by adding cards, creating cases, getting likes, making trades, and more.
+              Unlock achievement badges along the way!
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Simple, Collector-Friendly Pricing
             </h2>
@@ -280,7 +450,7 @@ export default function Landing() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>All layout styles (Grid, Row, Showcase)</span>
+                    <span>All layout styles</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
@@ -288,11 +458,15 @@ export default function Landing() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>Public sharing links</span>
+                    <span>Follow collectors & social features</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>Likes and comments</span>
+                    <span>Make offers & trade cards</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-primary" />
+                    <span>Prestige badges & tiers</span>
                   </li>
                 </ul>
                 <a href="/api/login" className="block mt-6">
@@ -340,11 +514,15 @@ export default function Landing() {
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>Top Cards case generator</span>
+                    <span className="font-medium">6 Premium display themes</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="h-4 w-4 text-primary" />
-                    <span>Priority support</span>
+                    <span>Portfolio analytics & charts</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Check className="h-4 w-4 text-primary" />
+                    <span>Top Cards case generator</span>
                   </li>
                 </ul>
                 <a href="/api/login" className="block mt-6">
