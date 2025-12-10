@@ -35,6 +35,7 @@ import { SocialFeatures } from "@/components/social-features";
 import { PrestigeDisplay } from "@/components/prestige-display";
 import { FollowButton } from "@/components/follow-button";
 import { FollowStats } from "@/components/follow-stats";
+import { MessageButton } from "@/components/message-button";
 
 function ValueChangeIndicator({ card }: { card: Card }) {
   if (!card.estimatedValue || !card.previousValue || card.previousValue <= 0) return null;
@@ -347,7 +348,10 @@ export default function CaseView() {
                   <div className="flex items-center gap-3 flex-wrap">
                     <PrestigeDisplay userId={displayCase.userId} compact />
                     {user && !isOwner && (
-                      <FollowButton userId={displayCase.userId} compact />
+                      <>
+                        <FollowButton userId={displayCase.userId} compact />
+                        <MessageButton userId={displayCase.userId} compact />
+                      </>
                     )}
                   </div>
                   <FollowStats userId={displayCase.userId} compact />

@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LayoutGrid, LogOut, User, Crown, Search, Compass, Shield, BarChart3, Bookmark, HandCoins } from "lucide-react";
+import { LayoutGrid, LogOut, User, Crown, Search, Compass, Shield, BarChart3, Bookmark, HandCoins, MessageSquare } from "lucide-react";
 
 export function Navigation() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -151,6 +151,12 @@ export function Navigation() {
                       <Link href="/offers" className="flex items-center gap-2 cursor-pointer" data-testid="link-offers">
                         <HandCoins className="h-4 w-4" />
                         Offers
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/messages" className="flex items-center gap-2 cursor-pointer" data-testid="link-messages">
+                        <MessageSquare className="h-4 w-4" />
+                        Messages
                       </Link>
                     </DropdownMenuItem>
                     {isAdmin && (
