@@ -293,3 +293,23 @@ Preferred communication style: Simple, everyday language.
   - `POST /api/prestige/recalculate` - Recalculate user's score
 - PrestigeDisplay component shows tier badge and earned badges on case-view page
 - Tables: `badges` (definitions), `user_badges` (earned badges with unique constraint)
+
+### Messaging System (Phase 4)
+- Direct messaging between collectors to discuss trades and sales
+- Conversation-based model with persistent message history
+- Database tables:
+  - `conversations` - Tracks participant pairs with last message preview
+  - `messages` - Individual messages with sender, content, read status
+- Routes:
+  - `GET /api/messages/inbox` - List all user's conversations with unread counts
+  - `GET /api/messages/unread-count` - Total unread message count
+  - `POST /api/messages/conversations` - Start or get existing conversation with user
+  - `GET /api/messages/conversations/:id` - Get conversation with messages
+  - `POST /api/messages/conversations/:id` - Send a new message
+  - `POST /api/messages/conversations/:id/read` - Mark messages as read
+- Entry points:
+  - User dropdown menu "Messages" link with unread badge
+  - MessageButton component on case-view page (next to Follow button)
+- Messages page at `/messages` shows conversation list
+- Auto-refresh every 30 seconds for unread count, 10 seconds for conversation view
+- Notifications sent when receiving new messages

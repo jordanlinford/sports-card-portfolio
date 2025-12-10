@@ -1949,12 +1949,18 @@ Allow: /
       const userId = req.user.claims.sub;
       const { recipientId } = req.body;
 
-      if (!recipientId) {
-        return res.status(400).json({ message: "Recipient ID is required" });
+      if (!recipientId || typeof recipientId !== "string" || recipientId.trim().length === 0) {
+        return res.status(400).json({ message: "Valid recipient ID is required" });
       }
 
       if (recipientId === userId) {
         return res.status(400).json({ message: "Cannot message yourself" });
+      }
+
+      // Verify recipient exists
+      const recipient = await storage.getUser(recipientId);
+      if (!recipient) {
+        return res.status(404).json({ message: "Recipient not found" });
       }
 
       const conversation = await storage.getOrCreateConversation(userId, recipientId);
@@ -1970,9 +1976,13 @@ Allow: /
       const userId = req.user.claims.sub;
       const conversationId = parseInt(req.params.id);
 
+      if (isNaN(conversationId) || conversationId <= 0) {
+        return res.status(400).json({ message: "Invalid conversation ID" });
+      }
+
       const conversation = await storage.getConversation(conversationId, userId);
       if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
+        return res.status(403).json({ message: "Access denied or conversation not found" });
       }
 
       const messages = await storage.getConversationMessages(conversationId);
@@ -2008,14 +2018,18 @@ Allow: /
       const conversationId = parseInt(req.params.id);
       const { content } = req.body;
 
-      if (!content || content.trim().length === 0) {
+      if (isNaN(conversationId) || conversationId <= 0) {
+        return res.status(400).json({ message: "Invalid conversation ID" });
+      }
+
+      if (!content || typeof content !== "string" || content.trim().length === 0) {
         return res.status(400).json({ message: "Message content is required" });
       }
 
       // Verify user is part of this conversation
       const conversation = await storage.getConversation(conversationId, userId);
       if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
+        return res.status(403).json({ message: "Access denied or conversation not found" });
       }
 
       const message = await storage.createMessage(conversationId, userId, content.trim());
@@ -2045,9 +2059,13 @@ Allow: /
       const userId = req.user.claims.sub;
       const conversationId = parseInt(req.params.id);
 
+      if (isNaN(conversationId) || conversationId <= 0) {
+        return res.status(400).json({ message: "Invalid conversation ID" });
+      }
+
       const conversation = await storage.getConversation(conversationId, userId);
       if (!conversation) {
-        return res.status(404).json({ message: "Conversation not found" });
+        return res.status(403).json({ message: "Access denied or conversation not found" });
       }
 
       await storage.markMessagesAsRead(conversationId, userId);

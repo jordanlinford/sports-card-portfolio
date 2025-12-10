@@ -24,6 +24,12 @@ export function Navigation() {
     enabled: isAuthenticated,
   });
 
+  const { data: unreadCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/messages/unread-count"],
+    enabled: isAuthenticated,
+    refetchInterval: 30000,
+  });
+
   const isAdmin = adminCheck?.isAdmin || false;
 
   const getInitials = (firstName?: string | null, lastName?: string | null, email?: string | null) => {
@@ -157,6 +163,9 @@ export function Navigation() {
                       <Link href="/messages" className="flex items-center gap-2 cursor-pointer" data-testid="link-messages">
                         <MessageSquare className="h-4 w-4" />
                         Messages
+                        {unreadCount?.count && unreadCount.count > 0 && (
+                          <Badge variant="default" className="ml-auto">{unreadCount.count}</Badge>
+                        )}
                       </Link>
                     </DropdownMenuItem>
                     {isAdmin && (

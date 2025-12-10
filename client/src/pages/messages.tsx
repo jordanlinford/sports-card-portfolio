@@ -156,13 +156,16 @@ function ConversationView({
   }, [refetch]);
 
   const handleSend = () => {
-    if (newMessage.trim()) {
-      sendMutation.mutate(newMessage.trim());
+    const trimmed = newMessage.trim();
+    if (trimmed.length > 0) {
+      sendMutation.mutate(trimmed);
     }
   };
 
+  const isValidMessage = newMessage.trim().length > 0;
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && isValidMessage) {
       e.preventDefault();
       handleSend();
     }
@@ -239,7 +242,7 @@ function ConversationView({
           />
           <Button 
             onClick={handleSend} 
-            disabled={!newMessage.trim() || sendMutation.isPending}
+            disabled={!isValidMessage || sendMutation.isPending}
             className="flex-shrink-0"
             data-testid="button-send-message"
           >
