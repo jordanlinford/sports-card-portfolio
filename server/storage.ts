@@ -7,6 +7,8 @@ import {
   bookmarks,
   offers,
   notifications,
+  badges,
+  userBadges,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -24,6 +26,9 @@ import {
   type InsertOffer,
   type OfferWithUsers,
   type Notification,
+  type Badge,
+  type UserBadge,
+  type UserBadgeWithBadge,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql } from "drizzle-orm";
@@ -115,6 +120,15 @@ export interface IStorage {
   createNotification(userId: string, type: string, data: any): Promise<Notification>;
   markNotificationAsRead(id: number): Promise<void>;
   markAllNotificationsAsRead(userId: string): Promise<void>;
+
+  // Badge and Prestige operations
+  getAllBadges(): Promise<Badge[]>;
+  getBadge(id: string): Promise<Badge | undefined>;
+  getUserBadges(userId: string): Promise<UserBadgeWithBadge[]>;
+  hasUserBadge(userId: string, badgeId: string): Promise<boolean>;
+  awardBadge(userId: string, badgeId: string): Promise<UserBadge>;
+  updateUserScore(userId: string, score: number, tier: string): Promise<User | undefined>;
+  getUserPrestigeStats(userId: string): Promise<{ score: number; tier: string; badgeCount: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1091,6 +1105,89 @@ export class DatabaseStorage implements IStorage {
       .update(notifications)
       .set({ isRead: true })
       .where(eq(notifications.userId, userId));
+  }
+
+  // Badge and Prestige operations
+  async getAllBadges(): Promise<Badge[]> {
+    return await db
+      .select()
+      .from(badges)
+      .where(eq(badges.isActive, true))
+      .orderBy(badges.category, badges.name);
+  }
+
+  async getBadge(id: string): Promise<Badge | undefined> {
+    const [badge] = await db.select().from(badges).where(eq(badges.id, id));
+    return badge;
+  }
+
+  async getUserBadges(userId: string): Promise<UserBadgeWithBadge[]> {
+    const userBadgeRows = await db
+      .select()
+      .from(userBadges)
+      .where(eq(userBadges.userId, userId))
+      .orderBy(desc(userBadges.earnedAt));
+    
+    const result: UserBadgeWithBadge[] = [];
+    for (const ub of userBadgeRows) {
+      const [badge] = await db.select().from(badges).where(eq(badges.id, ub.badgeId));
+      if (badge) {
+        result.push({ ...ub, badge });
+      }
+    }
+    return result;
+  }
+
+  async hasUserBadge(userId: string, badgeId: string): Promise<boolean> {
+    const [existing] = await db
+      .select()
+      .from(userBadges)
+      .where(and(eq(userBadges.userId, userId), eq(userBadges.badgeId, badgeId)));
+    return !!existing;
+  }
+
+  async awardBadge(userId: string, badgeId: string): Promise<UserBadge> {
+    const [userBadge] = await db
+      .insert(userBadges)
+      .values({ userId, badgeId })
+      .onConflictDoNothing({ target: [userBadges.userId, userBadges.badgeId] })
+      .returning();
+    
+    if (!userBadge) {
+      const [existing] = await db
+        .select()
+        .from(userBadges)
+        .where(and(eq(userBadges.userId, userId), eq(userBadges.badgeId, badgeId)));
+      return existing;
+    }
+    return userBadge;
+  }
+
+  async updateUserScore(userId: string, score: number, tier: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ collectorScore: score, collectorTier: tier, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async getUserPrestigeStats(userId: string): Promise<{ score: number; tier: string; badgeCount: number }> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      return { score: 0, tier: "bronze", badgeCount: 0 };
+    }
+    
+    const badgeResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(userBadges)
+      .where(eq(userBadges.userId, userId));
+    
+    return {
+      score: user.collectorScore,
+      tier: user.collectorTier,
+      badgeCount: Number(badgeResult[0]?.count || 0),
+    };
   }
 }
 

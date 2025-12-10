@@ -10,6 +10,7 @@ import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
 import { generateShareImage } from "./shareImageService";
+import { prestigeService } from "./prestigeService";
 
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
@@ -1103,6 +1104,13 @@ Allow: /
       const hasLiked = await storage.toggleLike(id, likeUserId);
       const count = await storage.getLikeCount(id);
 
+      // Award badge if authenticated user liked (not unliked)
+      if (hasLiked && userId) {
+        prestigeService.checkAndAwardLikeBadge(userId).catch(err => {
+          console.error("Error awarding like badge:", err);
+        });
+      }
+
       res.json({ hasLiked, count });
     } catch (error) {
       console.error("Error toggling like:", error);
@@ -1295,6 +1303,12 @@ Allow: /
       }
 
       const bookmark = await storage.addBookmark(userId, cardId);
+
+      // Award bookmark badge
+      prestigeService.checkAndAwardBookmarkBadge(userId).catch(err => {
+        console.error("Error awarding bookmark badge:", err);
+      });
+
       res.status(201).json(bookmark);
     } catch (error) {
       console.error("Error adding bookmark:", error);
@@ -1413,6 +1427,11 @@ Allow: /
         isAnonymous: isAnonymous || false,
       });
 
+      // Award offer badge
+      prestigeService.checkAndAwardOfferBadge(userId).catch(err => {
+        console.error("Error awarding offer badge:", err);
+      });
+
       res.status(201).json(offer);
     } catch (error) {
       console.error("Error creating offer:", error);
@@ -1450,6 +1469,11 @@ Allow: /
         offerId,
         cardTitle: card?.title || "Card",
         amount: offer.amount,
+      });
+
+      // Award badge to the offer maker
+      prestigeService.checkAndAwardOfferAcceptedBadge(offer.fromUserId).catch(err => {
+        console.error("Error awarding offer accepted badge:", err);
       });
 
       res.json(updatedOffer);
@@ -1611,6 +1635,68 @@ Allow: /
       console.error("Error updating offer settings:", error);
       res.status(500).json({ message: "Failed to update offer settings" });
     }
+  });
+
+  // Badge and Prestige routes
+  app.get("/api/badges", async (req, res) => {
+    try {
+      const allBadges = await storage.getAllBadges();
+      res.json(allBadges);
+    } catch (error) {
+      console.error("Error fetching badges:", error);
+      res.status(500).json({ message: "Failed to fetch badges" });
+    }
+  });
+
+  app.get("/api/prestige", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getUserPrestigeStats(userId);
+      const userBadges = await storage.getUserBadges(userId);
+      res.json({ ...stats, badges: userBadges });
+    } catch (error) {
+      console.error("Error fetching prestige:", error);
+      res.status(500).json({ message: "Failed to fetch prestige data" });
+    }
+  });
+
+  app.get("/api/prestige/:userId", async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const stats = await storage.getUserPrestigeStats(userId);
+      const userBadges = await storage.getUserBadges(userId);
+      res.json({ ...stats, badges: userBadges });
+    } catch (error) {
+      console.error("Error fetching user prestige:", error);
+      res.status(500).json({ message: "Failed to fetch user prestige data" });
+    }
+  });
+
+  app.get("/api/users/:userId/badges", async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const userBadges = await storage.getUserBadges(userId);
+      res.json(userBadges);
+    } catch (error) {
+      console.error("Error fetching user badges:", error);
+      res.status(500).json({ message: "Failed to fetch user badges" });
+    }
+  });
+
+  app.post("/api/prestige/recalculate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const result = await prestigeService.recalculateUserPrestige(userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Error recalculating prestige:", error);
+      res.status(500).json({ message: "Failed to recalculate prestige" });
+    }
+  });
+
+  // Initialize badges on server start
+  prestigeService.initializeBadges().catch(err => {
+    console.error("Failed to initialize badges:", err);
   });
 
 }

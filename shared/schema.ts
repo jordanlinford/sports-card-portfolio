@@ -10,6 +10,7 @@ import {
   boolean,
   real,
   serial,
+  unique,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -36,6 +37,8 @@ export const users = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   isAdmin: boolean("is_admin").default(false).notNull(),
+  collectorScore: integer("collector_score").default(0).notNull(),
+  collectorTier: varchar("collector_tier", { length: 50 }).default("bronze").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -201,6 +204,43 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
+// Badges table - definitions of available badges
+export const badges = pgTable("badges", {
+  id: varchar("id", { length: 50 }).primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: text("description").notNull(),
+  icon: varchar("icon", { length: 100 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  requirement: text("requirement").notNull(),
+  pointValue: integer("point_value").default(10).notNull(),
+  rarity: varchar("rarity", { length: 20 }).default("common").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User Badges table - tracks which badges users have earned
+export const userBadges = pgTable("user_badges", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  badgeId: varchar("badge_id", { length: 50 }).notNull().references(() => badges.id),
+  earnedAt: timestamp("earned_at").defaultNow(),
+  progress: integer("progress").default(0),
+  isNotified: boolean("is_notified").default(false).notNull(),
+}, (table) => [
+  unique("unique_user_badge").on(table.userId, table.badgeId),
+]);
+
+export const userBadgesRelations = relations(userBadges, ({ one }) => ({
+  user: one(users, {
+    fields: [userBadges.userId],
+    references: [users.id],
+  }),
+  badge: one(badges, {
+    fields: [userBadges.badgeId],
+    references: [badges.id],
+  }),
+}));
+
 // Schemas and Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -248,9 +288,24 @@ export type Offer = typeof offers.$inferSelect;
 
 export type Notification = typeof notifications.$inferSelect;
 
+export type Badge = typeof badges.$inferSelect;
+export type UserBadge = typeof userBadges.$inferSelect;
+export type UserBadgeWithBadge = UserBadge & { badge: Badge };
+
 // Extended types with relations
 export type DisplayCaseWithCards = DisplayCase & { cards: Card[] };
 export type DisplayCaseWithUser = DisplayCase & { user: User };
 export type CommentWithUser = Comment & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> };
 export type BookmarkWithCard = Bookmark & { card: Card };
 export type OfferWithUsers = Offer & { fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; card: Card };
+
+// Prestige tiers for collectors
+export const COLLECTOR_TIERS = {
+  bronze: { name: "Bronze", minScore: 0, color: "#CD7F32" },
+  silver: { name: "Silver", minScore: 100, color: "#C0C0C0" },
+  gold: { name: "Gold", minScore: 500, color: "#FFD700" },
+  platinum: { name: "Platinum", minScore: 1500, color: "#E5E4E2" },
+  diamond: { name: "Diamond", minScore: 5000, color: "#B9F2FF" },
+} as const;
+
+export type CollectorTier = keyof typeof COLLECTOR_TIERS;

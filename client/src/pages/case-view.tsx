@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { SocialFeatures } from "@/components/social-features";
+import { PrestigeDisplay } from "@/components/prestige-display";
 
 function ValueChangeIndicator({ card }: { card: Card }) {
   if (!card.estimatedValue || !card.previousValue || card.previousValue <= 0) return null;
@@ -339,6 +340,11 @@ export default function CaseView() {
                   </span>
                 )}
               </div>
+              {displayCase.userId && (
+                <div className="mt-4">
+                  <PrestigeDisplay userId={displayCase.userId} compact />
+                </div>
+              )}
             </div>
 
             <DropdownMenu>
