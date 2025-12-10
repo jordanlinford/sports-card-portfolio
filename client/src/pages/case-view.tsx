@@ -514,6 +514,7 @@ export default function CaseView() {
         canEdit={isOwner}
         isPro={user?.subscriptionStatus === "PRO"}
         isAuthenticated={!!user}
+        ownerUserId={displayCase?.userId}
       />
     </div>
   );

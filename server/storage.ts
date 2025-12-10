@@ -9,6 +9,8 @@ import {
   notifications,
   badges,
   userBadges,
+  tradeOffers,
+  follows,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -29,6 +31,9 @@ import {
   type Badge,
   type UserBadge,
   type UserBadgeWithBadge,
+  type TradeOffer,
+  type TradeOfferWithDetails,
+  type Follow,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql } from "drizzle-orm";
@@ -129,6 +134,22 @@ export interface IStorage {
   awardBadge(userId: string, badgeId: string): Promise<UserBadge>;
   updateUserScore(userId: string, score: number, tier: string): Promise<User | undefined>;
   getUserPrestigeStats(userId: string): Promise<{ score: number; tier: string; badgeCount: number }>;
+
+  // Trade offer operations
+  createTradeOffer(fromUserId: string, toUserId: string, offeredCardIds: number[], requestedCardIds: number[], cashAdjustment: number, message?: string): Promise<TradeOffer>;
+  getTradeOffer(id: number): Promise<TradeOffer | undefined>;
+  getReceivedTradeOffers(userId: string): Promise<TradeOfferWithDetails[]>;
+  getSentTradeOffers(userId: string): Promise<TradeOfferWithDetails[]>;
+  updateTradeOfferStatus(id: number, status: string): Promise<TradeOffer | undefined>;
+
+  // Follow operations
+  followUser(followerId: string, followedId: string): Promise<Follow>;
+  unfollowUser(followerId: string, followedId: string): Promise<void>;
+  isFollowing(followerId: string, followedId: string): Promise<boolean>;
+  getFollowers(userId: string): Promise<(Follow & { follower: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]>;
+  getFollowing(userId: string): Promise<(Follow & { followed: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]>;
+  getFollowerCount(userId: string): Promise<number>;
+  getFollowingCount(userId: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1188,6 +1209,180 @@ export class DatabaseStorage implements IStorage {
       tier: user.collectorTier,
       badgeCount: Number(badgeResult[0]?.count || 0),
     };
+  }
+
+  // Trade offer operations
+  async createTradeOffer(fromUserId: string, toUserId: string, offeredCardIds: number[], requestedCardIds: number[], cashAdjustment: number, message?: string): Promise<TradeOffer> {
+    const [tradeOffer] = await db
+      .insert(tradeOffers)
+      .values({
+        fromUserId,
+        toUserId,
+        offeredCardIds,
+        requestedCardIds,
+        cashAdjustment,
+        message,
+      })
+      .returning();
+    return tradeOffer;
+  }
+
+  async getTradeOffer(id: number): Promise<TradeOffer | undefined> {
+    const [tradeOffer] = await db.select().from(tradeOffers).where(eq(tradeOffers.id, id));
+    return tradeOffer;
+  }
+
+  async getReceivedTradeOffers(userId: string): Promise<TradeOfferWithDetails[]> {
+    const tradeOfferRows = await db
+      .select()
+      .from(tradeOffers)
+      .where(eq(tradeOffers.toUserId, userId))
+      .orderBy(desc(tradeOffers.createdAt));
+    
+    return this.enrichTradeOffers(tradeOfferRows);
+  }
+
+  async getSentTradeOffers(userId: string): Promise<TradeOfferWithDetails[]> {
+    const tradeOfferRows = await db
+      .select()
+      .from(tradeOffers)
+      .where(eq(tradeOffers.fromUserId, userId))
+      .orderBy(desc(tradeOffers.createdAt));
+    
+    return this.enrichTradeOffers(tradeOfferRows);
+  }
+
+  private async enrichTradeOffers(tradeOfferRows: TradeOffer[]): Promise<TradeOfferWithDetails[]> {
+    const result: TradeOfferWithDetails[] = [];
+    
+    for (const trade of tradeOfferRows) {
+      const [fromUser] = await db
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .from(users)
+        .where(eq(users.id, trade.fromUserId));
+      
+      const [toUser] = await db
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .from(users)
+        .where(eq(users.id, trade.toUserId));
+      
+      const offeredCards = trade.offeredCardIds.length > 0 
+        ? await db.select().from(cards).where(inArray(cards.id, trade.offeredCardIds))
+        : [];
+      
+      const requestedCards = trade.requestedCardIds.length > 0
+        ? await db.select().from(cards).where(inArray(cards.id, trade.requestedCardIds))
+        : [];
+      
+      result.push({
+        ...trade,
+        fromUser: fromUser || { id: '', firstName: null, lastName: null, profileImageUrl: null },
+        toUser: toUser || { id: '', firstName: null, lastName: null, profileImageUrl: null },
+        offeredCards,
+        requestedCards,
+      });
+    }
+    
+    return result;
+  }
+
+  async updateTradeOfferStatus(id: number, status: string): Promise<TradeOffer | undefined> {
+    const [tradeOffer] = await db
+      .update(tradeOffers)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(tradeOffers.id, id))
+      .returning();
+    return tradeOffer;
+  }
+
+  // Follow operations
+  async followUser(followerId: string, followedId: string): Promise<Follow> {
+    const [follow] = await db
+      .insert(follows)
+      .values({ followerId, followedId })
+      .onConflictDoNothing({ target: [follows.followerId, follows.followedId] })
+      .returning();
+    
+    if (!follow) {
+      const [existing] = await db
+        .select()
+        .from(follows)
+        .where(and(eq(follows.followerId, followerId), eq(follows.followedId, followedId)));
+      return existing;
+    }
+    return follow;
+  }
+
+  async unfollowUser(followerId: string, followedId: string): Promise<void> {
+    await db
+      .delete(follows)
+      .where(and(eq(follows.followerId, followerId), eq(follows.followedId, followedId)));
+  }
+
+  async isFollowing(followerId: string, followedId: string): Promise<boolean> {
+    const [existing] = await db
+      .select()
+      .from(follows)
+      .where(and(eq(follows.followerId, followerId), eq(follows.followedId, followedId)));
+    return !!existing;
+  }
+
+  async getFollowers(userId: string): Promise<(Follow & { follower: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]> {
+    const followRows = await db
+      .select()
+      .from(follows)
+      .where(eq(follows.followedId, userId))
+      .orderBy(desc(follows.createdAt));
+    
+    const result = [];
+    for (const follow of followRows) {
+      const [follower] = await db
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .from(users)
+        .where(eq(users.id, follow.followerId));
+      
+      if (follower) {
+        result.push({ ...follow, follower });
+      }
+    }
+    return result;
+  }
+
+  async getFollowing(userId: string): Promise<(Follow & { followed: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]> {
+    const followRows = await db
+      .select()
+      .from(follows)
+      .where(eq(follows.followerId, userId))
+      .orderBy(desc(follows.createdAt));
+    
+    const result = [];
+    for (const follow of followRows) {
+      const [followed] = await db
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .from(users)
+        .where(eq(users.id, follow.followedId));
+      
+      if (followed) {
+        result.push({ ...follow, followed });
+      }
+    }
+    return result;
+  }
+
+  async getFollowerCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(follows)
+      .where(eq(follows.followedId, userId));
+    return Number(result[0]?.count || 0);
+  }
+
+  async getFollowingCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(follows)
+      .where(eq(follows.followerId, userId));
+    return Number(result[0]?.count || 0);
   }
 }
 

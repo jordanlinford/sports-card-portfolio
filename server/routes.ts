@@ -1699,4 +1699,215 @@ Allow: /
     console.error("Failed to initialize badges:", err);
   });
 
+  // Trade offer routes
+  app.post("/api/trades", isAuthenticated, async (req: any, res) => {
+    try {
+      const fromUserId = req.user.claims.sub;
+      const { toUserId, offeredCardIds, requestedCardIds, cashAdjustment, message } = req.body;
+
+      if (!toUserId || !offeredCardIds || !requestedCardIds) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      if (offeredCardIds.length === 0 && (!cashAdjustment || cashAdjustment <= 0)) {
+        return res.status(400).json({ message: "Must offer at least one card or cash" });
+      }
+
+      if (requestedCardIds.length === 0) {
+        return res.status(400).json({ message: "Must request at least one card" });
+      }
+
+      const tradeOffer = await storage.createTradeOffer(
+        fromUserId,
+        toUserId,
+        offeredCardIds,
+        requestedCardIds,
+        cashAdjustment || 0,
+        message
+      );
+
+      // Create notification for the recipient
+      await storage.createNotification(toUserId, "trade_received", {
+        tradeOfferId: tradeOffer.id,
+        fromUserId,
+        cardCount: requestedCardIds.length,
+      });
+
+      res.json(tradeOffer);
+    } catch (error) {
+      console.error("Error creating trade offer:", error);
+      res.status(500).json({ message: "Failed to create trade offer" });
+    }
+  });
+
+  app.get("/api/trades/received", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const trades = await storage.getReceivedTradeOffers(userId);
+      res.json(trades);
+    } catch (error) {
+      console.error("Error fetching received trades:", error);
+      res.status(500).json({ message: "Failed to fetch received trades" });
+    }
+  });
+
+  app.get("/api/trades/sent", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const trades = await storage.getSentTradeOffers(userId);
+      res.json(trades);
+    } catch (error) {
+      console.error("Error fetching sent trades:", error);
+      res.status(500).json({ message: "Failed to fetch sent trades" });
+    }
+  });
+
+  app.patch("/api/trades/:id/accept", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid trade offer ID" });
+      }
+
+      const tradeOffer = await storage.getTradeOffer(id);
+      if (!tradeOffer) {
+        return res.status(404).json({ message: "Trade offer not found" });
+      }
+
+      if (tradeOffer.toUserId !== userId) {
+        return res.status(403).json({ message: "Not authorized to accept this trade" });
+      }
+
+      if (tradeOffer.status !== "pending") {
+        return res.status(400).json({ message: "Trade offer is no longer pending" });
+      }
+
+      const updatedTrade = await storage.updateTradeOfferStatus(id, "accepted");
+
+      // Notify the sender
+      await storage.createNotification(tradeOffer.fromUserId, "trade_accepted", {
+        tradeOfferId: id,
+      });
+
+      res.json(updatedTrade);
+    } catch (error) {
+      console.error("Error accepting trade offer:", error);
+      res.status(500).json({ message: "Failed to accept trade offer" });
+    }
+  });
+
+  app.patch("/api/trades/:id/decline", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid trade offer ID" });
+      }
+
+      const tradeOffer = await storage.getTradeOffer(id);
+      if (!tradeOffer) {
+        return res.status(404).json({ message: "Trade offer not found" });
+      }
+
+      if (tradeOffer.toUserId !== userId) {
+        return res.status(403).json({ message: "Not authorized to decline this trade" });
+      }
+
+      if (tradeOffer.status !== "pending") {
+        return res.status(400).json({ message: "Trade offer is no longer pending" });
+      }
+
+      const updatedTrade = await storage.updateTradeOfferStatus(id, "declined");
+
+      // Notify the sender
+      await storage.createNotification(tradeOffer.fromUserId, "trade_declined", {
+        tradeOfferId: id,
+      });
+
+      res.json(updatedTrade);
+    } catch (error) {
+      console.error("Error declining trade offer:", error);
+      res.status(500).json({ message: "Failed to decline trade offer" });
+    }
+  });
+
+  // Follow routes
+  app.post("/api/users/:userId/follow", isAuthenticated, async (req: any, res) => {
+    try {
+      const followerId = req.user.claims.sub;
+      const followedId = req.params.userId;
+
+      if (followerId === followedId) {
+        return res.status(400).json({ message: "Cannot follow yourself" });
+      }
+
+      const follow = await storage.followUser(followerId, followedId);
+
+      // Notify the followed user
+      const follower = await storage.getUser(followerId);
+      await storage.createNotification(followedId, "new_follower", {
+        followerId,
+        followerName: follower ? `${follower.firstName || ''} ${follower.lastName || ''}`.trim() || 'Someone' : 'Someone',
+      });
+
+      res.json(follow);
+    } catch (error) {
+      console.error("Error following user:", error);
+      res.status(500).json({ message: "Failed to follow user" });
+    }
+  });
+
+  app.delete("/api/users/:userId/follow", isAuthenticated, async (req: any, res) => {
+    try {
+      const followerId = req.user.claims.sub;
+      const followedId = req.params.userId;
+
+      await storage.unfollowUser(followerId, followedId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error unfollowing user:", error);
+      res.status(500).json({ message: "Failed to unfollow user" });
+    }
+  });
+
+  app.get("/api/users/:userId/is-following", isAuthenticated, async (req: any, res) => {
+    try {
+      const followerId = req.user.claims.sub;
+      const followedId = req.params.userId;
+
+      const isFollowing = await storage.isFollowing(followerId, followedId);
+      res.json({ isFollowing });
+    } catch (error) {
+      console.error("Error checking follow status:", error);
+      res.status(500).json({ message: "Failed to check follow status" });
+    }
+  });
+
+  app.get("/api/users/:userId/followers", async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const followers = await storage.getFollowers(userId);
+      const count = await storage.getFollowerCount(userId);
+      res.json({ followers, count });
+    } catch (error) {
+      console.error("Error fetching followers:", error);
+      res.status(500).json({ message: "Failed to fetch followers" });
+    }
+  });
+
+  app.get("/api/users/:userId/following", async (req, res) => {
+    try {
+      const userId = req.params.userId;
+      const following = await storage.getFollowing(userId);
+      const count = await storage.getFollowingCount(userId);
+      res.json({ following, count });
+    } catch (error) {
+      console.error("Error fetching following:", error);
+      res.status(500).json({ message: "Failed to fetch following" });
+    }
+  });
+
 }

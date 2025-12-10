@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Send, DollarSign, AlertCircle } from "lucide-react";
+import { Loader2, Send, DollarSign, AlertCircle, EyeOff } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { Card } from "@shared/schema";
 
@@ -21,6 +22,7 @@ export function MakeOfferModal({ card, open, onOpenChange }: MakeOfferModalProps
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
   const [message, setMessage] = useState("");
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
   const minOffer = card.minOfferAmount ? Number(card.minOfferAmount) : 0;
   const offerAmount = amount ? parseFloat(amount) : 0;
@@ -32,6 +34,7 @@ export function MakeOfferModal({ card, open, onOpenChange }: MakeOfferModalProps
         cardId: card.id,
         amount: amount,
         message: message.trim() || undefined,
+        isAnonymous: isAnonymous,
       });
       return response;
     },
@@ -43,6 +46,7 @@ export function MakeOfferModal({ card, open, onOpenChange }: MakeOfferModalProps
       queryClient.invalidateQueries({ queryKey: ["/api/offers/outgoing"] });
       setAmount("");
       setMessage("");
+      setIsAnonymous(false);
       onOpenChange(false);
     },
     onError: (error: Error) => {
@@ -135,6 +139,19 @@ export function MakeOfferModal({ card, open, onOpenChange }: MakeOfferModalProps
               rows={3}
               data-testid="input-offer-message"
             />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="anonymous-offer"
+              checked={isAnonymous}
+              onCheckedChange={(checked) => setIsAnonymous(checked === true)}
+              data-testid="checkbox-anonymous-offer"
+            />
+            <Label htmlFor="anonymous-offer" className="flex items-center gap-2 text-sm cursor-pointer">
+              <EyeOff className="h-4 w-4 text-muted-foreground" />
+              Hide my name from the card owner
+            </Label>
           </div>
 
           <div className="flex gap-2 justify-end pt-2">

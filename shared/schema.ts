@@ -241,6 +241,52 @@ export const userBadgesRelations = relations(userBadges, ({ one }) => ({
   }),
 }));
 
+// Trade Offers table - for card-to-card trades
+export const tradeOffers = pgTable("trade_offers", {
+  id: serial("id").primaryKey(),
+  fromUserId: varchar("from_user_id").notNull().references(() => users.id),
+  toUserId: varchar("to_user_id").notNull().references(() => users.id),
+  offeredCardIds: integer("offered_card_ids").array().notNull(),
+  requestedCardIds: integer("requested_card_ids").array().notNull(),
+  cashAdjustment: real("cash_adjustment").default(0).notNull(),
+  message: text("message"),
+  status: varchar("status", { length: 50 }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const tradeOffersRelations = relations(tradeOffers, ({ one }) => ({
+  fromUser: one(users, {
+    fields: [tradeOffers.fromUserId],
+    references: [users.id],
+  }),
+  toUser: one(users, {
+    fields: [tradeOffers.toUserId],
+    references: [users.id],
+  }),
+}));
+
+// Follows table - for users to follow other users
+export const follows = pgTable("follows", {
+  id: serial("id").primaryKey(),
+  followerId: varchar("follower_id").notNull().references(() => users.id),
+  followedId: varchar("followed_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique("unique_follow").on(table.followerId, table.followedId),
+]);
+
+export const followsRelations = relations(follows, ({ one }) => ({
+  follower: one(users, {
+    fields: [follows.followerId],
+    references: [users.id],
+  }),
+  followed: one(users, {
+    fields: [follows.followedId],
+    references: [users.id],
+  }),
+}));
+
 // Schemas and Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -288,6 +334,18 @@ export type Offer = typeof offers.$inferSelect;
 
 export type Notification = typeof notifications.$inferSelect;
 
+export const insertTradeOfferSchema = createInsertSchema(tradeOffers).omit({
+  id: true,
+  fromUserId: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertTradeOffer = z.infer<typeof insertTradeOfferSchema>;
+export type TradeOffer = typeof tradeOffers.$inferSelect;
+
+export type Follow = typeof follows.$inferSelect;
+
 export type Badge = typeof badges.$inferSelect;
 export type UserBadge = typeof userBadges.$inferSelect;
 export type UserBadgeWithBadge = UserBadge & { badge: Badge };
@@ -298,6 +356,12 @@ export type DisplayCaseWithUser = DisplayCase & { user: User };
 export type CommentWithUser = Comment & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> };
 export type BookmarkWithCard = Bookmark & { card: Card };
 export type OfferWithUsers = Offer & { fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; card: Card };
+export type TradeOfferWithDetails = TradeOffer & { 
+  fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; 
+  toUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; 
+  offeredCards: Card[];
+  requestedCards: Card[];
+};
 
 // Prestige tiers for collectors
 export const COLLECTOR_TIERS = {

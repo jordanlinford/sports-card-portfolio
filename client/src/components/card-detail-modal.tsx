@@ -11,13 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins } from "lucide-react";
+import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins, ArrowRightLeft } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MakeOfferModal } from "@/components/make-offer-modal";
+import { ProposeTradeModal } from "@/components/propose-trade-modal";
 
 interface CardDetailModalProps {
   card: Card | null;
@@ -27,6 +28,7 @@ interface CardDetailModalProps {
   canEdit?: boolean;
   isPro?: boolean;
   isAuthenticated?: boolean;
+  ownerUserId?: string;
 }
 
 interface EditFormData {
@@ -56,11 +58,13 @@ export function CardDetailModal({
   displayCaseId,
   canEdit = false,
   isPro = false,
-  isAuthenticated = false
+  isAuthenticated = false,
+  ownerUserId
 }: CardDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
+  const [showTradeModal, setShowTradeModal] = useState(false);
   const { toast } = useToast();
 
   const { data: bookmarkStatus, refetch: refetchBookmark } = useQuery<{ hasBookmarked: boolean; bookmarkCount: number }>({
@@ -695,14 +699,25 @@ export function CardDetailModal({
                       )}
                     </div>
                     {isAuthenticated && (
-                      <Button 
-                        className="w-full gap-2"
-                        onClick={() => setShowOfferModal(true)}
-                        data-testid="button-make-offer"
-                      >
-                        <HandCoins className="h-4 w-4" />
-                        Make an Offer
-                      </Button>
+                      <div className="flex flex-col gap-2">
+                        <Button 
+                          className="w-full gap-2"
+                          onClick={() => setShowOfferModal(true)}
+                          data-testid="button-make-offer"
+                        >
+                          <HandCoins className="h-4 w-4" />
+                          Make an Offer
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          className="w-full gap-2"
+                          onClick={() => setShowTradeModal(true)}
+                          data-testid="button-propose-trade"
+                        >
+                          <ArrowRightLeft className="h-4 w-4" />
+                          Propose a Trade
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </>
@@ -717,6 +732,15 @@ export function CardDetailModal({
           card={card}
           open={showOfferModal}
           onOpenChange={setShowOfferModal}
+        />
+      )}
+
+      {card && ownerUserId && (
+        <ProposeTradeModal
+          targetCard={card}
+          targetUserId={ownerUserId}
+          open={showTradeModal}
+          onOpenChange={setShowTradeModal}
         />
       )}
     </Dialog>
