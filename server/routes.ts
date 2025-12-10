@@ -1196,6 +1196,7 @@ Allow: /
             quantity: 1,
           },
         ],
+        allow_promotion_codes: true,
         success_url: `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${baseUrl}/upgrade`,
         metadata: {
