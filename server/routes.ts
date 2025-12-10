@@ -28,6 +28,18 @@ function isSocialCrawler(userAgent: string): boolean {
   return SOCIAL_CRAWLERS.some(crawler => userAgent.includes(crawler));
 }
 
+async function ensureDefaultPromoCodes() {
+  try {
+    const betaUserCode = await storage.getPromoCode('BETAUSER');
+    if (!betaUserCode) {
+      await storage.createPromoCode('BETAUSER', 25, 'Free Pro access for early beta testers');
+      console.log('Created default BETAUSER promo code');
+    }
+  } catch (error) {
+    console.error('Error ensuring default promo codes:', error);
+  }
+}
+
 async function initStripe(app: Express) {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -75,6 +87,9 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // Initialize Stripe webhooks and sync
   await initStripe(app);
+
+  // Ensure default promo codes exist
+  await ensureDefaultPromoCodes();
 
   // Robots.txt - allow social media crawlers
   app.get("/robots.txt", (req, res) => {
