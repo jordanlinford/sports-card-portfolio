@@ -15,8 +15,17 @@ import {
   TrendingDown,
   RefreshCw,
   Loader2,
-  Edit
+  Edit,
+  Share2,
+  Link as LinkIcon,
+  Download
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { DisplayCaseWithCards, Card, User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -331,6 +340,69 @@ export default function CaseView() {
                 )}
               </div>
             </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2" data-testid="button-share">
+                  <Share2 className="h-4 w-4" />
+                  Share
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem 
+                  onClick={() => {
+                    const url = `${window.location.origin}/case/${id}`;
+                    navigator.clipboard.writeText(url);
+                    toast({
+                      title: "Link Copied",
+                      description: "Case link copied to clipboard!",
+                    });
+                  }}
+                  data-testid="button-copy-link"
+                >
+                  <LinkIcon className="h-4 w-4 mr-2" />
+                  Copy Link
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    const imageUrl = `/api/share-image/case/${id}`;
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = `${displayCase.name.replace(/[^a-zA-Z0-9]/g, '-')}-share.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    toast({
+                      title: "Downloading...",
+                      description: "Share image is being downloaded.",
+                    });
+                  }}
+                  data-testid="button-download-share-image"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Share Image
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    const imageUrl = `/api/share-image/case/${id}?format=story`;
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = `${displayCase.name.replace(/[^a-zA-Z0-9]/g, '-')}-story.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    toast({
+                      title: "Downloading...",
+                      description: "Story image is being downloaded.",
+                    });
+                  }}
+                  data-testid="button-download-story-image"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Story Image (9:16)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -435,6 +507,7 @@ export default function CaseView() {
         displayCaseId={parseInt(id || "0")}
         canEdit={isOwner}
         isPro={user?.subscriptionStatus === "PRO"}
+        isAuthenticated={!!user}
       />
     </div>
   );

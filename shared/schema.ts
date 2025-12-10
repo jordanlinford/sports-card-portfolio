@@ -85,6 +85,8 @@ export const cards = pgTable("cards", {
   notes: text("notes"),
   tags: text("tags").array(),
   sortOrder: integer("sort_order").default(0).notNull(),
+  openToOffers: boolean("open_to_offers").default(false).notNull(),
+  minOfferAmount: real("min_offer_amount"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -134,6 +136,71 @@ export const likesRelations = relations(likes, ({ one }) => ({
   }),
 }));
 
+// Bookmarks table - for users to save cards they're interested in
+export const bookmarks = pgTable("bookmarks", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const bookmarksRelations = relations(bookmarks, ({ one }) => ({
+  user: one(users, {
+    fields: [bookmarks.userId],
+    references: [users.id],
+  }),
+  card: one(cards, {
+    fields: [bookmarks.cardId],
+    references: [cards.id],
+  }),
+}));
+
+// Offers table - for users to make offers on cards
+export const offers = pgTable("offers", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  fromUserId: varchar("from_user_id").notNull().references(() => users.id),
+  toUserId: varchar("to_user_id").notNull().references(() => users.id),
+  amount: real("amount").notNull(),
+  message: text("message"),
+  isAnonymous: boolean("is_anonymous").default(false).notNull(),
+  status: varchar("status", { length: 50 }).default("pending").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offersRelations = relations(offers, ({ one }) => ({
+  card: one(cards, {
+    fields: [offers.cardId],
+    references: [cards.id],
+  }),
+  fromUser: one(users, {
+    fields: [offers.fromUserId],
+    references: [users.id],
+  }),
+  toUser: one(users, {
+    fields: [offers.toUserId],
+    references: [users.id],
+  }),
+}));
+
+// Notifications table
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  type: varchar("type", { length: 50 }).notNull(),
+  data: jsonb("data"),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+}));
+
 // Schemas and Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -166,7 +233,24 @@ export type Comment = typeof comments.$inferSelect;
 
 export type Like = typeof likes.$inferSelect;
 
+export type Bookmark = typeof bookmarks.$inferSelect;
+
+export const insertOfferSchema = createInsertSchema(offers).omit({
+  id: true,
+  fromUserId: true,
+  toUserId: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertOffer = z.infer<typeof insertOfferSchema>;
+export type Offer = typeof offers.$inferSelect;
+
+export type Notification = typeof notifications.$inferSelect;
+
 // Extended types with relations
 export type DisplayCaseWithCards = DisplayCase & { cards: Card[] };
 export type DisplayCaseWithUser = DisplayCase & { user: User };
 export type CommentWithUser = Comment & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> };
+export type BookmarkWithCard = Bookmark & { card: Card };
+export type OfferWithUsers = Offer & { fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; card: Card };

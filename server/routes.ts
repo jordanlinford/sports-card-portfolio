@@ -9,6 +9,7 @@ import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
+import { generateShareImage } from "./shareImageService";
 
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
@@ -149,18 +150,8 @@ Allow: /
         ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
         : `https://${req.headers.host}`;
       
-      // Find the best card image (prefer graded cards or first card)
-      const sortedCards = [...cards].sort((a, b) => {
-        if (a.grade && !b.grade) return -1;
-        if (!a.grade && b.grade) return 1;
-        return 0;
-      });
-      const bestCard = sortedCards[0];
-      
-      // Build image URL - use card image or fallback
-      const imageUrl = bestCard?.imagePath 
-        ? `${baseUrl}${bestCard.imagePath}`
-        : `${baseUrl}/og-default.png`;
+      // Use the share image endpoint for rich preview images
+      const imageUrl = `${baseUrl}/api/share-image/case/${id}`;
       
       // Get owner info for better description
       const owner = await storage.getUser(displayCase.userId);
@@ -192,9 +183,7 @@ Allow: /
       const fullTitle = `${title} | ${cardCount} Cards | MyDisplayCase`;
       
       // Alt text for image
-      const imageAlt = bestCard?.title 
-        ? `${bestCard.title} from ${displayCase.name}`
-        : `Card collection: ${displayCase.name}`;
+      const imageAlt = `${displayCase.name} - Card collection on MyDisplayCase`;
 
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -371,6 +360,44 @@ Allow: /
     } catch (error) {
       console.error("Error fetching public display case:", error);
       res.status(500).json({ message: "Failed to fetch display case" });
+    }
+  });
+
+  // Share image generation endpoint
+  app.get("/api/share-image/case/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid display case ID" });
+      }
+
+      const displayCase = await storage.getDisplayCase(id);
+      if (!displayCase || !displayCase.isPublic) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      const owner = await storage.getUser(displayCase.userId);
+      if (!owner) {
+        return res.status(404).json({ message: "Owner not found" });
+      }
+
+      const format = (req.query.format as string) === "story" ? "story" : "social";
+      
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
+        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
+        : `https://${req.headers.host}`;
+
+      const imageBuffer = await generateShareImage(displayCase, owner, baseUrl, { format });
+
+      res.set({
+        "Content-Type": "image/png",
+        "Content-Length": imageBuffer.length,
+        "Cache-Control": "public, max-age=3600",
+      });
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error("Error generating share image:", error);
+      res.status(500).json({ message: "Failed to generate share image" });
     }
   });
 
@@ -1233,6 +1260,356 @@ Allow: /
     } catch (error) {
       console.error("Error fetching analytics:", error);
       res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
+  // Bookmark routes
+  app.get("/api/bookmarks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const bookmarks = await storage.getBookmarks(userId);
+      res.json(bookmarks);
+    } catch (error) {
+      console.error("Error fetching bookmarks:", error);
+      res.status(500).json({ message: "Failed to fetch bookmarks" });
+    }
+  });
+
+  app.post("/api/cards/:id/bookmark", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      const hasBookmarked = await storage.hasUserBookmarked(userId, cardId);
+      if (hasBookmarked) {
+        return res.status(400).json({ message: "Already bookmarked" });
+      }
+
+      const bookmark = await storage.addBookmark(userId, cardId);
+      res.status(201).json(bookmark);
+    } catch (error) {
+      console.error("Error adding bookmark:", error);
+      res.status(500).json({ message: "Failed to add bookmark" });
+    }
+  });
+
+  app.delete("/api/cards/:id/bookmark", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      await storage.removeBookmark(userId, cardId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing bookmark:", error);
+      res.status(500).json({ message: "Failed to remove bookmark" });
+    }
+  });
+
+  app.get("/api/cards/:id/bookmark-status", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const hasBookmarked = await storage.hasUserBookmarked(userId, cardId);
+      const bookmarkCount = await storage.getCardBookmarkCount(cardId);
+      res.json({ hasBookmarked, bookmarkCount });
+    } catch (error) {
+      console.error("Error checking bookmark status:", error);
+      res.status(500).json({ message: "Failed to check bookmark status" });
+    }
+  });
+
+  // Offer routes
+  app.get("/api/offers/received", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const offers = await storage.getReceivedOffers(userId);
+      res.json(offers);
+    } catch (error) {
+      console.error("Error fetching received offers:", error);
+      res.status(500).json({ message: "Failed to fetch received offers" });
+    }
+  });
+
+  app.get("/api/offers/sent", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const offers = await storage.getSentOffers(userId);
+      res.json(offers);
+    } catch (error) {
+      console.error("Error fetching sent offers:", error);
+      res.status(500).json({ message: "Failed to fetch sent offers" });
+    }
+  });
+
+  app.post("/api/cards/:id/offers", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { amount, message, isAnonymous } = req.body;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ message: "Invalid offer amount" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      if (!card.openToOffers) {
+        return res.status(400).json({ message: "This card is not open to offers" });
+      }
+
+      if (card.minOfferAmount && amount < card.minOfferAmount) {
+        return res.status(400).json({ message: `Minimum offer is $${card.minOfferAmount}` });
+      }
+
+      // Get the card owner
+      const displayCase = await storage.getDisplayCase(card.displayCaseId);
+      if (!displayCase) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      if (displayCase.userId === userId) {
+        return res.status(400).json({ message: "Cannot make an offer on your own card" });
+      }
+
+      const offer = await storage.createOffer(userId, displayCase.userId, {
+        cardId,
+        amount,
+        message: message || null,
+        isAnonymous: isAnonymous || false,
+      });
+
+      // Create notification for card owner
+      await storage.createNotification(displayCase.userId, "offer_received", {
+        offerId: offer.id,
+        cardId,
+        cardTitle: card.title,
+        amount,
+        isAnonymous: isAnonymous || false,
+      });
+
+      res.status(201).json(offer);
+    } catch (error) {
+      console.error("Error creating offer:", error);
+      res.status(500).json({ message: "Failed to create offer" });
+    }
+  });
+
+  app.patch("/api/offers/:id/accept", isAuthenticated, async (req: any, res) => {
+    try {
+      const offerId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(offerId)) {
+        return res.status(400).json({ message: "Invalid offer ID" });
+      }
+
+      const offer = await storage.getOffer(offerId);
+      if (!offer) {
+        return res.status(404).json({ message: "Offer not found" });
+      }
+
+      if (offer.toUserId !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (offer.status !== "pending") {
+        return res.status(400).json({ message: "Offer is not pending" });
+      }
+
+      const updatedOffer = await storage.updateOfferStatus(offerId, "accepted");
+
+      // Notify the buyer
+      const card = await storage.getCard(offer.cardId);
+      await storage.createNotification(offer.fromUserId, "offer_accepted", {
+        offerId,
+        cardTitle: card?.title || "Card",
+        amount: offer.amount,
+      });
+
+      res.json(updatedOffer);
+    } catch (error) {
+      console.error("Error accepting offer:", error);
+      res.status(500).json({ message: "Failed to accept offer" });
+    }
+  });
+
+  app.patch("/api/offers/:id/decline", isAuthenticated, async (req: any, res) => {
+    try {
+      const offerId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(offerId)) {
+        return res.status(400).json({ message: "Invalid offer ID" });
+      }
+
+      const offer = await storage.getOffer(offerId);
+      if (!offer) {
+        return res.status(404).json({ message: "Offer not found" });
+      }
+
+      if (offer.toUserId !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (offer.status !== "pending") {
+        return res.status(400).json({ message: "Offer is not pending" });
+      }
+
+      const updatedOffer = await storage.updateOfferStatus(offerId, "declined");
+
+      // Notify the buyer
+      const card = await storage.getCard(offer.cardId);
+      await storage.createNotification(offer.fromUserId, "offer_declined", {
+        offerId,
+        cardTitle: card?.title || "Card",
+        amount: offer.amount,
+      });
+
+      res.json(updatedOffer);
+    } catch (error) {
+      console.error("Error declining offer:", error);
+      res.status(500).json({ message: "Failed to decline offer" });
+    }
+  });
+
+  app.patch("/api/offers/:id/withdraw", isAuthenticated, async (req: any, res) => {
+    try {
+      const offerId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      if (isNaN(offerId)) {
+        return res.status(400).json({ message: "Invalid offer ID" });
+      }
+
+      const offer = await storage.getOffer(offerId);
+      if (!offer) {
+        return res.status(404).json({ message: "Offer not found" });
+      }
+
+      if (offer.fromUserId !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (offer.status !== "pending") {
+        return res.status(400).json({ message: "Offer is not pending" });
+      }
+
+      const updatedOffer = await storage.updateOfferStatus(offerId, "withdrawn");
+      res.json(updatedOffer);
+    } catch (error) {
+      console.error("Error withdrawing offer:", error);
+      res.status(500).json({ message: "Failed to withdraw offer" });
+    }
+  });
+
+  // Notification routes
+  app.get("/api/notifications", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = parseInt(req.query.limit as string) || 50;
+      const notifications = await storage.getNotifications(userId, limit);
+      res.json(notifications);
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/unread-count", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const count = await storage.getUnreadNotificationCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+      res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid notification ID" });
+      }
+
+      await storage.markNotificationAsRead(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking notification as read:", error);
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.patch("/api/notifications/read-all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.markAllNotificationsAsRead(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error marking all notifications as read:", error);
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Update card offer settings
+  app.patch("/api/cards/:id/offer-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { openToOffers, minOfferAmount } = req.body;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      // Verify ownership
+      const displayCase = await storage.getDisplayCase(card.displayCaseId);
+      if (!displayCase || displayCase.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const updatedCard = await storage.updateCard(cardId, {
+        openToOffers: openToOffers ?? card.openToOffers,
+        minOfferAmount: minOfferAmount !== undefined ? minOfferAmount : card.minOfferAmount,
+      });
+
+      res.json(updatedCard);
+    } catch (error) {
+      console.error("Error updating offer settings:", error);
+      res.status(500).json({ message: "Failed to update offer settings" });
     }
   });
 

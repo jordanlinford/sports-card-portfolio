@@ -4,6 +4,9 @@ import {
   cards,
   comments,
   likes,
+  bookmarks,
+  offers,
+  notifications,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -15,6 +18,12 @@ import {
   type InsertComment,
   type CommentWithUser,
   type Like,
+  type Bookmark,
+  type BookmarkWithCard,
+  type Offer,
+  type InsertOffer,
+  type OfferWithUsers,
+  type Notification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql } from "drizzle-orm";
@@ -85,6 +94,27 @@ export interface IStorage {
 
   // Duplicate detection
   findSimilarCards(userId: string, title: string, excludeCardId?: number): Promise<Card[]>;
+
+  // Bookmark operations
+  getBookmarks(userId: string): Promise<BookmarkWithCard[]>;
+  addBookmark(userId: string, cardId: number): Promise<Bookmark>;
+  removeBookmark(userId: string, cardId: number): Promise<void>;
+  hasUserBookmarked(userId: string, cardId: number): Promise<boolean>;
+  getCardBookmarkCount(cardId: number): Promise<number>;
+
+  // Offer operations
+  getReceivedOffers(userId: string): Promise<OfferWithUsers[]>;
+  getSentOffers(userId: string): Promise<OfferWithUsers[]>;
+  createOffer(fromUserId: string, toUserId: string, data: InsertOffer): Promise<Offer>;
+  updateOfferStatus(offerId: number, status: string): Promise<Offer | undefined>;
+  getOffer(id: number): Promise<Offer | undefined>;
+
+  // Notification operations
+  getNotifications(userId: string, limit?: number): Promise<Notification[]>;
+  getUnreadNotificationCount(userId: string): Promise<number>;
+  createNotification(userId: string, type: string, data: any): Promise<Notification>;
+  markNotificationAsRead(id: number): Promise<void>;
+  markAllNotificationsAsRead(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -903,6 +933,164 @@ export class DatabaseStorage implements IStorage {
     return excludeCardId 
       ? results.filter(c => c.id !== excludeCardId) 
       : results;
+  }
+
+  // Bookmark operations
+  async getBookmarks(userId: string): Promise<BookmarkWithCard[]> {
+    const userBookmarks = await db
+      .select()
+      .from(bookmarks)
+      .where(eq(bookmarks.userId, userId))
+      .orderBy(desc(bookmarks.createdAt));
+
+    const result: BookmarkWithCard[] = [];
+    for (const bookmark of userBookmarks) {
+      const [card] = await db.select().from(cards).where(eq(cards.id, bookmark.cardId));
+      if (card) {
+        result.push({ ...bookmark, card });
+      }
+    }
+    return result;
+  }
+
+  async addBookmark(userId: string, cardId: number): Promise<Bookmark> {
+    const [bookmark] = await db
+      .insert(bookmarks)
+      .values({ userId, cardId })
+      .returning();
+    return bookmark;
+  }
+
+  async removeBookmark(userId: string, cardId: number): Promise<void> {
+    await db
+      .delete(bookmarks)
+      .where(and(eq(bookmarks.userId, userId), eq(bookmarks.cardId, cardId)));
+  }
+
+  async hasUserBookmarked(userId: string, cardId: number): Promise<boolean> {
+    const [bookmark] = await db
+      .select()
+      .from(bookmarks)
+      .where(and(eq(bookmarks.userId, userId), eq(bookmarks.cardId, cardId)));
+    return !!bookmark;
+  }
+
+  async getCardBookmarkCount(cardId: number): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(bookmarks)
+      .where(eq(bookmarks.cardId, cardId));
+    return Number(result[0]?.count || 0);
+  }
+
+  // Offer operations
+  async getReceivedOffers(userId: string): Promise<OfferWithUsers[]> {
+    const receivedOffers = await db
+      .select()
+      .from(offers)
+      .where(eq(offers.toUserId, userId))
+      .orderBy(desc(offers.createdAt));
+
+    const result: OfferWithUsers[] = [];
+    for (const offer of receivedOffers) {
+      const [fromUser] = await db
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .from(users)
+        .where(eq(users.id, offer.fromUserId));
+      const [card] = await db.select().from(cards).where(eq(cards.id, offer.cardId));
+      if (fromUser && card) {
+        result.push({ ...offer, fromUser, card });
+      }
+    }
+    return result;
+  }
+
+  async getSentOffers(userId: string): Promise<OfferWithUsers[]> {
+    const sentOffers = await db
+      .select()
+      .from(offers)
+      .where(eq(offers.fromUserId, userId))
+      .orderBy(desc(offers.createdAt));
+
+    const result: OfferWithUsers[] = [];
+    for (const offer of sentOffers) {
+      const [fromUser] = await db
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .from(users)
+        .where(eq(users.id, offer.fromUserId));
+      const [card] = await db.select().from(cards).where(eq(cards.id, offer.cardId));
+      if (fromUser && card) {
+        result.push({ ...offer, fromUser, card });
+      }
+    }
+    return result;
+  }
+
+  async createOffer(fromUserId: string, toUserId: string, data: InsertOffer): Promise<Offer> {
+    const [offer] = await db
+      .insert(offers)
+      .values({
+        ...data,
+        fromUserId,
+        toUserId,
+        status: "pending",
+      })
+      .returning();
+    return offer;
+  }
+
+  async updateOfferStatus(offerId: number, status: string): Promise<Offer | undefined> {
+    const [offer] = await db
+      .update(offers)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(offers.id, offerId))
+      .returning();
+    return offer;
+  }
+
+  async getOffer(id: number): Promise<Offer | undefined> {
+    const [offer] = await db.select().from(offers).where(eq(offers.id, id));
+    return offer;
+  }
+
+  // Notification operations
+  async getNotifications(userId: string, limit: number = 50): Promise<Notification[]> {
+    return await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, userId))
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+  }
+
+  async getUnreadNotificationCount(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+    return Number(result[0]?.count || 0);
+  }
+
+  async createNotification(userId: string, type: string, data: any): Promise<Notification> {
+    const [notification] = await db
+      .insert(notifications)
+      .values({ userId, type, data })
+      .returning();
+    return notification;
+  }
+
+  async markNotificationAsRead(id: number): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id));
+  }
+
+  async markAllNotificationsAsRead(userId: string): Promise<void> {
+    await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.userId, userId));
   }
 }
 

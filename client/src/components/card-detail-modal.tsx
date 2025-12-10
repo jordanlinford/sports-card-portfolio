@@ -11,11 +11,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag } from "lucide-react";
+import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 interface CardDetailModalProps {
   card: Card | null;
@@ -24,6 +25,7 @@ interface CardDetailModalProps {
   displayCaseId: number;
   canEdit?: boolean;
   isPro?: boolean;
+  isAuthenticated?: boolean;
 }
 
 interface EditFormData {
@@ -36,6 +38,8 @@ interface EditFormData {
   estimatedValue: string;
   notes: string;
   tags: string[];
+  openToOffers: boolean;
+  minOfferAmount: string;
 }
 
 const SUGGESTED_TAGS = [
@@ -50,11 +54,51 @@ export function CardDetailModal({
   onClose, 
   displayCaseId,
   canEdit = false,
-  isPro = false
+  isPro = false,
+  isAuthenticated = false
 }: CardDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
+
+  const { data: bookmarkStatus, refetch: refetchBookmark } = useQuery<{ hasBookmarked: boolean; bookmarkCount: number }>({
+    queryKey: ["/api/cards", card?.id, "bookmark-status"],
+    queryFn: async () => {
+      if (!card) return { hasBookmarked: false, bookmarkCount: 0 };
+      const res = await fetch(`/api/cards/${card.id}/bookmark-status`);
+      if (!res.ok) return { hasBookmarked: false, bookmarkCount: 0 };
+      return res.json();
+    },
+    enabled: isOpen && !!card && isAuthenticated && !canEdit,
+  });
+
+  const bookmarkMutation = useMutation({
+    mutationFn: async () => {
+      if (!card) return;
+      if (bookmarkStatus?.hasBookmarked) {
+        await apiRequest("DELETE", `/api/cards/${card.id}/bookmark`);
+      } else {
+        await apiRequest("POST", `/api/cards/${card.id}/bookmark`);
+      }
+    },
+    onSuccess: () => {
+      refetchBookmark();
+      queryClient.invalidateQueries({ queryKey: ["/api/bookmarks"] });
+      toast({
+        title: bookmarkStatus?.hasBookmarked ? "Bookmark Removed" : "Card Bookmarked",
+        description: bookmarkStatus?.hasBookmarked 
+          ? "Card removed from your bookmarks" 
+          : "Card added to your bookmarks",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update bookmark",
+        variant: "destructive",
+      });
+    },
+  });
 
   const refreshPriceMutation = useMutation({
     mutationFn: async (cardId: number) => {
@@ -99,6 +143,8 @@ export function CardDetailModal({
     estimatedValue: "",
     notes: "",
     tags: [],
+    openToOffers: false,
+    minOfferAmount: "",
   });
   const [tagInput, setTagInput] = useState("");
 
@@ -114,6 +160,8 @@ export function CardDetailModal({
         estimatedValue: card.estimatedValue?.toString() || "",
         notes: card.notes || "",
         tags: card.tags || [],
+        openToOffers: card.openToOffers || false,
+        minOfferAmount: card.minOfferAmount?.toString() || "",
       });
     }
   }, [card]);
@@ -142,6 +190,8 @@ export function CardDetailModal({
         estimatedValue: formData.estimatedValue ? parseFloat(formData.estimatedValue) : null,
         notes: formData.notes.trim() || null,
         tags: formData.tags.length > 0 ? formData.tags : null,
+        openToOffers: formData.openToOffers,
+        minOfferAmount: formData.minOfferAmount ? parseFloat(formData.minOfferAmount) : null,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
@@ -176,6 +226,8 @@ export function CardDetailModal({
           estimatedValue: card.estimatedValue?.toString() || "",
           notes: card.notes || "",
           tags: card.tags || [],
+          openToOffers: card.openToOffers || false,
+          minOfferAmount: card.minOfferAmount?.toString() || "",
         });
       }
       onClose();
@@ -196,6 +248,8 @@ export function CardDetailModal({
         estimatedValue: card.estimatedValue?.toString() || "",
         notes: card.notes || "",
         tags: card.tags || [],
+        openToOffers: card.openToOffers || false,
+        minOfferAmount: card.minOfferAmount?.toString() || "",
       });
     }
   };
@@ -239,17 +293,31 @@ export function CardDetailModal({
             <DialogTitle className="text-xl" data-testid="text-card-modal-title">
               {isEditing ? "Edit Card" : card.title}
             </DialogTitle>
-            {canEdit && !isEditing && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setIsEditing(true)}
-                data-testid="button-edit-card"
-              >
-                <Edit2 className="w-3 h-3 mr-1" />
-                Edit
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {isAuthenticated && !canEdit && (
+                <Button
+                  size="sm"
+                  variant={bookmarkStatus?.hasBookmarked ? "secondary" : "outline"}
+                  onClick={() => bookmarkMutation.mutate()}
+                  disabled={bookmarkMutation.isPending}
+                  data-testid="button-bookmark-card"
+                >
+                  <Bookmark className={`w-3 h-3 mr-1 ${bookmarkStatus?.hasBookmarked ? "fill-current" : ""}`} />
+                  {bookmarkStatus?.hasBookmarked ? "Saved" : "Save"}
+                </Button>
+              )}
+              {canEdit && !isEditing && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsEditing(true)}
+                  data-testid="button-edit-card"
+                >
+                  <Edit2 className="w-3 h-3 mr-1" />
+                  Edit
+                </Button>
+              )}
+            </div>
           </div>
         </DialogHeader>
 
@@ -407,6 +475,45 @@ export function CardDetailModal({
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <HandCoins className="h-4 w-4 text-muted-foreground" />
+                      <Label htmlFor="open-to-offers" className="text-sm font-normal">
+                        Open to Offers
+                      </Label>
+                    </div>
+                    <Switch
+                      id="open-to-offers"
+                      checked={formData.openToOffers}
+                      onCheckedChange={(checked) => setFormData({ ...formData, openToOffers: checked })}
+                      data-testid="switch-open-to-offers"
+                    />
+                  </div>
+                  {formData.openToOffers && (
+                    <div className="space-y-1 pl-6">
+                      <Label htmlFor="min-offer-amount" className="text-sm font-normal text-muted-foreground">
+                        Minimum Offer Amount (optional)
+                      </Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">$</span>
+                        <Input
+                          id="min-offer-amount"
+                          type="number"
+                          step="0.01"
+                          value={formData.minOfferAmount}
+                          onChange={(e) => setFormData({ ...formData, minOfferAmount: e.target.value })}
+                          placeholder="0.00"
+                          className="max-w-[120px]"
+                          data-testid="input-min-offer-amount"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -566,6 +673,30 @@ export function CardDetailModal({
                     <p className="text-sm text-muted-foreground" data-testid="text-card-notes">
                       {card.notes}
                     </p>
+                  </div>
+                </>
+              )}
+
+              {card.openToOffers && !canEdit && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <HandCoins className="w-4 h-4 text-green-600" />
+                      <Badge className="bg-green-600 text-white" data-testid="badge-open-to-offers">
+                        Open to Offers
+                      </Badge>
+                      {card.minOfferAmount && (
+                        <span className="text-sm text-muted-foreground">
+                          (Min: ${card.minOfferAmount})
+                        </span>
+                      )}
+                    </div>
+                    {isAuthenticated && (
+                      <p className="text-sm text-muted-foreground">
+                        Interested in this card? You can make an offer to the collector.
+                      </p>
+                    )}
                   </div>
                 </>
               )}

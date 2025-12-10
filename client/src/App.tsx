@@ -24,6 +24,7 @@ import PrivacyPolicy from "@/pages/privacy-policy";
 import Explore from "@/pages/explore";
 import AdminDashboard from "@/pages/admin";
 import AnalyticsPage from "@/pages/analytics";
+import BookmarksPage from "@/pages/bookmarks";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -46,6 +47,7 @@ function Router() {
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/analytics" component={AnalyticsPage} />
+          <Route path="/bookmarks" component={BookmarksPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />
