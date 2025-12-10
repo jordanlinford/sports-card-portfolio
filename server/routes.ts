@@ -1393,6 +1393,74 @@ Allow: /
   });
 
   // Offer routes
+  // Create a new offer (frontend uses this endpoint)
+  app.post("/api/offers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { cardId, amount, message, isAnonymous } = req.body;
+
+      if (!cardId || isNaN(parseInt(cardId))) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const numericCardId = parseInt(cardId);
+      const numericAmount = parseFloat(amount);
+
+      if (!amount || numericAmount <= 0) {
+        return res.status(400).json({ message: "Invalid offer amount" });
+      }
+
+      const card = await storage.getCard(numericCardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      if (!card.openToOffers) {
+        return res.status(400).json({ message: "This card is not open to offers" });
+      }
+
+      if (card.minOfferAmount && numericAmount < Number(card.minOfferAmount)) {
+        return res.status(400).json({ message: `Minimum offer is $${card.minOfferAmount}` });
+      }
+
+      // Get the card owner
+      const displayCase = await storage.getDisplayCase(card.displayCaseId);
+      if (!displayCase) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      if (displayCase.userId === userId) {
+        return res.status(400).json({ message: "Cannot make an offer on your own card" });
+      }
+
+      const offer = await storage.createOffer(userId, displayCase.userId, {
+        cardId: numericCardId,
+        amount: numericAmount,
+        message: message || null,
+        isAnonymous: isAnonymous || false,
+      });
+
+      // Create notification for card owner
+      await storage.createNotification(displayCase.userId, "offer_received", {
+        offerId: offer.id,
+        cardId: numericCardId,
+        cardTitle: card.title,
+        amount: numericAmount,
+        isAnonymous: isAnonymous || false,
+      });
+
+      // Award offer badge
+      prestigeService.checkAndAwardOfferBadge(userId).catch(err => {
+        console.error("Error awarding offer badge:", err);
+      });
+
+      res.status(201).json(offer);
+    } catch (error) {
+      console.error("Error creating offer:", error);
+      res.status(500).json({ message: "Failed to create offer" });
+    }
+  });
+
   app.get("/api/offers/received", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
