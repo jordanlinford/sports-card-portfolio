@@ -87,7 +87,7 @@ export function ProposeTradeModal({ targetCard, targetUserId, open, onOpenChange
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
-        <DialogHeader>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <ArrowRightLeft className="h-5 w-5" />
             Propose a Trade
@@ -97,116 +97,120 @@ export function ProposeTradeModal({ targetCard, targetUserId, open, onOpenChange
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
-          <div className="p-3 border rounded-md bg-muted/50">
-            <p className="text-sm font-medium">You want:</p>
-            <div className="flex items-center gap-3 mt-2">
-              {targetCard.imagePath && (
-                <img 
-                  src={targetCard.imagePath} 
-                  alt={targetCard.title} 
-                  className="h-16 w-12 object-cover rounded"
-                />
-              )}
-              <div>
-                <p className="font-medium">{targetCard.title}</p>
-                {targetCard.estimatedValue && (
-                  <p className="text-sm text-muted-foreground">
-                    Est. value: ${Number(targetCard.estimatedValue).toFixed(2)}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <Label className="mb-2 block">Your cards to offer:</Label>
-            {isLoadingCases ? (
-              <div className="flex items-center justify-center h-32">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : myCards.length === 0 ? (
-              <div className="text-center p-4 text-muted-foreground border rounded-md">
-                You don't have any cards in your collection yet.
-              </div>
-            ) : (
-              <div className="border rounded-md p-2 max-h-40 overflow-y-auto">
-                <div className="grid grid-cols-2 gap-2">
-                  {myCards.map(card => (
-                    <div
-                      key={card.id}
-                      className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
-                        selectedCardIds.includes(card.id) 
-                          ? "border-primary bg-primary/10" 
-                          : "hover:bg-muted"
-                      }`}
-                      onClick={() => toggleCardSelection(card.id)}
-                      data-testid={`trade-card-${card.id}`}
-                    >
-                      <Checkbox 
-                        checked={selectedCardIds.includes(card.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        onCheckedChange={() => toggleCardSelection(card.id)}
-                      />
-                      {card.imagePath && (
-                        <img 
-                          src={card.imagePath} 
-                          alt={card.title} 
-                          className="h-12 w-9 object-cover rounded"
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{card.title}</p>
-                        {card.estimatedValue && (
-                          <p className="text-xs text-muted-foreground">
-                            ${Number(card.estimatedValue).toFixed(2)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-4">
+              <div className="p-3 border rounded-md bg-muted/50">
+                <p className="text-sm font-medium">You want:</p>
+                <div className="flex items-center gap-3 mt-2">
+                  {targetCard.imagePath && (
+                    <img 
+                      src={targetCard.imagePath} 
+                      alt={targetCard.title} 
+                      className="h-16 w-12 object-cover rounded"
+                    />
+                  )}
+                  <div>
+                    <p className="font-medium">{targetCard.title}</p>
+                    {targetCard.estimatedValue && (
+                      <p className="text-sm text-muted-foreground">
+                        Est. value: ${Number(targetCard.estimatedValue).toFixed(2)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-            )}
 
-            {selectedCardIds.length > 0 && (
-              <div className="text-sm text-muted-foreground mt-2">
-                {selectedCardIds.length} card{selectedCardIds.length !== 1 ? 's' : ''} selected
+              <div>
+                <Label className="mb-2 block">Your cards to offer:</Label>
+                {isLoadingCases ? (
+                  <div className="flex items-center justify-center h-32">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                  </div>
+                ) : myCards.length === 0 ? (
+                  <div className="text-center p-4 text-muted-foreground border rounded-md">
+                    You don't have any cards in your collection yet.
+                  </div>
+                ) : (
+                  <div className="border rounded-md p-2 max-h-48 overflow-y-auto">
+                    <div className="grid grid-cols-2 gap-2">
+                      {myCards.map(card => (
+                        <div
+                          key={card.id}
+                          className={`flex items-center gap-2 p-2 rounded-md border cursor-pointer transition-colors ${
+                            selectedCardIds.includes(card.id) 
+                              ? "border-primary bg-primary/10" 
+                              : "hover:bg-muted"
+                          }`}
+                          onClick={() => toggleCardSelection(card.id)}
+                          data-testid={`trade-card-${card.id}`}
+                        >
+                          <Checkbox 
+                            checked={selectedCardIds.includes(card.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            onCheckedChange={() => toggleCardSelection(card.id)}
+                          />
+                          {card.imagePath && (
+                            <img 
+                              src={card.imagePath} 
+                              alt={card.title} 
+                              className="h-12 w-9 object-cover rounded"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{card.title}</p>
+                            {card.estimatedValue && (
+                              <p className="text-xs text-muted-foreground">
+                                ${Number(card.estimatedValue).toFixed(2)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedCardIds.length > 0 && (
+                  <div className="text-sm text-muted-foreground mt-2">
+                    {selectedCardIds.length} card{selectedCardIds.length !== 1 ? 's' : ''} selected
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="cash-amount">Add cash (optional)</Label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="cash-amount"
-                type="number"
-                step="0.01"
-                min="0"
-                value={cashAmount}
-                onChange={(e) => setCashAmount(e.target.value)}
-                placeholder="0.00"
-                className="pl-9"
-                data-testid="input-trade-cash"
-              />
+              <div className="space-y-2">
+                <Label htmlFor="cash-amount">Add cash (optional)</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="cash-amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={cashAmount}
+                    onChange={(e) => setCashAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="pl-9"
+                    data-testid="input-trade-cash"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="trade-message">Message (optional)</Label>
+                <Textarea
+                  id="trade-message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Add a message to your trade offer..."
+                  rows={2}
+                  data-testid="input-trade-message"
+                />
+              </div>
             </div>
-          </div>
+          </ScrollArea>
 
-          <div className="space-y-2">
-            <Label htmlFor="trade-message">Message (optional)</Label>
-            <Textarea
-              id="trade-message"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Add a message to your trade offer..."
-              rows={2}
-              data-testid="input-trade-message"
-            />
-          </div>
-
-          <div className="flex gap-2 justify-end pt-2">
+          <div className="flex gap-2 justify-end pt-4 mt-4 border-t flex-shrink-0">
             <Button
               type="button"
               variant="outline"
