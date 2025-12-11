@@ -154,6 +154,10 @@ export default function AdminDashboard() {
   const updateSubscriptionMutation = useMutation({
     mutationFn: async ({ userId, subscriptionStatus }: { userId: string; subscriptionStatus: string }) => {
       const response = await apiRequest("PATCH", `/api/admin/users/${userId}/subscription`, { subscriptionStatus });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to update subscription");
+      }
       return response.json();
     },
     onSuccess: (_, variables) => {
@@ -164,10 +168,10 @@ export default function AdminDashboard() {
         description: `User subscription updated to ${variables.subscriptionStatus}`,
       });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: "Failed to update user subscription",
+        description: error.message || "Failed to update user subscription",
         variant: "destructive",
       });
     },
