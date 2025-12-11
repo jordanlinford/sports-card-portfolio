@@ -10,6 +10,7 @@ import { Search, Filter, ImageIcon, ArrowLeft, ExternalLink } from "lucide-react
 import { Link } from "wouter";
 import type { Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
+import { OutlookBadge } from "@/components/outlook-badge";
 
 type SearchResult = CardType & { displayCaseName: string; displayCaseId: number };
 
@@ -205,12 +206,17 @@ export default function SearchPage() {
                 className="group relative bg-card rounded-lg overflow-hidden border hover-elevate text-left cursor-pointer w-full"
                 data-testid={`card-search-result-${card.id}`}
               >
-                <div className="aspect-square">
+                <div className="aspect-square relative">
                   <img
                     src={card.imagePath}
                     alt={card.title}
                     className="w-full h-full object-cover"
                   />
+                  {card.outlookAction && (
+                    <div className="absolute top-1 left-1">
+                      <OutlookBadge action={card.outlookAction} size="sm" />
+                    </div>
+                  )}
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <div className="absolute bottom-0 left-0 right-0 p-3 text-white">

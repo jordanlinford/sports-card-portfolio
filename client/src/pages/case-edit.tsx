@@ -67,6 +67,7 @@ import {
 import type { DisplayCaseWithCards, Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { Badge } from "@/components/ui/badge";
+import { OutlookBadge } from "@/components/outlook-badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Crown, AlertTriangle } from "lucide-react";
 import { DISPLAY_CASE_THEMES } from "@/lib/themes";
@@ -126,12 +127,17 @@ function SortableCardTile({ card, onDelete, onClick }: { card: CardType; onDelet
       className="group relative bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing touch-none"
       data-testid={`card-tile-${card.id}`}
     >
-      <div className="aspect-square" onClick={onClick}>
+      <div className="aspect-square relative" onClick={onClick}>
         <img
           src={card.imagePath}
           alt={card.title}
           className="w-full h-full object-cover pointer-events-none"
         />
+        {card.outlookAction && (
+          <div className="absolute top-1 left-1 pointer-events-none">
+            <OutlookBadge action={card.outlookAction} size="sm" />
+          </div>
+        )}
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         <div className="absolute bottom-0 left-0 right-0 p-3">

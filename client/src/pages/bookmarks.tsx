@@ -7,6 +7,7 @@ import { Loader2, Bookmark, Trash2, ExternalLink, DollarSign } from "lucide-reac
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { BookmarkWithCard } from "@shared/schema";
+import { OutlookBadge } from "@/components/outlook-badge";
 import { formatDistanceToNow } from "date-fns";
 
 export default function BookmarksPage() {
@@ -86,6 +87,11 @@ export default function BookmarksPage() {
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">
                     No Image
+                  </div>
+                )}
+                {bookmark.card.outlookAction && (
+                  <div className="absolute top-2 left-2">
+                    <OutlookBadge action={bookmark.card.outlookAction} size="sm" />
                   </div>
                 )}
                 {bookmark.card.openToOffers && (

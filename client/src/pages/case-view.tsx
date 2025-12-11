@@ -42,6 +42,7 @@ import { PrestigeDisplay } from "@/components/prestige-display";
 import { FollowButton } from "@/components/follow-button";
 import { FollowStats } from "@/components/follow-stats";
 import { MessageButton } from "@/components/message-button";
+import { OutlookBadge } from "@/components/outlook-badge";
 
 function ValueChangeIndicator({ card }: { card: Card }) {
   if (!card.estimatedValue || !card.previousValue || card.previousValue <= 0) return null;
@@ -164,6 +165,11 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
             />
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none" />
+          {card.outlookAction && !compact && (
+            <div className="absolute top-1 left-1">
+              <OutlookBadge action={card.outlookAction} size="sm" />
+            </div>
+          )}
         </div>
         
         <div className={`mt-2 px-1 ${compact ? 'hidden sm:block' : ''}`}>
