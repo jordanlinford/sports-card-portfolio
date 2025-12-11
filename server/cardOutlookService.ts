@@ -107,6 +107,189 @@ const POSITION_SCORES: Record<string, Record<string, number>> = {
   },
 };
 
+// Player lifecycle profiles define realistic score ranges for each career stage
+// These reflect the INVESTMENT reality, not the player's quality
+interface LifecycleProfile {
+  upsideRange: { min: number; max: number };  // Lower for established, higher for prospects
+  riskRange: { min: number; max: number };     // Lower for proven, higher for unknowns
+  confidenceFloor: number;                      // Minimum confidence for well-known players
+  stabilityBonus: number;                       // Reduces risk for stable markets
+}
+
+const LIFECYCLE_PROFILES: Record<LegacyTier, LifecycleProfile> = {
+  // Rookies and prospects: HIGH upside potential, HIGH risk, LOW confidence
+  PROSPECT: {
+    upsideRange: { min: 50, max: 95 },
+    riskRange: { min: 55, max: 90 },
+    confidenceFloor: 25,
+    stabilityBonus: 0,
+  },
+  // Rising stars (3-5 years): Still HIGH upside, MODERATE risk
+  RISING_STAR: {
+    upsideRange: { min: 45, max: 85 },
+    riskRange: { min: 40, max: 75 },
+    confidenceFloor: 40,
+    stabilityBonus: 0.1,
+  },
+  // Established stars: MODERATE upside, MODERATE risk
+  STAR: {
+    upsideRange: { min: 30, max: 65 },
+    riskRange: { min: 30, max: 55 },
+    confidenceFloor: 55,
+    stabilityBonus: 0.2,
+  },
+  // Superstars (MVP-caliber active): MODERATE upside (priced in), LOW-MODERATE risk
+  SUPERSTAR: {
+    upsideRange: { min: 25, max: 55 },
+    riskRange: { min: 20, max: 45 },
+    confidenceFloor: 65,
+    stabilityBonus: 0.25,
+  },
+  // Aging veterans: LOW upside (declining), MODERATE-HIGH risk (injury/retirement)
+  AGING_VET: {
+    upsideRange: { min: 15, max: 40 },
+    riskRange: { min: 35, max: 65 },
+    confidenceFloor: 50,
+    stabilityBonus: 0.1,
+  },
+  // Retired (not HOF): VERY LOW upside (stable), LOW risk, HIGH confidence
+  RETIRED: {
+    upsideRange: { min: 5, max: 25 },
+    riskRange: { min: 15, max: 35 },
+    confidenceFloor: 70,
+    stabilityBonus: 0.4,
+  },
+  // Hall of Fame: VERY LOW upside (fully priced in), VERY LOW risk, VERY HIGH confidence
+  HOF: {
+    upsideRange: { min: 3, max: 20 },
+    riskRange: { min: 8, max: 25 },
+    confidenceFloor: 80,
+    stabilityBonus: 0.5,
+  },
+  // Deceased legends: MINIMAL upside, MINIMAL risk, HIGHEST confidence
+  LEGEND_DECEASED: {
+    upsideRange: { min: 2, max: 15 },
+    riskRange: { min: 5, max: 20 },
+    confidenceFloor: 85,
+    stabilityBonus: 0.6,
+  },
+};
+
+// Sport-specific modifiers affect how career stages impact scores
+interface SportConfig {
+  positionVolatility: Record<string, number>;  // How volatile is this position's market?
+  careerLongevity: number;                      // How long do careers typically last?
+  rookieHypeMultiplier: number;                 // How much does the hobby hype rookies?
+  retiredStabilityBonus: number;                // Extra stability for retired players
+}
+
+const SPORT_CONFIGS: Record<string, SportConfig> = {
+  football: {
+    positionVolatility: { QB: 0.7, WR: 0.85, RB: 1.0, TE: 0.8, DEF: 0.6, K: 0.5 },
+    careerLongevity: 0.7,  // Shorter careers = more risk
+    rookieHypeMultiplier: 1.3,
+    retiredStabilityBonus: 0.15,
+  },
+  basketball: {
+    positionVolatility: { PG: 0.75, SG: 0.8, SF: 0.8, PF: 0.75, C: 0.7 },
+    careerLongevity: 0.85,
+    rookieHypeMultiplier: 1.4,
+    retiredStabilityBonus: 0.1,
+  },
+  baseball: {
+    positionVolatility: { OF: 0.7, SS: 0.75, "1B": 0.65, "2B": 0.7, "3B": 0.7, C: 0.65, P: 0.85, DH: 0.6 },
+    careerLongevity: 1.0,  // Longer careers = more stability
+    rookieHypeMultiplier: 1.2,
+    retiredStabilityBonus: 0.2,
+  },
+  hockey: {
+    positionVolatility: { C: 0.75, RW: 0.8, LW: 0.8, D: 0.7, G: 0.65 },
+    careerLongevity: 0.9,
+    rookieHypeMultiplier: 1.1,
+    retiredStabilityBonus: 0.15,
+  },
+  soccer: {
+    positionVolatility: { FW: 0.85, MF: 0.75, DF: 0.65, GK: 0.6 },
+    careerLongevity: 0.8,
+    rookieHypeMultiplier: 1.2,
+    retiredStabilityBonus: 0.1,
+  },
+  tcg: {
+    positionVolatility: { chase: 1.0, ultra_rare: 0.9, rare: 0.7, uncommon: 0.5, common: 0.3 },
+    careerLongevity: 1.0,
+    rookieHypeMultiplier: 1.5,
+    retiredStabilityBonus: 0.3,
+  },
+};
+
+// Accolades detection patterns
+interface DetectedAccolades {
+  hasMVP: boolean;
+  hasChampionship: boolean;
+  hasAllStar: boolean;
+  hasROY: boolean;
+  accoladeCount: number;
+}
+
+function detectAccolades(title: string, playerName: string | null): DetectedAccolades {
+  const combined = `${title} ${playerName || ""}`.toLowerCase();
+  
+  const mvpPatterns = ["mvp", "most valuable"];
+  const championshipPatterns = ["super bowl", "world series", "nba champion", "stanley cup", "champion"];
+  const allStarPatterns = ["all-star", "all star", "pro bowl", "all-pro"];
+  const royPatterns = ["roy", "rookie of the year"];
+  
+  const hasMVP = mvpPatterns.some(p => combined.includes(p));
+  const hasChampionship = championshipPatterns.some(p => combined.includes(p));
+  const hasAllStar = allStarPatterns.some(p => combined.includes(p));
+  const hasROY = royPatterns.some(p => combined.includes(p));
+  
+  return {
+    hasMVP,
+    hasChampionship,
+    hasAllStar,
+    hasROY,
+    accoladeCount: [hasMVP, hasChampionship, hasAllStar, hasROY].filter(Boolean).length,
+  };
+}
+
+// Market stability assessment
+function assessMarketStability(card: Card): number {
+  let stability = 0.5;  // Base stability
+  
+  // Card age contributes to stability (older = more stable market)
+  if (card.year) {
+    const cardAge = new Date().getFullYear() - card.year;
+    if (cardAge >= 20) stability += 0.3;
+    else if (cardAge >= 10) stability += 0.2;
+    else if (cardAge >= 5) stability += 0.1;
+    else if (cardAge <= 2) stability -= 0.1;  // New cards are volatile
+  }
+  
+  // Graded cards are more stable
+  if (card.grade) {
+    const gradeUpper = card.grade.toUpperCase();
+    if (gradeUpper.includes("10") || gradeUpper.includes("9.5")) stability += 0.15;
+    else if (gradeUpper.includes("9")) stability += 0.1;
+    else stability += 0.05;
+  }
+  
+  // Low price volatility = stable
+  if (card.priceStdDevPct !== null) {
+    if (card.priceStdDevPct <= 10) stability += 0.2;
+    else if (card.priceStdDevPct <= 25) stability += 0.1;
+    else if (card.priceStdDevPct >= 50) stability -= 0.15;
+  }
+  
+  // Good liquidity = stable
+  if (card.salesLast30Days !== null) {
+    if (card.salesLast30Days >= 10) stability += 0.1;
+    else if (card.salesLast30Days === 0) stability -= 0.1;
+  }
+  
+  return clamp(stability, 0, 1);
+}
+
 const LEGACY_SCORES: Record<LegacyTier, number> = {
   PROSPECT: 0.7,
   RISING_STAR: 0.9,
@@ -217,6 +400,152 @@ function normalizePositionScore(positionScore: number): number {
   return (positionScore - minScore) / (maxScore - minScore);
 }
 
+// NEW: Lifecycle-aware upside calculation
+function calculateLifecycleAwareUpside(
+  card: Card,
+  cardTypeScore: number,
+  positionScore: number,
+  hypeScore: number,
+  marketStability: number,
+  sportConfig: SportConfig | null
+): number {
+  const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
+  const profile = LIFECYCLE_PROFILES[legacyTier];
+  
+  // Start with the base range for this lifecycle stage
+  const { min: minUpside, max: maxUpside } = profile.upsideRange;
+  const rangeSize = maxUpside - minUpside;
+  
+  // Calculate modifiers that push us within the range
+  let modifier = 0;
+  
+  // Card type contribution (rookies, autos, numbered boost upside for prospects/rising stars)
+  if (legacyTier === "PROSPECT" || legacyTier === "RISING_STAR") {
+    modifier += cardTypeScore * 0.4;  // Premium cards have more upside for young players
+  } else if (legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED" || legacyTier === "RETIRED") {
+    // For established legends, card type matters less for "upside" 
+    // (the player is known, value is established)
+    modifier += cardTypeScore * 0.15;
+  } else {
+    modifier += cardTypeScore * 0.25;
+  }
+  
+  // Position contribution (QBs, stars at premium positions)
+  const posNorm = normalizePositionScore(positionScore);
+  modifier += posNorm * 0.2;
+  
+  // Hype contribution (recent price trends)
+  if (hypeScore > 0) {
+    modifier += hypeScore * 0.25;  // Positive momentum increases upside
+  } else {
+    modifier += hypeScore * 0.1;  // Negative momentum slightly decreases
+  }
+  
+  // Sport-specific rookie hype multiplier
+  if (sportConfig && (legacyTier === "PROSPECT" || legacyTier === "RISING_STAR")) {
+    modifier *= sportConfig.rookieHypeMultiplier;
+  }
+  
+  // Apply modifier to range
+  const upsideWithinRange = minUpside + (modifier * rangeSize);
+  
+  return clamp(Math.round(upsideWithinRange), minUpside, maxUpside);
+}
+
+// NEW: Lifecycle-aware risk calculation
+function calculateLifecycleAwareRisk(
+  card: Card,
+  volatilityScore: number,
+  liquidityScore: number,
+  hypeScore: number,
+  marketStability: number,
+  sportConfig: SportConfig | null
+): number {
+  const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
+  const profile = LIFECYCLE_PROFILES[legacyTier];
+  
+  // Start with the base range for this lifecycle stage
+  const { min: minRisk, max: maxRisk } = profile.riskRange;
+  const rangeSize = maxRisk - minRisk;
+  
+  // Calculate modifiers that push us within the range
+  let modifier = 0;
+  
+  // Volatility is a major risk factor
+  modifier += volatilityScore * 0.35;
+  
+  // Low liquidity increases risk
+  modifier += (1 - liquidityScore) * 0.25;
+  
+  // Negative hype (declining prices) increases risk
+  if (hypeScore < 0) {
+    modifier += Math.abs(hypeScore) * 0.2;
+  }
+  
+  // Market stability reduces risk
+  modifier -= marketStability * profile.stabilityBonus;
+  
+  // Sport-specific career longevity affects risk for active players
+  if (sportConfig && (legacyTier === "PROSPECT" || legacyTier === "RISING_STAR" || legacyTier === "STAR")) {
+    // Shorter career sports (football) = higher risk for active players
+    modifier += (1 - sportConfig.careerLongevity) * 0.15;
+  }
+  
+  // Sport-specific stability bonus for retired players
+  if (sportConfig && (legacyTier === "RETIRED" || legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED")) {
+    modifier -= sportConfig.retiredStabilityBonus;
+  }
+  
+  // Apply modifier to range
+  const riskWithinRange = minRisk + (modifier * rangeSize);
+  
+  return clamp(Math.round(riskWithinRange), minRisk, maxRisk);
+}
+
+// NEW: Lifecycle-aware confidence calculation
+function calculateLifecycleAwareConfidence(
+  card: Card,
+  salesLast30Days: number | null,
+  marketStability: number,
+  accolades: DetectedAccolades
+): number {
+  const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
+  const profile = LIFECYCLE_PROFILES[legacyTier];
+  
+  // Start with the confidence floor for this lifecycle stage
+  let confidence = profile.confidenceFloor;
+  
+  // Data completeness adds confidence
+  let knownFields = 0;
+  const totalFields = 8;
+  if (card.sport) knownFields++;
+  if (card.position) knownFields++;
+  if (card.legacyTier) knownFields++;
+  if (card.grade) knownFields++;
+  if (card.estimatedValue) knownFields++;
+  if (card.avgSalePrice30) knownFields++;
+  if (card.avgSalePrice90) knownFields++;
+  if (card.playerName) knownFields++;
+  
+  const dataCompleteness = knownFields / totalFields;
+  confidence += dataCompleteness * 10;
+  
+  // Sales depth adds confidence
+  if (salesLast30Days !== null) {
+    if (salesLast30Days >= 10) confidence += 10;
+    else if (salesLast30Days >= 5) confidence += 6;
+    else if (salesLast30Days >= 1) confidence += 3;
+  }
+  
+  // Market stability adds confidence
+  confidence += marketStability * 8;
+  
+  // Known accolades increase confidence (we know more about the player)
+  confidence += accolades.accoladeCount * 2;
+  
+  return clamp(Math.round(confidence), profile.confidenceFloor, 98);
+}
+
 function calculateUpsideScore(
   cardTypeScore: number,
   positionScore: number,
@@ -296,11 +625,24 @@ function calculateConfidenceScore(
 }
 
 function determineAction(upsideScore: number, riskScore: number): OutlookAction {
-  if (upsideScore >= 70 && riskScore <= 60) {
+  // NEW: Adjusted thresholds for lifecycle-aware scoring
+  // BUY: High upside (60+) relative to risk, OR very favorable risk/reward ratio
+  if (upsideScore >= 60 && riskScore <= 50) {
     return "BUY";
-  } else if (upsideScore <= 40 && riskScore >= 60) {
+  }
+  // Also BUY if upside significantly exceeds risk
+  if (upsideScore > riskScore + 20 && upsideScore >= 50) {
+    return "BUY";
+  }
+  // SELL: Low upside with high risk (bad risk/reward)
+  if (upsideScore <= 30 && riskScore >= 50) {
     return "SELL";
   }
+  // Also SELL if risk significantly exceeds upside
+  if (riskScore > upsideScore + 25 && riskScore >= 45) {
+    return "SELL";
+  }
+  // WATCH: Everything else - stable holds, uncertain situations, etc.
   return "WATCH";
 }
 
@@ -421,6 +763,203 @@ function generateFallbackLong(
   
   if (factors.liquidityScore < 0.5) {
     parts.push(`Low trading volume makes pricing less reliable and sales may take longer.`);
+  }
+  
+  parts.push(`Overall view: ${action} for the next 12 months.`);
+  
+  return parts.join(" ");
+}
+
+// NEW: Enhanced editorial explanation with investment rationale
+async function generateEditorialExplanation(
+  card: Card,
+  factors: CardOutlookResult["factors"],
+  upsideScore: number,
+  riskScore: number,
+  confidenceScore: number,
+  action: OutlookAction,
+  timeHorizonMonths: number,
+  marketStability: number,
+  accolades: DetectedAccolades,
+  sportConfig: SportConfig | null
+): Promise<{ short: string; long: string }> {
+  const openai = getOpenAI();
+  const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
+  
+  // Build context for narrative
+  const lifecycleContext = getLifecycleNarrative(legacyTier, card);
+  const cardContext = getCardNarrative(card);
+  const stabilityContext = getStabilityNarrative(marketStability, legacyTier);
+  
+  if (!openai) {
+    return {
+      short: generateEditorialFallbackShort(action, upsideScore, riskScore, legacyTier, card),
+      long: generateEditorialFallbackLong(card, action, upsideScore, riskScore, confidenceScore, legacyTier, lifecycleContext, cardContext, stabilityContext),
+    };
+  }
+  
+  try {
+    const trendPct = card.avgSalePrice30 && card.avgSalePrice90 && card.avgSalePrice90 > 0
+      ? ((card.avgSalePrice30 - card.avgSalePrice90) / card.avgSalePrice90 * 100).toFixed(1)
+      : "unknown";
+    
+    const prompt = `You are an expert sports card investment analyst writing for collectors. Your analysis should be insightful, editorial, and explain the "why" behind each score like a knowledgeable hobbyist would.
+
+CRITICAL CONTEXT:
+- Upside score reflects GROWTH POTENTIAL, not player quality. Hall of Famers and retired legends have LOW upside because their value is already established. Rookies and rising stars have HIGH upside because they have room to grow.
+- Risk score reflects INVESTMENT RISK. Established players (HOF, retired) have LOW risk because markets are stable. Prospects have HIGH risk due to uncertainty.
+- Confidence reflects how certain we are about the prediction.
+
+Player & Card:
+- Name: ${card.playerName || card.title}
+- Sport: ${card.sport || "unknown"}, Position: ${card.position || "unknown"}
+- Career Stage: ${legacyTier} (${lifecycleContext})
+- Card: ${cardContext}
+- Year: ${card.year || "unknown"}, Grade: ${card.grade || "raw"}
+
+Investment Scores:
+- Upside: ${upsideScore}/100 (${upsideScore < 25 ? "Low - value already established" : upsideScore < 50 ? "Moderate" : "High - room for growth"})
+- Risk: ${riskScore}/100 (${riskScore < 25 ? "Very Low - stable market" : riskScore < 45 ? "Low-Moderate" : "Higher uncertainty"})
+- Confidence: ${confidenceScore}/100
+
+Market Context:
+- Price trend (30d vs 90d): ${trendPct}%
+- Market stability: ${marketStability > 0.7 ? "Very stable, established market" : marketStability > 0.5 ? "Moderately stable" : "More volatile, newer to market"}
+${accolades.accoladeCount > 0 ? `- Known accolades: ${accolades.hasMVP ? "MVP" : ""} ${accolades.hasChampionship ? "Champion" : ""} ${accolades.hasAllStar ? "All-Star" : ""}`.trim() : ""}
+
+Write an investment memo-style analysis:
+1. SHORT: (1-2 sentences) Quick verdict with the key insight. Example: "This is a Hall of Fame lock whose value is already priced in - minimal upside but also minimal risk. A safe hold."
+2. LONG: (3-5 sentences) Explain the rationale. Be specific about WHY the scores are what they are. Mention career stage, market dynamics, and what collectors should consider. End with "Overall view: ${action} for the next ${timeHorizonMonths} months."
+
+Format response as:
+SHORT: [your short summary]
+LONG: [your detailed analysis]`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const content = response.choices[0]?.message?.content || "";
+    
+    const shortMatch = content.match(/SHORT:\s*([\s\S]+?)(?=LONG:|$)/);
+    const longMatch = content.match(/LONG:\s*([\s\S]+)/);
+    
+    return {
+      short: shortMatch?.[1]?.trim() || generateEditorialFallbackShort(action, upsideScore, riskScore, legacyTier, card),
+      long: longMatch?.[1]?.trim() || generateEditorialFallbackLong(card, action, upsideScore, riskScore, confidenceScore, legacyTier, lifecycleContext, cardContext, stabilityContext),
+    };
+  } catch (error) {
+    console.error("Error generating editorial explanation:", error);
+    return {
+      short: generateEditorialFallbackShort(action, upsideScore, riskScore, legacyTier, card),
+      long: generateEditorialFallbackLong(card, action, upsideScore, riskScore, confidenceScore, legacyTier, lifecycleContext, cardContext, stabilityContext),
+    };
+  }
+}
+
+function getLifecycleNarrative(legacyTier: LegacyTier, card: Card): string {
+  const narratives: Record<LegacyTier, string> = {
+    PROSPECT: "Early career, unknown ceiling, high volatility",
+    RISING_STAR: "Showing promise, building reputation, prices still have room to grow",
+    STAR: "Established player, proven track record, moderate growth potential",
+    SUPERSTAR: "Elite active player, premium pricing already reflects status",
+    AGING_VET: "Past prime but still active, uncertain trajectory ahead",
+    RETIRED: "No longer playing, market has stabilized, value is established",
+    HOF: "Hall of Fame inductee, fully priced-in legacy, minimal upside but very safe",
+    LEGEND_DECEASED: "Historical legend, stable market, collector's piece with predictable value",
+  };
+  return narratives[legacyTier];
+}
+
+function getCardNarrative(card: Card): string {
+  const parts: string[] = [];
+  if (card.isRookie) parts.push("Rookie");
+  if (card.hasAuto) parts.push("Autograph");
+  if (card.isNumbered && card.serialNumber) parts.push(`/${card.serialNumber}`);
+  if (card.grade) parts.push(card.grade);
+  if (parts.length === 0) return "Base card";
+  return parts.join(", ");
+}
+
+function getStabilityNarrative(marketStability: number, legacyTier: LegacyTier): string {
+  if (marketStability >= 0.8) return "Very established market with predictable pricing";
+  if (marketStability >= 0.6) return "Stable market conditions";
+  if (marketStability >= 0.4) return "Moderate market volatility";
+  return "Newer to market with less price history";
+}
+
+function generateEditorialFallbackShort(
+  action: OutlookAction,
+  upsideScore: number,
+  riskScore: number,
+  legacyTier: LegacyTier,
+  card: Card
+): string {
+  const playerName = card.playerName || card.title;
+  
+  if (legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED") {
+    return `${playerName}'s legacy is secure - this is a stable hold with minimal upside (${upsideScore}) but very low risk (${riskScore}). A safe collector's piece.`;
+  }
+  if (legacyTier === "RETIRED") {
+    return `${playerName} is retired and their market has stabilized. Low upside (${upsideScore}) but also low risk (${riskScore}) - prices unlikely to move dramatically.`;
+  }
+  if (legacyTier === "PROSPECT" || legacyTier === "RISING_STAR") {
+    return `${playerName} has significant room for growth (upside ${upsideScore}) but with the typical uncertainty of an emerging player (risk ${riskScore}).`;
+  }
+  if (legacyTier === "AGING_VET") {
+    return `${playerName} is past their prime - limited upside (${upsideScore}) with elevated risk (${riskScore}) as retirement approaches.`;
+  }
+  
+  return `${playerName} shows moderate potential with upside of ${upsideScore} and risk of ${riskScore}. Monitor market conditions.`;
+}
+
+function generateEditorialFallbackLong(
+  card: Card,
+  action: OutlookAction,
+  upsideScore: number,
+  riskScore: number,
+  confidenceScore: number,
+  legacyTier: LegacyTier,
+  lifecycleContext: string,
+  cardContext: string,
+  stabilityContext: string
+): string {
+  const playerName = card.playerName || card.title;
+  const parts: string[] = [];
+  
+  // Opening with career stage context
+  if (legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED") {
+    parts.push(`${playerName} is a ${legacyTier === "HOF" ? "Hall of Famer" : "deceased legend"} whose place in history is secure.`);
+    parts.push(`Their card values are fully established with years of market data supporting stable pricing.`);
+    parts.push(`This means minimal upside - the market already reflects their legacy - but also minimal risk for the same reason.`);
+  } else if (legacyTier === "RETIRED") {
+    parts.push(`${playerName} has retired, which means their on-field story is complete.`);
+    parts.push(`The market has had time to settle on their value, making this a stable but low-growth investment.`);
+  } else if (legacyTier === "PROSPECT" || legacyTier === "RISING_STAR") {
+    parts.push(`${playerName} is ${legacyTier === "PROSPECT" ? "early in their career" : "an emerging talent"} with ${lifecycleContext}.`);
+    parts.push(`This creates significant upside potential if they develop into a star, but also substantial risk if they don't pan out.`);
+    if (card.isRookie) {
+      parts.push(`The rookie designation adds both collector appeal and price volatility.`);
+    }
+  } else if (legacyTier === "SUPERSTAR") {
+    parts.push(`${playerName} is an elite active player whose status is already reflected in premium pricing.`);
+    parts.push(`While they're among the best in their sport, much of that value is already priced in, limiting upside.`);
+  } else if (legacyTier === "AGING_VET") {
+    parts.push(`${playerName} is past their prime but still active, creating uncertainty about their trajectory.`);
+    parts.push(`Cards of aging veterans often face downward pressure as collectors pivot to newer stars.`);
+  } else {
+    parts.push(`${playerName} is an established player in their sport.`);
+    parts.push(`Their market shows ${stabilityContext.toLowerCase()}.`);
+  }
+  
+  // Confidence context
+  if (confidenceScore >= 80) {
+    parts.push(`We have high confidence (${confidenceScore}/100) in this assessment based on substantial market data.`);
+  } else if (confidenceScore <= 50) {
+    parts.push(`Our confidence is moderate (${confidenceScore}/100) due to limited market data.`);
   }
   
   parts.push(`Overall view: ${action} for the next 12 months.`);
@@ -648,6 +1187,7 @@ export async function generateCardOutlook(
   card: Card,
   timeHorizonMonths: number = 12
 ): Promise<CardOutlookResult> {
+  // Calculate base scores
   const cardTypeScore = calculateCardTypeScore(card);
   const positionScore = calculatePositionScore(card.sport, card.position);
   const legacyScore = calculateLegacyScore(card.legacyTier);
@@ -655,22 +1195,37 @@ export async function generateCardOutlook(
   const volatilityScore = calculateVolatilityScore(card.priceStdDevPct);
   const hypeScore = calculateHypeScore(card.avgSalePrice30, card.avgSalePrice90);
   
-  const upsideScore = calculateUpsideScore(
+  // NEW: Get lifecycle-aware context
+  const marketStability = assessMarketStability(card);
+  const accolades = detectAccolades(card.title, card.playerName);
+  const sportConfig = card.sport ? SPORT_CONFIGS[card.sport.toLowerCase()] || null : null;
+  
+  // NEW: Use lifecycle-aware scoring that respects career stage ranges
+  const upsideScore = calculateLifecycleAwareUpside(
+    card,
     cardTypeScore,
     positionScore,
-    legacyScore,
-    volatilityScore,
-    hypeScore
+    hypeScore,
+    marketStability,
+    sportConfig
   );
   
-  const riskScore = calculateRiskScore(
+  const riskScore = calculateLifecycleAwareRisk(
+    card,
     volatilityScore,
-    card.legacyTier,
     liquidityScore,
-    hypeScore
+    hypeScore,
+    marketStability,
+    sportConfig
   );
   
-  const confidenceScore = calculateConfidenceScore(card, card.salesLast30Days);
+  const confidenceScore = calculateLifecycleAwareConfidence(
+    card,
+    card.salesLast30Days,
+    marketStability,
+    accolades
+  );
+  
   const action = determineAction(upsideScore, riskScore);
   const projectedOutlook = calculateProjectedOutlook(upsideScore, riskScore, hypeScore);
   
@@ -683,14 +1238,18 @@ export async function generateCardOutlook(
     hypeScore: Math.round(hypeScore * 100) / 100,
   };
   
-  const explanation = await generateExplanation(
+  // NEW: Pass additional context to explanation generator
+  const explanation = await generateEditorialExplanation(
     card,
     factors,
     upsideScore,
     riskScore,
     confidenceScore,
     action,
-    timeHorizonMonths
+    timeHorizonMonths,
+    marketStability,
+    accolades,
+    sportConfig
   );
   
   return {
@@ -715,29 +1274,44 @@ export function generateQuickOutlook(card: Card): {
   riskScore: number;
   confidenceScore: number;
 } {
+  // Calculate base scores
   const cardTypeScore = calculateCardTypeScore(card);
   const positionScore = calculatePositionScore(card.sport, card.position);
-  const legacyScore = calculateLegacyScore(card.legacyTier);
   const liquidityScore = calculateLiquidityScore(card.salesLast30Days);
   const volatilityScore = calculateVolatilityScore(card.priceStdDevPct);
   const hypeScore = calculateHypeScore(card.avgSalePrice30, card.avgSalePrice90);
   
-  const upsideScore = calculateUpsideScore(
+  // NEW: Get lifecycle-aware context
+  const marketStability = assessMarketStability(card);
+  const accolades = detectAccolades(card.title, card.playerName);
+  const sportConfig = card.sport ? SPORT_CONFIGS[card.sport.toLowerCase()] || null : null;
+  
+  // NEW: Use lifecycle-aware scoring
+  const upsideScore = calculateLifecycleAwareUpside(
+    card,
     cardTypeScore,
     positionScore,
-    legacyScore,
-    volatilityScore,
-    hypeScore
+    hypeScore,
+    marketStability,
+    sportConfig
   );
   
-  const riskScore = calculateRiskScore(
+  const riskScore = calculateLifecycleAwareRisk(
+    card,
     volatilityScore,
-    card.legacyTier,
     liquidityScore,
-    hypeScore
+    hypeScore,
+    marketStability,
+    sportConfig
   );
   
-  const confidenceScore = calculateConfidenceScore(card, card.salesLast30Days);
+  const confidenceScore = calculateLifecycleAwareConfidence(
+    card,
+    card.salesLast30Days,
+    marketStability,
+    accolades
+  );
+  
   const action = determineAction(upsideScore, riskScore);
   
   return { action, upsideScore, riskScore, confidenceScore };
