@@ -29,6 +29,36 @@ export type InjuryRisk = "LOW" | "MED" | "HIGH";
 export type TeamMarketSize = "SMALL" | "MEDIUM" | "LARGE";
 export type InsertTier = "base" | "silver" | "refractor" | "case-hit";
 
+// Card category types
+export type CardCategory = "sports" | "tcg" | "non_sport";
+
+// TCG Character Tiers - affects upside ceiling
+export type CharacterTier = 
+  | "S_TIER_ICON"      // Charizard, Pikachu, Black Lotus
+  | "A_TIER_FAVORITE"  // Popular fan favorites
+  | "B_TIER_POPULAR"   // Well-known characters
+  | "C_TIER_NICHE"     // Niche or background characters
+  | "D_TIER_COMMON";   // Generic/forgettable
+
+// TCG Rarity Tiers - affects value floor and upside
+export type RarityTier =
+  | "SECRET_RARE"      // Gold stars, alt arts, chase variants
+  | "ULTRA_RARE"       // Full art, VMAX, EX, GX
+  | "RARE_HOLO"        // Standard holos
+  | "RARE"             // Non-holo rares
+  | "UNCOMMON"
+  | "COMMON";
+
+// Era Prestige - vintage vs modern
+export type EraPrestige =
+  | "VINTAGE_WOTC"     // 1999-2003 WotC era
+  | "EARLY_MODERN"     // 2004-2015
+  | "MODERN"           // 2016-present
+  | "SPECIAL_SET";     // Celebrations, Hidden Fates, etc.
+
+// Franchise Heat - is the IP currently popular?
+export type FranchiseHeat = "HOT" | "STABLE" | "COOLING";
+
 export interface CardOutlookResult {
   cardId: number;
   playerName: string | null;
@@ -290,6 +320,215 @@ const SEASONAL_CONFIGS: Record<string, SeasonalConfig> = {
     offseasonPenalty: 0.95,
   },
 };
+
+// ============================================
+// TCG / NON-SPORT SCORING ENGINE
+// ============================================
+
+// Character tier scoring - determines upside ceiling (like legacy tier for sports)
+const CHARACTER_TIER_SCORES: Record<CharacterTier, { upsideBase: number; riskModifier: number; confidenceFloor: number }> = {
+  S_TIER_ICON: { upsideBase: 0.85, riskModifier: 0.7, confidenceFloor: 75 },      // Charizard, Pikachu
+  A_TIER_FAVORITE: { upsideBase: 0.70, riskModifier: 0.8, confidenceFloor: 60 },  // Popular fan favorites
+  B_TIER_POPULAR: { upsideBase: 0.50, riskModifier: 0.9, confidenceFloor: 50 },   // Well-known characters
+  C_TIER_NICHE: { upsideBase: 0.25, riskModifier: 1.0, confidenceFloor: 40 },     // Niche characters
+  D_TIER_COMMON: { upsideBase: 0.10, riskModifier: 1.1, confidenceFloor: 30 },    // Generic/forgettable
+};
+
+// Rarity tier scoring - affects both value floor and upside potential
+const RARITY_TIER_SCORES: Record<RarityTier, { upsideMultiplier: number; riskReduction: number; valueFloor: number }> = {
+  SECRET_RARE: { upsideMultiplier: 1.4, riskReduction: 0.15, valueFloor: 0.9 },   // Gold stars, alt arts
+  ULTRA_RARE: { upsideMultiplier: 1.25, riskReduction: 0.10, valueFloor: 0.8 },   // Full art, VMAX
+  RARE_HOLO: { upsideMultiplier: 1.1, riskReduction: 0.05, valueFloor: 0.6 },     // Standard holos
+  RARE: { upsideMultiplier: 1.0, riskReduction: 0, valueFloor: 0.4 },             // Non-holo rares
+  UNCOMMON: { upsideMultiplier: 0.7, riskReduction: -0.05, valueFloor: 0.2 },     // Low interest
+  COMMON: { upsideMultiplier: 0.4, riskReduction: -0.10, valueFloor: 0.1 },       // Near-zero upside
+};
+
+// Era prestige - vintage vs modern affects collectibility
+const ERA_PRESTIGE_SCORES: Record<EraPrestige, { upsideBonus: number; stabilityBonus: number }> = {
+  VINTAGE_WOTC: { upsideBonus: 0.25, stabilityBonus: 0.3 },      // 1999-2003 WotC era (most valuable)
+  EARLY_MODERN: { upsideBonus: 0.10, stabilityBonus: 0.15 },     // 2004-2015
+  MODERN: { upsideBonus: 0, stabilityBonus: 0 },                  // 2016-present (baseline)
+  SPECIAL_SET: { upsideBonus: 0.15, stabilityBonus: 0.1 },        // Celebrations, Hidden Fates
+};
+
+// Franchise heat - current IP popularity
+const FRANCHISE_HEAT_SCORES: Record<FranchiseHeat, { upsideModifier: number; riskModifier: number }> = {
+  HOT: { upsideModifier: 1.2, riskModifier: 1.1 },      // New games/movies = high demand, some volatility
+  STABLE: { upsideModifier: 1.0, riskModifier: 1.0 },   // Consistent interest
+  COOLING: { upsideModifier: 0.8, riskModifier: 1.15 }, // Declining interest = lower upside, higher risk
+};
+
+// Calculate TCG-specific upside score
+function calculateTCGUpside(card: Card): number {
+  const charTier = (card.characterTier as CharacterTier) || "C_TIER_NICHE";
+  const rarityTier = (card.rarityTier as RarityTier) || "RARE";
+  const era = (card.eraPrestige as EraPrestige) || "MODERN";
+  const heat = (card.franchiseHeat as FranchiseHeat) || "STABLE";
+  
+  const charScore = CHARACTER_TIER_SCORES[charTier] || CHARACTER_TIER_SCORES.C_TIER_NICHE;
+  const rarityScore = RARITY_TIER_SCORES[rarityTier] || RARITY_TIER_SCORES.RARE;
+  const eraScore = ERA_PRESTIGE_SCORES[era] || ERA_PRESTIGE_SCORES.MODERN;
+  const heatScore = FRANCHISE_HEAT_SCORES[heat] || FRANCHISE_HEAT_SCORES.STABLE;
+  
+  // Base upside from character tier
+  let upside = charScore.upsideBase * 100;
+  
+  // Apply rarity multiplier
+  upside *= rarityScore.upsideMultiplier;
+  
+  // Add era prestige bonus
+  upside += eraScore.upsideBonus * 100;
+  
+  // Apply franchise heat modifier
+  upside *= heatScore.upsideModifier;
+  
+  return clamp(Math.round(upside), 0, 100);
+}
+
+// Calculate TCG-specific risk score
+function calculateTCGRisk(card: Card): number {
+  const charTier = (card.characterTier as CharacterTier) || "C_TIER_NICHE";
+  const rarityTier = (card.rarityTier as RarityTier) || "RARE";
+  const era = (card.eraPrestige as EraPrestige) || "MODERN";
+  const heat = (card.franchiseHeat as FranchiseHeat) || "STABLE";
+  
+  const charScore = CHARACTER_TIER_SCORES[charTier] || CHARACTER_TIER_SCORES.C_TIER_NICHE;
+  const rarityScore = RARITY_TIER_SCORES[rarityTier] || RARITY_TIER_SCORES.RARE;
+  const eraScore = ERA_PRESTIGE_SCORES[era] || ERA_PRESTIGE_SCORES.MODERN;
+  const heatScore = FRANCHISE_HEAT_SCORES[heat] || FRANCHISE_HEAT_SCORES.STABLE;
+  
+  // Base risk (inverse of character tier strength)
+  let risk = 50 * charScore.riskModifier;
+  
+  // Reduce risk for higher rarity (more collectible = stronger floor)
+  risk -= rarityScore.riskReduction * 100;
+  
+  // Reduce risk for vintage era (proven long-term value)
+  risk -= eraScore.stabilityBonus * 50;
+  
+  // Apply franchise heat risk modifier
+  risk *= heatScore.riskModifier;
+  
+  return clamp(Math.round(risk), 5, 95);
+}
+
+// Calculate TCG-specific confidence score
+function calculateTCGConfidence(card: Card): number {
+  const charTier = (card.characterTier as CharacterTier) || "C_TIER_NICHE";
+  const rarityTier = (card.rarityTier as RarityTier) || "RARE";
+  const era = (card.eraPrestige as EraPrestige) || "MODERN";
+  
+  const charScore = CHARACTER_TIER_SCORES[charTier] || CHARACTER_TIER_SCORES.C_TIER_NICHE;
+  const eraScore = ERA_PRESTIGE_SCORES[era] || ERA_PRESTIGE_SCORES.MODERN;
+  
+  // Start with character tier confidence floor
+  let confidence = charScore.confidenceFloor;
+  
+  // Vintage era = more historical data = higher confidence
+  confidence += eraScore.stabilityBonus * 30;
+  
+  // Has price history? Boost confidence
+  if (card.avgSalePrice30 && card.avgSalePrice30 > 0) {
+    confidence += 10;
+  }
+  if (card.salesLast30Days && card.salesLast30Days > 5) {
+    confidence += 10;
+  }
+  
+  return clamp(Math.round(confidence), 20, 95);
+}
+
+// Generate TCG outlook result
+function generateTCGOutlook(card: Card, timeHorizonMonths: number): Omit<CardOutlookResult, 'explanation'> {
+  const upsideScore = calculateTCGUpside(card);
+  const riskScore = calculateTCGRisk(card);
+  const confidenceScore = calculateTCGConfidence(card);
+  const action = determineAction(upsideScore, riskScore);
+  
+  const charTier = (card.characterTier as CharacterTier) || "C_TIER_NICHE";
+  const rarityTier = (card.rarityTier as RarityTier) || "RARE";
+  
+  return {
+    cardId: card.id,
+    playerName: card.playerName || card.title,
+    sport: card.sport || "tcg",
+    position: rarityTier,
+    timeHorizonMonths,
+    action,
+    upsideScore,
+    riskScore,
+    confidenceScore,
+    projectedOutlook: {
+      bearCaseChangePct: -5 - (riskScore * 0.15),
+      baseCaseChangePct: (upsideScore - riskScore) * 0.1,
+      bullCaseChangePct: upsideScore * 0.25,
+    },
+    factors: {
+      cardTypeScore: RARITY_TIER_SCORES[rarityTier]?.upsideMultiplier || 1.0,
+      positionScore: 1.0,
+      legacyScore: CHARACTER_TIER_SCORES[charTier]?.upsideBase || 0.5,
+      liquidityScore: 0.5,
+      volatilityScore: 0.5,
+      hypeScore: FRANCHISE_HEAT_SCORES[(card.franchiseHeat as FranchiseHeat) || "STABLE"]?.upsideModifier || 1.0,
+    },
+    priceTargets: calculatePriceTargets(card),
+    confidenceBreakdown: {
+      salesDataConfidence: card.salesLast30Days && card.salesLast30Days > 5 ? 70 : 40,
+      priceStabilityConfidence: card.priceStdDevPct && card.priceStdDevPct < 20 ? 75 : 50,
+      playerStatusConfidence: confidenceScore,
+      overallConfidence: confidenceScore,
+      factors: [
+        `Character tier: ${charTier.replace(/_/g, ' ').toLowerCase()}`,
+        `Rarity: ${rarityTier.replace(/_/g, ' ').toLowerCase()}`,
+        `Era: ${(card.eraPrestige || 'modern').replace(/_/g, ' ').toLowerCase()}`,
+        `IP Heat: ${(card.franchiseHeat || 'stable').toLowerCase()}`,
+      ],
+    },
+  };
+}
+
+// Generate TCG-specific explanation
+async function generateTCGExplanation(
+  card: Card,
+  result: Omit<CardOutlookResult, 'explanation'>
+): Promise<{ short: string; long: string }> {
+  const charTier = (card.characterTier as CharacterTier) || "C_TIER_NICHE";
+  const rarityTier = (card.rarityTier as RarityTier) || "RARE";
+  const era = (card.eraPrestige as EraPrestige) || "MODERN";
+  const heat = (card.franchiseHeat as FranchiseHeat) || "STABLE";
+  
+  const charLabel = charTier.replace(/_/g, ' ').toLowerCase();
+  const rarityLabel = rarityTier.replace(/_/g, ' ').toLowerCase();
+  const eraLabel = era.replace(/_/g, ' ').toLowerCase();
+  
+  // Build short explanation
+  let short = "";
+  if (result.action === "BUY") {
+    if (charTier === "S_TIER_ICON" || charTier === "A_TIER_FAVORITE") {
+      short = `Strong collectible with ${charLabel} character status and ${rarityLabel} rarity. The combination of iconic character recognition and scarcity suggests solid long-term value retention.`;
+    } else {
+      short = `This ${rarityLabel} card shows buy potential based on its rarity tier and current market position.`;
+    }
+  } else if (result.action === "WATCH") {
+    short = `Monitor this ${rarityLabel} card. ${heat === "HOT" ? "The franchise is currently popular but volatility is elevated." : "Market conditions suggest waiting for a better entry point."}`;
+  } else {
+    short = `Consider reducing exposure. ${charTier === "C_TIER_NICHE" || charTier === "D_TIER_COMMON" ? "Niche characters typically have limited upside." : "Current risk/reward balance favors taking profits."}`;
+  }
+  
+  // Build long explanation
+  const longParts = [
+    `Character Analysis: This card features a ${charLabel} character, which ${charTier.includes("S_TIER") || charTier.includes("A_TIER") ? "commands strong collector interest" : "has more limited collector appeal"}.`,
+    `Rarity Factor: As a ${rarityLabel}, this card ${rarityTier.includes("SECRET") || rarityTier.includes("ULTRA") ? "has scarcity working in its favor" : "faces competition from higher-tier variants"}.`,
+    `Era Consideration: ${era === "VINTAGE_WOTC" ? "Vintage WotC-era cards have proven long-term value appreciation." : era === "SPECIAL_SET" ? "Special set releases often maintain collector interest." : "Modern era cards need time to establish collectible status."}`,
+    `Market Heat: The franchise is currently ${heat.toLowerCase()}, ${heat === "HOT" ? "which drives demand but also volatility" : heat === "COOLING" ? "suggesting caution on new positions" : "providing stable but not explosive conditions"}.`,
+  ];
+  
+  return {
+    short,
+    long: longParts.join(" "),
+  };
+}
 
 function getSeasonalMultiplier(sport: string | null): number {
   if (!sport) return 1.0;
@@ -1525,6 +1764,17 @@ export async function generateCardOutlook(
   card: Card,
   timeHorizonMonths: number = 12
 ): Promise<CardOutlookResult> {
+  // Check card category - use TCG engine for non-sports cards
+  const category = (card.cardCategory as CardCategory) || "sports";
+  
+  if (category === "tcg" || category === "non_sport") {
+    // Use TCG/Non-Sport scoring engine
+    const tcgResult = generateTCGOutlook(card, timeHorizonMonths);
+    const explanation = await generateTCGExplanation(card, tcgResult);
+    return { ...tcgResult, explanation };
+  }
+  
+  // Sports card scoring continues below...
   // Calculate base scores
   const cardTypeScore = calculateCardTypeScore(card);
   const positionScore = calculatePositionScore(card.sport, card.position);
@@ -1533,7 +1783,7 @@ export async function generateCardOutlook(
   const volatilityScore = calculateVolatilityScore(card.priceStdDevPct);
   const hypeScore = calculateHypeScore(card.avgSalePrice30, card.avgSalePrice90);
   
-  // NEW: Get lifecycle-aware context
+  // Get lifecycle-aware context
   const marketStability = assessMarketStability(card);
   const accolades = detectAccolades(card.title, card.playerName);
   const sportConfig = card.sport ? SPORT_CONFIGS[card.sport.toLowerCase()] || null : null;

@@ -91,7 +91,10 @@ export const cards = pgTable("cards", {
   openToOffers: boolean("open_to_offers").default(false).notNull(),
   minOfferAmount: real("min_offer_amount"),
   createdAt: timestamp("created_at").defaultNow(),
-  // Card Outlook AI fields
+  // Card category (sports/tcg/non_sport)
+  cardCategory: varchar("card_category", { length: 20 }).default("sports"),
+  
+  // Card Outlook AI fields - Sports
   sport: varchar("sport", { length: 50 }),
   position: varchar("position", { length: 50 }),
   playerName: varchar("player_name", { length: 255 }),
@@ -109,6 +112,12 @@ export const cards = pgTable("cards", {
   avgSalePrice30: real("avg_sale_price_30"),
   avgSalePrice90: real("avg_sale_price_90"),
   priceStdDevPct: real("price_std_dev_pct"),
+  
+  // Card Outlook AI fields - TCG/Non-Sport
+  characterTier: varchar("character_tier", { length: 50 }),
+  rarityTier: varchar("rarity_tier", { length: 50 }),
+  eraPrestige: varchar("era_prestige", { length: 50 }),
+  franchiseHeat: varchar("franchise_heat", { length: 20 }),
   // Cached outlook data
   outlookAction: varchar("outlook_action", { length: 10 }),
   outlookUpsideScore: integer("outlook_upside_score"),

@@ -71,6 +71,7 @@ import { OutlookBadge } from "@/components/outlook-badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Crown, AlertTriangle } from "lucide-react";
 import { DISPLAY_CASE_THEMES } from "@/lib/themes";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const LAYOUT_OPTIONS = [
   { id: "grid", name: "Grid", description: "Classic grid layout - cards displayed in rows and columns", icon: "grid" },
@@ -96,6 +97,13 @@ const addCardSchema = z.object({
   grade: z.string().max(50).optional(),
   purchasePrice: z.coerce.number().min(0).optional().or(z.literal("")),
   estimatedValue: z.coerce.number().min(0).optional().or(z.literal("")),
+  // Card category for outlook scoring
+  cardCategory: z.enum(["sports", "tcg", "non_sport"]).default("sports"),
+  // TCG/Non-Sport fields
+  characterTier: z.string().optional(),
+  rarityTier: z.string().optional(),
+  eraPrestige: z.string().optional(),
+  franchiseHeat: z.string().optional(),
 });
 
 type UpdateCaseFormData = z.infer<typeof updateCaseSchema>;
@@ -228,6 +236,11 @@ export default function CaseEdit() {
       grade: "",
       purchasePrice: "",
       estimatedValue: "",
+      cardCategory: "sports",
+      characterTier: "",
+      rarityTier: "",
+      eraPrestige: "",
+      franchiseHeat: "",
     },
   });
 
@@ -960,6 +973,137 @@ export default function CaseEdit() {
                           </FormItem>
                         )}
                       />
+
+                      <FormField
+                        control={cardForm.control}
+                        name="cardCategory"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Card Type</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-card-category">
+                                  <SelectValue placeholder="Select card type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="sports">Sports Card</SelectItem>
+                                <SelectItem value="tcg">TCG (Pokemon, MTG, etc.)</SelectItem>
+                                <SelectItem value="non_sport">Non-Sport (Marvel, Star Wars, etc.)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormDescription className="text-xs">
+                              Affects how Card Outlook AI analyzes this card
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {(cardForm.watch("cardCategory") === "tcg" || cardForm.watch("cardCategory") === "non_sport") && (
+                        <div className="space-y-4 p-3 rounded-md bg-muted/50">
+                          <p className="text-xs text-muted-foreground font-medium">TCG / Non-Sport Details (for AI Outlook)</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={cardForm.control}
+                              name="characterTier"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Character Tier</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-character-tier">
+                                        <SelectValue placeholder="Select tier" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="S_TIER_ICON">S-Tier Icon (Charizard, Pikachu)</SelectItem>
+                                      <SelectItem value="A_TIER_FAVORITE">A-Tier Fan Favorite</SelectItem>
+                                      <SelectItem value="B_TIER_POPULAR">B-Tier Popular</SelectItem>
+                                      <SelectItem value="C_TIER_NICHE">C-Tier Niche</SelectItem>
+                                      <SelectItem value="D_TIER_COMMON">D-Tier Common</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={cardForm.control}
+                              name="rarityTier"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Rarity</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-rarity-tier">
+                                        <SelectValue placeholder="Select rarity" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="SECRET_RARE">Secret Rare / Alt Art</SelectItem>
+                                      <SelectItem value="ULTRA_RARE">Ultra Rare / Full Art</SelectItem>
+                                      <SelectItem value="RARE_HOLO">Rare Holo</SelectItem>
+                                      <SelectItem value="RARE">Rare</SelectItem>
+                                      <SelectItem value="UNCOMMON">Uncommon</SelectItem>
+                                      <SelectItem value="COMMON">Common</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={cardForm.control}
+                              name="eraPrestige"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Era</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-era-prestige">
+                                        <SelectValue placeholder="Select era" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="VINTAGE_WOTC">Vintage (WotC 1999-2003)</SelectItem>
+                                      <SelectItem value="EARLY_MODERN">Early Modern (2004-2015)</SelectItem>
+                                      <SelectItem value="MODERN">Modern (2016+)</SelectItem>
+                                      <SelectItem value="SPECIAL_SET">Special Set</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={cardForm.control}
+                              name="franchiseHeat"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">IP Popularity</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-franchise-heat">
+                                        <SelectValue placeholder="Select heat" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="HOT">Hot (new releases, movies)</SelectItem>
+                                      <SelectItem value="STABLE">Stable</SelectItem>
+                                      <SelectItem value="COOLING">Cooling (declining interest)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+                      )}
 
                       <div className="grid grid-cols-2 gap-4">
                         <FormField

@@ -248,6 +248,11 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
           <div className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             <CardTitle className="text-base">Card Outlook AI</CardTitle>
+            {card.cardCategory && card.cardCategory !== "sports" && (
+              <Badge variant="outline" className="text-[10px] uppercase">
+                {card.cardCategory === "tcg" ? "TCG" : "Non-Sport"}
+              </Badge>
+            )}
           </div>
           <Badge className={`${getActionColor(outlook.action)} gap-1`} data-testid="badge-outlook-action">
             {getActionIcon(outlook.action)}
@@ -436,7 +441,9 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                   <div className="font-medium">{outlook.confidenceBreakdown.priceStabilityConfidence}%</div>
                 </div>
                 <div className="space-y-1">
-                  <div className="text-muted-foreground">Player Status</div>
+                  <div className="text-muted-foreground">
+                    {card.cardCategory === "tcg" || card.cardCategory === "non_sport" ? "Character/IP" : "Player Status"}
+                  </div>
                   <Progress value={outlook.confidenceBreakdown.playerStatusConfidence} className="h-1" />
                   <div className="font-medium">{outlook.confidenceBreakdown.playerStatusConfidence}%</div>
                 </div>
@@ -488,20 +495,20 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
           </>
         )}
 
-        {isPro && canEdit && (
+        {isPro && canEdit && (!card.cardCategory || card.cardCategory === "sports") && (
           <>
             <Separator />
             <Collapsible>
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" className="gap-2 p-0 h-auto text-muted-foreground">
                   <UserCog className="h-3.5 w-3.5" />
-                  Adjust Career Stage
+                  Adjust Legacy Tier
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-2 space-y-2">
                 <p className="text-xs text-muted-foreground">
-                  If our detection is incorrect, override the career stage to improve accuracy:
+                  Override the player's legacy tier to adjust upside potential:
                 </p>
                 <div className="flex items-center gap-2">
                   <Select
@@ -538,6 +545,29 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                 onClick={() => generateOutlookMutation.mutate()}
                 disabled={generateOutlookMutation.isPending}
                 data-testid="button-refresh-outlook"
+              >
+                {generateOutlookMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {generateOutlookMutation.isPending ? "Analyzing..." : "Refresh Outlook"}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {isPro && canEdit && (card.cardCategory === "tcg" || card.cardCategory === "non_sport") && (
+          <>
+            <Separator />
+            <div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 w-full"
+                onClick={() => generateOutlookMutation.mutate()}
+                disabled={generateOutlookMutation.isPending}
+                data-testid="button-refresh-outlook-tcg"
               >
                 {generateOutlookMutation.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
