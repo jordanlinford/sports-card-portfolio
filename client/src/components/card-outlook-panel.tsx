@@ -549,6 +549,15 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
             </div>
           </>
         )}
+
+        <Separator />
+        <div className="text-[10px] text-muted-foreground/70 leading-relaxed" data-testid="text-outlook-disclaimer">
+          <Info className="h-3 w-3 inline mr-1 align-text-top" />
+          <strong>Disclaimer:</strong> This analysis is for informational purposes only and is not financial advice. 
+          Scores are based on your entered values, general market patterns, and career lifecycle estimates — not real-time 
+          sales data or professional appraisals. Actual card values can vary significantly. Always do your own research 
+          before buying or selling.
+        </div>
       </CardContent>
     </Card>
   );
