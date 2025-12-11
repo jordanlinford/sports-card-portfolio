@@ -1,0 +1,351 @@
+I’ll give you:
+
+Feature concept + name
+
+Exact output schema (what the API returns)
+
+V1 scoring engine (no ML yet – all rules you can code today)
+
+How to layer OpenAI on top for explanations
+
+Where it plugs into MyDisplayCase UX + a simple flow
+
+1. Feature Concept & Name
+
+Working name (you can rename later):
+
+Card Outlook AI
+“Should I buy, hold, or sell this card?”
+
+Key idea:
+Instead of spitting out a “value,” it gives you an investment-style outlook:
+
+🚦 Action: BUY / WATCH / SELL
+
+📈 Upside: 0–100 score
+
+⚠️ Risk: 0–100 score
+
+🎯 Confidence: 0–100 score
+
+🧠 Plain-English explanation
+
+2. Output Schema (what our predictor returns)
+
+Here’s a JSON shape you can literally wire into your backend:
+
+{
+  "cardId": "abc123",
+  "playerName": "Josh Allen",
+  "sport": "football",
+  "position": "QB",
+  "timeHorizonMonths": 12,
+
+  "action": "BUY",          // "BUY" | "WATCH" | "SELL"
+  "upsideScore": 82,        // 0–100
+  "riskScore": 64,          // 0–100 (higher = riskier)
+  "confidenceScore": 78,    // 0–100
+
+  "projectedOutlook": {
+    "bearCaseChangePct": -18,
+    "baseCaseChangePct": 12,
+    "bullCaseChangePct": 40
+  },
+
+  "factors": {
+    "cardTypeScore": 0.84,
+    "positionScore": 1.25,
+    "legacyScore": 0.6,
+    "liquidityScore": 0.7,
+    "volatilityScore": 0.65,
+    "hypeScore": 0.8
+  },
+
+  "explanation": {
+    "short": "High-upside QB play with moderate risk. Prices already reflect some hype but could climb on a deep playoff run.",
+    "long": "As a starting QB on a playoff-caliber team, Josh Allen cards historically show strong upside around big performances..."
+  }
+}
+
+
+You can trim fields if it feels heavy – but this gives you everything you need for v1.
+
+3. V1 Scoring Engine (rules you can implement today)
+3.1 Inputs we assume you already have / can easily add
+
+For a given card:
+
+sport (football, basketball, baseball, TCG, etc.)
+
+position (QB, WR, RB, PG, C, etc.)
+
+isRookie (true/false)
+
+isNumbered (true/false) + serialNumber (e.g., 10 for /10, 99 for /99)
+
+hasAuto (true/false)
+
+isCaseHit or insertTier (base / silver / refractor / case-hit)
+
+grade + grader (PSA 10, BGS 9.5, etc.) if graded
+
+Price history stats for this card or close comps:
+
+salesLast30Days
+
+avgSalePrice30
+
+avgSalePrice90
+
+priceStdDevPct (volatility)
+
+Player meta (can be a small manual table to start):
+
+legacyTier (PROSPECT, RISING_STAR, STAR, SUPERSTAR, HOF, LEGEND_DECEASED)
+
+age
+
+injuryRisk (LOW/MED/HIGH)
+
+teamMarketSize (SMALL/MEDIUM/LARGE)
+
+You can start simple: even partial data is fine – we’ll bake “low data” into a lower confidence score.
+
+3.2 Step-by-step Scoring Logic (pseudo-code)
+1) Card Type Score (0–1)
+base = 0.4
+if isRookie:                 base += 0.2
+if hasAuto:                  base += 0.2
+if isNumbered:
+    if serialNumber <= 10:   base += 0.15
+    else if <= 25:          base += 0.12
+    else if <= 99:          base += 0.08
+if grade is PSA 10/BGS 9.5: base += 0.1
+else if PSA 9:              base += 0.05
+
+cardTypeScore = clamp(base, 0, 1)
+
+2) Position Score (multiplier, ~0.5–1.4)
+
+Example mapping (per sport):
+
+football:
+  QB = 1.35
+  WR = 1.2
+  RB = 1.15
+  TE = 0.95
+  DEF = 0.6
+
+basketball:
+  Star Guard/Wing = 1.3
+  Scoring Wing    = 1.25
+  Point Guard     = 1.2
+  Big             = 0.9
+
+baseball:
+  Elite Hitter    = 1.3
+  Everyday Bat    = 1.1
+  Pitcher         = 0.8
+
+tcg example:
+  Charizard-tier character = 1.4
+  Other chase             = 1.2
+  Filler                  = 0.7
+
+3) Legacy Score (0–1)
+PROSPECT          = 0.7   // lots of upside but unproven
+RISING_STAR       = 0.9
+STAR              = 0.95
+SUPERSTAR         = 1.0
+AGING_VET         = 0.7
+RETIRED           = 0.8
+HOF               = 0.95
+LEGEND_DECEASED   = 1.0   // icons like Kobe, Hank Aaron
+
+4) Liquidity & Volatility (0–1 each)
+// Liquidity: more recent sales = higher score
+if salesLast30Days >= 10:  liquidityScore = 1.0
+else if >= 5:              liquidityScore = 0.8
+else if >= 1:              liquidityScore = 0.6
+else                       liquidityScore = 0.3   // thin market
+
+// Volatility: based on std dev of price percentage changes
+if priceStdDevPct <= 10%:  volatilityScore = 0.3  // low volatility
+else if <= 25%:            volatilityScore = 0.5
+else if <= 50%:            volatilityScore = 0.7
+else                       volatilityScore = 0.9  // very swingy
+
+5) Hype / Trend Score (−1 to +1)
+
+Simple slope for now:
+
+trendPct = (avgSalePrice30 - avgSalePrice90) / avgSalePrice90
+
+if trendPct >= 0.5:      hypeScore = 1.0
+else if >= 0.2:          hypeScore = 0.7
+else if >= 0.05:         hypeScore = 0.4
+else if >= -0.05:        hypeScore = 0.0
+else if >= -0.2:         hypeScore = -0.4
+else if >= -0.5:         hypeScore = -0.7
+else:                    hypeScore = -1.0
+
+3.3 Roll it into Upside, Risk, Confidence
+Upside Score (0–100)
+rawUpside =
+  (cardTypeScore * 0.35) +
+  (positionScoreNormalized * 0.2) +
+  (legacyScore * 0.15) +
+  ((1 - volatilityScore) * 0.1) +   // lower volatility = slightly higher upside safety
+  (max(hypeScore, 0) * 0.2)         // only count positive trend toward upside
+
+// Normalize positionScore to 0–1 range, e.g.:
+// positionScoreNormalized = (positionScore - 0.5) / (1.4 - 0.5)
+
+upsideScore = clamp(rawUpside * 100, 0, 100)
+
+Risk Score (0–100)
+rawRisk =
+  (volatilityScore * 0.5) +
+  (prospectOrAgingRiskFactor * 0.3) + // PROSPECT / AGING_VET bump risk
+  ((1 - liquidityScore) * 0.2)
+
+riskScore = clamp(rawRisk * 100, 0, 100)
+
+
+Where:
+
+prospectOrAgingRiskFactor =
+  if legacyTier == PROSPECT:      1.0
+  else if legacyTier == RISING_STAR: 0.7
+  else if legacyTier == AGING_VET:   0.8
+  else:                          0.4
+
+Confidence Score (0–100)
+dataDepthFactor =
+  if salesLast30Days >= 10: 1.0
+  else if >= 5:             0.8
+  else if >= 1:             0.6
+  else                      0.4
+
+cardDataCompleteness =
+  fraction of known fields (position, legacyTier, cardType info, etc.) // 0–1
+
+confidenceScore = clamp(
+  (dataDepthFactor * 0.6 + cardDataCompleteness * 0.4) * 100,
+  0,
+  100
+)
+
+Action: BUY / WATCH / SELL
+if upsideScore >= 70 and riskScore <= 60:
+    action = "BUY"
+else if upsideScore <= 40 and riskScore >= 60:
+    action = "SELL"
+else:
+    action = "WATCH"
+
+
+You can tweak thresholds later, but that logic is super easy to code.
+
+4. Where OpenAI Comes In
+
+You use the rules above to get numbers, then call OpenAI to explain why.
+
+Prompt Template (pseudo-code)
+You are an assistant helping sports card collectors decide whether to invest
+in specific cards. You will receive structured data about a card, the player,
+and a set of pre-calculated scores.
+
+Return:
+1. A 1–2 sentence summary for beginners.
+2. A 3–6 sentence detailed explanation using hobby language (no promises).
+
+Data:
+- Player: {{playerName}}, {{sport}}, {{position}}, legacy tier: {{legacyTier}}.
+- Card: rookie={{isRookie}}, numbered={{isNumbered}} (/{{serialNumber}}),
+        auto={{hasAuto}}, graded={{grade}}.
+- Scores: upside={{upsideScore}}, risk={{riskScore}}, confidence={{confidenceScore}}.
+- Market: recent sales={{salesLast30Days}}, trend (30 vs 90 days)={{trendPct}}.
+
+Explain the reasoning behind the scores and end with a plain-language tag like:
+"Overall view: {{action}} for the next {{timeHorizonMonths}} months."
+
+
+Then you map the response into:
+
+explanation.short = first 1–2 sentences
+explanation.long  = full content
+
+5. Where This Fits into MyDisplayCase
+
+Places to surface Card Outlook AI:
+
+Card Detail Modal / Page
+
+Add a tab or panel: “Outlook (AI)”
+
+Show:
+
+Badge: BUY / WATCH / SELL
+
+Three meters: Upside, Risk, Confidence
+
+Price bands (Bear/Base/Bull)
+
+Short explanation
+
+Collection View
+
+Add a column: Outlook icon (↑, ⚠️, ↓)
+
+Filters: “Show only BUY cards,” “High Upside, Low Risk”
+
+Display Cases
+
+Show average Outlook for the case:
+
+“Speculative Prospect Case”
+
+“Blue-Chip Legends Case”
+
+Great for marketing: “FutureFlex Case Score”
+
+Trade / Offer Flows
+
+When comparing two cards:
+
+Show side-by-side Outlook: upside, risk, action.
+
+“Based on future outlook, this side of the trade has better long-term upside.”
+
+6. Practical Next Step (What you can implement right now)
+
+Here’s a minimal implementation roadmap:
+
+Data model update
+
+Ensure cards in MyDisplayCase store: sport, position, rookie flag, numbered/serial, auto, grade.
+
+Add simple player meta (even hardcoded JSON at first): legacyTier, age, injuryRisk.
+
+Backend endpoint
+
+Add an endpoint: POST /api/outlook
+
+Input: cardId OR cardData
+
+Output: JSON in the schema above.
+
+Scoring function
+
+Implement the rule-based scoring steps from §3 in your backend.
+
+Don’t worry about perfection; we just need “good and tweakable.”
+
+OpenAI call
+
+After you compute scores, call OpenAI with the prompt template and store the resulting explanation.
+
+UI panel
+
+Add an “Outlook” section on the card detail view and wire it to the endpoint.
