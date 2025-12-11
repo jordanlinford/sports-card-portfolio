@@ -1162,6 +1162,64 @@ Allow: /
     }
   });
 
+  // Update card lifecycle tier (career stage) override - Pro feature
+  app.patch("/api/cards/:cardId/lifecycle", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+      const userId = req.user.claims.sub;
+      const { legacyTier } = req.body;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const validTiers = ["PROSPECT", "RISING_STAR", "STAR", "SUPERSTAR", "AGING_VET", "RETIRED", "HOF", "LEGEND_DECEASED"];
+      if (!legacyTier || !validTiers.includes(legacyTier)) {
+        return res.status(400).json({ message: "Invalid legacy tier", validTiers });
+      }
+
+      // Check user is Pro
+      const user = await storage.getUser(userId);
+      if (!user || user.subscriptionStatus !== "PRO") {
+        return res.status(403).json({ message: "Pro subscription required" });
+      }
+
+      // Verify the user owns the card
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      const displayCase = await storage.getDisplayCase(card.displayCaseId);
+      if (!displayCase || displayCase.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized to modify this card" });
+      }
+
+      // Update the card's legacy tier
+      const updatedCard = await storage.updateCard(cardId, { legacyTier });
+
+      // Clear cached outlook so it gets regenerated with new tier
+      await storage.updateCardOutlook(cardId, {
+        outlookAction: null,
+        outlookUpsideScore: null,
+        outlookRiskScore: null,
+        outlookConfidenceScore: null,
+        outlookExplanationShort: null,
+        outlookExplanationLong: null,
+        outlookGeneratedAt: null,
+      });
+
+      res.json({ 
+        success: true, 
+        legacyTier: updatedCard?.legacyTier,
+        message: "Career stage updated. Regenerate outlook to see updated scores."
+      });
+    } catch (error) {
+      console.error("Error updating card lifecycle:", error);
+      res.status(500).json({ message: "Failed to update card lifecycle" });
+    }
+  });
+
   // Object Storage routes - allows public access for public objects
   app.get("/objects/:objectPath(*)", async (req: any, res) => {
     // Get userId if authenticated, but don't require authentication

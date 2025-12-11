@@ -51,10 +51,21 @@ export interface CardOutlookResult {
     liquidityScore: number;
     volatilityScore: number;
     hypeScore: number;
+    seasonalMultiplier?: number;
+    franchiseMultiplier?: number;
+    setPrestigeTier?: string;
   };
   explanation: {
     short: string;
     long: string;
+  };
+  // NEW: Enhanced outlook data
+  priceTargets?: PriceTargets;
+  confidenceBreakdown?: ConfidenceBreakdown;
+  seasonalContext?: {
+    currentMultiplier: number;
+    isInSeason: boolean;
+    isPlayoffSeason: boolean;
   };
 }
 
@@ -221,6 +232,333 @@ const SPORT_CONFIGS: Record<string, SportConfig> = {
     retiredStabilityBonus: 0.3,
   },
 };
+
+// ============================================
+// NEW ENHANCEMENT FACTORS
+// ============================================
+
+// SEASONAL ADJUSTMENTS - Card values fluctuate with sports calendars
+interface SeasonalConfig {
+  peakMonths: number[];        // 1-12, months when this sport is hottest
+  playoffMonths: number[];     // Championship/playoff months
+  peakMultiplier: number;      // Upside boost during peak
+  playoffMultiplier: number;   // Extra boost during playoffs
+  offseasonPenalty: number;    // Upside reduction during offseason
+}
+
+const SEASONAL_CONFIGS: Record<string, SeasonalConfig> = {
+  football: {
+    peakMonths: [9, 10, 11, 12, 1, 2],  // Sept-Feb (NFL season + Super Bowl)
+    playoffMonths: [1, 2],              // January/February playoffs
+    peakMultiplier: 1.15,
+    playoffMultiplier: 1.25,
+    offseasonPenalty: 0.85,
+  },
+  basketball: {
+    peakMonths: [11, 12, 1, 2, 3, 4, 5, 6],  // Nov-June (NBA season)
+    playoffMonths: [4, 5, 6],
+    peakMultiplier: 1.1,
+    playoffMultiplier: 1.2,
+    offseasonPenalty: 0.9,
+  },
+  baseball: {
+    peakMonths: [4, 5, 6, 7, 8, 9, 10],  // April-October
+    playoffMonths: [10],                  // October World Series
+    peakMultiplier: 1.1,
+    playoffMultiplier: 1.2,
+    offseasonPenalty: 0.88,
+  },
+  hockey: {
+    peakMonths: [10, 11, 12, 1, 2, 3, 4, 5, 6],  // Oct-June
+    playoffMonths: [4, 5, 6],
+    peakMultiplier: 1.08,
+    playoffMultiplier: 1.15,
+    offseasonPenalty: 0.92,
+  },
+  soccer: {
+    peakMonths: [8, 9, 10, 11, 12, 1, 2, 3, 4, 5],  // Most leagues Aug-May
+    playoffMonths: [5, 6, 7],  // World Cup years, Champions League
+    peakMultiplier: 1.1,
+    playoffMultiplier: 1.3,  // World Cup boost is significant
+    offseasonPenalty: 0.9,
+  },
+  tcg: {
+    peakMonths: [11, 12],  // Holiday season
+    playoffMonths: [],
+    peakMultiplier: 1.15,
+    playoffMultiplier: 1.0,
+    offseasonPenalty: 0.95,
+  },
+};
+
+function getSeasonalMultiplier(sport: string | null): number {
+  if (!sport) return 1.0;
+  const config = SEASONAL_CONFIGS[sport.toLowerCase()];
+  if (!config) return 1.0;
+  
+  const currentMonth = new Date().getMonth() + 1;  // 1-12
+  
+  if (config.playoffMonths.includes(currentMonth)) {
+    return config.playoffMultiplier;
+  }
+  if (config.peakMonths.includes(currentMonth)) {
+    return config.peakMultiplier;
+  }
+  return config.offseasonPenalty;
+}
+
+// FRANCHISE POPULARITY - Big market teams command premiums
+const FRANCHISE_POPULARITY: Record<string, Record<string, number>> = {
+  football: {
+    "cowboys": 1.2, "dallas cowboys": 1.2,
+    "patriots": 1.15, "new england patriots": 1.15,
+    "packers": 1.15, "green bay packers": 1.15,
+    "49ers": 1.12, "san francisco 49ers": 1.12,
+    "raiders": 1.1, "las vegas raiders": 1.1,
+    "chiefs": 1.15, "kansas city chiefs": 1.15,
+    "steelers": 1.12, "pittsburgh steelers": 1.12,
+    "bears": 1.1, "chicago bears": 1.1,
+    "eagles": 1.08, "philadelphia eagles": 1.08,
+    "broncos": 1.05, "denver broncos": 1.05,
+  },
+  basketball: {
+    "lakers": 1.25, "los angeles lakers": 1.25, "la lakers": 1.25,
+    "celtics": 1.18, "boston celtics": 1.18,
+    "bulls": 1.15, "chicago bulls": 1.15,
+    "warriors": 1.12, "golden state warriors": 1.12,
+    "knicks": 1.1, "new york knicks": 1.1,
+    "heat": 1.08, "miami heat": 1.08,
+    "spurs": 1.05, "san antonio spurs": 1.05,
+    "76ers": 1.05, "philadelphia 76ers": 1.05,
+  },
+  baseball: {
+    "yankees": 1.25, "new york yankees": 1.25,
+    "dodgers": 1.18, "los angeles dodgers": 1.18, "la dodgers": 1.18,
+    "red sox": 1.12, "boston red sox": 1.12,
+    "cubs": 1.1, "chicago cubs": 1.1,
+    "cardinals": 1.08, "st. louis cardinals": 1.08,
+    "giants": 1.05, "san francisco giants": 1.05,
+    "mets": 1.05, "new york mets": 1.05,
+  },
+  hockey: {
+    "maple leafs": 1.15, "toronto maple leafs": 1.15,
+    "canadiens": 1.12, "montreal canadiens": 1.12,
+    "rangers": 1.1, "new york rangers": 1.1,
+    "blackhawks": 1.08, "chicago blackhawks": 1.08,
+    "bruins": 1.08, "boston bruins": 1.08,
+    "penguins": 1.05, "pittsburgh penguins": 1.05,
+  },
+  soccer: {
+    "real madrid": 1.25,
+    "barcelona": 1.2, "fc barcelona": 1.2,
+    "manchester united": 1.18, "man united": 1.18,
+    "liverpool": 1.12,
+    "bayern munich": 1.1, "bayern": 1.1,
+    "psg": 1.08, "paris saint-germain": 1.08,
+    "juventus": 1.05,
+  },
+};
+
+function getFranchiseMultiplier(sport: string | null, title: string, playerName: string | null): number {
+  if (!sport) return 1.0;
+  const franchises = FRANCHISE_POPULARITY[sport.toLowerCase()];
+  if (!franchises) return 1.0;
+  
+  const combined = `${title} ${playerName || ""}`.toLowerCase();
+  
+  for (const [team, multiplier] of Object.entries(franchises)) {
+    if (combined.includes(team)) {
+      return multiplier;
+    }
+  }
+  return 1.0;
+}
+
+// CARD SET/BRAND PRESTIGE - Premium brands command premiums
+interface SetPrestige {
+  tier: "ultra_premium" | "premium" | "mid" | "base" | "budget";
+  multiplier: number;
+  stabilityBonus: number;  // Premium sets are more stable
+}
+
+const SET_PRESTIGE: Record<string, SetPrestige> = {
+  // Ultra Premium (1.3x+)
+  "national treasures": { tier: "ultra_premium", multiplier: 1.35, stabilityBonus: 0.15 },
+  "flawless": { tier: "ultra_premium", multiplier: 1.4, stabilityBonus: 0.18 },
+  "immaculate": { tier: "ultra_premium", multiplier: 1.3, stabilityBonus: 0.15 },
+  "one": { tier: "ultra_premium", multiplier: 1.25, stabilityBonus: 0.12 },
+  "noir": { tier: "ultra_premium", multiplier: 1.25, stabilityBonus: 0.12 },
+  
+  // Premium (1.15-1.25x)
+  "prizm": { tier: "premium", multiplier: 1.2, stabilityBonus: 0.1 },
+  "select": { tier: "premium", multiplier: 1.15, stabilityBonus: 0.08 },
+  "optic": { tier: "premium", multiplier: 1.18, stabilityBonus: 0.1 },
+  "mosaic": { tier: "premium", multiplier: 1.12, stabilityBonus: 0.08 },
+  "spectra": { tier: "premium", multiplier: 1.2, stabilityBonus: 0.1 },
+  "contenders": { tier: "premium", multiplier: 1.1, stabilityBonus: 0.06 },
+  "topps chrome": { tier: "premium", multiplier: 1.2, stabilityBonus: 0.12 },
+  "bowman chrome": { tier: "premium", multiplier: 1.25, stabilityBonus: 0.12 },
+  "upper deck": { tier: "premium", multiplier: 1.1, stabilityBonus: 0.08 },
+  
+  // Mid Tier (1.0-1.1x)
+  "donruss": { tier: "mid", multiplier: 1.05, stabilityBonus: 0.05 },
+  "chronicles": { tier: "mid", multiplier: 1.05, stabilityBonus: 0.04 },
+  "absolute": { tier: "mid", multiplier: 1.08, stabilityBonus: 0.05 },
+  "phoenix": { tier: "mid", multiplier: 1.05, stabilityBonus: 0.04 },
+  "topps": { tier: "mid", multiplier: 1.05, stabilityBonus: 0.06 },
+  "bowman": { tier: "mid", multiplier: 1.08, stabilityBonus: 0.06 },
+  
+  // Base (1.0x)
+  "score": { tier: "base", multiplier: 1.0, stabilityBonus: 0.02 },
+  "prestige": { tier: "base", multiplier: 1.0, stabilityBonus: 0.02 },
+  
+  // Budget/Mass Market (0.9-0.95x)
+  "pro set": { tier: "budget", multiplier: 0.85, stabilityBonus: 0 },
+  "hoops": { tier: "base", multiplier: 0.95, stabilityBonus: 0.02 },
+};
+
+function getSetPrestige(title: string, setName: string | null): SetPrestige {
+  const combined = `${title} ${setName || ""}`.toLowerCase();
+  
+  for (const [setKey, prestige] of Object.entries(SET_PRESTIGE)) {
+    if (combined.includes(setKey)) {
+      return prestige;
+    }
+  }
+  return { tier: "base", multiplier: 1.0, stabilityBonus: 0 };
+}
+
+// PRICE TARGETS - Calculate buy/sell thresholds from historical data
+interface PriceTargets {
+  strongBuyBelow: number | null;
+  buyBelow: number | null;
+  fairValue: number | null;
+  sellAbove: number | null;
+  strongSellAbove: number | null;
+}
+
+function calculatePriceTargets(card: Card): PriceTargets {
+  // Need price history to calculate targets
+  if (!card.avgSalePrice90 && !card.avgSalePrice30 && !card.estimatedValue) {
+    return { strongBuyBelow: null, buyBelow: null, fairValue: null, sellAbove: null, strongSellAbove: null };
+  }
+  
+  // Use available price data to establish fair value
+  const fairValue = card.avgSalePrice90 || card.avgSalePrice30 || card.estimatedValue || 0;
+  if (fairValue === 0) {
+    return { strongBuyBelow: null, buyBelow: null, fairValue: null, sellAbove: null, strongSellAbove: null };
+  }
+  
+  // Use volatility to set target ranges
+  const volatility = card.priceStdDevPct || 15;  // Default 15% if unknown
+  const volMultiplier = volatility / 100;
+  
+  return {
+    strongBuyBelow: Math.round(fairValue * (1 - volMultiplier * 1.5) * 100) / 100,
+    buyBelow: Math.round(fairValue * (1 - volMultiplier * 0.75) * 100) / 100,
+    fairValue: Math.round(fairValue * 100) / 100,
+    sellAbove: Math.round(fairValue * (1 + volMultiplier * 0.75) * 100) / 100,
+    strongSellAbove: Math.round(fairValue * (1 + volMultiplier * 1.5) * 100) / 100,
+  };
+}
+
+// CONFIDENCE BREAKDOWN - Show what factors drive uncertainty
+interface ConfidenceBreakdown {
+  salesDataConfidence: number;    // Based on sales volume
+  priceStabilityConfidence: number;  // Based on volatility
+  playerStatusConfidence: number;    // Based on career stage clarity
+  overallConfidence: number;
+  factors: string[];              // Human-readable factor descriptions
+}
+
+function calculateConfidenceBreakdown(
+  card: Card,
+  marketStability: number,
+  accolades: DetectedAccolades
+): ConfidenceBreakdown {
+  const factors: string[] = [];
+  
+  // Sales data confidence (0-100)
+  let salesDataConfidence = 50;
+  if (card.salesLast30Days !== null) {
+    if (card.salesLast30Days >= 20) {
+      salesDataConfidence = 90;
+      factors.push("Strong sales volume provides reliable data");
+    } else if (card.salesLast30Days >= 10) {
+      salesDataConfidence = 75;
+      factors.push("Moderate sales volume supports analysis");
+    } else if (card.salesLast30Days >= 3) {
+      salesDataConfidence = 55;
+      factors.push("Limited recent sales data");
+    } else {
+      salesDataConfidence = 30;
+      factors.push("Very few recent sales - pricing uncertain");
+    }
+  } else {
+    factors.push("No sales data available");
+    salesDataConfidence = 25;
+  }
+  
+  // Price stability confidence (0-100)
+  let priceStabilityConfidence = 60;
+  if (card.priceStdDevPct !== null) {
+    if (card.priceStdDevPct <= 10) {
+      priceStabilityConfidence = 90;
+      factors.push("Very stable pricing history");
+    } else if (card.priceStdDevPct <= 25) {
+      priceStabilityConfidence = 70;
+      factors.push("Reasonably stable prices");
+    } else if (card.priceStdDevPct <= 50) {
+      priceStabilityConfidence = 45;
+      factors.push("Moderate price swings observed");
+    } else {
+      priceStabilityConfidence = 25;
+      factors.push("High price volatility reduces certainty");
+    }
+  }
+  
+  // Player status confidence (0-100)
+  let playerStatusConfidence = 50;
+  const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
+  
+  if (legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED") {
+    playerStatusConfidence = 95;
+    factors.push("Established legacy provides clear valuation");
+  } else if (legacyTier === "RETIRED") {
+    playerStatusConfidence = 80;
+    factors.push("Retired player - career arc complete");
+  } else if (legacyTier === "SUPERSTAR") {
+    playerStatusConfidence = 70;
+    factors.push("Elite active player with proven track record");
+  } else if (legacyTier === "STAR") {
+    playerStatusConfidence = 55;
+    factors.push("Established player but future uncertain");
+  } else if (legacyTier === "PROSPECT" || legacyTier === "RISING_STAR") {
+    playerStatusConfidence = 35;
+    factors.push("Early career - trajectory still developing");
+  } else if (legacyTier === "AGING_VET") {
+    playerStatusConfidence = 45;
+    factors.push("Aging player - decline risk present");
+  }
+  
+  // Accolades boost confidence
+  if (accolades.accoladeCount >= 2) {
+    playerStatusConfidence = Math.min(100, playerStatusConfidence + 15);
+    factors.push("Multiple accolades provide clearer picture");
+  }
+  
+  const overallConfidence = Math.round(
+    (salesDataConfidence * 0.35 + priceStabilityConfidence * 0.3 + playerStatusConfidence * 0.35)
+  );
+  
+  return {
+    salesDataConfidence,
+    priceStabilityConfidence,
+    playerStatusConfidence,
+    overallConfidence,
+    factors,
+  };
+}
 
 // Accolades detection patterns
 interface DetectedAccolades {
@@ -1200,6 +1538,19 @@ export async function generateCardOutlook(
   const accolades = detectAccolades(card.title, card.playerName);
   const sportConfig = card.sport ? SPORT_CONFIGS[card.sport.toLowerCase()] || null : null;
   
+  // NEW: Get enhancement factors
+  const seasonalMultiplier = getSeasonalMultiplier(card.sport);
+  const franchiseMultiplier = getFranchiseMultiplier(card.sport, card.title, card.playerName);
+  const setPrestige = getSetPrestige(card.title, card.set);
+  const priceTargets = calculatePriceTargets(card);
+  const confidenceBreakdown = calculateConfidenceBreakdown(card, marketStability, accolades);
+  
+  // Get seasonal context
+  const seasonConfig = card.sport ? SEASONAL_CONFIGS[card.sport.toLowerCase()] : null;
+  const currentMonth = new Date().getMonth() + 1;
+  const isPlayoffSeason = seasonConfig?.playoffMonths.includes(currentMonth) ?? false;
+  const isInSeason = seasonConfig?.peakMonths.includes(currentMonth) ?? false;
+  
   // NEW: Use lifecycle-aware scoring that respects career stage ranges
   const upsideScore = calculateLifecycleAwareUpside(
     card,
@@ -1236,13 +1587,24 @@ export async function generateCardOutlook(
     liquidityScore: Math.round(liquidityScore * 100) / 100,
     volatilityScore: Math.round(volatilityScore * 100) / 100,
     hypeScore: Math.round(hypeScore * 100) / 100,
+    // NEW: Enhancement factors
+    seasonalMultiplier: Math.round(seasonalMultiplier * 100) / 100,
+    franchiseMultiplier: Math.round(franchiseMultiplier * 100) / 100,
+    setPrestigeTier: setPrestige.tier,
   };
+  
+  // Apply seasonal and franchise multipliers to upside (within bounds)
+  const adjustedUpside = Math.round(clamp(
+    upsideScore * seasonalMultiplier * franchiseMultiplier * setPrestige.multiplier,
+    0,
+    100
+  ));
   
   // NEW: Pass additional context to explanation generator
   const explanation = await generateEditorialExplanation(
     card,
     factors,
-    upsideScore,
+    adjustedUpside,
     riskScore,
     confidenceScore,
     action,
@@ -1259,12 +1621,20 @@ export async function generateCardOutlook(
     position: card.position,
     timeHorizonMonths,
     action,
-    upsideScore,
+    upsideScore: adjustedUpside,
     riskScore,
     confidenceScore,
     projectedOutlook,
     factors,
     explanation,
+    // NEW: Enhanced data
+    priceTargets,
+    confidenceBreakdown,
+    seasonalContext: {
+      currentMultiplier: seasonalMultiplier,
+      isInSeason,
+      isPlayoffSeason,
+    },
   };
 }
 
@@ -1286,8 +1656,13 @@ export function generateQuickOutlook(card: Card): {
   const accolades = detectAccolades(card.title, card.playerName);
   const sportConfig = card.sport ? SPORT_CONFIGS[card.sport.toLowerCase()] || null : null;
   
+  // NEW: Get enhancement factors
+  const seasonalMultiplier = getSeasonalMultiplier(card.sport);
+  const franchiseMultiplier = getFranchiseMultiplier(card.sport, card.title, card.playerName);
+  const setPrestige = getSetPrestige(card.title, card.set);
+  
   // NEW: Use lifecycle-aware scoring
-  const upsideScore = calculateLifecycleAwareUpside(
+  const baseUpside = calculateLifecycleAwareUpside(
     card,
     cardTypeScore,
     positionScore,
@@ -1295,6 +1670,13 @@ export function generateQuickOutlook(card: Card): {
     marketStability,
     sportConfig
   );
+  
+  // Apply multipliers
+  const upsideScore = Math.round(clamp(
+    baseUpside * seasonalMultiplier * franchiseMultiplier * setPrestige.multiplier,
+    0,
+    100
+  ));
   
   const riskScore = calculateLifecycleAwareRisk(
     card,

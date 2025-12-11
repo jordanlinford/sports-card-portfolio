@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -20,7 +21,13 @@ import {
   Gauge,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  DollarSign,
+  Calendar,
+  Info,
+  Sun,
+  Trophy,
+  UserCog
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +37,28 @@ interface CardOutlookPanelProps {
   card: CardType;
   isPro?: boolean;
   canEdit?: boolean;
+}
+
+interface PriceTargets {
+  strongBuyBelow: number | null;
+  buyBelow: number | null;
+  fairValue: number | null;
+  sellAbove: number | null;
+  strongSellAbove: number | null;
+}
+
+interface ConfidenceBreakdown {
+  salesDataConfidence: number;
+  priceStabilityConfidence: number;
+  playerStatusConfidence: number;
+  overallConfidence: number;
+  factors: string[];
+}
+
+interface SeasonalContext {
+  currentMultiplier: number;
+  isInSeason: boolean;
+  isPlayoffSeason: boolean;
 }
 
 interface OutlookData {
@@ -53,6 +82,9 @@ interface OutlookData {
     liquidityScore: number;
     volatilityScore: number;
     hypeScore: number;
+    seasonalMultiplier?: number;
+    franchiseMultiplier?: number;
+    setPrestigeTier?: string;
   };
   explanation?: {
     short: string;
@@ -60,6 +92,10 @@ interface OutlookData {
   } | null;
   generatedAt?: string | null;
   cached: boolean;
+  // NEW: Enhanced data
+  priceTargets?: PriceTargets;
+  confidenceBreakdown?: ConfidenceBreakdown;
+  seasonalContext?: SeasonalContext;
 }
 
 function getActionColor(action: "BUY" | "WATCH" | "SELL"): string {
@@ -127,6 +163,26 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
       toast({
         title: "Generation Failed",
         description: error.message || "Failed to generate outlook",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateLifecycleMutation = useMutation({
+    mutationFn: async (legacyTier: string) => {
+      return await apiRequest("PATCH", `/api/cards/${card.id}/lifecycle`, { legacyTier });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cards", card.id, "outlook"] });
+      toast({
+        title: "Career Stage Updated",
+        description: "The career stage has been updated. Regenerate outlook to see updated scores.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update career stage",
         variant: "destructive",
       });
     },
@@ -279,6 +335,123 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
           </>
         )}
 
+        {outlook.priceTargets && outlook.priceTargets.fairValue && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <DollarSign className="h-3 w-3" />
+                <span>Price Targets</span>
+              </div>
+              <div className="grid grid-cols-5 gap-1 text-center text-xs">
+                <div className="p-1.5 rounded-md bg-green-600/20 dark:bg-green-600/10">
+                  <div className="text-muted-foreground text-[10px]">Strong Buy</div>
+                  <div className="font-semibold text-green-600" data-testid="text-strong-buy">
+                    ${outlook.priceTargets.strongBuyBelow?.toFixed(0) || '-'}
+                  </div>
+                </div>
+                <div className="p-1.5 rounded-md bg-green-500/10">
+                  <div className="text-muted-foreground text-[10px]">Buy</div>
+                  <div className="font-semibold text-green-500" data-testid="text-buy-below">
+                    ${outlook.priceTargets.buyBelow?.toFixed(0) || '-'}
+                  </div>
+                </div>
+                <div className="p-1.5 rounded-md bg-muted">
+                  <div className="text-muted-foreground text-[10px]">Fair Value</div>
+                  <div className="font-semibold" data-testid="text-fair-value">
+                    ${outlook.priceTargets.fairValue?.toFixed(0) || '-'}
+                  </div>
+                </div>
+                <div className="p-1.5 rounded-md bg-amber-500/10">
+                  <div className="text-muted-foreground text-[10px]">Sell</div>
+                  <div className="font-semibold text-amber-500" data-testid="text-sell-above">
+                    ${outlook.priceTargets.sellAbove?.toFixed(0) || '-'}
+                  </div>
+                </div>
+                <div className="p-1.5 rounded-md bg-red-500/10">
+                  <div className="text-muted-foreground text-[10px]">Strong Sell</div>
+                  <div className="font-semibold text-red-500" data-testid="text-strong-sell">
+                    ${outlook.priceTargets.strongSellAbove?.toFixed(0) || '-'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {outlook.seasonalContext && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                <Calendar className="h-3 w-3" />
+                <span>Market Timing</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {outlook.seasonalContext.isPlayoffSeason && (
+                  <Badge variant="outline" className="gap-1 text-xs bg-amber-500/10 border-amber-500/30 text-amber-600">
+                    <Trophy className="h-3 w-3" />
+                    Playoff Season
+                  </Badge>
+                )}
+                {outlook.seasonalContext.isInSeason && !outlook.seasonalContext.isPlayoffSeason && (
+                  <Badge variant="outline" className="gap-1 text-xs bg-green-500/10 border-green-500/30 text-green-600">
+                    <Sun className="h-3 w-3" />
+                    In Season
+                  </Badge>
+                )}
+                {!outlook.seasonalContext.isInSeason && !outlook.seasonalContext.isPlayoffSeason && (
+                  <Badge variant="outline" className="gap-1 text-xs bg-muted border-muted-foreground/30">
+                    Off Season
+                  </Badge>
+                )}
+                {outlook.seasonalContext.currentMultiplier !== 1 && (
+                  <span className="text-xs text-muted-foreground">
+                    ({outlook.seasonalContext.currentMultiplier > 1 ? '+' : ''}{((outlook.seasonalContext.currentMultiplier - 1) * 100).toFixed(0)}% seasonal factor)
+                  </span>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {outlook.confidenceBreakdown && (
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1 p-0 h-auto text-xs text-muted-foreground">
+                <Info className="h-3 w-3" />
+                Why this confidence level?
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2 space-y-2">
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Sales Data</div>
+                  <Progress value={outlook.confidenceBreakdown.salesDataConfidence} className="h-1" />
+                  <div className="font-medium">{outlook.confidenceBreakdown.salesDataConfidence}%</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Price Stability</div>
+                  <Progress value={outlook.confidenceBreakdown.priceStabilityConfidence} className="h-1" />
+                  <div className="font-medium">{outlook.confidenceBreakdown.priceStabilityConfidence}%</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-muted-foreground">Player Status</div>
+                  <Progress value={outlook.confidenceBreakdown.playerStatusConfidence} className="h-1" />
+                  <div className="font-medium">{outlook.confidenceBreakdown.playerStatusConfidence}%</div>
+                </div>
+              </div>
+              {outlook.confidenceBreakdown.factors.length > 0 && (
+                <ul className="text-xs text-muted-foreground space-y-0.5 list-disc list-inside">
+                  {outlook.confidenceBreakdown.factors.map((factor, i) => (
+                    <li key={i}>{factor}</li>
+                  ))}
+                </ul>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
         {outlook.explanation?.short && (
           <>
             <Separator />
@@ -316,23 +489,64 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
         )}
 
         {isPro && canEdit && (
-          <div className="pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 w-full"
-              onClick={() => generateOutlookMutation.mutate()}
-              disabled={generateOutlookMutation.isPending}
-              data-testid="button-refresh-outlook"
-            >
-              {generateOutlookMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              {generateOutlookMutation.isPending ? "Analyzing..." : "Refresh Outlook"}
-            </Button>
-          </div>
+          <>
+            <Separator />
+            <Collapsible>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-2 p-0 h-auto text-muted-foreground">
+                  <UserCog className="h-3.5 w-3.5" />
+                  Adjust Career Stage
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2 space-y-2">
+                <p className="text-xs text-muted-foreground">
+                  If our detection is incorrect, override the career stage to improve accuracy:
+                </p>
+                <div className="flex items-center gap-2">
+                  <Select
+                    defaultValue={card.legacyTier || ""}
+                    onValueChange={(value) => updateLifecycleMutation.mutate(value)}
+                    disabled={updateLifecycleMutation.isPending}
+                  >
+                    <SelectTrigger className="flex-1" data-testid="select-lifecycle-override">
+                      <SelectValue placeholder="Auto-detect (default)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rising_star">Rising Star (Rookie/Sophomore)</SelectItem>
+                      <SelectItem value="prime">Prime (Peak Performance)</SelectItem>
+                      <SelectItem value="established">Established Veteran</SelectItem>
+                      <SelectItem value="declining">Declining (Late Career)</SelectItem>
+                      <SelectItem value="retired_recent">Recently Retired</SelectItem>
+                      <SelectItem value="retired">Retired (Legacy Era)</SelectItem>
+                      <SelectItem value="legend">Legend / Hall of Famer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {updateLifecycleMutation.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 w-full"
+                onClick={() => generateOutlookMutation.mutate()}
+                disabled={generateOutlookMutation.isPending}
+                data-testid="button-refresh-outlook"
+              >
+                {generateOutlookMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {generateOutlookMutation.isPending ? "Analyzing..." : "Refresh Outlook"}
+              </Button>
+            </div>
+          </>
         )}
       </CardContent>
     </Card>

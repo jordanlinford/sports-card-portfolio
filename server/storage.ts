@@ -76,13 +76,13 @@ export interface IStorage {
   copyCardsToDisplayCase(cardIds: number[], targetDisplayCaseId: number): Promise<Card[]>;
   updateCard(id: number, data: Partial<InsertCard>): Promise<Card | undefined>;
   updateCardOutlook(id: number, data: {
-    outlookAction: string;
-    outlookUpsideScore: number;
-    outlookRiskScore: number;
-    outlookConfidenceScore: number;
-    outlookExplanationShort: string;
-    outlookExplanationLong: string;
-    outlookGeneratedAt: Date;
+    outlookAction: string | null;
+    outlookUpsideScore: number | null;
+    outlookRiskScore: number | null;
+    outlookConfidenceScore: number | null;
+    outlookExplanationShort: string | null;
+    outlookExplanationLong: string | null;
+    outlookGeneratedAt: Date | null;
   }): Promise<Card | undefined>;
   deleteCard(id: number): Promise<void>;
   getMaxSortOrder(displayCaseId: number): Promise<number>;
@@ -560,13 +560,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCardOutlook(id: number, data: {
-    outlookAction: string;
-    outlookUpsideScore: number;
-    outlookRiskScore: number;
-    outlookConfidenceScore: number;
-    outlookExplanationShort: string;
-    outlookExplanationLong: string;
-    outlookGeneratedAt: Date;
+    outlookAction: string | null;
+    outlookUpsideScore: number | null;
+    outlookRiskScore: number | null;
+    outlookConfidenceScore: number | null;
+    outlookExplanationShort: string | null;
+    outlookExplanationLong: string | null;
+    outlookGeneratedAt: Date | null;
   }): Promise<Card | undefined> {
     const [card] = await db
       .update(cards)
