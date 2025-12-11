@@ -1344,6 +1344,30 @@ Allow: /
     }
   });
 
+  // Admin: Update user subscription status
+  app.patch("/api/admin/users/:id/subscription", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+      const { subscriptionStatus } = req.body;
+
+      if (!subscriptionStatus || !["FREE", "PRO"].includes(subscriptionStatus)) {
+        return res.status(400).json({ message: "Invalid subscription status. Must be FREE or PRO" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      await storage.updateUserSubscription(userId, subscriptionStatus, user.stripeCustomerId || undefined);
+      const updatedUser = await storage.getUser(userId);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user subscription:", error);
+      res.status(500).json({ message: "Failed to update user subscription" });
+    }
+  });
+
   // Portfolio Analytics
   app.get("/api/analytics", isAuthenticated, async (req: any, res) => {
     try {

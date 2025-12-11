@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Users, LayoutGrid, CreditCard, Image } from "lucide-react";
+import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { format } from "date-fns";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { User, DisplayCaseWithCards } from "@shared/schema";
 
 interface PlatformStats {
@@ -37,12 +39,14 @@ function StatCard({ title, value, icon: Icon, description }: { title: string; va
   );
 }
 
-function UserRow({ user }: { user: User }) {
+function UserRow({ user, onUpdateSubscription }: { user: User; onUpdateSubscription: (userId: string, status: string) => void }) {
   const initials = [user.firstName, user.lastName]
     .filter(Boolean)
     .map((n) => n?.[0])
     .join("")
     .toUpperCase() || "?";
+
+  const isPro = user.subscriptionStatus === "PRO";
 
   return (
     <div className="flex items-center gap-4 p-4 border-b last:border-b-0" data-testid={`row-user-${user.id}`}>
@@ -60,9 +64,30 @@ function UserRow({ user }: { user: User }) {
         {user.isAdmin && (
           <Badge variant="default">Admin</Badge>
         )}
-        <Badge variant={user.subscriptionStatus === "PRO" ? "default" : "secondary"}>
+        <Badge variant={isPro ? "default" : "secondary"}>
           {user.subscriptionStatus || "FREE"}
         </Badge>
+        {isPro ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onUpdateSubscription(user.id, "FREE")}
+            data-testid={`button-downgrade-${user.id}`}
+          >
+            <UserMinus className="h-4 w-4 mr-1" />
+            Downgrade
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            variant="default"
+            onClick={() => onUpdateSubscription(user.id, "PRO")}
+            data-testid={`button-upgrade-${user.id}`}
+          >
+            <Crown className="h-4 w-4 mr-1" />
+            Upgrade to Pro
+          </Button>
+        )}
       </div>
       {user.createdAt && (
         <span className="text-sm text-muted-foreground hidden md:block">
@@ -109,6 +134,8 @@ function DisplayCaseRow({ displayCase }: { displayCase: DisplayCaseWithOwner }) 
 }
 
 export default function AdminDashboard() {
+  const { toast } = useToast();
+  
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<PlatformStats>({
     queryKey: ["/api/admin/stats"],
     retry: false,
@@ -123,6 +150,32 @@ export default function AdminDashboard() {
     queryKey: ["/api/admin/display-cases"],
     retry: false,
   });
+
+  const updateSubscriptionMutation = useMutation({
+    mutationFn: async ({ userId, subscriptionStatus }: { userId: string; subscriptionStatus: string }) => {
+      const response = await apiRequest("PATCH", `/api/admin/users/${userId}/subscription`, { subscriptionStatus });
+      return response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({
+        title: variables.subscriptionStatus === "PRO" ? "User Upgraded" : "User Downgraded",
+        description: `User subscription updated to ${variables.subscriptionStatus}`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update user subscription",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleUpdateSubscription = (userId: string, status: string) => {
+    updateSubscriptionMutation.mutate({ userId, subscriptionStatus: status });
+  };
 
   if (statsError) {
     return (
@@ -216,7 +269,7 @@ export default function AdminDashboard() {
                     </div>
                   ) : users && users.length > 0 ? (
                     users.map((user) => (
-                      <UserRow key={user.id} user={user} />
+                      <UserRow key={user.id} user={user} onUpdateSubscription={handleUpdateSubscription} />
                     ))
                   ) : (
                     <div className="p-8 text-center text-muted-foreground">
