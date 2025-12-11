@@ -428,6 +428,222 @@ function generateFallbackLong(
   return parts.join(" ");
 }
 
+export interface InferredCardMetadata {
+  playerName: string | null;
+  sport: string | null;
+  position: string | null;
+  isRookie: boolean | null;
+  hasAuto: boolean | null;
+  isNumbered: boolean | null;
+  serialNumber: number | null;
+  legacyTier: LegacyTier | null;
+  grader: string | null;
+}
+
+function inferLegacyTierFromYear(year: number | null, title: string): LegacyTier | null {
+  if (!year) return null;
+  
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - year;
+  
+  const titleLower = title.toLowerCase();
+  if (titleLower.includes("hof") || titleLower.includes("hall of fame")) {
+    return "HOF";
+  }
+  if (titleLower.includes("legend") || titleLower.includes("deceased") || titleLower.includes("memorial")) {
+    return "LEGEND_DECEASED";
+  }
+  
+  if (age <= 2) return "PROSPECT";
+  if (age <= 5) return "RISING_STAR";
+  if (age <= 10) return "STAR";
+  if (age <= 15) return "SUPERSTAR";
+  if (age <= 25) return "RETIRED";
+  return "HOF";
+}
+
+function inferFromTitle(title: string, set: string | null, grade: string | null): Partial<InferredCardMetadata> {
+  const result: Partial<InferredCardMetadata> = {};
+  const combined = `${title} ${set || ""} ${grade || ""}`.toLowerCase();
+  
+  if (combined.includes("rookie") || combined.includes(" rc ") || combined.includes(" rc") || 
+      combined.includes("1st bowman") || combined.includes("first bowman") || combined.includes("rated rookie")) {
+    result.isRookie = true;
+  }
+  
+  if (combined.includes("auto") || combined.includes("autograph") || combined.includes("signed") || combined.includes("on-card")) {
+    result.hasAuto = true;
+  }
+  
+  const numberedMatch = combined.match(/\/(\d+)/);
+  if (numberedMatch) {
+    result.isNumbered = true;
+    result.serialNumber = parseInt(numberedMatch[1], 10);
+  } else if (combined.includes("numbered") || combined.includes("serial") || combined.includes("ssp") || combined.includes("sp ")) {
+    result.isNumbered = true;
+  }
+  
+  const graderPatterns = [
+    { pattern: /psa\s*\d+/i, grader: "PSA" },
+    { pattern: /bgs\s*[\d.]+/i, grader: "BGS" },
+    { pattern: /sgc\s*[\d.]+/i, grader: "SGC" },
+    { pattern: /cgc\s*[\d.]+/i, grader: "CGC" },
+  ];
+  for (const { pattern, grader } of graderPatterns) {
+    if (pattern.test(combined)) {
+      result.grader = grader;
+      break;
+    }
+  }
+  
+  const sportPatterns = [
+    { keywords: ["topps baseball", "bowman baseball", "mlb", "baseball"], sport: "baseball" },
+    { keywords: ["topps chrome", "bowman chrome", "bowman 1st", "topps heritage"], sport: "baseball" },
+    { keywords: ["panini prizm basketball", "nba", "hoops basketball", "select basketball"], sport: "basketball" },
+    { keywords: ["panini prizm football", "nfl", "donruss football", "select football", "topps football"], sport: "football" },
+    { keywords: ["upper deck hockey", "nhl", "o-pee-chee", "young guns"], sport: "hockey" },
+    { keywords: ["panini soccer", "topps soccer", "premier league", "champions league"], sport: "soccer" },
+    { keywords: ["pokemon", "pikachu", "charizard", "trainer", "scarlet & violet", "sword & shield"], sport: "tcg" },
+    { keywords: ["magic the gathering", "mtg", "planeswalker"], sport: "tcg" },
+    { keywords: ["yugioh", "yu-gi-oh"], sport: "tcg" },
+  ];
+  
+  for (const { keywords, sport } of sportPatterns) {
+    if (keywords.some(k => combined.includes(k))) {
+      result.sport = sport;
+      break;
+    }
+  }
+  
+  if (!result.sport) {
+    const footballIndicators = ["nfl", "football", "quarterback", "qb", "wr", "rb", "te", "cb", "lb"];
+    const basketballIndicators = ["nba", "basketball"];
+    const hockeyIndicators = ["nhl", "hockey"];
+    const soccerIndicators = ["soccer", "premier league", "champions league", "mls"];
+    
+    const hasFootball = footballIndicators.some(k => combined.includes(k));
+    const hasBasketball = basketballIndicators.some(k => combined.includes(k));
+    const hasHockey = hockeyIndicators.some(k => combined.includes(k));
+    const hasSoccer = soccerIndicators.some(k => combined.includes(k));
+    
+    if ((combined.includes("topps") || combined.includes("bowman")) && !hasFootball && !hasBasketball && !hasHockey && !hasSoccer) {
+      result.sport = "baseball";
+    }
+  }
+  
+  return result;
+}
+
+export async function inferCardMetadata(
+  card: Card
+): Promise<InferredCardMetadata> {
+  const basicInference = inferFromTitle(card.title, card.set, card.grade);
+  
+  const result: InferredCardMetadata = {
+    playerName: card.playerName || null,
+    sport: card.sport || basicInference.sport || null,
+    position: card.position || null,
+    isRookie: card.isRookie ?? basicInference.isRookie ?? null,
+    hasAuto: card.hasAuto ?? basicInference.hasAuto ?? null,
+    isNumbered: card.isNumbered ?? basicInference.isNumbered ?? null,
+    serialNumber: card.serialNumber ?? basicInference.serialNumber ?? null,
+    legacyTier: (card.legacyTier as LegacyTier) || null,
+    grader: card.grader || basicInference.grader || null,
+  };
+  
+  const needsAI = !result.playerName || !result.sport || !result.position || !result.legacyTier;
+  
+  if (!needsAI) {
+    return result;
+  }
+  
+  const openai = getOpenAI();
+  if (!openai) {
+    result.legacyTier = result.legacyTier || inferLegacyTierFromYear(card.year, card.title);
+    return result;
+  }
+  
+  try {
+    const prompt = `Analyze this trading card and extract metadata. Return ONLY valid JSON.
+
+Card Title: ${card.title}
+Set: ${card.set || "unknown"}
+Year: ${card.year || "unknown"}
+Grade: ${card.grade || "ungraded"}
+
+Extract:
+- playerName: The person/character name (string or null)
+- sport: One of "football", "basketball", "baseball", "hockey", "soccer", "tcg" (string or null)
+- position: Player position like QB, WR, PG, SF, etc. For TCG use rarity like "chase", "ultra_rare" (string or null)
+- legacyTier: One of "PROSPECT", "RISING_STAR", "STAR", "SUPERSTAR", "AGING_VET", "RETIRED", "HOF", "LEGEND_DECEASED" (string or null)
+
+Rules for legacyTier:
+- PROSPECT: Rookie or 1-2 years in league
+- RISING_STAR: 3-5 years, showing promise
+- STAR: Established player, 5-10 years
+- SUPERSTAR: Elite player, MVP candidate
+- AGING_VET: Past prime, still active
+- RETIRED: No longer playing
+- HOF: Hall of Fame inductee
+- LEGEND_DECEASED: Deceased legends
+
+Return only JSON: {"playerName":"...","sport":"...","position":"...","legacyTier":"..."}`;
+
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 150,
+      temperature: 0.3,
+    });
+
+    const content = response.choices[0]?.message?.content || "";
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        
+        if (typeof parsed === "object" && parsed !== null) {
+          if (!result.playerName && parsed.playerName && typeof parsed.playerName === "string") {
+            const trimmed = parsed.playerName.trim();
+            if (trimmed.length > 0) {
+              result.playerName = trimmed;
+            }
+          }
+          if (!result.sport && parsed.sport && typeof parsed.sport === "string") {
+            const normalizedSport = parsed.sport.trim().toLowerCase();
+            const validSports = ["football", "basketball", "baseball", "hockey", "soccer", "tcg"];
+            if (validSports.includes(normalizedSport)) {
+              result.sport = normalizedSport;
+            }
+          }
+          if (!result.position && parsed.position && typeof parsed.position === "string") {
+            const trimmed = parsed.position.trim();
+            if (trimmed.length > 0) {
+              result.position = trimmed;
+            }
+          }
+          if (!result.legacyTier && parsed.legacyTier && typeof parsed.legacyTier === "string") {
+            const normalizedTier = parsed.legacyTier.trim().toUpperCase().replace(/\s+/g, "_");
+            const validTiers: LegacyTier[] = ["PROSPECT", "RISING_STAR", "STAR", "SUPERSTAR", "AGING_VET", "RETIRED", "HOF", "LEGEND_DECEASED"];
+            if (validTiers.includes(normalizedTier as LegacyTier)) {
+              result.legacyTier = normalizedTier as LegacyTier;
+            }
+          }
+        }
+      } catch (parseError) {
+        console.error("Error parsing AI response JSON:", parseError);
+      }
+    }
+  } catch (error) {
+    console.error("Error inferring card metadata with AI:", error);
+  }
+  
+  result.legacyTier = result.legacyTier || inferLegacyTierFromYear(card.year, card.title);
+  
+  return result;
+}
+
 export async function generateCardOutlook(
   card: Card,
   timeHorizonMonths: number = 12

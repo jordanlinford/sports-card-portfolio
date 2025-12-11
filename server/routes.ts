@@ -11,7 +11,7 @@ import { WebhookHandlers } from "./webhookHandlers";
 import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
 import { generateShareImage } from "./shareImageService";
 import { prestigeService } from "./prestigeService";
-import { generateCardOutlook, generateQuickOutlook } from "./cardOutlookService";
+import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./cardOutlookService";
 
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
@@ -999,8 +999,42 @@ Allow: /
         return res.status(403).json({ message: "You don't have permission to analyze this card" });
       }
 
-      // Generate the full outlook with AI explanation
-      const outlook = await generateCardOutlook(card, timeHorizonMonths);
+      // First, infer any missing metadata using AI
+      const inferredMetadata = await inferCardMetadata(card);
+      
+      // Save inferred metadata to the card if any fields were updated
+      const metadataUpdates: Record<string, any> = {};
+      if (inferredMetadata.playerName && !card.playerName) metadataUpdates.playerName = inferredMetadata.playerName;
+      if (inferredMetadata.sport && !card.sport) metadataUpdates.sport = inferredMetadata.sport;
+      if (inferredMetadata.position && !card.position) metadataUpdates.position = inferredMetadata.position;
+      if (inferredMetadata.legacyTier && !card.legacyTier) metadataUpdates.legacyTier = inferredMetadata.legacyTier;
+      if (inferredMetadata.isRookie !== null && card.isRookie === null) metadataUpdates.isRookie = inferredMetadata.isRookie;
+      if (inferredMetadata.hasAuto !== null && card.hasAuto === null) metadataUpdates.hasAuto = inferredMetadata.hasAuto;
+      if (inferredMetadata.isNumbered !== null && card.isNumbered === null) metadataUpdates.isNumbered = inferredMetadata.isNumbered;
+      if (inferredMetadata.serialNumber && !card.serialNumber) metadataUpdates.serialNumber = inferredMetadata.serialNumber;
+      if (inferredMetadata.grader && !card.grader) metadataUpdates.grader = inferredMetadata.grader;
+      
+      // Update card with inferred metadata if we have any
+      if (Object.keys(metadataUpdates).length > 0) {
+        await storage.updateCard(cardId, metadataUpdates);
+      }
+      
+      // Create enriched card object for outlook generation
+      const enrichedCard = {
+        ...card,
+        playerName: inferredMetadata.playerName || card.playerName,
+        sport: inferredMetadata.sport || card.sport,
+        position: inferredMetadata.position || card.position,
+        legacyTier: inferredMetadata.legacyTier || card.legacyTier,
+        isRookie: inferredMetadata.isRookie ?? card.isRookie,
+        hasAuto: inferredMetadata.hasAuto ?? card.hasAuto,
+        isNumbered: inferredMetadata.isNumbered ?? card.isNumbered,
+        serialNumber: inferredMetadata.serialNumber || card.serialNumber,
+        grader: inferredMetadata.grader || card.grader,
+      };
+
+      // Generate the full outlook with AI explanation using enriched data
+      const outlook = await generateCardOutlook(enrichedCard, timeHorizonMonths);
 
       // Cache the outlook data on the card
       await storage.updateCardOutlook(cardId, {
