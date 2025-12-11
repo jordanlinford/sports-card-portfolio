@@ -166,10 +166,15 @@ Allow: /
       const cardCount = displayCase.cards?.length || 0;
       const cards = displayCase.cards || [];
       
-      // Use production domain for consistent URLs
-      const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
-        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
-        : `https://${req.headers.host}`;
+      // Use the request host for consistent URLs (supports custom domains like mydisplaycase.io)
+      // Prioritize the actual request host so social sharing works correctly on custom domains
+      const requestHost = req.headers.host || '';
+      const isCustomDomain = requestHost && !requestHost.includes('.replit.app') && !requestHost.includes('.repl.co');
+      const baseUrl = isCustomDomain 
+        ? `https://${requestHost}`
+        : (process.env.REPLIT_DEPLOYMENT_DOMAIN 
+            ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
+            : `https://${requestHost}`);
       
       // Use the share image endpoint for rich preview images
       const imageUrl = `${baseUrl}/api/share-image/case/${id}`;
