@@ -1,0 +1,339 @@
+Let’s tackle your two concerns:
+
+Joe Ingles vs Shaq problem (role vs legacy).
+
+TCG / non-sport needing totally different logic.
+
+1. Fixing Joe Ingles vs Shaq: split “Role” from “Legacy”
+
+Right now you have:
+
+Career Lifecycle (rookie, prime, veteran, retired, legend)
+…but no distinction between:
+
+“Aging veteran role player” (Joe Ingles)
+vs
+
+“Aging/retired legend” (Shaq)
+
+✅ Add two separate fields instead of one
+
+Keep Career Lifecycle but add:
+
+Career Lifecycle (you already have this)
+
+Rookie
+
+Early-career
+
+Prime
+
+Late-career vet
+
+Retired
+
+Post-career (HOF / Legend, etc.)
+
+Career Role / Legacy Tier (NEW selector)
+
+Generational Legend (MJ, LeBron, Kobe, Brady, Gretzky)
+
+Hall of Famer / Icon
+
+Star (multiple All-Star / Pro Bowl appearances)
+
+Solid Starter
+
+Role Player
+
+Journeyman / Fringe
+
+Now, you can model:
+
+Joe Ingles
+
+Lifecycle: Late-career vet / Retired
+
+Role: Role Player
+
+Shaq
+
+Lifecycle: Retired / Legend
+
+Role: Generational Legend or HOF/Icon
+
+Same age bucket, completely different legacy profile.
+
+How this affects scoring (conceptually)
+
+Instead of “Career Lifecycle” trying to do everything, split responsibilities:
+
+Career Lifecycle → mostly affects risk (prospect vs aging vet vs retired).
+
+Rookies: high risk, high upside
+
+Prime: moderate risk, high upside
+
+Late-career: low upside, moderate downside
+
+Retired/HOF: lower risk, modest upside unless icon
+
+Career Role / Legacy Tier → mostly affects upside ceiling + long-term floor.
+
+Generational Legend/HOF:
+
+Even if % growth is slower, they have strong value floor and steady long tail.
+
+Role Player/Journeyman:
+
+Very low long-term upside and soft floor. Their spikes are usually tied to tiny hype windows and fade fast.
+
+In your engine you can do something like:
+
+baseUpsideFromLegacy =
+  GenerationalLegend = 0.85
+  HOF/Icon           = 0.8
+  Star               = 0.7
+  SolidStarter       = 0.5
+  RolePlayer         = 0.25
+  Journeyman         = 0.15
+
+lifecycleModifier =
+  Rookie             = +0.15
+  EarlyCareer        = +0.1
+  Prime              = +0.05
+  LateCareerVet      = -0.05
+  Retired            = 0
+  PostCareerLegend   = +0.05 (for HOF bump windows etc.)
+
+rawUpsideBase = baseUpsideFromLegacy + lifecycleModifier
+
+
+So:
+
+Joe Ingles → Role Player (0.25) + Late vet (-0.05) = ~0.20 → Very low upside.
+
+Shaq → Generational Legend (0.85) + Retired / Legend (+0.05) = ~0.90 → High “collectible strength,” even if short-term growth % is modest.
+
+You can then still taper near-term projected % growth for retired legends, but they should never look like junk the way Ingles does.
+
+UX: keep it simple for the user
+
+You don’t want users overthinking this, so:
+
+Let Career Lifecycle default based on age + status (if you track that later).
+
+Let Role / Legacy Tier be a simple dropdown with helper text:
+
+“Role Player – rotational guy, never a star.”
+
+“Star – multiple All-Star/Pro Bowl level.”
+
+“Legend – one of the faces of the sport.”
+
+You can even pre-fill for some big names later, but for now it’s fine to let the user choose.
+
+2. Handling TCG / Pokémon / Non-Sport: different brain entirely
+
+You’re 100% right: Pokémon, MTG, Marvel, etc. should not share the same logic as QBs and point guards.
+
+Step 1: Add a top-level Category Type
+
+Before any of this logic runs, you need:
+
+Item Type / Category:
+
+Sports – Football / Basketball / Baseball / Soccer / Other Sports
+
+TCG – Pokémon / MTG / Yu-Gi-Oh / Other TCG
+
+Non-Sport – Marvel, Star Wars, TV/Movie, etc.
+
+Once “Sports” vs “TCG” vs “Non-Sport” is chosen, you:
+
+Show different inputs
+
+Use different factor weights
+
+For Sports (what you already have, plus updates)
+
+Your current factors are great:
+
+Career Lifecycle ✅
+
+Franchise Popularity ✅
+
+Seasonal Timing ✅
+
+Set Prestige ✅
+
+Card Condition ✅
+
+Price History ✅
+
+NEW: Career Role / Legacy Tier ✅
+
+That’s your sports engine.
+
+For TCG (e.g., Pokémon)
+
+Think in characters and rarity, not players and teams.
+
+Suggested factors for TCG:
+
+TCG Factors:
+
+Character Tier
+
+S-Tier Icon (Charizard, Pikachu, etc.)
+
+A-Tier Fan Favorite
+
+B-Tier Popular
+
+C-Tier Niche / Background
+
+Card Rarity / Slot
+
+Base / Non-holo
+
+Holo / Reverse Holo
+
+Full Art / VMAX / EX / GX style
+
+Alt Art / Secret Rare / Gold
+(You can condense for v1.)
+
+Era / Set Prestige
+
+Vintage / WotC era
+
+Early Modern
+
+Modern
+
+Special sets (e.g. Celebrations, Hidden Fates type).
+
+Print Run / Supply Feel
+
+Mass-printed
+
+Regular
+
+“Chase” level (low supply / special product)
+
+Media Activity / IP Heat
+
+IP currently hot? (new games, movies, series?)
+
+For v1, you can let the user toggle:
+
+“Franchise Heat”: Hot / Stable / Cooling
+
+Price History / Your Value Entries
+
+Stays the same: values over time, volatility.
+
+So a Pokémon Outlook might weigh things like:
+
+UpsideScore_TCG = 
+  CharacterTierWeight +
+  RarityTierWeight +
+  EraPrestigeWeight +
+  FranchiseHeatWeight +
+  TrendFromYourValues
+
+
+Where:
+
+Charizard Secret Rare, Vintage, strong entries over time → high upside, moderate risk.
+
+Random modern uncommon → near-zero upside, low risk because… no one cares.
+
+For Non-Sport (Marvel, Star Wars, etc.)
+
+Very similar to TCG:
+
+IP Tier (Marvel, Star Wars, Harry Potter, etc.)
+
+Character Tier (main hero vs side character)
+
+Card Type (auto, patch, sketch, original art, PMG, etc.)
+
+Era (vintage, early inserts, modern boom sets)
+
+Media Heat (new shows/movies, retired IP, cult classic)
+
+You can reuse the TCG framework but rename labels.
+
+3. How to keep all this from feeling too complex
+
+To avoid overwhelming users:
+
+A. Dynamic UI
+
+Once they choose Category (Sport vs TCG vs Non-Sport), only show relevant fields.
+
+Pre-fill “reasonable defaults” where you can.
+
+B. Use helper tooltips
+
+Each dropdown gets a short explanation:
+
+“Career Role: describe how important this player is historically, not just this season.”
+
+“Character Tier: is this one of the faces of the franchise, or a niche character?”
+
+C. Default to “good enough”
+
+If fields are missing, you still generate an Outlook but:
+
+Lower the Confidence Score
+
+Add a note in the explanation:
+
+“Limited data for this card; results are directional only.”
+
+That keeps the experience forgiving.
+
+4. How I’d tweak your public copy slightly
+
+Your spec is already strong; I’d just thread in the new ideas:
+
+Under Factors Considered, split sports vs TCG:
+
+Sports Cards:
+
+Career Lifecycle
+
+Career Role / Legacy Tier
+
+Seasonal Timing
+
+Franchise Popularity
+
+Set Prestige
+
+Card Condition
+
+Your Price History
+
+TCG & Non-Sport:
+
+Character / IP Tier
+
+Rarity / Chase Level
+
+Set & Era Prestige
+
+Franchise or Media Heat
+
+Card Condition
+
+Your Price History
+
+And add one line to Limitations:
+
+“Player/character roles and tiers are based on your selections, not external stats databases.”
+
+That’s honest but still powerful.
