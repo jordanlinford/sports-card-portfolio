@@ -513,13 +513,14 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                       <SelectValue placeholder="Auto-detect (default)" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="rising_star">Rising Star (Rookie/Sophomore)</SelectItem>
-                      <SelectItem value="prime">Prime (Peak Performance)</SelectItem>
-                      <SelectItem value="established">Established Veteran</SelectItem>
-                      <SelectItem value="declining">Declining (Late Career)</SelectItem>
-                      <SelectItem value="retired_recent">Recently Retired</SelectItem>
-                      <SelectItem value="retired">Retired (Legacy Era)</SelectItem>
-                      <SelectItem value="legend">Legend / Hall of Famer</SelectItem>
+                      <SelectItem value="PROSPECT">Prospect (Pre-Rookie)</SelectItem>
+                      <SelectItem value="RISING_STAR">Rising Star (Rookie/Sophomore)</SelectItem>
+                      <SelectItem value="STAR">Star (Peak Performance)</SelectItem>
+                      <SelectItem value="SUPERSTAR">Superstar (Elite Tier)</SelectItem>
+                      <SelectItem value="AGING_VET">Aging Veteran (Late Career)</SelectItem>
+                      <SelectItem value="RETIRED">Retired</SelectItem>
+                      <SelectItem value="HOF">Hall of Famer</SelectItem>
+                      <SelectItem value="LEGEND_DECEASED">Legend (Deceased)</SelectItem>
                     </SelectContent>
                   </Select>
                   {updateLifecycleMutation.isPending && (
