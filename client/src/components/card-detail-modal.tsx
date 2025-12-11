@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MakeOfferModal } from "@/components/make-offer-modal";
 import { ProposeTradeModal } from "@/components/propose-trade-modal";
+import { CardOutlookPanel } from "@/components/card-outlook-panel";
 
 interface CardDetailModalProps {
   card: Card | null;
@@ -682,6 +683,13 @@ export function CardDetailModal({
                   </div>
                 </>
               )}
+
+              <Separator />
+              <CardOutlookPanel 
+                card={card} 
+                isPro={isPro} 
+                canEdit={canEdit} 
+              />
 
               {card.openToOffers && !canEdit && (
                 <>

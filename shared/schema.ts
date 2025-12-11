@@ -91,6 +91,32 @@ export const cards = pgTable("cards", {
   openToOffers: boolean("open_to_offers").default(false).notNull(),
   minOfferAmount: real("min_offer_amount"),
   createdAt: timestamp("created_at").defaultNow(),
+  // Card Outlook AI fields
+  sport: varchar("sport", { length: 50 }),
+  position: varchar("position", { length: 50 }),
+  playerName: varchar("player_name", { length: 255 }),
+  isRookie: boolean("is_rookie").default(false),
+  isNumbered: boolean("is_numbered").default(false),
+  serialNumber: integer("serial_number"),
+  hasAuto: boolean("has_auto").default(false),
+  insertTier: varchar("insert_tier", { length: 50 }),
+  grader: varchar("grader", { length: 50 }),
+  legacyTier: varchar("legacy_tier", { length: 50 }),
+  playerAge: integer("player_age"),
+  injuryRisk: varchar("injury_risk", { length: 20 }),
+  teamMarketSize: varchar("team_market_size", { length: 20 }),
+  salesLast30Days: integer("sales_last_30_days"),
+  avgSalePrice30: real("avg_sale_price_30"),
+  avgSalePrice90: real("avg_sale_price_90"),
+  priceStdDevPct: real("price_std_dev_pct"),
+  // Cached outlook data
+  outlookAction: varchar("outlook_action", { length: 10 }),
+  outlookUpsideScore: integer("outlook_upside_score"),
+  outlookRiskScore: integer("outlook_risk_score"),
+  outlookConfidenceScore: integer("outlook_confidence_score"),
+  outlookExplanationShort: text("outlook_explanation_short"),
+  outlookExplanationLong: text("outlook_explanation_long"),
+  outlookGeneratedAt: timestamp("outlook_generated_at"),
 });
 
 export const cardsRelations = relations(cards, ({ one }) => ({
@@ -350,6 +376,13 @@ export const insertCardSchema = createInsertSchema(cards).omit({
   displayCaseId: true,
   createdAt: true,
   sortOrder: true,
+  outlookAction: true,
+  outlookUpsideScore: true,
+  outlookRiskScore: true,
+  outlookConfidenceScore: true,
+  outlookExplanationShort: true,
+  outlookExplanationLong: true,
+  outlookGeneratedAt: true,
 });
 export type InsertCard = z.infer<typeof insertCardSchema>;
 export type Card = typeof cards.$inferSelect;

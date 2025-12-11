@@ -11,6 +11,7 @@ import { WebhookHandlers } from "./webhookHandlers";
 import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
 import { generateShareImage } from "./shareImageService";
 import { prestigeService } from "./prestigeService";
+import { generateCardOutlook, generateQuickOutlook } from "./cardOutlookService";
 
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
@@ -965,6 +966,165 @@ Allow: /
     } catch (error) {
       console.error("Error refreshing prices:", error);
       res.status(500).json({ message: "Failed to refresh prices" });
+    }
+  });
+
+  // Card Outlook AI - Generate investment-style outlook for a card (Pro feature)
+  app.post("/api/cards/:cardId/outlook", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+      const userId = req.user.claims.sub;
+      const { timeHorizonMonths = 12 } = req.body;
+
+      // Check if user has Pro subscription
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        return res.status(403).json({ 
+          message: "Card Outlook AI is a Pro feature. Upgrade to Pro to get investment-grade insights on your cards." 
+        });
+      }
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      // Verify user owns this card via the display case
+      const displayCase = await storage.getDisplayCaseByIdAndUser(card.displayCaseId, userId);
+      if (!displayCase) {
+        return res.status(403).json({ message: "You don't have permission to analyze this card" });
+      }
+
+      // Generate the full outlook with AI explanation
+      const outlook = await generateCardOutlook(card, timeHorizonMonths);
+
+      // Cache the outlook data on the card
+      await storage.updateCardOutlook(cardId, {
+        outlookAction: outlook.action,
+        outlookUpsideScore: outlook.upsideScore,
+        outlookRiskScore: outlook.riskScore,
+        outlookConfidenceScore: outlook.confidenceScore,
+        outlookExplanationShort: outlook.explanation.short,
+        outlookExplanationLong: outlook.explanation.long,
+        outlookGeneratedAt: new Date(),
+      });
+
+      res.json(outlook);
+    } catch (error) {
+      console.error("Error generating card outlook:", error);
+      res.status(500).json({ message: "Failed to generate card outlook" });
+    }
+  });
+
+  // Get quick outlook (no AI, just scores) for a card - available for all users
+  app.get("/api/cards/:cardId/quick-outlook", async (req, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      // Check if we have cached outlook data
+      if (card.outlookAction && card.outlookGeneratedAt) {
+        const hoursSinceGenerated = (Date.now() - new Date(card.outlookGeneratedAt).getTime()) / (1000 * 60 * 60);
+        // Use cached data if less than 24 hours old
+        if (hoursSinceGenerated < 24) {
+          return res.json({
+            cardId: card.id,
+            action: card.outlookAction,
+            upsideScore: card.outlookUpsideScore,
+            riskScore: card.outlookRiskScore,
+            confidenceScore: card.outlookConfidenceScore,
+            cached: true,
+            cachedAt: card.outlookGeneratedAt,
+          });
+        }
+      }
+
+      // Generate quick outlook without AI explanation
+      const quickOutlook = generateQuickOutlook(card);
+
+      res.json({
+        cardId: card.id,
+        ...quickOutlook,
+        cached: false,
+      });
+    } catch (error) {
+      console.error("Error getting quick outlook:", error);
+      res.status(500).json({ message: "Failed to get card outlook" });
+    }
+  });
+
+  // Get cached outlook for a card (for display in UI without regenerating)
+  // Scores are public, but explanations require Pro subscription
+  app.get("/api/cards/:cardId/outlook", async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+      const userId = req.user?.claims?.sub;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      // Check if user has Pro access for explanations
+      let isPro = false;
+      if (userId) {
+        const user = await storage.getUser(userId);
+        isPro = user?.subscriptionStatus === "PRO";
+      }
+
+      // Return cached outlook if available
+      if (card.outlookAction && card.outlookGeneratedAt) {
+        return res.json({
+          cardId: card.id,
+          playerName: card.playerName,
+          sport: card.sport,
+          position: card.position,
+          action: card.outlookAction,
+          upsideScore: card.outlookUpsideScore,
+          riskScore: card.outlookRiskScore,
+          confidenceScore: card.outlookConfidenceScore,
+          explanation: isPro ? {
+            short: card.outlookExplanationShort,
+            long: card.outlookExplanationLong,
+          } : null,
+          generatedAt: card.outlookGeneratedAt,
+          cached: true,
+          proRequired: !isPro,
+        });
+      }
+
+      // No cached data, return quick outlook
+      const quickOutlook = generateQuickOutlook(card);
+      res.json({
+        cardId: card.id,
+        playerName: card.playerName,
+        sport: card.sport,
+        position: card.position,
+        ...quickOutlook,
+        explanation: null,
+        generatedAt: null,
+        cached: false,
+        proRequired: true,
+      });
+    } catch (error) {
+      console.error("Error getting card outlook:", error);
+      res.status(500).json({ message: "Failed to get card outlook" });
     }
   });
 
