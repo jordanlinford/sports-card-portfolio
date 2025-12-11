@@ -4,8 +4,8 @@ import { ArrowLeft } from "lucide-react";
 export default function PrivacyPolicy() {
   const lastUpdated = "December 7, 2024";
   const companyName = "MyDisplayCase";
-  const websiteUrl = "mydisplaycase.com";
-  const contactEmail = "support@mydisplaycase.com";
+  const websiteUrl = "mydisplaycase.io";
+  const contactEmail = "support@mydisplaycase.io";
 
   return (
     <div className="min-h-screen bg-background">

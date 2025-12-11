@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { Mail } from "lucide-react";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -10,7 +11,15 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             {currentYear} MyDisplayCase. All rights reserved.
           </p>
-          <nav className="flex items-center gap-6">
+          <nav className="flex flex-wrap items-center gap-6">
+            <a 
+              href="mailto:support@mydisplaycase.io" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
+              data-testid="link-support-email"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              Support
+            </a>
             <Link 
               href="/terms" 
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
