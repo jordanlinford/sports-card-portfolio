@@ -811,15 +811,17 @@ export class DatabaseStorage implements IStorage {
         .orderBy(asc(cards.sortOrder));
 
       const [owner] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName })
+        .select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle })
         .from(users)
         .where(eq(users.id, c.userId));
 
       const likeCount = await this.getLikeCount(c.id);
 
-      const ownerName = owner
-        ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
-        : "Anonymous";
+      const ownerName = owner?.handle
+        ? `@${owner.handle}`
+        : owner
+          ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
+          : "Anonymous";
 
       enrichedCases.push({
         ...c,
@@ -890,13 +892,15 @@ export class DatabaseStorage implements IStorage {
         .orderBy(asc(cards.sortOrder));
 
       const [owner] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName })
+        .select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle })
         .from(users)
         .where(eq(users.id, c.userId));
 
-      const ownerName = owner
-        ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
-        : "Anonymous";
+      const ownerName = owner?.handle
+        ? `@${owner.handle}`
+        : owner
+          ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
+          : "Anonymous";
 
       enrichedCases.push({
         ...c,
@@ -954,13 +958,15 @@ export class DatabaseStorage implements IStorage {
         .orderBy(asc(cards.sortOrder));
 
       const [owner] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName })
+        .select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle })
         .from(users)
         .where(eq(users.id, c.userId));
 
-      const ownerName = owner
-        ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
-        : "Anonymous";
+      const ownerName = owner?.handle
+        ? `@${owner.handle}`
+        : owner
+          ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
+          : "Anonymous";
 
       enrichedCases.push({
         ...c,
@@ -1003,13 +1009,15 @@ export class DatabaseStorage implements IStorage {
         .orderBy(asc(cards.sortOrder));
 
       const [owner] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName })
+        .select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle })
         .from(users)
         .where(eq(users.id, c.userId));
 
-      const ownerName = owner
-        ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
-        : "Anonymous";
+      const ownerName = owner?.handle
+        ? `@${owner.handle}`
+        : owner
+          ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
+          : "Anonymous";
 
       enrichedCases.push({
         ...c,
