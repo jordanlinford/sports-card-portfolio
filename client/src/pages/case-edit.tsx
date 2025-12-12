@@ -97,8 +97,6 @@ const addCardSchema = z.object({
   grade: z.string().max(50).optional(),
   purchasePrice: z.coerce.number().min(0).optional().or(z.literal("")),
   estimatedValue: z.coerce.number().min(0).optional().or(z.literal("")),
-  // Tags for organization
-  tags: z.array(z.string()).optional(),
   // Card category for outlook scoring
   cardCategory: z.enum(["sports", "tcg", "non_sport"]).default("sports"),
   // TCG/Non-Sport fields
@@ -238,7 +236,6 @@ export default function CaseEdit() {
       grade: "",
       purchasePrice: "",
       estimatedValue: "",
-      tags: [],
       cardCategory: "sports",
       characterTier: "",
       rarityTier: "",
@@ -1219,76 +1216,6 @@ export default function CaseEdit() {
                                   data-testid="input-card-estimated-value"
                                 />
                               </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={cardForm.control}
-                          name="tags"
-                          render={({ field }) => (
-                            <FormItem className="col-span-2">
-                              <FormLabel>Tags</FormLabel>
-                              <FormControl>
-                                <div className="space-y-2">
-                                  <div className="flex gap-2">
-                                    <Input
-                                      placeholder="Add a tag (e.g., Rookies, Graded)"
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                          e.preventDefault();
-                                          const input = e.currentTarget;
-                                          const value = input.value.trim();
-                                          if (value && !field.value?.includes(value)) {
-                                            field.onChange([...(field.value || []), value]);
-                                            input.value = '';
-                                          }
-                                        }
-                                      }}
-                                      data-testid="input-card-tag"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      size="icon"
-                                      onClick={(e) => {
-                                        const input = (e.currentTarget.previousSibling as HTMLInputElement);
-                                        const value = input.value.trim();
-                                        if (value && !field.value?.includes(value)) {
-                                          field.onChange([...(field.value || []), value]);
-                                          input.value = '';
-                                        }
-                                      }}
-                                      data-testid="button-add-tag"
-                                    >
-                                      <Plus className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                  {field.value && field.value.length > 0 && (
-                                    <div className="flex flex-wrap gap-1">
-                                      {field.value.map((tag, index) => (
-                                        <Badge key={index} variant="secondary" className="gap-1">
-                                          {tag}
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              field.onChange(field.value?.filter((_, i) => i !== index));
-                                            }}
-                                            className="hover:text-destructive"
-                                            data-testid={`button-remove-tag-${index}`}
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </button>
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </FormControl>
-                              <FormDescription>
-                                Tags help organize your cards. Press Enter or click + to add.
-                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}

@@ -491,9 +491,6 @@ export class DatabaseStorage implements IStorage {
     const newCards: Card[] = [];
     for (let i = 0; i < sourcCards.length; i++) {
       const sourceCard = sourcCards[i];
-      // Track the original card ID for analytics deduplication
-      // If source is already a copy, use its original; otherwise use source's id
-      const originalId = sourceCard.originalCardId || sourceCard.id;
       const [newCard] = await db
         .insert(cards)
         .values({
@@ -511,7 +508,6 @@ export class DatabaseStorage implements IStorage {
           notes: sourceCard.notes,
           tags: sourceCard.tags,
           sortOrder: maxSortOrder + i + 1,
-          originalCardId: originalId, // Mark as copy
         })
         .returning();
       newCards.push(newCard);
@@ -608,7 +604,7 @@ export class DatabaseStorage implements IStorage {
 
   async searchCards(
     userId: string,
-    filters: { query?: string; set?: string; year?: number; grade?: string; tag?: string }
+    filters: { query?: string; set?: string; year?: number; grade?: string }
   ): Promise<(Card & { displayCaseName: string; displayCaseId: number })[]> {
     const userCases = await db
       .select({ id: displayCases.id, name: displayCases.name })
@@ -649,13 +645,6 @@ export class DatabaseStorage implements IStorage {
     if (filters.grade) {
       allCards = allCards.filter(
         (c) => c.grade && c.grade.toLowerCase().includes(filters.grade!.toLowerCase())
-      );
-    }
-
-    if (filters.tag) {
-      const tagLower = filters.tag.toLowerCase();
-      allCards = allCards.filter(
-        (c) => c.tags && c.tags.some(t => t.toLowerCase().includes(tagLower))
       );
     }
 
@@ -1030,24 +1019,20 @@ export class DatabaseStorage implements IStorage {
       .from(cards)
       .where(inArray(cards.displayCaseId, caseIds));
 
-    // Filter out copied cards for analytics totals (only count originals)
-    // Cards with originalCardId are copies and shouldn't be double-counted
-    const originalCards = allCards.filter(c => c.originalCardId === null);
-
-    // Calculate totals using only original cards (no double-counting)
-    const totalValue = originalCards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
-    const totalCards = originalCards.length;
+    // Calculate totals
+    const totalValue = allCards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
+    const totalCards = allCards.length;
     const totalCases = userCases.length;
 
-    // Get top 10 cards by value (using originalCards to avoid counting copies)
-    const topCards = [...originalCards]
+    // Get top 10 cards by value
+    const topCards = [...allCards]
       .filter(c => c.estimatedValue && c.estimatedValue > 0)
       .sort((a, b) => (b.estimatedValue || 0) - (a.estimatedValue || 0))
       .slice(0, 10);
 
-    // Calculate value by case (using originalCards to avoid counting copies)
+    // Calculate value by case
     const valueByCase = userCases.map(c => {
-      const caseCards = originalCards.filter(card => card.displayCaseId === c.id);
+      const caseCards = allCards.filter(card => card.displayCaseId === c.id);
       return {
         caseName: c.name,
         totalValue: caseCards.reduce((sum, card) => sum + (card.estimatedValue || 0), 0),
@@ -1055,8 +1040,8 @@ export class DatabaseStorage implements IStorage {
       };
     }).filter(c => c.cardCount > 0);
 
-    // Get cards with recent value changes (using originalCards to avoid counting copies)
-    const recentValueChanges = originalCards
+    // Get cards with recent value changes (has previousValue and valueUpdatedAt)
+    const recentValueChanges = allCards
       .filter(c => c.previousValue !== null && c.valueUpdatedAt !== null)
       .sort((a, b) => {
         const aDate = a.valueUpdatedAt ? new Date(a.valueUpdatedAt).getTime() : 0;
