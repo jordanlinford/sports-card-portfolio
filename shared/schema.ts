@@ -32,6 +32,7 @@ export const users = pgTable("users", {
   email: varchar("email").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
+  handle: varchar("handle", { length: 30 }).unique(),
   profileImageUrl: varchar("profile_image_url"),
   subscriptionStatus: varchar("subscription_status").default("FREE").notNull(),
   stripeCustomerId: varchar("stripe_customer_id"),
@@ -451,23 +452,23 @@ export type UserBadgeWithBadge = UserBadge & { badge: Badge };
 // Extended types with relations
 export type DisplayCaseWithCards = DisplayCase & { cards: Card[] };
 export type DisplayCaseWithUser = DisplayCase & { user: User };
-export type CommentWithUser = Comment & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> };
+export type CommentWithUser = Comment & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> };
 export type BookmarkWithCard = Bookmark & { card: Card };
-export type OfferWithUsers = Offer & { fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; card: Card };
+export type OfferWithUsers = Offer & { fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>; card: Card };
 export type TradeOfferWithDetails = TradeOffer & { 
-  fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; 
-  toUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>; 
+  fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>; 
+  toUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>; 
   offeredCards: Card[];
   requestedCards: Card[];
 };
 
 export type ConversationWithDetails = Conversation & {
-  otherUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>;
+  otherUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>;
   unreadCount: number;
 };
 
 export type MessageWithSender = Message & {
-  sender: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>;
+  sender: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>;
 };
 
 // Promo codes table

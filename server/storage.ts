@@ -46,12 +46,34 @@ import {
   type PromoCodeRedemption,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, or, ilike, inArray, sql } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
+
+// Random handle generator for new users
+const adjectives = [
+  "Swift", "Golden", "Silver", "Lucky", "Epic", "Rare", "Vintage", "Classic", 
+  "Prime", "Elite", "Royal", "Cosmic", "Shiny", "Pristine", "Mint", "Graded",
+  "Rookie", "Legend", "Ace", "Pro", "Star", "Ultra", "Super", "Mega", "Neo"
+];
+
+const nouns = [
+  "Collector", "Trader", "Hunter", "Vault", "Deck", "Stash", "Pack", "Case",
+  "Grail", "Card", "Gem", "Diamond", "Pearl", "Crown", "Chest", "Cache",
+  "Hoard", "Trove", "Find", "Score", "Pull", "Hit", "Keeper", "Archive"
+];
+
+function generateRandomHandle(): string {
+  const adjective = adjectives[Math.floor(Math.random() * adjectives.length)].toLowerCase();
+  const noun = nouns[Math.floor(Math.random() * nouns.length)].toLowerCase();
+  const number = Math.floor(Math.random() * 9999) + 1;
+  return `${adjective}_${noun}_${number}`;
+}
 
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserHandle(userId: string, handle: string): Promise<User | undefined>;
+  isHandleAvailable(handle: string, excludeUserId?: string): Promise<boolean>;
   updateUserSubscription(userId: string, status: string, stripeCustomerId?: string): Promise<User | undefined>;
   updateUserByStripeCustomerId(stripeCustomerId: string, data: { subscriptionStatus?: string; stripeSubscriptionId?: string | null }): Promise<User | undefined>;
 
@@ -166,8 +188,8 @@ export interface IStorage {
   followUser(followerId: string, followedId: string): Promise<Follow>;
   unfollowUser(followerId: string, followedId: string): Promise<void>;
   isFollowing(followerId: string, followedId: string): Promise<boolean>;
-  getFollowers(userId: string): Promise<(Follow & { follower: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]>;
-  getFollowing(userId: string): Promise<(Follow & { followed: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]>;
+  getFollowers(userId: string): Promise<(Follow & { follower: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> })[]>;
+  getFollowing(userId: string): Promise<(Follow & { followed: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> })[]>;
   getFollowerCount(userId: string): Promise<number>;
   getFollowingCount(userId: string): Promise<number>;
 
@@ -200,10 +222,32 @@ export class DatabaseStorage implements IStorage {
     
     const isAdminEmail = userData.email && ADMIN_EMAILS.includes(userData.email.toLowerCase());
     
+    // Check if user exists and has a handle
+    const existingUser = userData.id ? await this.getUser(userData.id) : undefined;
+    
+    // Generate a unique handle for new users
+    let handle = existingUser?.handle;
+    if (!handle) {
+      // Try to generate a unique handle (with retries for collisions)
+      for (let i = 0; i < 5; i++) {
+        const candidateHandle = generateRandomHandle();
+        const [existing] = await db.select().from(users).where(eq(users.handle, candidateHandle));
+        if (!existing) {
+          handle = candidateHandle;
+          break;
+        }
+      }
+      // If all retries fail, append more random digits
+      if (!handle) {
+        handle = generateRandomHandle() + Math.floor(Math.random() * 1000);
+      }
+    }
+    
     const [user] = await db
       .insert(users)
       .values({
         ...userData,
+        handle,
         isAdmin: isAdminEmail ? true : false,
         subscriptionStatus: isAdminEmail ? 'PRO' : 'FREE',
       })
@@ -212,12 +256,31 @@ export class DatabaseStorage implements IStorage {
         set: {
           ...userData,
           updatedAt: new Date(),
+          // Only set handle if user doesn't have one
+          ...(existingUser?.handle ? {} : { handle }),
           // Always ensure admin emails have admin access
           ...(isAdminEmail ? { isAdmin: true, subscriptionStatus: 'PRO' } : {}),
         },
       })
       .returning();
     return user;
+  }
+
+  async updateUserHandle(userId: string, handle: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ handle, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async isHandleAvailable(handle: string, excludeUserId?: string): Promise<boolean> {
+    const query = excludeUserId
+      ? and(eq(users.handle, handle), sql`${users.id} != ${excludeUserId}`)
+      : eq(users.handle, handle);
+    const [existing] = await db.select().from(users).where(query);
+    return !existing;
   }
 
   async updateUserSubscription(userId: string, status: string, stripeCustomerId?: string): Promise<User | undefined> {
@@ -670,6 +733,7 @@ export class DatabaseStorage implements IStorage {
           id: users.id,
           firstName: users.firstName,
           lastName: users.lastName,
+          handle: users.handle,
           profileImageUrl: users.profileImageUrl,
         })
         .from(users)
@@ -677,7 +741,7 @@ export class DatabaseStorage implements IStorage {
 
       commentsWithUsers.push({
         ...comment,
-        user: user || { id: comment.userId, firstName: null, lastName: null, profileImageUrl: null },
+        user: user || { id: comment.userId, firstName: null, lastName: null, handle: null, profileImageUrl: null },
       });
     }
 
@@ -1167,7 +1231,7 @@ export class DatabaseStorage implements IStorage {
     const result: OfferWithUsers[] = [];
     for (const offer of receivedOffers) {
       const [fromUser] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
         .from(users)
         .where(eq(users.id, offer.fromUserId));
       const [card] = await db.select().from(cards).where(eq(cards.id, offer.cardId));
@@ -1188,7 +1252,7 @@ export class DatabaseStorage implements IStorage {
     const result: OfferWithUsers[] = [];
     for (const offer of sentOffers) {
       const [fromUser] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
         .from(users)
         .where(eq(users.id, offer.fromUserId));
       const [card] = await db.select().from(cards).where(eq(cards.id, offer.cardId));
@@ -1395,12 +1459,12 @@ export class DatabaseStorage implements IStorage {
     
     for (const trade of tradeOfferRows) {
       const [fromUser] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
         .from(users)
         .where(eq(users.id, trade.fromUserId));
       
       const [toUser] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
         .from(users)
         .where(eq(users.id, trade.toUserId));
       
@@ -1414,8 +1478,8 @@ export class DatabaseStorage implements IStorage {
       
       result.push({
         ...trade,
-        fromUser: fromUser || { id: '', firstName: null, lastName: null, profileImageUrl: null },
-        toUser: toUser || { id: '', firstName: null, lastName: null, profileImageUrl: null },
+        fromUser: fromUser || { id: '', firstName: null, lastName: null, handle: null, profileImageUrl: null },
+        toUser: toUser || { id: '', firstName: null, lastName: null, handle: null, profileImageUrl: null },
         offeredCards,
         requestedCards,
       });
@@ -1465,7 +1529,7 @@ export class DatabaseStorage implements IStorage {
     return !!existing;
   }
 
-  async getFollowers(userId: string): Promise<(Follow & { follower: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]> {
+  async getFollowers(userId: string): Promise<(Follow & { follower: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> })[]> {
     const followRows = await db
       .select()
       .from(follows)
@@ -1475,7 +1539,7 @@ export class DatabaseStorage implements IStorage {
     const result = [];
     for (const follow of followRows) {
       const [follower] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
         .from(users)
         .where(eq(users.id, follow.followerId));
       
@@ -1486,7 +1550,7 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async getFollowing(userId: string): Promise<(Follow & { followed: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> })[]> {
+  async getFollowing(userId: string): Promise<(Follow & { followed: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> })[]> {
     const followRows = await db
       .select()
       .from(follows)
@@ -1496,7 +1560,7 @@ export class DatabaseStorage implements IStorage {
     const result = [];
     for (const follow of followRows) {
       const [followed] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, profileImageUrl: users.profileImageUrl })
+        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
         .from(users)
         .where(eq(users.id, follow.followedId));
       
@@ -1593,6 +1657,7 @@ export class DatabaseStorage implements IStorage {
           id: users.id,
           firstName: users.firstName,
           lastName: users.lastName,
+          handle: users.handle,
           profileImageUrl: users.profileImageUrl,
         })
         .from(users)
@@ -1638,6 +1703,7 @@ export class DatabaseStorage implements IStorage {
           id: users.id,
           firstName: users.firstName,
           lastName: users.lastName,
+          handle: users.handle,
           profileImageUrl: users.profileImageUrl,
         })
         .from(users)

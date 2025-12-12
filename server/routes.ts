@@ -2282,9 +2282,12 @@ Allow: /
 
       // Notify the followed user
       const follower = await storage.getUser(followerId);
+      const followerDisplayName = follower?.handle 
+        ? `@${follower.handle}` 
+        : follower ? `${follower.firstName || ''} ${follower.lastName || ''}`.trim() || 'Someone' : 'Someone';
       await storage.createNotification(followedId, "new_follower", {
         followerId,
-        followerName: follower ? `${follower.firstName || ''} ${follower.lastName || ''}`.trim() || 'Someone' : 'Someone',
+        followerName: followerDisplayName,
       });
 
       res.json(follow);
@@ -2426,6 +2429,7 @@ Allow: /
           id: otherUser.id,
           firstName: otherUser.firstName,
           lastName: otherUser.lastName,
+          handle: otherUser.handle,
           profileImageUrl: otherUser.profileImageUrl,
         } : null
       });
@@ -2463,10 +2467,13 @@ Allow: /
         : conversation.participantAId;
       
       const sender = await storage.getUser(userId);
+      const senderDisplayName = sender?.handle 
+        ? `@${sender.handle}` 
+        : sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Someone' : 'Someone';
       await storage.createNotification(recipientId, "new_message", {
         conversationId,
         senderId: userId,
-        senderName: sender ? `${sender.firstName || ''} ${sender.lastName || ''}`.trim() || 'Someone' : 'Someone',
+        senderName: senderDisplayName,
         preview: content.substring(0, 50),
       });
 
@@ -2496,6 +2503,54 @@ Allow: /
     } catch (error) {
       console.error("Error marking messages as read:", error);
       res.status(500).json({ message: "Failed to mark messages as read" });
+    }
+  });
+
+  // Handle management routes
+  app.get("/api/handle/check/:handle", async (req, res) => {
+    try {
+      const handle = req.params.handle;
+      
+      // Validate handle format (alphanumeric, 3-30 chars)
+      if (!/^[a-zA-Z0-9_]{3,30}$/.test(handle)) {
+        return res.json({ available: false, message: "Handle must be 3-30 characters, letters, numbers, and underscores only" });
+      }
+      
+      const available = await storage.isHandleAvailable(handle);
+      res.json({ available });
+    } catch (error) {
+      console.error("Error checking handle availability:", error);
+      res.status(500).json({ message: "Failed to check handle availability" });
+    }
+  });
+
+  app.patch("/api/user/handle", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { handle } = req.body;
+      
+      // Validate handle format
+      if (!handle || typeof handle !== "string") {
+        return res.status(400).json({ message: "Handle is required" });
+      }
+      
+      const trimmedHandle = handle.trim();
+      
+      if (!/^[a-zA-Z0-9_]{3,30}$/.test(trimmedHandle)) {
+        return res.status(400).json({ message: "Handle must be 3-30 characters, letters, numbers, and underscores only" });
+      }
+      
+      // Check if handle is available (excluding current user)
+      const available = await storage.isHandleAvailable(trimmedHandle, userId);
+      if (!available) {
+        return res.status(409).json({ message: "Handle is already taken" });
+      }
+      
+      const user = await storage.updateUserHandle(userId, trimmedHandle);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating handle:", error);
+      res.status(500).json({ message: "Failed to update handle" });
     }
   });
 

@@ -229,6 +229,9 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
   };
 
   const getUserName = (comment: CommentWithUser) => {
+    if (comment.user.handle) {
+      return `@${comment.user.handle}`;
+    }
     if (comment.user.firstName && comment.user.lastName) {
       return `${comment.user.firstName} ${comment.user.lastName}`;
     }
@@ -239,8 +242,11 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
   };
 
   const getInitials = (comment: CommentWithUser) => {
-    const name = getUserName(comment);
-    return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
+    if (comment.user.handle) {
+      return comment.user.handle.slice(0, 2).toUpperCase();
+    }
+    const name = comment.user.firstName || "?";
+    return name.slice(0, 2).toUpperCase();
   };
 
   return (

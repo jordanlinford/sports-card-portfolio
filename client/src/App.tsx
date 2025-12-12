@@ -27,6 +27,7 @@ import AnalyticsPage from "@/pages/analytics";
 import BookmarksPage from "@/pages/bookmarks";
 import OffersPage from "@/pages/offers";
 import MessagesPage from "@/pages/messages";
+import SettingsPage from "@/pages/settings";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -55,6 +56,7 @@ function Router() {
           <Route path="/offers" component={OffersPage} />
           <Route path="/messages" component={MessagesPage} />
           <Route path="/messages/:conversationId" component={MessagesPage} />
+          <Route path="/settings" component={SettingsPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />

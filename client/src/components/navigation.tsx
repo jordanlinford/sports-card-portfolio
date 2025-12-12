@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LayoutGrid, LogOut, User, Crown, Search, Compass, Shield, BarChart3, Bookmark, HandCoins, MessageSquare } from "lucide-react";
+import { LayoutGrid, LogOut, User, Crown, Search, Compass, Shield, BarChart3, Bookmark, HandCoins, MessageSquare, Settings } from "lucide-react";
 
 export function Navigation() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -166,6 +166,12 @@ export function Navigation() {
                         {unreadCount?.count && unreadCount.count > 0 && (
                           <Badge variant="default" className="ml-auto">{unreadCount.count}</Badge>
                         )}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings" className="flex items-center gap-2 cursor-pointer" data-testid="link-settings">
+                        <Settings className="h-4 w-4" />
+                        Settings
                       </Link>
                     </DropdownMenuItem>
                     {isAdmin && (

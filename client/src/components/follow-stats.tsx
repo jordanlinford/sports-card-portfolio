@@ -19,21 +19,27 @@ interface FollowRecord {
   followerId: string;
   followedId: string;
   createdAt: Date;
-  follower?: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>;
-  followed?: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'>;
+  follower?: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>;
+  followed?: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>;
 }
 
-function UserListItem({ user }: { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'profileImageUrl'> }) {
-  const displayName = user.firstName && user.lastName 
-    ? `${user.firstName} ${user.lastName}` 
-    : user.firstName || "Collector";
+function UserListItem({ user }: { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> }) {
+  const displayName = user.handle 
+    ? `@${user.handle}` 
+    : user.firstName && user.lastName 
+      ? `${user.firstName} ${user.lastName}` 
+      : user.firstName || "Collector";
+  
+  const initials = user.handle 
+    ? user.handle.slice(0, 2).toUpperCase()
+    : user.firstName?.charAt(0)?.toUpperCase() || "?";
     
   return (
     <div className="flex items-center gap-3 p-2 hover-elevate rounded-md">
       <Avatar className="h-8 w-8">
         <AvatarImage src={user.profileImageUrl || undefined} />
         <AvatarFallback className="text-xs">
-          {user.firstName?.charAt(0)?.toUpperCase() || "?"}
+          {initials}
         </AvatarFallback>
       </Avatar>
       <span className="text-sm font-medium">{displayName}</span>

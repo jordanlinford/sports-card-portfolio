@@ -44,13 +44,13 @@ function ConversationListItem({
         <Avatar className="h-10 w-10">
           <AvatarImage src={conversation.otherUser?.profileImageUrl || undefined} />
           <AvatarFallback>
-            {conversation.otherUser?.firstName?.charAt(0)?.toUpperCase() || "?"}
+            {conversation.otherUser?.handle?.slice(0, 2).toUpperCase() || conversation.otherUser?.firstName?.charAt(0)?.toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className={`font-medium truncate ${hasUnread ? 'text-foreground' : 'text-muted-foreground'}`}>
-              {conversation.otherUser?.firstName || ""} {conversation.otherUser?.lastName || ""}
+              {conversation.otherUser?.handle ? `@${conversation.otherUser.handle}` : `${conversation.otherUser?.firstName || ""} ${conversation.otherUser?.lastName || ""}`.trim() || "Unknown"}
             </span>
             {hasUnread && (
               <Badge variant="default" className="flex-shrink-0">
@@ -77,12 +77,14 @@ function MessageBubble({
   message: MessageWithSender; 
   isOwn: boolean;
 }) {
+  const initials = message.sender?.handle?.slice(0, 2).toUpperCase() || message.sender?.firstName?.charAt(0)?.toUpperCase() || "?";
+  
   return (
     <div className={`flex gap-2 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
       <Avatar className="h-8 w-8 flex-shrink-0">
         <AvatarImage src={message.sender?.profileImageUrl || undefined} />
         <AvatarFallback className="text-xs">
-          {message.sender?.firstName?.charAt(0)?.toUpperCase() || "?"}
+          {initials}
         </AvatarFallback>
       </Avatar>
       <div className={`max-w-[70%] ${isOwn ? 'items-end' : 'items-start'}`}>
@@ -120,7 +122,7 @@ function ConversationView({
   const { data, isLoading, refetch } = useQuery<{
     conversation: any;
     messages: MessageWithSender[];
-    otherUser: { id: string; firstName: string; lastName: string; profileImageUrl: string | null } | null;
+    otherUser: { id: string; firstName: string; lastName: string; handle: string | null; profileImageUrl: string | null } | null;
   }>({
     queryKey: ["/api/messages/conversations", conversationId],
   });
@@ -202,11 +204,11 @@ function ConversationView({
         <Avatar className="h-10 w-10">
           <AvatarImage src={data?.otherUser?.profileImageUrl || undefined} />
           <AvatarFallback>
-            {data?.otherUser?.firstName?.charAt(0)?.toUpperCase() || "?"}
+            {data?.otherUser?.handle?.slice(0, 2).toUpperCase() || data?.otherUser?.firstName?.charAt(0)?.toUpperCase() || "?"}
           </AvatarFallback>
         </Avatar>
         <span className="font-medium" data-testid="text-conversation-user">
-          {data?.otherUser?.firstName || ""} {data?.otherUser?.lastName || ""}
+          {data?.otherUser?.handle ? `@${data.otherUser.handle}` : `${data?.otherUser?.firstName || ""} ${data?.otherUser?.lastName || ""}`.trim() || "Unknown"}
         </span>
       </div>
 
