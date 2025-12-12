@@ -215,11 +215,11 @@ function TradeCard({
             <Avatar className="h-6 w-6">
               <AvatarImage src={otherUser?.profileImageUrl || undefined} />
               <AvatarFallback className="text-xs">
-                {otherUser?.firstName?.charAt(0)?.toUpperCase() || "?"}
+                {otherUser?.handle?.slice(0, 2).toUpperCase() || otherUser?.firstName?.charAt(0)?.toUpperCase() || "?"}
               </AvatarFallback>
             </Avatar>
             <span className="text-sm font-medium">
-              {type === "incoming" ? "From" : "To"}: {otherUser?.firstName} {otherUser?.lastName}
+              {type === "incoming" ? "From" : "To"}: {otherUser?.handle ? `@${otherUser.handle}` : `${otherUser?.firstName || ''} ${otherUser?.lastName || ''}`.trim() || "Unknown"}
             </span>
           </div>
           {getStatusBadge(trade.status as OfferStatus)}

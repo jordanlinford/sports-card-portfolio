@@ -40,11 +40,13 @@ function StatCard({ title, value, icon: Icon, description }: { title: string; va
 }
 
 function UserRow({ user, onUpdateSubscription }: { user: User; onUpdateSubscription: (userId: string, status: string) => void }) {
-  const initials = [user.firstName, user.lastName]
-    .filter(Boolean)
-    .map((n) => n?.[0])
-    .join("")
-    .toUpperCase() || "?";
+  const initials = user.handle 
+    ? user.handle.slice(0, 2).toUpperCase()
+    : [user.firstName, user.lastName]
+        .filter(Boolean)
+        .map((n) => n?.[0])
+        .join("")
+        .toUpperCase() || "?";
 
   const isPro = user.subscriptionStatus === "PRO";
 
@@ -56,7 +58,7 @@ function UserRow({ user, onUpdateSubscription }: { user: User; onUpdateSubscript
       </Avatar>
       <div className="flex-1 min-w-0">
         <p className="font-medium truncate">
-          {[user.firstName, user.lastName].filter(Boolean).join(" ") || "Anonymous"}
+          {user.handle ? `@${user.handle}` : [user.firstName, user.lastName].filter(Boolean).join(" ") || "Anonymous"}
         </p>
         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
       </div>
