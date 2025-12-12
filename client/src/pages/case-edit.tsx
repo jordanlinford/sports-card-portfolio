@@ -72,6 +72,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Crown, AlertTriangle } from "lucide-react";
 import { DISPLAY_CASE_THEMES } from "@/lib/themes";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProFeatureGate } from "@/components/pro-feature-gate";
 
 const LAYOUT_OPTIONS = [
   { id: "grid", name: "Grid", description: "Classic grid layout - cards displayed in rows and columns", icon: "grid" },
@@ -638,46 +639,56 @@ export default function CaseEdit() {
                       </FormDescription>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
                         {DISPLAY_CASE_THEMES.map((theme) => {
-                          const isLocked = theme.isPremium && !isPro;
-                          return (
-                            <button
-                              key={theme.id}
-                              type="button"
-                              onClick={() => !isLocked && field.onChange(theme.id)}
-                              disabled={isLocked}
-                              className={`relative p-3 rounded-lg border-2 text-left transition-colors ${
-                                field.value === theme.id
-                                  ? "border-primary"
-                                  : isLocked
-                                  ? "border-muted opacity-60 cursor-not-allowed"
-                                  : "border-transparent hover:border-muted-foreground/30"
-                              }`}
-                              data-testid={`button-theme-${theme.id}`}
-                            >
-                              {theme.isPremium && (
-                                <Badge 
-                                  variant="secondary" 
-                                  className="absolute -top-2 -right-2 text-xs gap-0.5 px-1.5 py-0.5"
-                                >
-                                  <Crown className="h-3 w-3" />
-                                  Pro
-                                </Badge>
-                              )}
+                          const buttonContent = (
+                            <>
                               <div 
                                 className="w-full h-12 rounded-md mb-2 border"
                                 style={{ background: theme.preview }}
                               />
                               <p className="text-sm font-medium">{theme.name}</p>
                               <p className="text-xs text-muted-foreground truncate">{theme.description}</p>
+                            </>
+                          );
+
+                          const buttonClasses = `relative p-3 rounded-lg border-2 text-left transition-colors w-full ${
+                            field.value === theme.id
+                              ? "border-primary"
+                              : "border-transparent hover:border-muted-foreground/30"
+                          }`;
+
+                          if (theme.isPremium) {
+                            return (
+                              <ProFeatureGate
+                                key={theme.id}
+                                isPro={isPro}
+                                featureName="Premium Themes"
+                                featureDescription="Unlock beautiful premium themes like velvet, wood, ocean, and more to make your display cases stand out."
+                                onProClick={() => field.onChange(theme.id)}
+                              >
+                                <button
+                                  type="button"
+                                  className={buttonClasses}
+                                  data-testid={`button-theme-${theme.id}`}
+                                >
+                                  {buttonContent}
+                                </button>
+                              </ProFeatureGate>
+                            );
+                          }
+
+                          return (
+                            <button
+                              key={theme.id}
+                              type="button"
+                              onClick={() => field.onChange(theme.id)}
+                              className={buttonClasses}
+                              data-testid={`button-theme-${theme.id}`}
+                            >
+                              {buttonContent}
                             </button>
                           );
                         })}
                       </div>
-                      {!isPro && (
-                        <p className="text-xs text-muted-foreground mt-2">
-                          <Link href="/upgrade" className="text-primary hover:underline">Upgrade to Pro</Link> to unlock premium themes
-                        </p>
-                      )}
                     </FormItem>
                   )}
                 />

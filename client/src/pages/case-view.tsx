@@ -43,6 +43,8 @@ import { FollowButton } from "@/components/follow-button";
 import { FollowStats } from "@/components/follow-stats";
 import { MessageButton } from "@/components/message-button";
 import { OutlookBadge } from "@/components/outlook-badge";
+import { ProFeatureGate, ProBadge } from "@/components/pro-feature-gate";
+import { Crown } from "lucide-react";
 
 function ValueChangeIndicator({ card }: { card: Card }) {
   if (!card.estimatedValue || !card.previousValue || card.previousValue <= 0) return null;
@@ -208,6 +210,7 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
 export default function CaseView() {
   const { id } = useParams<{ id: string }>();
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [showProUpgradeModal, setShowProUpgradeModal] = useState(false);
   const { toast } = useToast();
 
   const { data: displayCase, isLoading, error } = useQuery<DisplayCaseWithCards>({
@@ -219,6 +222,7 @@ export default function CaseView() {
   });
 
   const isOwner = user?.id === displayCase?.userId;
+  const isPro = user?.subscriptionStatus === "PRO";
 
   const refreshAllPricesMutation = useMutation({
     mutationFn: async () => {
@@ -458,10 +462,17 @@ export default function CaseView() {
                 </DropdownMenuItem>
                 
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs text-muted-foreground">Brag Images</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs text-muted-foreground flex items-center gap-1">
+                  Brag Images
+                  {!isPro && <ProBadge />}
+                </DropdownMenuLabel>
                 
                 <DropdownMenuItem 
                   onClick={() => {
+                    if (!isPro) {
+                      setShowProUpgradeModal(true);
+                      return;
+                    }
                     const imageUrl = `/api/share-image/case/${id}?format=brag-card`;
                     const link = document.createElement('a');
                     link.href = imageUrl;
@@ -474,6 +485,7 @@ export default function CaseView() {
                       description: "Top card brag image downloading.",
                     });
                   }}
+                  className={!isPro ? "opacity-60" : ""}
                   data-testid="button-download-brag-card"
                 >
                   <Trophy className="h-4 w-4 mr-2" />
@@ -482,6 +494,10 @@ export default function CaseView() {
                 
                 <DropdownMenuItem 
                   onClick={() => {
+                    if (!isPro) {
+                      setShowProUpgradeModal(true);
+                      return;
+                    }
                     const imageUrl = `/api/share-image/case/${id}?format=brag-portfolio`;
                     const link = document.createElement('a');
                     link.href = imageUrl;
@@ -494,6 +510,7 @@ export default function CaseView() {
                       description: "Portfolio value image downloading.",
                     });
                   }}
+                  className={!isPro ? "opacity-60" : ""}
                   data-testid="button-download-brag-portfolio"
                 >
                   <Wallet className="h-4 w-4 mr-2" />
@@ -608,6 +625,88 @@ export default function CaseView() {
         isAuthenticated={!!user}
         ownerUserId={displayCase?.userId}
       />
+
+      <ProUpgradeDialog
+        open={showProUpgradeModal}
+        onOpenChange={setShowProUpgradeModal}
+        featureName="Premium Sharing Formats"
+        featureDescription="Upgrade to Pro to unlock Brag Images - special sharing formats designed to show off your best cards and portfolio value."
+      />
     </div>
+  );
+}
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Check, Sparkles } from "lucide-react";
+
+const PRO_BENEFITS = [
+  "Unlimited display cases",
+  "Premium themes",
+  "AI-powered price lookups",
+  "Card outlook analysis",
+  "Premium sharing formats",
+];
+
+function ProUpgradeDialog({
+  open,
+  onOpenChange,
+  featureName,
+  featureDescription,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  featureName: string;
+  featureDescription?: string;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Crown className="h-5 w-5 text-primary" />
+            </div>
+            <DialogTitle className="text-xl">Unlock {featureName}</DialogTitle>
+          </div>
+          <DialogDescription>
+            {featureDescription || `Upgrade to Pro to access ${featureName.toLowerCase()} and many more premium features.`}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="py-4">
+          <p className="text-sm font-medium mb-3 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            What you get with Pro:
+          </p>
+          <ul className="space-y-2">
+            {PRO_BENEFITS.map((benefit) => (
+              <li key={benefit} className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Check className="h-4 w-4 text-primary flex-shrink-0" />
+                {benefit}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <DialogFooter className="flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Maybe Later
+          </Button>
+          <Link href="/upgrade">
+            <Button className="gap-2 w-full sm:w-auto" data-testid="button-upgrade-modal">
+              <Crown className="h-4 w-4" />
+              Upgrade to Pro
+            </Button>
+          </Link>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

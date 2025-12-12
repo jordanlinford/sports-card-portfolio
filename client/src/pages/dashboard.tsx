@@ -31,6 +31,7 @@ import {
 import type { DisplayCaseWithCards } from "@shared/schema";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { ProFeatureGate } from "@/components/pro-feature-gate";
 
 function DashboardSkeleton() {
   return (
@@ -294,62 +295,73 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          {!isPro && caseCount >= 3 && (
-            <Link href="/upgrade">
-              <Button variant="outline" className="gap-2" data-testid="button-upgrade-dashboard">
-                <Crown className="h-4 w-4" />
-                Upgrade to Pro
-              </Button>
-            </Link>
-          )}
-          {canCreate && userTags.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="gap-2"
-                  disabled={createFromTagMutation.isPending}
-                  data-testid="button-create-from-tag"
-                >
-                  <Tag className="h-4 w-4" />
-                  {createFromTagMutation.isPending ? "Creating..." : "Create from Tag"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Select a tag</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {userTags.map((tag) => (
-                  <DropdownMenuItem
-                    key={tag}
-                    onClick={() => createFromTagMutation.mutate(tag)}
-                    data-testid={`dropdown-item-tag-${tag}`}
-                  >
-                    {tag}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {canCreate && hasValuableCards && (
-            <Button 
-              variant="outline" 
-              className="gap-2" 
-              onClick={() => createTopCardsMutation.mutate()}
-              disabled={createTopCardsMutation.isPending}
-              data-testid="button-create-top-cards"
+          {userTags.length > 0 && (
+            <ProFeatureGate
+              isPro={canCreate}
+              featureName="Unlimited Display Cases"
+              featureDescription="Free accounts are limited to 3 display cases. Upgrade to Pro for unlimited cases and premium features."
+              showBadge={false}
             >
-              <Sparkles className="h-4 w-4" />
-              {createTopCardsMutation.isPending ? "Creating..." : "Create Top Cards Case"}
-            </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="gap-2"
+                    disabled={createFromTagMutation.isPending}
+                    data-testid="button-create-from-tag"
+                  >
+                    <Tag className="h-4 w-4" />
+                    {createFromTagMutation.isPending ? "Creating..." : "Create from Tag"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Select a tag</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {userTags.map((tag) => (
+                    <DropdownMenuItem
+                      key={tag}
+                      onClick={() => createFromTagMutation.mutate(tag)}
+                      data-testid={`dropdown-item-tag-${tag}`}
+                    >
+                      {tag}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </ProFeatureGate>
           )}
-          {canCreate && (
+          {hasValuableCards && (
+            <ProFeatureGate
+              isPro={canCreate}
+              featureName="Unlimited Display Cases"
+              featureDescription="Free accounts are limited to 3 display cases. Upgrade to Pro for unlimited cases and premium features."
+              showBadge={false}
+            >
+              <Button 
+                variant="outline" 
+                className="gap-2" 
+                onClick={() => createTopCardsMutation.mutate()}
+                disabled={createTopCardsMutation.isPending}
+                data-testid="button-create-top-cards"
+              >
+                <Sparkles className="h-4 w-4" />
+                {createTopCardsMutation.isPending ? "Creating..." : "Create Top Cards Case"}
+              </Button>
+            </ProFeatureGate>
+          )}
+          <ProFeatureGate
+            isPro={canCreate}
+            featureName="Unlimited Display Cases"
+            featureDescription="Free accounts are limited to 3 display cases. Upgrade to Pro for unlimited cases and premium features."
+            showBadge={!canCreate}
+          >
             <Link href="/cases/new">
               <Button className="gap-2" data-testid="button-create-case">
                 <Plus className="h-4 w-4" />
                 New Display Case
               </Button>
             </Link>
-          )}
+          </ProFeatureGate>
         </div>
       </div>
 

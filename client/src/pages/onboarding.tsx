@@ -22,6 +22,8 @@ import {
 import { DISPLAY_CASE_THEMES } from "@/lib/themes";
 import { trackEvent } from "@/lib/analytics";
 import type { DisplayCaseWithCards } from "@shared/schema";
+import { ProFeatureGate } from "@/components/pro-feature-gate";
+import { useQuery } from "@tanstack/react-query";
 
 const ONBOARDING_THEMES = DISPLAY_CASE_THEMES.filter(t => 
   ["classic", "velvet", "wood"].includes(t.id)
@@ -31,6 +33,12 @@ export default function OnboardingPage() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+
+  const { data: user } = useQuery<{ id: string; subscriptionStatus: string }>({
+    queryKey: ["/api/auth/user"],
+    enabled: isAuthenticated,
+  });
+  const isPro = user?.subscriptionStatus === "PRO";
 
   const [step, setStep] = useState<"setup" | "success">("setup");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -420,34 +428,64 @@ export default function OnboardingPage() {
               Pick a theme
             </Label>
             <div className="grid grid-cols-3 gap-3">
-              {ONBOARDING_THEMES.map((theme) => (
-                <button
-                  key={theme.id}
-                  type="button"
-                  onClick={() => setSelectedTheme(theme.id)}
-                  className={`relative rounded-lg overflow-hidden aspect-square transition-all ${
-                    selectedTheme === theme.id
-                      ? "ring-2 ring-primary ring-offset-2"
-                      : "hover:ring-1 hover:ring-muted-foreground/50"
-                  }`}
-                  data-testid={`button-theme-${theme.id}`}
-                >
-                  <div
-                    className="absolute inset-0"
-                    style={{ background: theme.preview }}
-                  />
-                  <div className="absolute inset-0 flex items-end justify-center p-2">
-                    <span className="text-xs font-medium text-white drop-shadow-md">
-                      {theme.name}
-                    </span>
-                  </div>
-                  {selectedTheme === theme.id && (
-                    <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
-                      <Check className="w-3 h-3" />
+              {ONBOARDING_THEMES.map((theme) => {
+                const buttonContent = (
+                  <>
+                    <div
+                      className="absolute inset-0"
+                      style={{ background: theme.preview }}
+                    />
+                    <div className="absolute inset-0 flex items-end justify-center p-2">
+                      <span className="text-xs font-medium text-white drop-shadow-md">
+                        {theme.name}
+                      </span>
                     </div>
-                  )}
-                </button>
-              ))}
+                    {selectedTheme === theme.id && (
+                      <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+                        <Check className="w-3 h-3" />
+                      </div>
+                    )}
+                  </>
+                );
+
+                const buttonClasses = `relative rounded-lg overflow-hidden aspect-square transition-all w-full ${
+                  selectedTheme === theme.id
+                    ? "ring-2 ring-primary ring-offset-2"
+                    : "hover:ring-1 hover:ring-muted-foreground/50"
+                }`;
+
+                if (theme.isPremium) {
+                  return (
+                    <ProFeatureGate
+                      key={theme.id}
+                      isPro={isPro}
+                      featureName="Premium Themes"
+                      featureDescription="Unlock beautiful premium themes to make your display cases stand out."
+                      onProClick={() => setSelectedTheme(theme.id)}
+                    >
+                      <button
+                        type="button"
+                        className={buttonClasses}
+                        data-testid={`button-theme-${theme.id}`}
+                      >
+                        {buttonContent}
+                      </button>
+                    </ProFeatureGate>
+                  );
+                }
+
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => setSelectedTheme(theme.id)}
+                    className={buttonClasses}
+                    data-testid={`button-theme-${theme.id}`}
+                  >
+                    {buttonContent}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

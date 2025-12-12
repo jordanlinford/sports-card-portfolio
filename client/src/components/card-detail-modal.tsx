@@ -20,6 +20,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { MakeOfferModal } from "@/components/make-offer-modal";
 import { ProposeTradeModal } from "@/components/propose-trade-modal";
 import { CardOutlookPanel } from "@/components/card-outlook-panel";
+import { ProFeatureGate } from "@/components/pro-feature-gate";
 
 interface CardDetailModalProps {
   card: Card | null;
@@ -634,22 +635,29 @@ export function CardDetailModal({
                   </div>
                 )}
 
-                {canEdit && isPro && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 mt-2"
-                    onClick={() => refreshPriceMutation.mutate(card.id)}
-                    disabled={refreshPriceMutation.isPending}
-                    data-testid="button-refresh-price"
+                {canEdit && (
+                  <ProFeatureGate
+                    isPro={isPro}
+                    featureName="AI Price Lookup"
+                    featureDescription="Get real-time card values from eBay sales data using AI-powered price analysis."
+                    showBadge={true}
+                    onProClick={() => refreshPriceMutation.mutate(card.id)}
                   >
-                    {refreshPriceMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                    {refreshPriceMutation.isPending ? "Looking up..." : "Refresh Value from eBay"}
-                  </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 mt-2"
+                      disabled={refreshPriceMutation.isPending}
+                      data-testid="button-refresh-price"
+                    >
+                      {refreshPriceMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      {refreshPriceMutation.isPending ? "Looking up..." : "Refresh Value from eBay"}
+                    </Button>
+                  </ProFeatureGate>
                 )}
               </div>
 
