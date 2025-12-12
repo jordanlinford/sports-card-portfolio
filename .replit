@@ -48,3 +48,4 @@ REPLIT_DEPLOYMENT_DOMAIN = "sports-card-analyze--jordanlinford.replit.app"
 
 [userenv.shared]
 VITE_GA_MEASUREMENT_ID = "G-EHWTNRNW7V"
+VITE_HIDE_IOS_PAYMENTS = "false"

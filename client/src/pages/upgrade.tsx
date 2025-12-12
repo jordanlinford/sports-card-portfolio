@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useIOSStandalone } from "@/hooks/use-ios-standalone";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export default function Upgrade() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { shouldHidePayments, isIOSPWA } = useIOSStandalone();
   const [promoCode, setPromoCode] = useState("");
 
   useEffect(() => {
@@ -211,16 +213,27 @@ export default function Upgrade() {
                 <span>Priority support</span>
               </li>
             </ul>
-            <Button
-              className="w-full gap-2"
-              size="lg"
-              onClick={() => checkoutMutation.mutate()}
-              disabled={checkoutMutation.isPending}
-              data-testid="button-upgrade-checkout"
-            >
-              <Zap className="h-4 w-4" />
-              {checkoutMutation.isPending ? "Starting checkout..." : "Upgrade with Stripe"}
-            </Button>
+            {shouldHidePayments ? (
+              <div className="text-center p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">
+                  To upgrade to Pro, please visit mydisplaycase.io in your browser.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Subscriptions are managed through our website.
+                </p>
+              </div>
+            ) : (
+              <Button
+                className="w-full gap-2"
+                size="lg"
+                onClick={() => checkoutMutation.mutate()}
+                disabled={checkoutMutation.isPending}
+                data-testid="button-upgrade-checkout"
+              >
+                <Zap className="h-4 w-4" />
+                {checkoutMutation.isPending ? "Starting checkout..." : "Upgrade with Stripe"}
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
