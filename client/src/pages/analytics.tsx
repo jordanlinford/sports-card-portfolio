@@ -26,6 +26,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  Legend,
 } from "recharts";
 
 type AnalyticsData = {
@@ -261,22 +262,28 @@ export default function AnalyticsPage() {
                         dataKey="cardCount"
                         nameKey="caseName"
                         cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        label={({ caseName, cardCount }) => `${caseName}: ${cardCount}`}
-                        labelLine={false}
+                        cy="45%"
+                        outerRadius={80}
+                        label={({ cardCount }) => cardCount}
                       >
                         {analytics.valueByCase.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip 
-                        formatter={(value: number, name: string) => [value, name]}
+                        formatter={(value: number, name: string) => [`${value} cards`, name]}
                         contentStyle={{ 
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
                           borderRadius: "6px"
                         }}
+                      />
+                      <Legend 
+                        layout="horizontal"
+                        align="center"
+                        verticalAlign="bottom"
+                        wrapperStyle={{ paddingTop: 10 }}
+                        formatter={(value: string) => value.length > 20 ? `${value.substring(0, 20)}...` : value}
                       />
                     </PieChart>
                   </ResponsiveContainer>
