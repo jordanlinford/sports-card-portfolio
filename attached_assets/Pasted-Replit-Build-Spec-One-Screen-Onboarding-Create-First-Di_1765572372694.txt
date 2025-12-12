@@ -1,0 +1,243 @@
+Replit Build Spec: “One-Screen Onboarding” (Create First Display Case)
+Goal
+
+Increase activation by forcing a first win in <60 seconds:
+Upload 1 card → Create display case → Show share link (success state).
+
+Where it lives
+
+Route: /onboarding
+
+Trigger: All new users after signup/login if they have 0 cards OR 0 display cases.
+
+Also accessible from dashboard: “Create your first case”
+
+Success criteria (analytics)
+
+Track:
+
+onboarding_viewed
+
+onboarding_upload_started
+
+onboarding_upload_success
+
+onboarding_case_created
+
+onboarding_share_copied
+
+onboarding_completed
+
+UI Requirements (single screen, no scroll)
+Header
+
+Left: Logo
+
+Center/right: Text: “Setup: 1 minute”
+
+Small link: “Skip for now” (not prominent)
+
+Main Copy
+
+H1: Create your first display case
+
+Subtext: Upload one card. We’ll build the case around it.
+
+Inline 3-step wizard (all visible at once)
+Step 1 — Upload a card (REQUIRED)
+
+Component: UploadDropzone
+
+UI
+
+Large drag/drop zone + button “Upload photo”
+
+Microcopy: “Front photo is enough. Add the back later.”
+
+Behavior
+
+Accept: .jpg .jpeg .png .webp
+
+Max size: 10MB (or whatever limit you use)
+
+Show upload progress state
+
+On success: show thumbnail preview + “Replace” option
+
+Data
+
+Store uploaded image to Storage (or existing upload method)
+
+Create a Card draft object in DB with:
+
+ownerId
+
+imageUrl
+
+createdAt
+
+source: "onboarding"
+
+optional placeholder title: "First upload"
+
+Important: Don’t ask user for title/value/tags here.
+
+Step 2 — Name your case (DEFAULTED)
+
+Component: CaseNameInput
+
+UI
+
+Input prefilled: My First Case
+
+Helper text: “You can change this anytime.”
+
+Validation
+
+2–40 characters
+
+strip emojis if your DB hates them (optional)
+
+default fallback if empty: My First Case
+
+Step 3 — Pick a theme (ONLY 3 choices)
+
+Component: ThemePicker
+
+Options
+
+classic (default selected)
+
+velvet
+
+wood
+
+UI
+
+Three clickable tiles with mini previews
+
+Microcopy: “More themes later.”
+
+Primary CTA button
+
+Component: CreateCaseButton
+
+States
+
+Disabled until Step 1 upload success is true
+
+Disabled text (when no upload): Upload a card to continue
+
+Enabled text: Create my display case
+
+On click
+
+Create DisplayCase record in DB:
+
+ownerId
+
+name (from Step 2)
+
+theme (from Step 3)
+
+isPublic default: true (recommended for sharing) OR false if you prefer
+
+createdAt
+
+source: "onboarding"
+
+Add the uploaded card to the case:
+
+If you store cardIds[] on case: push the new card id
+
+Or create case-items join record (whatever your schema uses)
+
+Transition UI to success state on the same page (no navigation required, but OK to redirect if easier)
+
+Success State (replace wizard on same screen)
+
+Component: OnboardingSuccess
+
+Copy
+
+Title: Your case is live 🎉
+
+Subtext: “Share it or add a few more cards.”
+
+Show
+
+Small case preview (thumbnail + case name)
+
+Public link display with Copy button
+
+Buttons:
+
+Primary: Copy share link
+
+Secondary: Upload 5 more cards
+
+Tertiary: Go to my case
+
+Share link format
+
+Public URL: /case/:caseId or /public/:caseId (use whatever your app already uses)
+
+Events
+
+Copy link triggers onboarding_share_copied
+
+Routing logic (auto-send new users)
+
+After auth success, run:
+
+If user has displayCaseCount === 0 OR cardCount === 0 → redirect to /onboarding
+
+Else go to dashboard
+
+If you don’t have counts:
+
+Query DB for one item (limit 1) and check existence
+
+Error handling
+
+Upload failure: show toast/banner “Upload failed — try a smaller image.”
+
+Case create failure: “Couldn’t create case. Try again.”
+
+If upload succeeded but case create fails, do NOT delete card draft automatically (avoid data loss)
+
+Minimal components list (for Replit tasking)
+
+OnboardingPage.tsx
+
+UploadDropzone.tsx
+
+ThemePicker.tsx
+
+OnboardingSuccess.tsx
+
+Add DB functions:
+
+createCardDraft(imageUrl)
+
+createDisplayCase({name, theme, isPublic})
+
+addCardToCase(caseId, cardId)
+
+Add analytics hooks (optional but recommended)
+
+Acceptance tests (Replit should verify)
+
+New user logs in → lands on onboarding
+
+Cannot proceed without upload
+
+Upload shows preview
+
+Clicking “Create my display case” creates case + attaches card
+
+Success screen shows share link + Copy works
+
+Returning user with existing case bypasses onboarding
+
+If you tell me your current stack file names (React/Vite vs Next, Firebase vs DB tables, and your current “create case” + “upload card” functions), I’ll rewrite this into a drop-in technical task with the exact functions and paths matching your repo.
