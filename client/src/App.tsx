@@ -28,6 +28,7 @@ import BookmarksPage from "@/pages/bookmarks";
 import OffersPage from "@/pages/offers";
 import MessagesPage from "@/pages/messages";
 import SettingsPage from "@/pages/settings";
+import OnboardingPage from "@/pages/onboarding";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -51,6 +52,7 @@ function Router() {
         <>
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
+          <Route path="/onboarding" component={OnboardingPage} />
           <Route path="/analytics" component={AnalyticsPage} />
           <Route path="/bookmarks" component={BookmarksPage} />
           <Route path="/offers" component={OffersPage} />

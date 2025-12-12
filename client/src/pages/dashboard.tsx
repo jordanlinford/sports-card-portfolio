@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -172,6 +172,7 @@ export default function Dashboard() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const onboardingChecked = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -190,6 +191,16 @@ export default function Dashboard() {
     queryKey: ["/api/display-cases"],
     enabled: isAuthenticated,
   });
+
+  useEffect(() => {
+    if (!casesLoading && displayCases && !onboardingChecked.current) {
+      onboardingChecked.current = true;
+      const totalCards = displayCases.reduce((sum, c) => sum + (c.cards?.length || 0), 0);
+      if (displayCases.length === 0 || totalCards === 0) {
+        setLocation("/onboarding");
+      }
+    }
+  }, [displayCases, casesLoading, setLocation]);
 
   const { data: userTags = [] } = useQuery<string[]>({
     queryKey: ["/api/tags"],

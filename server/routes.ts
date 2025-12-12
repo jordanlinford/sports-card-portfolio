@@ -269,6 +269,26 @@ Allow: /
     }
   });
 
+  // Onboarding status - check if user needs onboarding (has 0 display cases or 0 cards)
+  app.get("/api/user/onboarding-status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const displayCases = (await storage.getDisplayCases(userId)) ?? [];
+      
+      const totalCards = displayCases.reduce((sum, c) => sum + (c.cards?.length || 0), 0);
+      const needsOnboarding = displayCases.length === 0 || totalCards === 0;
+      
+      res.json({ 
+        needsOnboarding,
+        displayCaseCount: displayCases.length,
+        cardCount: totalCards 
+      });
+    } catch (error) {
+      console.error("Error checking onboarding status:", error);
+      res.status(500).json({ message: "Failed to check onboarding status" });
+    }
+  });
+
   // Display Cases routes
   app.get("/api/display-cases", isAuthenticated, async (req: any, res) => {
     try {
