@@ -89,6 +89,8 @@ export const cards = pgTable("cards", {
   tags: text("tags").array(),
   sortOrder: integer("sort_order").default(0).notNull(),
   openToOffers: boolean("open_to_offers").default(false).notNull(),
+  // Track if this card is a copy of another card (for analytics deduplication)
+  originalCardId: integer("original_card_id"),
   minOfferAmount: real("min_offer_amount"),
   createdAt: timestamp("created_at").defaultNow(),
   // Card category (sports/tcg/non_sport)

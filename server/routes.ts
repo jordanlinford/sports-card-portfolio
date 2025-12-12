@@ -360,13 +360,14 @@ Allow: /
   app.get("/api/cards/search", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { q, set, year, grade } = req.query;
+      const { q, set, year, grade, tag } = req.query;
       
       const results = await storage.searchCards(userId, {
         query: q as string || "",
         set: set as string || undefined,
         year: year ? parseInt(year as string) : undefined,
         grade: grade as string || undefined,
+        tag: tag as string || undefined,
       });
       
       res.json(results);

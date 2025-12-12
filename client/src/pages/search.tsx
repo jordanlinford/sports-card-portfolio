@@ -29,13 +29,18 @@ function SearchResultSkeleton() {
 export default function SearchPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [filters, setFilters] = useState({ set: "", year: "", grade: "" });
+  const [filters, setFilters] = useState({ set: "", year: "", grade: "", tag: "" });
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCard, setSelectedCard] = useState<SearchResult | null>(null);
   const [activeQuery, setActiveQuery] = useState("");
 
   const { data: user } = useQuery<{ subscriptionStatus: string }>({
     queryKey: ["/api/auth/user"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: userTags = [] } = useQuery<string[]>({
+    queryKey: ["/api/tags"],
     enabled: isAuthenticated,
   });
 
@@ -47,12 +52,13 @@ export default function SearchPage() {
     if (filters.set) params.set("set", filters.set);
     if (filters.year) params.set("year", filters.year);
     if (filters.grade) params.set("grade", filters.grade);
+    if (filters.tag) params.set("tag", filters.tag);
     return params.toString();
   };
 
   const { data: results, isLoading, isFetching } = useQuery<SearchResult[]>({
     queryKey: [`/api/cards/search?${buildQueryString()}`],
-    enabled: isAuthenticated && (activeQuery.length > 0 || !!filters.set || !!filters.year || !!filters.grade),
+    enabled: isAuthenticated && (activeQuery.length > 0 || !!filters.set || !!filters.year || !!filters.grade || !!filters.tag),
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -110,7 +116,7 @@ export default function SearchPage() {
           {showFilters && (
             <Card>
               <CardContent className="pt-4">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                   <div>
                     <label className="text-sm font-medium mb-1 block">Set</label>
                     <Input
@@ -139,14 +145,52 @@ export default function SearchPage() {
                       data-testid="input-filter-grade"
                     />
                   </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Tag</label>
+                    <Input
+                      placeholder="Filter by tag..."
+                      value={filters.tag}
+                      onChange={(e) => setFilters({ ...filters, tag: e.target.value })}
+                      list="tag-suggestions"
+                      data-testid="input-filter-tag"
+                    />
+                    {userTags.length > 0 && (
+                      <datalist id="tag-suggestions">
+                        {userTags.map((tag) => (
+                          <option key={tag} value={tag} />
+                        ))}
+                      </datalist>
+                    )}
+                  </div>
                 </div>
+                {userTags.length > 0 && (
+                  <div className="mt-3">
+                    <label className="text-sm font-medium mb-2 block">Quick Filter by Tag</label>
+                    <div className="flex flex-wrap gap-1">
+                      {userTags.slice(0, 10).map((tag) => (
+                        <Badge 
+                          key={tag} 
+                          variant={filters.tag === tag ? "default" : "secondary"}
+                          className="cursor-pointer"
+                          onClick={() => {
+                            setFilters({ ...filters, tag: filters.tag === tag ? "" : tag });
+                            setActiveQuery(searchQuery);
+                          }}
+                          data-testid={`badge-tag-${tag}`}
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-2 mt-4">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setFilters({ set: "", year: "", grade: "" });
+                      setFilters({ set: "", year: "", grade: "", tag: "" });
                       setActiveQuery(searchQuery);
                     }}
                     data-testid="button-clear-filters"
@@ -170,7 +214,7 @@ export default function SearchPage() {
 
       {isLoading ? (
         <SearchResultSkeleton />
-      ) : !activeQuery && !filters.set && !filters.year && !filters.grade ? (
+      ) : !activeQuery && !filters.set && !filters.year && !filters.grade && !filters.tag ? (
         <div className="text-center py-16 px-4">
           <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
             <Search className="h-10 w-10 text-muted-foreground" />
