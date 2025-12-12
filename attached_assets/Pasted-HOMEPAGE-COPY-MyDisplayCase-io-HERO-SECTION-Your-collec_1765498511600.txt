@@ -1,0 +1,198 @@
+HOMEPAGE COPY — MyDisplayCase.io
+HERO SECTION
+Your collection deserves more than a spreadsheet.
+
+Digital display cases, AI value tracking, and trading—built for serious collectors.
+
+
+Primary CTA
+
+Start your free display case
+
+
+Secondary CTA (optional)
+
+View a public display case
+
+
+Microcopy
+
+No spreadsheets. No guesswork. No pressure to sell.
+
+SOCIAL PROOF / CATEGORY STRIP
+Built by a collector. Used by collectors.
+
+Sports Cards • Pokémon & TCG • Non-Sport & Pop Culture
+
+PROBLEM SECTION
+Headline
+Collecting shouldn’t feel like accounting.
+
+Body
+Most collectors end up juggling spreadsheets, notes apps, and endless eBay searches
+just to keep track of what they own and what it might be worth.
+
+Cards sit in boxes. Values go stale. Great collections stay hidden.
+
+Your collection deserves better.
+
+SOLUTION SECTION
+Headline
+One home for your entire collection.
+
+Body
+MyDisplayCase gives your cards a digital home you’re proud of.
+
+Upload cards, organize them into beautiful display cases, track value over time,
+and share your collection with the world—or keep it private.
+
+No marketplaces.
+No selling pressure.
+Just tools built for people who actually care about their cards.
+
+FEATURES SECTION
+Headline
+Everything a serious collector needs.
+
+Card Management
+Upload and manage your cards with ease.
+
+• Upload and store card images
+• Add player, year, set, condition, and grade
+• Track purchase price and estimated value
+• Tag cards with custom labels
+• Detect duplicates automatically
+• Mark cards as “Open to Offers”
+
+Display Cases
+Turn your collection into something worth showing off.
+
+• Create unlimited display cases
+• Grid, Row, and Showcase layouts
+• Public or private visibility
+• Auto-generate cases by tag or top value
+• Premium themes for Pro users
+
+Portfolio Analytics
+See the big picture.
+
+• Total collection value
+• Value breakdown by category
+• Top performing cards
+• Historical value tracking
+• Collection growth over time
+
+AI VALUE SECTION (PRO)
+Headline
+Know what your cards are worth—without the guesswork.
+
+Body
+Pro users unlock AI-powered insights that analyze market data and turn it into
+clear, collector-friendly recommendations.
+
+This isn’t day trading.
+It’s clarity.
+
+• AI price lookups
+• BUY / WATCH / SELL recommendations
+• Confidence scores with explanations
+• Category-aware logic for Sports, TCG, and Non-Sport cards
+
+SOCIAL & SHARING SECTION
+Headline
+Your collection. Your link.
+
+Body
+Every display case can be shared with a single URL.
+
+Whether you’re showing off, trading, or just keeping a personal archive,
+your collection finally lives somewhere that makes sense.
+
+• Shareable public display cases
+• Optimized previews for X, Instagram, Facebook, Discord, Slack, and more
+• Auto-generated social images
+• Export display cases as images
+• Like, comment, and bookmark other collectors’ cards
+
+TRADING SECTION
+Headline
+Trade on your terms.
+
+Body
+Mark cards as “Open to Offers” and let other collectors come to you.
+
+No listings.
+No auctions.
+No pressure.
+
+• Make, accept, decline, or counter offers
+• Track offer history
+• Private, real-time messaging
+• You control what’s available and what’s not
+
+PRESTIGE SECTION
+Headline
+Built for collectors, not flippers.
+
+Body
+Earn prestige badges based on your collection and activity.
+
+Show your status, highlight milestones, and build a public collector profile
+that reflects how seriously you take the hobby.
+
+• Prestige badges
+• Tiered collector recognition
+• Public collector profiles
+
+PRICING SECTION
+Headline
+Simple pricing. No games.
+
+Free
+• Upload cards
+• Create display cases
+• Public or private visibility
+• Basic analytics
+
+Pro — $12/month
+• AI price lookups
+• BUY / WATCH / SELL outlooks
+• Value history tracking
+• Premium display case themes
+• Unlimited display cases
+• Advanced portfolio analytics
+• Export and social sharing tools
+
+Start free. Upgrade anytime.
+
+FOUNDER SECTION
+Headline
+Built by a collector—because the tools didn’t exist.
+
+Body
+I built MyDisplayCase for myself first.
+
+I wanted a better way to track my collection, understand its value,
+and actually enjoy looking at it—without spreadsheets or noisy marketplaces.
+
+If you care about your cards, you’ll feel at home here.
+
+FINAL CTA
+Headline
+Give your collection the home it deserves.
+
+CTA
+Start your free display case
+
+Microcopy
+No credit card required.
+
+🧠 QUICK IMPLEMENTATION NOTES (Optional – delete later)
+
+Hero CTA should scroll to signup immediately
+
+Show real display case screenshots as soon as possible
+
+First-time empty state should say:
+
+“Your display case is empty—for now.”
