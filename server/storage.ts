@@ -1019,13 +1019,25 @@ export class DatabaseStorage implements IStorage {
       .from(cards)
       .where(inArray(cards.displayCaseId, caseIds));
 
-    // Calculate totals
-    const totalValue = allCards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
-    const totalCards = allCards.length;
+    // Deduplicate cards by imagePath to avoid counting the same physical card multiple times
+    // when it appears in multiple display cases. Keep the version with highest value.
+    const uniqueCardsMap = new Map<string, typeof allCards[0]>();
+    for (const card of allCards) {
+      const key = card.imagePath;
+      const existing = uniqueCardsMap.get(key);
+      if (!existing || (card.estimatedValue || 0) > (existing.estimatedValue || 0)) {
+        uniqueCardsMap.set(key, card);
+      }
+    }
+    const uniqueCards = Array.from(uniqueCardsMap.values());
+
+    // Calculate totals using deduplicated cards
+    const totalValue = uniqueCards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
+    const totalCards = uniqueCards.length;
     const totalCases = userCases.length;
 
-    // Get top 10 cards by value
-    const topCards = [...allCards]
+    // Get top 10 cards by value (from unique cards)
+    const topCards = [...uniqueCards]
       .filter(c => c.estimatedValue && c.estimatedValue > 0)
       .sort((a, b) => (b.estimatedValue || 0) - (a.estimatedValue || 0))
       .slice(0, 10);
@@ -1041,7 +1053,8 @@ export class DatabaseStorage implements IStorage {
     }).filter(c => c.cardCount > 0);
 
     // Get cards with recent value changes (has previousValue and valueUpdatedAt)
-    const recentValueChanges = allCards
+    // Use unique cards to avoid showing duplicate entries
+    const recentValueChanges = uniqueCards
       .filter(c => c.previousValue !== null && c.valueUpdatedAt !== null)
       .sort((a, b) => {
         const aDate = a.valueUpdatedAt ? new Date(a.valueUpdatedAt).getTime() : 0;
