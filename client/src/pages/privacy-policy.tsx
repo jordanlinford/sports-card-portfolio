@@ -34,8 +34,8 @@ export default function PrivacyPolicy() {
           <h3>2.1 Information You Provide</h3>
           <p>We collect information you voluntarily provide when using our Service:</p>
           <ul>
-            <li><strong>Account Information:</strong> When you sign up through Replit authentication, we receive your name, 
-            email address, and profile picture from your Replit account.</li>
+            <li><strong>Account Information:</strong> When you sign up, we receive your name, 
+            email address, and profile picture from your authentication provider.</li>
             <li><strong>User Content:</strong> Images of cards you upload, display case names, descriptions, and card details 
             (titles, descriptions, estimated values).</li>
             <li><strong>Comments and Social Interactions:</strong> Comments you post on display cases and your likes/interactions.</li>
@@ -79,7 +79,7 @@ export default function PrivacyPolicy() {
           <h3>4.2 Service Providers</h3>
           <p>We share information with trusted third-party service providers who assist in operating our Service:</p>
           <ul>
-            <li><strong>Replit:</strong> Authentication and hosting services</li>
+            <li><strong>Cloud Infrastructure:</strong> Authentication and hosting services</li>
             <li><strong>Stripe:</strong> Payment processing for subscriptions</li>
             <li><strong>Google Cloud Storage:</strong> Secure storage for uploaded images</li>
           </ul>
@@ -151,7 +151,7 @@ export default function PrivacyPolicy() {
           </p>
           <ul>
             <li>Encryption of data in transit (HTTPS/TLS)</li>
-            <li>Secure authentication through Replit's OAuth system</li>
+            <li>Secure authentication through industry-standard OAuth</li>
             <li>Secure payment processing through Stripe (PCI-DSS compliant)</li>
             <li>Access controls and authentication for our systems</li>
           </ul>
