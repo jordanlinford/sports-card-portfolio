@@ -1517,6 +1517,11 @@ Allow: /
         return res.status(400).json({ success: false, message: "Session ID required" });
       }
 
+      // Validate session ID format to prevent injection
+      if (!/^cs_[a-zA-Z0-9_]+$/.test(sessionId)) {
+        return res.status(400).json({ success: false, message: "Invalid session ID format" });
+      }
+
       const stripe = await getUncachableStripeClient();
       const session = await stripe.checkout.sessions.retrieve(sessionId);
       
@@ -1524,10 +1529,19 @@ Allow: /
         return res.status(400).json({ success: false, message: "Payment not completed" });
       }
 
-      // Verify the session belongs to the current user
-      const user = await storage.getUser(userId);
-      if (!user || (session.customer_details?.email && user.email !== session.customer_details.email)) {
+      // SECURITY: Verify the session belongs to the current user using metadata (most reliable)
+      // The metadata.userId was set when we created the checkout session
+      if (session.metadata?.userId !== userId) {
+        console.warn(`Security: User ${userId} attempted to claim session for user ${session.metadata?.userId}`);
         return res.status(403).json({ success: false, message: "Session does not belong to user" });
+      }
+
+      // Additional check: Verify session is not too old (prevent replay of old sessions)
+      const sessionCreatedAt = new Date(session.created * 1000);
+      const hoursSinceCreation = (Date.now() - sessionCreatedAt.getTime()) / (1000 * 60 * 60);
+      if (hoursSinceCreation > 24) {
+        console.warn(`Security: User ${userId} attempted to use expired session ${sessionId}`);
+        return res.status(400).json({ success: false, message: "Session has expired" });
       }
 
       // Update user subscription (webhooks will also handle this but we do it immediately for UX)
