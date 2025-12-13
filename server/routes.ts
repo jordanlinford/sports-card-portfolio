@@ -12,6 +12,7 @@ import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
 import { generateShareImage } from "./shareImageService";
 import { prestigeService } from "./prestigeService";
 import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./cardOutlookService";
+import { sendPaymentConfirmationEmail } from "./email";
 
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
@@ -1550,6 +1551,15 @@ Allow: /
         "PRO",
         session.customer as string
       );
+
+      // Send payment confirmation email
+      const user = await storage.getUser(userId);
+      if (user?.email) {
+        const userName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+        sendPaymentConfirmationEmail(user.email, userName).catch((err) =>
+          console.error("Failed to send payment confirmation email:", err)
+        );
+      }
 
       res.json({ success: true });
     } catch (error) {

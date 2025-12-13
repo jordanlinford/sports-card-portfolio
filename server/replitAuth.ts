@@ -7,6 +7,7 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { sendWelcomeEmail } from "./email";
 
 
 const getOidcConfig = memoize(
@@ -52,13 +53,20 @@ function updateUserSession(
 }
 
 async function upsertUser(claims: any) {
-  await storage.upsertUser({
+  const { user, isNewUser } = await storage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
   });
+  
+  if (isNewUser && user.email) {
+    const userName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+    sendWelcomeEmail(user.email, userName).catch((err) => 
+      console.error("Failed to send welcome email:", err)
+    );
+  }
 }
 
 

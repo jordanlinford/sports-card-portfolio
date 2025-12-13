@@ -71,7 +71,7 @@ function generateRandomHandle(): string {
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<{ user: User; isNewUser: boolean }>;
   updateUserHandle(userId: string, handle: string): Promise<User | undefined>;
   isHandleAvailable(handle: string, excludeUserId?: string): Promise<boolean>;
   updateUserSubscription(userId: string, status: string, stripeCustomerId?: string): Promise<User | undefined>;
@@ -216,7 +216,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
+  async upsertUser(userData: UpsertUser): Promise<{ user: User; isNewUser: boolean }> {
     // Admin emails that should automatically get admin access
     const ADMIN_EMAILS = ['jordanlinford@gmail.com'];
     
@@ -224,6 +224,7 @@ export class DatabaseStorage implements IStorage {
     
     // Check if user exists and has a handle
     const existingUser = userData.id ? await this.getUser(userData.id) : undefined;
+    const isNewUser = !existingUser;
     
     // Generate a unique handle for new users
     let handle = existingUser?.handle;
@@ -263,7 +264,7 @@ export class DatabaseStorage implements IStorage {
         },
       })
       .returning();
-    return user;
+    return { user, isNewUser };
   }
 
   async updateUserHandle(userId: string, handle: string): Promise<User | undefined> {
