@@ -663,7 +663,11 @@ export default function CaseEdit() {
                                 isPro={isPro}
                                 featureName="Premium Themes"
                                 featureDescription="Unlock beautiful premium themes like velvet, wood, ocean, and more to make your display cases stand out."
-                                onProClick={() => field.onChange(theme.id)}
+                                onProClick={() => {
+                                  field.onChange(theme.id);
+                                  const currentValues = form.getValues();
+                                  updateMutation.mutate({ ...currentValues, theme: theme.id });
+                                }}
                               >
                                 <button
                                   type="button"
@@ -680,7 +684,11 @@ export default function CaseEdit() {
                             <button
                               key={theme.id}
                               type="button"
-                              onClick={() => field.onChange(theme.id)}
+                              onClick={() => {
+                                field.onChange(theme.id);
+                                const currentValues = form.getValues();
+                                updateMutation.mutate({ ...currentValues, theme: theme.id });
+                              }}
                               className={buttonClasses}
                               data-testid={`button-theme-${theme.id}`}
                             >
@@ -707,7 +715,11 @@ export default function CaseEdit() {
                           <button
                             key={layout.id}
                             type="button"
-                            onClick={() => field.onChange(layout.id)}
+                            onClick={() => {
+                              field.onChange(layout.id);
+                              const currentValues = form.getValues();
+                              updateMutation.mutate({ ...currentValues, layout: layout.id });
+                            }}
                             className={`relative p-4 rounded-lg border-2 text-left transition-colors ${
                               field.value === layout.id
                                 ? "border-primary bg-primary/5"
