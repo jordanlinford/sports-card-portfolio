@@ -69,6 +69,7 @@ export function CardDetailModal({
   const [isSaving, setIsSaving] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [refreshedValue, setRefreshedValue] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: bookmarkStatus, refetch: refetchBookmark } = useQuery<{ hasBookmarked: boolean; bookmarkCount: number }>({
@@ -126,6 +127,7 @@ export function CardDetailModal({
           ...prev,
           estimatedValue: data.estimatedValue?.toString() || prev.estimatedValue,
         }));
+        setRefreshedValue(data.estimatedValue);
       } else {
         toast({
           title: "No Value Found",
@@ -173,6 +175,7 @@ export function CardDetailModal({
         openToOffers: card.openToOffers || false,
         minOfferAmount: card.minOfferAmount?.toString() || "",
       });
+      setRefreshedValue(null);
     }
   }, [card]);
 
@@ -291,8 +294,9 @@ export function CardDetailModal({
     }).format(value);
   };
 
-  const profitLoss = card.estimatedValue && card.purchasePrice 
-    ? card.estimatedValue - card.purchasePrice 
+  const currentValue = refreshedValue ?? card.estimatedValue;
+  const profitLoss = currentValue && card.purchasePrice 
+    ? currentValue - card.purchasePrice 
     : null;
 
   return (
@@ -597,23 +601,30 @@ export function CardDetailModal({
                   <TrendingUp className="w-4 h-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Estimated Value:</span>
                   <span className="font-medium" data-testid="text-estimated-value">
-                    {formatCurrency(card.estimatedValue)}
+                    {formatCurrency(refreshedValue ?? card.estimatedValue)}
                   </span>
-                  {card.previousValue && card.previousValue > 0 && card.estimatedValue && card.estimatedValue !== card.previousValue && (
-                    <Badge 
-                      variant={card.estimatedValue > card.previousValue ? "default" : "destructive"}
-                      className="gap-1"
-                      data-testid="badge-value-change"
-                    >
-                      {card.estimatedValue > card.previousValue ? (
-                        <TrendingUp className="h-3 w-3" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3" />
-                      )}
-                      {card.estimatedValue > card.previousValue ? '+' : ''}
-                      {(((card.estimatedValue - card.previousValue) / card.previousValue) * 100).toFixed(1)}%
-                    </Badge>
-                  )}
+                  {(() => {
+                    const displayValue = refreshedValue ?? card.estimatedValue;
+                    const prevValue = refreshedValue ? card.estimatedValue : card.previousValue;
+                    if (prevValue && prevValue > 0 && displayValue && displayValue !== prevValue) {
+                      return (
+                        <Badge 
+                          variant={displayValue > prevValue ? "default" : "destructive"}
+                          className="gap-1"
+                          data-testid="badge-value-change"
+                        >
+                          {displayValue > prevValue ? (
+                            <TrendingUp className="h-3 w-3" />
+                          ) : (
+                            <TrendingDown className="h-3 w-3" />
+                          )}
+                          {displayValue > prevValue ? '+' : ''}
+                          {(((displayValue - prevValue) / prevValue) * 100).toFixed(1)}%
+                        </Badge>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
 
                 {card.previousValue && (
