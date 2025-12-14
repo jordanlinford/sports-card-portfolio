@@ -2745,7 +2745,18 @@ Allow: /
       }
 
       const alerts = await storage.getCardPriceAlerts(cardId, userId);
-      res.json(alerts);
+      const userAlertCount = await storage.countUserPriceAlerts(userId);
+      const user = await storage.getUser(userId);
+      const isPro = user?.subscriptionStatus === "PRO";
+      const maxAlerts = isPro ? Infinity : 3;
+      const canCreateMore = isPro || userAlertCount < 3;
+
+      res.json({
+        alerts,
+        userAlertCount,
+        maxAlerts: isPro ? -1 : 3,
+        canCreateMore,
+      });
     } catch (error) {
       console.error("Error fetching card price alerts:", error);
       res.status(500).json({ message: "Failed to fetch card price alerts" });
