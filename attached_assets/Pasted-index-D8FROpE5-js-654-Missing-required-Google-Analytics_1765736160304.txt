@@ -1,0 +1,22 @@
+index-D8FROpE5.js:654 Missing required Google Analytics key: VITE_GA_MEASUREMENT_ID
+(anonymous) @ index-D8FROpE5.js:654Understand this warning
+mydisplaycase.io/:1 <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">Understand this warning
+2index-D8FROpE5.js:574 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous) @ index-D8FROpE5.js:574Understand this warning
+/api/price-alerts:1  Failed to load resource: the server responded with a status of 500 ()Understand this error
+index-D8FROpE5.js:574 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous) @ index-D8FROpE5.js:574Understand this warning
+/api/cards/4/price-history?days=30:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/cards/4/price-alerts:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/messages/unread-count:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/notifications/unread-count:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/display-cases/1/cards/4:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/messages/unread-count:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/notifications/unread-count:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+index-D8FROpE5.js:574 Warning: Missing `Description` or `aria-describedby={undefined}` for {DialogContent}.
+(anonymous) @ index-D8FROpE5.js:574Understand this warning
+/api/cards/5/price-history?days=30:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/cards/5/price-alerts:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/messages/unread-count:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/display-cases/1/cards/5:1  Failed to load resource: the server responded with a status of 401 ()Understand this error
+/api/notifications/unread-count:1  Failed to load resource: the server responded with a status of 401 ()

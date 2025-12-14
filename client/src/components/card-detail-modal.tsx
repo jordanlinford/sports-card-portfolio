@@ -636,10 +636,7 @@ export function CardDetailModal({
                   </div>
                 )}
 
-                <div className="space-y-1">
-                  <span className="text-sm text-muted-foreground">30-Day Trend</span>
-                  <PriceSparkline cardId={card.id} height={48} showTrend days={30} />
-                </div>
+{/* Price trend and alerts hidden temporarily - will re-enable once backend issues are resolved */}
 
                 {profitLoss !== null && (
                   <div className="flex items-center gap-2 text-sm">
@@ -717,12 +714,7 @@ export function CardDetailModal({
                 canEdit={canEdit} 
               />
 
-              {canEdit && isAuthenticated && (
-                <>
-                  <Separator />
-                  <CardPriceAlertsPanel card={card} isPro={isPro} />
-                </>
-              )}
+{/* Price alerts panel hidden temporarily - will re-enable once backend issues are resolved */}
 
               {card.openToOffers && !canEdit && (
                 <>
