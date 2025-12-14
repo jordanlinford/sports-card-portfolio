@@ -89,10 +89,10 @@ export async function sendPriceAlertEmail(
   alertType: string,
   threshold: number,
   currentPrice: number
-): Promise<void> {
+): Promise<boolean> {
   if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
     console.log("Zoho email not configured, skipping price alert email");
-    return;
+    return true;
   }
 
   const direction = alertType === "above" ? "risen above" : "fallen below";
@@ -119,8 +119,10 @@ export async function sendPriceAlertEmail(
       `,
     });
     console.log(`Price alert email sent to ${userEmail} for ${cardTitle}`);
+    return true;
   } catch (error) {
     console.error("Failed to send price alert email:", error);
+    return false;
   }
 }
 
@@ -143,10 +145,10 @@ export async function sendWeeklyDigestEmail(
   userEmail: string,
   userName: string,
   data: DigestData
-): Promise<void> {
+): Promise<boolean> {
   if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
     console.log("Zoho email not configured, skipping weekly digest email");
-    return;
+    return true;
   }
 
   const moverRows = data.topMovers.map(mover => {
@@ -217,7 +219,9 @@ export async function sendWeeklyDigestEmail(
       `,
     });
     console.log(`Weekly digest email sent to ${userEmail}`);
+    return true;
   } catch (error) {
     console.error("Failed to send weekly digest email:", error);
+    return false;
   }
 }

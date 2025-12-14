@@ -13,7 +13,7 @@ export async function processPriceAlerts(): Promise<{ processed: number; trigger
       processed++;
       const { card, user } = alert;
       
-      if (!card.estimatedValue) {
+      if (card.estimatedValue === null || card.estimatedValue === undefined) {
         continue;
       }
 
@@ -45,8 +45,9 @@ export async function processPriceAlerts(): Promise<{ processed: number; trigger
           });
         }
 
+        let emailSent = true;
         if (emailEnabled && user.email) {
-          await sendPriceAlertEmail(
+          emailSent = await sendPriceAlertEmail(
             user.email,
             user.firstName || "Collector",
             card.title,
@@ -54,6 +55,11 @@ export async function processPriceAlerts(): Promise<{ processed: number; trigger
             threshold,
             currentPrice
           );
+        }
+
+        if (!emailSent) {
+          console.warn(`Email failed for alert ${alert.id}, will retry on next run`);
+          continue;
         }
 
         await storage.markAlertTriggered(alert.id);
@@ -101,7 +107,7 @@ export async function processWeeklyDigests(): Promise<{ sent: number }> {
           : 0,
       }));
 
-      await sendWeeklyDigestEmail(
+      const emailSent = await sendWeeklyDigestEmail(
         user.email,
         user.firstName || "Collector",
         {
@@ -111,6 +117,11 @@ export async function processWeeklyDigests(): Promise<{ sent: number }> {
           topMovers,
         }
       );
+
+      if (!emailSent) {
+        console.warn(`Weekly digest email failed for user ${user.id}, will retry next week`);
+        continue;
+      }
 
       await storage.markDigestSent(user.id);
       sent++;
