@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Check, DollarSign, Heart, MessageSquare, Trophy, UserPlus } from "lucide-react";
+import { Bell, Check, DollarSign, Heart, MessageSquare, Trophy, UserPlus, TrendingUp, TrendingDown } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import type { Notification } from "@shared/schema";
@@ -48,7 +48,7 @@ export function NotificationBell() {
     },
   });
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string, data?: Record<string, unknown> | null) => {
     switch (type) {
       case "offer_received":
       case "offer_accepted":
@@ -62,6 +62,10 @@ export function NotificationBell() {
         return <Trophy className="h-4 w-4 text-yellow-500" />;
       case "new_follower":
         return <UserPlus className="h-4 w-4 text-purple-500" />;
+      case "price_alert":
+        return data?.alertType === "above" 
+          ? <TrendingUp className="h-4 w-4 text-green-500" />
+          : <TrendingDown className="h-4 w-4 text-red-500" />;
       default:
         return <Bell className="h-4 w-4" />;
     }
@@ -90,6 +94,8 @@ export function NotificationBell() {
         return `Your trade offer was accepted`;
       case "trade_declined":
         return `Your trade offer was declined`;
+      case "price_alert":
+        return data?.message as string || `Price alert triggered for ${data?.cardTitle || "a card"}`;
       default:
         return "New notification";
     }
@@ -155,7 +161,7 @@ export function NotificationBell() {
                 data-testid={`notification-item-${notification.id}`}
               >
                 <div className="flex-shrink-0 mt-0.5">
-                  {getNotificationIcon(notification.type)}
+                  {getNotificationIcon(notification.type, notification.data as Record<string, unknown> | null)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm line-clamp-2">
