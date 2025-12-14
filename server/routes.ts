@@ -2606,8 +2606,12 @@ Allow: /
       const userId = req.user.claims.sub;
       const alerts = await storage.getPriceAlerts(userId);
       res.json(alerts);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching price alerts:", error);
+      // Return empty array if table doesn't exist
+      if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+        return res.json([]);
+      }
       res.status(500).json({ message: "Failed to fetch price alerts" });
     }
   });
