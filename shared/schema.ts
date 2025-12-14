@@ -506,3 +506,85 @@ export const COLLECTOR_TIERS = {
 } as const;
 
 export type CollectorTier = keyof typeof COLLECTOR_TIERS;
+
+// Price Alerts table - per-card alert thresholds
+export const priceAlerts = pgTable("price_alerts", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  alertType: varchar("alert_type", { length: 20 }).notNull(), // 'above' or 'below'
+  threshold: real("threshold").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  lastTriggeredAt: timestamp("last_triggered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  unique("unique_card_user_alert").on(table.cardId, table.userId, table.alertType),
+]);
+
+export const priceAlertsRelations = relations(priceAlerts, ({ one }) => ({
+  card: one(cards, {
+    fields: [priceAlerts.cardId],
+    references: [cards.id],
+  }),
+  user: one(users, {
+    fields: [priceAlerts.userId],
+    references: [users.id],
+  }),
+}));
+
+// Price History table - daily price snapshots for trend tracking
+export const priceHistory = pgTable("price_history", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
+  price: real("price").notNull(),
+  recordedAt: timestamp("recorded_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_price_history_card_date").on(table.cardId, table.recordedAt),
+]);
+
+export const priceHistoryRelations = relations(priceHistory, ({ one }) => ({
+  card: one(cards, {
+    fields: [priceHistory.cardId],
+    references: [cards.id],
+  }),
+}));
+
+// User Alert Settings table - global user preferences for alerts
+export const userAlertSettings = pgTable("user_alert_settings", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  emailAlertsEnabled: boolean("email_alerts_enabled").default(true).notNull(),
+  inAppAlertsEnabled: boolean("in_app_alerts_enabled").default(true).notNull(),
+  weeklyDigestEnabled: boolean("weekly_digest_enabled").default(true).notNull(),
+  lastDigestSentAt: timestamp("last_digest_sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userAlertSettingsRelations = relations(userAlertSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [userAlertSettings.userId],
+    references: [users.id],
+  }),
+}));
+
+// Types and schemas for price alerts
+export const insertPriceAlertSchema = createInsertSchema(priceAlerts).omit({
+  id: true,
+  userId: true,
+  lastTriggeredAt: true,
+  createdAt: true,
+});
+export type InsertPriceAlert = z.infer<typeof insertPriceAlertSchema>;
+export type PriceAlert = typeof priceAlerts.$inferSelect;
+export type PriceAlertWithCard = PriceAlert & { card: Card };
+
+export type PriceHistory = typeof priceHistory.$inferSelect;
+
+export const insertUserAlertSettingsSchema = createInsertSchema(userAlertSettings).omit({
+  id: true,
+  userId: true,
+  lastDigestSentAt: true,
+  createdAt: true,
+});
+export type InsertUserAlertSettings = z.infer<typeof insertUserAlertSettingsSchema>;
+export type UserAlertSettings = typeof userAlertSettings.$inferSelect;

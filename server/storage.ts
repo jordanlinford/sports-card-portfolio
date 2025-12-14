@@ -15,6 +15,9 @@ import {
   messages,
   promoCodes,
   promoCodeRedemptions,
+  priceAlerts,
+  priceHistory,
+  userAlertSettings,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -44,6 +47,12 @@ import {
   type MessageWithSender,
   type PromoCode,
   type PromoCodeRedemption,
+  type PriceAlert,
+  type PriceAlertWithCard,
+  type InsertPriceAlert,
+  type PriceHistory,
+  type UserAlertSettings,
+  type InsertUserAlertSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -207,6 +216,28 @@ export interface IStorage {
   createPromoCode(code: string, maxUses: number, description?: string, expiresAt?: Date): Promise<PromoCode>;
   redeemPromoCode(code: string, userId: string): Promise<{ success: boolean; message: string }>;
   hasUserRedeemedPromoCode(userId: string, promoCodeId: number): Promise<boolean>;
+
+  // Price alert operations
+  getPriceAlerts(userId: string): Promise<PriceAlertWithCard[]>;
+  getPriceAlert(id: number): Promise<PriceAlert | undefined>;
+  getCardPriceAlerts(cardId: number, userId: string): Promise<PriceAlert[]>;
+  createPriceAlert(userId: string, data: InsertPriceAlert): Promise<PriceAlert>;
+  updatePriceAlert(id: number, data: Partial<InsertPriceAlert>): Promise<PriceAlert | undefined>;
+  deletePriceAlert(id: number): Promise<void>;
+  countUserPriceAlerts(userId: string): Promise<number>;
+  getActiveAlertsForProcessing(): Promise<(PriceAlert & { card: Card; user: User })[]>;
+  markAlertTriggered(id: number): Promise<void>;
+
+  // Price history operations
+  recordPriceHistory(cardId: number, price: number): Promise<PriceHistory>;
+  getCardPriceHistory(cardId: number, days?: number): Promise<PriceHistory[]>;
+  getLatestPriceHistory(cardId: number): Promise<PriceHistory | undefined>;
+
+  // User alert settings operations
+  getUserAlertSettings(userId: string): Promise<UserAlertSettings | undefined>;
+  upsertUserAlertSettings(userId: string, data: InsertUserAlertSettings): Promise<UserAlertSettings>;
+  getUsersForWeeklyDigest(): Promise<(UserAlertSettings & { user: User })[]>;
+  markDigestSent(userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1883,6 +1914,168 @@ export class DatabaseStorage implements IStorage {
     });
 
     return { success: true, message: "Promo code redeemed! You now have Pro access." };
+  }
+
+  // Price alert operations
+  async getPriceAlerts(userId: string): Promise<PriceAlertWithCard[]> {
+    const alerts = await db
+      .select()
+      .from(priceAlerts)
+      .where(eq(priceAlerts.userId, userId))
+      .orderBy(desc(priceAlerts.createdAt));
+    
+    const alertsWithCards: PriceAlertWithCard[] = [];
+    for (const alert of alerts) {
+      const [card] = await db.select().from(cards).where(eq(cards.id, alert.cardId));
+      if (card) {
+        alertsWithCards.push({ ...alert, card });
+      }
+    }
+    return alertsWithCards;
+  }
+
+  async getPriceAlert(id: number): Promise<PriceAlert | undefined> {
+    const [alert] = await db.select().from(priceAlerts).where(eq(priceAlerts.id, id));
+    return alert;
+  }
+
+  async getCardPriceAlerts(cardId: number, userId: string): Promise<PriceAlert[]> {
+    return db
+      .select()
+      .from(priceAlerts)
+      .where(and(eq(priceAlerts.cardId, cardId), eq(priceAlerts.userId, userId)));
+  }
+
+  async createPriceAlert(userId: string, data: InsertPriceAlert): Promise<PriceAlert> {
+    const [alert] = await db
+      .insert(priceAlerts)
+      .values({ ...data, userId })
+      .returning();
+    return alert;
+  }
+
+  async updatePriceAlert(id: number, data: Partial<InsertPriceAlert>): Promise<PriceAlert | undefined> {
+    const [alert] = await db
+      .update(priceAlerts)
+      .set(data)
+      .where(eq(priceAlerts.id, id))
+      .returning();
+    return alert;
+  }
+
+  async deletePriceAlert(id: number): Promise<void> {
+    await db.delete(priceAlerts).where(eq(priceAlerts.id, id));
+  }
+
+  async countUserPriceAlerts(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(priceAlerts)
+      .where(eq(priceAlerts.userId, userId));
+    return Number(result[0]?.count || 0);
+  }
+
+  async getActiveAlertsForProcessing(): Promise<(PriceAlert & { card: Card; user: User })[]> {
+    const alerts = await db
+      .select()
+      .from(priceAlerts)
+      .where(eq(priceAlerts.isActive, true));
+    
+    const result: (PriceAlert & { card: Card; user: User })[] = [];
+    for (const alert of alerts) {
+      const [card] = await db.select().from(cards).where(eq(cards.id, alert.cardId));
+      const [user] = await db.select().from(users).where(eq(users.id, alert.userId));
+      if (card && user) {
+        result.push({ ...alert, card, user });
+      }
+    }
+    return result;
+  }
+
+  async markAlertTriggered(id: number): Promise<void> {
+    await db
+      .update(priceAlerts)
+      .set({ lastTriggeredAt: new Date() })
+      .where(eq(priceAlerts.id, id));
+  }
+
+  // Price history operations
+  async recordPriceHistory(cardId: number, price: number): Promise<PriceHistory> {
+    const [record] = await db
+      .insert(priceHistory)
+      .values({ cardId, price })
+      .returning();
+    return record;
+  }
+
+  async getCardPriceHistory(cardId: number, days: number = 30): Promise<PriceHistory[]> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+    
+    return db
+      .select()
+      .from(priceHistory)
+      .where(
+        and(
+          eq(priceHistory.cardId, cardId),
+          sql`${priceHistory.recordedAt} >= ${cutoffDate}`
+        )
+      )
+      .orderBy(asc(priceHistory.recordedAt));
+  }
+
+  async getLatestPriceHistory(cardId: number): Promise<PriceHistory | undefined> {
+    const [record] = await db
+      .select()
+      .from(priceHistory)
+      .where(eq(priceHistory.cardId, cardId))
+      .orderBy(desc(priceHistory.recordedAt))
+      .limit(1);
+    return record;
+  }
+
+  // User alert settings operations
+  async getUserAlertSettings(userId: string): Promise<UserAlertSettings | undefined> {
+    const [settings] = await db
+      .select()
+      .from(userAlertSettings)
+      .where(eq(userAlertSettings.userId, userId));
+    return settings;
+  }
+
+  async upsertUserAlertSettings(userId: string, data: InsertUserAlertSettings): Promise<UserAlertSettings> {
+    const [settings] = await db
+      .insert(userAlertSettings)
+      .values({ ...data, userId })
+      .onConflictDoUpdate({
+        target: userAlertSettings.userId,
+        set: data,
+      })
+      .returning();
+    return settings;
+  }
+
+  async getUsersForWeeklyDigest(): Promise<(UserAlertSettings & { user: User })[]> {
+    const settings = await db
+      .select()
+      .from(userAlertSettings)
+      .where(eq(userAlertSettings.weeklyDigestEnabled, true));
+    
+    const result: (UserAlertSettings & { user: User })[] = [];
+    for (const setting of settings) {
+      const [user] = await db.select().from(users).where(eq(users.id, setting.userId));
+      if (user) {
+        result.push({ ...setting, user });
+      }
+    }
+    return result;
+  }
+
+  async markDigestSent(userId: string): Promise<void> {
+    await db
+      .update(userAlertSettings)
+      .set({ lastDigestSentAt: new Date() })
+      .where(eq(userAlertSettings.userId, userId));
   }
 }
 

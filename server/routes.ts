@@ -2598,4 +2598,242 @@ Allow: /
     }
   });
 
+  // ============ PRICE ALERTS ROUTES ============
+
+  // Get all price alerts for the current user
+  app.get("/api/price-alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const alerts = await storage.getPriceAlerts(userId);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching price alerts:", error);
+      res.status(500).json({ message: "Failed to fetch price alerts" });
+    }
+  });
+
+  // Create a new price alert
+  app.post("/api/price-alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { cardId, alertType, threshold, isActive } = req.body;
+
+      // Validate input
+      if (!cardId || typeof cardId !== "number") {
+        return res.status(400).json({ message: "Valid card ID is required" });
+      }
+      if (!alertType || !["above", "below"].includes(alertType)) {
+        return res.status(400).json({ message: "Alert type must be 'above' or 'below'" });
+      }
+      if (typeof threshold !== "number" || threshold <= 0) {
+        return res.status(400).json({ message: "Threshold must be a positive number" });
+      }
+
+      // Check Pro gating: Free users get 3 alerts, Pro gets unlimited
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        const alertCount = await storage.countUserPriceAlerts(userId);
+        if (alertCount >= 3) {
+          return res.status(403).json({ 
+            message: "Free tier limit reached. Upgrade to Pro for unlimited price alerts.",
+            upgradeRequired: true
+          });
+        }
+      }
+
+      // Verify the card exists and belongs to a case the user owns
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      // Verify user owns the display case containing this card
+      const displayCase = await storage.getDisplayCaseByIdAndUser(card.displayCaseId, userId);
+      if (!displayCase) {
+        return res.status(403).json({ message: "You can only set alerts for your own cards" });
+      }
+
+      const alert = await storage.createPriceAlert(userId, {
+        cardId,
+        alertType,
+        threshold,
+        isActive: isActive !== false,
+      });
+
+      res.status(201).json(alert);
+    } catch (error: any) {
+      // Handle unique constraint violation (duplicate alert)
+      if (error.code === "23505") {
+        return res.status(409).json({ message: "An alert of this type already exists for this card" });
+      }
+      console.error("Error creating price alert:", error);
+      res.status(500).json({ message: "Failed to create price alert" });
+    }
+  });
+
+  // Update a price alert
+  app.patch("/api/price-alerts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const alertId = parseInt(req.params.id);
+      const { threshold, isActive } = req.body;
+
+      if (isNaN(alertId)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+
+      // Verify ownership
+      const existingAlert = await storage.getPriceAlert(alertId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "Alert not found" });
+      }
+      if (existingAlert.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updateData: any = {};
+      if (typeof threshold === "number" && threshold > 0) {
+        updateData.threshold = threshold;
+      }
+      if (typeof isActive === "boolean") {
+        updateData.isActive = isActive;
+      }
+
+      const alert = await storage.updatePriceAlert(alertId, updateData);
+      res.json(alert);
+    } catch (error) {
+      console.error("Error updating price alert:", error);
+      res.status(500).json({ message: "Failed to update price alert" });
+    }
+  });
+
+  // Delete a price alert
+  app.delete("/api/price-alerts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const alertId = parseInt(req.params.id);
+
+      if (isNaN(alertId)) {
+        return res.status(400).json({ message: "Invalid alert ID" });
+      }
+
+      // Verify ownership
+      const existingAlert = await storage.getPriceAlert(alertId);
+      if (!existingAlert) {
+        return res.status(404).json({ message: "Alert not found" });
+      }
+      if (existingAlert.userId !== userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await storage.deletePriceAlert(alertId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting price alert:", error);
+      res.status(500).json({ message: "Failed to delete price alert" });
+    }
+  });
+
+  // Get price alerts for a specific card
+  app.get("/api/cards/:id/price-alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cardId = parseInt(req.params.id);
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const alerts = await storage.getCardPriceAlerts(cardId, userId);
+      res.json(alerts);
+    } catch (error) {
+      console.error("Error fetching card price alerts:", error);
+      res.status(500).json({ message: "Failed to fetch card price alerts" });
+    }
+  });
+
+  // Get price history for a specific card
+  app.get("/api/cards/:id/price-history", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.id);
+      const days = parseInt(req.query.days as string) || 30;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const history = await storage.getCardPriceHistory(cardId, days);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching price history:", error);
+      res.status(500).json({ message: "Failed to fetch price history" });
+    }
+  });
+
+  // Get user's alert settings
+  app.get("/api/user/alert-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      let settings = await storage.getUserAlertSettings(userId);
+      
+      // Return default settings if none exist
+      if (!settings) {
+        settings = {
+          id: 0,
+          userId,
+          emailAlertsEnabled: true,
+          inAppAlertsEnabled: true,
+          weeklyDigestEnabled: true,
+          lastDigestSentAt: null,
+          createdAt: null,
+        };
+      }
+      
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching alert settings:", error);
+      res.status(500).json({ message: "Failed to fetch alert settings" });
+    }
+  });
+
+  // Update user's alert settings
+  app.put("/api/user/alert-settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { emailAlertsEnabled, inAppAlertsEnabled, weeklyDigestEnabled } = req.body;
+
+      const updateData: any = {};
+      if (typeof emailAlertsEnabled === "boolean") {
+        updateData.emailAlertsEnabled = emailAlertsEnabled;
+      }
+      if (typeof inAppAlertsEnabled === "boolean") {
+        updateData.inAppAlertsEnabled = inAppAlertsEnabled;
+      }
+      if (typeof weeklyDigestEnabled === "boolean") {
+        updateData.weeklyDigestEnabled = weeklyDigestEnabled;
+      }
+
+      const settings = await storage.upsertUserAlertSettings(userId, updateData);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error updating alert settings:", error);
+      res.status(500).json({ message: "Failed to update alert settings" });
+    }
+  });
+
+  // Get count of user's price alerts (for UI to show limit)
+  app.get("/api/price-alerts/count", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const count = await storage.countUserPriceAlerts(userId);
+      const user = await storage.getUser(userId);
+      const limit = user?.subscriptionStatus === "PRO" ? null : 3;
+      
+      res.json({ count, limit, isPro: user?.subscriptionStatus === "PRO" });
+    } catch (error) {
+      console.error("Error fetching alert count:", error);
+      res.status(500).json({ message: "Failed to fetch alert count" });
+    }
+  });
+
 }
