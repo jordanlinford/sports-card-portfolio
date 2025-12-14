@@ -542,7 +542,7 @@ export default function CaseView() {
                 <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-stone-400/50" />
                 <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-stone-400/50" />
                 
-                <div className={`${theme.bg} rounded-md p-6 sm:p-8`}>
+                <div className={`${theme.bg} rounded-md p-6 sm:p-8 overflow-x-auto`}>
                   {/* Grid Layout (default) */}
                   {(!displayCase.layout || displayCase.layout === "grid") && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
@@ -554,7 +554,7 @@ export default function CaseView() {
                   
                   {/* Row Layout - horizontal scrollable row */}
                   {displayCase.layout === "row" && (
-                    <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 scrollbar-thin">
+                    <div className="flex gap-4 sm:gap-6 overflow-x-auto pb-4 scrollbar-thin" style={{ minWidth: 0 }}>
                       {displayCase.cards?.map((card) => (
                         <div key={card.id} className="flex-shrink-0 w-40 sm:w-48 md:w-56">
                           <CardItem card={card} theme={theme} onClick={() => setSelectedCard(card)} />
