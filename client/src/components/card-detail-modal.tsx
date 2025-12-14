@@ -20,6 +20,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { MakeOfferModal } from "@/components/make-offer-modal";
 import { ProposeTradeModal } from "@/components/propose-trade-modal";
 import { CardOutlookPanel } from "@/components/card-outlook-panel";
+import { CardPriceAlertsPanel } from "@/components/card-price-alerts-panel";
+import { PriceSparkline } from "@/components/price-sparkline";
 import { ProFeatureGate } from "@/components/pro-feature-gate";
 
 interface CardDetailModalProps {
@@ -623,6 +625,11 @@ export function CardDetailModal({
                   </div>
                 )}
 
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">30-Day Trend</span>
+                  <PriceSparkline cardId={card.id} height={48} showTrend days={30} />
+                </div>
+
                 {profitLoss !== null && (
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-muted-foreground">Profit/Loss:</span>
@@ -698,6 +705,13 @@ export function CardDetailModal({
                 isPro={isPro} 
                 canEdit={canEdit} 
               />
+
+              {canEdit && isAuthenticated && (
+                <>
+                  <Separator />
+                  <CardPriceAlertsPanel card={card} isPro={isPro} />
+                </>
+              )}
 
               {card.openToOffers && !canEdit && (
                 <>
