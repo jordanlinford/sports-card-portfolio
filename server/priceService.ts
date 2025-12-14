@@ -60,22 +60,24 @@ function buildSearchQueries(card: CardInfo): string[] {
   const queries: string[] = [];
   const cleanTitle = cleanCardTitle(card.title);
   
-  // Primary query: player name + set + year + grade + "value" or "price" for pricing info
+  // Primary query: player name + set + year + variation + grade + "value" or "price" for pricing info
+  // Variation is important for parallel cards like Refractor, Prizm, Auto, /25, etc.
   const primaryParts: string[] = [];
   if (cleanTitle) primaryParts.push(cleanTitle);
   if (card.set) primaryParts.push(card.set);
   if (card.year) primaryParts.push(String(card.year));
+  if (card.variation) primaryParts.push(card.variation);
   if (card.grade) primaryParts.push(card.grade);
   queries.push(primaryParts.join(" ") + " value price");
   
-  // Secondary query: search PSA auction prices specifically
-  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${card.grade || ""} auction price sold`);
+  // Secondary query: search PSA auction prices specifically (include variation)
+  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${card.variation || ""} ${card.grade || ""} auction price sold`);
   
-  // Tertiary query: just player name + year + grade + "rookie card value"
-  queries.push(`${cleanTitle} ${card.year || ""} ${card.grade || ""} rookie card value`);
+  // Tertiary query: player name + year + variation + grade + "rookie card value"
+  queries.push(`${cleanTitle} ${card.year || ""} ${card.variation || ""} ${card.grade || ""} rookie card value`);
   
-  // Fourth query: simpler version targeting price guides
-  queries.push(`${cleanTitle} ${card.set || ""} ${card.grade || ""} price guide`);
+  // Fourth query: simpler version targeting price guides (include variation)
+  queries.push(`${cleanTitle} ${card.set || ""} ${card.variation || ""} ${card.grade || ""} price guide`);
   
   return queries;
 }
