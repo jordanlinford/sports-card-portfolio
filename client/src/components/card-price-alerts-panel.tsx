@@ -40,7 +40,9 @@ export function CardPriceAlertsPanel({ card, isPro }: CardPriceAlertsPanelProps)
   const { data: alertsData, isLoading } = useQuery<AlertsData>({
     queryKey: ["/api/cards", card.id, "price-alerts"],
     queryFn: async () => {
-      const res = await fetch(`/api/cards/${card.id}/price-alerts`);
+      const res = await fetch(`/api/cards/${card.id}/price-alerts`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch alerts");
       return res.json();
     },
@@ -60,8 +62,8 @@ export function CardPriceAlertsPanel({ card, isPro }: CardPriceAlertsPanelProps)
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cards", card.id, "price-alerts"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/cards", card.id, "price-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/price-alerts"] });
       toast({
         title: "Alert Created",
@@ -83,8 +85,8 @@ export function CardPriceAlertsPanel({ card, isPro }: CardPriceAlertsPanelProps)
     mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
       return await apiRequest("PATCH", `/api/price-alerts/${id}`, { isActive });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cards", card.id, "price-alerts"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/cards", card.id, "price-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/price-alerts"] });
     },
     onError: () => {
@@ -100,8 +102,8 @@ export function CardPriceAlertsPanel({ card, isPro }: CardPriceAlertsPanelProps)
     mutationFn: async (id: number) => {
       return await apiRequest("DELETE", `/api/price-alerts/${id}`);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cards", card.id, "price-alerts"] });
+    onSuccess: async () => {
+      await queryClient.refetchQueries({ queryKey: ["/api/cards", card.id, "price-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/price-alerts"] });
       toast({
         title: "Alert Deleted",
