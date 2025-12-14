@@ -2757,8 +2757,12 @@ Allow: /
         maxAlerts: isPro ? -1 : 3,
         canCreateMore,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching card price alerts:", error);
+      // Return empty data if table doesn't exist or other DB error
+      if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+        return res.json({ alerts: [], userAlertCount: 0, maxAlerts: 3, canCreateMore: true });
+      }
       res.status(500).json({ message: "Failed to fetch card price alerts" });
     }
   });
@@ -2775,8 +2779,12 @@ Allow: /
 
       const history = await storage.getCardPriceHistory(cardId, days);
       res.json(history);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching price history:", error);
+      // Return empty array if table doesn't exist
+      if (error?.code === '42P01' || error?.message?.includes('does not exist')) {
+        return res.json([]);
+      }
       res.status(500).json({ message: "Failed to fetch price history" });
     }
   });
