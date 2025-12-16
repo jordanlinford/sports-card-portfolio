@@ -855,12 +855,15 @@ export class DatabaseStorage implements IStorage {
           ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
           : "Anonymous";
 
-      enrichedCases.push({
-        ...c,
-        cards: caseCards,
-        ownerName,
-        likeCount,
-      });
+      // Only include cases with at least one card
+      if (caseCards.length > 0) {
+        enrichedCases.push({
+          ...c,
+          cards: caseCards,
+          ownerName,
+          likeCount,
+        });
+      }
     }
 
     return enrichedCases;
@@ -934,12 +937,15 @@ export class DatabaseStorage implements IStorage {
           ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
           : "Anonymous";
 
-      enrichedCases.push({
-        ...c,
-        cards: caseCards,
-        ownerName,
-        likeCount: c.likeCount,
-      });
+      // Only include cases with at least one card
+      if (caseCards.length > 0) {
+        enrichedCases.push({
+          ...c,
+          cards: caseCards,
+          ownerName,
+          likeCount: c.likeCount,
+        });
+      }
     }
 
     return enrichedCases;
@@ -1000,13 +1006,16 @@ export class DatabaseStorage implements IStorage {
           ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
           : "Anonymous";
 
-      enrichedCases.push({
-        ...c,
-        cards: caseCards,
-        ownerName,
-        likeCount: c.likeCount,
-        trendingScore: c.trendingScore,
-      });
+      // Only include cases with at least one card
+      if (caseCards.length > 0) {
+        enrichedCases.push({
+          ...c,
+          cards: caseCards,
+          ownerName,
+          likeCount: c.likeCount,
+          trendingScore: c.trendingScore,
+        });
+      }
     }
 
     return enrichedCases;
