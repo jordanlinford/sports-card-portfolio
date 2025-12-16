@@ -61,17 +61,33 @@ export default function Landing() {
             {/* Left side - Copy */}
             <div className="text-center lg:text-left">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-title">
-                Your collection deserves more than a spreadsheet.
+                The AI-powered portfolio for card collectors.
               </h1>
-              <p className="text-lg md:text-xl text-muted-foreground mb-8" data-testid="text-hero-subtitle">
-                Digital display cases, AI value tracking, and trading—built for serious collectors.
+              <p className="text-lg md:text-xl text-muted-foreground mb-4" data-testid="text-hero-subtitle">
+                Track value. Predict movement. Showcase your collection. Trade with confidence.
               </p>
+              
+              {/* 3 Key Value Props */}
+              <ul className="flex flex-col gap-2 mb-8 text-left max-w-md mx-auto lg:mx-0">
+                <li className="flex items-center gap-3">
+                  <Sparkles className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">AI-powered pricing and market outlooks</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <BarChart3 className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">Portfolio-level analytics and value tracking</span>
+                </li>
+                <li className="flex items-center gap-3">
+                  <Layers className="h-5 w-5 text-primary flex-shrink-0" />
+                  <span className="text-muted-foreground">Beautiful, shareable display cases</span>
+                </li>
+              </ul>
               
               {/* CTAs */}
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-6">
                 <a href="/api/login">
                   <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-hero-cta">
-                    Start your free display case
+                    Start tracking your collection
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </a>
@@ -85,7 +101,7 @@ export default function Landing() {
 
               {/* Microcopy */}
               <p className="text-sm text-muted-foreground">
-                No spreadsheets. No guesswork. No pressure to sell.
+                Free forever. Pro unlocks AI intelligence.
               </p>
             </div>
 
@@ -169,7 +185,7 @@ export default function Landing() {
       {/* Social Proof / Category Strip */}
       <section className="py-8 border-y bg-muted/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-muted-foreground mb-4">Built by a collector. Used by collectors.</p>
+          <p className="text-muted-foreground mb-4">AI-powered pricing intelligence for every card category.</p>
           <div className="flex flex-wrap justify-center gap-4 md:gap-8 text-sm font-medium">
             <span className="flex items-center gap-2">
               <CircleDot className="h-4 w-4 text-primary" />
@@ -191,7 +207,7 @@ export default function Landing() {
       <section className="py-16 md:py-24">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Collecting shouldn't feel like accounting.
+            Your cards aren't just collectibles—they're a portfolio.
           </h2>
           <div className="text-lg text-muted-foreground space-y-4">
             <p>
@@ -199,10 +215,10 @@ export default function Landing() {
               just to keep track of what they own and what it might be worth.
             </p>
             <p>
-              Cards sit in boxes. Values go stale. Great collections stay hidden.
+              Pricing apps give you numbers, but no context. No intelligence. No recommendations.
             </p>
             <p className="font-medium text-foreground">
-              Your collection deserves better.
+              You need a system that thinks like a collector.
             </p>
           </div>
         </div>
@@ -212,32 +228,227 @@ export default function Landing() {
       <section className="py-16 md:py-24 bg-muted/30">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            One home for your entire collection.
+            Finally—AI that understands the card market.
           </h2>
           <div className="text-lg text-muted-foreground space-y-4 mb-8">
             <p>
-              MyDisplayCase gives your cards a digital home you're proud of.
+              MyDisplayCase analyzes real sales data, evaluates market trends, and delivers 
+              actionable intelligence—not just static prices.
             </p>
             <p>
-              Upload cards, organize them into beautiful display cases, track value over time,
-              and share your collection with the world—or keep it private.
+              Know what to buy. Know when to sell. Know exactly where you stand.
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-4 text-sm font-medium text-muted-foreground">
-            <span>No marketplaces.</span>
-            <span>No selling pressure.</span>
-            <span>Just tools built for people who actually care about their cards.</span>
+            <span>Real market data.</span>
+            <span>AI-powered recommendations.</span>
+            <span>Built for collectors who invest in their hobby.</span>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* AI Intelligence Section - THE DIFFERENTIATOR */}
+      <section className="py-16 md:py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <Badge variant="secondary" className="mb-4">
+              <Sparkles className="h-3 w-3 mr-1" />
+              What Sets Us Apart
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              AI-powered pricing intelligence.
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-3xl mx-auto">
+              We don't just show you numbers. Our AI analyzes real market data from eBay, PSA, and price guides
+              to give you actionable insights—not just prices.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+            {/* Current Value */}
+            <Card className="relative">
+              <div className="absolute -top-3 left-4">
+                <Badge variant="outline" className="bg-background">Step 1</Badge>
+              </div>
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                  <Search className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>AI Price Lookup</CardTitle>
+                <CardDescription>
+                  Real market values, not guesswork
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Scans eBay sold listings in real-time</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Considers grade, variation, and condition</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Confidence scores on every lookup</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Works for Sports, Pokemon, and Non-Sport</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Future Outlook */}
+            <Card className="relative">
+              <div className="absolute -top-3 left-4">
+                <Badge variant="outline" className="bg-background">Step 2</Badge>
+              </div>
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                  <TrendingUp className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Card Outlook AI</CardTitle>
+                <CardDescription>
+                  BUY / WATCH / SELL recommendations
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Investment-style recommendations</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Detailed reasoning for every outlook</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Category-aware analysis (sports vs TCG)</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Factors in player career, set rarity, trends</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Actionable Alerts */}
+            <Card className="relative">
+              <div className="absolute -top-3 left-4">
+                <Badge variant="outline" className="bg-background">Step 3</Badge>
+              </div>
+              <CardHeader>
+                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
+                  <Zap className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Never Miss a Move</CardTitle>
+                <CardDescription>
+                  Stay informed automatically
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Value history tracking over time</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Weekly portfolio digest emails</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Top movers and biggest changes</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span>Portfolio-level profit/loss tracking</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="text-center mt-8">
+            <Badge variant="secondary" className="text-xs">
+              <Zap className="h-3 w-3 mr-1" />
+              Pro Feature
+            </Badge>
+          </div>
+        </div>
+      </section>
+
+      {/* Portfolio Management Section */}
+      <section className="py-16 md:py-24 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Manage your collection like a portfolio.
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              See the big picture. Track performance. Understand your position.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            <div className="text-center p-6 bg-background rounded-lg border">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <DollarSign className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Total Value</h3>
+              <p className="text-sm text-muted-foreground">
+                Real-time collection worth
+              </p>
+            </div>
+
+            <div className="text-center p-6 bg-background rounded-lg border">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <TrendingUp className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Profit / Loss</h3>
+              <p className="text-sm text-muted-foreground">
+                Purchase vs. current value
+              </p>
+            </div>
+
+            <div className="text-center p-6 bg-background rounded-lg border">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <BarChart3 className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Top Movers</h3>
+              <p className="text-sm text-muted-foreground">
+                Cards gaining or losing value
+              </p>
+            </div>
+
+            <div className="text-center p-6 bg-background rounded-lg border">
+              <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Layers className="h-6 w-6 text-primary" />
+              </div>
+              <h3 className="font-semibold mb-2">Category Breakdown</h3>
+              <p className="text-sm text-muted-foreground">
+                Value by player, set, or sport
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Display & Organization Section */}
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Everything a serious collector needs.
+              Plus: organization and presentation tools.
             </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Organize your collection. Share your wins. Keep everything in one place.
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
@@ -249,7 +460,7 @@ export default function Landing() {
                 </div>
                 <CardTitle>Card Management</CardTitle>
                 <CardDescription>
-                  Upload and manage your cards with ease.
+                  Upload and organize with ease
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -260,11 +471,7 @@ export default function Landing() {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Add player, year, set, condition, and grade</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Track purchase price and estimated value</span>
+                    <span>Track player, year, set, and grade</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
@@ -274,34 +481,30 @@ export default function Landing() {
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                     <span>Detect duplicates automatically</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Mark cards as "Open to Offers"</span>
-                  </li>
                 </ul>
               </CardContent>
             </Card>
 
-            {/* Display Cases */}
+            {/* Collection Views */}
             <Card>
               <CardHeader>
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <Layers className="h-6 w-6 text-primary" />
+                  <Frame className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle>Display Cases</CardTitle>
+                <CardTitle>Collection Views</CardTitle>
                 <CardDescription>
-                  Turn your collection into something worth showing off.
+                  Organize cards for better insights
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Create unlimited display cases</span>
+                    <span>Group by player, set, or category</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Grid, Row, and Showcase layouts</span>
+                    <span>Auto-generate by top value</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
@@ -309,48 +512,40 @@ export default function Landing() {
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Auto-generate cases by tag or top value</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Premium themes for Pro users</span>
+                    <span>Multiple layout options</span>
                   </li>
                 </ul>
               </CardContent>
             </Card>
 
-            {/* Portfolio Analytics */}
+            {/* Share & Connect */}
             <Card>
               <CardHeader>
                 <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mb-4">
-                  <BarChart3 className="h-6 w-6 text-primary" />
+                  <Share2 className="h-6 w-6 text-primary" />
                 </div>
-                <CardTitle>Portfolio Analytics</CardTitle>
+                <CardTitle>Share & Connect</CardTitle>
                 <CardDescription>
-                  See the big picture.
+                  Show your portfolio to the world
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2 text-sm text-muted-foreground">
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Total collection value</span>
+                    <span>Shareable collection links</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Value breakdown by category</span>
+                    <span>Social previews for X, Facebook</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Top performing cards</span>
+                    <span>Export for social media</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Historical value tracking</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Collection growth over time</span>
+                    <span>Auto-generated preview images</span>
                   </li>
                 </ul>
               </CardContent>
@@ -359,179 +554,63 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* AI Value Section (Pro) */}
+      {/* From Discovery to Deal Section */}
       <section className="py-16 md:py-24 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <Badge variant="secondary" className="mb-4">
-              <Zap className="h-3 w-3 mr-1" />
-              Pro Feature
-            </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Know what your cards are worth—without the guesswork.
+              From discovery to deal.
             </h2>
-            <p className="text-muted-foreground text-lg max-w-3xl mx-auto mb-6">
-              Pro users unlock AI-powered insights that analyze market data and turn it into
-              clear, collector-friendly recommendations.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              This isn't day trading. It's clarity.
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Explore collections. Engage with cards. Make offers. Close deals.
+              The complete collector lifecycle in one platform.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-4 gap-6 max-w-5xl mx-auto">
-            <div className="text-center p-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
+            <div className="text-center p-6 bg-background rounded-lg border">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Search className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-semibold mb-2">AI Price Lookups</h3>
+              <h3 className="font-semibold mb-2">Explore</h3>
               <p className="text-sm text-muted-foreground">
-                Real prices from eBay sold listings, powered by AI
+                Discover trending cases and cards from other collectors
               </p>
             </div>
 
-            <div className="text-center p-6">
+            <div className="text-center p-6 bg-background rounded-lg border">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <TrendingUp className="h-6 w-6 text-primary" />
+                <Heart className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-semibold mb-2">BUY / WATCH / SELL</h3>
+              <h3 className="font-semibold mb-2">Engage</h3>
               <p className="text-sm text-muted-foreground">
-                Investment-style recommendations for every card
+                Like, comment, and bookmark cards you're interested in
               </p>
             </div>
 
-            <div className="text-center p-6">
+            <div className="text-center p-6 bg-background rounded-lg border">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="h-6 w-6 text-primary" />
+                <Handshake className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-semibold mb-2">Confidence Scores</h3>
+              <h3 className="font-semibold mb-2">Offer</h3>
               <p className="text-sm text-muted-foreground">
-                Explanations for every recommendation
+                Make offers on cards marked "Open to Offers"
               </p>
             </div>
 
-            <div className="text-center p-6">
+            <div className="text-center p-6 bg-background rounded-lg border">
               <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Layers className="h-6 w-6 text-primary" />
+                <MessageCircle className="h-6 w-6 text-primary" />
               </div>
-              <h3 className="font-semibold mb-2">Category-Aware</h3>
+              <h3 className="font-semibold mb-2">Connect</h3>
               <p className="text-sm text-muted-foreground">
-                Different logic for Sports, TCG, and Non-Sport
+                Direct messaging to negotiate and close deals
               </p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Social & Sharing Section */}
-      <section className="py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Your collection. Your link.
-            </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Every display case can be shared with a single URL.
-              Whether you're showing off, trading, or just keeping a personal archive,
-              your collection finally lives somewhere that makes sense.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-5xl mx-auto">
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Share2 className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm mb-1">Shareable Cases</h3>
-              <p className="text-xs text-muted-foreground">Public display cases</p>
-            </div>
-
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Globe className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm mb-1">Social Previews</h3>
-              <p className="text-xs text-muted-foreground">X, Facebook, Discord</p>
-            </div>
-
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Image className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm mb-1">Auto Images</h3>
-              <p className="text-xs text-muted-foreground">Generated previews</p>
-            </div>
-
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Copy className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm mb-1">Export Cases</h3>
-              <p className="text-xs text-muted-foreground">Download as images</p>
-            </div>
-
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Heart className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm mb-1">Like & Comment</h3>
-              <p className="text-xs text-muted-foreground">Engage with cards</p>
-            </div>
-
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Bookmark className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm mb-1">Bookmark Cards</h3>
-              <p className="text-xs text-muted-foreground">Save your favorites</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Trading Section */}
-      <section className="py-16 md:py-24 bg-muted/30">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6">
-            Trade on your terms.
-          </h2>
-          <p className="text-lg text-muted-foreground mb-8">
-            Mark cards as "Open to Offers" and let other collectors come to you.
-          </p>
-          <div className="flex flex-wrap justify-center gap-4 text-sm text-muted-foreground mb-12">
-            <span>No listings.</span>
-            <span>No auctions.</span>
-            <span>No pressure.</span>
-          </div>
-
-          <div className="grid md:grid-cols-4 gap-6">
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <DollarSign className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm">Make Offers</h3>
-            </div>
-
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <ArrowRightLeft className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm">Accept or Counter</h3>
-            </div>
-
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <BarChart3 className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm">Track History</h3>
-            </div>
-
-            <div className="text-center p-4">
-              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                <MessageCircle className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium text-sm">Private Messaging</h3>
-            </div>
+          <div className="text-center mt-8 text-sm text-muted-foreground">
+            No marketplace listings. No auction fees. Trade on your terms.
           </div>
         </div>
       </section>
@@ -542,15 +621,15 @@ export default function Landing() {
           <div className="text-center mb-12">
             <Badge variant="secondary" className="mb-4">
               <Trophy className="h-3 w-3 mr-1" />
-              Prestige System
+              Collector Credibility
             </Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Built for collectors, not flippers.
+              Build trust in the collector community.
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              Earn prestige badges based on your collection and activity.
-              Show your status, highlight milestones, and build a public collector profile
-              that reflects how seriously you take the hobby.
+              Earn prestige badges based on your portfolio value and activity.
+              Verified collection data and transparent analytics build credibility
+              when you're ready to trade.
             </p>
           </div>
 
@@ -608,8 +687,109 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Why MyDisplayCase Section */}
       <section className="py-16 md:py-24 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Why collectors choose MyDisplayCase
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Pricing apps give you numbers. Marketplaces push you to sell. 
+              We give you intelligence and control.
+            </p>
+          </div>
+
+          <div className="max-w-4xl mx-auto">
+            <div className="grid grid-cols-4 gap-4 mb-6 text-center">
+              <div></div>
+              <div className="font-semibold text-muted-foreground text-sm">Pricing Apps</div>
+              <div className="font-semibold text-muted-foreground text-sm">Marketplaces</div>
+              <div className="font-semibold text-primary text-sm">MyDisplayCase</div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="grid grid-cols-4 gap-4 items-center py-3 border-b">
+                <div className="text-sm font-medium">Real-time price data</div>
+                <div className="text-center text-muted-foreground">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+                <div className="text-center text-muted-foreground">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+                <div className="text-center text-primary">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center py-3 border-b">
+                <div className="text-sm font-medium">AI-powered market outlook</div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-primary">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center py-3 border-b">
+                <div className="text-sm font-medium">BUY / WATCH / SELL guidance</div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-primary">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center py-3 border-b">
+                <div className="text-sm font-medium">Portfolio-level analytics</div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-primary">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center py-3 border-b">
+                <div className="text-sm font-medium">No selling pressure</div>
+                <div className="text-center text-muted-foreground">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-primary">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center py-3 border-b">
+                <div className="text-sm font-medium">Collection organization</div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-muted-foreground text-sm">Limited</div>
+                <div className="text-center text-primary">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-4 gap-4 items-center py-3">
+                <div className="text-sm font-medium">Direct trading</div>
+                <div className="text-center text-muted-foreground text-sm">—</div>
+                <div className="text-center text-muted-foreground">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+                <div className="text-center text-primary">
+                  <Check className="h-5 w-5 mx-auto" />
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-center text-sm text-muted-foreground mt-8">
+              The only platform that combines AI intelligence with portfolio management and social features.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
@@ -741,17 +921,20 @@ export default function Landing() {
       {/* Final CTA */}
       <section className="py-16 md:py-24 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-8">
-            Give your collection the home it deserves.
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            Ready to manage your collection like a pro?
           </h2>
+          <p className="text-muted-foreground text-lg mb-8 max-w-2xl mx-auto">
+            AI pricing. Portfolio analytics. Beautiful display cases. All in one place.
+          </p>
           <a href="/api/login">
             <Button size="lg" className="gap-2" data-testid="button-cta-bottom">
-              Start your free display case
+              Start tracking your collection
               <ArrowRight className="h-4 w-4" />
             </Button>
           </a>
           <p className="text-sm text-muted-foreground mt-4">
-            No credit card required.
+            Free forever. Pro unlocks AI intelligence.
           </p>
         </div>
       </section>
@@ -775,7 +958,7 @@ export default function Landing() {
               </Link>
             </div>
             <p className="text-sm text-muted-foreground">
-              A simple, beautiful way to showcase your collection.
+              AI-powered portfolio management for card collectors.
             </p>
           </div>
         </div>
