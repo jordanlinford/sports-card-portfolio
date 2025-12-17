@@ -1052,7 +1052,9 @@ Return JSON with pricePoints array (all prices found), estimatedValue, salesFoun
         "silver", "gold", "hyper", "shimmer", "wave", "camo", 
         "kaboom", "downtown", "case hit", "ssp", "sp ",
         "refractor", "prizm", "auto", "autograph", "numbered", "/10", "/25", "/50", "/99",
-        "1/1", "one of one", "superfractor", "atomic"
+        "1/1", "one of one", "superfractor", "atomic",
+        // Insert set names (these are premium even without numbered)
+        "rookie kings", "lombardi bound", "dynamic patch", "elite series"
       ];
       
       // Check if text contains premium variation keywords
@@ -1060,6 +1062,18 @@ Return JSON with pricePoints array (all prices found), estimatedValue, salesFoun
         const lower = text.toLowerCase();
         for (const kw of PREMIUM_KEYWORDS) {
           if (lower.includes(kw)) return kw;
+        }
+        // Also check for insert set card numbers like #D-10 (Downtown), #RK-1 (Rookie Kings), etc.
+        // These indicate premium inserts even if the set name isn't in the title
+        const insertNumberMatch = lower.match(/#[a-z]+-?\d+/); // Matches #D-10, #RK-1, #LB-PM10, etc.
+        if (insertNumberMatch) {
+          // Check if it's a known insert prefix
+          const insertPrefixes = ['d-', 'rk-', 'lb-', 'dp-', 'dk-', 'sk-', 'dt-']; // Downtown, Rookie Kings, Lombardi Bound, Dynamic Patch, etc.
+          for (const prefix of insertPrefixes) {
+            if (insertNumberMatch[0].includes(prefix)) {
+              return `insert ${insertNumberMatch[0]}`;
+            }
+          }
         }
         return null;
       };
