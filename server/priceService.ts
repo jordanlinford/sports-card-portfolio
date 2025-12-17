@@ -1070,36 +1070,57 @@ Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and 
   return null;
 }
 
-// Filter out price points that deviate more than 25% from the mean
-// This helps suppress outliers when using loose comps as fallback
-function filterMeanDeviationOutliers(
-  pricePoints: PricePoint[],
-  maxDeviationPercent: number = 25
+// Filter out EXTREME price outliers using IQR method
+// Only removes truly anomalous prices (>2x IQR from quartiles) to preserve trend data
+// This is more conservative than fixed % to avoid masking legitimate price growth/decline
+function filterExtremeOutliers(
+  pricePoints: PricePoint[]
 ): { filtered: PricePoint[]; removed: PricePoint[]; mean: number | null } {
-  if (pricePoints.length < 2) {
-    return { filtered: pricePoints, removed: [], mean: pricePoints[0]?.price ?? null };
+  if (pricePoints.length < 4) {
+    // Need at least 4 points for IQR to be meaningful
+    const mean = pricePoints.length > 0 
+      ? pricePoints.reduce((sum, pp) => sum + pp.price, 0) / pricePoints.length 
+      : null;
+    return { filtered: pricePoints, removed: [], mean };
   }
   
-  const mean = pricePoints.reduce((sum, pp) => sum + pp.price, 0) / pricePoints.length;
-  const threshold = mean * (maxDeviationPercent / 100);
+  const prices = pricePoints.map(p => p.price).sort((a, b) => a - b);
+  const n = prices.length;
+  
+  // Calculate quartiles
+  const q1Index = Math.floor(n * 0.25);
+  const q3Index = Math.floor(n * 0.75);
+  const q1 = prices[q1Index];
+  const q3 = prices[q3Index];
+  const iqr = q3 - q1;
+  
+  // Use 2x IQR for outlier bounds (more conservative than typical 1.5x)
+  // This only filters EXTREME outliers, preserving legitimate 20-50% price movements
+  const lowerBound = q1 - (2 * iqr);
+  const upperBound = q3 + (2 * iqr);
   
   const filtered: PricePoint[] = [];
   const removed: PricePoint[] = [];
   
   for (const pp of pricePoints) {
-    const deviation = Math.abs(pp.price - mean);
-    if (deviation <= threshold) {
+    if (pp.price >= lowerBound && pp.price <= upperBound) {
       filtered.push(pp);
     } else {
       removed.push(pp);
-      console.log(`[OUTLIER FILTER] Excluded "$${pp.price}" from "${pp.source}" - ${((deviation / mean) * 100).toFixed(1)}% from mean ($${mean.toFixed(2)})`);
+      console.log(`[EXTREME OUTLIER] Excluded "$${pp.price}" from "${pp.source}" - outside IQR bounds ($${lowerBound.toFixed(0)}-$${upperBound.toFixed(0)})`);
     }
   }
   
-  // If we removed too many (>50%), fall back to original to avoid losing all data
-  if (filtered.length < pricePoints.length * 0.5 && filtered.length < 2) {
-    console.log(`[OUTLIER FILTER] Too aggressive - reverting to original ${pricePoints.length} comps`);
-    return { filtered: pricePoints, removed: [], mean };
+  // Calculate mean from filtered points
+  const mean = filtered.length > 0 
+    ? filtered.reduce((sum, pp) => sum + pp.price, 0) / filtered.length 
+    : null;
+  
+  // If we removed too many, fall back to original
+  if (filtered.length < 2) {
+    console.log(`[EXTREME OUTLIER] Too aggressive - reverting to original ${pricePoints.length} comps`);
+    const originalMean = pricePoints.reduce((sum, pp) => sum + pp.price, 0) / pricePoints.length;
+    return { filtered: pricePoints, removed: [], mean: originalMean };
   }
   
   return { filtered, removed, mean };
@@ -1141,13 +1162,13 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    // Apply 25% mean deviation filter to suppress outliers
-    // This is especially important when using loose comps as fallback
+    // Apply IQR-based extreme outlier filter
+    // Uses 2x IQR bounds to only remove truly anomalous prices (preserves legitimate trends)
     const { filtered: filteredPricePoints, removed: removedOutliers, mean } = 
-      filterMeanDeviationOutliers(allPricePoints, 25);
+      filterExtremeOutliers(allPricePoints);
     
     if (removedOutliers.length > 0) {
-      console.log(`[OUTLIER FILTER] Removed ${removedOutliers.length} of ${allPricePoints.length} comps (>25% from mean)`);
+      console.log(`[EXTREME OUTLIER] Removed ${removedOutliers.length} of ${allPricePoints.length} comps (outside IQR bounds)`);
     }
 
     // Calculate final values using filtered price points
