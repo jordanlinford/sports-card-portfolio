@@ -152,6 +152,36 @@ function isStrictComp(
     return { isStrict: false, excludeReason: `Grader mismatch: ${cardGrade.grader.toUpperCase()} vs ${listingGrade.grader.toUpperCase()}` };
   }
   
+  // HARD GATE 4: Variation/parallel mismatch - base cards should not match parallels
+  // This is critical for pricing accuracy
+  const parallelKeywords = [
+    "/25", "/50", "/75", "/99", "/100", "/149", "/199", "/250", "/299", "/499", "/999",
+    "refractor", "prizm", "opti-chrome",
+    "auto", "autograph", "signature", "signed",
+    "holo", "holographic", "holofoil",
+    "red yellow", "red/yellow", "red & yellow", "red and yellow",
+    "ice", "neon", "laser", "wave", "pulsar", "mojo", "shimmer", "sparkle", "hyper",
+    "cracked ice", "disco", "fluorescent", "mosaic", "camo",
+    "superfractor", "xfractor", "atomic", "seismic", "velocity", "fast break",
+    "downtown", "kaboom", "silhouettes",
+    "reverse holo", "full art", "secret rare", "ultra rare", "rainbow rare", "alt art",
+    "patch", "jersey", "relic", "game-used", "game used", "memorabilia",
+  ];
+  
+  const listingHasParallel = parallelKeywords.some(kw => combined.includes(kw.toLowerCase()));
+  const userSpecifiedVariation = card.variation && card.variation.trim().length > 0;
+  
+  if (!userSpecifiedVariation && listingHasParallel) {
+    // User wants base card but listing is a parallel - not strict
+    const detectedParallel = parallelKeywords.find(kw => combined.includes(kw.toLowerCase()));
+    return { isStrict: false, excludeReason: `Base card vs parallel mismatch: listing has "${detectedParallel}"` };
+  }
+  
+  if (userSpecifiedVariation && !listingHasParallel) {
+    // User wants specific parallel but listing appears to be base card - not strict
+    return { isStrict: false, excludeReason: `Parallel "${card.variation}" vs base card mismatch` };
+  }
+  
   return { isStrict: true, excludeReason: null };
 }
 
@@ -248,9 +278,49 @@ function computeListingMatchScore(
       matched.variation = combined.includes(numberedMatch[0]) || combined.includes(`/${numberedMatch[1]}`);
     }
   } else {
-    // No variation specified - penalize if listing has a parallel keyword
-    const parallelKeywords = ["refractor", "prizm", "auto", "autograph", "numbered", "/25", "/50", "/99"];
-    const hasParallel = parallelKeywords.some(kw => combined.includes(kw));
+    // No variation specified - penalize if listing has a parallel/variation keyword
+    // Extensive list to catch all common parallels and colored variations
+    const parallelKeywords = [
+      // Numbered parallels
+      "/25", "/50", "/75", "/99", "/100", "/149", "/199", "/250", "/299", "/499", "/999",
+      // Premium parallels
+      "refractor", "prizm", "opti-chrome",
+      "auto", "autograph", "signature", "signed", "on-card auto",
+      // Color parallels (Donruss, Prizm, Topps, etc.)
+      "holo", "holographic", "holofoil",
+      "red yellow", "red/yellow", "red & yellow", "red and yellow",
+      "ice", "neon", "laser", "wave", "pulsar", "mojo", "shimmer", "sparkle", "hyper",
+      // Insert/special parallels
+      "cracked ice", "disco", "fluorescent", "mosaic", "camo",
+      "superfractor", "xfractor", "atomic", "seismic", "velocity", "fast break",
+      // Sports card specific premium
+      "downtown", "kaboom", "silhouettes",
+      // TCG parallels
+      "reverse holo", "full art", "secret rare", "ultra rare", "rainbow rare", "alt art", "alternate art",
+      // Premium materials
+      "patch", "jersey", "relic", "game-used", "game used", "memorabilia",
+    ];
+    // Also check for standalone color words that indicate parallels when near "parallel" or after set name
+    const colorParallels = ["red", "blue", "green", "gold", "silver", "pink", "purple", "orange", "yellow", "black", "white"];
+    const combinedLower = combined.toLowerCase();
+    
+    // Check for explicit parallel keywords first
+    let hasParallel = parallelKeywords.some(kw => combinedLower.includes(kw.toLowerCase()));
+    
+    // Check for color + parallel context (e.g., "red parallel", "gold /99", "blue prizm")
+    if (!hasParallel) {
+      for (const color of colorParallels) {
+        // Check if color appears near parallel-indicating words
+        if (combinedLower.includes(color)) {
+          const colorRegex = new RegExp(`${color}\\s*(parallel|prizm|refractor|wave|shimmer|/\\d+|\\d+/\\d+)`, 'i');
+          if (colorRegex.test(combinedLower)) {
+            hasParallel = true;
+            break;
+          }
+        }
+      }
+    }
+    
     matched.variation = !hasParallel; // True if base card, false if listing has parallel
   }
 
