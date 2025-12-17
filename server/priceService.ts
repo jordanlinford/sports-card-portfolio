@@ -926,11 +926,17 @@ Year: ${card.year || "Unknown"}
 Variation: ${card.variation || "None"}
 Grade: ${card.grade || "Raw/Ungraded"}
 
-IMPORTANT: Only include prices from listings that match:
+CRITICAL GRADING RULES - DO NOT MIX GRADERS:
+- This card is graded by: ${parseGradeInfo(card.grade).grader?.toUpperCase() || "any grader"}
+- ONLY include prices from the SAME grading company
+- PSA 10 ≠ BGS Pristine 10 ≠ BGS 10 ≠ SGC 10 ≠ CGC 10 (these are DIFFERENT)
+- If card is PSA, EXCLUDE all BGS/Beckett, SGC, CGC prices
+- If card is BGS, EXCLUDE all PSA, SGC, CGC prices
+
+Additional match requirements:
 - Same card number (if specified above)
-- Same grader (${parseGradeInfo(card.grade).grader?.toUpperCase() || "any"})
-- Same grade number
-- NO qualifiers like (ST), (OC), etc.
+- Same numeric grade (PSA 10 vs PSA 9 are different values)
+- NO qualifiers like (ST), (OC), (MK), (MC), (PD), etc.
 
 Search results:
 ${searchContext}
@@ -953,12 +959,26 @@ Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and 
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]);
+      const cardGrader = parseGradeInfo(card.grade).grader;
       const pricePoints: PricePoint[] = (parsed.pricePoints || []).map((pp: any) => ({
         date: pp.date || new Date().toISOString().split('T')[0],
         price: typeof pp.price === 'number' ? pp.price : parseFloat(pp.price) || 0,
         source: pp.source || "Unknown",
         url: pp.url,
-      })).filter((pp: PricePoint) => pp.price > 0);
+      })).filter((pp: PricePoint) => {
+        if (pp.price <= 0) return false;
+        
+        // Post-filter: Check for grader mismatch in source description
+        // If card is PSA, exclude BGS/SGC/CGC prices and vice versa
+        if (cardGrader) {
+          const sourceGrade = parseGradeInfo(pp.source);
+          if (sourceGrade.grader && sourceGrade.grader !== cardGrader) {
+            console.log(`[GRADER FILTER] Excluded "${pp.source}" ($${pp.price}) - grader mismatch: ${sourceGrade.grader.toUpperCase()} vs ${cardGrader.toUpperCase()}`);
+            return false;
+          }
+        }
+        return true;
+      });
       
       if (pricePoints.length > 0 || parsed.estimatedValue > 0) {
         return {
