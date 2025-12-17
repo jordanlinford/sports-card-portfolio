@@ -287,7 +287,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   <Label className="mb-2 block">Card Image (optional)</Label>
                   <div className="relative w-32 h-44 border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center">
                     {previewUrl ? (
-                      <img src={previewUrl} alt="Card preview" className="w-full h-full object-cover" />
+                      <img src={previewUrl} alt="Card preview" className="w-full h-full object-contain" />
                     ) : (
                       <div className="text-center p-2">
                         <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-1" />
@@ -423,8 +423,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
             <div className="space-y-4">
               <div className="flex gap-4">
                 {previewUrl && (
-                  <div className="flex-shrink-0 w-24 h-32 rounded-lg overflow-hidden border">
-                    <img src={previewUrl} alt="Card" className="w-full h-full object-cover" />
+                  <div className="flex-shrink-0 w-24 h-32 rounded-lg overflow-hidden border bg-muted/30">
+                    <img src={previewUrl} alt="Card" className="w-full h-full object-contain" />
                   </div>
                 )}
                 <div className="flex-1">
@@ -481,6 +481,19 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   <p className="text-xs text-muted-foreground">Market Friction</p>
                   <p className={`font-semibold ${result.signals.marketFriction <= 25 ? "text-green-600 dark:text-green-400" : result.signals.marketFriction <= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
                     {result.signals.marketFriction <= 25 ? "Low" : result.signals.marketFriction <= 50 ? "Medium" : result.signals.marketFriction <= 75 ? "High" : "Very High"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {result.action === "LEGACY_HOLD"
+                      ? (result.signals.marketFriction > 75 
+                          ? "Thin market—eye appeal drives big spreads." 
+                          : "Sells slowly—patient pricing works best.")
+                      : result.signals.marketFriction <= 25 
+                        ? "Easy to move—buyers are plentiful."
+                        : result.signals.marketFriction <= 50 
+                          ? "Usually sellable, but timing matters."
+                          : result.signals.marketFriction <= 75 
+                            ? "May take a while to sell at a fair price."
+                            : "Trades infrequently—expect wide spreads."}
                   </p>
                 </div>
               </div>
@@ -645,7 +658,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
           <img 
             src={card.imagePath.startsWith('/objects/') ? card.imagePath : `/objects/${card.imagePath}`}
             alt={card.title}
-            className="h-full w-full object-cover"
+            className="h-full w-full object-contain"
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">

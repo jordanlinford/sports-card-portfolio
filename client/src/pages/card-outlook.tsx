@@ -175,11 +175,12 @@ function SignalBar({ label, value, max = 10, color = "primary" }: { label: strin
   );
 }
 
-function CompositeScoreCard({ label, value, icon: Icon, description }: { 
+function CompositeScoreCard({ label, value, icon: Icon, description, helperText }: { 
   label: string; 
   value?: number; 
   icon: typeof Target; 
   description: string;
+  helperText?: string;
 }) {
   if (value === undefined || value === null) return null;
   
@@ -199,9 +200,24 @@ function CompositeScoreCard({ label, value, icon: Icon, description }: {
           <span className={`text-lg font-bold ${colorClass}`}>{value}</span>
         </div>
         <p className="text-xs text-muted-foreground truncate">{description}</p>
+        {helperText && (
+          <p className="text-xs text-muted-foreground/70 mt-0.5 truncate">{helperText}</p>
+        )}
       </div>
     </div>
   );
+}
+
+function getMarketFrictionHelperText(value: number, action?: string): string {
+  if (action === "LEGACY_HOLD") {
+    return value > 75 
+      ? "Thin market—eye appeal drives big spreads." 
+      : "Sells slowly—patient pricing works best.";
+  }
+  if (value <= 25) return "Easy to move—buyers are plentiful.";
+  if (value <= 50) return "Usually sellable, but timing matters.";
+  if (value <= 75) return "May take a while to sell at a fair price.";
+  return "Trades infrequently—expect wide spreads.";
 }
 
 function OutlookSkeleton() {
@@ -570,6 +586,7 @@ export default function CardOutlookPage() {
                   value={outlook.signals.marketFriction} 
                   icon={ShieldAlert} 
                   description="Difficulty buying/selling"
+                  helperText={getMarketFrictionHelperText(outlook.signals.marketFriction, outlook?.action)}
                 />
               </div>
               {isPro && (
