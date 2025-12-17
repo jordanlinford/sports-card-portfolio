@@ -724,14 +724,17 @@ async function runFetchJob(job: FetchJob): Promise<void> {
   console.log(`[eBay Comps] Starting fetch job for: ${canonicalQuery}`);
   
   try {
-    // Scrape eBay
+    // Add initial delay before scraping to avoid rate limiting
+    await randomDelay(2000, 4000);
+    
+    // Scrape eBay with reduced limits to avoid blocking
     const { comps: rawComps, pagesScraped, error: scrapeError, isBlocked } = await scrapeEbaySoldListings(
       canonicalQuery,
-      3, // max pages
+      2, // max pages (reduced from 3 to avoid rate limiting)
       60 // max items
     );
     
-    // Handle blocked status - set short expiry and mark as blocked
+    // Handle blocked status - set short expiry, LOW confidence, and mark as blocked
     if (isBlocked) {
       console.warn(`[eBay Comps] Scrape blocked (bot detection): ${scrapeError}`);
       const now = new Date();
@@ -742,13 +745,15 @@ async function runFetchJob(job: FetchJob): Promise<void> {
         .set({
           fetchStatus: "blocked",
           fetchError: scrapeError || "Bot detection triggered",
+          confidence: "LOW", // Always LOW for blocked/fallback
+          soldCount: 0, // Reset - no reliable data
           pagesScraped,
           lastFetchedAt: now,
           expiresAt
         })
         .where(eq(marketCompsCache.queryHash, queryHash));
       
-      console.log(`[eBay Comps] Marked as blocked, will retry after ${blockedExpiryHours}h`);
+      console.log(`[eBay Comps] Marked as blocked with LOW confidence, will retry after ${blockedExpiryHours}h`);
       return;
     }
     
@@ -767,8 +772,8 @@ async function runFetchJob(job: FetchJob): Promise<void> {
       ? filteredComps.reduce((s, c) => s + c.matchScore, 0) / filteredComps.length
       : 0;
     
-    // Determine confidence
-    const confidence = calculateConfidence(summary.soldCount, avgMatchScore);
+    // Determine confidence (not fallback since we have real eBay data)
+    const confidence = calculateConfidence(summary.soldCount, avgMatchScore, false);
     
     // Calculate expiry (48h for good data, 12h for low count to allow retry)
     const now = new Date();
@@ -799,11 +804,19 @@ async function runFetchJob(job: FetchJob): Promise<void> {
   } catch (err) {
     console.error(`[eBay Comps] Fetch job error:`, err);
     
-    // Mark as failed
+    // Mark as failed with LOW confidence
+    const now = new Date();
+    const failedExpiryHours = 1; // Retry in 1 hour
+    const expiresAt = new Date(now.getTime() + failedExpiryHours * 60 * 60 * 1000);
+    
     await db.update(marketCompsCache)
       .set({
         fetchStatus: "failed",
-        fetchError: err instanceof Error ? err.message : String(err)
+        fetchError: err instanceof Error ? err.message : String(err),
+        confidence: "LOW", // Always LOW for failed
+        soldCount: 0, // Reset - no reliable data
+        lastFetchedAt: now,
+        expiresAt
       })
       .where(eq(marketCompsCache.queryHash, queryHash));
     

@@ -327,24 +327,24 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
       
       const data = await response.json();
       
-      // Update the result with new comps data
+      // Update the result with new comps data - build fresh object from backend response
       if (data.status === "complete" || data.fetchStatus === "complete") {
         setResult(prev => prev ? {
           ...prev,
           comps: {
-            ...prev.comps!,
             status: "hit",
-            soldCount: data.soldCount ?? prev.comps?.soldCount ?? 0,
-            confidence: data.confidence ?? prev.comps?.confidence ?? "LOW",
-            source: "EBAY_SOLD",
-            summary: data.summaryJson ?? data.summary ?? prev.comps?.summary ?? {},
-            debug: prev.comps?.debug ? {
-              ...prev.comps.debug,
-              pagesScraped: data.pagesScraped ?? prev.comps.debug.pagesScraped,
-              itemsFound: data.itemsFound ?? prev.comps.debug.itemsFound,
-              itemsKept: data.itemsKept ?? prev.comps.debug.itemsKept,
-              lastFetchedAt: data.lastFetchedAt ?? prev.comps.debug.lastFetchedAt,
-            } : undefined,
+            soldCount: data.soldCount ?? 0,
+            confidence: data.confidence ?? "LOW",
+            source: "EBAY_SOLD" as const,
+            summary: data.summaryJson ?? data.summary ?? {},
+            queryHash: data.queryHash ?? prev.comps?.queryHash ?? "",
+            debug: {
+              canonicalQuery: data.canonicalQuery ?? prev.comps?.debug?.canonicalQuery ?? "",
+              pagesScraped: data.pagesScraped ?? prev.comps?.debug?.pagesScraped ?? 0,
+              itemsFound: data.itemsFound ?? prev.comps?.debug?.itemsFound ?? 0,
+              itemsKept: data.itemsKept ?? prev.comps?.debug?.itemsKept ?? 0,
+              lastFetchedAt: data.lastFetchedAt ?? prev.comps?.debug?.lastFetchedAt ?? null,
+            },
             message: "Up to date",
           }
         } : null);
@@ -353,10 +353,20 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         setResult(prev => prev ? {
           ...prev,
           comps: {
-            ...prev.comps!,
             status: "blocked",
-            source: "SERPER",
-            message: data.fetchError || "eBay is temporarily limiting requests. Using fallback data.",
+            source: "SERPER" as const,
+            soldCount: data.soldCount ?? 0,
+            confidence: data.confidence ?? "LOW",
+            summary: data.summaryJson ?? data.summary ?? prev.comps?.summary ?? {},
+            queryHash: data.queryHash ?? prev.comps?.queryHash ?? "",
+            debug: {
+              canonicalQuery: data.canonicalQuery ?? prev.comps?.debug?.canonicalQuery ?? "",
+              pagesScraped: data.pagesScraped ?? prev.comps?.debug?.pagesScraped ?? 0,
+              itemsFound: data.itemsFound ?? prev.comps?.debug?.itemsFound ?? 0,
+              itemsKept: data.itemsKept ?? prev.comps?.debug?.itemsKept ?? 0,
+              lastFetchedAt: data.lastFetchedAt ?? prev.comps?.debug?.lastFetchedAt ?? null,
+            },
+            message: data.error || data.fetchError || "eBay is temporarily limiting requests. Using fallback data.",
           }
         } : null);
         return true; // Stop polling
@@ -364,10 +374,20 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         setResult(prev => prev ? {
           ...prev,
           comps: {
-            ...prev.comps!,
             status: "failed",
-            source: "SERPER",
-            message: data.fetchError || "Using fallback comps",
+            source: "SERPER" as const,
+            soldCount: data.soldCount ?? 0,
+            confidence: data.confidence ?? "LOW",
+            summary: data.summaryJson ?? data.summary ?? prev.comps?.summary ?? {},
+            queryHash: data.queryHash ?? prev.comps?.queryHash ?? "",
+            debug: {
+              canonicalQuery: data.canonicalQuery ?? prev.comps?.debug?.canonicalQuery ?? "",
+              pagesScraped: data.pagesScraped ?? prev.comps?.debug?.pagesScraped ?? 0,
+              itemsFound: data.itemsFound ?? prev.comps?.debug?.itemsFound ?? 0,
+              itemsKept: data.itemsKept ?? prev.comps?.debug?.itemsKept ?? 0,
+              lastFetchedAt: data.lastFetchedAt ?? prev.comps?.debug?.lastFetchedAt ?? null,
+            },
+            message: data.error || data.fetchError || "Using fallback comps",
           }
         } : null);
         return true; // Stop polling
