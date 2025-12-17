@@ -16,11 +16,54 @@ import {
   Shield,
   Zap,
   BarChart3,
-  ChevronRight
+  ChevronRight,
+  Clock,
+  Plus,
+  Search,
+  Info
 } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PortfolioSnapshot, PortfolioExposures, RiskSignal, RecommendedAction } from "@shared/schema";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+function formatTimestamp(date: Date | string | null | undefined): string {
+  if (!date) return "Unknown";
+  const d = new Date(date);
+  return d.toLocaleDateString("en-US", { 
+    month: "short", 
+    day: "numeric", 
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function ConfidenceBadge({ score, cardCount }: { score?: number | null; cardCount?: number | null }) {
+  const isLowConfidence = (score && score < 50) || (cardCount && cardCount < 5);
+  const isThinData = cardCount && cardCount < 10;
+  
+  if (!isLowConfidence && !isThinData) return null;
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" className="gap-1 text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700">
+          <Info className="h-3 w-3" />
+          {isThinData ? "Limited data" : "Low confidence"}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-sm max-w-[200px]">
+          {isThinData 
+            ? `Analysis based on only ${cardCount} cards. Add more cards for better insights.`
+            : "Market data is limited. Recommendations may be less accurate."
+          }
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 function ExposureBar({ label, value, color = "primary" }: { label: string; value: number; color?: string }) {
   const percentage = Math.round(value * 100);
@@ -160,24 +203,40 @@ export default function PortfolioOutlookPage() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Generate your first portfolio outlook to see AI-powered insights about your collection's exposures, risks, and opportunities.
             </p>
-            <Button 
-              size="lg" 
-              onClick={() => handleGenerate(false)}
-              disabled={generateMutation.isPending}
-              data-testid="button-generate-outlook"
-            >
-              {generateMutation.isPending ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Generate Outlook
-                </>
-              )}
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button 
+                size="lg" 
+                onClick={() => handleGenerate(false)}
+                disabled={generateMutation.isPending}
+                data-testid="button-generate-outlook"
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Generate Outlook
+                  </>
+                )}
+              </Button>
+              <div className="flex gap-2">
+                <Link href="/cases/new">
+                  <Button variant="outline" size="lg" data-testid="button-add-cards">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Cards
+                  </Button>
+                </Link>
+                <Link href="/outlook">
+                  <Button variant="ghost" size="lg" data-testid="button-quick-check">
+                    <Search className="h-4 w-4 mr-2" />
+                    Quick Check
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -204,7 +263,11 @@ export default function PortfolioOutlookPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold mb-1">Portfolio Outlook</h1>
-          <p className="text-muted-foreground">AI snapshot of your collection</p>
+          <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
+            <Clock className="h-4 w-4" />
+            <span className="text-sm">Last generated: {formatTimestamp(snapshot.asOfDate)}</span>
+            <ConfidenceBadge score={snapshot.confidenceScore} cardCount={snapshot.cardCount} />
+          </div>
         </div>
         <Button 
           variant="outline" 
@@ -213,7 +276,7 @@ export default function PortfolioOutlookPage() {
           data-testid="button-refresh-outlook"
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-          Refresh
+          Refresh Analysis
         </Button>
       </div>
 
@@ -389,7 +452,7 @@ export default function PortfolioOutlookPage() {
       )}
 
       <p className="text-xs text-muted-foreground text-center">
-        Not financial advice. Last updated: {snapshot.asOfDate ? new Date(snapshot.asOfDate).toLocaleDateString() : "Unknown"}
+        Not financial advice.
       </p>
     </div>
   );

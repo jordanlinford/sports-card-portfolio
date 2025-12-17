@@ -15,11 +15,48 @@ import {
   ArrowDownRight,
   Minus,
   Filter,
-  Sparkles
+  Sparkles,
+  Clock,
+  Plus,
+  Search,
+  Info
 } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { NextBuy, NextBuyPortfolioImpact } from "@shared/schema";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+function formatTimestamp(date: Date | string | null | undefined): string {
+  if (!date) return "Unknown";
+  const d = new Date(date);
+  return d.toLocaleDateString("en-US", { 
+    month: "short", 
+    day: "numeric", 
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function ConfidenceBadge({ confidence }: { confidence?: number | null }) {
+  if (!confidence || confidence >= 60) return null;
+  
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" className="gap-1 text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700">
+          <Info className="h-3 w-3" />
+          Data is thin
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-sm max-w-[200px]">
+          Limited sales data available for pricing. Recommendations may be less accurate.
+        </p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 function ScoreBadge({ score, label }: { score: number; label: string }) {
   const color = score >= 75 ? "text-green-600 dark:text-green-400" : 
@@ -156,7 +193,7 @@ export default function NextBuysPage() {
   const [showBuyOnly, setShowBuyOnly] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data, isLoading, error } = useQuery<{ buys: NextBuy[]; count: number }>({
+  const { data, isLoading, error } = useQuery<{ buys: NextBuy[]; count: number; generatedAt?: string }>({
     queryKey: ["/api/portfolio/next-buys"],
   });
 
@@ -228,24 +265,40 @@ export default function NextBuysPage() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Generate personalized buy recommendations based on your portfolio's exposures and gaps.
             </p>
-            <Button 
-              size="lg" 
-              onClick={() => handleGenerate(false)}
-              disabled={generateMutation.isPending}
-              data-testid="button-generate-buys"
-            >
-              {generateMutation.isPending ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Zap className="h-4 w-4 mr-2" />
-                  Generate Recommendations
-                </>
-              )}
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button 
+                size="lg" 
+                onClick={() => handleGenerate(false)}
+                disabled={generateMutation.isPending}
+                data-testid="button-generate-buys"
+              >
+                {generateMutation.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Generate Recommendations
+                  </>
+                )}
+              </Button>
+              <div className="flex gap-2">
+                <Link href="/cases/new">
+                  <Button variant="outline" size="lg" data-testid="button-add-cards-buys">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Cards First
+                  </Button>
+                </Link>
+                <Link href="/outlook">
+                  <Button variant="ghost" size="lg" data-testid="button-quick-check-buys">
+                    <Search className="h-4 w-4 mr-2" />
+                    Quick Check
+                  </Button>
+                </Link>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -260,9 +313,10 @@ export default function NextBuysPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold mb-1">Next Buys</h1>
-          <p className="text-muted-foreground">
-            Cards that strengthen your portfolio
-          </p>
+          <div className="flex items-center gap-2 text-muted-foreground flex-wrap">
+            <Clock className="h-4 w-4" />
+            <span className="text-sm">Last generated: {formatTimestamp(data?.generatedAt)}</span>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Button 

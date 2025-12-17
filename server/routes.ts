@@ -62,6 +62,38 @@ function recordFreeUserLookup(userId: string) {
   }
 }
 
+// Portfolio Intelligence Rate Limiting (even Pro users to prevent abuse)
+const PORTFOLIO_AI_RATE_LIMIT_MS = 60000; // 1 minute between portfolio AI calls per user
+const portfolioAILastCall = new Map<string, number>();
+
+function checkPortfolioAIRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
+  const lastCall = portfolioAILastCall.get(userId);
+  const now = Date.now();
+  
+  if (lastCall && (now - lastCall) < PORTFOLIO_AI_RATE_LIMIT_MS) {
+    const retryAfter = Math.ceil((PORTFOLIO_AI_RATE_LIMIT_MS - (now - lastCall)) / 1000);
+    return { allowed: false, retryAfter };
+  }
+  
+  return { allowed: true };
+}
+
+function recordPortfolioAICall(userId: string) {
+  portfolioAILastCall.set(userId, Date.now());
+  
+  // Cleanup old entries
+  if (portfolioAILastCall.size > 500) {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    portfolioAILastCall.forEach((time, id) => {
+      if (now - time > PORTFOLIO_AI_RATE_LIMIT_MS * 5) {
+        keysToDelete.push(id);
+      }
+    });
+    keysToDelete.forEach(id => portfolioAILastCall.delete(id));
+  }
+}
+
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
   'Facebot',
@@ -4189,7 +4221,18 @@ Allow: /
         }
       }
 
+      // Rate limit even Pro users to prevent abuse (1 call per minute)
+      const rateCheck = checkPortfolioAIRateLimit(userId);
+      if (!rateCheck.allowed) {
+        return res.status(429).json({ 
+          message: `Please wait ${rateCheck.retryAfter} seconds before refreshing.`,
+          rateLimited: true,
+          retryAfter: rateCheck.retryAfter
+        });
+      }
+
       console.log(`[Portfolio Outlook] Generating for user ${userId}...`);
+      recordPortfolioAICall(userId);
       const snapshot = await generatePortfolioOutlook(userId);
       
       res.json({ 
@@ -4230,10 +4273,12 @@ Allow: /
       }
 
       const buys = await getLatestNextBuys(userId);
+      const generatedAt = buys.length > 0 && buys[0].createdAt ? buys[0].createdAt : null;
       
       res.json({ 
-        buys,
-        count: buys.length
+        buys: buys.slice(0, 7),
+        count: Math.min(buys.length, 7),
+        generatedAt
       });
     } catch (error) {
       console.error("[Next Buys] Error getting:", error);
@@ -4255,21 +4300,36 @@ Allow: /
       if (!refresh) {
         const existing = await getLatestNextBuys(userId);
         if (existing.length > 0) {
+          const generatedAt = existing[0].createdAt || new Date().toISOString();
           return res.json({ 
-            buys: existing, 
+            buys: existing.slice(0, 7), 
             cached: true,
+            generatedAt,
             message: "Returning today's recommendations" 
           });
         }
       }
 
+      // Rate limit even Pro users to prevent abuse (1 call per minute)
+      const rateCheck = checkPortfolioAIRateLimit(userId);
+      if (!rateCheck.allowed) {
+        return res.status(429).json({ 
+          message: `Please wait ${rateCheck.retryAfter} seconds before refreshing.`,
+          rateLimited: true,
+          retryAfter: rateCheck.retryAfter
+        });
+      }
+
       console.log(`[Next Buys] Generating for user ${userId}...`);
+      recordPortfolioAICall(userId);
       const buys = await generateNextBuys(userId);
+      const limitedBuys = buys.slice(0, 7);
       
       res.json({ 
-        buys, 
+        buys: limitedBuys, 
         cached: false,
-        count: buys.length,
+        count: limitedBuys.length,
+        generatedAt: new Date().toISOString(),
         message: "New next buys recommendations generated" 
       });
     } catch (error) {
