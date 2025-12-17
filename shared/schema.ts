@@ -825,7 +825,7 @@ export const marketCompsCache = pgTable("market_comps_cache", {
   avgMatchScore: real("avg_match_score").default(0),
   
   // Fetch status
-  fetchStatus: varchar("fetch_status", { length: 20 }).default("pending").notNull(), // pending | fetching | complete | failed
+  fetchStatus: varchar("fetch_status", { length: 20 }).default("pending").notNull(), // pending | fetching | complete | failed | blocked
   fetchError: text("fetch_error"),
   pagesScraped: integer("pages_scraped").default(0),
   itemsFound: integer("items_found").default(0),
@@ -856,6 +856,7 @@ export const FETCH_STATUS = {
   FETCHING: "fetching",
   COMPLETE: "complete",
   FAILED: "failed",
+  BLOCKED: "blocked",
 } as const;
 
 export type FetchStatus = typeof FETCH_STATUS[keyof typeof FETCH_STATUS];

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,10 @@ import {
   XCircle,
   Trophy,
   MinusCircle,
-  ExternalLink
+  ExternalLink,
+  Database,
+  Activity,
+  Bug,
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -97,13 +100,148 @@ function OutlookSkeleton() {
   );
 }
 
+// Comps & Confidence Panel Component
+function CompsConfidencePanel({ 
+  comps, 
+  onRefresh, 
+  isPolling,
+  showDebug = false 
+}: { 
+  comps: CompsData; 
+  onRefresh?: () => void;
+  isPolling?: boolean;
+  showDebug?: boolean;
+}) {
+  const isLoading = comps.status === "queued" || comps.status === "fetching";
+  const isAvailable = comps.status === "hit" || comps.status === "complete";
+  const isFallback = comps.status === "blocked" || comps.status === "failed";
+  
+  const getConfidenceStyle = (confidence: string) => {
+    switch (confidence) {
+      case "HIGH": return { color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10", label: "Strong comp coverage" };
+      case "MED": return { color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-500/10", label: "Decent comp coverage" };
+      case "LOW": 
+      default: return { color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10", label: "Thin comps - treat cautiously" };
+    }
+  };
+  
+  const getStatusDisplay = () => {
+    if (isLoading) return { icon: Loader2, text: "Gathering sold comps...", animate: true };
+    if (isAvailable) return { icon: CheckCircle, text: "Up to date", animate: false };
+    if (comps.status === "blocked") return { icon: AlertTriangle, text: "Using fallback comps", animate: false };
+    if (comps.status === "failed") return { icon: XCircle, text: "Using fallback comps", animate: false };
+    return { icon: Activity, text: comps.message || "Unknown", animate: false };
+  };
+  
+  const confidenceStyle = getConfidenceStyle(comps.confidence);
+  const statusDisplay = getStatusDisplay();
+  const StatusIcon = statusDisplay.icon;
+  
+  return (
+    <div className="rounded-lg border p-4 space-y-3" data-testid="panel-comps-confidence">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Database className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium text-sm">Comps & Confidence</span>
+        </div>
+        <Badge variant="secondary" className={confidenceStyle.bg} data-testid="badge-confidence">
+          <span className={confidenceStyle.color}>{comps.confidence}</span>
+        </Badge>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <span className="text-muted-foreground">Sold Comps</span>
+          <p className="font-medium" data-testid="text-sold-count">
+            {isLoading ? (
+              <Skeleton className="h-5 w-16 inline-block" />
+            ) : (
+              `${comps.soldCount} sold`
+            )}
+          </p>
+        </div>
+        <div>
+          <span className="text-muted-foreground">Data Source</span>
+          <p className="font-medium" data-testid="text-data-source">
+            {comps.source === "EBAY_SOLD" ? "eBay Sold" : comps.source === "SERPER" ? "Fallback comps" : "Mixed"}
+          </p>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2 text-xs">
+        <StatusIcon className={`h-3 w-3 ${statusDisplay.animate ? "animate-spin" : ""} ${isFallback ? "text-yellow-500" : isAvailable ? "text-green-500" : "text-muted-foreground"}`} />
+        <span className="text-muted-foreground" data-testid="text-status">{statusDisplay.text}</span>
+        {isPolling && (
+          <span className="text-muted-foreground/60">(polling...)</span>
+        )}
+      </div>
+      
+      {comps.confidence === "LOW" && (
+        <p className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 p-2 rounded" data-testid="text-low-confidence-warning">
+          Low confidence because we found limited matching sold comps.
+        </p>
+      )}
+      
+      {isFallback && (
+        <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded" data-testid="text-fallback-notice">
+          {comps.message || (comps.status === "blocked" 
+            ? "eBay is temporarily limiting requests. Using fallback data."
+            : "Using fallback comps. Try refresh later for better coverage.")}
+        </p>
+      )}
+      
+      {showDebug && comps.debug && (
+        <div className="mt-3 p-2 rounded bg-muted/30 border border-dashed text-xs font-mono space-y-1" data-testid="panel-debug">
+          <div className="flex items-center gap-1 text-muted-foreground mb-1">
+            <Bug className="h-3 w-3" />
+            <span>Debug Info</span>
+          </div>
+          <div>Query: {comps.debug.canonicalQuery}</div>
+          <div>Hash: {comps.queryHash}</div>
+          <div>Pages: {comps.debug.pagesScraped} | Found: {comps.debug.itemsFound} | Kept: {comps.debug.itemsKept}</div>
+          {comps.debug.lastFetchedAt && (
+            <div>Last fetch: {new Date(comps.debug.lastFetchedAt).toLocaleString()}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type CompsData = {
+  status: "hit" | "complete" | "queued" | "fetching" | "failed" | "blocked";
+  source: "EBAY_SOLD" | "SERPER" | "MIXED";
+  soldCount: number;
+  confidence: "HIGH" | "MED" | "LOW" | string;
+  summary: {
+    medianPrice?: number | null;
+    meanPrice?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    trendSeries?: Array<{ week: string; medianPrice: number; count: number }>;
+    trendSlope?: number;
+    volatility?: number;
+    liquidity?: number;
+    soldCount?: number;
+  };
+  queryHash: string;
+  debug?: {
+    canonicalQuery: string;
+    pagesScraped: number;
+    itemsFound: number;
+    itemsKept: number;
+    lastFetchedAt: string | null;
+  };
+  message?: string;
+};
+
 type QuickAnalyzeResult = {
   tempCard: { title: string; year?: string; set?: string; variation?: string; grade?: string; grader?: string; imagePath?: string };
   market: { value: number | null; min: number | null; max: number | null; compCount: number };
   signals: { upside: number; downsideRisk: number; marketFriction: number };
   action: string;
   actionReasons: string[] | null;
-  explanation: { short: string; long: string | null };
+  explanation: { short: string; long: string | null; bullets?: string[] };
   bigMover: { flag: boolean; reason: string | null };
   confidence: { level: string; reason: string | null };
   matchConfidence?: {
@@ -117,6 +255,7 @@ type QuickAnalyzeResult = {
       url?: string;
     }>;
   } | null;
+  comps?: CompsData;
   isPro: boolean;
 };
 
@@ -136,6 +275,131 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [uploading, setUploading] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
+  
+  // Polling state for comps
+  const [isPollingComps, setIsPollingComps] = useState(false);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollStartTimeRef = useRef<number>(0);
+  
+  // Check for debug mode via query param
+  const searchParams = new URLSearchParams(window.location.search);
+  const showDebug = searchParams.get("debug") === "1";
+  
+  // Cleanup polling on unmount or result clear
+  useEffect(() => {
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    };
+  }, []);
+  
+  // Stop polling when result is cleared
+  useEffect(() => {
+    if (!result && pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+      setIsPollingComps(false);
+    }
+  }, [result]);
+  
+  // Poll for comps status when queued/fetching
+  const pollCompsStatus = async (queryHash: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/comps/ebay/status?queryHash=${queryHash}`, {
+        credentials: "include"
+      });
+      if (!response.ok) return false;
+      
+      const data = await response.json();
+      
+      // Update the result with new comps data
+      if (data.status === "complete" || data.fetchStatus === "complete") {
+        setResult(prev => prev ? {
+          ...prev,
+          comps: {
+            ...prev.comps!,
+            status: "hit",
+            soldCount: data.soldCount ?? prev.comps?.soldCount ?? 0,
+            confidence: data.confidence ?? prev.comps?.confidence ?? "LOW",
+            source: "EBAY_SOLD",
+            summary: data.summaryJson ?? data.summary ?? prev.comps?.summary ?? {},
+            debug: prev.comps?.debug ? {
+              ...prev.comps.debug,
+              pagesScraped: data.pagesScraped ?? prev.comps.debug.pagesScraped,
+              itemsFound: data.itemsFound ?? prev.comps.debug.itemsFound,
+              itemsKept: data.itemsKept ?? prev.comps.debug.itemsKept,
+              lastFetchedAt: data.lastFetchedAt ?? prev.comps.debug.lastFetchedAt,
+            } : undefined,
+            message: "Up to date",
+          }
+        } : null);
+        return true; // Stop polling
+      } else if (data.status === "blocked" || data.fetchStatus === "blocked") {
+        setResult(prev => prev ? {
+          ...prev,
+          comps: {
+            ...prev.comps!,
+            status: "blocked",
+            source: "SERPER",
+            message: data.fetchError || "eBay is temporarily limiting requests. Using fallback data.",
+          }
+        } : null);
+        return true; // Stop polling
+      } else if (data.status === "failed" || data.fetchStatus === "failed") {
+        setResult(prev => prev ? {
+          ...prev,
+          comps: {
+            ...prev.comps!,
+            status: "failed",
+            source: "SERPER",
+            message: data.fetchError || "Using fallback comps",
+          }
+        } : null);
+        return true; // Stop polling
+      }
+    } catch (err) {
+      console.error("Error polling comps status:", err);
+    }
+    return false; // Continue polling
+  };
+  
+  // Start polling when result has queued/fetching comps
+  const startPolling = (queryHash: string) => {
+    // Don't start if already polling
+    if (pollIntervalRef.current) return;
+    
+    setIsPollingComps(true);
+    pollStartTimeRef.current = Date.now();
+    
+    pollIntervalRef.current = setInterval(async () => {
+      const elapsed = Date.now() - pollStartTimeRef.current;
+      
+      // Stop after 20 seconds
+      if (elapsed > 20000) {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        setIsPollingComps(false);
+        toast({
+          title: "Still gathering comps",
+          description: "We'll keep improving comps - try refresh in a bit.",
+        });
+        return;
+      }
+      
+      const shouldStop = await pollCompsStatus(queryHash);
+      if (shouldStop) {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        setIsPollingComps(false);
+      }
+    }, 2000);
+  };
 
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -191,6 +455,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
       setResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
       toast({ title: "Analysis complete", description: `Got ${data.action} recommendation for ${title}` });
+      
+      // Start polling if comps are being fetched
+      if (data.comps && (data.comps.status === "queued" || data.comps.status === "fetching")) {
+        startPolling(data.comps.queryHash);
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -499,6 +768,22 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     </Button>
                   </div>
                 </DialogHeader>
+                
+                {result.comps && (
+                  <div className="mb-4">
+                    <CompsConfidencePanel 
+                      comps={result.comps}
+                      isPolling={isPollingComps}
+                      showDebug={showDebug}
+                      onRefresh={() => {
+                        if (result.comps?.queryHash) {
+                          startPolling(result.comps.queryHash);
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                
                 <OutlookDetails 
                   data={{
                     card: {
@@ -513,7 +798,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       value: result.market.value,
                       min: result.market.min,
                       max: result.market.max,
-                      compCount: result.market.compCount,
+                      compCount: result.comps?.soldCount ?? result.market.compCount,
                     },
                     signals: result.signals,
                     action: result.action,

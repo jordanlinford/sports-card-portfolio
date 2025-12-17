@@ -1,0 +1,80 @@
+If eBay is blocked, return:
+	•	status: "blocked"
+	•	a short reason string for logs/UI
+
+B) Frontend UI components to build
+
+Add a “Comps & Confidence” panel on the Market Outlook results page:
+
+Show these always:
+	•	Confidence badge: High/Med/Low
+	•	Sold comps count: “12 sold comps”
+	•	Data source label: “eBay Sold” / “Fallback comps”
+	•	Status:
+	•	hit/complete: “Up to date”
+	•	queued/fetching: “Gathering more sold comps…”
+	•	failed/blocked: “Using fallback comps (eBay limited right now)”
+
+When status is queued/fetching
+	•	show skeleton loader in the comps section
+	•	show a lightweight message:
+	•	“Fetching more sold comps in the background”
+	•	keep the rest of the AI outlook visible (don’t block the page)
+
+C) Polling behavior
+
+If response returns status: "queued" or "fetching":
+	•	Poll GET /api/comps/ebay?queryHash=... every 2 seconds
+	•	Stop when:
+	•	status becomes complete or hit
+	•	OR after 20 seconds total
+	•	If timeout:
+	•	keep fallback results visible
+	•	show: “We’ll keep improving comps—try refresh in a bit.”
+
+D) Confidence copy rules (honesty matters)
+
+Confidence should drive the narrative:
+	•	HIGH: “Strong comp coverage”
+	•	MED: “Decent comp coverage”
+	•	LOW: “Thin comps — treat recommendation cautiously”
+
+If LOW, UI must explicitly display:
+
+“Low confidence because we found limited matching sold comps.”
+
+E) Paywall behavior (important)
+
+If user is FREE and out of runs:
+	•	show paywall modal immediately
+	•	do not enqueue eBay jobs
+
+F) Error + Bot detection handling
+
+If scraper hits bot detection:
+	•	mark status = "blocked"
+	•	do not retry aggressively
+	•	set cache TTL short (ex: 1–3 hours) so it can try later
+	•	show fallback comps and a soft message in UI
+
+G) Add a debug toggle (admin/dev only)
+
+Add a hidden dev panel (query param like ?debug=1) that shows:
+	•	canonicalQuery
+	•	queryHash
+	•	pages scraped
+	•	items found vs items kept
+	•	block reason
+
+This is critical for diagnosing why comps are “scarce.”
+
+⸻
+
+3) One big warning (you should enforce this with Replit)
+
+They already said: “The bot detection is expected.” That means you must make sure:
+	•	the product still works even if eBay blocks scraping sometimes
+	•	you are not relying on eBay scrape success for core UX
+	•	“fallback comps” must be first-class
+
+So the frontend must always show something and be transparent.

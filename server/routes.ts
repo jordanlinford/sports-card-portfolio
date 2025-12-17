@@ -1714,38 +1714,49 @@ Allow: /
       
       // Check for cached eBay comps
       let ebayComps: any = null;
-      let ebayCompsStatus: "available" | "fetching" | "missing" | "failed" = "missing";
+      let ebayCompsStatus: "hit" | "complete" | "queued" | "fetching" | "failed" | "blocked" = "queued";
+      let ebayCompsSource: "EBAY_SOLD" | "SERPER" | "MIXED" = "SERPER"; // Fallback source
       
       try {
         const cachedComps = await getCachedComps(normalized.queryHash);
         
         if (cachedComps && cachedComps.fetchStatus === "complete") {
-          ebayCompsStatus = "available";
+          ebayCompsStatus = "hit";
+          ebayCompsSource = "EBAY_SOLD";
           ebayComps = {
             queryHash: cachedComps.queryHash,
             confidence: cachedComps.confidence,
             soldCount: cachedComps.soldCount,
             summary: cachedComps.summaryJson,
             lastFetchedAt: cachedComps.lastFetchedAt,
+            pagesScraped: cachedComps.pagesScraped,
+            itemsFound: cachedComps.itemsFound,
+            itemsKept: cachedComps.itemsKept,
           };
           console.log(`[Quick Analyze] eBay comps cache hit: ${cachedComps.soldCount} comps`);
         } else {
-          // Check if already fetching
+          // Check if already fetching or has other status
           const entry = await getCacheEntry(normalized.queryHash);
           
           if (entry?.fetchStatus === "fetching") {
             ebayCompsStatus = "fetching";
+          } else if (entry?.fetchStatus === "blocked") {
+            ebayCompsStatus = "blocked";
+            ebayCompsSource = "SERPER"; // Fall back to Serper
+            console.log(`[Quick Analyze] eBay comps blocked, using fallback`);
           } else if (entry?.fetchStatus === "failed") {
             ebayCompsStatus = "failed";
+            ebayCompsSource = "SERPER"; // Fall back to Serper
           } else {
             // Enqueue a fetch job for background scraping
             console.log(`[Quick Analyze] Enqueuing eBay comps fetch for: ${normalized.canonicalQuery}`);
             await enqueueFetchJob(normalized.canonicalQuery, normalized.queryHash, normalized.filters);
-            ebayCompsStatus = "fetching";
+            ebayCompsStatus = "queued";
           }
         }
       } catch (err) {
         console.error("[Quick Analyze] Error checking eBay comps:", err);
+        ebayCompsStatus = "failed";
       }
 
       // Compute signals
@@ -1824,25 +1835,45 @@ Allow: /
           flag: signals.bigMoverFlag,
           reason: isPro ? signals.bigMoverReason : null,
         },
-        // eBay comps data (if available)
-        ebayComps: ebayComps ? {
+        // Comps data - unified contract
+        comps: {
           status: ebayCompsStatus,
-          queryHash: ebayComps.queryHash,
-          confidence: ebayComps.confidence,
-          soldCount: ebayComps.soldCount,
-          summary: isPro ? ebayComps.summary : {
-            medianPrice: ebayComps.summary?.medianPrice,
-            soldCount: ebayComps.summary?.soldCount,
+          source: ebayCompsSource,
+          soldCount: ebayComps?.soldCount ?? priceData.salesFound ?? 0,
+          confidence: ebayComps?.confidence ?? (priceData.matchConfidence?.tier || "LOW"),
+          summary: isPro && ebayComps?.summary ? {
+            medianPrice: ebayComps.summary.medianPrice,
+            meanPrice: ebayComps.summary.meanPrice,
+            minPrice: ebayComps.summary.minPrice,
+            maxPrice: ebayComps.summary.maxPrice,
+            trendSeries: ebayComps.summary.trendSeries || [],
+            trendSlope: ebayComps.summary.trendSlope || 0,
+            volatility: ebayComps.summary.volatility,
+            liquidity: ebayComps.summary.liquidity,
+          } : {
+            medianPrice: ebayComps?.summary?.medianPrice ?? priceData.estimatedValue,
+            soldCount: ebayComps?.soldCount ?? priceData.salesFound ?? 0,
+            trendSeries: [],
           },
-          lastFetchedAt: ebayComps.lastFetchedAt,
-        } : {
-          status: ebayCompsStatus,
           queryHash: normalized.queryHash,
-          message: ebayCompsStatus === "fetching" 
-            ? "eBay sold comps are being fetched. Poll /api/comps/ebay/status for updates."
+          // Debug info (only for Pro)
+          debug: isPro ? {
+            canonicalQuery: normalized.canonicalQuery,
+            pagesScraped: ebayComps?.pagesScraped ?? 0,
+            itemsFound: ebayComps?.itemsFound ?? 0,
+            itemsKept: ebayComps?.itemsKept ?? 0,
+            lastFetchedAt: ebayComps?.lastFetchedAt ?? null,
+          } : undefined,
+          // User-friendly message based on status
+          message: ebayCompsStatus === "queued" || ebayCompsStatus === "fetching"
+            ? "Gathering more sold comps in the background..."
+            : ebayCompsStatus === "blocked"
+            ? "Using fallback comps (eBay limited right now)"
             : ebayCompsStatus === "failed"
-            ? "Failed to fetch eBay comps. Will retry on next request."
-            : "No eBay comps available yet.",
+            ? "Using fallback comps"
+            : ebayCompsStatus === "hit" || ebayCompsStatus === "complete"
+            ? "Up to date"
+            : undefined,
         },
         generatedAt: new Date().toISOString(),
         isPro,

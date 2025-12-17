@@ -562,7 +562,7 @@ async function scrapeEbaySoldListings(
   canonicalQuery: string,
   maxPages: number = 3,
   maxItems: number = 60
-): Promise<{ comps: EbayComp[]; pagesScraped: number; error?: string }> {
+): Promise<{ comps: EbayComp[]; pagesScraped: number; error?: string; isBlocked?: boolean }> {
   const comps: EbayComp[] = [];
   let pagesScraped = 0;
   
@@ -594,7 +594,7 @@ async function scrapeEbaySoldListings(
       if (!response.ok) {
         console.error(`[eBay Scraper] HTTP ${response.status} on page ${page}`);
         if (response.status === 429 || response.status === 403) {
-          return { comps, pagesScraped, error: "Rate limited or blocked" };
+          return { comps, pagesScraped, error: "Rate limited or blocked", isBlocked: true };
         }
         continue;
       }
@@ -605,7 +605,7 @@ async function scrapeEbaySoldListings(
       // Check for bot detection
       if (html.includes("robot") || html.includes("captcha") || html.includes("blocked")) {
         console.warn(`[eBay Scraper] Bot detection triggered on page ${page}`);
-        return { comps, pagesScraped, error: "Bot detection triggered" };
+        return { comps, pagesScraped, error: "Bot detection triggered", isBlocked: true };
       }
       
       // Parse listings from HTML
@@ -713,11 +713,32 @@ async function runFetchJob(job: FetchJob): Promise<void> {
   
   try {
     // Scrape eBay
-    const { comps: rawComps, pagesScraped, error: scrapeError } = await scrapeEbaySoldListings(
+    const { comps: rawComps, pagesScraped, error: scrapeError, isBlocked } = await scrapeEbaySoldListings(
       canonicalQuery,
       3, // max pages
       60 // max items
     );
+    
+    // Handle blocked status - set short expiry and mark as blocked
+    if (isBlocked) {
+      console.warn(`[eBay Comps] Scrape blocked (bot detection): ${scrapeError}`);
+      const now = new Date();
+      const blockedExpiryHours = 2; // Retry in 2 hours
+      const expiresAt = new Date(now.getTime() + blockedExpiryHours * 60 * 60 * 1000);
+      
+      await db.update(marketCompsCache)
+        .set({
+          fetchStatus: "blocked",
+          fetchError: scrapeError || "Bot detection triggered",
+          pagesScraped,
+          lastFetchedAt: now,
+          expiresAt
+        })
+        .where(eq(marketCompsCache.queryHash, queryHash));
+      
+      console.log(`[eBay Comps] Marked as blocked, will retry after ${blockedExpiryHours}h`);
+      return;
+    }
     
     if (scrapeError) {
       console.warn(`[eBay Comps] Scrape warning: ${scrapeError}`);
