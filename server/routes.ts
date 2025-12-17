@@ -14,6 +14,45 @@ import { prestigeService } from "./prestigeService";
 import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./cardOutlookService";
 import { sendPaymentConfirmationEmail } from "./email";
 
+// ============================================================================
+// Free User Cost Safeguards
+// ============================================================================
+
+// Global daily cap for all free user outlook lookups combined
+const FREE_USER_DAILY_GLOBAL_CAP = 500; // Max 500 lookups/day for ALL free users
+
+// Per-user rate limiter (prevents abuse - max 1 lookup per 30 seconds)
+const FREE_USER_RATE_LIMIT_MS = 30000; // 30 seconds between lookups
+const freeUserLastLookup = new Map<string, number>();
+
+function checkFreeUserRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
+  const lastLookup = freeUserLastLookup.get(userId);
+  const now = Date.now();
+  
+  if (lastLookup && (now - lastLookup) < FREE_USER_RATE_LIMIT_MS) {
+    const retryAfter = Math.ceil((FREE_USER_RATE_LIMIT_MS - (now - lastLookup)) / 1000);
+    return { allowed: false, retryAfter };
+  }
+  
+  return { allowed: true };
+}
+
+function recordFreeUserLookup(userId: string) {
+  freeUserLastLookup.set(userId, Date.now());
+  
+  // Cleanup old entries periodically to prevent memory bloat
+  if (freeUserLastLookup.size > 1000) {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
+    freeUserLastLookup.forEach((time, id) => {
+      if (now - time > FREE_USER_RATE_LIMIT_MS * 2) {
+        keysToDelete.push(id);
+      }
+    });
+    keysToDelete.forEach(id => freeUserLastLookup.delete(id));
+  }
+}
+
 const SOCIAL_CRAWLERS = [
   'facebookexternalhit',
   'Facebot',
@@ -1301,6 +1340,26 @@ Allow: /
       const FREE_TIER_LIMIT = 3;
       
       if (!isPro) {
+        // Check per-user rate limit (prevent abuse)
+        const rateCheck = checkFreeUserRateLimit(userId);
+        if (!rateCheck.allowed) {
+          return res.status(429).json({ 
+            message: `Please wait ${rateCheck.retryAfter} seconds before your next lookup.`,
+            rateLimited: true,
+            retryAfter: rateCheck.retryAfter
+          });
+        }
+        
+        // Check global daily cap (cost control)
+        const globalDailyCount = await storage.countDailyFreeUserOutlookGenerations();
+        if (globalDailyCount >= FREE_USER_DAILY_GLOBAL_CAP) {
+          return res.status(503).json({ 
+            message: "Free lookups are temporarily unavailable due to high demand. Please try again tomorrow or upgrade to Pro for unlimited access.",
+            dailyCapReached: true
+          });
+        }
+        
+        // Check per-user monthly limit
         const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
         if (monthlyCount >= FREE_TIER_LIMIT) {
           return res.status(403).json({ 
@@ -1310,6 +1369,9 @@ Allow: /
             limit: FREE_TIER_LIMIT
           });
         }
+        
+        // Record rate limit timestamp
+        recordFreeUserLookup(userId);
       }
 
       if (isNaN(cardId)) {
@@ -1618,6 +1680,26 @@ Allow: /
       const FREE_TIER_LIMIT = 3;
       
       if (!isPro) {
+        // Check per-user rate limit (prevent abuse)
+        const rateCheck = checkFreeUserRateLimit(userId);
+        if (!rateCheck.allowed) {
+          return res.status(429).json({ 
+            message: `Please wait ${rateCheck.retryAfter} seconds before your next lookup.`,
+            rateLimited: true,
+            retryAfter: rateCheck.retryAfter
+          });
+        }
+        
+        // Check global daily cap (cost control)
+        const globalDailyCount = await storage.countDailyFreeUserOutlookGenerations();
+        if (globalDailyCount >= FREE_USER_DAILY_GLOBAL_CAP) {
+          return res.status(503).json({ 
+            message: "Free lookups are temporarily unavailable due to high demand. Please try again tomorrow or upgrade to Pro for unlimited access.",
+            dailyCapReached: true
+          });
+        }
+        
+        // Check per-user monthly limit
         const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
         if (monthlyCount >= FREE_TIER_LIMIT) {
           return res.status(403).json({ 
@@ -1627,6 +1709,9 @@ Allow: /
             limit: FREE_TIER_LIMIT
           });
         }
+        
+        // Record rate limit timestamp
+        recordFreeUserLookup(userId);
       }
 
       // Create a temporary card object for the analysis

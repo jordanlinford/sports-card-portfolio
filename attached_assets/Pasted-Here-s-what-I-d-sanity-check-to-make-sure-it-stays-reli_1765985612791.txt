@@ -1,0 +1,59 @@
+Here’s what I’d sanity-check to make sure it stays reliable at scale:
+
+1) Stale-while-refresh: make it bulletproof
+	•	Single-flight refresh: if 50 users request the same card while it’s stale, ensure you only kick off one refresh job (lock by cache key).
+	•	Fail-safe refresh: if refresh fails, keep serving stale and record the failure count + last error (so you don’t silently rot).
+	•	Stale TTL limit: define a max “serve stale” window (ex: 7–30 days) so you don’t serve ancient comps forever.
+
+2) Cache duration logic: great — just make it measurable
+
+Since you’re extending cache time for “reliable” data, make sure “reliable” is explicitly computed and stored:
+	•	sold count thresholds (ex: 10+ sales)
+	•	tight price dispersion (low variance / IQR)
+	•	strong match score distribution (few low-score items)
+
+Then log/cache:
+	•	confidence, sold_count, match_quality_avg, price_iqr, data_age
+
+That gives you a reason the cache is long, and lets you tune later without guessing.
+
+3) Auto-broadening searches: powerful, but guardrails matter
+
+Broadening is how you avoid “no data,” but it’s also how you accidentally mix the wrong card.
+
+Best practice:
+	•	broaden in stages (never jump straight to “player + year”)
+	•	remove graders/condition constraints → remove parallel specificity → remove set name → player + card # → player + year
+	•	always keep a hard filter on the most identity-like fields (card number, set, parallel keywords) when available
+	•	if broadening succeeds but match quality drops, return a lower confidence badge and optionally show “Wider match set used.”
+
+4) Nightly job: good — pick “popular” the smart way
+
+Make the nightly refresh list driven by:
+	•	top queried cache keys in last 24–72h
+	•	cards on users’ watchlists / collections (if you have that)
+	•	“high volatility” cards (big price moves deserve freshness)
+
+Also: stagger it with rate limits + jitter so you don’t create a predictable scraping signature.
+
+5) The one missing piece: observability
+
+If you don’t already have this, add a simple dashboard (even just logs + a table):
+	•	cache hit rate (fresh vs stale)
+	•	refresh success rate
+	•	average refresh duration
+	•	scrape/block rate
+	•	% of results that required broadening
+	•	confidence distribution over time
+
+That’s how you’ll know it’s “working” beyond vibes.
+
+6) UX detail that makes this feel premium
+
+When serving stale:
+	•	show “Updated X hours ago • refreshing now” (or subtle spinner)
+	•	if refresh completes during the session, optionally toast “New comps available” and update UI
+
+⸻
+
+If you’ve got the single-flight refresh + max-stale cutoff + measured confidence stored alongside the cached payload, I’d call this a solid, shippable architecture.

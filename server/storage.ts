@@ -252,6 +252,11 @@ export interface IStorage {
   upsertUserAlertSettings(userId: string, data: InsertUserAlertSettings): Promise<UserAlertSettings>;
   getUsersForWeeklyDigest(): Promise<(UserAlertSettings & { user: User })[]>;
   markDigestSent(userId: string): Promise<void>;
+
+  // Outlook usage tracking (for free tier enforcement)
+  countUserMonthlyOutlookGenerations(userId: string): Promise<number>;
+  countDailyFreeUserOutlookGenerations(): Promise<number>;
+  recordOutlookUsage(userId: string, source: 'collection' | 'quick', cardId?: number, cardTitle?: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -777,6 +782,26 @@ export class DatabaseStorage implements IStorage {
       source,
       cardTitle: cardTitle || null,
     });
+  }
+
+  // Count all free user outlook generations today (global daily cap)
+  async countDailyFreeUserOutlookGenerations(): Promise<number> {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    // Join with users table to only count free users
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(outlookUsage)
+      .innerJoin(users, eq(outlookUsage.userId, users.id))
+      .where(
+        and(
+          sql`${outlookUsage.createdAt} >= ${startOfDay}`,
+          sql`${users.subscriptionStatus} != 'PRO'`
+        )
+      );
+    
+    return result?.count || 0;
   }
 
   async deleteCardOutlook(cardId: number): Promise<void> {
