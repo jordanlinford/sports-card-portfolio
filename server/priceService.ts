@@ -390,7 +390,16 @@ function isStrictComp(
     "insert", "ssp", "case hit", "short print",
   ];
   
-  const listingHasParallel = parallelKeywords.some(kw => combined.includes(kw.toLowerCase()));
+  // IMPORTANT: Filter out parallel keywords that match the card's set name
+  // e.g., "Mosaic" is both a set name AND a parallel type - if set is Mosaic, don't flag "mosaic" as parallel
+  const setNameLower = (card.set || "").toLowerCase();
+  const filteredParallelKeywords = parallelKeywords.filter(kw => {
+    const kwLower = kw.toLowerCase();
+    // If the keyword appears in the set name, don't use it for parallel detection
+    return !setNameLower.includes(kwLower);
+  });
+  
+  const listingHasParallel = filteredParallelKeywords.some(kw => combined.includes(kw.toLowerCase()));
   const userSpecifiedVariation = card.variation && card.variation.trim().length > 0;
   
   // These "variations" are actually just base subset names, NOT premium parallels
@@ -407,7 +416,7 @@ function isStrictComp(
   
   if (!effectivelyHasVariation && listingHasParallel) {
     // User wants base card but listing is a parallel - not strict
-    const detectedParallel = parallelKeywords.find(kw => combined.includes(kw.toLowerCase()));
+    const detectedParallel = filteredParallelKeywords.find(kw => combined.includes(kw.toLowerCase()));
     return { isStrict: false, excludeReason: `Base card vs parallel mismatch: listing has "${detectedParallel}"` };
   }
   
