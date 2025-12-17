@@ -123,10 +123,10 @@ function CompsConfidencePanel({
     }
   };
   
-  // Simple user-friendly messages only
+  // Simple user-friendly messages only - avoid assumptions about why data is limited
   const getLowConfidenceReason = () => {
-    if (comps.soldCount < 3) return "Very few recent sales found - may be a rare card";
-    if (comps.soldCount < 5) return "Limited recent sales - try broadening grade or parallel";
+    if (comps.soldCount < 3) return "Limited sales data found - estimate may be less accurate";
+    if (comps.soldCount < 5) return "Few recent sales found - consider this a rough estimate";
     return null;
   };
   

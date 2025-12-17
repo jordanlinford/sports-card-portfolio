@@ -179,7 +179,7 @@ function isStrictComp(
   }
   
   // HARD GATE 4: Variation/parallel mismatch - base cards should not match parallels
-  // This is critical for pricing accuracy - comprehensive list covering all major card types
+  // This is critical for pricing accuracy - all keywords must be lowercase for matching
   const parallelKeywords = [
     // Numbered parallels (most reliable indicator)
     "/10", "/15", "/25", "/35", "/49", "/50", "/75", "/99", "/100", "/149", "/150", "/175", "/199", "/250", "/299", "/349", "/399", "/499", "/599", "/749", "/799", "/999",
@@ -195,16 +195,15 @@ function isStrictComp(
     "velocity", "hyper", "scope", "fast break", "flash", "neon", "laser", "fluorescent", "seismic",
     // Color parallels (Donruss Optic specific)
     "red yellow", "red/yellow", "red & yellow", "red and yellow", "red white blue", "rwb",
-    // Color parallels with context
-    "gold /", "silver /", "red /", "blue /", "green /", "orange /", "purple /", "pink /", "black /", "white /",
+    // Color parallels - explicit parallel terms
     "gold parallel", "silver parallel", "red parallel", "blue parallel", "green parallel",
     "orange parallel", "purple parallel", "pink parallel", "black parallel", "white parallel",
     "neon green", "neon orange", "neon pink", "neon blue",
-    // Premium colors
-    "sapphire", "ruby", "emerald", "diamond", "platinum", "bronze", "copper", "peacock",
+    // Premium colors (these are almost always parallels when in card titles)
+    "sapphire", "ruby", "emerald", "platinum", "bronze", "copper", "peacock",
     // Mosaic/Panini specific
     "mosaic", "camo", "reactive", "genesis", "reactive blue", "reactive gold",
-    "asia", "asia exclusive", "choice", "mega box", "blaster exclusive",
+    "asia exclusive", "choice prizm", "mega box", "blaster exclusive",
     // Topps specific
     "sepia", "negative", "sp image", "photo variation",
     // Other parallels
@@ -212,7 +211,7 @@ function isStrictComp(
     // Relics/Memorabilia
     "patch", "jersey", "relic", "game-used", "game used", "memorabilia", "swatch",
     // Inserts/Short prints
-    "insert", "ssp", "sp ", "case hit", "short print",
+    "insert", "ssp", "case hit", "short print",
   ];
   
   const listingHasParallel = parallelKeywords.some(kw => combined.includes(kw.toLowerCase()));
@@ -326,7 +325,7 @@ function computeListingMatchScore(
     }
   } else {
     // No variation specified - penalize if listing has a parallel/variation keyword
-    // Comprehensive list matching the isStrictComp function
+    // Matching the isStrictComp function - all keywords lowercase
     const parallelKeywords = [
       // Numbered parallels (most reliable indicator)
       "/10", "/15", "/25", "/35", "/49", "/50", "/75", "/99", "/100", "/149", "/150", "/175", "/199", "/250", "/299", "/349", "/399", "/499", "/599", "/749", "/799", "/999",
@@ -342,16 +341,15 @@ function computeListingMatchScore(
       "velocity", "hyper", "scope", "fast break", "flash", "neon", "laser", "fluorescent", "seismic",
       // Color parallels (Donruss Optic specific)
       "red yellow", "red/yellow", "red & yellow", "red and yellow", "red white blue", "rwb",
-      // Color parallels with context
-      "gold /", "silver /", "red /", "blue /", "green /", "orange /", "purple /", "pink /", "black /", "white /",
+      // Color parallels - explicit parallel terms
       "gold parallel", "silver parallel", "red parallel", "blue parallel", "green parallel",
       "orange parallel", "purple parallel", "pink parallel", "black parallel", "white parallel",
       "neon green", "neon orange", "neon pink", "neon blue",
-      // Premium colors
-      "sapphire", "ruby", "emerald", "diamond", "platinum", "bronze", "copper", "peacock",
+      // Premium colors (these are almost always parallels when in card titles)
+      "sapphire", "ruby", "emerald", "platinum", "bronze", "copper", "peacock",
       // Mosaic/Panini specific
       "mosaic", "camo", "reactive", "genesis", "reactive blue", "reactive gold",
-      "asia", "asia exclusive", "choice", "mega box", "blaster exclusive",
+      "asia exclusive", "choice prizm", "mega box", "blaster exclusive",
       // Topps specific
       "sepia", "negative", "sp image", "photo variation",
       // Other parallels
@@ -359,7 +357,7 @@ function computeListingMatchScore(
       // Relics/Memorabilia
       "patch", "jersey", "relic", "game-used", "game used", "memorabilia", "swatch",
       // Inserts/Short prints
-      "insert", "ssp", "sp ", "case hit", "short print",
+      "insert", "ssp", "case hit", "short print",
     ];
     // Also check for standalone color words that indicate parallels when near "parallel" or after set name
     const colorParallels = ["red", "blue", "green", "gold", "silver", "pink", "purple", "orange", "yellow", "black", "white"];
