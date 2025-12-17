@@ -1114,8 +1114,11 @@ Return JSON with pricePoints array (all prices found), estimatedValue, salesFoun
           pricePoints,
           salesFound: pricePoints.length || parsed.salesFound || 0,
           confidence: parsed.confidence || "medium",
-          confidenceReason: parsed.confidenceReason || `${pricePoints.length} price points found`,
+          confidenceReason: usingLooseFallback 
+            ? `${pricePoints.length} price points (loose/approximate comps)` 
+            : (parsed.confidenceReason || `${pricePoints.length} price points found`),
           rawSearchResults: rawResults,
+          usedLooseFallback: usingLooseFallback, // Track if we used loose comps
         };
       }
     } catch {
@@ -1184,23 +1187,34 @@ function filterExtremeOutliers(
 
 export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedPriceLookupResult> {
   const queries = buildSearchQueries(card);
-  const allPricePoints: PricePoint[] = [];
+  const strictPricePoints: PricePoint[] = [];
+  const loosePricePoints: PricePoint[] = [];
   const allRawResults: Array<{ title: string; snippet: string; link: string }> = [];
   
   try {
     // Try multiple queries to gather more price data
+    // IMPORTANT: Track strict vs loose separately, only use loose if NO strict found across ALL queries
     for (const query of queries.slice(0, 2)) { // Use first 2 queries
       console.log(`[Enhanced] Trying search query: ${query}`);
       const result = await tryEnhancedSearchQuery(query, card);
       
       if (result) {
-        // Merge price points, avoiding duplicates by URL
+        // Check if this result came from strict or loose comps using the explicit flag
+        const isFromStrictComps = !(result as any).usedLooseFallback;
+        
+        // Merge price points into appropriate bucket, avoiding duplicates by URL
         for (const pp of result.pricePoints) {
-          const isDuplicate = allPricePoints.some(
+          const isDuplicateStrict = strictPricePoints.some(
             existing => existing.url && pp.url && existing.url === pp.url
           );
-          if (!isDuplicate) {
-            allPricePoints.push(pp);
+          const isDuplicateLoose = loosePricePoints.some(
+            existing => existing.url && pp.url && existing.url === pp.url
+          );
+          
+          if (isFromStrictComps && !isDuplicateStrict) {
+            strictPricePoints.push(pp);
+          } else if (!isFromStrictComps && !isDuplicateLoose && !isDuplicateStrict) {
+            loosePricePoints.push(pp);
           }
         }
         
@@ -1216,6 +1230,17 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       }
       
       await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    
+    // CRITICAL: Prioritize strict comps across ALL queries
+    // Only fall back to loose if NO strict comps found from ANY query
+    const allPricePoints = strictPricePoints.length > 0 ? strictPricePoints : loosePricePoints;
+    const usingLooseFallback = strictPricePoints.length === 0 && loosePricePoints.length > 0;
+    
+    if (usingLooseFallback) {
+      console.log(`[Enhanced] WARNING: No strict comps found, using ${loosePricePoints.length} loose comps`);
+    } else if (strictPricePoints.length > 0) {
+      console.log(`[Enhanced] Using ${strictPricePoints.length} strict comps (ignored ${loosePricePoints.length} loose)`);
     }
 
     // Apply IQR-based extreme outlier filter
