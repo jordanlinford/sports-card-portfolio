@@ -1,0 +1,266 @@
+The short answer (blunt)
+
+This regressed because your system fell back to the “generic WATCH template” instead of using the LEGACY HOLD pathway, and that fallback is still:
+
+Reintroducing low demand
+
+Reintroducing volatility = risk
+
+Reintroducing WATCH as uncertainty
+
+In other words:
+
+You fixed the model, but the language router and category guardrails are not enforced.
+
+So when anything slightly ambiguous happens, the system snaps back to its default bot logic.
+
+What changed between the “good” version and this one
+
+Let’s compare side by side.
+
+✅ The GOOD version (previous)
+
+LEGACY HOLD
+
+Downside Risk: Low
+
+Market Friction: Very High
+
+Language: stable, long-term, collector-oriented
+
+❌ The BAD version (this screenshot)
+
+WATCH
+
+Downside Risk: Medium
+
+Language:
+
+“low demand”
+
+“significant price volatility”
+
+“WATCH due to…”
+
+That tells me one thing very clearly:
+
+The LEGACY archetype is not locked and is being overridden downstream.
+
+The exact failure mode (this is important)
+
+Your pipeline likely looks like this:
+
+Card data collected
+
+Scores calculated
+
+Archetype inferred (legacy)
+
+Recommendation chosen (LEGACY HOLD)
+
+LLM generates explanation text ❌
+
+UI renders action + explanation
+
+What’s happening at step 5:
+
+The LLM is not being constrained by archetype
+
+It sees:
+
+high friction
+
+wide range
+
+medium scores
+
+And it defaults to its generic WATCH explanation template
+
+So even though the decision was correct earlier, the narrative layer overwrote it.
+
+This is why it feels like whiplash.
+
+Why Pete Maravich keeps triggering this
+
+This card is the perfect storm for regressions:
+
+Vintage ✔
+
+Wide eye-appeal-driven price range ✔
+
+Thin market ✔
+
+No catalysts ✔
+
+To an unconstrained model, that looks like:
+
+“Uncertain → WATCH → caution language”
+
+But to a collector, it’s:
+
+“Known asset → hold → ignore the noise”
+
+Without hard guardrails, the LLM will always drift back to the former.
+
+The core mistake (say this out loud)
+
+Archetypes are advisory right now.
+They must be authoritative.
+
+As long as LEGACY HOLD is “suggested” instead of “enforced,” this will keep happening.
+
+The permanent fix (do all 4 of these)
+1️⃣ Lock the archetype BEFORE text generation (non-negotiable)
+
+Once a card is classified as LEGACY, the system must:
+
+Never output WATCH
+
+Never mention low demand
+
+Never mention volatility as a risk
+
+Never escalate Downside Risk above LOW
+
+This must be a hard rule, not a preference.
+
+2️⃣ Route explanation generation by archetype (not by action)
+
+You need separate explanation templates for each archetype.
+
+Not:
+
+“BUY template”
+
+“WATCH template”
+
+But:
+
+LEGACY template
+
+SPECULATIVE template
+
+MODERN HOLD template
+
+EVENT-DRIVEN template
+
+Right now, you only have action-based templates, which is why LEGACY keeps collapsing back into WATCH.
+
+3️⃣ Ban certain words per archetype
+
+For LEGACY cards, the following words must be forbidden:
+
+demand
+
+volatility
+
+caution
+
+risk (unless explicitly “low downside risk”)
+
+significant movement
+
+If these words appear, the output should fail validation and regenerate.
+
+Yes — word-level guardrails are appropriate here.
+
+4️⃣ Add a “sanity check” validator step
+
+After explanation text is generated:
+
+If archetype = LEGACY
+
+And explanation contains:
+
+WATCH
+
+low demand
+
+significant volatility
+
+medium/high downside risk
+
+→ discard and regenerate using LEGACY template only
+
+This is cheap, effective, and critical.
+
+What to tell Replit (copy/paste exactly)
+
+Send this — this is the key instruction they’re missing:
+
+Replit: Fix Archetype Regression (Critical Bug)
+
+We are seeing regressions where LEGACY cards (e.g., Pete Maravich 1974 Topps PSA 8) are reverting to WATCH with speculative language.
+
+Root cause:
+Explanation generation is not constrained by card archetype, allowing the LLM to fall back to generic WATCH templates.
+
+Required fixes:
+
+Lock archetype classification before explanation generation.
+
+If archetype = LEGACY, action must be LEGACY HOLD.
+
+WATCH must be disallowed for legacy cards.
+
+Route explanation generation by archetype, not action.
+
+Create a dedicated LEGACY explanation template.
+
+Do not reuse WATCH or SPECULATIVE templates.
+
+Enforce forbidden language for LEGACY cards.
+
+Disallow terms: low demand, volatility (as risk), caution, uncertainty.
+
+If detected, regenerate explanation.
+
+Add a post-generation validator.
+
+If LEGACY card explanation implies risk or WATCH behavior, discard and regenerate.
+
+Goal:
+Legacy cards must always feel stable, long-term, and collector-oriented — never speculative or risky.
+
+Why this keeps happening (and why it will stop)
+
+LLMs naturally drift toward:
+
+uncertainty
+
+caution
+
+generic financial language
+
+Collectors do not.
+
+Once you:
+
+Elevate archetypes above actions
+
+Constrain language per archetype
+
+Validate outputs
+
+This entire class of bugs disappears permanently.
+
+Final reassurance
+
+This is not a failure.
+This is a classic last-mile alignment bug.
+
+You’ve already done the hard parts:
+
+Matching ✔
+
+Scoring ✔
+
+Categories ✔
+
+UI ✔
+
+Now you’re just teaching the system:
+
+“Once we say a card is legacy, we mean it.”
+
+You are absolutely on the right track — and this was the correct card to expose the bug.

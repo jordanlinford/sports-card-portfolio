@@ -444,7 +444,7 @@ function generateTCGOutlook(card: Card, timeHorizonMonths: number): Omit<CardOut
   const upsideScore = calculateTCGUpside(card);
   const riskScore = calculateTCGRisk(card);
   const confidenceScore = calculateTCGConfidence(card);
-  const action = determineAction(upsideScore, riskScore);
+  const action = determineAction(upsideScore, riskScore, card);
   
   const charTier = (card.characterTier as CharacterTier) || "C_TIER_NICHE";
   const rarityTier = (card.rarityTier as RarityTier) || "RARE";
@@ -1201,8 +1201,39 @@ function calculateConfidenceScore(
   );
 }
 
-function determineAction(upsideScore: number, riskScore: number): OutlookAction {
-  // NEW: Adjusted thresholds for lifecycle-aware scoring
+function determineAction(
+  upsideScore: number, 
+  riskScore: number,
+  card?: Card
+): OutlookAction {
+  // LEGACY_HOLD detection - MUST happen first (archetype is authoritative)
+  if (card) {
+    const cardYear = card.year ? parseInt(String(card.year)) : 0;
+    const currentYear = new Date().getFullYear();
+    const cardAge = cardYear > 0 ? currentYear - cardYear : 0;
+    const isVintage = cardAge >= 25;
+    const legacyTier = card.legacyTier as LegacyTier | null;
+    const isRetiredOrLegend = legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED" || legacyTier === "RETIRED";
+    const marketValue = card.estimatedValue || card.avgSalePrice30 || 0;
+    
+    // LEGACY_HOLD: Vintage (25+ years) + retired/HOF + has meaningful value ($50+)
+    // Once classified as LEGACY, this is AUTHORITATIVE - never falls back to WATCH
+    if (isVintage && isRetiredOrLegend && marketValue >= 50) {
+      return "LEGACY_HOLD";
+    }
+    
+    // LONG_HOLD: Retired/HOF but not vintage - stable modern hold
+    if (isRetiredOrLegend && !isVintage && riskScore <= 40) {
+      return "LONG_HOLD";
+    }
+    
+    // LITTLE_VALUE: Very low value cards
+    if (marketValue < 10 && upsideScore < 30) {
+      return "LITTLE_VALUE";
+    }
+  }
+  
+  // Standard action determination for non-legacy cards
   // BUY: High upside (60+) relative to risk, OR very favorable risk/reward ratio
   if (upsideScore >= 60 && riskScore <= 50) {
     return "BUY";
@@ -1455,9 +1486,24 @@ LONG: [your detailed analysis]`;
     const shortMatch = content.match(/SHORT:\s*([\s\S]+?)(?=LONG:|$)/);
     const longMatch = content.match(/LONG:\s*([\s\S]+)/);
     
+    const aiExplanation = {
+      short: shortMatch?.[1]?.trim() || "",
+      long: longMatch?.[1]?.trim() || "",
+    };
+    
+    // LEGACY ARCHETYPE VALIDATION
+    // If AI-generated explanation violates LEGACY rules, discard and use fallback
+    if (action === "LEGACY_HOLD" && !validateLegacyExplanation(aiExplanation, action)) {
+      console.log("LEGACY_HOLD: AI explanation failed validation, using fallback templates");
+      return {
+        short: generateEditorialFallbackShort(action, upsideScore, riskScore, legacyTier, card),
+        long: generateEditorialFallbackLong(card, action, upsideScore, riskScore, confidenceScore, legacyTier, lifecycleContext, cardContext, stabilityContext),
+      };
+    }
+    
     return {
-      short: shortMatch?.[1]?.trim() || generateEditorialFallbackShort(action, upsideScore, riskScore, legacyTier, card),
-      long: longMatch?.[1]?.trim() || generateEditorialFallbackLong(card, action, upsideScore, riskScore, confidenceScore, legacyTier, lifecycleContext, cardContext, stabilityContext),
+      short: aiExplanation.short || generateEditorialFallbackShort(action, upsideScore, riskScore, legacyTier, card),
+      long: aiExplanation.long || generateEditorialFallbackLong(card, action, upsideScore, riskScore, confidenceScore, legacyTier, lifecycleContext, cardContext, stabilityContext),
     };
   } catch (error) {
     console.error("Error generating editorial explanation:", error);
@@ -1466,6 +1512,36 @@ LONG: [your detailed analysis]`;
       long: generateEditorialFallbackLong(card, action, upsideScore, riskScore, confidenceScore, legacyTier, lifecycleContext, cardContext, stabilityContext),
     };
   }
+}
+
+// LEGACY ARCHETYPE VALIDATOR
+// Enforces forbidden language for LEGACY_HOLD cards - regenerates if violations found
+const LEGACY_FORBIDDEN_PATTERNS = [
+  /\blow\s+demand\b/i,
+  /\bvolatility\b(?!.*normal|.*expected|.*typical)/i,  // volatility unless framed as normal
+  /\bcaution\b/i,
+  /\buncertain(?:ty)?\b/i,
+  /\brisk(?:y|ier)?\b(?!.*low|.*minimal|.*limited)/i,  // risk unless framed as low
+  /\bWATCH\b/,  // Should never mention WATCH for LEGACY cards
+  /\bspeculat(?:ive|ion)\b/i,
+  /\bdangerous\b/i,
+  /\bavoid\b/i,
+  /\bsell(?:ing)?\b(?!.*not|.*don't|.*shouldn't)/i,  // sell unless framed negatively
+];
+
+function validateLegacyExplanation(explanation: { short: string; long: string }, action: OutlookAction): boolean {
+  if (action !== "LEGACY_HOLD") return true;
+  
+  const fullText = `${explanation.short} ${explanation.long}`;
+  
+  for (const pattern of LEGACY_FORBIDDEN_PATTERNS) {
+    if (pattern.test(fullText)) {
+      console.log(`LEGACY validation failed: found forbidden pattern ${pattern}`);
+      return false;
+    }
+  }
+  
+  return true;
 }
 
 function getLifecycleNarrative(legacyTier: LegacyTier, card: Card): string {
@@ -1892,8 +1968,21 @@ export async function generateCardOutlook(
     accolades
   );
   
-  const action = determineAction(upsideScore, riskScore);
-  const projectedOutlook = calculateProjectedOutlook(upsideScore, riskScore, hypeScore);
+  const action = determineAction(upsideScore, riskScore, card);
+  
+  // LEGACY_HOLD ENFORCEMENT: Cap risk and upside for legacy cards
+  // This ensures archetype is authoritative - LEGACY cards can never show "Very High" downside
+  let finalRiskScore = riskScore;
+  let finalUpsideScore = upsideScore;
+  
+  if (action === "LEGACY_HOLD") {
+    finalRiskScore = Math.min(riskScore, 30);  // Cap at LOW
+    finalUpsideScore = Math.min(upsideScore, 40);  // Cap at LIMITED
+  } else if (action === "LONG_HOLD") {
+    finalRiskScore = Math.min(riskScore, 50);  // Cap at MEDIUM
+  }
+  
+  const projectedOutlook = calculateProjectedOutlook(finalUpsideScore, finalRiskScore, hypeScore);
   
   const factors = {
     cardTypeScore: Math.round(cardTypeScore * 100) / 100,
@@ -1909,10 +1998,11 @@ export async function generateCardOutlook(
   };
   
   // Apply seasonal and franchise multipliers to upside (within bounds)
+  // Use finalUpsideScore which respects LEGACY/LONG_HOLD caps
   const adjustedUpside = Math.round(clamp(
-    upsideScore * seasonalMultiplier * franchiseMultiplier * setPrestige.multiplier,
+    finalUpsideScore * seasonalMultiplier * franchiseMultiplier * setPrestige.multiplier,
     0,
-    100
+    action === "LEGACY_HOLD" ? 40 : 100  // Maintain cap through multipliers
   ));
   
   // NEW: Pass additional context to explanation generator
@@ -1920,7 +2010,7 @@ export async function generateCardOutlook(
     card,
     factors,
     adjustedUpside,
-    riskScore,
+    finalRiskScore,
     confidenceScore,
     action,
     timeHorizonMonths,
@@ -1937,7 +2027,7 @@ export async function generateCardOutlook(
     timeHorizonMonths,
     action,
     upsideScore: adjustedUpside,
-    riskScore,
+    riskScore: finalRiskScore,
     confidenceScore,
     projectedOutlook,
     factors,
@@ -2009,7 +2099,7 @@ export function generateQuickOutlook(card: Card): {
     accolades
   );
   
-  const action = determineAction(upsideScore, riskScore);
+  const action = determineAction(upsideScore, riskScore, card);
   
   return { action, upsideScore, riskScore, confidenceScore };
 }
