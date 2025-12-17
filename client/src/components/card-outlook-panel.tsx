@@ -102,6 +102,30 @@ interface OutlookData {
 
 type OutlookAction = "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
 
+function getMarketFrictionFromLiquidity(liquidityScore?: number): number {
+  if (liquidityScore === undefined || liquidityScore === null) return 50;
+  return Math.round((1 - liquidityScore) * 100);
+}
+
+function getMarketFrictionLabel(friction: number): string {
+  if (friction <= 25) return "Low";
+  if (friction <= 50) return "Medium";
+  if (friction <= 75) return "High";
+  return "Very High";
+}
+
+function getMarketFrictionHelperText(friction: number, action?: string): string {
+  if (action === "LEGACY_HOLD") {
+    return friction > 75 
+      ? "Thin market—eye appeal drives big spreads." 
+      : "Sells slowly—patient pricing works best.";
+  }
+  if (friction <= 25) return "Easy to move—buyers are plentiful.";
+  if (friction <= 50) return "Usually sellable, but timing matters.";
+  if (friction <= 75) return "May take a while to sell at a fair price.";
+  return "Trades infrequently—expect wide spreads.";
+}
+
 function getActionColor(action: OutlookAction): string {
   switch (action) {
     case "BUY":
@@ -306,7 +330,7 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
       </CardHeader>
 
       <CardContent className="p-4 pt-2 space-y-4">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Target className="h-3 w-3" />
@@ -348,6 +372,21 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
               className="h-1.5"
             />
           </div>
+
+          {outlook.factors?.liquidityScore !== undefined && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                <span>Market Friction</span>
+              </div>
+              <div className={`text-lg font-bold ${getScoreColor(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore), true)}`} data-testid="text-friction-score">
+                {getMarketFrictionLabel(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore))}
+              </div>
+              <p className="text-xs text-muted-foreground/70 leading-tight">
+                {getMarketFrictionHelperText(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore), outlook.action)}
+              </p>
+            </div>
+          )}
         </div>
 
         {outlook.projectedOutlook && (
