@@ -35,6 +35,11 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Card as CardType } from "@shared/schema";
 
+function safeCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(value)) return "-";
+  return `$${Math.round(value)}`;
+}
+
 interface CardOutlookPanelProps {
   card: CardType;
   isPro?: boolean;
@@ -430,31 +435,31 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                 <div className="p-1.5 rounded-md bg-green-600/20 dark:bg-green-600/10">
                   <div className="text-muted-foreground text-[10px]">Strong Buy</div>
                   <div className="font-semibold text-green-600" data-testid="text-strong-buy">
-                    ${outlook.priceTargets.strongBuyBelow?.toFixed(0) || '-'}
+                    {safeCurrency(outlook.priceTargets.strongBuyBelow)}
                   </div>
                 </div>
                 <div className="p-1.5 rounded-md bg-green-500/10">
                   <div className="text-muted-foreground text-[10px]">Buy</div>
                   <div className="font-semibold text-green-500" data-testid="text-buy-below">
-                    ${outlook.priceTargets.buyBelow?.toFixed(0) || '-'}
+                    {safeCurrency(outlook.priceTargets.buyBelow)}
                   </div>
                 </div>
                 <div className="p-1.5 rounded-md bg-muted">
                   <div className="text-muted-foreground text-[10px]">Fair Value</div>
                   <div className="font-semibold" data-testid="text-fair-value">
-                    ${outlook.priceTargets.fairValue?.toFixed(0) || '-'}
+                    {safeCurrency(outlook.priceTargets.fairValue)}
                   </div>
                 </div>
                 <div className="p-1.5 rounded-md bg-amber-500/10">
                   <div className="text-muted-foreground text-[10px]">Sell</div>
                   <div className="font-semibold text-amber-500" data-testid="text-sell-above">
-                    ${outlook.priceTargets.sellAbove?.toFixed(0) || '-'}
+                    {safeCurrency(outlook.priceTargets.sellAbove)}
                   </div>
                 </div>
                 <div className="p-1.5 rounded-md bg-red-500/10">
                   <div className="text-muted-foreground text-[10px]">Strong Sell</div>
                   <div className="font-semibold text-red-500" data-testid="text-strong-sell">
-                    ${outlook.priceTargets.strongSellAbove?.toFixed(0) || '-'}
+                    {safeCurrency(outlook.priceTargets.strongSellAbove)}
                   </div>
                 </div>
               </div>

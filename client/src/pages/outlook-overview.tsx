@@ -239,8 +239,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setSelectedCaseId("");
   };
 
-  const formatCurrency = (value: number | null) => {
-    if (value === null) return "N/A";
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value === null || value === undefined || isNaN(value)) return "N/A";
     return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
   };
 

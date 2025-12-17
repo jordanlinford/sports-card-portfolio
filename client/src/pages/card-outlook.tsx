@@ -151,8 +151,8 @@ const CONFIDENCE_STYLES: Record<string, { color: string; icon: typeof CheckCircl
   LOW: { color: "text-red-500", icon: XCircle },
 };
 
-function formatCurrency(value: number | null): string {
-  if (value === null || value === undefined) return "N/A";
+function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(value)) return "N/A";
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
