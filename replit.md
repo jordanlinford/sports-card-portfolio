@@ -33,6 +33,8 @@ The application supports core functionalities including:
 - **API**: RESTful API design for all backend interactions.
 - **Build Process**: Vite for client bundling and esbuild for server bundling, optimized for production deployment.
 - **Session Management**: Secure, HttpOnly cookies with a 7-day TTL, storing session data in PostgreSQL.
+- **eBay Comps Caching**: Uses a stale-while-revalidate (SWR) pattern with extended TTLs (7 days for 15+ comps, 72h for 6-14, 24h for sparse data). Includes query broadening ladder (stops at 12+ comps) and nightly prewarm job.
+- **VPS Worker Architecture**: Documented pattern for moving eBay scraper to dedicated-IP VPS for improved reliability (see docs/VPS_SCRAPER_ARCHITECTURE.md).
 
 ## External Dependencies
 

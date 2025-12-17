@@ -150,6 +150,81 @@ export function normalizeEbayQuery(input: string): NormalizedQuery {
 }
 
 // ============================================================================
+// QUERY BROADENING LADDER
+// ============================================================================
+
+const MIN_COMPS_THRESHOLD = 12; // Stop broadening when we have this many good comps
+
+/**
+ * Generate a ladder of progressively broader queries.
+ * Each step removes specificity to increase comp matches.
+ */
+export function generateQueryLadder(filters: CompsQueryFilters): string[] {
+  const ladder: string[] = [];
+  
+  // Level 0: Full query with all filters (most specific)
+  const fullParts: string[] = [];
+  if (filters.year) fullParts.push(String(filters.year));
+  if (filters.set) fullParts.push(filters.set);
+  if (filters.player) fullParts.push(filters.player);
+  if (filters.parallel) fullParts.push(filters.parallel);
+  if (filters.grader && filters.grade) fullParts.push(`${filters.grader} ${filters.grade}`);
+  if (fullParts.length > 0) ladder.push(fullParts.join(" "));
+  
+  // Level 1: Remove parallel (keep player + year + set + grade)
+  if (filters.parallel) {
+    const parts: string[] = [];
+    if (filters.year) parts.push(String(filters.year));
+    if (filters.set) parts.push(filters.set);
+    if (filters.player) parts.push(filters.player);
+    if (filters.grader && filters.grade) parts.push(`${filters.grader} ${filters.grade}`);
+    if (parts.length > 0 && parts.join(" ") !== ladder[ladder.length - 1]) {
+      ladder.push(parts.join(" "));
+    }
+  }
+  
+  // Level 2: Remove card number (keep player + year + set + grader only, no exact grade)
+  if (filters.grader && filters.grade) {
+    const parts: string[] = [];
+    if (filters.year) parts.push(String(filters.year));
+    if (filters.set) parts.push(filters.set);
+    if (filters.player) parts.push(filters.player);
+    if (filters.grader) parts.push(filters.grader); // Just grader, no specific grade
+    if (parts.length > 0 && parts.join(" ") !== ladder[ladder.length - 1]) {
+      ladder.push(parts.join(" "));
+    }
+  }
+  
+  // Level 3: Remove set (keep player + year + grader)
+  if (filters.set) {
+    const parts: string[] = [];
+    if (filters.year) parts.push(String(filters.year));
+    if (filters.player) parts.push(filters.player);
+    if (filters.grader) parts.push(filters.grader);
+    if (parts.length > 0 && parts.join(" ") !== ladder[ladder.length - 1]) {
+      ladder.push(parts.join(" "));
+    }
+  }
+  
+  // Level 4: Just player + year (broadest useful query)
+  if (filters.player && filters.year) {
+    const parts = [String(filters.year), filters.player];
+    if (parts.join(" ") !== ladder[ladder.length - 1]) {
+      ladder.push(parts.join(" "));
+    }
+  }
+  
+  // Level 5: Just player (very broad, last resort)
+  if (filters.player) {
+    if (filters.player !== ladder[ladder.length - 1]) {
+      ladder.push(filters.player);
+    }
+  }
+  
+  return ladder;
+}
+
+// ============================================================================
 // BACKGROUND JOB QUEUE
 // ============================================================================
 
@@ -715,7 +790,8 @@ function parseEbayListings(html: string): EbayComp[] {
 // ============================================================================
 
 /**
- * Run a fetch job in the background
+ * Run a fetch job in the background with query broadening ladder.
+ * If initial query returns < MIN_COMPS_THRESHOLD, tries progressively broader queries.
  */
 async function runFetchJob(job: FetchJob): Promise<void> {
   const { queryHash, canonicalQuery, filters } = job;
@@ -723,31 +799,90 @@ async function runFetchJob(job: FetchJob): Promise<void> {
   
   console.log(`[eBay Comps] Starting fetch job for: ${canonicalQuery}`);
   
+  // Generate the query broadening ladder
+  const queryLadder = generateQueryLadder(filters);
+  // Ensure original query is first if not already in ladder
+  if (queryLadder.length === 0 || queryLadder[0] !== canonicalQuery) {
+    queryLadder.unshift(canonicalQuery);
+  }
+  
+  let allComps: EbayComp[] = [];
+  let totalPagesScraped = 0;
+  let lastError: string | undefined;
+  let wasBlocked = false;
+  let queriesUsed: string[] = [];
+  
   try {
-    // Add initial delay before scraping to avoid rate limiting
-    await randomDelay(2000, 4000);
+    // Try each query in the ladder until we have enough comps
+    for (let i = 0; i < queryLadder.length && allComps.length < MIN_COMPS_THRESHOLD; i++) {
+      const currentQuery = queryLadder[i];
+      queriesUsed.push(currentQuery);
+      
+      console.log(`[eBay Comps] Ladder step ${i + 1}/${queryLadder.length}: "${currentQuery}"`);
+      
+      // Add delay between ladder steps (longer delay for subsequent queries)
+      if (i > 0) {
+        await randomDelay(5000, 8000);
+      } else {
+        await randomDelay(2000, 4000);
+      }
+      
+      // Scrape eBay with reduced limits to avoid blocking
+      const { comps: rawComps, pagesScraped, error: scrapeError, isBlocked } = await scrapeEbaySoldListings(
+        currentQuery,
+        2, // max pages
+        60 // max items
+      );
+      
+      totalPagesScraped += pagesScraped;
+      
+      // Handle blocked status - stop the ladder
+      if (isBlocked) {
+        console.warn(`[eBay Comps] Scrape blocked at ladder step ${i + 1}: ${scrapeError}`);
+        wasBlocked = true;
+        lastError = scrapeError || "Bot detection triggered";
+        break;
+      }
+      
+      if (scrapeError) {
+        lastError = scrapeError;
+        console.warn(`[eBay Comps] Scrape warning at step ${i + 1}: ${scrapeError}`);
+      }
+      
+      // Filter and score comps from this query
+      const filteredComps = filterAndScoreComps(rawComps, filters);
+      
+      // Add new comps (avoid duplicates by URL)
+      const existingUrls = new Set(allComps.map(c => c.itemUrl).filter(Boolean));
+      for (const comp of filteredComps) {
+        if (!comp.itemUrl || !existingUrls.has(comp.itemUrl)) {
+          allComps.push(comp);
+          if (comp.itemUrl) existingUrls.add(comp.itemUrl);
+        }
+      }
+      
+      console.log(`[eBay Comps] After step ${i + 1}: ${allComps.length} unique comps (need ${MIN_COMPS_THRESHOLD})`);
+      
+      // Stop if we have enough comps
+      if (allComps.length >= MIN_COMPS_THRESHOLD) {
+        console.log(`[eBay Comps] Reached ${MIN_COMPS_THRESHOLD}+ comps, stopping ladder`);
+        break;
+      }
+    }
     
-    // Scrape eBay with reduced limits to avoid blocking
-    const { comps: rawComps, pagesScraped, error: scrapeError, isBlocked } = await scrapeEbaySoldListings(
-      canonicalQuery,
-      2, // max pages (reduced from 3 to avoid rate limiting)
-      60 // max items
-    );
-    
-    // Handle blocked status - set short expiry, LOW confidence, and mark as blocked
-    if (isBlocked) {
-      console.warn(`[eBay Comps] Scrape blocked (bot detection): ${scrapeError}`);
+    // If blocked and we have no comps, mark as blocked
+    if (wasBlocked && allComps.length === 0) {
       const now = new Date();
-      const blockedExpiryHours = 2; // Retry in 2 hours
+      const blockedExpiryHours = 2;
       const expiresAt = new Date(now.getTime() + blockedExpiryHours * 60 * 60 * 1000);
       
       await db.update(marketCompsCache)
         .set({
           fetchStatus: "blocked",
-          fetchError: scrapeError || "Bot detection triggered",
-          confidence: "LOW", // Always LOW for blocked/fallback
-          soldCount: 0, // Reset - no reliable data
-          pagesScraped,
+          fetchError: lastError || "Bot detection triggered",
+          confidence: "LOW",
+          soldCount: 0,
+          pagesScraped: totalPagesScraped,
           lastFetchedAt: now,
           expiresAt
         })
@@ -757,12 +892,8 @@ async function runFetchJob(job: FetchJob): Promise<void> {
       return;
     }
     
-    if (scrapeError) {
-      console.warn(`[eBay Comps] Scrape warning: ${scrapeError}`);
-    }
-    
-    // Filter and score comps
-    const filteredComps = filterAndScoreComps(rawComps, filters);
+    // Use the comps we collected from the ladder
+    const filteredComps = allComps;
     
     // Calculate aggregations
     const summary = calculateAggregations(filteredComps);
@@ -775,12 +906,15 @@ async function runFetchJob(job: FetchJob): Promise<void> {
     // Determine confidence (not fallback since we have real eBay data)
     const confidence = calculateConfidence(summary.soldCount, avgMatchScore, false);
     
-    // Calculate expiry (48h for good data, 12h for low count to allow retry)
+    // Calculate expiry with longer TTLs for reliability:
+    // - 7 days (168h) for strong data (>=15 comps)
+    // - 3 days (72h) for medium data (6-14 comps)
+    // - 1 day (24h) for sparse data (<=5 comps)
     const now = new Date();
-    const expiryHours = summary.soldCount >= 15 ? 48 : summary.soldCount <= 5 ? 12 : 24;
+    const expiryHours = summary.soldCount >= 15 ? 168 : summary.soldCount <= 5 ? 24 : 72;
     const expiresAt = new Date(now.getTime() + expiryHours * 60 * 60 * 1000);
     
-    // Update cache
+    // Update cache with ladder results
     await db.update(marketCompsCache)
       .set({
         soldCount: summary.soldCount,
@@ -788,10 +922,10 @@ async function runFetchJob(job: FetchJob): Promise<void> {
         summaryJson: summary,
         confidence,
         avgMatchScore,
-        fetchStatus: "complete",
-        fetchError: scrapeError || null,
-        pagesScraped,
-        itemsFound: rawComps.length,
+        fetchStatus: wasBlocked ? "blocked" : "complete",
+        fetchError: lastError || null,
+        pagesScraped: totalPagesScraped,
+        itemsFound: allComps.length, // Total items collected
         itemsKept: filteredComps.length,
         lastFetchedAt: now,
         expiresAt
@@ -799,7 +933,7 @@ async function runFetchJob(job: FetchJob): Promise<void> {
       .where(eq(marketCompsCache.queryHash, queryHash));
     
     const duration = Date.now() - startTime;
-    console.log(`[eBay Comps] Fetch complete for ${queryHash}: ${filteredComps.length} comps, ${confidence} confidence, ${duration}ms`);
+    console.log(`[eBay Comps] Fetch complete for ${queryHash}: ${filteredComps.length} comps, ${confidence} confidence, ${queriesUsed.length} ladder steps, ${duration}ms`);
     
   } catch (err) {
     console.error(`[eBay Comps] Fetch job error:`, err);
@@ -827,11 +961,61 @@ async function runFetchJob(job: FetchJob): Promise<void> {
 }
 
 // ============================================================================
-// CACHE ACCESS
+// CACHE ACCESS (Stale-While-Revalidate Pattern)
 // ============================================================================
 
+interface CacheResult {
+  data: MarketCompsCache | null;
+  isStale: boolean;
+  needsRefresh: boolean;
+}
+
 /**
- * Get cached comps by query hash
+ * Get cached comps with stale-while-revalidate pattern.
+ * Returns stale data immediately while triggering background refresh.
+ */
+export async function getCachedCompsWithSWR(
+  queryHash: string,
+  canonicalQuery?: string,
+  filters?: CompsQueryFilters
+): Promise<CacheResult> {
+  const now = new Date();
+  
+  const results = await db.select()
+    .from(marketCompsCache)
+    .where(eq(marketCompsCache.queryHash, queryHash))
+    .limit(1);
+  
+  if (results.length === 0) {
+    return { data: null, isStale: false, needsRefresh: true };
+  }
+  
+  const cached = results[0];
+  const expiresAt = cached.expiresAt ? new Date(cached.expiresAt) : null;
+  const isStale = !expiresAt || expiresAt <= now;
+  const isFetching = cached.fetchStatus === "fetching";
+  
+  // If stale and not already fetching, trigger background refresh
+  const needsRefresh = isStale && !isFetching;
+  if (needsRefresh && canonicalQuery && filters) {
+    console.log(`[eBay Comps] SWR: Serving stale data for ${queryHash}, triggering background refresh`);
+    // Don't await - let it run in background
+    enqueueFetchJob(canonicalQuery, queryHash, filters).catch(err => {
+      console.error(`[eBay Comps] SWR background refresh failed:`, err);
+    });
+  }
+  
+  // Return cached data even if stale (SWR pattern)
+  if (cached.fetchStatus === "complete" || cached.compsJson) {
+    console.log(`[eBay Comps] Cache ${isStale ? "stale" : "fresh"} hit for ${queryHash}`);
+    return { data: cached, isStale, needsRefresh };
+  }
+  
+  return { data: null, isStale: false, needsRefresh: true };
+}
+
+/**
+ * Get cached comps by query hash (legacy - prefers fresh data)
  */
 export async function getCachedComps(queryHash: string): Promise<MarketCompsCache | null> {
   const now = new Date();

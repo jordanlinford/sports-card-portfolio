@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { startPrewarmJob } from "./prewarmJob";
 
 const app = express();
 const httpServer = createServer(app);
@@ -103,6 +104,9 @@ app.use((req, res, next) => {
           const { setupVite } = await import("./vite");
           await setupVite(httpServer, app);
         }
+        
+        // Start the nightly prewarm job for eBay comps cache
+        startPrewarmJob();
         
         log("All routes registered successfully");
       } catch (err) {

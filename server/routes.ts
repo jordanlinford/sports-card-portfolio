@@ -1701,8 +1701,8 @@ Allow: /
       // Filter outliers to get tighter price range
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
-      // Check for eBay comps data
-      const { normalizeEbayQuery, getCachedComps, getCacheEntry, enqueueFetchJob } = await import("./ebayCompsService");
+      // Check for eBay comps data with stale-while-revalidate pattern
+      const { normalizeEbayQuery, getCachedCompsWithSWR, getCacheEntry, enqueueFetchJob } = await import("./ebayCompsService");
       
       // Build query for comps lookup
       const compsQueryParts = [title];
@@ -1714,28 +1714,35 @@ Allow: /
       const compsQueryInput = compsQueryParts.join(" ");
       const normalized = normalizeEbayQuery(compsQueryInput);
       
-      // Check for cached eBay comps
+      // Check for cached eBay comps using SWR pattern (serves stale, refreshes in background)
       let ebayComps: any = null;
-      let ebayCompsStatus: "hit" | "complete" | "queued" | "fetching" | "failed" | "blocked" = "queued";
+      let ebayCompsStatus: "hit" | "stale" | "complete" | "queued" | "fetching" | "failed" | "blocked" = "queued";
       let ebayCompsSource: "EBAY_SOLD" | "SERPER" | "MIXED" = "SERPER"; // Fallback source
       
       try {
-        const cachedComps = await getCachedComps(normalized.queryHash);
+        // Use SWR pattern - returns stale data while triggering background refresh
+        const swrResult = await getCachedCompsWithSWR(
+          normalized.queryHash, 
+          normalized.canonicalQuery, 
+          normalized.filters
+        );
         
-        if (cachedComps && cachedComps.fetchStatus === "complete") {
-          ebayCompsStatus = "hit";
+        if (swrResult.data && (swrResult.data.fetchStatus === "complete" || swrResult.data.compsJson)) {
+          ebayCompsStatus = swrResult.isStale ? "stale" : "hit";
           ebayCompsSource = "EBAY_SOLD";
           ebayComps = {
-            queryHash: cachedComps.queryHash,
-            confidence: cachedComps.confidence,
-            soldCount: cachedComps.soldCount,
-            summary: cachedComps.summaryJson,
-            lastFetchedAt: cachedComps.lastFetchedAt,
-            pagesScraped: cachedComps.pagesScraped,
-            itemsFound: cachedComps.itemsFound,
-            itemsKept: cachedComps.itemsKept,
+            queryHash: swrResult.data.queryHash,
+            confidence: swrResult.data.confidence,
+            soldCount: swrResult.data.soldCount,
+            summary: swrResult.data.summaryJson,
+            lastFetchedAt: swrResult.data.lastFetchedAt,
+            pagesScraped: swrResult.data.pagesScraped,
+            itemsFound: swrResult.data.itemsFound,
+            itemsKept: swrResult.data.itemsKept,
+            isStale: swrResult.isStale,
+            refreshing: swrResult.needsRefresh,
           };
-          console.log(`[Quick Analyze] eBay comps cache hit: ${cachedComps.soldCount} comps`);
+          console.log(`[Quick Analyze] eBay comps cache ${swrResult.isStale ? "stale" : "fresh"} hit: ${swrResult.data.soldCount} comps`);
         } else {
           // Check if already fetching or has other status
           const entry = await getCacheEntry(normalized.queryHash);
@@ -1873,8 +1880,10 @@ Allow: /
             ? "Using fallback comps (eBay limited right now)"
             : ebayCompsStatus === "failed"
             ? "Using fallback comps"
-            : ebayCompsStatus === "hit" || ebayCompsStatus === "complete"
+            : ebayCompsStatus === "hit"
             ? "Up to date"
+            : ebayCompsStatus === "stale"
+            ? "Updating in background..."
             : undefined,
         },
         generatedAt: new Date().toISOString(),
@@ -2338,6 +2347,29 @@ Allow: /
     } catch (error) {
       console.error("Error updating user subscription:", error);
       res.status(500).json({ message: "Failed to update user subscription" });
+    }
+  });
+
+  // Admin: Prewarm job status and trigger
+  app.get("/api/admin/prewarm/status", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getPrewarmStatus } = await import("./prewarmJob");
+      const status = getPrewarmStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Error getting prewarm status:", error);
+      res.status(500).json({ message: "Failed to get prewarm status" });
+    }
+  });
+
+  app.post("/api/admin/prewarm/trigger", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { triggerPrewarm } = await import("./prewarmJob");
+      const result = await triggerPrewarm();
+      res.json(result);
+    } catch (error) {
+      console.error("Error triggering prewarm:", error);
+      res.status(500).json({ message: "Failed to trigger prewarm" });
     }
   });
 
@@ -3547,22 +3579,24 @@ Allow: /
         return res.status(400).json({ error: "queryHash is required" });
       }
       
-      // Check for valid cached data
-      const cached = await ebayComps.getCachedComps(queryHash);
+      // Check for cached data using SWR pattern (returns stale data while refreshing in background)
+      const swrResult = await ebayComps.getCachedCompsWithSWR(queryHash);
       
-      if (cached && cached.fetchStatus === "complete") {
-        console.log(`[Comps API] Cache hit for ${queryHash}`);
+      if (swrResult.data && (swrResult.data.fetchStatus === "complete" || swrResult.data.compsJson)) {
+        console.log(`[Comps API] Cache ${swrResult.isStale ? "stale" : "fresh"} hit for ${queryHash}`);
         return res.json({
-          status: "complete",
+          status: swrResult.isStale ? "stale" : "complete",
           data: {
-            queryHash: cached.queryHash,
-            canonicalQuery: cached.canonicalQuery,
-            soldCount: cached.soldCount,
-            confidence: cached.confidence,
-            summary: cached.summaryJson,
-            comps: cached.compsJson,
-            lastFetchedAt: cached.lastFetchedAt,
-            expiresAt: cached.expiresAt
+            queryHash: swrResult.data.queryHash,
+            canonicalQuery: swrResult.data.canonicalQuery,
+            soldCount: swrResult.data.soldCount,
+            confidence: swrResult.data.confidence,
+            summary: swrResult.data.summaryJson,
+            comps: swrResult.data.compsJson,
+            lastFetchedAt: swrResult.data.lastFetchedAt,
+            expiresAt: swrResult.data.expiresAt,
+            isStale: swrResult.isStale,
+            refreshing: swrResult.needsRefresh
           }
         });
       }
@@ -3611,13 +3645,13 @@ Allow: /
       
       console.log(`[Comps API] Fetch request for: "${normalized.canonicalQuery}" (hash: ${normalized.queryHash})`);
       
-      // Check if already cached and valid
-      const cached = await ebayComps.getCachedComps(normalized.queryHash);
-      if (cached && cached.fetchStatus === "complete") {
+      // Check if already cached and valid (using SWR pattern)
+      const swrResult = await ebayComps.getCachedCompsWithSWR(normalized.queryHash);
+      if (swrResult.data && !swrResult.isStale) {
         return res.json({ 
           status: "cached", 
           queryHash: normalized.queryHash,
-          message: "Data already cached"
+          message: "Data already cached and fresh"
         });
       }
       
