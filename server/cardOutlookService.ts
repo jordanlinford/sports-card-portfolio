@@ -13,7 +13,7 @@ function getOpenAI(): OpenAI | null {
   return openaiClient;
 }
 
-export type OutlookAction = "BUY" | "WATCH" | "SELL";
+export type OutlookAction = "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE";
 
 export type LegacyTier = 
   | "PROSPECT" 
@@ -1382,6 +1382,10 @@ async function generateEditorialExplanation(
     
     // Detect if card is likely mass-produced (junk wax era or high-volume set)
     const cardYear = card.year ? parseInt(String(card.year)) : 0;
+    const currentYear = new Date().getFullYear();
+    const cardAge = cardYear > 0 ? currentYear - cardYear : 0;
+    const isVintage = cardAge >= 25;
+    const isLegacyHold = action === "LEGACY_HOLD";
     const isMassProduced = (cardYear >= 1987 && cardYear <= 1993) || 
       (card.salesLast30Days && card.salesLast30Days > 50) ||
       (card.avgSalePrice30 && card.avgSalePrice30 < 20 && !card.isNumbered && !card.hasAuto);
@@ -1393,13 +1397,25 @@ CRITICAL LANGUAGE RULES:
 - Use collector-native language: "pricing spreads", "timing matters", "thin market", "overprinted era" instead of finance jargon
 - For WATCH recommendations, explain in practical terms: "This card trades inconsistently due to high supply, making pricing spreads wide and timing important"
 - Avoid phrases like "caution is warranted" - too formal. Instead: "worth monitoring", "timing your entry matters", "patience pays here"
+${isLegacyHold ? `
+LEGACY HOLD SPECIAL RULES (this is a LEGACY_HOLD card):
+- This is a CLASSIC VINTAGE COLLECTIBLE, not a speculative asset
+- Suppress ALL speculative or cautionary language
+- Downside Risk should be framed as "Low" - these are stable long-term assets
+- Market Friction should be framed as "thin market" NOT as danger/risk/caution
+- Upside should be "Limited" or "Long-term / Steady" NOT "Medium" or "High"
+- Explain that value is driven by condition, eye appeal, and cultural relevance
+- Frame as "personal collection hold" or "legacy asset" rather than investment
+- Example language: "This is a classic vintage card with proven long-term demand. Prices vary due to eye appeal and infrequent sales, making it better suited as a personal collection hold than a short-term trade."
+` : ""}
 
 CRITICAL CONTEXT:
 - Upside score reflects GROWTH POTENTIAL, not player quality. Hall of Famers and retired legends have LOW upside because their value is already established. Rookies and rising stars have HIGH upside because they have room to grow.
-- Downside Risk reflects potential for price decline (volatility + negative trends).
-- Market Friction reflects ease of selling (liquidity + sales volume).
+- Downside Risk reflects potential for price decline (volatility + negative trends).${isLegacyHold ? " For LEGACY_HOLD cards, downside is inherently LOW." : ""}
+- Market Friction reflects ease of selling (liquidity + sales volume).${isLegacyHold ? " For vintage cards, high friction is normal (thin market) - not a warning sign." : ""}
 - Confidence reflects how certain we are about the prediction.
 ${isMassProduced ? "- NOTE: This appears to be a mass-produced card (high print run era or common set). Be conservative with upside language - use 'Limited' or 'Low' rather than 'Medium' for upside unless there's a specific catalyst." : ""}
+${isVintage && !isMassProduced ? "- NOTE: This is a vintage card (25+ years old). Value driven by condition, eye appeal, and cultural significance rather than player performance catalysts." : ""}
 
 Player & Card:
 - Name: ${card.playerName || card.title}
@@ -1492,11 +1508,16 @@ function generateEditorialFallbackShort(
 ): string {
   const playerName = card.playerName || card.title;
   
+  // LEGACY_HOLD special handling
+  if (action === "LEGACY_HOLD") {
+    return `${playerName} is a classic vintage card with proven long-term demand. Value varies by eye appeal and condition. Best suited as a personal collection hold.`;
+  }
+  
   if (legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED") {
-    return `${playerName}'s legacy is secure - this is a stable hold with minimal upside (${upsideScore}) but very low risk (${riskScore}). A safe collector's piece.`;
+    return `${playerName}'s legacy is secure - this is a stable hold with limited upside but very low downside. A safe collector's piece.`;
   }
   if (legacyTier === "RETIRED") {
-    return `${playerName} is retired and their market has stabilized. Low upside (${upsideScore}) but also low risk (${riskScore}) - prices unlikely to move dramatically.`;
+    return `${playerName} is retired and their market has stabilized. Limited upside but also low downside - prices unlikely to move dramatically.`;
   }
   if (legacyTier === "PROSPECT" || legacyTier === "RISING_STAR") {
     return `${playerName} has significant room for growth (upside ${upsideScore}) but with the typical uncertainty of an emerging player (risk ${riskScore}).`;
@@ -1532,14 +1553,24 @@ function generateEditorialFallbackLong(
   const playerName = card.playerName || card.title;
   const parts: string[] = [];
   
+  // LEGACY_HOLD special handling - vintage collector pieces
+  if (action === "LEGACY_HOLD") {
+    parts.push(`${playerName} is a classic vintage card with proven long-term demand.`);
+    parts.push(`Prices vary widely due to eye appeal and condition grading nuances - this is normal for vintage.`);
+    parts.push(`The thin market means sales are infrequent, creating wide price spreads between listings.`);
+    parts.push(`This is best held as part of a personal collection rather than a short-term trade.`);
+    parts.push(`Overall view: LEGACY HOLD - stable long-term asset.`);
+    return parts.join(" ");
+  }
+  
   // Opening with career stage context
   if (legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED") {
     parts.push(`${playerName} is a ${legacyTier === "HOF" ? "Hall of Famer" : "deceased legend"} whose place in history is secure.`);
     parts.push(`Their card values are fully established with years of market data supporting stable pricing.`);
-    parts.push(`This means minimal upside - the market already reflects their legacy - but also minimal risk for the same reason.`);
+    parts.push(`This means limited upside - the market already reflects their legacy - but also minimal downside for the same reason.`);
   } else if (legacyTier === "RETIRED") {
     parts.push(`${playerName} has retired, which means their on-field story is complete.`);
-    parts.push(`The market has had time to settle on their value, making this a stable but low-growth investment.`);
+    parts.push(`The market has had time to settle on their value, making this a stable but low-growth hold.`);
   } else if (legacyTier === "PROSPECT" || legacyTier === "RISING_STAR") {
     parts.push(`${playerName} is ${legacyTier === "PROSPECT" ? "early in their career" : "an emerging talent"} with ${lifecycleContext}.`);
     parts.push(`This creates significant upside potential if they develop into a star, but also substantial risk if they don't pan out.`);

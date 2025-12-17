@@ -342,7 +342,7 @@ export function detectCareerStage(card: Card): string {
 }
 
 // Deterministic Action Logic
-export type OutlookAction = "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE";
+export type OutlookAction = "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE";
 
 interface ActionDecision {
   action: OutlookAction;
@@ -357,9 +357,15 @@ export function computeAction(
   volatilityScore: number,
   liquidityScore: number,
   marketValue: number | null,
-  careerStage: string | null | undefined
+  careerStage: string | null | undefined,
+  cardYear?: number | null
 ): ActionDecision {
   const reasons: string[] = [];
+  
+  // Calculate card age for vintage detection
+  const currentYear = new Date().getFullYear();
+  const cardAge = cardYear ? currentYear - cardYear : 0;
+  const isVintage = cardAge >= 25;
   
   // LITTLE_VALUE: Low quality + low demand + low value
   if (qualityScore < 30 && demandScore < 30 && (marketValue === null || marketValue < 10)) {
@@ -368,7 +374,21 @@ export function computeAction(
     return { action: "LITTLE_VALUE", reasons };
   }
   
-  // LONG_HOLD: Retired/Legend + low volatility + decent demand
+  // LEGACY_HOLD: Vintage cards (25+ years) with HOF/cultural relevance + no parabolic movement
+  // LEGEND status indicates HOF or cultural icon (detected from title keywords)
+  // Vintage RETIRED with significant value (>$50) also qualifies as collectible legacy piece
+  const hasLegacyRelevance = careerStage === "LEGEND" || 
+    (isVintage && careerStage === "RETIRED" && marketValue !== null && marketValue >= 50);
+  
+  if (isVintage && hasLegacyRelevance && trendScore <= 7 && volatilityScore <= 6) {
+    reasons.push("Vintage card with proven long-term demand");
+    reasons.push("Prices stable - no recent parabolic movement");
+    if (careerStage === "LEGEND") reasons.push("Hall of Fame / cultural icon status");
+    reasons.push("Best suited as personal collection hold");
+    return { action: "LEGACY_HOLD", reasons };
+  }
+  
+  // LONG_HOLD: Retired/legend + low volatility + decent demand (may be modern or pre-vintage)
   if ((careerStage === "RETIRED" || careerStage === "LEGEND") && 
       volatilityScore <= 4 && demandScore >= 40) {
     reasons.push(`${careerStage} player with established legacy`);
@@ -685,7 +705,7 @@ export function computeAllSignals(
   const downsideRisk = computeDownsideRisk(volatilityScore, trendScore, dataConfidence, careerStageAuto);
   const marketFriction = computeMarketFriction(liquidityScore, volatilityScore, pricePoints.length);
   
-  // Compute action
+  // Compute action (pass cardYear for vintage detection)
   const { action, reasons: actionReasons } = computeAction(
     qualityScore,
     demandScore,
@@ -694,7 +714,8 @@ export function computeAllSignals(
     volatilityScore,
     liquidityScore,
     marketValue,
-    careerStageAuto
+    careerStageAuto,
+    card.year
   );
   
   // Compute Big Mover flag (use downsideRisk instead of old riskScore)
@@ -708,6 +729,11 @@ export function computeAllSignals(
     dataConfidence
   );
   
+  // LEGACY_HOLD: Cap downside risk to LOW (max 25) - these are stable long-term assets
+  // Also cap upside to reflect "limited/steady" rather than speculative growth
+  const finalDownsideRisk = action === "LEGACY_HOLD" ? Math.min(downsideRisk, 25) : downsideRisk;
+  const finalUpsideScore = action === "LEGACY_HOLD" ? Math.min(upsideScore, 40) : upsideScore;
+  
   return {
     trendScore,
     liquidityScore,
@@ -718,8 +744,8 @@ export function computeAllSignals(
     demandScore,
     momentumScore,
     qualityScore,
-    upsideScore,
-    downsideRisk,
+    upsideScore: finalUpsideScore,
+    downsideRisk: finalDownsideRisk,
     marketFriction,
     action,
     actionReasons,

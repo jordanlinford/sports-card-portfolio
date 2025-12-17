@@ -1,0 +1,240 @@
+The missing category you must introduce
+
+You already named it earlier — and this card proves why.
+
+👉 PC / LEGACY HOLD
+
+This card is not:
+
+BUY (not cheap)
+
+SELL (not overheated)
+
+WATCH (not speculative)
+
+It is:
+
+Hold if you want it. Trade only on price.
+
+That’s a different class of recommendation.
+
+The real fix (this unlocks everything)
+Step 1: Split WATCH into two different meanings
+
+Right now WATCH is overloaded.
+
+You need:
+
+WATCH – Speculative
+
+Waiting for catalyst
+
+Volatility matters
+
+Modern cards, prospects
+
+HOLD – Legacy / PC
+
+Vintage
+
+Retired stars
+
+Proven long-term demand
+
+Low downside
+
+Pete Maravich belongs only in #2.
+
+Step 2: Change how Upside is computed for legacy cards
+
+Vintage upside is not the same thing as modern upside.
+
+For legacy cards:
+
+Upside ≠ breakout
+
+Upside = slow appreciation + inflation hedge + cultural relevance
+
+So:
+
+Upside should almost never be “Medium” or “High”
+
+It should be:
+
+Limited
+
+Steady
+
+Long-term
+
+Your current model is still thinking like:
+
+“What could happen?”
+
+Collectors think:
+
+“What has always happened?”
+
+Step 3: Market Friction is correct — but needs reframing
+
+“Very High Market Friction” is true, but scary.
+
+For legacy cards, friction should be framed as:
+
+Thin market
+
+Long holding periods
+
+Wide spreads due to eye appeal
+
+Not:
+
+Caution
+
+Risk
+
+Warning
+
+Same data. Different framing.
+
+Step 4: The explanation text is actively hurting you
+
+This sentence is the biggest offender:
+
+“indicating caution is warranted”
+
+For this card, no caution is warranted.
+
+A better explanation would be:
+
+“This is a classic vintage card with proven long-term demand. Prices vary widely due to eye appeal and infrequent sales, making it better suited as a personal collection hold than a short-term trade.”
+
+That instantly feels right.
+
+What the output SHOULD look like for this card
+
+Here’s the correct mental model:
+
+Market Outlook: LEGACY HOLD
+Why: Proven vintage value, no near-term catalysts
+
+Est. Value: $148
+Range (PSA 8): $95–$299 (eye appeal driven)
+
+Upside Potential: Limited (Long-Term)
+Downside Risk: Low
+Market Friction: Very High (thin market)
+
+Notes:
+• Vintage Hall-of-Fame card
+• Value driven by condition and eye appeal
+• Best held as part of a personal collection
+
+That feels collector-native.
+
+The rule your system is missing (this is key)
+Legacy Rule
+
+If:
+
+Player is retired AND
+
+Card age > 25 years AND
+
+Hall-of-Fame / cultural relevance AND
+
+No recent parabolic movement
+
+Then:
+
+Suppress speculative language
+
+Replace WATCH with LEGACY HOLD
+
+Cap Downside Risk at LOW
+
+Reframe friction as “thin market”
+
+This one rule fixes:
+
+Maravich
+
+Aikman vintage
+
+Jordan Fleer non-rookie
+
+Mantle, Aaron, etc.
+
+What to tell Replit (copy/paste, critical)
+
+Send this exactly:
+
+Replit: Add Legacy / PC Hold Category (Critical Fix)
+
+We still have trust issues for vintage cards.
+
+Problem:
+Vintage Hall-of-Fame cards are being treated as speculative assets (WATCH with “caution”), which feels wrong to collectors.
+
+Required changes:
+
+Add a new recommendation category:
+LEGACY HOLD / PC HOLD
+
+Trigger LEGACY HOLD when:
+
+Player is retired
+
+Card age > ~25 years
+
+Cultural relevance or HOF status
+
+No recent parabolic price movement
+
+For LEGACY HOLD cards:
+
+Downside Risk must be LOW
+
+Upside Potential should be LIMITED or LONG-TERM
+
+Market Friction may be HIGH, but framed as “thin market,” not danger
+
+Suppress “caution” language
+
+Update explanation templates:
+
+Avoid “low demand” for vintage cards
+
+Use “high supply,” “thin market,” or “eye appeal variance”
+
+Emphasize long-term stability over short-term action
+
+Goal:
+Vintage cards should feel like stable assets, not risky trades.
+
+Final truth (important)
+
+Your system is now too smart for its own good — it has the data right but hasn’t learned collector taxonomy yet.
+
+Once you separate:
+
+Speculative cards
+
+Modern holds
+
+Legacy holds
+
+This entire product will suddenly feel calm, confident, and right.
+
+You’re not far.
+You’re missing one conceptual switch — and you just found it.
+
+If you want, next I can:
+
+Help you define all card archetypes (rookie QB, junk wax, legacy HOF, PC card, etc.)
+
+Map each archetype to language + score caps
+
+Rewrite explanation templates for each category
+
+Just tell me.
