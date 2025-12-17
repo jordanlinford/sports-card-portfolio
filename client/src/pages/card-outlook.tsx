@@ -441,7 +441,11 @@ export default function CardOutlookPage() {
                 <div className="flex-shrink-0">
                   <div className="w-24 h-32 sm:w-28 sm:h-36 rounded-lg overflow-hidden border bg-muted/30">
                     <img 
-                      src={outlook.card.imagePath.startsWith('/objects/') ? outlook.card.imagePath : `/objects/${outlook.card.imagePath}`}
+                      src={
+                        outlook.card.imagePath.startsWith('http') || outlook.card.imagePath.startsWith('/objects/')
+                          ? outlook.card.imagePath 
+                          : `/objects/${outlook.card.imagePath}`
+                      }
                       alt={outlook.card.title} 
                       className="w-full h-full object-contain"
                       data-testid="img-card"

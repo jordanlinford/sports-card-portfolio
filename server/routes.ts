@@ -1577,6 +1577,9 @@ Allow: /
         card: {
           id: card.id,
           title: card.title,
+          playerName: card.playerName,
+          sport: card.sport,
+          position: card.position,
           year: card.year,
           set: card.set,
           variation: card.variation,
