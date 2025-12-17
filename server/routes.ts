@@ -1327,7 +1327,7 @@ Allow: /
 
       // Import the outlook engine dynamically to avoid circular dependencies
       const { computeAllSignals, generateOutlookExplanation } = await import("./outlookEngine");
-      const { lookupEnhancedCardPrice } = await import("./priceService");
+      const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
       // First, get enhanced price data with individual price points
       console.log(`[Outlook 2.0] Fetching enhanced price data for card ${cardId}`);
@@ -1347,6 +1347,9 @@ Allow: /
         source: pp.source,
         url: pp.url,
       }));
+
+      // Filter outliers to get tighter price range
+      const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
       // Compute all signals using deterministic engine
       console.log(`[Outlook 2.0] Computing signals for card ${cardId}`);
@@ -1368,13 +1371,13 @@ Allow: /
       const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
       const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue);
 
-      // Store outlook in the new card_outlooks table
+      // Store outlook in the new card_outlooks table (use filtered min/max for tighter range)
       const outlookData = {
         cardId,
         pricePoints: pricePointsForSchema,
         marketValue: priceData.estimatedValue ? Math.round(priceData.estimatedValue * 100) : null, // Store in cents
-        priceMin: priceData.pricePoints.length > 0 ? Math.round(Math.min(...priceData.pricePoints.map(p => p.price)) * 100) : null,
-        priceMax: priceData.pricePoints.length > 0 ? Math.round(Math.max(...priceData.pricePoints.map(p => p.price)) * 100) : null,
+        priceMin: filteredPriceData.min ? Math.round(filteredPriceData.min * 100) : null,
+        priceMax: filteredPriceData.max ? Math.round(filteredPriceData.max * 100) : null,
         compCount: priceData.salesFound,
         trendScore: signals.trendScore,
         liquidityScore: signals.liquidityScore,
@@ -1431,8 +1434,8 @@ Allow: /
         },
         market: {
           value: priceData.estimatedValue,
-          min: priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map(p => p.price)) : null,
-          max: priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map(p => p.price)) : null,
+          min: filteredPriceData.min,
+          max: filteredPriceData.max,
           compCount: priceData.salesFound,
           pricePoints: priceData.pricePoints,
         },
@@ -1680,7 +1683,7 @@ Allow: /
 
       // Import the outlook engine dynamically
       const { computeAllSignals, generateOutlookExplanation } = await import("./outlookEngine");
-      const { lookupEnhancedCardPrice } = await import("./priceService");
+      const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
       // Fetch enhanced price data
       console.log(`[Quick Analyze] Fetching price data for: ${title}`);
@@ -1692,6 +1695,9 @@ Allow: /
         grade: grade || undefined,
         grader: grader || undefined,
       });
+
+      // Filter outliers to get tighter price range
+      const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
       // Compute signals
       console.log(`[Quick Analyze] Computing signals`);
@@ -1729,8 +1735,8 @@ Allow: /
         },
         market: {
           value: priceData.estimatedValue,
-          min: priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map(p => p.price)) : null,
-          max: priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map(p => p.price)) : null,
+          min: filteredPriceData.min,
+          max: filteredPriceData.max,
           compCount: priceData.salesFound,
           pricePoints: isPro ? priceData.pricePoints : null,
         },

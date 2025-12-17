@@ -1109,4 +1109,96 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
   }
 }
 
-export { type EnhancedPriceLookupResult, type PricePoint, computeCardMatchConfidence };
+// Filter outliers using IQR method to tighten price ranges
+// Returns { filteredPrices, min, max, median }
+function filterPriceOutliers(pricePoints: PricePoint[]): {
+  filteredPrices: PricePoint[];
+  min: number | null;
+  max: number | null;
+  median: number | null;
+  originalCount: number;
+  removedCount: number;
+} {
+  if (pricePoints.length === 0) {
+    return { filteredPrices: [], min: null, max: null, median: null, originalCount: 0, removedCount: 0 };
+  }
+
+  const prices = pricePoints.map(p => p.price).sort((a, b) => a - b);
+  const n = prices.length;
+  
+  // Need at least 4 comps for IQR filtering
+  if (n < 4) {
+    const median = prices[Math.floor(n / 2)];
+    return {
+      filteredPrices: pricePoints,
+      min: prices[0],
+      max: prices[n - 1],
+      median,
+      originalCount: n,
+      removedCount: 0,
+    };
+  }
+
+  // Calculate quartiles
+  const q1Index = Math.floor(n * 0.25);
+  const q3Index = Math.floor(n * 0.75);
+  const q1 = prices[q1Index];
+  const q3 = prices[q3Index];
+  const iqr = q3 - q1;
+
+  // Use 1.5x IQR for outlier detection (standard Tukey method)
+  const lowerBound = q1 - 1.5 * iqr;
+  const upperBound = q3 + 1.5 * iqr;
+
+  // Filter to keep only non-outliers
+  const filteredPrices = pricePoints.filter(p => p.price >= lowerBound && p.price <= upperBound);
+  
+  // If filtering removes too many (>50%), fall back to less aggressive filtering
+  if (filteredPrices.length < n * 0.5 && filteredPrices.length < 3) {
+    // Use 2.5x IQR instead
+    const looseLower = q1 - 2.5 * iqr;
+    const looseUpper = q3 + 2.5 * iqr;
+    const looseFiltered = pricePoints.filter(p => p.price >= looseLower && p.price <= looseUpper);
+    
+    if (looseFiltered.length >= 3) {
+      const loosePrices = looseFiltered.map(p => p.price).sort((a, b) => a - b);
+      return {
+        filteredPrices: looseFiltered,
+        min: loosePrices[0],
+        max: loosePrices[loosePrices.length - 1],
+        median: loosePrices[Math.floor(loosePrices.length / 2)],
+        originalCount: n,
+        removedCount: n - looseFiltered.length,
+      };
+    }
+    
+    // Fall back to original
+    const median = prices[Math.floor(n / 2)];
+    return {
+      filteredPrices: pricePoints,
+      min: prices[0],
+      max: prices[n - 1],
+      median,
+      originalCount: n,
+      removedCount: 0,
+    };
+  }
+
+  const filteredSorted = filteredPrices.map(p => p.price).sort((a, b) => a - b);
+  const removedCount = n - filteredPrices.length;
+  
+  if (removedCount > 0) {
+    console.log(`[PriceService] Outlier filtering: removed ${removedCount} of ${n} comps (bounds: $${lowerBound.toFixed(2)} - $${upperBound.toFixed(2)})`);
+  }
+
+  return {
+    filteredPrices,
+    min: filteredSorted[0],
+    max: filteredSorted[filteredSorted.length - 1],
+    median: filteredSorted[Math.floor(filteredSorted.length / 2)],
+    originalCount: n,
+    removedCount,
+  };
+}
+
+export { type EnhancedPriceLookupResult, type PricePoint, computeCardMatchConfidence, filterPriceOutliers };
