@@ -29,7 +29,9 @@ import {
   ChevronUp,
   X,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  CheckCircle,
+  XCircle
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -84,6 +86,17 @@ type QuickAnalyzeResult = {
   explanation: { short: string; long: string | null };
   bigMover: { flag: boolean; reason: string | null };
   confidence: { level: string; reason: string | null };
+  matchConfidence?: {
+    score: number;
+    tier: "HIGH" | "MEDIUM" | "LOW";
+    reason: string;
+    samples?: Array<{
+      title: string;
+      price: number;
+      matchScore: number;
+      url?: string;
+    }>;
+  } | null;
   isPro: boolean;
 };
 
@@ -438,6 +451,36 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     <span className="font-medium text-sm">Big Mover Potential</span>
                   </div>
                   <p className="text-sm text-muted-foreground">{result.bigMover.reason}</p>
+                </div>
+              )}
+
+              {result.matchConfidence && (
+                <div className={`p-4 rounded-lg border ${
+                  result.matchConfidence.tier === "HIGH" 
+                    ? "bg-green-500/5 border-green-500/20" 
+                    : result.matchConfidence.tier === "MEDIUM"
+                    ? "bg-yellow-500/5 border-yellow-500/20"
+                    : "bg-red-500/5 border-red-500/20"
+                }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {result.matchConfidence.tier === "HIGH" && <CheckCircle className="h-4 w-4 text-green-500" />}
+                    {result.matchConfidence.tier === "MEDIUM" && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
+                    {result.matchConfidence.tier === "LOW" && <XCircle className="h-4 w-4 text-red-500" />}
+                    <span className="font-medium text-sm">Card Match Confidence</span>
+                    <Badge 
+                      variant={result.matchConfidence.tier === "HIGH" ? "default" : result.matchConfidence.tier === "MEDIUM" ? "secondary" : "destructive"}
+                      className="text-xs ml-1"
+                      data-testid="badge-match-confidence"
+                    >
+                      {result.matchConfidence.tier} ({Math.round(result.matchConfidence.score * 100)}%)
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{result.matchConfidence.reason}</p>
+                  {result.matchConfidence.tier === "LOW" && (
+                    <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2 font-medium">
+                      Pricing data may not accurately reflect this exact card.
+                    </p>
+                  )}
                 </div>
               )}
 

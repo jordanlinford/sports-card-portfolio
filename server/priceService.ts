@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { MatchedAttributes, MatchSample, CardMatchConfidence, MatchConfidenceTier } from "@shared/schema";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
@@ -38,6 +39,306 @@ interface EnhancedPriceLookupResult {
   confidenceReason: string;
   details?: string;
   rawSearchResults?: Array<{ title: string; snippet: string; link: string }>;
+  matchConfidence?: CardMatchConfidence;
+}
+
+// Match confidence attribute weights (sum = 1.0)
+const MATCH_WEIGHTS = {
+  player: 0.30,
+  year: 0.15,
+  set: 0.20,
+  variation: 0.15,
+  grade: 0.15,
+  rookie: 0.05,
+};
+
+// Extract player name from card title (first 2-3 words typically)
+function extractPlayerName(title: string): string {
+  const cleanTitle = title.replace(/#\d+/g, "").trim();
+  const words = cleanTitle.split(/\s+/);
+  // Most player names are 2-3 words
+  return words.slice(0, 3).join(" ").toLowerCase();
+}
+
+// Normalize text for comparison
+function normalizeText(text: string | null | undefined): string {
+  if (!text) return "";
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+// Check if text contains any variation of a search term
+function containsTerm(haystack: string, needle: string): boolean {
+  if (!needle || !haystack) return false;
+  const normalized = normalizeText(needle);
+  const haystackNorm = normalizeText(haystack);
+  const terms = normalized.split(/\s+/).filter(t => t.length > 2);
+  return terms.some(term => haystackNorm.includes(term));
+}
+
+// Compute match score for a single listing against the card
+function computeListingMatchScore(
+  listingTitle: string,
+  listingSnippet: string,
+  card: CardInfo
+): { score: number; matched: MatchedAttributes } {
+  const combined = `${listingTitle} ${listingSnippet}`.toLowerCase();
+  
+  const matched: MatchedAttributes = {
+    player: false,
+    year: false,
+    set: false,
+    variation: false,
+    grade: false,
+    rookie: false,
+  };
+
+  // Player match - check if player name appears in listing
+  const playerName = extractPlayerName(card.title);
+  const playerNameParts = playerName.split(/\s+/).filter(p => p.length > 2);
+  const playerMatches = playerNameParts.filter(part => combined.includes(part)).length;
+  matched.player = playerMatches >= Math.min(2, playerNameParts.length);
+
+  // Year match - exact year, multi-year format (2018-19), or ±1 tolerance
+  let yearScore = 0;
+  if (card.year) {
+    const yearStr = String(card.year);
+    const yearNum = card.year;
+    const prevYear = String(yearNum - 1);
+    const nextYear = String(yearNum + 1);
+    
+    // Multi-year format check (e.g., "2018-19" contains both 2018 and 2019)
+    const multiYearPattern = new RegExp(`(${prevYear}|${yearStr})[\\-/](${yearStr.slice(-2)}|${nextYear.slice(-2)})`);
+    
+    if (combined.includes(yearStr)) {
+      yearScore = 1.0; // Exact match
+    } else if (multiYearPattern.test(combined)) {
+      yearScore = 1.0; // Multi-year format containing the year
+    } else if (combined.includes(prevYear) || combined.includes(nextYear)) {
+      yearScore = 0.7; // ±1 year tolerance gets partial credit
+    }
+    matched.year = yearScore > 0;
+  } else {
+    yearScore = 1.0;
+    matched.year = true; // No year to match
+  }
+
+  // Set match - check if set name appears
+  if (card.set) {
+    const setTerms = normalizeText(card.set).split(/\s+/).filter(t => t.length > 2);
+    const setMatches = setTerms.filter(term => combined.includes(term)).length;
+    matched.set = setMatches >= Math.ceil(setTerms.length * 0.6);
+  } else {
+    matched.set = true; // No set to match
+  }
+
+  // Variation match - critical for parallels like Refractor, Prizm, /25, Auto
+  if (card.variation) {
+    const variationLower = card.variation.toLowerCase();
+    // Check for exact variation terms
+    const variationTerms = variationLower.split(/[\s\/]+/).filter(t => t.length > 1);
+    const variationMatches = variationTerms.filter(term => combined.includes(term)).length;
+    matched.variation = variationMatches >= Math.ceil(variationTerms.length * 0.5);
+    
+    // Strict check for numbered parallels (/25, /99, etc.)
+    const numberedMatch = variationLower.match(/\/(\d+)/);
+    if (numberedMatch) {
+      matched.variation = combined.includes(numberedMatch[0]) || combined.includes(`/${numberedMatch[1]}`);
+    }
+  } else {
+    // No variation specified - penalize if listing has a parallel keyword
+    const parallelKeywords = ["refractor", "prizm", "auto", "autograph", "numbered", "/25", "/50", "/99"];
+    const hasParallel = parallelKeywords.some(kw => combined.includes(kw));
+    matched.variation = !hasParallel; // True if base card, false if listing has parallel
+  }
+
+  // Grade match - PSA 10, BGS 9.5, etc. with near-grade equivalence
+  let gradeScore = 0;
+  if (card.grade) {
+    const gradeLower = card.grade.toLowerCase();
+    
+    // Extract grader and numeric grade from card
+    const cardGradeMatch = gradeLower.match(/(psa|bgs|sgc|cgc)?\s*(\d+\.?\d*)/);
+    const cardGrader = cardGradeMatch?.[1] || "";
+    const cardGradeNum = cardGradeMatch?.[2] ? parseFloat(cardGradeMatch[2]) : null;
+    
+    // Check for exact match first
+    if (combined.includes(gradeLower)) {
+      gradeScore = 1.0;
+    } else if (cardGradeNum !== null) {
+      // Near-grade equivalence table for top grades
+      // PSA 10 ~ BGS 9.5 ~ SGC 10 (gem mint equivalents)
+      const gemMintGrades = [
+        { grader: "psa", score: 10 },
+        { grader: "bgs", score: 9.5 },
+        { grader: "sgc", score: 10 },
+        { grader: "cgc", score: 10 },
+      ];
+      
+      const nearMintGrades = [
+        { grader: "psa", score: 9 },
+        { grader: "bgs", score: 9 },
+        { grader: "sgc", score: 9.5 },
+        { grader: "cgc", score: 9 },
+      ];
+      
+      // Check if card grade is in gem mint tier
+      const isCardGemMint = gemMintGrades.some(g => 
+        (cardGrader === g.grader || !cardGrader) && cardGradeNum === g.score
+      );
+      
+      // Check if card grade is in near mint tier
+      const isCardNearMint = nearMintGrades.some(g => 
+        (cardGrader === g.grader || !cardGrader) && cardGradeNum === g.score
+      );
+      
+      // Check what grades are in the listing
+      const listingHasGemMint = gemMintGrades.some(g => 
+        combined.includes(`${g.grader} ${g.score}`) || combined.includes(`${g.grader}${g.score}`)
+      );
+      const listingHasNearMint = nearMintGrades.some(g => 
+        combined.includes(`${g.grader} ${g.score}`) || combined.includes(`${g.grader}${g.score}`)
+      );
+      
+      // Exact grader + score match
+      if (cardGrader && combined.includes(cardGrader) && combined.includes(String(cardGradeNum))) {
+        gradeScore = 1.0;
+      }
+      // Cross-grader equivalence (gem mint tier)
+      else if (isCardGemMint && listingHasGemMint) {
+        gradeScore = 0.75; // Partial credit for equivalent gem mint grades across graders
+      }
+      // Cross-grader equivalence (near mint tier)
+      else if (isCardNearMint && listingHasNearMint) {
+        gradeScore = 0.75;
+      }
+      // Same grader, slightly different grade (e.g., 9 vs 9.5)
+      else if (cardGrader) {
+        const gradePattern = new RegExp(`${cardGrader}\\s*(\\d+\\.?\\d*)`, "i");
+        const listingGradeMatch = combined.match(gradePattern);
+        if (listingGradeMatch) {
+          const listingGradeNum = parseFloat(listingGradeMatch[1]);
+          const diff = Math.abs(cardGradeNum - listingGradeNum);
+          if (diff <= 0.5) gradeScore = 0.6; // Close grade, same grader
+          else if (diff <= 1) gradeScore = 0.4; // Within 1 grade point
+        }
+      }
+    }
+    matched.grade = gradeScore > 0;
+  } else {
+    // Raw/ungraded - check if listing is also raw
+    const gradeKeywords = ["psa", "bgs", "sgc", "cgc", "graded"];
+    const isGraded = gradeKeywords.some(kw => combined.includes(kw));
+    gradeScore = isGraded ? 0 : 1.0;
+    matched.grade = !isGraded; // True if both are raw
+  }
+
+  // Rookie match - check for rookie keywords
+  const titleLower = card.title.toLowerCase();
+  const cardIsRookie = titleLower.includes("rookie") || titleLower.includes("rc");
+  const listingIsRookie = combined.includes("rookie") || combined.includes(" rc ");
+  matched.rookie = cardIsRookie === listingIsRookie;
+
+  // Calculate weighted score - use proportional scores for year/grade
+  let score = 0;
+  score += matched.player ? MATCH_WEIGHTS.player : 0;
+  score += yearScore * MATCH_WEIGHTS.year; // Proportional year score
+  score += matched.set ? MATCH_WEIGHTS.set : 0;
+  score += matched.variation ? MATCH_WEIGHTS.variation : 0;
+  score += gradeScore * MATCH_WEIGHTS.grade; // Proportional grade score
+  score += matched.rookie ? MATCH_WEIGHTS.rookie : 0;
+
+  return { score, matched };
+}
+
+// Compute overall card match confidence from multiple listings
+function computeCardMatchConfidence(
+  listings: Array<{ title: string; snippet: string; link: string; price?: number }>,
+  card: CardInfo
+): CardMatchConfidence {
+  if (listings.length === 0) {
+    return {
+      tier: "LOW",
+      score: 0,
+      reason: "No comparable listings found",
+      matchedComps: 0,
+      totalComps: 0,
+      samples: [],
+    };
+  }
+
+  const samples: MatchSample[] = [];
+  let totalScore = 0;
+  let highMatchCount = 0;
+
+  for (const listing of listings) {
+    const { score, matched } = computeListingMatchScore(listing.title, listing.snippet, card);
+    totalScore += score;
+    
+    if (score >= 0.8) highMatchCount++;
+
+    // Keep top 5 samples for review
+    if (samples.length < 5) {
+      samples.push({
+        title: listing.title,
+        snippet: listing.snippet,
+        source: extractSourceFromUrl(listing.link),
+        url: listing.link,
+        price: listing.price,
+        matchScore: Math.round(score * 100) / 100,
+        matched,
+      });
+    }
+  }
+
+  const avgScore = totalScore / listings.length;
+  const highMatchRatio = highMatchCount / listings.length;
+
+  // Determine tier
+  let tier: MatchConfidenceTier;
+  let reason: string;
+
+  if (avgScore >= 0.8 && highMatchCount >= 3) {
+    tier = "HIGH";
+    reason = `${highMatchCount} of ${listings.length} listings closely match card attributes`;
+  } else if (avgScore >= 0.55 || (highMatchCount >= 2 && listings.length >= 3)) {
+    tier = "MEDIUM";
+    reason = `Partial match: ${Math.round(avgScore * 100)}% average match score`;
+  } else {
+    tier = "LOW";
+    if (samples.length > 0 && !samples[0].matched.player) {
+      reason = "Player name mismatch detected";
+    } else if (samples.length > 0 && !samples[0].matched.variation) {
+      reason = "Card variation/parallel mismatch detected";
+    } else if (samples.length > 0 && !samples[0].matched.grade) {
+      reason = "Grade mismatch detected";
+    } else {
+      reason = `Low match confidence: ${Math.round(avgScore * 100)}% average score`;
+    }
+  }
+
+  return {
+    tier,
+    score: Math.round(avgScore * 100) / 100,
+    reason,
+    matchedComps: highMatchCount,
+    totalComps: listings.length,
+    samples: samples.sort((a, b) => b.matchScore - a.matchScore),
+  };
+}
+
+// Extract source name from URL
+function extractSourceFromUrl(url: string): string {
+  try {
+    const hostname = new URL(url).hostname;
+    if (hostname.includes("ebay")) return "eBay";
+    if (hostname.includes("psa")) return "PSA";
+    if (hostname.includes("130point")) return "130point";
+    if (hostname.includes("sportscardspro")) return "SportsCardsPro";
+    if (hostname.includes("pricecharting")) return "PriceCharting";
+    return hostname.replace("www.", "");
+  } catch {
+    return "Unknown";
+  }
 }
 
 async function searchCardPrices(query: string): Promise<any> {
@@ -416,6 +717,9 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       ? allPricePoints.reduce((sum, pp) => sum + pp.price, 0) / salesFound 
       : null;
     
+    // Compute card match confidence from raw search results
+    const matchConfidence = computeCardMatchConfidence(allRawResults, card);
+    
     // Determine confidence based on data quality
     let confidence: "high" | "medium" | "low";
     let confidenceReason: string;
@@ -433,6 +737,12 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       confidence = "low";
       confidenceReason = "No sold listings found";
     }
+    
+    // Downgrade market confidence if match confidence is LOW
+    if (matchConfidence.tier === "LOW" && confidence !== "low") {
+      confidence = matchConfidence.tier === "LOW" && confidence === "high" ? "medium" : "low";
+      confidenceReason = `${confidenceReason}. Match confidence: ${matchConfidence.reason}`;
+    }
 
     return {
       estimatedValue,
@@ -441,6 +751,7 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       confidence,
       confidenceReason,
       rawSearchResults: allRawResults.slice(0, 15),
+      matchConfidence,
     };
   } catch (error) {
     console.error("Enhanced price lookup error:", error);
@@ -450,8 +761,16 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       salesFound: 0,
       confidence: "low",
       confidenceReason: `Lookup failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      matchConfidence: {
+        tier: "LOW" as const,
+        score: 0,
+        reason: "Lookup failed",
+        matchedComps: 0,
+        totalComps: 0,
+        samples: [],
+      },
     };
   }
 }
 
-export { type EnhancedPriceLookupResult, type PricePoint };
+export { type EnhancedPriceLookupResult, type PricePoint, computeCardMatchConfidence };

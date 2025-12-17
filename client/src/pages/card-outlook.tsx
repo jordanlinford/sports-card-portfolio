@@ -109,6 +109,17 @@ type OutlookData = {
     level: string;
     reason?: string;
   };
+  matchConfidence?: {
+    score: number;
+    tier: "HIGH" | "MEDIUM" | "LOW";
+    reason: string;
+    samples?: Array<{
+      title: string;
+      price: number;
+      matchScore: number;
+      url?: string;
+    }>;
+  } | null;
   explanation?: {
     short: string;
     long?: string;
@@ -227,6 +238,7 @@ export default function CardOutlookPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   const [showFullExplanation, setShowFullExplanation] = useState(false);
   const [showAddToCaseModal, setShowAddToCaseModal] = useState(false);
+  const [showMatchSamplesModal, setShowMatchSamplesModal] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const { toast } = useToast();
 
@@ -677,6 +689,53 @@ export default function CardOutlookPage() {
         </Card>
       )}
 
+      {outlook?.matchConfidence && (
+        <Card className={outlook.matchConfidence.tier === "LOW" ? "border-yellow-500/50" : ""}>
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              {outlook.matchConfidence.tier === "HIGH" && (
+                <CheckCircle className="h-4 w-4 mt-0.5 text-green-500 shrink-0" />
+              )}
+              {outlook.matchConfidence.tier === "MEDIUM" && (
+                <AlertTriangle className="h-4 w-4 mt-0.5 text-yellow-500 shrink-0" />
+              )}
+              {outlook.matchConfidence.tier === "LOW" && (
+                <XCircle className="h-4 w-4 mt-0.5 text-red-500 shrink-0" />
+              )}
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Card Match Confidence: </span>
+                  <Badge 
+                    variant={outlook.matchConfidence.tier === "HIGH" ? "default" : outlook.matchConfidence.tier === "MEDIUM" ? "secondary" : "destructive"}
+                    className="text-xs"
+                    data-testid="badge-match-confidence"
+                  >
+                    {outlook.matchConfidence.tier} ({Math.round(outlook.matchConfidence.score * 100)}%)
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">{outlook.matchConfidence.reason}</p>
+                {outlook.matchConfidence.tier === "LOW" && (
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2 font-medium">
+                    Pricing data may not accurately reflect this exact card. Action has been set to WATCH.
+                  </p>
+                )}
+                {outlook.matchConfidence.samples && outlook.matchConfidence.samples.length > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-0 h-auto mt-2 text-sm text-primary hover:underline"
+                    onClick={() => setShowMatchSamplesModal(true)}
+                    data-testid="button-review-matches"
+                  >
+                    Review pricing matches
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {outlook?.card && isAuthenticated && (
         <Card className="mt-6">
           <CardContent className="py-4">
@@ -746,6 +805,66 @@ export default function CardOutlookPage() {
                 <Plus className="h-4 w-4 mr-2" />
               )}
               Add Card
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showMatchSamplesModal} onOpenChange={setShowMatchSamplesModal}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Pricing Match Samples</DialogTitle>
+            <DialogDescription>
+              These are the market listings we found that may correspond to your card. 
+              Higher match scores indicate stronger similarity to your card.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-4">
+            {outlook?.matchConfidence?.samples?.map((sample, idx) => (
+              <div 
+                key={idx} 
+                className="p-3 rounded-lg border bg-muted/30 flex items-start justify-between gap-4"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" title={sample.title}>
+                    {sample.title}
+                  </p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm text-muted-foreground">
+                      ${sample.price.toLocaleString()}
+                    </span>
+                    {sample.url && (
+                      <a 
+                        href={sample.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline"
+                      >
+                        View listing
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <Badge 
+                  variant={sample.matchScore >= 0.8 ? "default" : sample.matchScore >= 0.55 ? "secondary" : "outline"}
+                  className="shrink-0"
+                >
+                  {Math.round(sample.matchScore * 100)}% match
+                </Badge>
+              </div>
+            ))}
+            
+            {(!outlook?.matchConfidence?.samples || outlook.matchConfidence.samples.length === 0) && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No sample listings available.
+              </p>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowMatchSamplesModal(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1335,10 +1335,22 @@ Allow: /
       // Compute all signals using deterministic engine
       console.log(`[Outlook 2.0] Computing signals for card ${cardId}`);
       const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
+      
+      // Get match confidence from price data
+      const matchConfidence = priceData.matchConfidence;
+      
+      // Override action to WATCH if match confidence is LOW
+      let finalAction = signals.action;
+      let finalActionReasons = [...signals.actionReasons];
+      if (matchConfidence && matchConfidence.tier === "LOW") {
+        finalAction = "WATCH";
+        finalActionReasons = [`Low card match confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+      }
 
       // Generate AI explanation (AI explains, doesn't decide)
-      console.log(`[Outlook 2.0] Generating AI explanation for ${signals.action}`);
-      const explanation = await generateOutlookExplanation(card, signals, priceData.pricePoints, priceData.estimatedValue);
+      console.log(`[Outlook 2.0] Generating AI explanation for ${finalAction}`);
+      const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
+      const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue);
 
       // Store outlook in the new card_outlooks table
       const outlookData = {
@@ -1359,8 +1371,8 @@ Allow: /
         qualityScore: signals.qualityScore,
         upsideScore: signals.upsideScore,
         riskScore: signals.riskScore,
-        action: signals.action,
-        actionReasons: signals.actionReasons,
+        action: finalAction,
+        actionReasons: finalActionReasons,
         careerStageAuto: signals.careerStageAuto,
         dataConfidence: signals.dataConfidence,
         confidenceReason: signals.confidenceReason,
@@ -1420,13 +1432,14 @@ Allow: /
           upside: signals.upsideScore,
           risk: signals.riskScore,
         },
-        action: signals.action,
-        actionReasons: signals.actionReasons,
+        action: finalAction,
+        actionReasons: finalActionReasons,
         careerStage: signals.careerStageAuto,
         confidence: {
           level: signals.dataConfidence,
           reason: signals.confidenceReason,
         },
+        matchConfidence: matchConfidence || null,
         explanation: {
           short: explanation.short,
           long: explanation.long,
@@ -1649,10 +1662,22 @@ Allow: /
       // Compute signals
       console.log(`[Quick Analyze] Computing signals`);
       const signals = computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
+      
+      // Get match confidence from price data
+      const matchConfidence = priceData.matchConfidence;
+      
+      // Override action to WATCH if match confidence is LOW
+      let finalAction = signals.action;
+      let finalActionReasons = [...signals.actionReasons];
+      if (matchConfidence && matchConfidence.tier === "LOW") {
+        finalAction = "WATCH";
+        finalActionReasons = [`Low card match confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+      }
 
       // Generate AI explanation
-      console.log(`[Quick Analyze] Generating AI explanation for ${signals.action}`);
-      const explanation = await generateOutlookExplanation(tempCard as any, signals, priceData.pricePoints, priceData.estimatedValue);
+      console.log(`[Quick Analyze] Generating AI explanation for ${finalAction}`);
+      const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
+      const explanation = await generateOutlookExplanation(tempCard as any, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue);
 
       // Record usage for free tier tracking
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);
@@ -1691,13 +1716,14 @@ Allow: /
           upside: signals.upsideScore,
           risk: signals.riskScore,
         },
-        action: signals.action,
-        actionReasons: isPro ? signals.actionReasons : null,
+        action: finalAction,
+        actionReasons: isPro ? finalActionReasons : null,
         careerStage: signals.careerStageAuto,
         confidence: {
           level: signals.dataConfidence,
           reason: isPro ? signals.confidenceReason : null,
         },
+        matchConfidence: matchConfidence || null,
         explanation: {
           short: explanation.short,
           long: isPro ? explanation.long : null,
@@ -1713,6 +1739,38 @@ Allow: /
     } catch (error) {
       console.error("Error in quick analyze:", error);
       res.status(500).json({ message: "Failed to analyze card" });
+    }
+  });
+
+  // Match feedback endpoint - allows users to report incorrect price matches
+  app.post("/api/outlook/match-feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { cardId, cardTitle, sampleUrl, feedback, comment } = req.body;
+
+      if (!feedback || !["correct", "incorrect"].includes(feedback)) {
+        return res.status(400).json({ message: "Feedback must be 'correct' or 'incorrect'" });
+      }
+
+      // Log feedback for analysis (in production, store in database)
+      console.log(`[Match Feedback] User ${userId}:`, {
+        cardId,
+        cardTitle,
+        sampleUrl,
+        feedback,
+        comment,
+        timestamp: new Date().toISOString(),
+      });
+
+      // For now, just acknowledge the feedback
+      // In the future, this could be stored in a match_feedback table for ML training
+      res.json({ 
+        success: true, 
+        message: "Thank you for your feedback. This helps improve our matching accuracy." 
+      });
+    } catch (error) {
+      console.error("Error submitting match feedback:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
     }
   });
 
