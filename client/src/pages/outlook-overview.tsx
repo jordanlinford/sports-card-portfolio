@@ -27,7 +27,9 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
-  X
+  X,
+  Upload,
+  Image as ImageIcon
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -74,7 +76,7 @@ function OutlookSkeleton() {
 }
 
 type QuickAnalyzeResult = {
-  tempCard: { title: string; year?: string; set?: string; variation?: string; grade?: string; grader?: string };
+  tempCard: { title: string; year?: string; set?: string; variation?: string; grade?: string; grader?: string; imagePath?: string };
   market: { value: number | null; min: number | null; max: number | null; compCount: number };
   signals: { upside: number; risk: number };
   action: string;
@@ -85,7 +87,7 @@ type QuickAnalyzeResult = {
   isPro: boolean;
 };
 
-function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
+function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; userCases: DisplayCase[] }) {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [result, setResult] = useState<QuickAnalyzeResult | null>(null);
@@ -95,6 +97,47 @@ function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
   const [variation, setVariation] = useState("");
   const [grade, setGrade] = useState("");
   const [grader, setGrader] = useState("");
+  const [imagePath, setImagePath] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [selectedCaseId, setSelectedCaseId] = useState<string>("");
+
+  const handleImageUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file", description: "Please upload an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please upload an image under 10MB", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => setPreviewUrl(reader.result as string);
+    reader.readAsDataURL(file);
+
+    setUploading(true);
+    try {
+      const uploadUrlRes = await apiRequest("POST", "/api/objects/upload");
+      const { uploadURL } = uploadUrlRes;
+
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      const updateRes = await apiRequest("PUT", "/api/card-images", { cardImageURL: uploadURL });
+      setImagePath(updateRes.objectPath);
+      toast({ title: "Image uploaded", description: "Card image ready" });
+    } catch (error) {
+      toast({ title: "Upload failed", description: "Please try again", variant: "destructive" });
+      setPreviewUrl(null);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const analyzeMutation = useMutation({
     mutationFn: async () => {
@@ -105,6 +148,7 @@ function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
         variation: variation || undefined,
         grade: grade || undefined,
         grader: grader || undefined,
+        imagePath: imagePath || undefined,
       });
       return data;
     },
@@ -118,6 +162,34 @@ function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
     }
   });
 
+  const addToCollectionMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCaseId || !result) throw new Error("Please select a display case");
+      const cardData = {
+        title: result.tempCard.title,
+        year: result.tempCard.year ? parseInt(result.tempCard.year) : null,
+        set: result.tempCard.set || null,
+        variation: result.tempCard.variation || null,
+        grade: result.tempCard.grade || null,
+        grader: result.tempCard.grader || null,
+        imagePath: imagePath || null,
+        estimatedValue: result.market.value,
+        cardCategory: "sports" as const,
+      };
+      const data = await apiRequest("POST", `/api/display-cases/${selectedCaseId}/cards`, cardData);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      toast({ title: "Card added", description: `${result?.tempCard.title} added to your collection` });
+      setShowAddDialog(false);
+      resetForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
   const resetForm = () => {
     setTitle("");
     setYear("");
@@ -125,7 +197,10 @@ function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
     setVariation("");
     setGrade("");
     setGrader("");
+    setImagePath(null);
+    setPreviewUrl(null);
     setResult(null);
+    setSelectedCaseId("");
   };
 
   const formatCurrency = (value: number | null) => {
@@ -172,71 +247,102 @@ function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
         <CardContent className="space-y-4">
           {!result ? (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="title">Card Title / Player Name *</Label>
-                  <Input
-                    id="title"
-                    placeholder="e.g., LeBron James Rookie"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    data-testid="input-quick-title"
-                  />
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-shrink-0">
+                  <Label className="mb-2 block">Card Image (optional)</Label>
+                  <div className="relative w-32 h-44 border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center">
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="Card preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-center p-2">
+                        <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-1" />
+                        <span className="text-xs text-muted-foreground">Upload image</span>
+                      </div>
+                    )}
+                    {uploading && (
+                      <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file);
+                      }}
+                      disabled={uploading}
+                      data-testid="input-quick-image"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="year">Year</Label>
-                  <Input
-                    id="year"
-                    placeholder="e.g., 2003"
-                    value={year}
-                    onChange={(e) => setYear(e.target.value)}
-                    data-testid="input-quick-year"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="set">Set</Label>
-                  <Input
-                    id="set"
-                    placeholder="e.g., Topps Chrome"
-                    value={set}
-                    onChange={(e) => setSet(e.target.value)}
-                    data-testid="input-quick-set"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="variation">Variation</Label>
-                  <Input
-                    id="variation"
-                    placeholder="e.g., Refractor"
-                    value={variation}
-                    onChange={(e) => setVariation(e.target.value)}
-                    data-testid="input-quick-variation"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="grade">Grade</Label>
-                  <Input
-                    id="grade"
-                    placeholder="e.g., PSA 10"
-                    value={grade}
-                    onChange={(e) => setGrade(e.target.value)}
-                    data-testid="input-quick-grade"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="grader">Grader</Label>
-                  <Select value={grader} onValueChange={setGrader}>
-                    <SelectTrigger data-testid="select-quick-grader">
-                      <SelectValue placeholder="Select grader" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PSA">PSA</SelectItem>
-                      <SelectItem value="BGS">BGS</SelectItem>
-                      <SelectItem value="SGC">SGC</SelectItem>
-                      <SelectItem value="CGC">CGC</SelectItem>
-                      <SelectItem value="raw">Raw (ungraded)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="title">Card Title / Player Name *</Label>
+                    <Input
+                      id="title"
+                      placeholder="e.g., LeBron James Rookie"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      data-testid="input-quick-title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="year">Year</Label>
+                    <Input
+                      id="year"
+                      placeholder="e.g., 2003"
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      data-testid="input-quick-year"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="set">Set</Label>
+                    <Input
+                      id="set"
+                      placeholder="e.g., Topps Chrome"
+                      value={set}
+                      onChange={(e) => setSet(e.target.value)}
+                      data-testid="input-quick-set"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="variation">Variation</Label>
+                    <Input
+                      id="variation"
+                      placeholder="e.g., Refractor"
+                      value={variation}
+                      onChange={(e) => setVariation(e.target.value)}
+                      data-testid="input-quick-variation"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="grade">Grade</Label>
+                    <Input
+                      id="grade"
+                      placeholder="e.g., PSA 10"
+                      value={grade}
+                      onChange={(e) => setGrade(e.target.value)}
+                      data-testid="input-quick-grade"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="grader">Grader</Label>
+                    <Select value={grader} onValueChange={setGrader}>
+                      <SelectTrigger data-testid="select-quick-grader">
+                        <SelectValue placeholder="Select grader" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PSA">PSA</SelectItem>
+                        <SelectItem value="BGS">BGS</SelectItem>
+                        <SelectItem value="SGC">SGC</SelectItem>
+                        <SelectItem value="CGC">CGC</SelectItem>
+                        <SelectItem value="raw">Raw (ungraded)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
@@ -270,24 +376,33 @@ function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
             </>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <h3 className="font-semibold text-lg">{result.tempCard.title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {result.tempCard.year} {result.tempCard.set} {result.tempCard.variation ? `- ${result.tempCard.variation}` : ""} {result.tempCard.grade ? `(${result.tempCard.grade})` : ""}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge variant="outline" className={`gap-1 ${getActionColor(result.action)}`}>
-                    {getActionIcon(result.action)}
-                    {result.action}
-                  </Badge>
-                  {result.bigMover.flag && (
-                    <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 gap-1">
-                      <Zap className="h-3 w-3" />
-                      Big Mover
-                    </Badge>
-                  )}
+              <div className="flex gap-4">
+                {previewUrl && (
+                  <div className="flex-shrink-0 w-24 h-32 rounded-lg overflow-hidden border">
+                    <img src={previewUrl} alt="Card" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                      <h3 className="font-semibold text-lg">{result.tempCard.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {result.tempCard.year} {result.tempCard.set} {result.tempCard.variation ? `- ${result.tempCard.variation}` : ""} {result.tempCard.grade ? `(${result.tempCard.grade})` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className={`gap-1 ${getActionColor(result.action)}`}>
+                        {getActionIcon(result.action)}
+                        {result.action}
+                      </Badge>
+                      {result.bigMover.flag && (
+                        <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 gap-1">
+                          <Zap className="h-3 w-3" />
+                          Big Mover
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -327,6 +442,63 @@ function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
               )}
 
               <div className="flex gap-2 pt-2 flex-wrap">
+                <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-add-to-collection">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add to Collection
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add to Display Case</DialogTitle>
+                      <DialogDescription>
+                        Choose which display case to add "{result.tempCard.title}" to.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label>Select Display Case</Label>
+                        <Select value={selectedCaseId} onValueChange={setSelectedCaseId}>
+                          <SelectTrigger data-testid="select-display-case">
+                            <SelectValue placeholder="Choose a display case" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userCases.map((c) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {userCases.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          You don't have any display cases yet. Create one first from your dashboard.
+                        </p>
+                      )}
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={() => addToCollectionMutation.mutate()}
+                          disabled={!selectedCaseId || addToCollectionMutation.isPending}
+                          data-testid="button-confirm-add"
+                        >
+                          {addToCollectionMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            "Add Card"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
                 <Button
                   variant="outline"
                   onClick={resetForm}
@@ -568,7 +740,10 @@ export default function OutlookOverviewPage() {
         </Card>
       )}
 
-      <QuickAnalyzeSection canAnalyze={isPro || (usage?.remaining != null && usage.remaining > 0)} />
+      <QuickAnalyzeSection 
+        canAnalyze={isPro || (usage?.remaining != null && usage.remaining > 0)} 
+        userCases={cases?.map(c => ({ id: c.id, name: c.name, createdAt: c.createdAt, updatedAt: c.updatedAt, userId: c.userId, description: c.description, isPublic: c.isPublic, theme: c.theme, layout: c.layout, showCardCount: c.showCardCount, showTotalValue: c.showTotalValue, viewCount: c.viewCount })) || []}
+      />
 
       {isLoading ? (
         <OutlookSkeleton />
