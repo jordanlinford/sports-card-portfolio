@@ -370,6 +370,27 @@ export const messagesRelations = relations(messages, ({ one }) => ({
   }),
 }));
 
+// Outlook usage tracking - unified tracking for all Market Outlook analyses
+export const outlookUsage = pgTable("outlook_usage", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  cardId: integer("card_id").references(() => cards.id, { onDelete: "set null" }),
+  source: varchar("source", { length: 20 }).notNull(), // 'collection' or 'quick'
+  cardTitle: text("card_title"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const outlookUsageRelations = relations(outlookUsage, ({ one }) => ({
+  user: one(users, {
+    fields: [outlookUsage.userId],
+    references: [users.id],
+  }),
+  card: one(cards, {
+    fields: [outlookUsage.cardId],
+    references: [cards.id],
+  }),
+}));
+
 // Schemas and Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;

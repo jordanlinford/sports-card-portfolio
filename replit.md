@@ -20,7 +20,8 @@ The application supports core functionalities including:
 - **Subscription Model**: Free and Pro tiers managed via Stripe for payments.
 - **Authentication**: Secure user authentication and authorization using Replit Auth.
 - **Image Handling**: Integration with Google Cloud Storage for card image uploads.
-- **Value Tracking & AI**: Tracks estimated card values with historical data and offers AI-powered price lookups and card outlook analysis (buy/watch/sell recommendations) for Pro users.
+- **Value Tracking & AI**: Tracks estimated card values with historical data and offers AI-powered price lookups and card outlook analysis (buy/watch/sell recommendations) for Pro users. Includes Quick Card Check for analyzing cards before purchase without adding to collection.
+- **Unified Usage Tracking**: Both collection and quick analyses are tracked in the `outlook_usage` table for consistent free tier enforcement (3 analyses/month for free users).
 - **Display Customization**: Multiple layout styles (grid, row, showcase) and premium themes for display cases.
 - **Collection Organization**: Card tagging, automatic case generation from top cards or tags, and duplicate detection.
 - **Social Features**: Liking, commenting, a prestige system with tiers and badges, and a bookmarking system for cards.

@@ -438,7 +438,7 @@ export default function CardOutlookPage() {
                     Range: {formatCurrency(outlook.market.min)} - {formatCurrency(outlook.market.max)}
                   </div>
                 )}
-                {outlook.market?.compCount !== null && (
+                {outlook.market?.compCount != null && (
                   <div className="text-sm text-muted-foreground">
                     Based on {outlook.market.compCount} comp{outlook.market.compCount !== 1 ? 's' : ''}
                   </div>

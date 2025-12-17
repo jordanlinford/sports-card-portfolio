@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 import { 
   Zap, 
@@ -16,7 +21,13 @@ import {
   Crown,
   ArrowRight,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Search,
+  Plus,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  X
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -59,6 +70,277 @@ function OutlookSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+type QuickAnalyzeResult = {
+  tempCard: { title: string; year?: string; set?: string; variation?: string; grade?: string; grader?: string };
+  market: { value: number | null; min: number | null; max: number | null; compCount: number };
+  signals: { upside: number; risk: number };
+  action: string;
+  actionReasons: string[] | null;
+  explanation: { short: string; long: string | null };
+  bigMover: { flag: boolean; reason: string | null };
+  confidence: { level: string; reason: string | null };
+  isPro: boolean;
+};
+
+function QuickAnalyzeSection({ canAnalyze }: { canAnalyze: boolean }) {
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [result, setResult] = useState<QuickAnalyzeResult | null>(null);
+  const [title, setTitle] = useState("");
+  const [year, setYear] = useState("");
+  const [set, setSet] = useState("");
+  const [variation, setVariation] = useState("");
+  const [grade, setGrade] = useState("");
+  const [grader, setGrader] = useState("");
+
+  const analyzeMutation = useMutation({
+    mutationFn: async () => {
+      const data = await apiRequest("POST", "/api/outlook/quick-analyze", {
+        title,
+        year: year || undefined,
+        set: set || undefined,
+        variation: variation || undefined,
+        grade: grade || undefined,
+        grader: grader || undefined,
+      });
+      return data;
+    },
+    onSuccess: (data) => {
+      setResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
+      toast({ title: "Analysis complete", description: `Got ${data.action} recommendation for ${title}` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const resetForm = () => {
+    setTitle("");
+    setYear("");
+    setSet("");
+    setVariation("");
+    setGrade("");
+    setGrader("");
+    setResult(null);
+  };
+
+  const formatCurrency = (value: number | null) => {
+    if (value === null) return "N/A";
+    return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+  };
+
+  return (
+    <Card className="mb-6">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Search className="h-5 w-5 text-primary" />
+            <CardTitle className="text-lg">Quick Card Check</CardTitle>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setShowForm(!showForm);
+              if (showForm) resetForm();
+            }}
+            data-testid="button-toggle-quick-analyze"
+          >
+            {showForm ? (
+              <>
+                <X className="h-4 w-4 mr-2" />
+                Close
+              </>
+            ) : (
+              <>
+                <Search className="h-4 w-4 mr-2" />
+                Analyze Any Card
+              </>
+            )}
+          </Button>
+        </div>
+        <CardDescription>
+          Check a card before buying or get a quick outlook without adding to your collection
+        </CardDescription>
+      </CardHeader>
+
+      {showForm && (
+        <CardContent className="space-y-4">
+          {!result ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Card Title / Player Name *</Label>
+                  <Input
+                    id="title"
+                    placeholder="e.g., LeBron James Rookie"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    data-testid="input-quick-title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="year">Year</Label>
+                  <Input
+                    id="year"
+                    placeholder="e.g., 2003"
+                    value={year}
+                    onChange={(e) => setYear(e.target.value)}
+                    data-testid="input-quick-year"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="set">Set</Label>
+                  <Input
+                    id="set"
+                    placeholder="e.g., Topps Chrome"
+                    value={set}
+                    onChange={(e) => setSet(e.target.value)}
+                    data-testid="input-quick-set"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="variation">Variation</Label>
+                  <Input
+                    id="variation"
+                    placeholder="e.g., Refractor"
+                    value={variation}
+                    onChange={(e) => setVariation(e.target.value)}
+                    data-testid="input-quick-variation"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="grade">Grade</Label>
+                  <Input
+                    id="grade"
+                    placeholder="e.g., PSA 10"
+                    value={grade}
+                    onChange={(e) => setGrade(e.target.value)}
+                    data-testid="input-quick-grade"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="grader">Grader</Label>
+                  <Select value={grader} onValueChange={setGrader}>
+                    <SelectTrigger data-testid="select-quick-grader">
+                      <SelectValue placeholder="Select grader" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PSA">PSA</SelectItem>
+                      <SelectItem value="BGS">BGS</SelectItem>
+                      <SelectItem value="SGC">SGC</SelectItem>
+                      <SelectItem value="CGC">CGC</SelectItem>
+                      <SelectItem value="raw">Raw (ungraded)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={() => analyzeMutation.mutate()}
+                  disabled={!title || analyzeMutation.isPending || !canAnalyze}
+                  data-testid="button-quick-analyze"
+                >
+                  {analyzeMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Get Outlook
+                    </>
+                  )}
+                </Button>
+                {!canAnalyze && (
+                  <Link href="/upgrade">
+                    <Button variant="outline">
+                      <Crown className="h-4 w-4 mr-2" />
+                      Upgrade for Analyses
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h3 className="font-semibold text-lg">{result.tempCard.title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {result.tempCard.year} {result.tempCard.set} {result.tempCard.variation ? `- ${result.tempCard.variation}` : ""} {result.tempCard.grade ? `(${result.tempCard.grade})` : ""}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className={`gap-1 ${getActionColor(result.action)}`}>
+                    {getActionIcon(result.action)}
+                    {result.action}
+                  </Badge>
+                  {result.bigMover.flag && (
+                    <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 gap-1">
+                      <Zap className="h-3 w-3" />
+                      Big Mover
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Est. Value</p>
+                  <p className="font-semibold" data-testid="text-quick-value">{formatCurrency(result.market.value)}</p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Price Range</p>
+                  <p className="font-semibold text-sm">{formatCurrency(result.market.min)} - {formatCurrency(result.market.max)}</p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Upside</p>
+                  <p className="font-semibold text-green-600 dark:text-green-400">{result.signals.upside}/100</p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Risk</p>
+                  <p className="font-semibold text-red-600 dark:text-red-400">{result.signals.risk}/100</p>
+                </div>
+              </div>
+
+              {result.explanation.short && (
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <p className="text-sm">{result.explanation.short}</p>
+                </div>
+              )}
+
+              {result.bigMover.reason && result.isPro && (
+                <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Zap className="h-4 w-4 text-purple-500" />
+                    <span className="font-medium text-sm">Big Mover Potential</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{result.bigMover.reason}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  onClick={resetForm}
+                  data-testid="button-quick-reset"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Check Another Card
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
@@ -285,6 +567,8 @@ export default function OutlookOverviewPage() {
           </CardContent>
         </Card>
       )}
+
+      <QuickAnalyzeSection canAnalyze={isPro || (usage?.remaining != null && usage.remaining > 0)} />
 
       {isLoading ? (
         <OutlookSkeleton />

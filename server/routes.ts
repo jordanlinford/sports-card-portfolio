@@ -1373,6 +1373,9 @@ Allow: /
 
       await storage.upsertCardOutlook(cardId, outlookData);
 
+      // Record usage for free tier tracking
+      await storage.recordOutlookUsage(userId, 'collection', cardId, card.title);
+
       // Also update the card's estimated value and Big Mover status
       const cardUpdate: any = {
         outlookBigMover: signals.bigMoverFlag,
@@ -1545,6 +1548,171 @@ Allow: /
     } catch (error) {
       console.error("Error getting outlook v2:", error);
       res.status(500).json({ message: "Failed to get card outlook" });
+    }
+  });
+
+  // One-off card analysis - analyze a card without adding to collection
+  // Returns analysis that can optionally be saved to a display case
+  app.post("/api/outlook/quick-analyze", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, year, set, variation, grade, grader, imagePath } = req.body;
+
+      if (!title) {
+        return res.status(400).json({ message: "Card title is required" });
+      }
+
+      // Check subscription - free users get 3 analyses per month
+      const user = await storage.getUser(userId);
+      const isPro = user?.subscriptionStatus === "PRO";
+      const FREE_TIER_LIMIT = 3;
+      
+      if (!isPro) {
+        const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
+        if (monthlyCount >= FREE_TIER_LIMIT) {
+          return res.status(403).json({ 
+            message: `You've used all ${FREE_TIER_LIMIT} free Market Outlook analyses this month. Upgrade to Pro for unlimited analyses.`,
+            usageExceeded: true,
+            used: monthlyCount,
+            limit: FREE_TIER_LIMIT
+          });
+        }
+      }
+
+      // Create a temporary card object for the analysis
+      const tempCard = {
+        id: 0,
+        displayCaseId: 0,
+        title,
+        year: year ? parseInt(year) : null,
+        set: set || null,
+        variation: variation || null,
+        grade: grade || null,
+        grader: grader || null,
+        imagePath: imagePath || null,
+        purchasePrice: null,
+        estimatedValue: null,
+        previousValue: null,
+        valueUpdatedAt: null,
+        notes: null,
+        tags: null,
+        sortOrder: 0,
+        openToOffers: false,
+        minOfferAmount: null,
+        createdAt: new Date(),
+        cardCategory: "sports" as const,
+        sport: null,
+        position: null,
+        playerName: null,
+        isRookie: false,
+        isNumbered: false,
+        serialNumber: null,
+        hasAuto: false,
+        insertTier: null,
+        legacyTier: null,
+        playerAge: null,
+        injuryRisk: null,
+        teamMarketSize: null,
+        salesLast30Days: null,
+        avgSalePrice30: null,
+        avgSalePrice90: null,
+        priceStdDevPct: null,
+        characterTier: null,
+        rarityTier: null,
+        eraPrestige: null,
+        franchiseHeat: null,
+        outlookAction: null,
+        outlookUpsideScore: null,
+        outlookRiskScore: null,
+        outlookConfidenceScore: null,
+        outlookExplanationShort: null,
+        outlookExplanationLong: null,
+        outlookGeneratedAt: null,
+        outlookBigMover: false,
+        outlookBigMoverReason: null,
+      };
+
+      // Import the outlook engine dynamically
+      const { computeAllSignals, generateOutlookExplanation } = await import("./outlookEngine");
+      const { lookupEnhancedCardPrice } = await import("./priceService");
+
+      // Fetch enhanced price data
+      console.log(`[Quick Analyze] Fetching price data for: ${title}`);
+      const priceData = await lookupEnhancedCardPrice({
+        title,
+        set: set || undefined,
+        year: year ? parseInt(year) : undefined,
+        variation: variation || undefined,
+        grade: grade || undefined,
+      });
+
+      // Compute signals
+      console.log(`[Quick Analyze] Computing signals`);
+      const signals = computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
+
+      // Generate AI explanation
+      console.log(`[Quick Analyze] Generating AI explanation for ${signals.action}`);
+      const explanation = await generateOutlookExplanation(tempCard as any, signals, priceData.pricePoints, priceData.estimatedValue);
+
+      // Record usage for free tier tracking
+      await storage.recordOutlookUsage(userId, 'quick', undefined, title);
+
+      // Return the analysis without saving
+      res.json({
+        tempCard: {
+          title,
+          year,
+          set,
+          variation,
+          grade,
+          grader,
+          imagePath,
+        },
+        market: {
+          value: priceData.estimatedValue,
+          min: priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map(p => p.price)) : null,
+          max: priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map(p => p.price)) : null,
+          compCount: priceData.salesFound,
+          pricePoints: isPro ? priceData.pricePoints : null,
+        },
+        signals: isPro ? {
+          trend: signals.trendScore,
+          liquidity: signals.liquidityScore,
+          volatility: signals.volatilityScore,
+          sport: signals.sportScore,
+          position: signals.positionScore,
+          cardType: signals.cardTypeScore,
+          demand: signals.demandScore,
+          momentum: signals.momentumScore,
+          quality: signals.qualityScore,
+          upside: signals.upsideScore,
+          risk: signals.riskScore,
+        } : {
+          upside: signals.upsideScore,
+          risk: signals.riskScore,
+        },
+        action: signals.action,
+        actionReasons: isPro ? signals.actionReasons : null,
+        careerStage: signals.careerStageAuto,
+        confidence: {
+          level: signals.dataConfidence,
+          reason: isPro ? signals.confidenceReason : null,
+        },
+        explanation: {
+          short: explanation.short,
+          long: isPro ? explanation.long : null,
+          bullets: isPro ? explanation.bullets : null,
+        },
+        bigMover: {
+          flag: signals.bigMoverFlag,
+          reason: isPro ? signals.bigMoverReason : null,
+        },
+        generatedAt: new Date().toISOString(),
+        isPro,
+      });
+    } catch (error) {
+      console.error("Error in quick analyze:", error);
+      res.status(500).json({ message: "Failed to analyze card" });
     }
   });
 
