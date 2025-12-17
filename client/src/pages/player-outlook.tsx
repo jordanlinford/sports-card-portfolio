@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -165,13 +166,27 @@ function PlayerOutlookSkeleton() {
 }
 
 function PlayerHeader({ player, snapshot }: { player: PlayerOutlookResponse["player"]; snapshot: PlayerOutlookResponse["snapshot"] }) {
+  const { data: imageData } = useQuery({
+    queryKey: ["/api/player-image", player.name, player.sport],
+    queryFn: async () => {
+      const res = await fetch(`/api/player-image?name=${encodeURIComponent(player.name)}&sport=${encodeURIComponent(player.sport)}`);
+      return res.json();
+    },
+    staleTime: 1000 * 60 * 60, // Cache for 1 hour
+  });
+
+  const initials = player.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-4" data-testid="player-header">
-      <div className="h-16 w-16 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center border">
-        <span className="text-2xl font-bold text-primary">
-          {player.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
-        </span>
-      </div>
+      <Avatar className="h-16 w-16 border-2 border-primary/20">
+        {imageData?.imageUrl && (
+          <AvatarImage src={imageData.imageUrl} alt={player.name} />
+        )}
+        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-xl font-bold text-primary">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
       <div className="flex-1">
         <h1 className="text-2xl font-bold" data-testid="text-player-name">{player.name}</h1>
         <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">

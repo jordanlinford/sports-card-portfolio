@@ -2015,6 +2015,49 @@ Allow: /
   // ============================================================================
   // Player Outlook V2 - Player-First Market Intelligence
   // ============================================================================
+
+  // Get player image from Wikipedia
+  app.get("/api/player-image", async (req, res) => {
+    try {
+      const { name, sport } = req.query;
+      if (!name || typeof name !== "string") {
+        return res.status(400).json({ message: "Player name is required" });
+      }
+
+      // Build Wikipedia search query with sport context for disambiguation
+      const sportContext = sport ? ` ${sport}` : "";
+      const searchTerm = `${name}${sportContext}`;
+      
+      // Use Wikipedia API to get page and image
+      const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(searchTerm)}&format=json&origin=*`;
+      const searchRes = await fetch(searchUrl);
+      const searchData = await searchRes.json();
+      
+      if (!searchData.query?.search?.length) {
+        return res.json({ imageUrl: null });
+      }
+
+      const pageTitle = searchData.query.search[0].title;
+      
+      // Get page images
+      const imageUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=pageimages&format=json&pithumbsize=200&origin=*`;
+      const imageRes = await fetch(imageUrl);
+      const imageData = await imageRes.json();
+      
+      const pages = imageData.query?.pages;
+      if (!pages) {
+        return res.json({ imageUrl: null });
+      }
+
+      const page = Object.values(pages)[0] as any;
+      const thumbnail = page?.thumbnail?.source;
+
+      res.json({ imageUrl: thumbnail || null, pageTitle });
+    } catch (error) {
+      console.error("Error fetching player image:", error);
+      res.json({ imageUrl: null });
+    }
+  });
   
   // Get player outlook - player = stock, cards = exposure vehicles
   app.post("/api/player-outlook", isAuthenticated, async (req: any, res) => {
