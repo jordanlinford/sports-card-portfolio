@@ -42,6 +42,7 @@ interface EnhancedPriceLookupResult {
   details?: string;
   rawSearchResults?: Array<{ title: string; snippet: string; link: string }>;
   matchConfidence?: CardMatchConfidence;
+  usedLooseFallback?: boolean; // Track if we fell back to loose comps
 }
 
 // Match confidence attribute weights (sum = 1.0)
@@ -919,14 +920,16 @@ Your task:
 Return ONLY a JSON object with:
 {
   "pricePoints": [
-    { "date": "2024-12-01", "price": 79, "source": "eBay Sold", "url": "https://..." },
-    { "date": "2024-11-30", "price": 61, "source": "eBay Sold", "url": "https://..." }
+    { "date": "2024-12-01", "price": 79, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Bijan Robinson RC" },
+    { "date": "2024-11-30", "price": 61, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Rated Rookie Bijan Robinson" }
   ],
   "estimatedValue": number (average of prices found),
   "salesFound": number (total price points extracted),
   "confidence": "low" | "medium" (never high for approximate data),
   "confidenceReason": string (explain data is approximate and why)
 }
+
+IMPORTANT: Include "listingTitle" with the exact card name from each listing - this is required.
 
 RULES:
 - Extract up to 20 individual price points
@@ -953,15 +956,16 @@ Your task:
 Return ONLY a JSON object with:
 {
   "pricePoints": [
-    { "date": "2024-12-01", "price": 79, "source": "eBay Sold", "url": "https://...", "isStrict": true },
-    { "date": "2024-11-15", "price": 61, "source": "eBay Sold", "url": "https://...", "isStrict": true },
-    { "date": "2024-11-10", "price": 55, "source": "130point", "url": "https://...", "isStrict": true }
+    { "date": "2024-12-01", "price": 79, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss #305 Bijan Robinson RC PSA 10" },
+    { "date": "2024-11-15", "price": 61, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Rated Rookie Bijan Robinson PSA 10" }
   ],
   "estimatedValue": number (average of STRICT matches only),
   "salesFound": number (total STRICT price points extracted),
   "confidence": "high" | "medium" | "low",
   "confidenceReason": string (explain why this confidence level)
 }
+
+IMPORTANT: Include "listingTitle" with the exact card name from the listing for EACH price point - this is required for validation.
 
 RULES:
 - Extract up to 20 individual price points
@@ -1072,10 +1076,12 @@ Return JSON with pricePoints array (all prices found), estimatedValue, salesFoun
         price: typeof pp.price === 'number' ? pp.price : parseFloat(pp.price) || 0,
         source: pp.source || "Unknown",
         url: pp.url,
-      })).filter((pp: PricePoint) => {
+        listingTitle: pp.listingTitle || "", // Capture listing title for validation
+      })).filter((pp: PricePoint & { listingTitle?: string }) => {
         if (pp.price <= 0) return false;
         
-        const combinedText = `${pp.source} ${pp.url || ""}`;
+        // CRITICAL: Use listingTitle for variation filtering - this is the actual card name
+        const combinedText = `${pp.listingTitle || ""} ${pp.source} ${pp.url || ""}`;
         
         // Filter 1: Exclude BGS Pristine/Black Label (commands 2-5x premium)
         if (isBGSPremium(combinedText)) {
@@ -1098,7 +1104,7 @@ Return JSON with pricePoints array (all prices found), estimatedValue, salesFoun
         if (!cardHasPremium) {
           const premiumFound = hasPremiumKeyword(combinedText);
           if (premiumFound) {
-            console.log(`[VARIATION FILTER] Excluded "${pp.source}" ($${pp.price}) - premium variation: ${premiumFound}`);
+            console.log(`[VARIATION FILTER] Excluded "$${pp.price}" - listing "${(pp as any).listingTitle || pp.source}" has premium: ${premiumFound}`);
             return false;
           }
         }
