@@ -369,6 +369,9 @@ function isStrictComp(
     // NOTE: Removed bare "ice" - it matches "price" as substring! Use specific terms only
     "cracked ice", "ice prizm", "ice parallel", "fractured", "shock", "sparkle", "white sparkle", "red sparkle",
     "velocity", "hyper", "scope", "fast break", "neon", "laser", "fluorescent", "seismic",
+    // Donruss Press Proofs and Optic variants
+    "press proof", "blue press proof", "red press proof", "stat line", "season stat line",
+    "optic", "donruss optic", "optic preview", "canvas",
     // Color parallels (Donruss Optic specific)
     "red yellow", "red/yellow", "red & yellow", "red and yellow", "red white blue", "rwb",
     // Color parallels - explicit parallel terms
