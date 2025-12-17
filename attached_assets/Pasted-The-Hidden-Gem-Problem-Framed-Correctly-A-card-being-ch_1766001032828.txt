@@ -1,0 +1,181 @@
+The Hidden Gem Problem, Framed Correctly
+
+A card being “cheap” relative to perceived talent can mean two totally different things:
+
+A) Undervalued Opportunity
+
+Market is slow to reprice, player is flying under the radar, or the “setup” hasn’t happened yet.
+
+B) Smart Discount
+
+The market is pricing in risks the casual buyer isn’t seeing (situation, longevity, hobby demand ceilings).
+
+Your product should not just say “buy.”
+It should say:
+
+“It’s cheap because of X. If X is wrong, it’s a gem. If X is right, it’s a trap.”
+
+That’s the insight.
+
+Build an “Explainable Discount Engine”
+
+When a player looks underpriced, your system should generate a short Why Discounted section with ranked hypotheses.
+
+Discount Factors (the stuff your system should learn to surface)
+
+Market size / hobby ceiling
+
+Some teams just don’t print hobby superstars unless the player becomes undeniable.
+
+Your Utah Jazz example is perfect: smaller market + fewer national TV moments + lower casual demand.
+
+Narrative + media gravity
+
+Hobby demand follows attention, not just performance.
+
+Players with fewer highlights, fewer viral moments, fewer “face of the league” narratives get capped.
+
+Position premium and archetype premium
+
+In football, QB matters. In basketball, heliocentric stars matter. In baseball, prospects have different cycles.
+
+Even within QB: “game manager” archetypes get discounted versus “superhero” archetypes.
+
+Draft capital & “belief inertia”
+
+The hobby anchors hard to draft status, pedigree, and pre-draft hype.
+
+Lower hype prospects can outperform and still stay discounted longer than you’d expect.
+
+Supply pressure
+
+If there’s a ton of product / parallels / rookies / ripping hype, supply can keep prices down even if the player is legit.
+
+Liquidity discount
+
+If the player doesn’t have strong “default chase cards,” buyers hesitate because exit paths aren’t obvious.
+
+Time horizon mismatch
+
+Some players are “slow burns.” The market hates waiting.
+
+Role fragility
+
+The market prices “how easily can this situation change?”
+
+(Coach changes, scheme, competition, short leash—whatever applies.)
+
+Your Bo Nix Example: “Why are his cards cheap?”
+
+Without claiming any specific facts, your system should output hypotheses like:
+
+Why Discounted (ranked):
+
+Hobby ceiling risk: market may view him as “solid starter” rather than “future top-tier face of league,” which caps demand.
+
+Narrative gap: fewer “signature moments” / less national hype = slower repricing.
+
+Supply pressure: rookie supply can suppress prices early.
+
+Belief inertia: if pre-draft expectations were modest, the market can lag real performance for a while.
+
+Then the key:
+
+What would flip the pricing?
+
+Signature nationally visible wins
+
+Clear “franchise QB” narrative
+
+Playoff moments / prime-time performances
+
+A single “iconic” card becoming the default chase (Prizm Silver / Optic Holo equivalent)
+
+That’s the hidden gem logic people crave.
+
+Product Feature: “Hidden Gem Finder”
+
+Make this a dedicated module inside your Portfolio/Player Outlook flow.
+
+How users interact
+
+Filters:
+
+Sport
+
+Position (QB, WR1, etc.)
+
+Temperature: Warm/Neutral only (avoid already-hot)
+
+“Cheap relative to peers” toggle
+
+Liquidity: High/Med (avoid traps unless user opts in)
+
+Output:
+
+A list of 10–20 “candidates”
+
+Each with:
+
+Why discounted (top 2 bullets)
+
+What must happen to reprice (1 bullet)
+
+Trap risk (1 bullet)
+
+Suggested exposure tier (Growth/Core)
+
+This makes the product feel like it finds angles, not just summaries.
+
+How to do this without “AI fluff”
+Require the model to speak in conditional logic
+
+Every “gem” must include:
+
+Reason for discount
+
+Catalyst
+
+Trap door
+
+Example format:
+
+“Cheap because ___.”
+
+“If ___ happens, market likely reprices.”
+
+“If ___ happens instead, it stays capped (or drops).”
+
+That’s what makes it feel smart.
+
+Data-light, Insight-heavy (the key to beating the big dogs)
+
+You don’t need perfect comps to do this. You need:
+
+relative comps (player vs peer group)
+
+narrative signals (news/buzz snippets you already collect)
+
+simple archetype logic
+
+Your edge is interpretation + framing.
+
+What to tell Replit to build next
+
+Add a new section to Player Outlook:
+
+“Why Discounted” (ranked bullets)
+
+“Repricing Catalysts”
+
+“Trap Risks”
+
+Add a backend function:
+
+analyzeDiscount(player, peerGroup, signals) → returns those three blocks
+
+Add “Hidden Gem Finder” page:
+
+filter UI + list of candidates
+
+click-through opens Player Outlook

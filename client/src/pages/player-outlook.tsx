@@ -39,8 +39,10 @@ import {
   BarChart3,
   BookOpen,
   ExternalLink,
+  Star,
+  StarOff,
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier } from "@shared/schema";
 
@@ -472,13 +474,94 @@ export default function PlayerOutlookPage() {
   const [playerName, setPlayerName] = useState("");
   const [sport, setSport] = useState("football");
   const [outlookData, setOutlookData] = useState<PlayerOutlookResponse | null>(null);
+  const [outlookSport, setOutlookSport] = useState<string>("football");
+
+  const playerKey = outlookData?.player?.name 
+    ? `${outlookSport.toLowerCase()}:${outlookData.player.name.toLowerCase().trim().replace(/\s+/g, "_")}`
+    : null;
+
+  const { data: watchlistStatus, refetch: refetchWatchlistStatus } = useQuery<{ watching: boolean }>({
+    queryKey: ["/api/watchlist/check", playerKey],
+    queryFn: async () => {
+      if (!playerKey) return { watching: false };
+      const res = await fetch(`/api/watchlist/check/${encodeURIComponent(playerKey)}`);
+      if (!res.ok) throw new Error("Failed to check watchlist");
+      return res.json();
+    },
+    enabled: !!playerKey && !!user,
+  });
+
+  const addToWatchlistMutation = useMutation({
+    mutationFn: async () => {
+      if (!outlookData) throw new Error("No outlook data");
+      return await apiRequest("POST", "/api/watchlist", {
+        playerName: outlookData.player.name,
+        sport: outlookSport,
+        currentOutlook: outlookData,
+      });
+    },
+    onSuccess: () => {
+      refetchWatchlistStatus();
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      toast({
+        title: "Added to watchlist",
+        description: `${outlookData?.player?.name} is now on your watchlist.`,
+      });
+    },
+    onError: (error: any) => {
+      if (error?.message?.includes("already")) {
+        refetchWatchlistStatus();
+      } else {
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to add to watchlist",
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  const removeFromWatchlistMutation = useMutation({
+    mutationFn: async () => {
+      if (!playerKey) throw new Error("No player key");
+      return await apiRequest("DELETE", `/api/watchlist/${encodeURIComponent(playerKey)}`);
+    },
+    onSuccess: () => {
+      refetchWatchlistStatus();
+      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      toast({
+        title: "Removed from watchlist",
+        description: `${outlookData?.player?.name} has been removed from your watchlist.`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to remove from watchlist",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const isWatching = watchlistStatus?.watching ?? false;
+  const isWatchlistLoading = addToWatchlistMutation.isPending || removeFromWatchlistMutation.isPending;
+
+  const handleToggleWatchlist = () => {
+    if (isWatching) {
+      removeFromWatchlistMutation.mutate();
+    } else {
+      addToWatchlistMutation.mutate();
+    }
+  };
 
   const outlookMutation = useMutation({
     mutationFn: async (data: { playerName: string; sport: string }) => {
-      return await apiRequest("POST", "/api/player-outlook", data);
+      const result = await apiRequest("POST", "/api/player-outlook", data);
+      return { data: result, sport: data.sport };
     },
-    onSuccess: (data) => {
+    onSuccess: ({ data, sport: usedSport }) => {
       setOutlookData(data);
+      setOutlookSport(usedSport);
     },
     onError: (error: any) => {
       const message = error?.message || "Failed to get player outlook";
@@ -599,6 +682,21 @@ export default function PlayerOutlookPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-3">
+                <Button 
+                  variant={isWatching ? "secondary" : "default"}
+                  onClick={handleToggleWatchlist}
+                  disabled={isWatchlistLoading}
+                  data-testid="button-toggle-watchlist"
+                >
+                  {isWatchlistLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : isWatching ? (
+                    <StarOff className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Star className="h-4 w-4 mr-2" />
+                  )}
+                  {isWatching ? "Remove from Watchlist" : "Add to Watchlist"}
+                </Button>
                 <Button variant="outline" asChild>
                   <a 
                     href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(outlookData.player.name + " card")}&_sacat=0&LH_Sold=1`}

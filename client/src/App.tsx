@@ -32,6 +32,7 @@ import OnboardingPage from "@/pages/onboarding";
 import CardOutlookPage from "@/pages/card-outlook";
 import OutlookOverviewPage from "@/pages/outlook-overview";
 import PlayerOutlookPage from "@/pages/player-outlook";
+import WatchlistPage from "@/pages/watchlist";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -76,6 +77,7 @@ function Router() {
           <Route path="/settings" component={SettingsPage} />
           <Route path="/outlook" component={OutlookOverviewPage} />
           <Route path="/player-outlook" component={PlayerOutlookPage} />
+          <Route path="/watchlist" component={WatchlistPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />
