@@ -80,6 +80,85 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Your Portfolio, Explained - Flagship Features */}
+      <section className="py-16 md:py-20 bg-gradient-to-b from-background to-muted/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4" data-testid="text-portfolio-explained-title">
+              Your Portfolio, Explained
+            </h2>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Three tools to understand and grow your collection.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
+            {/* Portfolio Outlook */}
+            <Card className="relative overflow-visible border-2 hover-elevate">
+              <CardHeader className="pb-3">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
+                  <Brain className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle className="text-xl">Portfolio Outlook</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground text-sm">
+                  See your portfolio's stance, risks, and opportunities in one AI-generated snapshot.
+                </p>
+                <a href="/api/login">
+                  <Button className="w-full gap-2" data-testid="button-portfolio-outlook-cta">
+                    View Portfolio Outlook
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </a>
+              </CardContent>
+            </Card>
+
+            {/* Next Buys */}
+            <Card className="relative overflow-visible border-2 hover-elevate">
+              <CardHeader className="pb-3">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle className="text-xl">Next Buys</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground text-sm">
+                  Personalized card recommendations based on gaps and concentration in your collection.
+                </p>
+                <a href="/api/login">
+                  <Button className="w-full gap-2" data-testid="button-next-buys-cta">
+                    See Next Buys
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </a>
+              </CardContent>
+            </Card>
+
+            {/* Quick Card Check */}
+            <Card className="relative overflow-visible border-2 hover-elevate">
+              <CardHeader className="pb-3">
+                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
+                  <Search className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle className="text-xl">Quick Card Check</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-muted-foreground text-sm">
+                  Analyze any card before you buy — no upload required. Get instant market insights.
+                </p>
+                <a href="/api/login">
+                  <Button variant="outline" className="w-full gap-2" data-testid="button-quick-check-cta">
+                    Analyze a Card
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </a>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Value Proposition - 3 Columns */}
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
