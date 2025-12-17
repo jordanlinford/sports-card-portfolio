@@ -77,7 +77,7 @@ export const cards = pgTable("cards", {
   id: serial("id").primaryKey(),
   displayCaseId: integer("display_case_id").notNull().references(() => displayCases.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }).notNull(),
-  imagePath: varchar("image_path").notNull(),
+  imagePath: varchar("image_path"),
   set: varchar("set", { length: 255 }),
   year: integer("year"),
   cardNumber: varchar("card_number", { length: 50 }),
