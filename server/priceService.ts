@@ -70,16 +70,30 @@ const QUALIFIER_GRADE_PENALTY = 1.5; // Downgrade by 1.5 grade points
 
 // Insert/parallel keywords to exclude when user hasn't specified a variation
 // These are expensive variants that should not match base card searches
+// Keywords that indicate a premium/parallel card vs base
+// NOTE: Avoid single colors (gold, blue, red) as they cause false positives on price guide pages
+// that list all variants. Use specific parallel names instead.
 const PREMIUM_VARIATION_KEYWORDS = [
-  "downtown", "kaboom", "disco", "gold", "silver", "prizm", "refractor",
-  "auto", "autograph", "signature", "patch", "relic", "jersey", "mem",
-  "numbered", "/10", "/25", "/50", "/75", "/99", "/100", "/149", "/199", "/250",
-  "ssp", "sp ", "case hit", "1/1", "one of one", "superfractor",
-  "mosaic", "optic holo", "ice", "wave", "shock", "velocity", "neon",
-  "cosmic", "no huddle", "downtown!", "genesis", "color blast",
-  "lazer", "laser", "blue", "red", "green", "orange", "purple", "pink",
-  "cracked ice", "fast break", "my house", "fireworks", "stained glass",
-  "black finite", "gold finite", "color", "parallel", "insert", "ssp", "rookie kings"
+  // Premium inserts (highly valuable)
+  "downtown", "kaboom", "disco", "stained glass", "color blast", "genesis",
+  // Prizm/Refractor family
+  "prizm", "refractor", "superfractor", "xfractor", "atomic",
+  // Autograph/Memorabilia
+  "auto", "autograph", "signature", "patch", "relic", "jersey", "memorabilia",
+  // Numbered cards (explicit indicators)
+  "numbered /", "/10", "/25", "/50", "/75", "/99", "/100", "/149", "/199", "/250",
+  "1/1", "one of one",
+  // Short prints
+  "ssp", "case hit",
+  // Specific parallel names (avoid bare colors)
+  "gold prizm", "silver prizm", "blue prizm", "red prizm", "green prizm",
+  "gold refractor", "silver refractor", "gold parallel", "silver parallel",
+  "gold label", "black label",
+  "cracked ice", "ice prizm", "fast break", "velocity", "hyper",
+  "cosmic", "no huddle", "my house", "fireworks",
+  "black finite", "gold finite",
+  // Insert sets
+  "rookie kings", "lombardi bound"
 ];
 
 // Retail sites that show asking prices, not sold prices - exclude these
