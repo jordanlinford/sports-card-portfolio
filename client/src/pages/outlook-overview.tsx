@@ -987,6 +987,15 @@ export default function OutlookOverviewPage() {
         <p className="text-muted-foreground">
           AI-powered analysis of your cards with buy, sell, and hold recommendations based on market signals.
         </p>
+        <div className="mt-4">
+          <Link href="/player-outlook">
+            <Button variant="outline" className="gap-2" data-testid="link-player-outlook">
+              <TrendingUp className="h-4 w-4" />
+              Try Player Outlook
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {!isPro && (
