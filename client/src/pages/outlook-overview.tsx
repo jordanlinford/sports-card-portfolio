@@ -218,6 +218,8 @@ type QuickAnalyzeResult = {
     score: number;
     tier: "HIGH" | "MEDIUM" | "LOW";
     reason: string;
+    matchedComps?: number;
+    totalComps?: number;
     samples?: Array<{
       title: string;
       price: number;
@@ -788,7 +790,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       value: result.market.value,
                       min: result.market.min,
                       max: result.market.max,
-                      compCount: result.comps?.soldCount ?? result.market.compCount,
+                      compCount: result.matchConfidence?.totalComps ?? result.comps?.soldCount ?? result.market.compCount,
                     },
                     signals: result.signals,
                     action: result.action,
