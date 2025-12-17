@@ -971,6 +971,31 @@ Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and 
     try {
       const parsed = JSON.parse(jsonMatch[0]);
       const cardGrader = card.grader?.toLowerCase() || parseGradeInfo(card.grade).grader;
+      // Premium variation keywords that indicate higher-value parallels
+      const PREMIUM_KEYWORDS = [
+        "pristine", "black label", "gem mint", "gold label",
+        "silver", "gold", "hyper", "shimmer", "wave", "camo", 
+        "kaboom", "downtown", "case hit", "ssp", "sp ",
+        "refractor", "prizm", "auto", "autograph", "numbered", "/10", "/25", "/50", "/99",
+        "1/1", "one of one", "superfractor", "atomic"
+      ];
+      
+      // Check if text contains premium variation keywords
+      const hasPremiumKeyword = (text: string): string | null => {
+        const lower = text.toLowerCase();
+        for (const kw of PREMIUM_KEYWORDS) {
+          if (lower.includes(kw)) return kw;
+        }
+        return null;
+      };
+      
+      // Check for BGS Pristine/Black Label which command huge premiums
+      const isBGSPremium = (text: string): boolean => {
+        const lower = text.toLowerCase();
+        return (lower.includes("bgs") || lower.includes("beckett")) && 
+               (lower.includes("pristine") || lower.includes("black label") || lower.includes("10.0") || lower.includes("gem mint"));
+      };
+      
       const pricePoints: PricePoint[] = (parsed.pricePoints || []).map((pp: any) => ({
         date: pp.date || new Date().toISOString().split('T')[0],
         price: typeof pp.price === 'number' ? pp.price : parseFloat(pp.price) || 0,
@@ -979,15 +1004,34 @@ Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and 
       })).filter((pp: PricePoint) => {
         if (pp.price <= 0) return false;
         
-        // Post-filter: Check for grader mismatch in source description
-        // If card is PSA, exclude BGS/SGC/CGC prices and vice versa
+        const combinedText = `${pp.source} ${pp.url || ""}`;
+        
+        // Filter 1: Exclude BGS Pristine/Black Label (commands 2-5x premium)
+        if (isBGSPremium(combinedText)) {
+          console.log(`[BGS PREMIUM FILTER] Excluded "${pp.source}" ($${pp.price}) - BGS Pristine/Black Label`);
+          return false;
+        }
+        
+        // Filter 2: Grader mismatch - If card is PSA, exclude BGS/SGC/CGC prices
         if (cardGrader) {
-          const sourceGrade = parseGradeInfo(pp.source);
+          const sourceGrade = parseGradeInfo(combinedText);
           if (sourceGrade.grader && sourceGrade.grader !== cardGrader) {
             console.log(`[GRADER FILTER] Excluded "${pp.source}" ($${pp.price}) - grader mismatch: ${sourceGrade.grader.toUpperCase()} vs ${cardGrader.toUpperCase()}`);
             return false;
           }
         }
+        
+        // Filter 3: Premium variations (only if card is a base card)
+        // Don't filter if the original card has these keywords
+        const cardHasPremium = hasPremiumKeyword(card.title + " " + (card.variation || ""));
+        if (!cardHasPremium) {
+          const premiumFound = hasPremiumKeyword(combinedText);
+          if (premiumFound) {
+            console.log(`[VARIATION FILTER] Excluded "${pp.source}" ($${pp.price}) - premium variation: ${premiumFound}`);
+            return false;
+          }
+        }
+        
         return true;
       });
       
