@@ -1463,11 +1463,12 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
     }
 
     // FILTER 2: Exclude results from wrong sets (Donruss vs Donruss Optic, etc.)
+    // Check source text, URL, and listing title for set mismatches
     const beforeSetFilter = allPricePoints.length;
     allPricePoints = allPricePoints.filter(pp => {
-      const sourceText = pp.source || "";
-      if (isWrongSet(sourceText, card.set)) {
-        console.log(`[SET FILTER] Excluded wrong set: "${pp.source}" - $${pp.price} (card set: ${card.set})`);
+      const combinedText = `${pp.source || ""} ${pp.url || ""} ${(pp as any).listingTitle || ""}`;
+      if (isWrongSet(combinedText, card.set)) {
+        console.log(`[SET FILTER] Excluded wrong set: "${pp.source}" - $${pp.price} (URL: ${pp.url})`);
         return false;
       }
       return true;
