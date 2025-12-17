@@ -95,6 +95,7 @@ const addCardSchema = z.object({
   title: z.string().min(1, "Title is required").max(255, "Title is too long"),
   set: z.string().max(255).optional(),
   year: z.coerce.number().min(1800).max(new Date().getFullYear() + 1).optional().or(z.literal("")),
+  cardNumber: z.string().max(50).optional(),
   variation: z.string().max(255).optional(),
   grade: z.string().max(50).optional(),
   purchasePrice: z.coerce.number().min(0).optional().or(z.literal("")),
@@ -242,6 +243,7 @@ export default function CaseEdit() {
       title: "",
       set: "",
       year: "",
+      cardNumber: "",
       variation: "",
       grade: "",
       purchasePrice: "",
@@ -305,6 +307,7 @@ export default function CaseEdit() {
       const payload = {
         ...data,
         year: data.year === "" ? undefined : Number(data.year),
+        cardNumber: data.cardNumber === "" ? undefined : data.cardNumber,
         purchasePrice: data.purchasePrice === "" ? undefined : Number(data.purchasePrice),
         estimatedValue: data.estimatedValue === "" ? undefined : Number(data.estimatedValue),
       };
@@ -1125,7 +1128,7 @@ export default function CaseEdit() {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
                         <FormField
                           control={cardForm.control}
                           name="set"
@@ -1156,6 +1159,24 @@ export default function CaseEdit() {
                                   placeholder="1986"
                                   {...field}
                                   data-testid="input-card-year"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={cardForm.control}
+                          name="cardNumber"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Card # (optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="10"
+                                  {...field}
+                                  data-testid="input-card-number"
                                 />
                               </FormControl>
                               <FormMessage />

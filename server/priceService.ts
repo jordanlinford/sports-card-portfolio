@@ -10,6 +10,7 @@ interface CardInfo {
   title: string;
   set?: string | null;
   year?: number | null;
+  cardNumber?: string | null;
   variation?: string | null;
   grade?: string | null;
 }
@@ -131,7 +132,8 @@ function isStrictComp(
   const combined = `${listingTitle} ${listingSnippet}`.toLowerCase();
   
   // HARD GATE 1: Card number must match exactly if both have one
-  const cardNumber = extractCardNumber(card.title);
+  // Use explicit cardNumber field if provided, otherwise extract from title
+  const cardNumber = card.cardNumber || extractCardNumber(card.title);
   const listingNumber = extractCardNumber(listingTitle) || extractCardNumber(listingSnippet);
   
   if (cardNumber && listingNumber && cardNumber !== listingNumber) {
@@ -848,7 +850,7 @@ ${searchContext}
 Return JSON with pricePoints array, estimatedValue, salesFound, confidence (max "medium"), and confidenceReason.`
     : `Extract STRICT MATCH price points for this card:
 Card: ${card.title}
-Card Number: ${extractCardNumber(card.title) || "Not specified"}
+Card Number: ${card.cardNumber || extractCardNumber(card.title) || "Not specified"}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
 Variation: ${card.variation || "None"}
