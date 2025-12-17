@@ -1043,14 +1043,25 @@ export type ExposureRecommendation = {
   timingGuidance?: string; // When to buy guidance
 };
 
+// Reference comp from valuation service
+export type ReferenceComp = {
+  cardType: string;
+  estimatedValue: number;
+  liquidity: "high" | "medium" | "low";
+};
+
 // Evidence Panel - Supporting data (collapsed by default)
 export type EvidenceData = {
   compsSummary?: {
     available: boolean;
     median?: number;
+    low?: number;
+    high?: number;
     soldCount?: number;
+    source?: "live" | "modeled"; // Whether data is live market or modeled estimate
     recentSales?: Array<{ price: number; date: string; source: string }>;
   };
+  referenceComps?: ReferenceComp[]; // Synthetic reference cards with estimated values
   notes: string[]; // e.g., ["thin comps", "match quality medium"]
   newsSnippets?: string[]; // Recent news/hype if available
   lastUpdated?: string;

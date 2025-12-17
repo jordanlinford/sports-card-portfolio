@@ -3,6 +3,7 @@ import { db } from "./db";
 import { playerOutlookCache } from "@shared/schema";
 import { eq, and, gt, lt } from "drizzle-orm";
 import { classifyPlayer, getExposureRecommendations, type ClassificationInput, type ClassificationOutput } from "./playerClassificationEngine";
+import { calculateValuation } from "./valuationService";
 import type {
   PlayerOutlookResponse,
   PlayerOutlookRequest,
@@ -178,6 +179,11 @@ async function generatePlayerOutlookAI(
   verdict: PlayerVerdictResult;
   confidence: DataConfidence;
   dataQuality: DataConfidence;
+  discountAnalysis?: {
+    whyDiscounted: string[];
+    repricingCatalysts: string[];
+    trapRisks: string[];
+  };
 }> {
   // Build the system message with strict guardrails
   const systemMessage = `You are MyDisplayCase Player Outlook, a skeptical sports-card market analyst. You help collectors decide whether to invest in a player like a stock, and choose the right card exposure (Premium/Growth/Core/Speculative) based on risk, liquidity, and timing.
@@ -471,22 +477,32 @@ async function generateFreshOutlook(
     confidence,
   };
   
-  // Step 6: Build evidence
+  // Step 6: Calculate valuation using heuristic model
+  const valuation = calculateValuation(sport, classification, verdict.modifier);
+  
+  // Step 7: Build evidence with modeled valuation
   const evidence: EvidenceData = {
     compsSummary: {
-      available: false, // Will integrate with existing comps engine later
+      available: true,
+      median: valuation.estimatedRange.mid,
+      low: valuation.estimatedRange.low,
+      high: valuation.estimatedRange.high,
+      soldCount: undefined,
+      source: "modeled",
     },
+    referenceComps: valuation.referenceComps,
     notes: [
       snippets.length === 0 ? "Limited news data available" : `${snippets.length} recent news items analyzed`,
       `Classification: ${classification.stage} stage, ${classification.baseTemperature} market`,
-      "We use comps as supporting evidence — not as the decision driver.",
+      valuation.methodology,
+      "Modeled estimate - not live market data. Use as directional guidance.",
     ],
     newsSnippets: snippets.slice(0, 3),
     lastUpdated: new Date().toISOString(),
     dataQuality,
   };
   
-  // Step 7: Build response
+  // Step 8: Build response
   const response: PlayerOutlookResponse = {
     player: playerInfo,
     snapshot,

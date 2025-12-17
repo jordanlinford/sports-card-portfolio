@@ -501,12 +501,47 @@ function EvidencePanel({ evidence, cacheStatus }: { evidence: PlayerOutlookRespo
           <CardContent className="pt-0 space-y-4">
             {evidence.compsSummary?.available && evidence.compsSummary.median && (
               <div className="p-3 rounded-lg bg-muted/50">
-                <p className="text-sm font-medium mb-1">Comparable Sales</p>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>Median: ${evidence.compsSummary.median.toFixed(2)}</span>
-                  {evidence.compsSummary.soldCount && (
-                    <span>{evidence.compsSummary.soldCount} recent sales</span>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium">Price Estimate</p>
+                  {evidence.compsSummary.source === "modeled" && (
+                    <Badge variant="secondary" className="text-xs">
+                      Modeled Estimate
+                    </Badge>
                   )}
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="font-medium text-foreground">
+                    ${evidence.compsSummary.low?.toFixed(0) || evidence.compsSummary.median.toFixed(0)} - ${evidence.compsSummary.high?.toFixed(0) || evidence.compsSummary.median.toFixed(0)}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Mid: ${evidence.compsSummary.median.toFixed(0)}
+                  </span>
+                  {evidence.compsSummary.soldCount && (
+                    <span className="text-muted-foreground">{evidence.compsSummary.soldCount} recent sales</span>
+                  )}
+                </div>
+                {evidence.compsSummary.source === "modeled" && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Based on player profile, position, and market conditions. Not live market data.
+                  </p>
+                )}
+              </div>
+            )}
+            {evidence.referenceComps && evidence.referenceComps.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Reference Cards</p>
+                <div className="space-y-2">
+                  {evidence.referenceComps.map((comp, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm p-2 rounded bg-muted/30">
+                      <span className="text-muted-foreground">{comp.cardType}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">~${comp.estimatedValue}</span>
+                        <Badge variant="outline" className="text-xs capitalize">
+                          {comp.liquidity}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

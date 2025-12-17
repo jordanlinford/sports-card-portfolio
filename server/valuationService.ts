@@ -32,29 +32,30 @@ export interface ReferenceComp {
 type PositionArchetype = "premium" | "standard" | "specialist" | "depth";
 
 // Base price ranges by sport (for a mid-tier, neutral temperature player)
+// These are conservative - multipliers will scale them up appropriately
 const SPORT_BASE_RANGES: Record<string, { low: number; mid: number; high: number }> = {
-  football: { low: 8, mid: 20, high: 45 },
-  basketball: { low: 10, mid: 25, high: 55 },
-  baseball: { low: 6, mid: 15, high: 35 },
-  hockey: { low: 5, mid: 12, high: 28 },
-  soccer: { low: 7, mid: 18, high: 40 },
+  football: { low: 12, mid: 22, high: 35 },
+  basketball: { low: 15, mid: 28, high: 45 },
+  baseball: { low: 8, mid: 16, high: 28 },
+  hockey: { low: 6, mid: 12, high: 22 },
+  soccer: { low: 10, mid: 20, high: 35 },
 };
 
-// Position premium multipliers by sport
+// Position premium multipliers by sport - calibrated to produce realistic ranges
 const POSITION_MULTIPLIERS: Record<string, Record<string, number>> = {
   football: {
-    QB: 2.0,
-    RB: 1.4,
-    WR: 1.3,
-    TE: 1.0,
+    QB: 1.5,
+    RB: 1.2,
+    WR: 1.15,
+    TE: 0.9,
     K: 0.3,
-    DEF: 0.6,
-    LB: 0.7,
-    DB: 0.7,
-    CB: 0.7,
-    S: 0.7,
-    DL: 0.6,
-    OL: 0.4,
+    DEF: 0.5,
+    LB: 0.6,
+    DB: 0.6,
+    CB: 0.6,
+    S: 0.6,
+    DL: 0.55,
+    OL: 0.35,
   },
   basketball: {
     PG: 1.3,
@@ -98,33 +99,33 @@ const POSITION_MULTIPLIERS: Record<string, Record<string, number>> = {
   },
 };
 
-// Stage multipliers (career phase impact on card value)
+// Stage multipliers (career phase impact on card value) - kept modest to avoid compounding
 const STAGE_MULTIPLIERS: Record<PlayerStage, number> = {
-  PROSPECT: 1.2,      // Pre-rookie hype
-  ROOKIE: 1.5,        // Rookie premium
-  YEAR_2: 1.4,        // Sophomore breakout potential
+  PROSPECT: 1.1,      // Pre-rookie hype
+  ROOKIE: 1.25,       // Rookie premium (reduced from 1.5)
+  YEAR_2: 1.15,       // Sophomore breakout potential
   PRIME: 1.0,         // Peak value baseline
-  VETERAN: 0.7,       // Declining demand
-  AGING: 0.5,         // Late career
-  RETIRED: 0.4,       // Legacy play only
-  RETIRED_HOF: 0.8,   // HOF trajectory premium
+  VETERAN: 0.75,      // Declining demand
+  AGING: 0.55,        // Late career
+  RETIRED: 0.45,      // Legacy play only
+  RETIRED_HOF: 0.85,  // HOF trajectory premium
 };
 
-// Temperature multipliers (market heat)
+// Temperature multipliers (market heat) - kept modest to avoid compounding
 const TEMPERATURE_MULTIPLIERS: Record<MarketTemperature, number> = {
-  HOT: 1.6,
-  WARM: 1.2,
+  HOT: 1.35,
+  WARM: 1.1,
   NEUTRAL: 1.0,
-  COOLING: 0.75,
+  COOLING: 0.8,
 };
 
-// Tier multipliers for exposure recommendations
+// Tier multipliers for exposure recommendations - kept modest
 const TIER_MULTIPLIERS: Record<string, number> = {
-  Premium: 2.5,
-  Growth: 1.5,
+  Premium: 1.6,
+  Growth: 1.15,
   Core: 1.0,
-  Speculative: 0.6,
-  Common: 0.3,
+  Speculative: 0.7,
+  Common: 0.4,
 };
 
 // Reference card templates by tier
@@ -184,8 +185,11 @@ function determinePrimaryTier(classification: ClassificationOutput): string {
   if (classification.baseTemperature === "HOT" && classification.stage === "ROOKIE") {
     return "Speculative";
   }
-  if (classification.baseTemperature === "WARM") {
-    return classification.stage === "YEAR_2" ? "Growth" : "Core";
+  if (classification.baseTemperature === "WARM" || classification.baseTemperature === "HOT") {
+    if (classification.stage === "YEAR_2" || classification.stage === "ROOKIE") {
+      return "Growth";
+    }
+    return classification.stage === "PRIME" ? "Premium" : "Core";
   }
   if (classification.stage === "ROOKIE" || classification.stage === "YEAR_2" || classification.stage === "PROSPECT") {
     return "Growth";
@@ -210,15 +214,18 @@ export function calculateValuation(
   const primaryTier = determinePrimaryTier(classification);
   const tierMult = TIER_MULTIPLIERS[primaryTier] || 1.0;
   
-  // Apply modifiers based on verdict
+  // Apply modifiers based on verdict - kept subtle
   let verdictAdjust = 1.0;
-  if (verdictModifier === "Momentum") verdictAdjust = 1.15;
-  if (verdictModifier === "Value") verdictAdjust = 0.85;
-  if (verdictModifier === "Late Cycle") verdictAdjust = 1.1;
-  if (verdictModifier === "Speculative") verdictAdjust = 0.9;
+  if (verdictModifier === "Momentum") verdictAdjust = 1.05;
+  if (verdictModifier === "Value") verdictAdjust = 0.9;
+  if (verdictModifier === "Late Cycle") verdictAdjust = 1.05;
+  if (verdictModifier === "Speculative") verdictAdjust = 0.95;
   
-  // Calculate final range
-  const totalMult = positionMult * stageMult * tempMult * tierMult * verdictAdjust;
+  // Calculate final range with cap to prevent extreme compounding
+  let totalMult = positionMult * stageMult * tempMult * tierMult * verdictAdjust;
+  // Cap multiplier to prevent unrealistic extremes
+  totalMult = Math.min(totalMult, 4.0); // Cap at 4x base
+  totalMult = Math.max(totalMult, 0.25); // Floor at 0.25x base
   
   const estimatedRange = {
     low: Math.round(baseRange.low * totalMult),
