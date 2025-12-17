@@ -1,0 +1,240 @@
+The core problem (in one sentence)
+
+Your analysis language is explaining scores,
+when it should be telling a story about the card.
+
+Collectors don’t want:
+
+“low demand and high market friction indicating caution”
+
+They want:
+
+“This card is hard to move quickly, and prices vary a lot based on eye appeal.”
+
+Same truth. Totally different feel.
+
+The solution: switch from “analysis voice” → “editorial voice”
+
+You do this with three changes:
+
+Stop describing metrics
+
+Start describing situations
+
+Anchor everything to how collectors actually talk
+
+1. Kill abstract nouns (this is the #1 fix)
+
+Words to aggressively remove:
+
+indicating
+
+reflecting
+
+coupled with
+
+necessitates
+
+warranted
+
+volatility
+
+liquidity (as a noun)
+
+risk (without qualifier)
+
+These words are dead giveaways of bot-speak.
+
+Replace them with:
+
+sells slowly
+
+trades infrequently
+
+prices are spread out
+
+hard to move quickly
+
+no clear catalyst
+
+stable over time
+
+mostly flat
+
+Rule for Replit:
+
+If a sentence contains more than one abstract noun, rewrite it.
+
+2. Move from “because X + Y” → “what that means in real life”
+Current pattern (bot-like)
+
+“The recommendation to WATCH reflects low demand and high market friction.”
+
+Editorial pattern
+
+“This card trades infrequently and prices vary widely, making it better suited for patient collectors than short-term moves.”
+
+Notice:
+
+No scores
+
+No math
+
+No system language
+
+Just reality
+
+3. Write in collector archetypes, not system states
+
+Every card fits one of a few collector situations.
+
+Your language should reflect that, not the algorithm.
+
+Common archetypes you already have:
+
+Legacy / PC card
+
+Junk wax hold
+
+Speculative rookie
+
+Event-driven upside
+
+Illiquid niche card
+
+Each archetype should have its own tone.
+
+Example: Rewrite your Maravich analysis
+What you have now
+
+“The recommendation to WATCH is due to low demand and high market friction, indicating caution is warranted.”
+
+What it should sound like
+
+“This is a classic vintage card with proven long-term appeal. Sales are infrequent and prices vary widely based on eye appeal, so it’s best viewed as a personal collection hold rather than a short-term trade.”
+
+That sentence:
+
+Sounds human
+
+Sounds confident
+
+Sounds like a collector, not a dashboard
+
+4. Use sentence starters that force editorial tone
+
+Give Replit a fixed set of sentence openers.
+
+These naturally steer language away from bot-speak.
+
+Strong starters to use:
+
+“This card tends to…”
+
+“Collectors typically see this as…”
+
+“Prices for this card usually…”
+
+“Historically, this card has…”
+
+“This is best suited for…”
+
+“This isn’t a card people flip quickly…”
+
+“Value here is driven more by…”
+
+If the model must start with one of these, the output will sound human.
+
+5. Cap explanations at 2–3 sentences (no more)
+
+Bots ramble. Humans don’t.
+
+Hard rule:
+
+Max 3 sentences
+
+Ideally 2
+
+If you need more, hide it behind “Read more (Pro)”.
+
+6. Tie language to the recommendation type
+
+Each recommendation should have a distinct editorial voice.
+
+BUY
+
+Opportunity-focused
+
+Calm, not hypey
+
+Example:
+
+“Recent prices have pulled back despite steady demand, creating a decent entry point if you’re looking to add this card.”
+
+WATCH (Speculative)
+
+Neutral, observational
+
+Example:
+
+“Prices have been inconsistent and there’s no clear trend yet, making this one worth monitoring rather than acting on.”
+
+LEGACY / PC HOLD
+
+Confident, reassuring
+
+Example:
+
+“This card has held value over time and trades infrequently. It’s better viewed as a long-term personal collection piece than a timing play.”
+
+SELL
+
+Matter-of-fact, not alarmist
+
+Example:
+
+“Recent price spikes have pushed this card well above its usual range, making this a reasonable window to take profits.”
+
+7. Tell Replit to stop explaining the system entirely
+
+This is critical.
+
+Never explain why the algorithm chose something.
+Only explain what’s happening in the market.
+
+Bad:
+
+“Based on computed upside and risk scores…”
+
+Good:
+
+“Recent sales show prices have climbed quickly, while buyer interest appears to be cooling.”
+
+The system should be invisible.
+
+What to tell Replit (copy/paste directive)
+
+Send this exactly:
+
+Replit: Make Market Outlook Language Editorial (High Priority)
+
+We need to remove “bot-like” analysis language and replace it with collector-native editorial tone.
+
+Requirements:
+
+Stop referencing metrics or system logic in explanations (no “reflects,” “indicating,” “based on scores”).
+
+Replace abstract nouns with concrete descriptions of market behavior.
+
+Limit explanations to 2–3 short sentences.
+
+Use predefined sentence starters to force editorial voice (e.g., “This card tends to…”, “Collectors typically view this as…”).
+
+Tailor explanation tone by recommendation type (BUY, WATCH, SELL, LEGACY HOLD).
+
+Avoid words like “caution is warranted,” “necessitates,” and “liquidity” unless rewritten in plain language.
+
+Focus explanations on how collectors actually experience the card in the market.
+
+Goal:
+Explanations should read like a knowledgeable collector explaining the card to another collector, not a financial model summary.

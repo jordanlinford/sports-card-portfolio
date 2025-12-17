@@ -374,15 +374,21 @@ export function computeAction(
     return { action: "LITTLE_VALUE", reasons };
   }
   
-  // LEGACY_HOLD: Vintage cards (25+ years) with HOF/cultural relevance + no parabolic movement
+  // LEGACY_HOLD: Vintage cards (25+ years) with HOF/cultural relevance
   // LEGEND status indicates HOF or cultural icon (detected from title keywords)
   // Vintage RETIRED with significant value (>$50) also qualifies as collectible legacy piece
+  // NOTE: We do NOT gate on volatility - vintage cards have high price variance due to
+  // eye appeal, condition subjectivity, and infrequent sales. That's normal, not risky.
+  // Only gate on trendScore to detect true parabolic movements (speculative spikes).
   const hasLegacyRelevance = careerStage === "LEGEND" || 
     (isVintage && careerStage === "RETIRED" && marketValue !== null && marketValue >= 50);
   
-  if (isVintage && hasLegacyRelevance && trendScore <= 7 && volatilityScore <= 6) {
-    reasons.push("Vintage card with proven long-term demand");
-    reasons.push("Prices stable - no recent parabolic movement");
+  // Parabolic detection: only very high trend scores (8+) indicate speculative spike
+  const isNotParabolic = trendScore <= 7;
+  
+  if (isVintage && hasLegacyRelevance && isNotParabolic) {
+    reasons.push("Vintage card with proven long-term collector demand");
+    reasons.push("Established market - no speculative price spike");
     if (careerStage === "LEGEND") reasons.push("Hall of Fame / cultural icon status");
     reasons.push("Best suited as personal collection hold");
     return { action: "LEGACY_HOLD", reasons };
@@ -729,10 +735,27 @@ export function computeAllSignals(
     dataConfidence
   );
   
-  // LEGACY_HOLD: Cap downside risk to LOW (max 25) - these are stable long-term assets
-  // Also cap upside to reflect "limited/steady" rather than speculative growth
-  const finalDownsideRisk = action === "LEGACY_HOLD" ? Math.min(downsideRisk, 25) : downsideRisk;
-  const finalUpsideScore = action === "LEGACY_HOLD" ? Math.min(upsideScore, 40) : upsideScore;
+  // Vintage+Retired: Cap downside risk regardless of action
+  // Illiquidity and price variance ≠ downside risk for established vintage cards
+  // This applies to ALL vintage retired/legend cards, not just LEGACY_HOLD
+  const currentYear = new Date().getFullYear();
+  const cardAge = card.year ? currentYear - card.year : 0;
+  const isVintage = cardAge >= 25;
+  const isRetiredOrLegend = careerStageAuto === "RETIRED" || careerStageAuto === "LEGEND";
+  
+  // For vintage retired/legend cards: cap downside risk at 35 (low-medium)
+  // For LEGACY_HOLD specifically: cap at 25 (low)
+  let finalDownsideRisk = downsideRisk;
+  let finalUpsideScore = upsideScore;
+  
+  if (action === "LEGACY_HOLD") {
+    // LEGACY_HOLD gets the strictest cap: downside LOW, upside LIMITED
+    finalDownsideRisk = Math.min(downsideRisk, 25);
+    finalUpsideScore = Math.min(upsideScore, 40);
+  } else if (isVintage && isRetiredOrLegend) {
+    // Other vintage retired cards still get downside cap at MEDIUM max
+    finalDownsideRisk = Math.min(downsideRisk, 50);
+  }
   
   return {
     trendScore,
