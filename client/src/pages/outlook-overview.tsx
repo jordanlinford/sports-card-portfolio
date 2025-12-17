@@ -202,7 +202,7 @@ export default function OutlookOverviewPage() {
   if (!isAuthenticated && !authLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <h2 className="text-2xl font-bold mb-4">Sign in to view Card Outlook AI</h2>
+        <h2 className="text-2xl font-bold mb-4">Sign in to view Market Outlook</h2>
         <p className="text-muted-foreground mb-6">Get AI-powered buy/sell recommendations for your card collection.</p>
         <a href="/api/login">
           <Button data-testid="button-signin">Sign In</Button>
@@ -216,7 +216,7 @@ export default function OutlookOverviewPage() {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <Zap className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Card Outlook AI</h1>
+          <h1 className="text-3xl font-bold" data-testid="text-page-title">Market Outlook</h1>
         </div>
         <p className="text-muted-foreground">
           AI-powered analysis of your cards with buy, sell, and hold recommendations based on market signals.
@@ -229,8 +229,8 @@ export default function OutlookOverviewPage() {
             <div className="flex items-center gap-3">
               <Crown className="h-6 w-6 text-primary" />
               <div>
-                <p className="font-medium">Upgrade to Pro for full access</p>
-                <p className="text-sm text-muted-foreground">Get AI recommendations and Big Mover alerts for all your cards.</p>
+                <p className="font-medium">Upgrade to Pro for full Market Outlook</p>
+                <p className="text-sm text-muted-foreground">Get AI recommendations, Big Mover alerts, and detailed analysis for all your cards.</p>
               </div>
             </div>
             <Link href="/upgrade">

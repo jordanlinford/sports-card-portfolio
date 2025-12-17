@@ -150,7 +150,7 @@ export function Navigation() {
                     <DropdownMenuItem asChild>
                       <Link href="/outlook" className="flex items-center gap-2 cursor-pointer" data-testid="link-outlook">
                         <Zap className="h-4 w-4" />
-                        Card Outlook AI
+                        Market Outlook
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
