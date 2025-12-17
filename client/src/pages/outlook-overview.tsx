@@ -31,7 +31,9 @@ import {
   Upload,
   Image as ImageIcon,
   CheckCircle,
-  XCircle
+  XCircle,
+  Trophy,
+  MinusCircle
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -46,6 +48,8 @@ function getActionIcon(action: string | null) {
     case "SELL": return <TrendingDown className="h-3 w-3" />;
     case "WATCH": return <Eye className="h-3 w-3" />;
     case "LONG_HOLD": return <Clock className="h-3 w-3" />;
+    case "LEGACY_HOLD": return <Trophy className="h-3 w-3" />;
+    case "LITTLE_VALUE": return <MinusCircle className="h-3 w-3" />;
     default: return null;
   }
 }
@@ -56,7 +60,21 @@ function getActionColor(action: string | null) {
     case "SELL": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
     case "WATCH": return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20";
     case "LONG_HOLD": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+    case "LEGACY_HOLD": return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
+    case "LITTLE_VALUE": return "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
     default: return "bg-muted text-muted-foreground";
+  }
+}
+
+function getActionLabel(action: string | null): string {
+  switch (action) {
+    case "BUY": return "BUY";
+    case "SELL": return "SELL";
+    case "WATCH": return "WATCH";
+    case "LONG_HOLD": return "LONG HOLD";
+    case "LEGACY_HOLD": return "LEGACY HOLD";
+    case "LITTLE_VALUE": return "LOW VALUE";
+    default: return action ?? "";
   }
 }
 
@@ -420,7 +438,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="outline" className={`gap-1 ${getActionColor(result.action)}`}>
                         {getActionIcon(result.action)}
-                        {result.action}
+                        {getActionLabel(result.action)}
                       </Badge>
                       {result.bigMover.flag && (
                         <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 gap-1">
@@ -661,7 +679,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
           <>
             <Badge variant="outline" className={`gap-1 ${getActionColor(card.outlookAction)}`}>
               {getActionIcon(card.outlookAction)}
-              {card.outlookAction}
+              {getActionLabel(card.outlookAction)}
             </Badge>
             {showDetails && card.outlookUpsideScore !== null && (
               <div className="text-xs text-muted-foreground hidden sm:block">

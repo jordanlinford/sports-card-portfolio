@@ -22,8 +22,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  MinusCircle,
   DollarSign,
   Calendar,
+  Clock,
   Info,
   Sun,
   Trophy,
@@ -66,7 +68,7 @@ interface OutlookData {
   playerName: string | null;
   sport: string | null;
   position: string | null;
-  action: "BUY" | "WATCH" | "SELL";
+  action: "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
   upsideScore: number;
   riskScore: number;
   confidenceScore: number;
@@ -98,7 +100,9 @@ interface OutlookData {
   seasonalContext?: SeasonalContext;
 }
 
-function getActionColor(action: "BUY" | "WATCH" | "SELL"): string {
+type OutlookAction = "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
+
+function getActionColor(action: OutlookAction): string {
   switch (action) {
     case "BUY":
       return "bg-green-600 text-white";
@@ -106,10 +110,18 @@ function getActionColor(action: "BUY" | "WATCH" | "SELL"): string {
       return "bg-red-600 text-white";
     case "WATCH":
       return "bg-amber-500 text-white";
+    case "LONG_HOLD":
+      return "bg-blue-600 text-white";
+    case "LEGACY_HOLD":
+      return "bg-indigo-600 text-white";
+    case "LITTLE_VALUE":
+      return "bg-slate-500 text-white";
+    default:
+      return "bg-muted text-muted-foreground";
   }
 }
 
-function getActionIcon(action: "BUY" | "WATCH" | "SELL") {
+function getActionIcon(action: OutlookAction) {
   switch (action) {
     case "BUY":
       return <ArrowUpRight className="h-4 w-4" />;
@@ -117,6 +129,33 @@ function getActionIcon(action: "BUY" | "WATCH" | "SELL") {
       return <ArrowDownRight className="h-4 w-4" />;
     case "WATCH":
       return <Minus className="h-4 w-4" />;
+    case "LONG_HOLD":
+      return <Clock className="h-4 w-4" />;
+    case "LEGACY_HOLD":
+      return <Trophy className="h-4 w-4" />;
+    case "LITTLE_VALUE":
+      return <MinusCircle className="h-4 w-4" />;
+    default:
+      return <Minus className="h-4 w-4" />;
+  }
+}
+
+function getActionLabel(action: OutlookAction): string {
+  switch (action) {
+    case "BUY":
+      return "BUY";
+    case "SELL":
+      return "SELL";
+    case "WATCH":
+      return "WATCH";
+    case "LONG_HOLD":
+      return "LONG HOLD";
+    case "LEGACY_HOLD":
+      return "LEGACY HOLD";
+    case "LITTLE_VALUE":
+      return "LOW VALUE";
+    default:
+      return action;
   }
 }
 
@@ -256,7 +295,7 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
           </div>
           <Badge className={`${getActionColor(outlook.action)} gap-1`} data-testid="badge-outlook-action">
             {getActionIcon(outlook.action)}
-            {outlook.action}
+            {getActionLabel(outlook.action)}
           </Badge>
         </div>
         {outlook.generatedAt && (
