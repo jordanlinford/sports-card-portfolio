@@ -114,6 +114,10 @@ type OutlookData = {
     long?: string;
     bullets?: string[];
   };
+  bigMover?: {
+    flag: boolean;
+    reason?: string | null;
+  };
   generatedAt: string;
   cached?: boolean;
   stale?: boolean;
@@ -414,6 +418,15 @@ export default function CardOutlookPage() {
                       {outlook.careerStage}
                     </Badge>
                   )}
+                  {outlook.bigMover?.flag && (
+                    <Badge 
+                      className="bg-purple-500/20 border-purple-500 border text-foreground gap-1"
+                      data-testid="badge-big-mover"
+                    >
+                      <Zap className="h-3 w-3" />
+                      Big Mover
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -459,6 +472,24 @@ export default function CardOutlookPage() {
                 <span className={`text-sm font-medium ${confidenceStyle.color}`}>
                   {outlook.confidence?.level}
                 </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {outlook?.bigMover?.flag && outlook?.bigMover?.reason && (
+        <Card className="mb-6 bg-purple-500/10 border-purple-500/50 border">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-purple-500/20">
+                <Zap className="h-5 w-5 text-purple-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold mb-1">Big Mover Potential</h3>
+                <p className="text-sm text-muted-foreground">
+                  {outlook.bigMover.reason}
+                </p>
               </div>
             </div>
           </CardContent>
