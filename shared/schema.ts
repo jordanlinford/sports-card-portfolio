@@ -908,3 +908,197 @@ export type CompsQueryFilters = {
   grader?: string;
   cardNumber?: string;
 };
+
+// ==================== PLAYER OUTLOOK V2 TYPES ====================
+// Player = Stock, Cards = Exposure Vehicles
+
+// Market Temperature - How hot is this player in the market right now?
+export const MARKET_TEMPERATURE = {
+  HOT: "HOT",         // High demand, rising prices, lots of activity
+  WARM: "WARM",       // Moderate demand, stable or slight gains
+  NEUTRAL: "NEUTRAL", // Baseline activity, no strong signals
+  COOLING: "COOLING", // Declining interest, falling prices
+} as const;
+export type MarketTemperature = keyof typeof MARKET_TEMPERATURE;
+
+// Volatility - How much do prices swing?
+export const VOLATILITY_LEVEL = {
+  LOW: "LOW",       // Stable, predictable pricing
+  MEDIUM: "MEDIUM", // Normal fluctuation
+  HIGH: "HIGH",     // Wild swings, speculative
+} as const;
+export type VolatilityLevel = keyof typeof VOLATILITY_LEVEL;
+
+// Risk Level - Overall investment risk
+export const RISK_LEVEL = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+} as const;
+export type RiskLevel = keyof typeof RISK_LEVEL;
+
+// Investment Horizon - Time frame for the thesis
+export const INVESTMENT_HORIZON = {
+  SHORT: "SHORT",   // 1-3 months
+  MID: "MID",       // 3-12 months
+  LONG: "LONG",     // 1+ years
+} as const;
+export type InvestmentHorizon = keyof typeof INVESTMENT_HORIZON;
+
+// Player Career Stage (extended from existing)
+export const PLAYER_STAGE = {
+  PROSPECT: "PROSPECT",     // Pre-rookie, draft eligible
+  ROOKIE: "ROOKIE",         // First year
+  YEAR_2: "YEAR_2",         // Sophomore, often breakout year
+  PRIME: "PRIME",           // Peak performance years
+  VETERAN: "VETERAN",       // Later career, established
+  AGING: "AGING",           // Declining performance
+  RETIRED: "RETIRED",       // No longer playing
+  RETIRED_HOF: "RETIRED_HOF", // Hall of Fame bound
+} as const;
+export type PlayerStage = keyof typeof PLAYER_STAGE;
+
+// Investment Verdict - The main action recommendation
+export const PLAYER_VERDICT = {
+  BUY: "BUY",     // Accumulate cards for this player
+  WATCH: "WATCH", // Monitor, don't rush to buy
+  AVOID: "AVOID", // Stay away, high risk or declining
+} as const;
+export type PlayerVerdict = keyof typeof PLAYER_VERDICT;
+
+// Stock Tier - Card exposure type
+export const STOCK_TIER = {
+  PREMIUM: "PREMIUM",         // Blue chip: autos, low serial, case hits
+  GROWTH: "GROWTH",           // Flagship silvers, quality parallels
+  CORE: "CORE",               // Standard rookies in good brands
+  COMMON: "COMMON",           // Base cards, volume plays
+  SPECULATIVE: "SPECULATIVE", // Niche sets, weird parallels, lottery tickets
+} as const;
+export type StockTier = keyof typeof STOCK_TIER;
+
+// Liquidity Level - How easy to buy/sell
+export const LIQUIDITY_LEVEL = {
+  HIGH: "HIGH",     // Lots of buyers and sellers
+  MEDIUM: "MEDIUM", // Moderate activity
+  LOW: "LOW",       // Hard to find buyers
+} as const;
+export type LiquidityLevel = keyof typeof LIQUIDITY_LEVEL;
+
+// Buyer Profile - Who is this card type for?
+export const BUYER_PROFILE = {
+  FLIPPER: "FLIPPER",       // Quick turnaround, price arbitrage
+  COLLECTOR: "COLLECTOR",   // Long-term hold, personal collection
+  INVESTOR: "INVESTOR",     // Growth-focused, portfolio mindset
+  BUDGET: "BUDGET",         // Value-conscious, entry-level
+} as const;
+export type BuyerProfile = keyof typeof BUYER_PROFILE;
+
+// Player Snapshot - Quick market read
+export type PlayerSnapshot = {
+  temperature: MarketTemperature;
+  volatility: VolatilityLevel;
+  risk: RiskLevel;
+  horizon: InvestmentHorizon;
+  confidence: DataConfidence; // Confidence in the thesis, not comps
+};
+
+// Player basic info
+export type PlayerInfo = {
+  name: string;
+  sport: string;
+  position?: string;
+  team?: string;
+  stage: PlayerStage;
+  rookieYear?: number;
+  inferred?: boolean; // True if position/team were AI-inferred
+};
+
+// Investment Verdict with explanation
+export type PlayerVerdictResult = {
+  action: PlayerVerdict;
+  summary: string; // 2-4 sentence explanation
+  whatMustBeTrue?: string[]; // Simple checklist for the thesis to work
+};
+
+// Card Exposure Recommendation
+export type ExposureRecommendation = {
+  tier: StockTier;
+  cardTargets: string[]; // e.g., ["Optic Rated Rookie Holo", "Prizm Silver RC"]
+  why: string;
+  liquidity: LiquidityLevel;
+  riskNote: string;
+  buyerProfile: BuyerProfile;
+};
+
+// Evidence Panel - Supporting data (collapsed by default)
+export type EvidenceData = {
+  compsSummary?: {
+    available: boolean;
+    median?: number;
+    soldCount?: number;
+    recentSales?: Array<{ price: number; date: string; source: string }>;
+  };
+  notes: string[]; // e.g., ["thin comps", "match quality medium"]
+  newsSnippets?: string[]; // Recent news/hype if available
+  lastUpdated?: string;
+};
+
+// Full Player Outlook Response
+export type PlayerOutlookResponse = {
+  player: PlayerInfo;
+  snapshot: PlayerSnapshot;
+  thesis: string[]; // 3-6 bullet points
+  verdict: PlayerVerdictResult;
+  exposures: ExposureRecommendation[];
+  evidence: EvidenceData;
+  generatedAt: string;
+  cacheStatus?: "fresh" | "stale" | "miss";
+};
+
+// Player Outlook Request
+export type PlayerOutlookRequest = {
+  playerName: string;
+  sport?: string; // Optional, can be inferred
+  contextCard?: {
+    set?: string;
+    year?: number;
+    parallel?: string;
+  };
+};
+
+// Player Outlook Cache table
+export const playerOutlookCache = pgTable("player_outlook_cache", {
+  id: serial("id").primaryKey(),
+  playerKey: varchar("player_key", { length: 128 }).notNull().unique(), // normalized: sport:playername
+  sport: varchar("sport", { length: 50 }).notNull(),
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  
+  // Classification outputs (deterministic)
+  classificationJson: jsonb("classification_json").$type<{
+    stage: PlayerStage;
+    position?: string;
+    team?: string;
+    rookieYear?: number;
+    baseTemperature: MarketTemperature;
+    baseVolatility: VolatilityLevel;
+    baseRisk: RiskLevel;
+    baseHorizon: InvestmentHorizon;
+  }>(),
+  
+  // Full outlook response
+  outlookJson: jsonb("outlook_json").$type<PlayerOutlookResponse>(),
+  
+  // Cache management
+  temperature: varchar("temperature", { length: 20 }), // For TTL decisions
+  lastFetchedAt: timestamp("last_fetched_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_player_outlook_key").on(table.playerKey),
+  index("idx_player_outlook_expires").on(table.expiresAt),
+  index("idx_player_outlook_sport").on(table.sport),
+]);
+
+export type PlayerOutlookCache = typeof playerOutlookCache.$inferSelect;
+export type InsertPlayerOutlookCache = typeof playerOutlookCache.$inferInsert;
