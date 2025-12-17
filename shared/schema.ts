@@ -731,3 +731,43 @@ export const DATA_CONFIDENCE = {
 } as const;
 
 export type DataConfidence = keyof typeof DATA_CONFIDENCE;
+
+// Card Match Confidence - validates pricing data matches the correct card
+export const MATCH_CONFIDENCE_TIERS = {
+  HIGH: "HIGH",
+  MEDIUM: "MEDIUM",
+  LOW: "LOW",
+} as const;
+
+export type MatchConfidenceTier = keyof typeof MATCH_CONFIDENCE_TIERS;
+
+// Individual matched attributes for a pricing sample
+export type MatchedAttributes = {
+  player: boolean;
+  year: boolean;
+  set: boolean;
+  variation: boolean;
+  grade: boolean;
+  rookie: boolean;
+};
+
+// A sampled listing with match score and matched attributes
+export type MatchSample = {
+  title: string;
+  snippet?: string;
+  source: string;
+  url?: string;
+  price?: number;
+  matchScore: number; // 0-1
+  matched: MatchedAttributes;
+};
+
+// Card Match Confidence result
+export type CardMatchConfidence = {
+  tier: MatchConfidenceTier;
+  score: number; // 0-1 aggregate score
+  reason: string;
+  matchedComps: number; // Number of comps with High match
+  totalComps: number;
+  samples: MatchSample[]; // Up to 5 sampled listings for review
+};
