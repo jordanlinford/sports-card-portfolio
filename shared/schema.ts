@@ -774,3 +774,130 @@ export type CardMatchConfidence = {
   totalComps: number;
   samples: MatchSample[]; // Up to 5 sampled listings for review
 };
+
+// eBay Market Comps Cache - stores scraped sold listings with aggregations
+export const marketCompsCache = pgTable("market_comps_cache", {
+  id: serial("id").primaryKey(),
+  queryHash: varchar("query_hash", { length: 64 }).notNull().unique(),
+  canonicalQuery: text("canonical_query").notNull(),
+  
+  // Parsed filters from the query
+  filters: jsonb("filters").$type<{
+    player?: string;
+    year?: number;
+    set?: string;
+    parallel?: string;
+    grade?: string;
+    grader?: string;
+    cardNumber?: string;
+  }>().default({}),
+  
+  // Raw comps data
+  soldCount: integer("sold_count").default(0).notNull(),
+  compsJson: jsonb("comps_json").$type<Array<{
+    title: string;
+    soldPrice: number;
+    shippingPrice?: number;
+    totalPrice: number;
+    soldDate?: string;
+    itemUrl?: string;
+    imageUrl?: string;
+    condition?: string;
+    isBestOffer?: boolean;
+    matchScore: number;
+  }>>().default([]),
+  
+  // Aggregated summary
+  summaryJson: jsonb("summary_json").$type<{
+    soldCount: number;
+    medianPrice: number;
+    meanPrice: number;
+    minPrice: number;
+    maxPrice: number;
+    volatility: number;
+    liquidity: number;
+    trendSeries: Array<{ week: string; medianPrice: number; count: number }>;
+    trendSlope: number;
+  }>(),
+  
+  // Confidence based on sold count + match quality
+  confidence: varchar("confidence", { length: 10 }).default("LOW").notNull(), // HIGH | MED | LOW
+  avgMatchScore: real("avg_match_score").default(0),
+  
+  // Fetch status
+  fetchStatus: varchar("fetch_status", { length: 20 }).default("pending").notNull(), // pending | fetching | complete | failed
+  fetchError: text("fetch_error"),
+  pagesScraped: integer("pages_scraped").default(0),
+  itemsFound: integer("items_found").default(0),
+  itemsKept: integer("items_kept").default(0),
+  
+  // Cache management
+  lastFetchedAt: timestamp("last_fetched_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_market_comps_query_hash").on(table.queryHash),
+  index("idx_market_comps_expires_at").on(table.expiresAt),
+  index("idx_market_comps_fetch_status").on(table.fetchStatus),
+]);
+
+// Comps confidence enum
+export const COMPS_CONFIDENCE = {
+  HIGH: "HIGH",
+  MED: "MED",
+  LOW: "LOW",
+} as const;
+
+export type CompsConfidence = keyof typeof COMPS_CONFIDENCE;
+
+// Fetch status enum
+export const FETCH_STATUS = {
+  PENDING: "pending",
+  FETCHING: "fetching",
+  COMPLETE: "complete",
+  FAILED: "failed",
+} as const;
+
+export type FetchStatus = typeof FETCH_STATUS[keyof typeof FETCH_STATUS];
+
+// Types for market comps
+export type MarketCompsCache = typeof marketCompsCache.$inferSelect;
+export type InsertMarketCompsCache = typeof marketCompsCache.$inferInsert;
+
+// Individual comp type
+export type EbayComp = {
+  title: string;
+  soldPrice: number;
+  shippingPrice?: number;
+  totalPrice: number;
+  soldDate?: string;
+  itemUrl?: string;
+  imageUrl?: string;
+  condition?: string;
+  isBestOffer?: boolean;
+  matchScore: number;
+};
+
+// Summary aggregations type
+export type CompsSummary = {
+  soldCount: number;
+  medianPrice: number;
+  meanPrice: number;
+  minPrice: number;
+  maxPrice: number;
+  volatility: number;
+  liquidity: number;
+  trendSeries: Array<{ week: string; medianPrice: number; count: number }>;
+  trendSlope: number;
+};
+
+// Query filters type
+export type CompsQueryFilters = {
+  player?: string;
+  year?: number;
+  set?: string;
+  parallel?: string;
+  grade?: string;
+  grader?: string;
+  cardNumber?: string;
+};

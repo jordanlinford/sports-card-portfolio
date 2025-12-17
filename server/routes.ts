@@ -1699,6 +1699,55 @@ Allow: /
       // Filter outliers to get tighter price range
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
+      // Check for eBay comps data
+      const { normalizeEbayQuery, getCachedComps, getCacheEntry, enqueueFetchJob } = await import("./ebayCompsService");
+      
+      // Build query for comps lookup
+      const compsQueryParts = [title];
+      if (year) compsQueryParts.unshift(String(year));
+      if (set) compsQueryParts.push(set);
+      if (variation) compsQueryParts.push(variation);
+      if (grade && grader) compsQueryParts.push(`${grader} ${grade}`);
+      
+      const compsQueryInput = compsQueryParts.join(" ");
+      const normalized = normalizeEbayQuery(compsQueryInput);
+      
+      // Check for cached eBay comps
+      let ebayComps: any = null;
+      let ebayCompsStatus: "available" | "fetching" | "missing" | "failed" = "missing";
+      
+      try {
+        const cachedComps = await getCachedComps(normalized.queryHash);
+        
+        if (cachedComps && cachedComps.fetchStatus === "complete") {
+          ebayCompsStatus = "available";
+          ebayComps = {
+            queryHash: cachedComps.queryHash,
+            confidence: cachedComps.confidence,
+            soldCount: cachedComps.soldCount,
+            summary: cachedComps.summaryJson,
+            lastFetchedAt: cachedComps.lastFetchedAt,
+          };
+          console.log(`[Quick Analyze] eBay comps cache hit: ${cachedComps.soldCount} comps`);
+        } else {
+          // Check if already fetching
+          const entry = await getCacheEntry(normalized.queryHash);
+          
+          if (entry?.fetchStatus === "fetching") {
+            ebayCompsStatus = "fetching";
+          } else if (entry?.fetchStatus === "failed") {
+            ebayCompsStatus = "failed";
+          } else {
+            // Enqueue a fetch job for background scraping
+            console.log(`[Quick Analyze] Enqueuing eBay comps fetch for: ${normalized.canonicalQuery}`);
+            await enqueueFetchJob(normalized.canonicalQuery, normalized.queryHash, normalized.filters);
+            ebayCompsStatus = "fetching";
+          }
+        }
+      } catch (err) {
+        console.error("[Quick Analyze] Error checking eBay comps:", err);
+      }
+
       // Compute signals
       console.log(`[Quick Analyze] Computing signals`);
       const signals = computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
@@ -1774,6 +1823,26 @@ Allow: /
         bigMover: {
           flag: signals.bigMoverFlag,
           reason: isPro ? signals.bigMoverReason : null,
+        },
+        // eBay comps data (if available)
+        ebayComps: ebayComps ? {
+          status: ebayCompsStatus,
+          queryHash: ebayComps.queryHash,
+          confidence: ebayComps.confidence,
+          soldCount: ebayComps.soldCount,
+          summary: isPro ? ebayComps.summary : {
+            medianPrice: ebayComps.summary?.medianPrice,
+            soldCount: ebayComps.summary?.soldCount,
+          },
+          lastFetchedAt: ebayComps.lastFetchedAt,
+        } : {
+          status: ebayCompsStatus,
+          queryHash: normalized.queryHash,
+          message: ebayCompsStatus === "fetching" 
+            ? "eBay sold comps are being fetched. Poll /api/comps/ebay/status for updates."
+            : ebayCompsStatus === "failed"
+            ? "Failed to fetch eBay comps. Will retry on next request."
+            : "No eBay comps available yet.",
         },
         generatedAt: new Date().toISOString(),
         isPro,
@@ -3426,6 +3495,185 @@ Allow: /
     } catch (error) {
       console.error("Error fetching alert count:", error);
       res.status(500).json({ message: "Failed to fetch alert count" });
+    }
+  });
+
+  // ============================================================================
+  // eBay Market Comps API
+  // ============================================================================
+
+  // Import the eBay comps service functions
+  const ebayComps = await import("./ebayCompsService");
+
+  // GET /api/comps/ebay - Get cached comps by query hash (requires auth)
+  app.get("/api/comps/ebay", isAuthenticated, async (req: any, res) => {
+    try {
+      const { queryHash } = req.query;
+      
+      if (!queryHash || typeof queryHash !== "string") {
+        return res.status(400).json({ error: "queryHash is required" });
+      }
+      
+      // Check for valid cached data
+      const cached = await ebayComps.getCachedComps(queryHash);
+      
+      if (cached && cached.fetchStatus === "complete") {
+        console.log(`[Comps API] Cache hit for ${queryHash}`);
+        return res.json({
+          status: "complete",
+          data: {
+            queryHash: cached.queryHash,
+            canonicalQuery: cached.canonicalQuery,
+            soldCount: cached.soldCount,
+            confidence: cached.confidence,
+            summary: cached.summaryJson,
+            comps: cached.compsJson,
+            lastFetchedAt: cached.lastFetchedAt,
+            expiresAt: cached.expiresAt
+          }
+        });
+      }
+      
+      // Check if there's an entry being fetched
+      const entry = await ebayComps.getCacheEntry(queryHash);
+      
+      if (entry) {
+        if (entry.fetchStatus === "fetching") {
+          return res.json({ status: "fetching", queryHash });
+        }
+        if (entry.fetchStatus === "failed") {
+          return res.json({ 
+            status: "failed", 
+            queryHash,
+            error: entry.fetchError 
+          });
+        }
+      }
+      
+      // No data
+      console.log(`[Comps API] Cache miss for ${queryHash}`);
+      return res.json({ status: "missing", queryHash });
+      
+    } catch (error) {
+      console.error("[Comps API] Error getting cached comps:", error);
+      res.status(500).json({ error: "Failed to get comps data" });
+    }
+  });
+
+  // POST /api/comps/ebay/fetch - Trigger a fetch job for comps (requires auth)
+  app.post("/api/comps/ebay/fetch", isAuthenticated, async (req: any, res) => {
+    try {
+      const { canonicalQuery, queryInput } = req.body;
+      
+      // Accept either a pre-normalized query or raw input
+      let normalized: { canonicalQuery: string; queryHash: string; filters: any };
+      
+      if (canonicalQuery) {
+        normalized = ebayComps.normalizeEbayQuery(canonicalQuery);
+      } else if (queryInput) {
+        normalized = ebayComps.normalizeEbayQuery(queryInput);
+      } else {
+        return res.status(400).json({ error: "canonicalQuery or queryInput is required" });
+      }
+      
+      console.log(`[Comps API] Fetch request for: "${normalized.canonicalQuery}" (hash: ${normalized.queryHash})`);
+      
+      // Check if already cached and valid
+      const cached = await ebayComps.getCachedComps(normalized.queryHash);
+      if (cached && cached.fetchStatus === "complete") {
+        return res.json({ 
+          status: "cached", 
+          queryHash: normalized.queryHash,
+          message: "Data already cached"
+        });
+      }
+      
+      // Enqueue the fetch job
+      const result = await ebayComps.enqueueFetchJob(
+        normalized.canonicalQuery,
+        normalized.queryHash,
+        normalized.filters
+      );
+      
+      if (result.queued) {
+        return res.json({ 
+          status: "queued", 
+          queryHash: normalized.queryHash,
+          canonicalQuery: normalized.canonicalQuery 
+        });
+      } else if (result.reason?.includes("already running")) {
+        // Job is already running for this query - client should poll status
+        return res.json({ 
+          status: "in_progress", 
+          queryHash: normalized.queryHash,
+          message: "Fetch already in progress for this query. Poll /api/comps/ebay/status for updates."
+        });
+      } else {
+        // System is busy - client should retry after delay
+        return res.status(503).json({ 
+          status: "busy", 
+          queryHash: normalized.queryHash,
+          retryAfter: 5,
+          message: "System at capacity. Please retry in a few seconds."
+        });
+      }
+      
+    } catch (error) {
+      console.error("[Comps API] Error triggering fetch:", error);
+      res.status(500).json({ error: "Failed to queue fetch job" });
+    }
+  });
+
+  // GET /api/comps/ebay/status - Get status of a fetch job (requires auth)
+  app.get("/api/comps/ebay/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const { queryHash } = req.query;
+      
+      if (!queryHash || typeof queryHash !== "string") {
+        return res.status(400).json({ error: "queryHash is required" });
+      }
+      
+      const entry = await ebayComps.getCacheEntry(queryHash);
+      
+      if (!entry) {
+        return res.json({ status: "not_found", queryHash });
+      }
+      
+      res.json({
+        status: entry.fetchStatus,
+        queryHash: entry.queryHash,
+        canonicalQuery: entry.canonicalQuery,
+        soldCount: entry.soldCount,
+        confidence: entry.confidence,
+        pagesScraped: entry.pagesScraped,
+        itemsFound: entry.itemsFound,
+        itemsKept: entry.itemsKept,
+        error: entry.fetchError,
+        lastFetchedAt: entry.lastFetchedAt,
+        expiresAt: entry.expiresAt
+      });
+      
+    } catch (error) {
+      console.error("[Comps API] Error getting status:", error);
+      res.status(500).json({ error: "Failed to get status" });
+    }
+  });
+
+  // POST /api/comps/ebay/normalize - Normalize a query (utility endpoint, requires auth)
+  app.post("/api/comps/ebay/normalize", isAuthenticated, (req: any, res) => {
+    try {
+      const { query } = req.body;
+      
+      if (!query || typeof query !== "string") {
+        return res.status(400).json({ error: "query is required" });
+      }
+      
+      const normalized = ebayComps.normalizeEbayQuery(query);
+      res.json(normalized);
+      
+    } catch (error) {
+      console.error("[Comps API] Error normalizing query:", error);
+      res.status(500).json({ error: "Failed to normalize query" });
     }
   });
 
