@@ -124,7 +124,7 @@ function EmptyState({ message }: { message: string }) {
       <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
         <LayoutGrid className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="text-lg font-medium mb-2">No display cases found</h3>
+      <h3 className="text-lg font-medium mb-2">No portfolios found</h3>
       <p className="text-muted-foreground">{message}</p>
     </div>
   );
@@ -163,9 +163,9 @@ export default function Explore() {
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Explore Collections</h1>
+          <h1 className="text-3xl font-bold mb-2">Explore Portfolios</h1>
           <p className="text-muted-foreground">
-            Discover amazing card collections from collectors around the world
+            Discover amazing card portfolios from collectors around the world
           </p>
         </div>
 
@@ -175,7 +175,7 @@ export default function Explore() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 type="text"
-                placeholder="Search collections by name or description..."
+                placeholder="Search portfolios by name or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"

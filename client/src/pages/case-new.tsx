@@ -116,7 +116,7 @@ export default function CaseNew() {
           copyFailed = true;
           toast({
             title: "Cards could not be imported",
-            description: "Your display case was created but some cards failed to import. You can add them manually.",
+            description: "Your portfolio was created but some cards failed to import. You can add them manually.",
             variant: "destructive",
           });
         }
@@ -125,10 +125,10 @@ export default function CaseNew() {
       queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
       if (!copyFailed) {
         toast({
-          title: "Display case created",
+          title: "Portfolio created",
           description: selectedCardIds.length > 0 
-            ? `Your display case is ready with ${selectedCardIds.length} imported card${selectedCardIds.length === 1 ? '' : 's'}!`
-            : "Your new display case is ready. Start adding cards!",
+            ? `Your portfolio is ready with ${selectedCardIds.length} imported card${selectedCardIds.length === 1 ? '' : 's'}!`
+            : "Your new portfolio is ready. Start adding cards!",
         });
       }
       setLocation(`/cases/${data.id}/edit`);
@@ -148,8 +148,8 @@ export default function CaseNew() {
       
       if (error.message.includes("limit")) {
         toast({
-          title: "Case limit reached",
-          description: "Upgrade to Pro for unlimited display cases.",
+          title: "Portfolio limit reached",
+          description: "Upgrade to Pro for unlimited portfolios.",
           variant: "destructive",
         });
         setLocation("/upgrade");
@@ -157,7 +157,7 @@ export default function CaseNew() {
       }
 
       toast({
-        title: "Error creating display case",
+        title: "Error creating portfolio",
         description: error.message || "Please try again.",
         variant: "destructive",
       });
@@ -184,9 +184,9 @@ export default function CaseNew() {
               <LayoutGrid className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <CardTitle>Create Display Case</CardTitle>
+              <CardTitle>Create Portfolio</CardTitle>
               <CardDescription>
-                Set up a new display case for your collection
+                Set up a new portfolio for your collection
               </CardDescription>
             </div>
           </div>
@@ -208,7 +208,7 @@ export default function CaseNew() {
                       />
                     </FormControl>
                     <FormDescription>
-                      Give your display case a memorable name
+                      Give your portfolio a memorable name
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -243,7 +243,7 @@ export default function CaseNew() {
                     <div>
                       <p className="font-medium text-sm">Import existing cards</p>
                       <p className="text-muted-foreground text-sm">
-                        Copy cards from your other display cases
+                        Copy cards from your other portfolios
                       </p>
                     </div>
                     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -263,7 +263,7 @@ export default function CaseNew() {
                         <DialogHeader>
                           <DialogTitle>Import Cards</DialogTitle>
                           <DialogDescription>
-                            Select cards to copy into your new display case
+                            Select cards to copy into your new portfolio
                           </DialogDescription>
                         </DialogHeader>
                         <ScrollArea className="h-[400px] pr-4">
@@ -289,11 +289,17 @@ export default function CaseNew() {
                                         </div>
                                       )}
                                       <div className="aspect-[3/4] bg-muted rounded overflow-hidden mb-1">
-                                        <img
-                                          src={card.imagePath}
-                                          alt={card.title}
-                                          className="w-full h-full object-cover"
-                                        />
+                                        {card.imagePath ? (
+                                          <img
+                                            src={card.imagePath}
+                                            alt={card.title}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center">
+                                            <LayoutGrid className="h-6 w-6 text-muted-foreground/30" />
+                                          </div>
+                                        )}
                                       </div>
                                       <p className="text-xs font-medium truncate">{card.title}</p>
                                     </div>

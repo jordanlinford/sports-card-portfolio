@@ -67,15 +67,15 @@ function EmptyState({ canCreate }: { canCreate: boolean }) {
       <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-6">
         <FolderOpen className="h-8 w-8 text-muted-foreground" />
       </div>
-      <h3 className="text-xl font-semibold mb-2">No display cases yet</h3>
+      <h3 className="text-xl font-semibold mb-2">No portfolios yet</h3>
       <p className="text-muted-foreground text-center max-w-md mb-6">
-        Create your first display case to start showcasing your card collection to the world.
+        Create your first portfolio to start tracking and showcasing your card collection.
       </p>
       {canCreate && (
         <Link href="/cases/new">
           <Button className="gap-2" data-testid="button-create-first-case">
             <Plus className="h-4 w-4" />
-            Create Your First Display Case
+            Create Your First Portfolio
           </Button>
         </Link>
       )}
@@ -116,11 +116,17 @@ function DisplayCaseCard({ displayCase }: { displayCase: DisplayCaseWithCards })
                   key={card.id}
                   className="bg-background rounded overflow-hidden"
                 >
-                  <img
-                    src={card.imagePath}
-                    alt={card.title}
-                    className="w-full h-full object-cover"
-                  />
+                  {card.imagePath ? (
+                    <img
+                      src={card.imagePath}
+                      alt={card.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-muted">
+                      <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                    </div>
+                  )}
                 </div>
               ))}
               {previewImages.length < 4 &&
@@ -281,16 +287,16 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-dashboard-title">
-            My Display Cases
+            My Portfolios
           </h1>
           <p className="text-muted-foreground mt-1">
             {isPro ? (
               <span className="flex items-center gap-1">
                 <Crown className="h-4 w-4 text-primary" />
-                Pro Account - Unlimited Cases
+                Pro Account - Unlimited Portfolios
               </span>
             ) : (
-              `${caseCount} of 3 free cases used`
+              `${caseCount} of 3 free portfolios used`
             )}
           </p>
         </div>
@@ -298,8 +304,8 @@ export default function Dashboard() {
           {userTags.length > 0 && (
             <ProFeatureGate
               isPro={canCreate}
-              featureName="Unlimited Display Cases"
-              featureDescription="Free accounts are limited to 3 display cases. Upgrade to Pro for unlimited cases and premium features."
+              featureName="Unlimited Portfolios"
+              featureDescription="Free accounts are limited to 3 portfolios. Upgrade to Pro for unlimited portfolios and premium features."
               showBadge={false}
             >
               <DropdownMenu>
@@ -333,8 +339,8 @@ export default function Dashboard() {
           {hasValuableCards && (
             <ProFeatureGate
               isPro={canCreate}
-              featureName="Unlimited Display Cases"
-              featureDescription="Free accounts are limited to 3 display cases. Upgrade to Pro for unlimited cases and premium features."
+              featureName="Unlimited Portfolios"
+              featureDescription="Free accounts are limited to 3 portfolios. Upgrade to Pro for unlimited portfolios and premium features."
               showBadge={false}
             >
               <Button 
@@ -345,7 +351,7 @@ export default function Dashboard() {
                 data-testid="button-create-top-cards"
               >
                 <Sparkles className="h-4 w-4" />
-                {createTopCardsMutation.isPending ? "Creating..." : "Create Top Cards Case"}
+                {createTopCardsMutation.isPending ? "Creating..." : "Create Top Cards Portfolio"}
               </Button>
             </ProFeatureGate>
           )}
@@ -358,7 +364,7 @@ export default function Dashboard() {
             <Link href="/cases/new">
               <Button className="gap-2" data-testid="button-create-case">
                 <Plus className="h-4 w-4" />
-                New Display Case
+                New Portfolio
               </Button>
             </Link>
           </ProFeatureGate>
