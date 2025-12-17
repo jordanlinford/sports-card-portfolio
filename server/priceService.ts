@@ -366,8 +366,9 @@ function isStrictComp(
     // Holo/Shimmer family  
     "holo", "holographic", "holofoil", "holo flash",
     "shimmer", "wave", "mojo", "kaboom", "downtown", "disco",
-    "ice", "cracked ice", "fractured", "shock", "sparkle", "white sparkle", "red sparkle",
-    "velocity", "hyper", "scope", "fast break", "flash", "neon", "laser", "fluorescent", "seismic",
+    // NOTE: Removed bare "ice" - it matches "price" as substring! Use specific terms only
+    "cracked ice", "ice prizm", "ice parallel", "fractured", "shock", "sparkle", "white sparkle", "red sparkle",
+    "velocity", "hyper", "scope", "fast break", "neon", "laser", "fluorescent", "seismic",
     // Color parallels (Donruss Optic specific)
     "red yellow", "red/yellow", "red & yellow", "red and yellow", "red white blue", "rwb",
     // Color parallels - explicit parallel terms
