@@ -1,0 +1,280 @@
+here’s the full set: (1) the LLM system prompt + guardrails, (2) the Player Watchlist UI spec, (3) launch players list, and (4) what to do with the existing Market Outlook so it still matters.
+
+1) LLM System Prompt So Tone Never Degrades
+A) System Prompt (paste as your “system” message)
+
+You are MyDisplayCase Player Outlook, a skeptical sports-card market analyst. You help collectors decide whether to invest in a player like a stock, and choose the right card exposure (Premium/Growth/Core/Speculative) based on risk, liquidity, and timing.
+
+Style rules (non-negotiable):
+
+Be clear, direct, and grounded. No hype. No marketing fluff.
+
+Never invent facts, stats, awards, or news. If unknown, say “Unknown” and proceed with conditional reasoning.
+
+No fake precision (no percentages, no “72% upside”).
+
+Every analysis must include one uncomfortable truth under “Market Reality Check.”
+
+Verdict must be one of: BUY / WATCH / AVOID, and must include a modifier: (Momentum / Speculative / Value / Long-Term / Late Cycle).
+
+Keep all sections scannable: bullets + short sentences. No long paragraphs.
+
+Reasoning rules:
+
+Use “If X, then Y” logic.
+
+Separate “Conviction (Thesis Confidence)” from “Price certainty.”
+
+Exposure recommendations must include Timing Guidance (1 line) and Risk Note (1 line).
+
+Output format rules (must match exactly):
+Return valid JSON only, matching the schema provided. Do not include markdown, commentary, or extra keys.
+
+B) Developer/Tool Prompt (the “instruction” you send with data)
+
+Include the variables you actually have, and force the model to admit unknowns:
+
+playerName, sport, position (or “Unknown”)
+
+team (or “Unknown”)
+
+stage (Rookie/Year2/Prime/Aging/Retired/Unknown)
+
+signals: any comps summary, buzz snippets, trend direction, starter status, etc.
+
+classification: your deterministic engine outputs (temperature, volatility, risk, horizon)
+
+C) JSON Schema (the model must output)
+{
+  "player": { "name": "", "sport": "", "position": "", "team": "", "stage": "", "inferredFields": [] },
+  "snapshot": {
+    "temperature": "Hot|Warm|Neutral|Cooling",
+    "volatility": "Low|Medium|High",
+    "risk": "Low|Medium|High",
+    "horizon": "Short|Mid|Long",
+    "conviction": "Low|Medium|High"
+  },
+  "thesis": {
+    "bullets": [],
+    "marketRealityCheck": []
+  },
+  "verdict": {
+    "action": "BUY|WATCH|AVOID",
+    "modifier": "Momentum|Speculative|Value|Long-Term|Late Cycle",
+    "summary": "",
+    "whatMustBeTrue": []
+  },
+  "exposures": [
+    {
+      "tier": "Premium|Growth|Core|Speculative",
+      "liquidity": "High|Medium|Low",
+      "bestFor": "Investor|Collector|Flipper|Budget",
+      "targets": [],
+      "why": "",
+      "timingGuidance": "",
+      "riskNote": ""
+    }
+  ],
+  "evidence": {
+    "compsAvailable": true,
+    "compsNotes": [],
+    "dataQuality": "Low|Medium|High"
+  }
+}
+
+D) Hard “anti-fluff” enforcement (simple trick)
+
+Add this to your prompt right before generation:
+
+If any thesis bullet could apply to 10+ random players, rewrite it to be more specific OR mark the missing input as Unknown and use conditional language.
+
+That one line cuts generic output dramatically.
+
+2) Player Watchlist UI Design (spec you can build)
+A) Where it lives
+
+Top nav item: Watchlist (icon: ⭐ or 📈)
+
+B) Watchlist Page Layout
+
+Header
+
+Title: “Watchlist”
+
+Subtext: “Track player markets and get notified when the thesis changes.”
+
+Controls row
+
+Search within watchlist (by player)
+
+Filters: Sport, Temperature, Verdict
+
+Sort: “Biggest Change”, “Hottest”, “Highest Risk”, “Recently Updated”
+
+Watchlist Cards (grid or list)
+Each card shows:
+
+Player name + headshot
+
+Badges: Temperature, Volatility, Risk, Horizon
+
+Verdict chip: “BUY (Speculative)” etc
+
+Pulse delta: e.g. “WARM → HOT” or “Risk ↑”
+
+Last updated timestamp
+
+Quick actions: “View”, “Refresh”, “Remove”
+
+C) Player Detail Watch View (when you click a watchlist card)
+
+Top row:
+
+Player header + “Watching ⭐” toggle
+
+Alert settings button
+
+Sections:
+
+Latest Outlook Summary (the same Player Outlook blocks you already have)
+
+What Changed (this is retention gold)
+
+“Temperature changed because…”
+
+“Verdict changed because…”
+
+Alerts
+
+Toggle: Verdict changes
+
+Toggle: Temperature changes
+
+Toggle: Volatility spikes
+
+Optional: Price swing alerts only if you have comp trend
+
+D) Empty State (super important)
+
+If no watchlist items:
+
+“Track the players you’re investing in.”
+
+Buttons: “Try Featured Players” + “Analyze a Player”
+
+Show 6 featured launch players as clickable pills.
+
+E) Notification strategy
+
+Start with in-app notifications only (simple bell icon), then add email later.
+Only trigger when:
+
+Temperature changes
+
+Verdict changes
+
+Risk goes Medium → High
+
+No noise = trust.
+
+3) Launch Players (the exact list + why)
+
+You want 8–12 to cover archetypes and create shareable demos. Here’s a clean starter set for football + a couple “control” cautionary names.
+
+Hot Rookie / New Starter QBs (high usage)
+
+Drake Maye (hot QB speculation)
+
+Jayden Daniels (buzz + premium position)
+
+Shedeur Sanders (hype-driven “narrative stock”)
+
+Caleb Williams (mass awareness)
+
+Breakout / Momentum
+
+C.J. Stroud (already a market mover; validates your logic)
+
+Jordan Love (momentum, mid-term thesis)
+
+Buy-low / Rebound (creates credibility)
+
+Trevor Lawrence (valuation vs expectations archetype)
+
+Bryce Young (high volatility rebound narrative)
+
+Cooling / Cautionary (trust builders)
+
+Mac Jones (perfect “late-cycle regret” teaching moment)
+
+Russell Wilson (aging + sentiment shifts)
+
+If you want to add basketball later, we can pick 4 that map cleanly to archetypes too.
+
+Why these work: they’re recognizable, debate-worthy, and will produce strong “Market Reality Check” lines (which builds trust fast).
+
+4) What to do with your existing Market Outlook feature
+
+You don’t kill it — you reposition it so you’re not competing head-on.
+
+A) Rename it so expectations change
+
+Market Outlook (current) becomes:
+
+Price Evidence
+
+Card Comps Snapshot
+
+Supporting Evidence
+
+Language matters. You’re telling users:
+
+“This supports the thesis — it’s not the thesis.”
+
+B) Move it to a secondary role everywhere
+
+On Player Outlook: keep it collapsed as you already did (perfect)
+
+On Card pages: show Player Outlook first, then “Card Evidence”
+
+C) Change the goal of comps
+
+Stop trying to be a full price engine. Make comps answer only:
+
+“Is there enough liquidity here to exit?”
+
+“Are prices moving up or down recently?”
+
+“Is this data thin / noisy / confident?”
+
+That’s the right use of your current engine.
+
+D) Use your current comps engine for one thing it can win at
+
+Entry timing guidance. Even thin comps can support:
+
+“Don’t buy immediately after spikes”
+
+“This player’s cards tend to retrace after big games”
+
+“Low-liquidity cards have wide spreads”
+
+So Market Outlook becomes the evidence layer that strengthens the player thesis.
+
+E) Simple new framing (UI copy)
+
+At the top of the evidence panel:
+
+“We use comps as supporting evidence — not as the decision driver.”
+
+That sentence prevents “why aren’t you Market Movers?” comparisons.
+
+If you want the most effective next step
+
+Tell Replit to implement two things first:
+
+The LLM output schema enforcement + Market Reality Check requirement
+
+The Watchlist MVP (add/remove + list + “what changed” placeholder)
+
+Those two create trust + retention immediately.
