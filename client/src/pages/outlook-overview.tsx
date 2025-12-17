@@ -33,7 +33,8 @@ import {
   CheckCircle,
   XCircle,
   Trophy,
-  MinusCircle
+  MinusCircle,
+  ExternalLink
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -540,6 +541,43 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2 font-medium">
                       Pricing data may not accurately reflect this exact card.
                     </p>
+                  )}
+                  
+                  {result.matchConfidence.samples && result.matchConfidence.samples.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-border/50">
+                      <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                        <TrendingUp className="h-3 w-3" />
+                        Recent Comps ({result.matchConfidence.samples.length} shown)
+                      </p>
+                      <div className="space-y-2">
+                        {result.matchConfidence.samples.map((comp, idx) => (
+                          <div key={idx} className="flex items-center justify-between gap-2 text-sm bg-background/50 rounded-md p-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate text-xs" title={comp.title}>{comp.title}</p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Badge variant="outline" className="text-xs">
+                                {Math.round(comp.matchScore * 100)}% match
+                              </Badge>
+                              <span className="font-semibold text-green-600 dark:text-green-400">
+                                {formatCurrency(comp.price)}
+                              </span>
+                              {comp.url && (
+                                <a 
+                                  href={comp.url} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-muted-foreground hover:text-foreground"
+                                  data-testid={`link-comp-${idx}`}
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
