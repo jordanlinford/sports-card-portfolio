@@ -1,0 +1,104 @@
+1) Slow down HARD + remove concurrency
+Global limits (non-negotiable):
+	•	Max 1 scrape worker at a time (globally)
+	•	Max 1 page request every 5–10 seconds
+	•	Max 2 pages per query, not 3+
+	•	Add random jitter (+/- 2–3 seconds)
+
+This alone fixes a lot of blocking.
+
+2) Cache everything (and don’t refetch if you don’t have to)
+	•	Cache key = queryHash
+	•	TTL = 24 hours (or longer)
+	•	If you already have 15+ comps, don’t refresh often
+	•	If you have <5 comps, refresh later, not immediately
+
+The #1 cause of blocks is refetching the same query repeatedly.
+
+3) Reuse sessions (cookies) and send real browser headers
+If you’re doing raw fetches:
+	•	Persist cookies per “scrape session”
+	•	Use consistent headers:
+	•	Accept-Language
+	•	Accept
+	•	Referer
+	•	User-Agent (don’t rotate every request)
+
+Rotating UA too aggressively can look more botty, not less.
+
+4) Detect blocks explicitly and mark them correctly
+Right now you’re showing “HIGH” confidence while also saying fallback comps + 2 sold. That’s a logic bug.
+
+If eBay blocked:
+	•	comps.status = "blocked"
+	•	confidence = "LOW"
+	•	soldCount should reflect only what you actually used
+
+Also store:
+	•	blockReason: "429" | "captcha" | "robot-check" | "unexpected-html"
+
+5) Don’t scrape in the user request
+You already planned this — keep it.
+	•	Return partial quickly
+	•	Queue background job
+	•	Poll status
+
+6) Consider a browser-based fetch only when needed (fallback tier)
+If HTML fetch is blocked:
+	•	Try a Playwright “real browser” job only for high-value queries or Pro users
+	•	Strictly rate limit it
+
+This is heavier, but it’s the only way to beat some of eBay’s protections without changing sources.
+
+Note: this can impact hosting costs and deploy size; keep it optional and behind limits.
+
+⸻
+
+What needs fixing “in general” (based on your screenshot)
+
+1) Confidence badge is wrong
+	•	2 comps + fallback comps should never show HIGH
+Fix confidence calculation to incorporate:
+	•	comps count
+	•	match quality
+	•	source reliability
+	•	whether you were blocked
+
+2) “Fallback comps” should be clearly labeled as NOT eBay sold comps
+
+Make it explicit:
+	•	“Fallback = Google/Serper results (less precise)”
+This builds trust instead of looking like the system is lying.
+
+3) Add a “why comps are low” explanation
+
+When soldCount < 5, show:
+	•	“Thin comps because: (few recent sales / too specific / grade mismatch / parallel mismatch)”
+…and suggest a one-click “Broaden search” toggle:
+	•	include PSA 9 + PSA 10
+	•	include “Base” if parallel is rare
+	•	include last 365 days
+
+4) Add internal debug output (admin-only)
+
+Add a hidden debug panel that shows:
+	•	canonicalQuery
+	•	queryHash
+	•	pages attempted
+	•	HTTP status codes
+	•	detected block pattern
+	•	items found vs kept
+
+This will let you fix this fast without guessing.
+
+⸻
+
+The fastest “fix plan” to send Replit right now
+
+If you want the quickest improvement with minimal rewrite, tell them:
+	1.	Set global scraper concurrency = 1
+	2.	Add delay = 7–12s between requests with jitter
+	3.	Cap pages per scrape = 2
+	4.	Improve block detection + return status:"blocked" properly
+	5.	Fix confidence logic (blocked/fallback/low comps → LOW)
+	6.	Increase cache TTL and stop re-scraping hot queries repeatedly

@@ -114,7 +114,10 @@ function CompsConfidencePanel({
 }) {
   const isLoading = comps.status === "queued" || comps.status === "fetching";
   const isAvailable = comps.status === "hit" || comps.status === "complete";
-  const isFallback = comps.status === "blocked" || comps.status === "failed";
+  const isFallback = comps.status === "blocked" || comps.status === "failed" || comps.source === "SERPER";
+  
+  // Override confidence to LOW if fallback or low comp count
+  const effectiveConfidence = (isFallback || comps.soldCount < 5) ? "LOW" : comps.confidence;
   
   const getConfidenceStyle = (confidence: string) => {
     switch (confidence) {
@@ -125,6 +128,15 @@ function CompsConfidencePanel({
     }
   };
   
+  // Explain why comps are low
+  const getLowCompsReason = () => {
+    if (isFallback && comps.status === "blocked") return "eBay rate limiting - using search estimates instead of sold data";
+    if (isFallback) return "Using search estimates (less precise than sold data)";
+    if (comps.soldCount < 3) return "Very few recent sales - may be a rare card or specific search";
+    if (comps.soldCount < 5) return "Limited recent sales found - try broadening grade or parallel";
+    return null;
+  };
+  
   const getStatusDisplay = () => {
     if (isLoading) return { icon: Loader2, text: "Gathering sold comps...", animate: true };
     if (isAvailable) return { icon: CheckCircle, text: "Up to date", animate: false };
@@ -133,9 +145,10 @@ function CompsConfidencePanel({
     return { icon: Activity, text: comps.message || "Unknown", animate: false };
   };
   
-  const confidenceStyle = getConfidenceStyle(comps.confidence);
+  const confidenceStyle = getConfidenceStyle(effectiveConfidence);
   const statusDisplay = getStatusDisplay();
   const StatusIcon = statusDisplay.icon;
+  const lowCompsReason = getLowCompsReason();
   
   return (
     <div className="rounded-lg border p-4 space-y-3" data-testid="panel-comps-confidence">
@@ -145,7 +158,7 @@ function CompsConfidencePanel({
           <span className="font-medium text-sm">Comps & Confidence</span>
         </div>
         <Badge variant="secondary" className={confidenceStyle.bg} data-testid="badge-confidence">
-          <span className={confidenceStyle.color}>{comps.confidence}</span>
+          <span className={confidenceStyle.color}>{effectiveConfidence}</span>
         </Badge>
       </div>
       
@@ -176,9 +189,9 @@ function CompsConfidencePanel({
         )}
       </div>
       
-      {comps.confidence === "LOW" && (
+      {effectiveConfidence === "LOW" && lowCompsReason && (
         <p className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 p-2 rounded" data-testid="text-low-confidence-warning">
-          Low confidence because we found limited matching sold comps.
+          {lowCompsReason}
         </p>
       )}
       
@@ -832,12 +845,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
   
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/cards/${card.id}/outlook-v2`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to generate outlook");
-      }
-      return res.json();
+      return await apiRequest("POST", `/api/cards/${card.id}/outlook-v2`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });

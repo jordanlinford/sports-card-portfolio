@@ -162,7 +162,7 @@ interface FetchJob {
 
 // In-memory job tracking
 const activeJobs = new Map<string, FetchJob>();
-const MAX_CONCURRENT_JOBS = 2;
+const MAX_CONCURRENT_JOBS = 1; // Single worker to avoid rate limiting
 
 /**
  * Check if a job is already running for this query hash
@@ -478,13 +478,25 @@ export function calculateAggregations(comps: EbayComp[]): CompsSummary {
 
 /**
  * Determine confidence level based on sold count and match quality
+ * LOW if < 5 comps, MED if 5-14, HIGH if 15+ with good match score
  */
 export function calculateConfidence(
   soldCount: number,
-  avgMatchScore: number
+  avgMatchScore: number,
+  isFallback: boolean = false
 ): "HIGH" | "MED" | "LOW" {
+  // If fallback/blocked, always LOW confidence
+  if (isFallback) {
+    return "LOW";
+  }
+  
+  // Less than 5 comps = always LOW
+  if (soldCount < 5) {
+    return "LOW";
+  }
+  
   const HIGH_COUNT_THRESHOLD = 15;
-  const MED_COUNT_THRESHOLD = 6;
+  const MED_COUNT_THRESHOLD = 5;
   const HIGH_SCORE_THRESHOLD = 0.7;
   const MED_SCORE_THRESHOLD = 0.5;
   
@@ -560,7 +572,7 @@ function parsePrice(priceStr: string): number | null {
  */
 async function scrapeEbaySoldListings(
   canonicalQuery: string,
-  maxPages: number = 3,
+  maxPages: number = 2, // Reduced to 2 pages max to avoid rate limiting
   maxItems: number = 60
 ): Promise<{ comps: EbayComp[]; pagesScraped: number; error?: string; isBlocked?: boolean }> {
   const comps: EbayComp[] = [];
@@ -575,9 +587,9 @@ async function scrapeEbaySoldListings(
       const url = buildEbaySearchUrl(canonicalQuery, page);
       console.log(`[eBay Scraper] Fetching page ${page}: ${url}`);
       
-      // Add jitter delay between requests (1-3 seconds)
+      // Add jitter delay between requests (7-12 seconds to avoid rate limiting)
       if (page > 1) {
-        await randomDelay(1000, 3000);
+        await randomDelay(7000, 12000);
       }
       
       const response = await fetch(url, {
@@ -758,9 +770,9 @@ async function runFetchJob(job: FetchJob): Promise<void> {
     // Determine confidence
     const confidence = calculateConfidence(summary.soldCount, avgMatchScore);
     
-    // Calculate expiry (24h normally, 6h for low count)
+    // Calculate expiry (48h for good data, 12h for low count to allow retry)
     const now = new Date();
-    const expiryHours = summary.soldCount <= 5 ? 6 : 24;
+    const expiryHours = summary.soldCount >= 15 ? 48 : summary.soldCount <= 5 ? 12 : 24;
     const expiresAt = new Date(now.getTime() + expiryHours * 60 * 60 * 1000);
     
     // Update cache
