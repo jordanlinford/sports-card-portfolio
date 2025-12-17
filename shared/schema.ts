@@ -127,6 +127,8 @@ export const cards = pgTable("cards", {
   outlookExplanationShort: text("outlook_explanation_short"),
   outlookExplanationLong: text("outlook_explanation_long"),
   outlookGeneratedAt: timestamp("outlook_generated_at"),
+  outlookBigMover: boolean("outlook_big_mover").default(false),
+  outlookBigMoverReason: text("outlook_big_mover_reason"),
 });
 
 export const cardsRelations = relations(cards, ({ one }) => ({
@@ -592,6 +594,10 @@ export const cardOutlooks = pgTable("card_outlooks", {
   explanationShort: text("explanation_short"),
   explanationLong: text("explanation_long"),
   explanationBullets: jsonb("explanation_bullets").$type<string[]>().default([]),
+  
+  // Big Mover flag - asymmetric upside potential
+  bigMoverFlag: boolean("big_mover_flag").default(false),
+  bigMoverReason: text("big_mover_reason"),
   
   // Career stage detection
   careerStageAuto: varchar("career_stage_auto", { length: 20 }), // ROOKIE | RISING | ELITE | VETERAN | RETIRED | LEGEND | UNKNOWN
