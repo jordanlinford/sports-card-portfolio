@@ -1,0 +1,408 @@
+Replit Build Ticket: Market Outlook v2 — Player = Stock, Cards = Exposure
+Goal
+
+Rebuild Market Outlook so it answers the real question collectors have:
+
+“Should I invest in this player right now — and if yes, what card types should I buy?”
+
+Instead of being comp-first, the experience becomes player-first:
+
+Player = the stock
+
+Cards = stock types / exposure vehicles (premium vs common)
+
+Comps become secondary supporting evidence, not the product.
+
+Success Criteria
+
+A user can enter a player name (or arrive from a card) and see a Player Outlook.
+
+The app outputs a clear Investment Verdict (Buy / Watch / Avoid + rationale).
+
+The app recommends card exposure types with a “stock tier” metaphor:
+
+Premium stock (blue-chip / low serial / autos)
+
+Growth stock (flagship RC silvers)
+
+Common stock (base)
+
+Speculative (weird parallels / low liquidity brands)
+
+The output is opinionated but transparent, avoids fake precision.
+
+Comps/data remain visible but clearly labeled as supporting and confidence-building, not required to function.
+
+Product Experience
+New Flow (Player-First)
+Entry Points
+
+Search bar: “Enter player name” (primary)
+
+From a card page: “View Player Outlook” (secondary)
+
+Page Sections (In order)
+
+Player Header
+
+Name, sport, position, team, rookie year / career stage
+
+“Market Temperature” badge (Hot / Warm / Neutral / Cooling)
+
+“Volatility” badge (Low / Medium / High)
+
+Player Stock Thesis
+
+3–6 bullet points explaining WHY this player is hot/cold
+
+Includes risk factors + what would change the outlook
+
+Investment Verdict
+
+One of: BUY / WATCH / AVOID
+
+Time horizon: Short / Mid / Long
+
+A “What has to be true” checklist (simple)
+
+Card Exposure Recommendations (Stock Types)
+
+Recommended vehicles (ranked)
+
+Each has:
+
+Stock Tier: Premium / Growth / Core / Common / Speculative
+
+Why it fits this player’s thesis
+
+Liquidity expectation (High/Med/Low)
+
+Who it’s for (flipper vs collector vs long-term)
+
+Optional: Evidence Panel
+
+Recent comps summary (if available)
+
+Notes about data quality + match confidence
+
+Action Buttons
+
+“Search recommended cards”
+
+“Add to Watchlist”
+
+“Create buy list”
+
+“Set alert (price / news / performance event)”
+
+Core Output Template (AI must follow)
+Player Snapshot
+
+Market Temperature: Hot/Warm/Neutral/Cooling
+
+Volatility: Low/Medium/High
+
+Risk: Low/Med/High
+
+Horizon: Short/Mid/Long
+
+Confidence: Low/Med/High (confidence in the thesis, not comps)
+
+Thesis Bullets
+
+Momentum factors (role, performance, hype, position premium)
+
+Narrative strength
+
+Market behavior (rising demand / speculative froth / fatigue)
+
+Key risk triggers
+
+Verdict
+
+BUY / WATCH / AVOID (must pick one)
+
+Plain language explanation (2–4 sentences)
+
+Card Exposure (Ranked List)
+
+Each recommendation object:
+
+tier: Premium | Growth | Core | Common | Speculative
+
+cardTargets: [brand + set + parallel type guidelines]
+
+why: string
+
+liquidity: High/Med/Low
+
+riskNote: string
+
+buyerProfile: Flipper | Collector | Investor | Budget
+
+Data + Logic Requirements
+1) Player Classification Engine (Non-LLM deterministic first)
+
+Build a lightweight rules engine that sets defaults before AI writes narrative.
+
+Inputs (use what we can detect)
+
+sport
+
+position (QB premium, etc.)
+
+career stage: Rookie / Year 2 / Prime / Aging / Retired-HOF
+
+role status: starter / backup / unclear
+
+recent momentum: “up / flat / down” (from available signals)
+
+hype index: mentions/trends if available (optional)
+
+Outputs
+
+marketTemperature (Hot/Warm/Neutral/Cooling)
+
+volatility (Low/Med/High)
+
+horizon (Short/Mid/Long)
+
+base risk profile (Low/Med/High)
+
+Important: If we can’t detect something, set “Unknown” and let AI handle it with transparency.
+
+2) Signals (Minimum Viable)
+
+We do NOT need perfect data feeds to ship v1.
+
+MVP signals you can use:
+
+Existing comps engine output (even thin)
+
+Google/Serper snippets you already use (news + hype)
+
+Basic player metadata (sport/position/team) from a simple API OR internal mapping
+
+If player metadata isn’t available:
+
+Use AI to infer sport/position but mark as “inferred”.
+
+3) Card Recommendation System (Deterministic framework)
+
+Create a reusable mapping per sport that AI can fill in.
+
+Example for Football (baseline guidance)
+
+Premium (Blue Chip)
+
+On-card autos
+
+Low-numbered rookies (/99 and below)
+
+Popular flagship parallels in liquid sets
+
+Growth
+
+Prizm Silver (or equivalent flagship silver)
+
+Optic Holo / Rated Rookie Holo
+
+Select Silver
+
+Core
+
+Standard rookies in strong brands
+
+Mid-tier parallels (/199, /299)
+
+Common
+
+Base rookies (only for budget + volume)
+
+Speculative
+
+Niche sets, low collector demand brands, odd inserts
+
+This is NOT player-specific yet. Player-specific selection happens based on position + outlook.
+
+UI Requirements (React)
+New Component Layout
+
+Create a new page or refactor existing MarketOutlook:
+
+Components
+
+PlayerOutlookHeader
+
+PlayerThesisCard
+
+InvestmentVerdictCard
+
+ExposureRecommendations
+
+EvidencePanel (optional collapse)
+
+ActionsRow
+
+UX Rules
+
+Page must be readable in 15 seconds.
+
+Use badges heavily (Hot/Warm, Volatility, Risk, Horizon).
+
+No long paragraphs.
+
+“Evidence Panel” collapses by default (to avoid comps-first mindset).
+
+Backend/API Changes
+New Endpoint
+
+POST /api/player-outlook
+
+Request
+{
+  "playerName": "Shedeur Sanders",
+  "sport": "football",
+  "contextCard": {
+    "set": "Donruss Optic",
+    "year": 2025,
+    "parallel": "Holo"
+  }
+}
+
+Response
+{
+  "player": { "name": "...", "sport": "...", "position": "...", "team": "...", "stage": "Rookie" },
+  "snapshot": { "temperature": "Hot", "volatility": "High", "risk": "High", "horizon": "Short", "confidence": "Medium" },
+  "thesis": [ "bullet1", "bullet2", "bullet3" ],
+  "verdict": { "action": "BUY", "summary": "..." },
+  "exposures": [
+    {
+      "tier": "Growth",
+      "cardTargets": ["Optic Rated Rookie Holo", "Prizm Silver RC"],
+      "why": "...",
+      "liquidity": "High",
+      "riskNote": "...",
+      "buyerProfile": "Investor"
+    }
+  ],
+  "evidence": {
+    "compsSummary": { "available": true, "median": 123.45, "soldCount": 18 },
+    "notes": ["thin comps", "match quality medium"]
+  }
+}
+
+LLM Prompting Requirements (Critical)
+Do not hallucinate certainty
+
+No made-up stats
+
+No fake percentages
+
+No “guarantees”
+
+Required writing style
+
+Opinionated
+
+Practical
+
+Transparent about uncertainty
+
+Uses the stock metaphor
+
+Prompt Skeleton
+
+System: “You are a sports card market analyst…”
+User: Provide player snapshot based on provided signals and classification outputs. Recommend exposures. Use short bullets.
+
+Inputs to AI must include:
+
+classification engine output
+
+any comps summary (even thin)
+
+any news snippets/hype signal
+
+sport + position + stage
+
+Caching + Refresh Strategy
+
+Player outlook should be cache-first and updated periodically.
+
+Cache keys
+
+player_outlook:{sport}:{playerNameNormalized}
+
+TTL
+
+Hot players: refresh daily
+
+Warm/Neutral: refresh every 3–7 days
+
+Cooling: refresh weekly
+
+Must support stale-while-revalidate
+
+Return cached result immediately and refresh async.
+
+Migration Plan (Do This Without Breaking Current Market Outlook)
+Phase 1 (MVP)
+
+Add PlayerOutlook page and endpoint
+
+Add “View Player Outlook” button from current card outlook
+
+Keep existing comps engine untouched
+
+Phase 2
+
+Make PlayerOutlook the default MarketOutlook landing
+
+Put card comps into collapsible Evidence Panel
+
+Phase 3
+
+Add watchlist + alerts + player tracking
+
+Add “recommended searches” that jump users into eBay/search workflows
+
+QA Checklist
+
+Works with: rookie QB, veteran WR, retired HOF, unknown player
+
+Handles missing position/team gracefully
+
+AI output follows template exactly
+
+No long paragraphs
+
+Evidence panel does not dominate
+
+Cache returns instantly; refresh runs async
+
+Does not break existing card-based flow
+
+Acceptance Test Example (Shedeur Sanders)
+
+When searching “Shedeur Sanders” the system should output:
+
+Temperature: Hot
+
+Volatility: High
+
+Verdict: BUY or WATCH (depending on signals)
+
+Exposure recs: Optic Holo RR / Prizm Silver style / numbered rookies/autos as Premium
+
+Clear risk notes: performance drop, benching, injury, hype cooldown
+
+Evidence: comps if available, otherwise “thin comps” clearly stated
+
+If you want, I can also give you:
+
+the exact UI copy for each card/section
+
+the exact rule engine defaults by sport/position
+
+a ready-to-use JSON schema + Zod validators for the response objects
