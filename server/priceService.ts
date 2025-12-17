@@ -1143,10 +1143,14 @@ RULES:
     : `You are a sports card pricing expert. Extract ALL INDIVIDUAL price points from search results.
 
 CRITICAL MATCHING RULES (STRICT COMPS ONLY):
-1. CARD NUMBER: If target card has #10, ONLY use listings with #10. Card #81 is a DIFFERENT card.
-2. GRADER: For PSA cards, only use PSA prices for value. CGC/SGC are different graders.
-3. QUALIFIERS: Exclude cards with (ST), (OC), (MC), (MK), (PD) - these are damaged/flawed.
-4. GRADE: PSA 8 is not the same as PSA 9 or PSA 7. Match exactly.
+1. GRADE IS CRITICAL - NEVER MIX GRADES:
+   - If the target card is "PSA 10", ONLY extract prices labeled "PSA 10"
+   - NEVER include "Raw", "Ungraded", or prices without a grade designation
+   - PSA 10 ≠ PSA 9 ≠ PSA 8 - each grade has DIFFERENT values
+   - When a snippet shows "Raw $27; PSA 9 $46; PSA 10 $108", extract ONLY the PSA 10 price ($108)
+2. CARD NUMBER: If target card has #10, ONLY use listings with #10. Card #81 is a DIFFERENT card.
+3. GRADER: For PSA cards, only use PSA prices for value. CGC/SGC are different graders.
+4. QUALIFIERS: Exclude cards with (ST), (OC), (MC), (MK), (PD) - these are damaged/flawed.
 5. VARIATION: Base cards are NOT the same as parallels (Prizm, Refractor, Holo, numbered /99, etc.)
 
 Your task:
@@ -1208,12 +1212,19 @@ Grade: ${card.grade || "Raw/Ungraded"}
 
 CRITICAL MATCHING RULES:
 
-1. GRADER MATCHING - DO NOT MIX GRADERS:
+1. GRADE MATCHING - EXACT GRADE ONLY:
+- This card is: ${card.grade || "Raw/Ungraded"}
+- ONLY extract prices that match this EXACT grade
+- If snippets show multiple grades like "Raw $27; PSA 9 $46; PSA 10 $108", extract ONLY ${card.grade || "the matching grade"} prices
+- NEVER include "Raw" or "Ungraded" prices when the card is graded
+- ${card.grade} ≠ lower grades (a PSA 10 is worth MORE than PSA 9)
+
+2. GRADER MATCHING - DO NOT MIX GRADERS:
 - This card is graded by: ${(card.grader || parseGradeInfo(card.grade).grader || "any grader").toUpperCase()}
 - ONLY include prices from the SAME grading company
 - PSA 10 ≠ BGS 10 ≠ SGC 10 ≠ CGC 10 (these are DIFFERENT)
 
-2. VARIATION MATCHING - ${isBaseCard ? "BASE CARDS ONLY" : `MATCH: ${card.variation}`}:
+3. VARIATION MATCHING - ${isBaseCard ? "BASE CARDS ONLY" : `MATCH: ${card.variation}`}:
 ${isBaseCard ? `- This is a BASE CARD - EXCLUDE all parallels, prizms, refractors, holos, numbered cards
 - EXCLUDE: Silver, Gold, Red, Blue, Green, Orange, Purple, Pink, Black, White parallels
 - EXCLUDE: Refractor, Prizm, Holo, Shimmer, Wave, Mojo, Ice, Shock, Velocity, Cracked Ice
