@@ -179,19 +179,40 @@ function isStrictComp(
   }
   
   // HARD GATE 4: Variation/parallel mismatch - base cards should not match parallels
-  // This is critical for pricing accuracy
+  // This is critical for pricing accuracy - comprehensive list covering all major card types
   const parallelKeywords = [
-    "/25", "/50", "/75", "/99", "/100", "/149", "/199", "/250", "/299", "/499", "/999",
-    "refractor", "prizm", "opti-chrome",
-    "auto", "autograph", "signature", "signed",
-    "holo", "holographic", "holofoil",
-    "red yellow", "red/yellow", "red & yellow", "red and yellow",
-    "ice", "neon", "laser", "wave", "pulsar", "mojo", "shimmer", "sparkle", "hyper",
-    "cracked ice", "disco", "fluorescent", "mosaic", "camo",
-    "superfractor", "xfractor", "atomic", "seismic", "velocity", "fast break",
-    "downtown", "kaboom", "silhouettes",
-    "reverse holo", "full art", "secret rare", "ultra rare", "rainbow rare", "alt art",
-    "patch", "jersey", "relic", "game-used", "game used", "memorabilia",
+    // Numbered parallels (most reliable indicator)
+    "/10", "/15", "/25", "/35", "/49", "/50", "/75", "/99", "/100", "/149", "/150", "/175", "/199", "/250", "/299", "/349", "/399", "/499", "/599", "/749", "/799", "/999",
+    "1/1", "one of one", "1 of 1",
+    // Refractor/Prizm family
+    "refractor", "prizm", "opti-chrome", "superfractor", "x-fractor", "xfractor", "atomic", "pulsar",
+    // Autographs
+    "auto", "autograph", "signature", "signed", "on-card auto", "on card auto",
+    // Holo/Shimmer family  
+    "holo", "holographic", "holofoil", "holo flash",
+    "shimmer", "wave", "mojo", "kaboom", "downtown", "disco",
+    "ice", "cracked ice", "fractured", "shock", "sparkle", "white sparkle", "red sparkle",
+    "velocity", "hyper", "scope", "fast break", "flash", "neon", "laser", "fluorescent", "seismic",
+    // Color parallels (Donruss Optic specific)
+    "red yellow", "red/yellow", "red & yellow", "red and yellow", "red white blue", "rwb",
+    // Color parallels with context
+    "gold /", "silver /", "red /", "blue /", "green /", "orange /", "purple /", "pink /", "black /", "white /",
+    "gold parallel", "silver parallel", "red parallel", "blue parallel", "green parallel",
+    "orange parallel", "purple parallel", "pink parallel", "black parallel", "white parallel",
+    "neon green", "neon orange", "neon pink", "neon blue",
+    // Premium colors
+    "sapphire", "ruby", "emerald", "diamond", "platinum", "bronze", "copper", "peacock",
+    // Mosaic/Panini specific
+    "mosaic", "camo", "reactive", "genesis", "reactive blue", "reactive gold",
+    "asia", "asia exclusive", "choice", "mega box", "blaster exclusive",
+    // Topps specific
+    "sepia", "negative", "sp image", "photo variation",
+    // Other parallels
+    "silhouettes", "reverse holo", "full art", "secret rare", "ultra rare", "rainbow rare", "alt art",
+    // Relics/Memorabilia
+    "patch", "jersey", "relic", "game-used", "game used", "memorabilia", "swatch",
+    // Inserts/Short prints
+    "insert", "ssp", "sp ", "case hit", "short print",
   ];
   
   const listingHasParallel = parallelKeywords.some(kw => combined.includes(kw.toLowerCase()));
@@ -305,26 +326,40 @@ function computeListingMatchScore(
     }
   } else {
     // No variation specified - penalize if listing has a parallel/variation keyword
-    // Extensive list to catch all common parallels and colored variations
+    // Comprehensive list matching the isStrictComp function
     const parallelKeywords = [
-      // Numbered parallels
-      "/25", "/50", "/75", "/99", "/100", "/149", "/199", "/250", "/299", "/499", "/999",
-      // Premium parallels
-      "refractor", "prizm", "opti-chrome",
-      "auto", "autograph", "signature", "signed", "on-card auto",
-      // Color parallels (Donruss, Prizm, Topps, etc.)
-      "holo", "holographic", "holofoil",
-      "red yellow", "red/yellow", "red & yellow", "red and yellow",
-      "ice", "neon", "laser", "wave", "pulsar", "mojo", "shimmer", "sparkle", "hyper",
-      // Insert/special parallels
-      "cracked ice", "disco", "fluorescent", "mosaic", "camo",
-      "superfractor", "xfractor", "atomic", "seismic", "velocity", "fast break",
-      // Sports card specific premium
-      "downtown", "kaboom", "silhouettes",
-      // TCG parallels
-      "reverse holo", "full art", "secret rare", "ultra rare", "rainbow rare", "alt art", "alternate art",
-      // Premium materials
-      "patch", "jersey", "relic", "game-used", "game used", "memorabilia",
+      // Numbered parallels (most reliable indicator)
+      "/10", "/15", "/25", "/35", "/49", "/50", "/75", "/99", "/100", "/149", "/150", "/175", "/199", "/250", "/299", "/349", "/399", "/499", "/599", "/749", "/799", "/999",
+      "1/1", "one of one", "1 of 1",
+      // Refractor/Prizm family
+      "refractor", "prizm", "opti-chrome", "superfractor", "x-fractor", "xfractor", "atomic", "pulsar",
+      // Autographs
+      "auto", "autograph", "signature", "signed", "on-card auto", "on card auto",
+      // Holo/Shimmer family  
+      "holo", "holographic", "holofoil", "holo flash",
+      "shimmer", "wave", "mojo", "kaboom", "downtown", "disco",
+      "ice", "cracked ice", "fractured", "shock", "sparkle", "white sparkle", "red sparkle",
+      "velocity", "hyper", "scope", "fast break", "flash", "neon", "laser", "fluorescent", "seismic",
+      // Color parallels (Donruss Optic specific)
+      "red yellow", "red/yellow", "red & yellow", "red and yellow", "red white blue", "rwb",
+      // Color parallels with context
+      "gold /", "silver /", "red /", "blue /", "green /", "orange /", "purple /", "pink /", "black /", "white /",
+      "gold parallel", "silver parallel", "red parallel", "blue parallel", "green parallel",
+      "orange parallel", "purple parallel", "pink parallel", "black parallel", "white parallel",
+      "neon green", "neon orange", "neon pink", "neon blue",
+      // Premium colors
+      "sapphire", "ruby", "emerald", "diamond", "platinum", "bronze", "copper", "peacock",
+      // Mosaic/Panini specific
+      "mosaic", "camo", "reactive", "genesis", "reactive blue", "reactive gold",
+      "asia", "asia exclusive", "choice", "mega box", "blaster exclusive",
+      // Topps specific
+      "sepia", "negative", "sp image", "photo variation",
+      // Other parallels
+      "silhouettes", "reverse holo", "full art", "secret rare", "ultra rare", "rainbow rare", "alt art", "alternate art",
+      // Relics/Memorabilia
+      "patch", "jersey", "relic", "game-used", "game used", "memorabilia", "swatch",
+      // Inserts/Short prints
+      "insert", "ssp", "sp ", "case hit", "short print",
     ];
     // Also check for standalone color words that indicate parallels when near "parallel" or after set name
     const colorParallels = ["red", "blue", "green", "gold", "silver", "pink", "purple", "orange", "yellow", "black", "white"];
@@ -873,19 +908,21 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
 
   // Adjust prompt based on whether we have strict comps or using loose fallback
   const systemPrompt = usingLooseFallback
-    ? `You are a sports card pricing expert. Extract price points from search results.
+    ? `You are a sports card pricing expert. Extract ALL price points from search results.
     
 NOTE: No exact matches found, using approximate comps. Extract all relevant prices but acknowledge this is approximate data.
 
 Your task:
 1. Find prices from the best matching listings available
-2. For each price, extract: price amount, approximate date (if visible), source name, and source URL
-3. Look for: eBay sold prices, auction results, price guide values, recent sales
+2. IMPORTANT: Extract EVERY price you see - if a snippet shows multiple prices like "SOLD FOR $79...SOLD FOR $61", extract BOTH as separate price points
+3. For each price, extract: price amount, approximate date (if visible), source name, and source URL
+4. Look for: eBay sold prices, auction results, price guide values, recent sales
 
 Return ONLY a JSON object with:
 {
   "pricePoints": [
-    { "date": "2024-12-01", "price": 299, "source": "eBay Sold", "url": "https://..." }
+    { "date": "2024-12-01", "price": 79, "source": "eBay Sold", "url": "https://..." },
+    { "date": "2024-11-30", "price": 61, "source": "eBay Sold", "url": "https://..." }
   ],
   "estimatedValue": number (average of prices found),
   "salesFound": number (total price points extracted),
@@ -895,27 +932,32 @@ Return ONLY a JSON object with:
 
 RULES:
 - Extract up to 20 individual price points
+- EXTRACT ALL PRICES from each snippet - don't stop at the first one!
+- A single search result may contain multiple sold prices - extract them all
 - Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
 - If no date is visible, use today's date
 - Note in confidenceReason that exact match data was not available`
-    : `You are a sports card pricing expert. Extract INDIVIDUAL price points from search results.
+    : `You are a sports card pricing expert. Extract ALL INDIVIDUAL price points from search results.
 
 CRITICAL MATCHING RULES (STRICT COMPS ONLY):
 1. CARD NUMBER: If target card has #10, ONLY use listings with #10. Card #81 is a DIFFERENT card.
 2. GRADER: For PSA cards, only use PSA prices for value. CGC/SGC are different graders.
 3. QUALIFIERS: Exclude cards with (ST), (OC), (MC), (MK), (PD) - these are damaged/flawed.
 4. GRADE: PSA 8 is not the same as PSA 9 or PSA 7. Match exactly.
+5. VARIATION: Base cards are NOT the same as parallels (Prizm, Refractor, Holo, numbered /99, etc.)
 
 Your task:
-1. Find STRICT MATCH prices only - same card number, same grader, same grade, no qualifiers
-2. For each price, extract: price amount, approximate date (if visible), source name, and source URL
-3. Look for: eBay sold prices, auction results, price guide values, recent sales
+1. Find STRICT MATCH prices only - same card number, same grader, same grade, same variation, no qualifiers
+2. IMPORTANT: Extract EVERY price you see - if a snippet shows "SOLD FOR $79...SOLD FOR $61", extract BOTH as separate price points
+3. For each price, extract: price amount, approximate date (if visible), source name, and source URL
+4. Look for: eBay sold prices, auction results, price guide values, recent sales
 
 Return ONLY a JSON object with:
 {
   "pricePoints": [
-    { "date": "2024-12-01", "price": 299, "source": "eBay Sold", "url": "https://...", "isStrict": true },
-    { "date": "2024-11-15", "price": 350, "source": "130point", "url": "https://...", "isStrict": true }
+    { "date": "2024-12-01", "price": 79, "source": "eBay Sold", "url": "https://...", "isStrict": true },
+    { "date": "2024-11-15", "price": 61, "source": "eBay Sold", "url": "https://...", "isStrict": true },
+    { "date": "2024-11-10", "price": 55, "source": "130point", "url": "https://...", "isStrict": true }
   ],
   "estimatedValue": number (average of STRICT matches only),
   "salesFound": number (total STRICT price points extracted),
@@ -925,49 +967,65 @@ Return ONLY a JSON object with:
 
 RULES:
 - Extract up to 20 individual price points
+- EXTRACT ALL PRICES from each snippet - don't stop at the first one!
+- A single search result may contain multiple sold prices (e.g., auction history) - extract them all
 - EXCLUDE different card numbers (e.g., #81 Team Leaders vs #10 Base)
 - EXCLUDE different graders for value calculation (CGC 8 ≠ PSA 8)
 - EXCLUDE qualifier grades like PSA 8 (ST) - these are worth much less
+- EXCLUDE parallels/variations when searching for base cards (Prizm, Refractor, Holo, /99, etc.)
 - Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
 - If no date is visible, use today's date
 - eBay sold listings are most reliable`;
 
+  const isBaseCard = !card.variation || card.variation.trim().length === 0;
+  
   const userPrompt = usingLooseFallback
-    ? `Extract approximate price points for this card (no exact matches found):
+    ? `Extract ALL price points for this card (no exact matches found):
 Card: ${card.title}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
-Variation: ${card.variation || "None"}
+Variation: ${card.variation || "Base card (no parallel)"}
 Grade: ${card.grade || "Raw/Ungraded"}
 
-Extract the best available pricing from these listings (acknowledge data is approximate):
-${searchContext}
-
-Return JSON with pricePoints array, estimatedValue, salesFound, confidence (max "medium"), and confidenceReason.`
-    : `Extract STRICT MATCH price points for this card:
-Card: ${card.title}
-Card Number: ${card.cardNumber || extractCardNumber(card.title) || "Not specified"}
-Set: ${card.set || "Unknown"}
-Year: ${card.year || "Unknown"}
-Variation: ${card.variation || "None"}
-Grade: ${card.grade || "Raw/Ungraded"}
-
-CRITICAL GRADING RULES - DO NOT MIX GRADERS:
-- This card is graded by: ${(card.grader || parseGradeInfo(card.grade).grader || "any grader").toUpperCase()}
-- ONLY include prices from the SAME grading company
-- PSA 10 ≠ BGS Pristine 10 ≠ BGS 10 ≠ SGC 10 ≠ CGC 10 (these are DIFFERENT)
-- If card is PSA, EXCLUDE all BGS/Beckett, SGC, CGC prices
-- If card is BGS, EXCLUDE all PSA, SGC, CGC prices
-
-Additional match requirements:
-- Same card number (if specified above)
-- Same numeric grade (PSA 10 vs PSA 9 are different values)
-- NO qualifiers like (ST), (OC), (MK), (MC), (PD), etc.
+IMPORTANT: Extract EVERY sold price you find in the snippets - some snippets contain multiple prices!
+For example, if you see "SOLD FOR $79...SOLD FOR $61", create TWO price points ($79 and $61).
 
 Search results:
 ${searchContext}
 
-Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and confidenceReason.`;
+Return JSON with pricePoints array (all prices found), estimatedValue, salesFound, confidence (max "medium"), and confidenceReason.`
+    : `Extract ALL STRICT MATCH price points for this card:
+Card: ${card.title}
+Card Number: ${card.cardNumber || extractCardNumber(card.title) || "Not specified"}
+Set: ${card.set || "Unknown"}
+Year: ${card.year || "Unknown"}
+Variation: ${card.variation || "BASE CARD (no parallel/refractor/prizm/holo/numbered)"}
+Grade: ${card.grade || "Raw/Ungraded"}
+
+CRITICAL MATCHING RULES:
+
+1. GRADER MATCHING - DO NOT MIX GRADERS:
+- This card is graded by: ${(card.grader || parseGradeInfo(card.grade).grader || "any grader").toUpperCase()}
+- ONLY include prices from the SAME grading company
+- PSA 10 ≠ BGS 10 ≠ SGC 10 ≠ CGC 10 (these are DIFFERENT)
+
+2. VARIATION MATCHING - ${isBaseCard ? "BASE CARDS ONLY" : `MATCH: ${card.variation}`}:
+${isBaseCard ? `- This is a BASE CARD - EXCLUDE all parallels, prizms, refractors, holos, numbered cards
+- EXCLUDE: Silver, Gold, Red, Blue, Green, Orange, Purple, Pink, Black, White parallels
+- EXCLUDE: Refractor, Prizm, Holo, Shimmer, Wave, Mojo, Ice, Shock, Velocity, Cracked Ice
+- EXCLUDE: Any numbered cards (/25, /50, /99, /199, /299, /499, etc.)
+- EXCLUDE: Auto, Autograph, Patch, Jersey, Relic, Memorabilia cards
+- ONLY include plain base card sales` : `- This is a ${card.variation} parallel - ONLY include prices for this exact variation
+- EXCLUDE base cards and other variations`}
+
+3. EXTRACT ALL PRICES:
+- IMPORTANT: Some snippets contain multiple sold prices - extract ALL of them!
+- If you see "SOLD FOR $79...SOLD FOR $61", create TWO separate price points
+
+Search results:
+${searchContext}
+
+Return JSON with pricePoints array (all prices found), estimatedValue, salesFound, confidence, and confidenceReason.`;
 
   const completion = await openai.chat.completions.create({
     model: "gpt-4o-mini",
