@@ -13,6 +13,7 @@ interface CardInfo {
   cardNumber?: string | null;
   variation?: string | null;
   grade?: string | null;
+  grader?: string | null; // Separate grader field (PSA, BGS, SGC, CGC)
 }
 
 interface PriceLookupResult {
@@ -127,9 +128,17 @@ function getEffectiveGrade(gradeNum: number | null, hasQualifier: boolean): numb
 function isStrictComp(
   listingTitle: string,
   listingSnippet: string,
-  card: CardInfo
+  card: CardInfo,
+  listingUrl?: string
 ): { isStrict: boolean; excludeReason: string | null } {
   const combined = `${listingTitle} ${listingSnippet}`.toLowerCase();
+  const url = (listingUrl || "").toLowerCase();
+  
+  // HARD GATE 0: Exclude marketplace aggregators that show mixed listings (not sold prices)
+  // These sites show multiple cards with different graders/conditions on one page
+  if (url.includes("comc.com")) {
+    return { isStrict: false, excludeReason: "COMC marketplace shows mixed listings, not reliable comps" };
+  }
   
   // HARD GATE 1: Card number must match exactly if both have one
   // Use explicit cardNumber field if provided, otherwise extract from title
@@ -147,9 +156,11 @@ function isStrictComp(
   }
   
   // HARD GATE 3: Grader must match for strict comp (PSA card needs PSA comps)
+  // Use explicit grader field if available, otherwise extract from grade string
   const cardGrade = parseGradeInfo(card.grade);
-  if (cardGrade.grader && listingGrade.grader && cardGrade.grader !== listingGrade.grader) {
-    return { isStrict: false, excludeReason: `Grader mismatch: ${cardGrade.grader.toUpperCase()} vs ${listingGrade.grader.toUpperCase()}` };
+  const effectiveCardGrader = card.grader?.toLowerCase() || cardGrade.grader;
+  if (effectiveCardGrader && listingGrade.grader && effectiveCardGrader !== listingGrade.grader) {
+    return { isStrict: false, excludeReason: `Grader mismatch: ${effectiveCardGrader.toUpperCase()} vs ${listingGrade.grader.toUpperCase()}` };
   }
   
   // HARD GATE 4: Variation/parallel mismatch - base cards should not match parallels
@@ -432,7 +443,7 @@ function filterToStrictComps(
   const loose: typeof listings = [];
   
   for (const listing of listings) {
-    const { isStrict, excludeReason } = isStrictComp(listing.title, listing.snippet, card);
+    const { isStrict, excludeReason } = isStrictComp(listing.title, listing.snippet, card, listing.link);
     if (isStrict) {
       strict.push(listing);
     } else {
@@ -519,7 +530,7 @@ function computeCardMatchConfidence(
   if (usingFallback) {
     // Using loose comps only - cap tier at MEDIUM max, explain why
     const { excludeReason } = looseComps[0] 
-      ? isStrictComp(looseComps[0].title, looseComps[0].snippet, card)
+      ? isStrictComp(looseComps[0].title, looseComps[0].snippet, card, looseComps[0].link)
       : { excludeReason: null };
     
     if (effectiveScore >= 0.7 && highMatchCount >= 2) {
@@ -832,7 +843,7 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
   console.log(`STRICT: ${strictResults.length} | LOOSE: ${looseResults.length}`);
   console.log("--------------------------------------------------------");
   rawResults.forEach((r: any, i: number) => {
-    const { isStrict } = isStrictComp(r.title, r.snippet, card);
+    const { isStrict } = isStrictComp(r.title, r.snippet, card, r.link);
     console.log(`[${i + 1}] ${isStrict ? "STRICT" : "LOOSE"} - ${r.title}`);
     console.log(`    Snippet: ${r.snippet?.substring(0, 150)}...`);
     console.log(`    URL: ${r.link}`);
@@ -927,7 +938,7 @@ Variation: ${card.variation || "None"}
 Grade: ${card.grade || "Raw/Ungraded"}
 
 CRITICAL GRADING RULES - DO NOT MIX GRADERS:
-- This card is graded by: ${parseGradeInfo(card.grade).grader?.toUpperCase() || "any grader"}
+- This card is graded by: ${(card.grader || parseGradeInfo(card.grade).grader || "any grader").toUpperCase()}
 - ONLY include prices from the SAME grading company
 - PSA 10 ≠ BGS Pristine 10 ≠ BGS 10 ≠ SGC 10 ≠ CGC 10 (these are DIFFERENT)
 - If card is PSA, EXCLUDE all BGS/Beckett, SGC, CGC prices
@@ -959,7 +970,7 @@ Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and 
   if (jsonMatch) {
     try {
       const parsed = JSON.parse(jsonMatch[0]);
-      const cardGrader = parseGradeInfo(card.grade).grader;
+      const cardGrader = card.grader?.toLowerCase() || parseGradeInfo(card.grade).grader;
       const pricePoints: PricePoint[] = (parsed.pricePoints || []).map((pp: any) => ({
         date: pp.date || new Date().toISOString().split('T')[0],
         price: typeof pp.price === 'number' ? pp.price : parseFloat(pp.price) || 0,

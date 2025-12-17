@@ -1337,6 +1337,7 @@ Allow: /
         year: card.year,
         variation: card.variation,
         grade: card.grade,
+        grader: card.grader,
       });
 
       // Convert price points to the schema format
@@ -1677,6 +1678,7 @@ Allow: /
         year: year ? parseInt(year) : undefined,
         variation: variation || undefined,
         grade: grade || undefined,
+        grader: grader || undefined,
       });
 
       // Compute signals
