@@ -2127,6 +2127,148 @@ Allow: /
     }
   });
 
+  // ====== PLAYER WATCHLIST ROUTES ======
+  
+  // Add player to watchlist
+  app.post("/api/watchlist", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerName, sport = "football", currentOutlook } = req.body;
+
+      if (!playerName || typeof playerName !== "string" || playerName.trim().length < 2) {
+        return res.status(400).json({ message: "Player name is required (minimum 2 characters)" });
+      }
+
+      // Normalize player key
+      const playerKey = `${sport.toLowerCase()}:${playerName.toLowerCase().trim().replace(/\s+/g, "_")}`;
+
+      // Check if already watching
+      const existing = await storage.getWatchlistItem(userId, playerKey);
+      if (existing) {
+        return res.status(409).json({ message: "Player already in watchlist", watching: true });
+      }
+
+      // Extract snapshot values from current outlook if provided
+      const watchlistItem = await storage.addToWatchlist({
+        userId,
+        playerKey,
+        playerName: playerName.trim(),
+        sport,
+        verdictAtAdd: currentOutlook?.verdict?.action || null,
+        modifierAtAdd: currentOutlook?.verdict?.modifier || null,
+        temperatureAtAdd: currentOutlook?.snapshot?.temperature || null,
+        notes: null,
+      });
+
+      res.status(201).json(watchlistItem);
+    } catch (error) {
+      console.error("Error adding to watchlist:", error);
+      res.status(500).json({ message: "Failed to add player to watchlist" });
+    }
+  });
+
+  // Remove player from watchlist
+  app.delete("/api/watchlist/:playerKey", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const playerKey = decodeURIComponent(req.params.playerKey);
+
+      const deleted = await storage.removeFromWatchlist(userId, playerKey);
+      if (!deleted) {
+        return res.status(404).json({ message: "Player not in watchlist" });
+      }
+
+      res.json({ message: "Removed from watchlist", watching: false });
+    } catch (error) {
+      console.error("Error removing from watchlist:", error);
+      res.status(500).json({ message: "Failed to remove player from watchlist" });
+    }
+  });
+
+  // Get user's full watchlist with current outlooks
+  app.get("/api/watchlist", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const sport = req.query.sport as string | undefined;
+
+      const watchlist = await storage.getWatchlist(userId, sport);
+      
+      // Fetch current outlooks and calculate changes
+      const { getPlayerOutlook } = await import("./playerOutlookEngine");
+      
+      const enrichedWatchlist = await Promise.all(
+        watchlist.map(async (item) => {
+          try {
+            // Get current cached outlook (don't generate new - just use cache)
+            const currentOutlook = await storage.getCachedPlayerOutlook(item.playerKey);
+            
+            // Calculate changes
+            const changes = {
+              verdictChanged: currentOutlook?.outlookJson?.verdict?.action !== item.verdictAtAdd,
+              modifierChanged: currentOutlook?.outlookJson?.verdict?.modifier !== item.modifierAtAdd,
+              temperatureChanged: currentOutlook?.outlookJson?.snapshot?.temperature !== item.temperatureAtAdd,
+              previousVerdict: item.verdictAtAdd,
+              previousModifier: item.modifierAtAdd,
+              previousTemperature: item.temperatureAtAdd,
+              changeCount: 0,
+            };
+            
+            if (changes.verdictChanged) changes.changeCount++;
+            if (changes.modifierChanged) changes.changeCount++;
+            if (changes.temperatureChanged) changes.changeCount++;
+            
+            return {
+              ...item,
+              currentOutlook: currentOutlook?.outlookJson || null,
+              changes: changes.changeCount > 0 ? changes : null,
+            };
+          } catch (error) {
+            console.error(`Error fetching outlook for ${item.playerKey}:`, error);
+            return { ...item, currentOutlook: null, changes: null };
+          }
+        })
+      );
+
+      res.json(enrichedWatchlist);
+    } catch (error) {
+      console.error("Error getting watchlist:", error);
+      res.status(500).json({ message: "Failed to get watchlist" });
+    }
+  });
+
+  // Check if player is in watchlist
+  app.get("/api/watchlist/check/:playerKey", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const playerKey = decodeURIComponent(req.params.playerKey);
+
+      const item = await storage.getWatchlistItem(userId, playerKey);
+      res.json({ watching: !!item, item });
+    } catch (error) {
+      console.error("Error checking watchlist:", error);
+      res.status(500).json({ message: "Failed to check watchlist status" });
+    }
+  });
+
+  // Update watchlist notes
+  app.patch("/api/watchlist/:playerKey", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const playerKey = decodeURIComponent(req.params.playerKey);
+      const { notes } = req.body;
+
+      const updated = await storage.updateWatchlistNotes(userId, playerKey, notes);
+      if (!updated) {
+        return res.status(404).json({ message: "Player not in watchlist" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating watchlist:", error);
+      res.status(500).json({ message: "Failed to update watchlist" });
+    }
+  });
+
   // Object Storage routes - allows public access for public objects
   app.get("/objects/:objectPath(*)", async (req: any, res) => {
     // Get userId if authenticated, but don't require authentication

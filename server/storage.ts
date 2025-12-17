@@ -20,6 +20,8 @@ import {
   userAlertSettings,
   cardOutlooks,
   outlookUsage,
+  playerWatchlist,
+  playerOutlookCache,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -59,6 +61,9 @@ import {
   type InsertCardOutlook,
   type CardOutlookWithCard,
   type PricePoint,
+  type PlayerWatchlist,
+  type InsertPlayerWatchlist,
+  type PlayerOutlookCache,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -257,6 +262,16 @@ export interface IStorage {
   countUserMonthlyOutlookGenerations(userId: string): Promise<number>;
   countDailyFreeUserOutlookGenerations(): Promise<number>;
   recordOutlookUsage(userId: string, source: 'collection' | 'quick', cardId?: number, cardTitle?: string): Promise<void>;
+
+  // Player Watchlist operations
+  getWatchlist(userId: string, sport?: string): Promise<PlayerWatchlist[]>;
+  getWatchlistItem(userId: string, playerKey: string): Promise<PlayerWatchlist | undefined>;
+  addToWatchlist(data: InsertPlayerWatchlist): Promise<PlayerWatchlist>;
+  removeFromWatchlist(userId: string, playerKey: string): Promise<boolean>;
+  updateWatchlistNotes(userId: string, playerKey: string, notes: string | null): Promise<PlayerWatchlist | undefined>;
+
+  // Player Outlook Cache operations
+  getCachedPlayerOutlook(playerKey: string): Promise<PlayerOutlookCache | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2222,6 +2237,76 @@ export class DatabaseStorage implements IStorage {
       .update(userAlertSettings)
       .set({ lastDigestSentAt: new Date() })
       .where(eq(userAlertSettings.userId, userId));
+  }
+
+  // Player Watchlist operations
+  async getWatchlist(userId: string, sport?: string): Promise<PlayerWatchlist[]> {
+    if (sport) {
+      return db
+        .select()
+        .from(playerWatchlist)
+        .where(and(
+          eq(playerWatchlist.userId, userId),
+          eq(playerWatchlist.sport, sport)
+        ))
+        .orderBy(desc(playerWatchlist.createdAt));
+    }
+    return db
+      .select()
+      .from(playerWatchlist)
+      .where(eq(playerWatchlist.userId, userId))
+      .orderBy(desc(playerWatchlist.createdAt));
+  }
+
+  async getWatchlistItem(userId: string, playerKey: string): Promise<PlayerWatchlist | undefined> {
+    const [item] = await db
+      .select()
+      .from(playerWatchlist)
+      .where(and(
+        eq(playerWatchlist.userId, userId),
+        eq(playerWatchlist.playerKey, playerKey)
+      ));
+    return item;
+  }
+
+  async addToWatchlist(data: InsertPlayerWatchlist): Promise<PlayerWatchlist> {
+    const [item] = await db
+      .insert(playerWatchlist)
+      .values(data)
+      .returning();
+    return item;
+  }
+
+  async removeFromWatchlist(userId: string, playerKey: string): Promise<boolean> {
+    const result = await db
+      .delete(playerWatchlist)
+      .where(and(
+        eq(playerWatchlist.userId, userId),
+        eq(playerWatchlist.playerKey, playerKey)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async updateWatchlistNotes(userId: string, playerKey: string, notes: string | null): Promise<PlayerWatchlist | undefined> {
+    const [updated] = await db
+      .update(playerWatchlist)
+      .set({ notes, updatedAt: new Date() })
+      .where(and(
+        eq(playerWatchlist.userId, userId),
+        eq(playerWatchlist.playerKey, playerKey)
+      ))
+      .returning();
+    return updated;
+  }
+
+  // Player Outlook Cache operations
+  async getCachedPlayerOutlook(playerKey: string): Promise<PlayerOutlookCache | undefined> {
+    const [cached] = await db
+      .select()
+      .from(playerOutlookCache)
+      .where(eq(playerOutlookCache.playerKey, playerKey));
+    return cached;
   }
 }
 
