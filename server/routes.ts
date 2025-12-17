@@ -13,6 +13,15 @@ import { generateShareImage } from "./shareImageService";
 import { prestigeService } from "./prestigeService";
 import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./cardOutlookService";
 import { sendPaymentConfirmationEmail } from "./email";
+import { 
+  buildPortfolioProfile, 
+  generateRiskSignals, 
+  generatePortfolioOutlook, 
+  getLatestPortfolioSnapshot, 
+  isSnapshotFresh,
+  generateNextBuys,
+  getLatestNextBuys
+} from "./portfolioIntelligenceService";
 
 // ============================================================================
 // Free User Cost Safeguards
@@ -4121,6 +4130,151 @@ Allow: /
     } catch (error) {
       console.error("[Comps API] Error normalizing query:", error);
       res.status(500).json({ error: "Failed to normalize query" });
+    }
+  });
+
+  // ============================================================================
+  // Portfolio Intelligence API
+  // ============================================================================
+
+  // GET /api/portfolio/outlook - Get latest portfolio outlook snapshot
+  app.get("/api/portfolio/outlook", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const snapshot = await getLatestPortfolioSnapshot(userId);
+      
+      if (!snapshot) {
+        return res.json({ 
+          hasSnapshot: false, 
+          message: "No portfolio outlook generated yet" 
+        });
+      }
+
+      res.json({ 
+        hasSnapshot: true, 
+        snapshot 
+      });
+    } catch (error) {
+      console.error("[Portfolio Outlook] Error getting snapshot:", error);
+      res.status(500).json({ error: "Failed to get portfolio outlook" });
+    }
+  });
+
+  // POST /api/portfolio/outlook/generate - Generate new portfolio outlook
+  app.post("/api/portfolio/outlook/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const refresh = req.query.refresh === "true";
+      
+      // Check if we have a fresh snapshot (unless refresh is requested)
+      if (!refresh) {
+        const isFresh = await isSnapshotFresh(userId, 12); // 12 hour cache
+        if (isFresh) {
+          const existing = await getLatestPortfolioSnapshot(userId);
+          if (existing) {
+            return res.json({ 
+              snapshot: existing, 
+              cached: true,
+              message: "Returning cached snapshot (less than 12 hours old)" 
+            });
+          }
+        }
+      }
+
+      console.log(`[Portfolio Outlook] Generating for user ${userId}...`);
+      const snapshot = await generatePortfolioOutlook(userId);
+      
+      res.json({ 
+        snapshot, 
+        cached: false,
+        message: "New portfolio outlook generated" 
+      });
+    } catch (error) {
+      console.error("[Portfolio Outlook] Error generating:", error);
+      res.status(500).json({ error: "Failed to generate portfolio outlook" });
+    }
+  });
+
+  // GET /api/portfolio/profile - Get raw portfolio profile (for debugging/display)
+  app.get("/api/portfolio/profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const profile = await buildPortfolioProfile(userId);
+      const riskSignals = generateRiskSignals(profile);
+      
+      res.json({ profile, riskSignals });
+    } catch (error) {
+      console.error("[Portfolio Profile] Error building:", error);
+      res.status(500).json({ error: "Failed to build portfolio profile" });
+    }
+  });
+
+  // GET /api/portfolio/next-buys - Get latest next buys recommendations
+  app.get("/api/portfolio/next-buys", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const buys = await getLatestNextBuys(userId);
+      
+      res.json({ 
+        buys,
+        count: buys.length
+      });
+    } catch (error) {
+      console.error("[Next Buys] Error getting:", error);
+      res.status(500).json({ error: "Failed to get next buys" });
+    }
+  });
+
+  // POST /api/portfolio/next-buys/generate - Generate new next buys recommendations
+  app.post("/api/portfolio/next-buys/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const refresh = req.query.refresh === "true";
+      
+      // Check for existing today's recommendations (unless refresh is requested)
+      if (!refresh) {
+        const existing = await getLatestNextBuys(userId);
+        if (existing.length > 0) {
+          return res.json({ 
+            buys: existing, 
+            cached: true,
+            message: "Returning today's recommendations" 
+          });
+        }
+      }
+
+      console.log(`[Next Buys] Generating for user ${userId}...`);
+      const buys = await generateNextBuys(userId);
+      
+      res.json({ 
+        buys, 
+        cached: false,
+        count: buys.length,
+        message: "New next buys recommendations generated" 
+      });
+    } catch (error) {
+      console.error("[Next Buys] Error generating:", error);
+      res.status(500).json({ error: "Failed to generate next buys" });
     }
   });
 

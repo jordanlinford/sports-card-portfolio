@@ -43,7 +43,9 @@ import {
   Lightbulb,
   Users,
   HandCoins,
-  ChevronDown
+  ChevronDown,
+  Target,
+  LineChart
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -119,7 +121,7 @@ export function Navigation() {
                     size="sm" 
                     className={cn(
                       "gap-1",
-                      isActiveSection(["/cases", "/analytics", "/search"]) && "bg-accent"
+                      isActiveSection(["/cases", "/analytics", "/search", "/portfolio"]) && "bg-accent"
                     )}
                     data-testid="nav-portfolio"
                   >
@@ -132,6 +134,19 @@ export function Navigation() {
                   <DropdownMenuLabel className="text-xs text-muted-foreground">
                     Your collection, organized like a real portfolio
                   </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/portfolio/outlook" className="flex items-center gap-2 cursor-pointer">
+                      <BarChart3 className="h-4 w-4" />
+                      Portfolio Outlook
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/portfolio/next-buys" className="flex items-center gap-2 cursor-pointer">
+                      <Target className="h-4 w-4" />
+                      Next Buys
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/cases/new" className="flex items-center gap-2 cursor-pointer">
@@ -147,7 +162,7 @@ export function Navigation() {
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/analytics" className="flex items-center gap-2 cursor-pointer">
-                      <BarChart3 className="h-4 w-4" />
+                      <LineChart className="h-4 w-4" />
                       Analytics
                     </Link>
                   </DropdownMenuItem>

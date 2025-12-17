@@ -1206,3 +1206,158 @@ export type WatchlistPlayerWithOutlook = PlayerWatchlist & {
     changeCount: number;
   };
 };
+
+// =============================================
+// PORTFOLIO INTELLIGENCE LAYER
+// =============================================
+
+// Types for portfolio exposures and risk signals
+export type PortfolioExposures = {
+  bySport: Record<string, number>;
+  byPosition: Record<string, number>;
+  byCareerStage: Record<string, number>;
+  byTeamMarket: Record<string, number>;
+  byGradeCompany: Record<string, number>;
+  topPlayersConcentration: Array<{ player: string; pct: number; value: number }>;
+  topTeamsConcentration: Array<{ team: string; pct: number }>;
+};
+
+export type RiskSignal = {
+  code: string;
+  label: string;
+  severity: "low" | "med" | "high";
+  explanation: string;
+  affectedCardIds: number[];
+};
+
+export type RecommendedAction = {
+  label: string;
+  why: string;
+  cta: string;
+  target: "portfolio" | "nextBuys" | "watchlist" | "marketOutlook";
+};
+
+// Portfolio Snapshots table - stores computed portfolio outlook per user
+export const portfolioSnapshots = pgTable("portfolio_snapshots", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  asOfDate: timestamp("as_of_date").defaultNow(),
+  
+  // Overall assessment
+  overallStance: varchar("overall_stance", { length: 100 }), // "Speculative Growth", "Balanced", "Value", "Legacy", "Aggressive Speculation"
+  confidenceScore: integer("confidence_score"), // 1-100
+  primaryDriver: text("primary_driver"),
+  summaryShort: text("summary_short"),
+  summaryLong: text("summary_long"),
+  
+  // Portfolio metrics
+  portfolioValueEstimate: real("portfolio_value_estimate"),
+  cardCount: integer("card_count"),
+  
+  // Exposures JSON
+  exposures: jsonb("exposures").$type<PortfolioExposures>(),
+  
+  // Risk signals JSON
+  riskSignals: jsonb("risk_signals").$type<RiskSignal[]>(),
+  
+  // AI-generated recommendations
+  opportunities: jsonb("opportunities").$type<string[]>(),
+  watchouts: jsonb("watchouts").$type<string[]>(),
+  recommendedNextActions: jsonb("recommended_next_actions").$type<RecommendedAction[]>(),
+}, (table) => [
+  index("idx_portfolio_snapshot_user").on(table.userId),
+  index("idx_portfolio_snapshot_date").on(table.userId, table.asOfDate),
+]);
+
+export type PortfolioSnapshot = typeof portfolioSnapshots.$inferSelect;
+export type InsertPortfolioSnapshot = typeof portfolioSnapshots.$inferInsert;
+export const insertPortfolioSnapshotSchema = createInsertSchema(portfolioSnapshots).omit({ id: true, createdAt: true });
+
+// Portfolio profile (non-persisted, computed)
+export type PortfolioProfile = {
+  portfolioValueEstimate: number;
+  cardCount: number;
+  sports: Record<string, number>;
+  positions: Record<string, number>;
+  careerStage: Record<string, number>;
+  teamMarket: Record<string, number>;
+  grades: Record<string, number>;
+  concentration: {
+    topPlayers: Array<{ player: string; pct: number; value: number }>;
+    topTeams: Array<{ team: string; pct: number }>;
+  };
+  liquiditySignals: {
+    highLiquidityPct: number;
+    lowLiquidityPct: number;
+  };
+  notableHoldings: Array<{
+    cardId: number;
+    title: string;
+    estValue: number;
+    player: string;
+    position: string;
+    stage: string;
+  }>;
+  weakSpots: Array<{
+    label: string;
+    detail: string;
+  }>;
+};
+
+// Next Buys table - stores recommended buy candidates
+export type NextBuyPortfolioImpact = {
+  qbExposureDelta?: number;
+  rookieExposureDelta?: number;
+  diversificationGain?: string;
+  teamConcentrationDelta?: number;
+};
+
+export const nextBuys = pgTable("next_buys", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  asOfDate: timestamp("as_of_date").defaultNow(),
+  
+  // Card identification
+  title: text("title").notNull(),
+  playerName: varchar("player_name", { length: 255 }),
+  sport: varchar("sport", { length: 50 }),
+  year: integer("year"),
+  setName: varchar("set_name", { length: 255 }),
+  cardNumber: varchar("card_number", { length: 50 }),
+  variation: varchar("variation", { length: 255 }),
+  gradeCompany: varchar("grade_company", { length: 50 }),
+  grade: varchar("grade", { length: 50 }),
+  
+  // Pricing
+  estPrice: real("est_price"),
+  
+  // Scoring (0-100)
+  valueScore: integer("value_score"),
+  fitScore: integer("fit_score"),
+  momentumScore: integer("momentum_score"),
+  overallScore: integer("overall_score"),
+  
+  // Verdict
+  verdict: varchar("verdict", { length: 20 }), // BUY, WATCH
+  
+  // Explanation
+  whyBullets: jsonb("why_bullets").$type<string[]>(),
+  portfolioImpact: jsonb("portfolio_impact").$type<NextBuyPortfolioImpact>(),
+  
+  // Source tracking
+  source: varchar("source", { length: 50 }), // HiddenGems, Watchlist, MarketOutlook, Manual
+  sourceUrl: text("source_url"),
+  
+  // Deduplication
+  cardFingerprint: varchar("card_fingerprint", { length: 255 }).notNull(),
+}, (table) => [
+  index("idx_next_buys_user").on(table.userId),
+  index("idx_next_buys_date_score").on(table.userId, table.asOfDate, table.overallScore),
+  unique("unique_user_fingerprint").on(table.userId, table.cardFingerprint),
+]);
+
+export type NextBuy = typeof nextBuys.$inferSelect;
+export type InsertNextBuy = typeof nextBuys.$inferInsert;
+export const insertNextBuySchema = createInsertSchema(nextBuys).omit({ id: true, createdAt: true });

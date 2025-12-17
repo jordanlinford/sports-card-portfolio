@@ -34,6 +34,8 @@ import OutlookOverviewPage from "@/pages/outlook-overview";
 import PlayerOutlookPage from "@/pages/player-outlook";
 import WatchlistPage from "@/pages/watchlist";
 import HiddenGemsPage from "@/pages/hidden-gems";
+import PortfolioOutlookPage from "@/pages/portfolio-outlook";
+import NextBuysPage from "@/pages/next-buys";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -80,6 +82,8 @@ function Router() {
           <Route path="/player-outlook" component={PlayerOutlookPage} />
           <Route path="/watchlist" component={WatchlistPage} />
           <Route path="/hidden-gems" component={HiddenGemsPage} />
+          <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
+          <Route path="/portfolio/next-buys" component={NextBuysPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />
