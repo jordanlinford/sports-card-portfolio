@@ -22,7 +22,8 @@ import {
   Instagram,
   Smartphone,
   Trophy,
-  Wallet
+  Wallet,
+  Zap
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -168,8 +169,17 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none" />
           {card.outlookAction && !compact && (
-            <div className="absolute top-1 left-1">
+            <div className="absolute top-1 left-1 flex items-center gap-1">
               <OutlookBadge action={card.outlookAction} size="sm" />
+              {card.outlookBigMover && (
+                <div 
+                  className="bg-purple-500/90 p-1 rounded"
+                  title="Big Mover Potential"
+                  data-testid={`badge-big-mover-${card.id}`}
+                >
+                  <Zap className="h-3 w-3 text-white" />
+                </div>
+              )}
             </div>
           )}
         </div>

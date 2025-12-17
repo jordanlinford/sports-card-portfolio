@@ -62,7 +62,8 @@ import {
   Save,
   X,
   RefreshCw,
-  Loader2
+  Loader2,
+  Zap
 } from "lucide-react";
 import type { DisplayCaseWithCards, Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
@@ -143,8 +144,16 @@ function SortableCardTile({ card, onDelete, onClick }: { card: CardType; onDelet
           className="w-full h-full object-cover pointer-events-none"
         />
         {card.outlookAction && (
-          <div className="absolute top-1 left-1 pointer-events-none">
+          <div className="absolute top-1 left-1 pointer-events-none flex items-center gap-1">
             <OutlookBadge action={card.outlookAction} size="sm" />
+            {card.outlookBigMover && (
+              <div 
+                className="bg-purple-500/90 p-1 rounded"
+                title="Big Mover Potential"
+              >
+                <Zap className="h-3 w-3 text-white" />
+              </div>
+            )}
           </div>
         )}
       </div>

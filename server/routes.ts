@@ -1343,10 +1343,15 @@ Allow: /
 
       await storage.upsertCardOutlook(cardId, outlookData);
 
-      // Also update the card's estimated value
+      // Also update the card's estimated value and Big Mover status
+      const cardUpdate: any = {
+        outlookBigMover: signals.bigMoverFlag,
+        outlookBigMoverReason: signals.bigMoverReason,
+      };
       if (priceData.estimatedValue) {
-        await storage.updateCard(cardId, { estimatedValue: priceData.estimatedValue });
+        cardUpdate.estimatedValue = priceData.estimatedValue;
       }
+      await storage.updateCard(cardId, cardUpdate);
 
       // Return the full outlook
       res.json({
