@@ -587,6 +587,18 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
     link: r.link || "",
   }));
 
+  // DEBUG: Log raw search results for match analysis
+  console.log("\n========== RAW COMP DATA FOR MATCH ANALYSIS ==========");
+  console.log(`Card: ${card.title} | Set: ${card.set} | Year: ${card.year} | Grade: ${card.grade}`);
+  console.log("--------------------------------------------------------");
+  rawResults.forEach((r: any, i: number) => {
+    console.log(`[${i + 1}] Title: ${r.title}`);
+    console.log(`    Snippet: ${r.snippet?.substring(0, 150)}...`);
+    console.log(`    URL: ${r.link}`);
+    console.log("");
+  });
+  console.log("========================================================\n");
+
   const searchContext = rawResults
     .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet}\nURL: ${r.link}`)
     .join("\n\n");
