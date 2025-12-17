@@ -1,0 +1,137 @@
+Behavior:
+	•	Dedupe: if a fetch job for queryHash is already running, do nothing
+	•	Enqueue job to fetch comps
+	•	Return { status: "queued", queryHash }
+
+3) Market Outlook integration
+
+When running Market Outlook:
+	•	check MarketCompsCache by queryHash
+	•	if cache hit: use it
+	•	if miss: return partial response, enqueue fetch job, UI polls status endpoint
+
+⸻
+
+Scraping Requirements (eBay)
+
+Target: eBay Sold Listings search results
+
+Use eBay search with sold filter:
+	•	Must filter to Sold Items (and completed)
+	•	Must sort by newly ended or most recent when possible
+	•	Collect up to N=60 items across first 1–3 pages max
+
+Stop conditions:
+	•	if 3 pages scraped OR 60 items OR repeated/empty results
+	•	if error/bot wall triggered: stop, record failure, backoff
+
+⸻
+
+Extraction Fields Per Comp
+
+For each sold item extract:
+	•	title
+	•	soldPrice (number)
+	•	shippingPrice (number, optional)
+	•	totalPrice = soldPrice + shippingPrice (preferred)
+	•	soldDate (if shown; otherwise approximate using listing metadata)
+	•	itemUrl
+	•	imageUrl
+	•	condition (if available)
+	•	isBestOffer (if detectable; optional flag)
+
+Important:
+	•	Normalize currency to USD if possible (else discard)
+	•	Discard non-card listings: “case”, “lot”, “pack”, “break”, “digital”, “replica”, “reprint”
+
+⸻
+
+Matching + Filtering (Critical)
+
+Implement a scoring function matchScore(compTitle, filters).
+
+Must-have filters
+
+Hard reject if:
+	•	player name not present (simple string check with common variations)
+	•	year mismatch when year is provided
+	•	grade mismatch when grade is required (PSA 10 vs raw)
+
+Soft scoring
+
+Add points for:
+	•	exact set name match (“Prizm”, “Optic”, “Select”)
+	•	parallel keywords (“Silver”, “Holo”, “Refractor”, “/99”)
+	•	card number match if provided
+	•	grading company match if graded
+
+Subtract points for:
+	•	“lot”, “break”, “pack”, “reprint”, “digital”, “case”
+	•	“read description”, “see pics” (often junk)
+	•	wildly different parallels (“green” when you asked “silver”)
+
+Keep top comps by score and discard below threshold.
+
+⸻
+
+Aggregations (summaryJson)
+
+From filtered comps compute:
+	•	soldCount
+	•	medianPrice
+	•	meanPrice
+	•	minPrice, maxPrice
+	•	volatility (std dev or coefficient of variation)
+	•	liquidity (sales per week over time window)
+	•	trendSeries (group by week: median price/week)
+	•	trendSlope (simple linear slope on weekly medians)
+
+⸻
+
+Confidence Score (HIGH/MED/LOW)
+
+Confidence should reflect both quantity and match quality.
+
+Suggested rubric:
+	•	HIGH: soldCount >= 15 AND average matchScore ≥ thresholdHigh
+	•	MED: soldCount 6–14
+	•	LOW: soldCount <= 5 OR average matchScore below thresholdMed
+
+Store in cache + surface to UI.
+
+⸻
+
+Caching + Refresh Rules
+	•	expiresAt = now + 24 hours (start here)
+	•	If soldCount is low (<=5), set expiresAt = now + 6 hours (try again sooner)
+	•	Always save raw comps + summary + confidence
+
+⸻
+
+Rate Limiting + Safety
+	•	Implement per-IP and per-user rate limit for fetch endpoint
+	•	Global concurrency cap (ex: max 2 scrape jobs at once)
+	•	Retry with exponential backoff up to 2 retries
+	•	Randomized user-agent list + polite delays (1–3s jitter) between page fetches
+	•	If bot detection triggers, fail gracefully and rely on fallback comps
+
+⸻
+
+Logging (Required)
+
+Log these events:
+	•	cache hit/miss
+	•	scrape start/end (duration)
+	•	pages scraped + items found
+	•	items kept after filtering
+	•	confidence level
+	•	any errors (bot wall, parsing failure)
+
+⸻
+
+Done When
+	•	eBay comps appear frequently enough to materially improve Market Outlook
+	•	cold queries return partial fast, then “complete” after fetch finishes
+	•	confidence badge is accurate and visible
+	•	cache reduces repeated scraping
+	•	system doesn’t crash or get banned under normal usage
