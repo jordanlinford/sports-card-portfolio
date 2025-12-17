@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel } from "@shared/schema";
+import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
   switch (temp) {
@@ -138,6 +138,17 @@ function getBuyerProfileLabel(profile: BuyerProfile) {
     case "INVESTOR": return "Best for: Long-term investors";
     case "BUDGET": return "Best for: Budget collectors";
     default: return "";
+  }
+}
+
+function getModifierColor(modifier: VerdictModifier) {
+  switch (modifier) {
+    case "Speculative": return "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20";
+    case "Momentum": return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
+    case "Value": return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20";
+    case "Long-Term": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+    case "Late Cycle": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
+    default: return "bg-muted text-muted-foreground";
   }
 }
 
@@ -256,21 +267,26 @@ function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["
   return (
     <Card className={`border-2 ${getVerdictColor(verdict.action)}`} data-testid="card-verdict">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <CardTitle className="text-lg flex items-center gap-2">
             Investment Verdict
           </CardTitle>
           <Badge variant="outline" className="text-xs">
-            {confidence} Confidence
+            {confidence} Conviction (Thesis Confidence)
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className={`p-3 rounded-lg ${getVerdictColor(verdict.action)}`}>
             {getVerdictIcon(verdict.action)}
           </div>
           <span className="text-3xl font-bold" data-testid="text-verdict-action">{verdict.action}</span>
+          {verdict.modifier && (
+            <Badge className={`${getModifierColor(verdict.modifier)} text-sm`} data-testid="badge-verdict-modifier">
+              {verdict.modifier}
+            </Badge>
+          )}
         </div>
         <p className="text-sm text-muted-foreground" data-testid="text-verdict-summary">{verdict.summary}</p>
         {verdict.whatMustBeTrue && verdict.whatMustBeTrue.length > 0 && (
@@ -291,6 +307,34 @@ function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["
   );
 }
 
+function MarketRealityCheckCard({ checks }: { checks: string[] }) {
+  if (!checks || checks.length === 0) return null;
+  
+  return (
+    <Card className="border-dashed border-yellow-500/30 bg-yellow-500/5" data-testid="card-market-reality-check">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+          Market Reality Check
+        </CardTitle>
+        <CardDescription>Uncomfortable truths you should consider</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {checks.map((check, i) => (
+            <li key={i} className="flex items-start gap-2 text-sm">
+              <span className="text-yellow-600 dark:text-yellow-400 mt-1">
+                <Minus className="h-4 w-4" />
+              </span>
+              <span className="text-foreground">{check}</span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
 function ExposureRecommendations({ exposures }: { exposures: PlayerOutlookResponse["exposures"] }) {
   return (
     <Card data-testid="card-exposures">
@@ -304,8 +348,8 @@ function ExposureRecommendations({ exposures }: { exposures: PlayerOutlookRespon
       <CardContent className="space-y-4">
         {exposures.map((exp, i) => (
           <div key={i} className="p-4 rounded-lg border hover-elevate" data-testid={`exposure-${exp.tier.toLowerCase()}`}>
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div className="flex items-center gap-2">
+            <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge className={`${getTierColor(exp.tier)} gap-1`}>
                   {getTierIcon(exp.tier)}
                   {exp.tier}
@@ -328,10 +372,18 @@ function ExposureRecommendations({ exposures }: { exposures: PlayerOutlookRespon
                 </Badge>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3" />
-              {exp.riskNote}
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {exp.riskNote}
+              </p>
+              {exp.timingGuidance && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1" data-testid={`timing-${exp.tier.toLowerCase()}`}>
+                  <Clock className="h-3 w-3" />
+                  <span className="font-medium">Best Entry:</span> {exp.timingGuidance}
+                </p>
+              )}
+            </div>
           </div>
         ))}
       </CardContent>
@@ -535,6 +587,8 @@ export default function PlayerOutlookPage() {
           <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} />
           
           <ThesisCard thesis={outlookData.thesis} />
+          
+          <MarketRealityCheckCard checks={outlookData.marketRealityCheck} />
           
           <VerdictCard verdict={outlookData.verdict} confidence={outlookData.snapshot.confidence} />
           
