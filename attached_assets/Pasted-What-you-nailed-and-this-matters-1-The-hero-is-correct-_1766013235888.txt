@@ -1,0 +1,143 @@
+What you nailed (and this matters)
+
+1. The hero is correct
+
+“Track, Analyze, and Grow Your Sports Card Portfolio”
+
+Clear subheadline about AI, market data, and assets
+
+Primary CTA = Analyze a Card
+This is exactly right for Phase 1.
+
+2. You elevated intelligence over storage
+
+The three-column section (“Build Your Portfolio / Understand the Market / Invest Player-First”) is strong
+
+Language is investment-oriented, not hobbyist
+
+No fluff, no hype
+
+3. The explanation-first positioning is excellent
+The “Not Just Prices — Explanations” section is very good.
+
+The CJ Stroud example is concrete
+
+WATCH verdict feels thoughtful, not hypey
+
+Scores + explanation reinforce trust
+
+This is one of your strongest sections.
+
+4. The portfolio sharing section is clean and secondary
+
+It’s no longer the hero
+
+It supports the story instead of defining it
+
+Exactly where it should be
+
+Net: this is a serious homepage, not a toy.
+
+So what’s the real issue?
+
+It’s not that the homepage is wrong.
+
+It’s that your strongest new feature — Portfolio Intelligence — is still implicit, not explicit enough.
+
+Right now the site says:
+
+“We help you analyze cards and portfolios intelligently”
+
+What it could say more forcefully is:
+
+“We manage your portfolio for you.”
+
+That’s a subtle but important shift.
+
+The ONE gap I still see (and it’s small)
+Portfolio Outlook & Next Buys are not named on the homepage
+
+They’re described, but not branded.
+
+You talk about:
+
+AI-powered signals
+
+Player-first investing
+
+Portfolio thinking
+
+But you never say, explicitly:
+
+Portfolio Outlook
+
+Next Buys
+
+Those are your products now.
+
+The fix is very simple (and you’re 90% there)
+Add ONE small section right after the hero or after the checkmark strip
+
+Something like:
+
+Your Portfolio, Explained
+
+Portfolio Outlook
+See your portfolio’s stance, risks, and opportunities in one AI-generated snapshot.
+
+Next Buys
+Personalized card recommendations based on gaps and concentration in your collection.
+
+Quick Card Check
+Analyze any card before you buy — no upload required.
+
+Buttons:
+
+View Portfolio Outlook
+
+See Next Buys
+
+Analyze a Card
+
+This does two things:
+
+Names the mental model
+
+Tells users exactly where the magic lives
+
+Everything else you’ve built already supports this.
+
+Important correction to my earlier feedback
+
+I want to be very clear here:
+
+You did not miss the mark
+
+You did not under-message the product
+
+You did the hard part correctly
+
+What’s left is naming and pointing, not rebuilding.
+
+This is the difference between:
+
+“Wow, this looks impressive”
+
+“Oh — this is what I should click”
+
+Final, corrected verdict
+Are you Phase-1 ready?
+
+Yes. Fully.
+
+Is the homepage aligned with the product?
+
+Yes — much more than I initially thought.
+
+Do you need a big rewrite?
+
+No. Absolutely not.
+
+Do you need a small emphasis shift?
+
+Yes — explicitly surface Portfolio Outlook + Next Buys as first-class features.
