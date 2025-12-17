@@ -2012,6 +2012,78 @@ Allow: /
     }
   });
 
+  // ============================================================================
+  // Player Outlook V2 - Player-First Market Intelligence
+  // ============================================================================
+  
+  // Get player outlook - player = stock, cards = exposure vehicles
+  app.post("/api/player-outlook", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerName, sport, contextCard } = req.body;
+
+      if (!playerName || typeof playerName !== "string" || playerName.trim().length < 2) {
+        return res.status(400).json({ message: "Player name is required (minimum 2 characters)" });
+      }
+
+      // Check subscription - this is a Pro feature for full analysis
+      // Free users can see limited info
+      const user = await storage.getUser(userId);
+      const isPro = user?.subscriptionStatus === "PRO";
+      
+      if (!isPro) {
+        // Check per-user rate limit (prevent abuse)
+        const rateCheck = checkFreeUserRateLimit(userId);
+        if (!rateCheck.allowed) {
+          return res.status(429).json({ 
+            message: `Please wait ${rateCheck.retryAfter} seconds before your next lookup.`,
+            rateLimited: true,
+            retryAfter: rateCheck.retryAfter
+          });
+        }
+        
+        // Check per-user monthly limit
+        const FREE_TIER_LIMIT = 3;
+        const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
+        if (monthlyCount >= FREE_TIER_LIMIT) {
+          return res.status(403).json({ 
+            message: `You've used all ${FREE_TIER_LIMIT} free Player Outlook analyses this month. Upgrade to Pro for unlimited analyses.`,
+            usageExceeded: true,
+            used: monthlyCount,
+            limit: FREE_TIER_LIMIT
+          });
+        }
+        
+        // Record rate limit timestamp
+        recordFreeUserLookup(userId);
+      }
+
+      console.log(`[Player Outlook] Request for: ${playerName} (${sport || "auto-detect"})`);
+
+      // Import and call the player outlook engine
+      const { getPlayerOutlook } = await import("./playerOutlookEngine");
+      
+      const outlook = await getPlayerOutlook({
+        playerName: playerName.trim(),
+        sport: sport || "football", // Default to football
+        contextCard,
+      });
+
+      // Track usage for free users (uses same pool as card outlooks)
+      if (!isPro) {
+        await storage.recordOutlookUsage(userId, 'quick', undefined, `Player: ${playerName}`);
+      }
+
+      res.json({
+        ...outlook,
+        isPro,
+      });
+    } catch (error) {
+      console.error("Error getting player outlook:", error);
+      res.status(500).json({ message: "Failed to get player outlook" });
+    }
+  });
+
   // Object Storage routes - allows public access for public objects
   app.get("/objects/:objectPath(*)", async (req: any, res) => {
     // Get userId if authenticated, but don't require authentication
