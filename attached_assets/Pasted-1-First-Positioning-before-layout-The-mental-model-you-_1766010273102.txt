@@ -1,0 +1,304 @@
+1. First: Positioning (before layout)
+The mental model you want users to have
+
+Not:
+
+“A bunch of tools for cards”
+
+But:
+
+“A portfolio platform for sports cards — like Fidelity + StockX + Instagram for collectors.”
+
+That framing lets everything make sense:
+
+Display cases = portfolios
+
+Players = stocks
+
+Outlooks = analyst ratings
+
+Hidden Gems = undervalued assets
+
+Watchlist = portfolio tracking
+
+Offers = liquidity
+
+Brand transition strategy (smart call, btw)
+
+Your approach is correct:
+
+Keep MyDisplayCase.io live
+
+Add sportscardportfolio.io as the future-facing brand
+
+Soft-introduce language now without breaking anything
+
+Homepage wording example:
+
+MyDisplayCase is becoming Sports Card Portfolio — the investment platform for modern collectors.
+
+No forced redirect yet. No confusion. Just evolution.
+
+2. Streamlined Navigation (this is key)
+
+Right now your dropdown is feature-complete but cognitively heavy.
+
+Recommended top-level nav (final form)
+
+Top Nav
+
+Dashboard
+
+Portfolio
+
+Market
+
+Players
+
+Explore
+
+Messages
+
+That’s it. Everything else nests.
+
+How features map under this (important)
+🧩 Dashboard
+
+Overview
+
+Portfolio value
+
+Alerts (price moves, outlook changes)
+
+Recent activity
+
+This is the “home base”
+
+📦 Portfolio
+
+My Cards
+
+Display Cases (rename visually to Portfolios)
+
+Create from Tag
+
+Analytics
+
+Copy tweak suggestion:
+
+“Your collection, organized and valued like a real portfolio.”
+
+📈 Market
+
+Market Outlook
+
+Hidden Gems
+
+Quick Card Check
+
+This becomes the alpha section
+
+👤 Players
+
+Player Analysis
+
+Player Watchlist
+
+Think “research before buying”
+
+🌍 Explore
+
+Public Portfolios
+
+Top Collectors
+
+Trending Cards
+
+💬 Messages
+
+Offers
+
+Chats
+
+Profile Menu (keep this lean)
+
+Bookmarks
+
+Settings
+
+Subscription
+
+Admin (conditional)
+
+3. Homepage Messaging (this matters most)
+
+Your homepage should answer three questions immediately:
+
+What is this?
+
+Who is it for?
+
+Why is it different?
+
+Hero Section (above the fold)
+Headline (strong, simple, confident)
+
+Track, Analyze, and Grow Your Sports Card Portfolio
+
+Subheadline
+
+Real market data, AI-powered insights, and public portfolios — built for modern collectors who treat cards like assets.
+
+Primary CTA
+
+🟡 Analyze a Card
+Secondary: View a Sample Portfolio
+
+Do not lead with “create an account”
+
+Social Proof / Credibility Strip
+
+Right under hero:
+
+“Real eBay sold comps”
+
+“Player-based investment analysis”
+
+“Public & private portfolios”
+
+“Trusted by serious collectors”
+
+No logos yet. Just confidence.
+
+Section 1: What You Can Do (3 columns)
+📦 Build Your Portfolio
+
+Track cards with or without images
+
+Organize by tags or themes
+
+Public or private portfolios
+
+📈 Understand the Market
+
+AI-powered BUY / WATCH / AVOID signals
+
+Upside, risk, and confidence scores
+
+Real comps from eBay, Card Hedger, and collectors
+
+🧠 Invest Player-First
+
+Treat players like stocks
+
+Career trajectory & legacy analysis
+
+Watchlists and long-term outlooks
+
+Section 2: Example Insight (this is where you win)
+Title
+
+Not Just Prices — Explanations
+
+Then show a real-style example:
+
+Verdict: WATCH
+Why: Strong rookie season, but limited market upside due to team exposure and position saturation. Comparable players historically plateau in value without playoff visibility.
+
+This reinforces:
+
+You’re not hype-driven
+
+You explain why
+
+You’re honest
+
+This directly supports your “no obvious picks” goal.
+
+Section 3: Display Cases → Portfolios (soft rename)
+Title
+
+Show Your Portfolio — or Keep It Private
+
+Share public portfolios
+
+Track views and engagement
+
+Premium themes for Pro users
+
+Likes, comments, and bookmarks
+
+Subtle copy line:
+
+Your cards deserve more than a spreadsheet.
+
+Section 4: Pro Value (simple, not salesy)
+Free
+
+3 AI analyses / month
+
+Basic portfolios
+
+Market lookups
+
+Pro — $12/month
+
+Unlimited analysis
+
+Premium portfolio themes
+
+Advanced market tools
+
+CTA:
+🟡 Upgrade When You’re Ready
+
+No pressure. Confidence.
+
+Footer Messaging (important for rebrand)
+
+In the footer:
+
+MyDisplayCase is evolving into Sports Card Portfolio — the long-term home for serious collectors.
+
+4. Naming Guidance (short + honest)
+
+You asked whether:
+
+Display Cases → Portfolios
+Answer: yes, visually and contextually — but keep “Display Case” in code for now.
+
+UI compromise:
+
+Label: Portfolios
+
+Subtitle: Display Cases
+
+Same feature. Better mental model.
+
+5. One Critical Product Insight (don’t skip this)
+
+You’ve built:
+
+A valuation engine
+
+A player intelligence engine
+
+A social layer
+
+The homepage must lead with intelligence, not storage.
+
+If users think:
+
+“This is where I learn before I buy”
+
+They will:
+
+trust your insights
+
+accept misses
+
+pay for Pro
+
+share portfolios
+
+That’s how this becomes defensible.
