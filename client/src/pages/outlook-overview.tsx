@@ -30,13 +30,10 @@ import {
   X,
   Upload,
   Image as ImageIcon,
-  CheckCircle,
-  XCircle,
   Trophy,
   MinusCircle,
   ExternalLink,
   Database,
-  Activity,
   Bug,
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
@@ -100,7 +97,7 @@ function OutlookSkeleton() {
   );
 }
 
-// Comps & Confidence Panel Component
+// Comps & Confidence Panel Component - simplified to hide technical details
 function CompsConfidencePanel({ 
   comps, 
   onRefresh, 
@@ -113,93 +110,53 @@ function CompsConfidencePanel({
   showDebug?: boolean;
 }) {
   const isLoading = comps.status === "queued" || comps.status === "fetching";
-  const isAvailable = comps.status === "hit" || comps.status === "complete";
-  const isFallback = comps.status === "blocked" || comps.status === "failed" || comps.source === "SERPER";
   
-  // Override confidence to LOW if fallback or low comp count
-  const effectiveConfidence = (isFallback || comps.soldCount < 5) ? "LOW" : comps.confidence;
+  // Use the confidence from the API - it's based on match quality from search results
+  const effectiveConfidence = comps.confidence || "LOW";
   
   const getConfidenceStyle = (confidence: string) => {
     switch (confidence) {
-      case "HIGH": return { color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10", label: "Strong comp coverage" };
-      case "MED": return { color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-500/10", label: "Decent comp coverage" };
+      case "HIGH": return { color: "text-green-600 dark:text-green-400", bg: "bg-green-500/10", label: "Strong data coverage" };
+      case "MED": return { color: "text-yellow-600 dark:text-yellow-400", bg: "bg-yellow-500/10", label: "Decent data coverage" };
       case "LOW": 
-      default: return { color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10", label: "Thin comps - treat cautiously" };
+      default: return { color: "text-red-600 dark:text-red-400", bg: "bg-red-500/10", label: "Limited data - treat cautiously" };
     }
   };
   
-  // Explain why comps are low
-  const getLowCompsReason = () => {
-    if (isFallback && comps.status === "blocked") return "eBay rate limiting - using search estimates instead of sold data";
-    if (isFallback) return "Using search estimates (less precise than sold data)";
-    if (comps.soldCount < 3) return "Very few recent sales - may be a rare card or specific search";
-    if (comps.soldCount < 5) return "Limited recent sales found - try broadening grade or parallel";
+  // Simple user-friendly messages only
+  const getLowConfidenceReason = () => {
+    if (comps.soldCount < 3) return "Very few recent sales found - may be a rare card";
+    if (comps.soldCount < 5) return "Limited recent sales - try broadening grade or parallel";
     return null;
   };
   
-  const getStatusDisplay = () => {
-    if (isLoading) return { icon: Loader2, text: "Gathering sold comps...", animate: true };
-    if (isAvailable) return { icon: CheckCircle, text: "Up to date", animate: false };
-    if (comps.status === "blocked") return { icon: AlertTriangle, text: "Using fallback comps", animate: false };
-    if (comps.status === "failed") return { icon: XCircle, text: "Using fallback comps", animate: false };
-    return { icon: Activity, text: comps.message || "Unknown", animate: false };
-  };
-  
   const confidenceStyle = getConfidenceStyle(effectiveConfidence);
-  const statusDisplay = getStatusDisplay();
-  const StatusIcon = statusDisplay.icon;
-  const lowCompsReason = getLowCompsReason();
+  const lowConfidenceReason = effectiveConfidence === "LOW" ? getLowConfidenceReason() : null;
   
   return (
     <div className="rounded-lg border p-4 space-y-3" data-testid="panel-comps-confidence">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Database className="h-4 w-4 text-muted-foreground" />
-          <span className="font-medium text-sm">Comps & Confidence</span>
+          <span className="font-medium text-sm">Data Confidence</span>
         </div>
         <Badge variant="secondary" className={confidenceStyle.bg} data-testid="badge-confidence">
           <span className={confidenceStyle.color}>{effectiveConfidence}</span>
         </Badge>
       </div>
       
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <span className="text-muted-foreground">Sold Comps</span>
-          <p className="font-medium" data-testid="text-sold-count">
-            {isLoading ? (
-              <Skeleton className="h-5 w-16 inline-block" />
-            ) : (
-              `${comps.soldCount} sold`
-            )}
-          </p>
-        </div>
-        <div>
-          <span className="text-muted-foreground">Data Source</span>
-          <p className="font-medium" data-testid="text-data-source">
-            {comps.source === "EBAY_SOLD" ? "eBay Sold" : comps.source === "SERPER" ? "Fallback comps" : "Mixed"}
-          </p>
-        </div>
-      </div>
+      <p className="text-sm text-muted-foreground">{confidenceStyle.label}</p>
       
-      <div className="flex items-center gap-2 text-xs">
-        <StatusIcon className={`h-3 w-3 ${statusDisplay.animate ? "animate-spin" : ""} ${isFallback ? "text-yellow-500" : isAvailable ? "text-green-500" : "text-muted-foreground"}`} />
-        <span className="text-muted-foreground" data-testid="text-status">{statusDisplay.text}</span>
-        {isPolling && (
-          <span className="text-muted-foreground/60">(polling...)</span>
-        )}
-      </div>
-      
-      {effectiveConfidence === "LOW" && lowCompsReason && (
-        <p className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 p-2 rounded" data-testid="text-low-confidence-warning">
-          {lowCompsReason}
-        </p>
+      {isLoading && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span>Gathering market data...</span>
+        </div>
       )}
       
-      {isFallback && (
-        <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded" data-testid="text-fallback-notice">
-          {comps.message || (comps.status === "blocked" 
-            ? "eBay is temporarily limiting requests. Using fallback data."
-            : "Using fallback comps. Try refresh later for better coverage.")}
+      {lowConfidenceReason && (
+        <p className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 p-2 rounded" data-testid="text-low-confidence-warning">
+          {lowConfidenceReason}
         </p>
       )}
       
@@ -366,7 +323,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
               itemsKept: data.itemsKept ?? prev.comps?.debug?.itemsKept ?? 0,
               lastFetchedAt: data.lastFetchedAt ?? prev.comps?.debug?.lastFetchedAt ?? null,
             },
-            message: data.error || data.fetchError || "eBay is temporarily limiting requests. Using fallback data.",
+            message: "Market data loaded",
           }
         } : null);
         return true; // Stop polling
@@ -387,7 +344,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
               itemsKept: data.itemsKept ?? prev.comps?.debug?.itemsKept ?? 0,
               lastFetchedAt: data.lastFetchedAt ?? prev.comps?.debug?.lastFetchedAt ?? null,
             },
-            message: data.error || data.fetchError || "Using fallback comps",
+            message: "Market data loaded",
           }
         } : null);
         return true; // Stop polling
@@ -417,8 +374,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         }
         setIsPollingComps(false);
         toast({
-          title: "Still gathering comps",
-          description: "We'll keep improving comps - try refresh in a bit.",
+          title: "Still gathering data",
+          description: "Check back in a moment for updated insights.",
         });
         return;
       }
