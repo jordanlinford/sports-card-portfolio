@@ -1117,3 +1117,73 @@ export const playerOutlookCache = pgTable("player_outlook_cache", {
 
 export type PlayerOutlookCache = typeof playerOutlookCache.$inferSelect;
 export type InsertPlayerOutlookCache = typeof playerOutlookCache.$inferInsert;
+
+// Player Watchlist table - tracks which players a user is watching
+export const playerWatchlist = pgTable("player_watchlist", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  playerKey: varchar("player_key", { length: 128 }).notNull(), // normalized: sport:playername
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  sport: varchar("sport", { length: 50 }).notNull().default("football"),
+  
+  // Snapshot at time of adding (for change tracking)
+  verdictAtAdd: varchar("verdict_at_add", { length: 20 }), // BUY, WATCH, AVOID
+  modifierAtAdd: varchar("modifier_at_add", { length: 50 }), // Momentum, Speculative, etc.
+  temperatureAtAdd: varchar("temperature_at_add", { length: 20 }), // HOT, WARM, COLD
+  
+  // User notes
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_watchlist_user").on(table.userId),
+  index("idx_watchlist_player_key").on(table.playerKey),
+]);
+
+export type PlayerWatchlist = typeof playerWatchlist.$inferSelect;
+export type InsertPlayerWatchlist = typeof playerWatchlist.$inferInsert;
+
+// Player Outlook History - snapshots of outlook over time for change tracking
+export const playerOutlookHistory = pgTable("player_outlook_history", {
+  id: serial("id").primaryKey(),
+  playerKey: varchar("player_key", { length: 128 }).notNull(),
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  sport: varchar("sport", { length: 50 }).notNull(),
+  
+  // Core verdict fields for quick comparison
+  verdict: varchar("verdict", { length: 20 }).notNull(), // BUY, WATCH, AVOID
+  modifier: varchar("modifier", { length: 50 }).notNull(),
+  temperature: varchar("temperature", { length: 20 }).notNull(),
+  confidence: varchar("confidence", { length: 20 }).notNull(),
+  
+  // Full outlook snapshot
+  outlookJson: jsonb("outlook_json").$type<PlayerOutlookResponse>().notNull(),
+  
+  // Hash of the verdict+modifier+temperature for change detection
+  snapshotHash: varchar("snapshot_hash", { length: 64 }).notNull(),
+  
+  snapshotAt: timestamp("snapshot_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_history_player_key").on(table.playerKey),
+  index("idx_history_snapshot_at").on(table.snapshotAt),
+  index("idx_history_hash").on(table.snapshotHash),
+]);
+
+export type PlayerOutlookHistory = typeof playerOutlookHistory.$inferSelect;
+export type InsertPlayerOutlookHistory = typeof playerOutlookHistory.$inferInsert;
+
+// Watchlist with current outlook (for API response)
+export type WatchlistPlayerWithOutlook = PlayerWatchlist & {
+  currentOutlook?: PlayerOutlookResponse;
+  changes?: {
+    verdictChanged: boolean;
+    modifierChanged: boolean;
+    temperatureChanged: boolean;
+    previousVerdict?: string;
+    previousModifier?: string;
+    previousTemperature?: string;
+    changeCount: number;
+  };
+};
