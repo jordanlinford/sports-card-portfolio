@@ -1307,11 +1307,11 @@ Explain the reasoning behind the scores and end with a plain-language tag like:
 
 function generateFallbackShort(action: OutlookAction, upsideScore: number, riskScore: number): string {
   if (action === "BUY") {
-    return `Strong upside potential (${upsideScore}/100) with manageable risk. Consider adding to your collection.`;
+    return `Strong upside potential (${upsideScore}/100) with manageable downside. Worth adding to your collection.`;
   } else if (action === "SELL") {
-    return `Higher risk (${riskScore}/100) relative to upside. May want to consider selling or trading.`;
+    return `Elevated downside risk (${riskScore}/100) relative to upside. Consider selling or trading.`;
   }
-  return `Balanced outlook with moderate upside (${upsideScore}/100) and risk (${riskScore}/100). Monitor market conditions.`;
+  return `Balanced outlook with moderate upside (${upsideScore}/100). Timing your entry matters here.`;
 }
 
 function generateFallbackLong(
@@ -1380,12 +1380,26 @@ async function generateEditorialExplanation(
       ? ((card.avgSalePrice30 - card.avgSalePrice90) / card.avgSalePrice90 * 100).toFixed(1)
       : "unknown";
     
+    // Detect if card is likely mass-produced (junk wax era or high-volume set)
+    const cardYear = card.year ? parseInt(String(card.year)) : 0;
+    const isMassProduced = (cardYear >= 1987 && cardYear <= 1993) || 
+      (card.salesLast30Days && card.salesLast30Days > 50) ||
+      (card.avgSalePrice30 && card.avgSalePrice30 < 20 && !card.isNumbered && !card.hasAuto);
+    
     const prompt = `You are an expert sports card investment analyst writing for collectors. Your analysis should be insightful, editorial, and explain the "why" behind each score like a knowledgeable hobbyist would.
+
+CRITICAL LANGUAGE RULES:
+- NEVER say "low demand" - instead say "high supply" (collectors understand supply gluts differently than demand issues)
+- Use collector-native language: "pricing spreads", "timing matters", "thin market", "overprinted era" instead of finance jargon
+- For WATCH recommendations, explain in practical terms: "This card trades inconsistently due to high supply, making pricing spreads wide and timing important"
+- Avoid phrases like "caution is warranted" - too formal. Instead: "worth monitoring", "timing your entry matters", "patience pays here"
 
 CRITICAL CONTEXT:
 - Upside score reflects GROWTH POTENTIAL, not player quality. Hall of Famers and retired legends have LOW upside because their value is already established. Rookies and rising stars have HIGH upside because they have room to grow.
-- Risk score reflects INVESTMENT RISK. Established players (HOF, retired) have LOW risk because markets are stable. Prospects have HIGH risk due to uncertainty.
+- Downside Risk reflects potential for price decline (volatility + negative trends).
+- Market Friction reflects ease of selling (liquidity + sales volume).
 - Confidence reflects how certain we are about the prediction.
+${isMassProduced ? "- NOTE: This appears to be a mass-produced card (high print run era or common set). Be conservative with upside language - use 'Limited' or 'Low' rather than 'Medium' for upside unless there's a specific catalyst." : ""}
 
 Player & Card:
 - Name: ${card.playerName || card.title}
@@ -1395,8 +1409,9 @@ Player & Card:
 - Year: ${card.year || "unknown"}, Grade: ${card.grade || "raw"}
 
 Investment Scores:
-- Upside: ${upsideScore}/100 (${upsideScore < 25 ? "Low - value already established" : upsideScore < 50 ? "Moderate" : "High - room for growth"})
-- Risk: ${riskScore}/100 (${riskScore < 25 ? "Very Low - stable market" : riskScore < 45 ? "Low-Moderate" : "Higher uncertainty"})
+- Upside: ${upsideScore}/100 (${isMassProduced && upsideScore < 60 ? "Limited - high supply era" : upsideScore < 25 ? "Low - value already established" : upsideScore < 50 ? "Moderate" : "High - room for growth"})
+- Downside Risk: ${riskScore < 30 ? "Low" : riskScore < 50 ? "Moderate" : "Elevated"}
+- Market Friction: ${(card.salesLast30Days || 0) < 5 ? "High - thin market" : (card.salesLast30Days || 0) < 20 ? "Moderate" : "Low - liquid market"}
 - Confidence: ${confidenceScore}/100
 
 Market Context:
@@ -1490,7 +1505,17 @@ function generateEditorialFallbackShort(
     return `${playerName} is past their prime - limited upside (${upsideScore}) with elevated risk (${riskScore}) as retirement approaches.`;
   }
   
-  return `${playerName} shows moderate potential with upside of ${upsideScore} and risk of ${riskScore}. Monitor market conditions.`;
+  // Check for high supply/mass-produced indicators
+  const cardYear = card.year ? parseInt(String(card.year)) : 0;
+  const isMassProduced = (cardYear >= 1987 && cardYear <= 1993) || 
+    (card.salesLast30Days && card.salesLast30Days > 50) ||
+    (card.avgSalePrice30 && card.avgSalePrice30 < 20 && !card.isNumbered && !card.hasAuto);
+  
+  if (isMassProduced) {
+    return `${playerName} - high supply keeps prices steady but limits upside (${upsideScore}). Pricing spreads can be wide, so timing your entry matters.`;
+  }
+  
+  return `${playerName} shows moderate potential with upside of ${upsideScore}. Worth monitoring - patience pays here.`;
 }
 
 function generateEditorialFallbackLong(
@@ -1530,6 +1555,16 @@ function generateEditorialFallbackLong(
   } else {
     parts.push(`${playerName} is an established player in their sport.`);
     parts.push(`Their market shows ${stabilityContext.toLowerCase()}.`);
+  }
+  
+  // Check for high supply indicators
+  const cardYear = card.year ? parseInt(String(card.year)) : 0;
+  const isMassProduced = (cardYear >= 1987 && cardYear <= 1993) || 
+    (card.salesLast30Days && card.salesLast30Days > 50) ||
+    (card.avgSalePrice30 && card.avgSalePrice30 < 20 && !card.isNumbered && !card.hasAuto);
+  
+  if (isMassProduced) {
+    parts.push(`High supply from this era means pricing spreads can be wide - timing your entry matters.`);
   }
   
   // Confidence context

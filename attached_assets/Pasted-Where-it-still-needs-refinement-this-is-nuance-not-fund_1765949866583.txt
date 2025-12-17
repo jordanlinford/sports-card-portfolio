@@ -1,0 +1,103 @@
+Where it still needs refinement (this is nuance, not fundamentals)
+⚠️ 1. “Low demand” is misleading language here
+
+The explanation says:
+
+“low demand and high market friction”
+
+But as a collector, I’d push back slightly:
+
+This card doesn’t have low demand — it has high supply.
+
+That distinction matters a lot psychologically.
+
+Why this matters
+
+“Low demand” sounds like nobody wants it
+
+“High supply” sounds like everyone already has it
+
+Collectors are much more comfortable with the second framing.
+
+Suggestion:
+Change explanation language to:
+
+“High supply and high market friction…”
+
+Same math. Much better feel.
+
+⚠️ 2. Upside Potential: “Medium” is debatable
+
+This is the only label I’d question.
+
+For this specific card:
+
+Medium upside implies some plausible appreciation
+
+Most collectors would think: limited upside unless macro interest in junk wax spikes
+
+I’d expect:
+
+Upside Potential: Low–Medium
+or
+
+Upside Potential: Limited
+
+You don’t need more precision — just less optimism.
+
+⚠️ 3. The WATCH explanation could be more collector-native
+
+Current:
+
+“indicating caution is warranted”
+
+That still sounds a bit like finance software.
+
+Consider something closer to:
+
+“This card trades inconsistently due to high supply, making pricing spreads wide and timing important.”
+
+Same message, more human.
+
+The bigger picture (this is important)
+
+You’ve crossed a key threshold here:
+
+The numbers no longer fight intuition
+
+The labels don’t over-dramatize
+
+The system feels conservative, which builds trust
+
+Collectors forgive conservative tools.
+They abandon confident-but-wrong ones.
+
+You are now in the forgivable zone.
+
+Final verdict on this example
+
+If I saw this output today:
+
+Would I trust it as a quick sanity check before buying?
+✅ Yes
+
+Would I argue with the WATCH call?
+❌ No
+
+Would I share this publicly yet?
+⚠️ Almost — I’d want the “low demand” wording tweaked first
+
+Does this feel like something I’d keep open while browsing eBay?
+✅ Absolutely
+
+That’s a huge win.
+
+Two small changes that will noticeably improve perception
+
+If you only change two things next, make them these:
+
+Replace “low demand” → “high supply” where applicable
+
+Slightly dampen Upside labels on junk-wax / mass-produced cards
+
+Do that, and this feature becomes something collectors will quietly rely on, which is the highest compliment.
