@@ -80,7 +80,7 @@ function OutlookSkeleton() {
 type QuickAnalyzeResult = {
   tempCard: { title: string; year?: string; set?: string; variation?: string; grade?: string; grader?: string; imagePath?: string };
   market: { value: number | null; min: number | null; max: number | null; compCount: number };
-  signals: { upside: number; risk: number };
+  signals: { upside: number; downsideRisk: number; marketFriction: number };
   action: string;
   actionReasons: string[] | null;
   explanation: { short: string; long: string | null };
@@ -433,7 +433,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <p className="text-xs text-muted-foreground">Est. Value</p>
                   <p className="font-semibold" data-testid="text-quick-value">{formatCurrency(result.market.value)}</p>
@@ -443,12 +443,22 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   <p className="font-semibold text-sm">{formatCurrency(result.market.min)} - {formatCurrency(result.market.max)}</p>
                 </div>
                 <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Upside</p>
-                  <p className="font-semibold text-green-600 dark:text-green-400">{result.signals.upside}/100</p>
+                  <p className="text-xs text-muted-foreground">Upside Potential</p>
+                  <p className="font-semibold text-green-600 dark:text-green-400">
+                    {result.signals.upside <= 25 ? "Low" : result.signals.upside <= 50 ? "Medium" : result.signals.upside <= 75 ? "High" : "Very High"}
+                  </p>
                 </div>
                 <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Risk</p>
-                  <p className="font-semibold text-red-600 dark:text-red-400">{result.signals.risk}/100</p>
+                  <p className="text-xs text-muted-foreground">Downside Risk</p>
+                  <p className={`font-semibold ${result.signals.downsideRisk <= 25 ? "text-green-600 dark:text-green-400" : result.signals.downsideRisk <= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                    {result.signals.downsideRisk <= 25 ? "Low" : result.signals.downsideRisk <= 50 ? "Medium" : result.signals.downsideRisk <= 75 ? "High" : "Very High"}
+                  </p>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-xs text-muted-foreground">Market Friction</p>
+                  <p className={`font-semibold ${result.signals.marketFriction <= 25 ? "text-green-600 dark:text-green-400" : result.signals.marketFriction <= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
+                    {result.signals.marketFriction <= 25 ? "Low" : result.signals.marketFriction <= 50 ? "Medium" : result.signals.marketFriction <= 75 ? "High" : "Very High"}
+                  </p>
                 </div>
               </div>
 

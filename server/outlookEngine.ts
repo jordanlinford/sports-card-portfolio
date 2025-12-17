@@ -211,18 +211,73 @@ export function computeUpsideScore(
   return Math.min(100, Math.max(0, Math.round(weighted)));
 }
 
-export function computeRiskScore(
+// Downside Risk: likelihood of meaningful value decline
+// High volatility + negative trend + low confidence = high downside risk
+// Stable vintage cards should have LOW downside risk
+export function computeDownsideRisk(
   volatilityScore: number, 
-  liquidityScore: number, 
-  confidence: string | null | undefined
+  trendScore: number,
+  confidence: string | null | undefined,
+  careerStage: string | null | undefined
 ): number {
-  // High volatility + low liquidity + low confidence = high risk
-  const confidencePenalty = confidence === "LOW" ? 20 : confidence === "MEDIUM" ? 10 : 0;
-  const liquidityPenalty = (10 - liquidityScore) * 3;
-  const volatilityPenalty = volatilityScore * 5;
+  // Volatility contributes to downside risk (wild swings = risk of decline)
+  const volatilityPenalty = volatilityScore * 4;
   
-  const risk = volatilityPenalty + liquidityPenalty + confidencePenalty;
+  // Negative trend (trend < 5) increases downside risk
+  const trendPenalty = trendScore < 5 ? (5 - trendScore) * 8 : 0;
+  
+  // Low confidence data means we can't trust stability
+  const confidencePenalty = confidence === "LOW" ? 15 : confidence === "MEDIUM" ? 5 : 0;
+  
+  // Career stage adjustments - retired/HOF have established value, lower risk
+  let stageAdjustment = 0;
+  if (careerStage === "HOF" || careerStage === "LEGEND") {
+    stageAdjustment = -15; // Very stable
+  } else if (careerStage === "RETIRED") {
+    stageAdjustment = -10; // Stable
+  } else if (careerStage === "AGING_VET") {
+    stageAdjustment = 5; // Some uncertainty
+  } else if (careerStage === "RISING_STAR" || careerStage === "PROSPECT") {
+    stageAdjustment = 10; // Higher uncertainty
+  }
+  
+  const risk = volatilityPenalty + trendPenalty + confidencePenalty + stageAdjustment;
   return Math.min(100, Math.max(0, Math.round(risk)));
+}
+
+// Market Friction: difficulty of buying/selling quickly at fair value
+// Low liquidity + thin sales volume = high friction
+export function computeMarketFriction(
+  liquidityScore: number,
+  volatilityScore: number,
+  pricePointCount: number
+): number {
+  // Low liquidity = high friction (inverted scale)
+  const liquidityPenalty = (10 - liquidityScore) * 6;
+  
+  // Few data points = harder to determine fair value
+  const dataPenalty = pricePointCount < 3 ? 20 : pricePointCount < 6 ? 10 : 0;
+  
+  // High volatility makes fair value harder to establish
+  const volatilityPenalty = volatilityScore > 6 ? (volatilityScore - 6) * 5 : 0;
+  
+  const friction = liquidityPenalty + dataPenalty + volatilityPenalty;
+  return Math.min(100, Math.max(0, Math.round(friction)));
+}
+
+// Convert numeric scores to human-readable labels
+export function getDownsideRiskLabel(score: number): string {
+  if (score <= 25) return "Low";
+  if (score <= 50) return "Medium";
+  if (score <= 75) return "High";
+  return "Very High";
+}
+
+export function getMarketFrictionLabel(score: number): string {
+  if (score <= 25) return "Low";
+  if (score <= 50) return "Medium";
+  if (score <= 75) return "High";
+  return "Very High";
 }
 
 // Career Stage Auto-Detection
@@ -496,7 +551,8 @@ export interface ComputedOutlookSignals {
   momentumScore: number;
   qualityScore: number;
   upsideScore: number;
-  riskScore: number;
+  downsideRisk: number;
+  marketFriction: number;
   
   // Action
   action: OutlookAction;
@@ -548,9 +604,9 @@ SIGNAL SCORES (these determined the action):
 - Demand: ${signals.demandScore}/100 (Liquidity: ${signals.liquidityScore}/10)
 - Momentum: ${signals.momentumScore}/100 (Trend: ${signals.trendScore}/10)
 - Quality: ${signals.qualityScore}/100 (Card Type: ${signals.cardTypeScore}/10)
-- Upside: ${signals.upsideScore}/100
-- Risk: ${signals.riskScore}/100
-- Volatility: ${signals.volatilityScore}/10
+- Upside Potential: ${signals.upsideScore}/100
+- Downside Risk: ${signals.downsideRisk}/100 (${getDownsideRiskLabel(signals.downsideRisk)})
+- Market Friction: ${signals.marketFriction}/100 (${getMarketFrictionLabel(signals.marketFriction)})
 - Data Confidence: ${signals.dataConfidence}
 
 REASONS (computed): ${signals.actionReasons.join("; ")}
@@ -596,7 +652,7 @@ Keep explanations honest and data-driven. Reference the actual scores and prices
   return {
     bullets: signals.actionReasons,
     short: `${signals.action} recommendation based on ${signals.dataConfidence.toLowerCase()} confidence market data.`,
-    long: `This ${signals.action} recommendation is computed from market signals: Demand ${signals.demandScore}/100, Momentum ${signals.momentumScore}/100, Quality ${signals.qualityScore}/100, Risk ${signals.riskScore}/100. Career stage: ${signals.careerStageAuto}. Data confidence: ${signals.dataConfidence} - ${signals.confidenceReason}.`
+    long: `This ${signals.action} recommendation is computed from market signals: Demand ${signals.demandScore}/100, Momentum ${signals.momentumScore}/100, Quality ${signals.qualityScore}/100. Downside Risk: ${getDownsideRiskLabel(signals.downsideRisk)}, Market Friction: ${getMarketFrictionLabel(signals.marketFriction)}. Career stage: ${signals.careerStageAuto}. Data confidence: ${signals.dataConfidence} - ${signals.confidenceReason}.`
   };
 }
 
@@ -622,10 +678,12 @@ export function computeAllSignals(
   const qualityScore = computeQualityScore(cardTypeScore, careerStageAuto);
   const upsideScore = computeUpsideScore(qualityScore, momentumScore, careerStageAuto);
   
-  // Compute confidence first (needed for risk)
+  // Compute confidence first (needed for risk calculations)
   const { confidence: dataConfidence, reason: confidenceReason } = computeDataConfidence(pricePoints, volatilityScore);
   
-  const riskScore = computeRiskScore(volatilityScore, liquidityScore, dataConfidence);
+  // Compute new risk metrics
+  const downsideRisk = computeDownsideRisk(volatilityScore, trendScore, dataConfidence, careerStageAuto);
+  const marketFriction = computeMarketFriction(liquidityScore, volatilityScore, pricePoints.length);
   
   // Compute action
   const { action, reasons: actionReasons } = computeAction(
@@ -639,10 +697,10 @@ export function computeAllSignals(
     careerStageAuto
   );
   
-  // Compute Big Mover flag
+  // Compute Big Mover flag (use downsideRisk instead of old riskScore)
   const { flag: bigMoverFlag, reason: bigMoverReason } = computeBigMover(
     upsideScore,
-    riskScore,
+    downsideRisk,
     liquidityScore,
     trendScore,
     volatilityScore,
@@ -661,7 +719,8 @@ export function computeAllSignals(
     momentumScore,
     qualityScore,
     upsideScore,
-    riskScore,
+    downsideRisk,
+    marketFriction,
     action,
     actionReasons,
     dataConfidence,

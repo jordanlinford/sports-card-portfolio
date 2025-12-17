@@ -100,7 +100,8 @@ type OutlookData = {
     momentum?: number;
     quality?: number;
     upside: number;
-    risk: number;
+    downsideRisk: number;
+    marketFriction: number;
   };
   action: string;
   actionReasons?: string[];
@@ -551,7 +552,7 @@ export default function CardOutlookPage() {
               <CardDescription>Computed from real market data</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <CompositeScoreCard 
                   label="Upside" 
                   value={outlook.signals.upside} 
@@ -559,10 +560,16 @@ export default function CardOutlookPage() {
                   description="Growth potential"
                 />
                 <CompositeScoreCard 
-                  label="Risk" 
-                  value={outlook.signals.risk} 
+                  label="Downside Risk" 
+                  value={outlook.signals.downsideRisk} 
                   icon={ShieldAlert} 
-                  description="Market risk level"
+                  description="Chance of losing value"
+                />
+                <CompositeScoreCard 
+                  label="Market Friction" 
+                  value={outlook.signals.marketFriction} 
+                  icon={ShieldAlert} 
+                  description="Difficulty buying/selling"
                 />
               </div>
               {isPro && (

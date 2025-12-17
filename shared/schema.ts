@@ -604,7 +604,8 @@ export const cardOutlooks = pgTable("card_outlooks", {
   momentumScore: integer("momentum_score"),
   qualityScore: integer("quality_score"),
   upsideScore: integer("upside_score"),
-  riskScore: integer("risk_score"),
+  downsideRisk: integer("downside_risk"),
+  marketFriction: integer("market_friction"),
   
   // Action & Confidence (deterministic, not AI-decided)
   action: varchar("action", { length: 20 }), // BUY | WATCH | SELL | LONG_HOLD | LITTLE_VALUE

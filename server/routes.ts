@@ -1120,11 +1120,14 @@ Allow: /
         const hoursSinceGenerated = (Date.now() - new Date(card.outlookGeneratedAt).getTime()) / (1000 * 60 * 60);
         // Use cached data if less than 24 hours old
         if (hoursSinceGenerated < 24) {
+          // Derive new metrics from legacy riskScore if not available
+          const legacyRisk = card.outlookRiskScore || 50;
           return res.json({
             cardId: card.id,
             action: card.outlookAction,
             upsideScore: card.outlookUpsideScore,
-            riskScore: card.outlookRiskScore,
+            downsideRisk: Math.round(legacyRisk * 0.6),
+            marketFriction: Math.round(legacyRisk * 0.4),
             confidenceScore: card.outlookConfidenceScore,
             cached: true,
             cachedAt: card.outlookGeneratedAt,
@@ -1135,9 +1138,14 @@ Allow: /
       // Generate quick outlook without AI explanation
       const quickOutlook = generateQuickOutlook(card);
 
+      // Convert legacy riskScore to new metrics
       res.json({
         cardId: card.id,
-        ...quickOutlook,
+        action: quickOutlook.action,
+        upsideScore: quickOutlook.upsideScore,
+        downsideRisk: Math.round(quickOutlook.riskScore * 0.6),
+        marketFriction: Math.round(quickOutlook.riskScore * 0.4),
+        confidenceScore: quickOutlook.confidenceScore,
         cached: false,
       });
     } catch (error) {
@@ -1171,6 +1179,8 @@ Allow: /
 
       // Return cached outlook if available
       if (card.outlookAction && card.outlookGeneratedAt) {
+        // Derive new metrics from legacy riskScore for backward compatibility
+        const legacyRisk = card.outlookRiskScore || 50;
         return res.json({
           cardId: card.id,
           playerName: card.playerName,
@@ -1178,7 +1188,8 @@ Allow: /
           position: card.position,
           action: card.outlookAction,
           upsideScore: card.outlookUpsideScore,
-          riskScore: card.outlookRiskScore,
+          downsideRisk: Math.round(legacyRisk * 0.6),
+          marketFriction: Math.round(legacyRisk * 0.4),
           confidenceScore: card.outlookConfidenceScore,
           explanation: isPro ? {
             short: card.outlookExplanationShort,
@@ -1190,14 +1201,18 @@ Allow: /
         });
       }
 
-      // No cached data, return quick outlook
+      // No cached data, return quick outlook with converted metrics
       const quickOutlook = generateQuickOutlook(card);
       res.json({
         cardId: card.id,
         playerName: card.playerName,
         sport: card.sport,
         position: card.position,
-        ...quickOutlook,
+        action: quickOutlook.action,
+        upsideScore: quickOutlook.upsideScore,
+        downsideRisk: Math.round(quickOutlook.riskScore * 0.6),
+        marketFriction: Math.round(quickOutlook.riskScore * 0.4),
+        confidenceScore: quickOutlook.confidenceScore,
         explanation: null,
         generatedAt: null,
         cached: false,
@@ -1370,7 +1385,8 @@ Allow: /
         momentumScore: signals.momentumScore,
         qualityScore: signals.qualityScore,
         upsideScore: signals.upsideScore,
-        riskScore: signals.riskScore,
+        downsideRisk: signals.downsideRisk,
+        marketFriction: signals.marketFriction,
         action: finalAction,
         actionReasons: finalActionReasons,
         careerStageAuto: signals.careerStageAuto,
@@ -1430,7 +1446,8 @@ Allow: /
           momentum: signals.momentumScore,
           quality: signals.qualityScore,
           upside: signals.upsideScore,
-          risk: signals.riskScore,
+          downsideRisk: signals.downsideRisk,
+          marketFriction: signals.marketFriction,
         },
         action: finalAction,
         actionReasons: finalActionReasons,
@@ -1515,10 +1532,12 @@ Allow: /
             momentum: outlook.momentumScore,
             quality: outlook.qualityScore,
             upside: outlook.upsideScore,
-            risk: outlook.riskScore,
+            downsideRisk: outlook.downsideRisk,
+            marketFriction: outlook.marketFriction,
           } : {
             upside: outlook.upsideScore,
-            risk: outlook.riskScore,
+            downsideRisk: outlook.downsideRisk,
+            marketFriction: outlook.marketFriction,
           },
           action: outlook.action,
           actionReasons: isPro ? outlook.actionReasons : null,
@@ -1712,10 +1731,12 @@ Allow: /
           momentum: signals.momentumScore,
           quality: signals.qualityScore,
           upside: signals.upsideScore,
-          risk: signals.riskScore,
+          downsideRisk: signals.downsideRisk,
+          marketFriction: signals.marketFriction,
         } : {
           upside: signals.upsideScore,
-          risk: signals.riskScore,
+          downsideRisk: signals.downsideRisk,
+          marketFriction: signals.marketFriction,
         },
         action: finalAction,
         actionReasons: isPro ? finalActionReasons : null,
