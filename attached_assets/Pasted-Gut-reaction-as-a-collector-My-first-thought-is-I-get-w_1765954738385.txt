@@ -1,0 +1,217 @@
+Gut reaction (as a collector)
+
+My first thought is:
+
+“I get why this is WATCH… but the reason given doesn’t quite line up with the rest of the screen.”
+
+That tells us the signals are right, but the story is misaligned.
+
+What’s working well
+✅ 1. Upside / Risk / Friction mix makes sense
+
+For a 2017 Donruss Optic Rated Rookie PSA 10:
+
+Upside: High → yes, star player, flagship rookie
+
+Downside Risk: High → fair (price sensitive to performance, hype cycles)
+
+Market Friction: High → fair (Optic RR PSA 10 has a lot of supply and spread)
+
+This feels like a modern-star card, not legacy, not junk.
+
+Good.
+
+✅ 2. WATCH is the right action
+
+This is not:
+
+A screaming buy
+
+A legacy hold
+
+An obvious sell
+
+WATCH is correct.
+
+So classification-wise, you nailed it.
+
+✅ 3. Plain-language friction helper works
+
+“May take a while to sell at a fair price.”
+
+Perfect.
+This is exactly how collectors talk.
+
+Keep this pattern.
+
+Where it still breaks (important)
+🚨 The explanation sentence is wrong for this card
+
+“WATCH recommendation based on low confidence market data.”
+
+This is the problem.
+
+Because the rest of the screen says:
+
+15 strict comps
+
+Card Match Confidence: HIGH (82%)
+
+So as a user I immediately think:
+
+“Wait… which is it?
+Do you have data or not?”
+
+You’ve accidentally introduced a contradiction between layers.
+
+What’s actually happening under the hood
+
+This card is not suffering from low data availability.
+It’s suffering from high dispersion and sensitivity.
+
+That’s a very different story.
+
+The correct reason to WATCH here is:
+
+Prices are all over the place
+
+The card is hype-sensitive
+
+Timing matters a lot
+
+Not:
+
+“We don’t have enough data”
+
+The key distinction you need to enforce
+❌ “Low confidence market data”
+
+Means:
+
+Few comps
+
+Bad matches
+
+Thin market
+
+✅ “High variance / unstable pricing”
+
+Means:
+
+Plenty of comps
+
+Wide spread
+
+Market disagreement
+
+Donovan Mitchell Optic RR PSA 10 is the second case, not the first.
+
+The fix (language + logic alignment)
+1. Split “confidence” into two internal concepts (even if UI shows one)
+
+You already have:
+
+Card Match Confidence (good)
+
+Market Data Confidence (implicit)
+
+You need to differentiate:
+
+Data availability
+vs
+
+Price stability
+
+This card has:
+
+High availability
+
+Low stability
+
+Your explanation should reflect that.
+
+2. Replace the explanation sentence with this pattern
+
+Instead of:
+
+“WATCH recommendation based on low confidence market data.”
+
+Use something like:
+
+“Prices for this card vary widely and tend to move with performance and market sentiment, making timing more important than conviction right now.”
+
+That instantly aligns with:
+
+High upside
+
+High downside
+
+High friction
+
+3. Add an explanation router based on why WATCH was chosen
+
+WATCH is being triggered for different reasons across archetypes.
+
+You need sub-reasons:
+
+WATCH — Unstable pricing
+
+WATCH — Waiting for catalyst
+
+WATCH — Data uncertain
+
+WATCH — Cooling after run-up
+
+Donovan Mitchell should clearly be:
+
+WATCH — Unstable pricing / sentiment-driven
+
+What to tell Replit (copy/paste)
+
+Replit: Fix WATCH explanation mismatch (Modern Star Cards)
+
+We have WATCH outputs where explanation text contradicts the displayed data.
+
+Problem:
+Modern star cards with many comps and high variance are being described as “low confidence market data,” which is incorrect.
+
+Required changes:
+
+Do not use “low confidence market data” when:
+
+Card Match Confidence is HIGH
+
+Strict comps count ≥ threshold
+
+Introduce WATCH reason codes:
+
+WATCH_UNSTABLE_PRICING
+
+WATCH_WAITING_CATALYST
+
+WATCH_DATA_UNCERTAIN
+
+Route explanation language based on WATCH reason:
+
+Unstable pricing → talk about wide spreads, sentiment, timing
+
+Data uncertain → talk about few comps or weak matches
+
+Ensure explanation language never contradicts confidence indicators shown in UI.
+
+Goal:
+The explanation should always tell the same story as the numbers.
+
+Final verdict on this card
+
+If I saw this after the fix:
+
+Would I trust it? → ✅ Yes
+
+Would I understand why it’s WATCH? → ✅ Yes
+
+Would I disagree with the logic? → ❌ No
+
+You’re no longer fighting philosophy — you’re tuning narrative alignment.
+
+And that’s exactly where a product should be at this stage.
