@@ -1,0 +1,315 @@
+This is excellent debugging — you’ve just identified the exact reasons trust broke. And the good news is: these are solvable with deterministic rules, not more AI.
+
+I’ll walk through each issue, explain why it happened, and give you precise fixes you can hand to Replit.
+
+What’s really happening (pattern-level)
+
+Your system is currently doing semantic similarity, not collector-grade identity matching.
+
+Collectors don’t think:
+
+“Is this similar?”
+
+They think:
+
+“Is this the same card?”
+
+Right now:
+
+Some mismatches are being treated as equal
+
+Qualifiers are being ignored
+
+Grader differences are overweighted
+
+That’s why your range exploded and risk spiked.
+
+Issue-by-issue fixes (very concrete)
+Issue 1
+❌ #81 Team Leaders included with #10 Base
+Why this happened
+
+Your matcher likely:
+
+Sees same player
+
+Same year
+
+Same brand (Topps)
+
+Similar keywords
+
+But card number ≠ variation — it’s a different card entirely.
+
+To a collector:
+
+#10 Base ≠ #81 Team Leaders
+
+Not even “neighbor comps”
+
+✅ Required fix: Card Number = HARD GATE
+
+Rule:
+If both the target card and listing have a card number, they must match exactly to be considered a strict comp.
+
+Implementation logic
+If target.card_number exists AND listing.card_number exists:
+    If target.card_number != listing.card_number:
+        Exclude from strict comps
+
+
+Do not downgrade — exclude.
+
+This one rule alone will fix a huge amount of noise.
+
+Issue 2
+⚠️ CGC 8 treated as equal to PSA 8
+Why this happened
+
+Your system is treating:
+
+Grade number = primary signal
+
+Grader = secondary or ignored
+
+Collectors do not do this.
+
+✅ Required fix: Grader Normalization Table
+
+Grades must be normalized, not equalized.
+
+Suggested normalization weights (starting point)
+Grader	Weight
+PSA	1.00
+BGS	0.95
+SGC	0.90
+CGC	0.80
+Raw	0.65
+Implementation logic
+
+PSA 8 = baseline
+
+CGC 8 → value × 0.80 before aggregation
+
+CGC comps should:
+
+never define the median for PSA value
+
+only influence trend direction slightly
+
+Also:
+
+CGC comps should lower match confidence, not raise it
+
+Issue 3
+❌ PSA 8 (ST) qualifier treated as clean PSA 8
+
+This one is huge, and you caught it correctly.
+
+Why this is critical
+
+Qualifiers are value destroyers, not footnotes.
+
+Collectors often price:
+
+PSA 8 (ST) closer to PSA 6–7
+
+Sometimes even lower depending on eye appeal
+
+Treating it as full PSA 8 will:
+
+Inflate variance
+
+Inflate risk
+
+Destroy trust
+
+✅ Required fix: Qualifier Parsing + Grade Penalty
+Step 1: Detect qualifiers
+
+Look for:
+
+(ST)
+
+(OC)
+
+(MC)
+
+(MK)
+
+(PD)
+
+Normalize text before parsing.
+
+Step 2: Apply grade penalty
+
+You have two safe options:
+
+Option A (simplest, safest)
+
+Downgrade qualifier grades by 1.0–1.5 grade levels.
+
+Example:
+
+PSA 8 (ST) → treat as PSA 6.5–7 equivalent
+
+Option B (more nuanced)
+
+Apply a value multiplier:
+
+Qualifier	Multiplier
+ST	0.65
+OC	0.70
+MC	0.75
+MK	0.70
+PD	0.60
+
+I recommend Option A for V1 — easier to reason about.
+
+How these fixes change your Maravich output
+Before
+
+Mixed #81 and #10 cards
+
+CGC 8 treated as equal
+
+PSA 8 (ST) inflating spread
+→ Result: $40–$300 range, Risk 97
+
+After fixes
+
+Only #10 Base comps included
+
+PSA 8 only for strict comps
+
+CGC comps weighted down
+
+Qualifier downgraded or excluded
+
+Expected outcome:
+
+Much tighter range (e.g. $115–$160)
+
+Downside risk low
+
+Market friction moderate
+
+WATCH (Stable / Low Upside) makes sense
+
+One additional rule you should add (important)
+STRICT vs LOOSE comp buckets
+
+Split comps into:
+
+1️⃣ Strict Comps (define value)
+
+Must match:
+
+Player
+
+Year
+
+Set
+
+Card number
+
+Parallel
+
+Grade (normalized)
+
+No qualifiers
+
+Used for:
+
+Est. Value
+
+Primary range
+
+2️⃣ Loose Comps (context only)
+
+May differ by:
+
+Grader
+
+±1 grade
+
+No card number match
+
+Used for:
+
+Trend direction
+
+Explanation context
+
+Confidence assessment
+
+Never mix these buckets.
+
+What to tell Replit (copy/paste)
+
+Send this exactly:
+
+Replit: Fix Card Matching Errors (Critical Trust Issue)
+
+We identified specific card-matching failures that are breaking trust.
+
+Required changes:
+
+Card Number Hard Gate
+
+If target card has a card number and listing has a card number, they must match exactly.
+
+Example: 1974 Topps #10 Base ≠ #81 Team Leaders → exclude from strict comps.
+
+Grader Normalization
+
+PSA is baseline (1.0).
+
+Apply value weights to non-PSA graders:
+
+CGC ~0.80
+
+SGC ~0.90
+
+BGS ~0.95
+
+Non-PSA comps should not define median PSA value.
+
+Qualifier Detection
+
+Detect qualifiers: (ST), (OC), (MC), (MK), (PD).
+
+Qualifier grades must be downgraded or penalized.
+
+PSA 8 (ST) should be treated closer to PSA 6.5–7 or excluded from strict comps.
+
+Strict vs Loose Comp Buckets
+
+Strict comps (exact matches, no qualifiers) define value and range.
+
+Loose comps only influence trend, explanation, and confidence.
+
+Goal:
+Price ranges should be tight and intuitive for collectors. A single misidentified card or qualifier must not distort value or risk scores.
+
+Final reassurance (important)
+
+You just did what good products do:
+
+You inspected the data
+
+You spotted collector-relevant errors
+
+You didn’t blame the model — you fixed the rules
+
+Once these three fixes are in, your Outlook will feel dramatically more trustworthy without changing the core architecture.
+
+If you want next, I can:
+
+Help you design a visual “why these comps were used” UI
+
+Help you decide when to exclude vs downgrade comps
+
+Stress-test weird edge cases (Team Leaders, multi-player cards, checklists, oddball sets)
+
+Just say the word.

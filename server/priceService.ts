@@ -52,6 +52,107 @@ const MATCH_WEIGHTS = {
   rookie: 0.05,
 };
 
+// Grader normalization weights (PSA is baseline)
+const GRADER_WEIGHTS: Record<string, number> = {
+  psa: 1.00,
+  bgs: 0.95,
+  sgc: 0.90,
+  cgc: 0.80,
+  raw: 0.65,
+};
+
+// Grade qualifiers that reduce value (ST = stain, OC = off-center, etc.)
+const GRADE_QUALIFIERS = ["st", "oc", "mc", "mk", "pd"];
+const QUALIFIER_GRADE_PENALTY = 1.5; // Downgrade by 1.5 grade points
+
+// Extract card number from title (e.g., "#10", "#304")
+function extractCardNumber(text: string): string | null {
+  const match = text.match(/#(\d+)/);
+  return match ? match[1] : null;
+}
+
+// Parse grade info: grader, numeric grade, and qualifiers
+function parseGradeInfo(gradeStr: string | null | undefined): {
+  grader: string | null;
+  gradeNum: number | null;
+  hasQualifier: boolean;
+  qualifiers: string[];
+} {
+  if (!gradeStr) {
+    return { grader: null, gradeNum: null, hasQualifier: false, qualifiers: [] };
+  }
+  
+  const lower = gradeStr.toLowerCase();
+  
+  // Detect qualifiers like (ST), (OC), etc.
+  const qualifiers: string[] = [];
+  for (const q of GRADE_QUALIFIERS) {
+    if (lower.includes(`(${q})`) || lower.includes(` ${q} `) || lower.endsWith(` ${q}`)) {
+      qualifiers.push(q.toUpperCase());
+    }
+  }
+  
+  // Extract grader
+  let grader: string | null = null;
+  for (const g of ["psa", "bgs", "sgc", "cgc"]) {
+    if (lower.includes(g)) {
+      grader = g;
+      break;
+    }
+  }
+  
+  // Extract numeric grade
+  const gradeMatch = lower.match(/(\d+\.?\d*)/);
+  const gradeNum = gradeMatch ? parseFloat(gradeMatch[1]) : null;
+  
+  return {
+    grader,
+    gradeNum,
+    hasQualifier: qualifiers.length > 0,
+    qualifiers,
+  };
+}
+
+// Get effective grade after qualifier penalty
+function getEffectiveGrade(gradeNum: number | null, hasQualifier: boolean): number | null {
+  if (gradeNum === null) return null;
+  if (hasQualifier) {
+    return Math.max(1, gradeNum - QUALIFIER_GRADE_PENALTY);
+  }
+  return gradeNum;
+}
+
+// Check if listing is a STRICT comp (exact match, eligible to define value)
+function isStrictComp(
+  listingTitle: string,
+  listingSnippet: string,
+  card: CardInfo
+): { isStrict: boolean; excludeReason: string | null } {
+  const combined = `${listingTitle} ${listingSnippet}`.toLowerCase();
+  
+  // HARD GATE 1: Card number must match exactly if both have one
+  const cardNumber = extractCardNumber(card.title);
+  const listingNumber = extractCardNumber(listingTitle) || extractCardNumber(listingSnippet);
+  
+  if (cardNumber && listingNumber && cardNumber !== listingNumber) {
+    return { isStrict: false, excludeReason: `Card number mismatch: #${cardNumber} vs #${listingNumber}` };
+  }
+  
+  // HARD GATE 2: Qualifier comps are not strict
+  const listingGrade = parseGradeInfo(combined);
+  if (listingGrade.hasQualifier) {
+    return { isStrict: false, excludeReason: `Has qualifier: ${listingGrade.qualifiers.join(", ")}` };
+  }
+  
+  // HARD GATE 3: Grader must match for strict comp (PSA card needs PSA comps)
+  const cardGrade = parseGradeInfo(card.grade);
+  if (cardGrade.grader && listingGrade.grader && cardGrade.grader !== listingGrade.grader) {
+    return { isStrict: false, excludeReason: `Grader mismatch: ${cardGrade.grader.toUpperCase()} vs ${listingGrade.grader.toUpperCase()}` };
+  }
+  
+  return { isStrict: true, excludeReason: null };
+}
+
 // Extract player name from card title (first 2-3 words typically)
 function extractPlayerName(title: string): string {
   const cleanTitle = title.replace(/#\d+/g, "").trim();
@@ -250,6 +351,28 @@ function computeListingMatchScore(
   return { score, matched };
 }
 
+// Filter listings to strict comps only (for value calculation)
+function filterToStrictComps(
+  listings: Array<{ title: string; snippet: string; link: string; price?: number }>,
+  card: CardInfo
+): { strict: typeof listings; loose: typeof listings } {
+  const strict: typeof listings = [];
+  const loose: typeof listings = [];
+  
+  for (const listing of listings) {
+    const { isStrict, excludeReason } = isStrictComp(listing.title, listing.snippet, card);
+    if (isStrict) {
+      strict.push(listing);
+    } else {
+      loose.push(listing);
+      console.log(`[LOOSE COMP] ${listing.title.substring(0, 50)}... - ${excludeReason}`);
+    }
+  }
+  
+  console.log(`[STRICT/LOOSE SPLIT] ${card.title}: ${strict.length} strict, ${loose.length} loose`);
+  return { strict, loose };
+}
+
 // Compute overall card match confidence from multiple listings
 function computeCardMatchConfidence(
   listings: Array<{ title: string; snippet: string; link: string; price?: number }>,
@@ -266,17 +389,22 @@ function computeCardMatchConfidence(
     };
   }
 
+  const { strict: strictComps, loose: looseComps } = filterToStrictComps(listings, card);
+  
+  // Use strict comps for scoring if available, otherwise fall back to loose comps
+  const primaryComps = strictComps.length > 0 ? strictComps : looseComps;
+  const usingFallback = strictComps.length === 0 && looseComps.length > 0;
+  
   const samples: MatchSample[] = [];
   let totalScore = 0;
   let highMatchCount = 0;
 
-  for (const listing of listings) {
+  // Score primary comps (strict preferred, loose as fallback)
+  for (const listing of primaryComps) {
     const { score, matched } = computeListingMatchScore(listing.title, listing.snippet, card);
     totalScore += score;
-    
     if (score >= 0.8) highMatchCount++;
 
-    // Keep top 5 samples for review
     if (samples.length < 5) {
       samples.push({
         title: listing.title,
@@ -290,37 +418,69 @@ function computeCardMatchConfidence(
     }
   }
 
-  const avgScore = totalScore / listings.length;
-  const highMatchRatio = highMatchCount / listings.length;
+  // If using strict comps, add some loose comps to samples for context
+  if (!usingFallback && samples.length < 5) {
+    for (const listing of looseComps) {
+      if (samples.length >= 5) break;
+      const { score, matched } = computeListingMatchScore(listing.title, listing.snippet, card);
+      samples.push({
+        title: listing.title,
+        snippet: listing.snippet,
+        source: extractSourceFromUrl(listing.link),
+        url: listing.link,
+        price: listing.price,
+        matchScore: Math.round(score * 100) / 100,
+        matched,
+      });
+    }
+  }
 
-  // Determine tier
+  // Calculate score from primary comps
+  const effectiveScore = primaryComps.length > 0 
+    ? totalScore / primaryComps.length 
+    : 0;
+
+  // Determine tier - degraded when using fallback (loose comps)
   let tier: MatchConfidenceTier;
   let reason: string;
 
-  if (avgScore >= 0.8 && highMatchCount >= 3) {
+  if (usingFallback) {
+    // Using loose comps only - cap tier at MEDIUM max, explain why
+    const { excludeReason } = looseComps[0] 
+      ? isStrictComp(looseComps[0].title, looseComps[0].snippet, card)
+      : { excludeReason: null };
+    
+    if (effectiveScore >= 0.7 && highMatchCount >= 2) {
+      tier = "MEDIUM";
+      reason = `No strict comps (${excludeReason || "card #/grader mismatch"}) - using ${looseComps.length} loose comps`;
+    } else {
+      tier = "LOW";
+      reason = excludeReason || "No strict comps - loose data may be inaccurate";
+    }
+  } else if (strictComps.length >= 3 && effectiveScore >= 0.8 && highMatchCount >= 2) {
     tier = "HIGH";
-    reason = `${highMatchCount} of ${listings.length} listings closely match card attributes`;
-  } else if (avgScore >= 0.55 || (highMatchCount >= 2 && listings.length >= 3)) {
+    reason = `${strictComps.length} strict comps match exactly (card #, grade, grader)`;
+  } else if (strictComps.length >= 1 && (effectiveScore >= 0.6 || highMatchCount >= 1)) {
     tier = "MEDIUM";
-    reason = `Partial match: ${Math.round(avgScore * 100)}% average match score`;
+    reason = `${strictComps.length} strict + ${looseComps.length} loose comps found`;
   } else {
     tier = "LOW";
     if (samples.length > 0 && !samples[0].matched.player) {
       reason = "Player name mismatch detected";
     } else if (samples.length > 0 && !samples[0].matched.variation) {
       reason = "Card variation/parallel mismatch detected";
-    } else if (samples.length > 0 && !samples[0].matched.grade) {
-      reason = "Grade mismatch detected";
     } else {
-      reason = `Low match confidence: ${Math.round(avgScore * 100)}% average score`;
+      reason = `Only ${strictComps.length} strict comps found`;
     }
   }
 
+  console.log(`[MATCH CONFIDENCE] ${card.title}: ${strictComps.length} strict, ${looseComps.length} loose${usingFallback ? " (FALLBACK)" : ""} -> ${tier}`);
+
   return {
     tier,
-    score: Math.round(avgScore * 100) / 100,
+    score: Math.round(effectiveScore * 100) / 100,
     reason,
-    matchedComps: highMatchCount,
+    matchedComps: strictComps.length > 0 ? strictComps.length : looseComps.length,
     totalComps: listings.length,
     samples: samples.sort((a, b) => b.matchScore - a.matchScore),
   };
@@ -587,68 +747,129 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
     link: r.link || "",
   }));
 
+  // Filter to STRICT comps only for GPT price extraction
+  const { strict: strictResults, loose: looseResults } = filterToStrictComps(rawResults, card);
+  
+  // Use strict results for pricing, fall back to loose if no strict found
+  const resultsForPricing = strictResults.length > 0 ? strictResults : looseResults;
+  const usingLooseFallback = strictResults.length === 0;
+
   // DEBUG: Log raw search results for match analysis
   console.log("\n========== RAW COMP DATA FOR MATCH ANALYSIS ==========");
   console.log(`Card: ${card.title} | Set: ${card.set} | Year: ${card.year} | Grade: ${card.grade}`);
+  console.log(`STRICT: ${strictResults.length} | LOOSE: ${looseResults.length}`);
   console.log("--------------------------------------------------------");
   rawResults.forEach((r: any, i: number) => {
-    console.log(`[${i + 1}] Title: ${r.title}`);
+    const { isStrict } = isStrictComp(r.title, r.snippet, card);
+    console.log(`[${i + 1}] ${isStrict ? "STRICT" : "LOOSE"} - ${r.title}`);
     console.log(`    Snippet: ${r.snippet?.substring(0, 150)}...`);
     console.log(`    URL: ${r.link}`);
     console.log("");
   });
   console.log("========================================================\n");
 
-  const searchContext = rawResults
+  // Send comps to GPT for price extraction (strict preferred, loose as fallback)
+  const searchContext = resultsForPricing
     .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet}\nURL: ${r.link}`)
     .join("\n\n");
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content: `You are a sports card pricing expert. Extract INDIVIDUAL price points from search results.
+  // Adjust prompt based on whether we have strict comps or using loose fallback
+  const systemPrompt = usingLooseFallback
+    ? `You are a sports card pricing expert. Extract price points from search results.
+    
+NOTE: No exact matches found, using approximate comps. Extract all relevant prices but acknowledge this is approximate data.
 
 Your task:
-1. Find ALL individual prices mentioned in the search results
+1. Find prices from the best matching listings available
 2. For each price, extract: price amount, approximate date (if visible), source name, and source URL
 3. Look for: eBay sold prices, auction results, price guide values, recent sales
 
 Return ONLY a JSON object with:
 {
   "pricePoints": [
-    { "date": "2024-12-01", "price": 299, "source": "eBay Sold", "url": "https://..." },
-    { "date": "2024-11-15", "price": 350, "source": "130point", "url": "https://..." }
+    { "date": "2024-12-01", "price": 299, "source": "eBay Sold", "url": "https://..." }
   ],
-  "estimatedValue": number (average of all prices found),
+  "estimatedValue": number (average of prices found),
   "salesFound": number (total price points extracted),
-  "confidence": "high" | "medium" | "low",
-  "confidenceReason": string (explain why this confidence level, e.g., "12 recent sold comps in last 90 days")
+  "confidence": "low" | "medium" (never high for approximate data),
+  "confidenceReason": string (explain data is approximate and why)
 }
 
 RULES:
 - Extract up to 20 individual price points
-- If no date is visible, use today's date
-- Match the card's grade (PSA 10, PSA 9, etc.) - don't mix grades
 - Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
-- eBay sold listings are most reliable
-- Be aggressive - extract every price you can find`,
-      },
-      {
-        role: "user",
-        content: `Extract all price points for this card:
+- If no date is visible, use today's date
+- Note in confidenceReason that exact match data was not available`
+    : `You are a sports card pricing expert. Extract INDIVIDUAL price points from search results.
+
+CRITICAL MATCHING RULES (STRICT COMPS ONLY):
+1. CARD NUMBER: If target card has #10, ONLY use listings with #10. Card #81 is a DIFFERENT card.
+2. GRADER: For PSA cards, only use PSA prices for value. CGC/SGC are different graders.
+3. QUALIFIERS: Exclude cards with (ST), (OC), (MC), (MK), (PD) - these are damaged/flawed.
+4. GRADE: PSA 8 is not the same as PSA 9 or PSA 7. Match exactly.
+
+Your task:
+1. Find STRICT MATCH prices only - same card number, same grader, same grade, no qualifiers
+2. For each price, extract: price amount, approximate date (if visible), source name, and source URL
+3. Look for: eBay sold prices, auction results, price guide values, recent sales
+
+Return ONLY a JSON object with:
+{
+  "pricePoints": [
+    { "date": "2024-12-01", "price": 299, "source": "eBay Sold", "url": "https://...", "isStrict": true },
+    { "date": "2024-11-15", "price": 350, "source": "130point", "url": "https://...", "isStrict": true }
+  ],
+  "estimatedValue": number (average of STRICT matches only),
+  "salesFound": number (total STRICT price points extracted),
+  "confidence": "high" | "medium" | "low",
+  "confidenceReason": string (explain why this confidence level)
+}
+
+RULES:
+- Extract up to 20 individual price points
+- EXCLUDE different card numbers (e.g., #81 Team Leaders vs #10 Base)
+- EXCLUDE different graders for value calculation (CGC 8 ≠ PSA 8)
+- EXCLUDE qualifier grades like PSA 8 (ST) - these are worth much less
+- Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
+- If no date is visible, use today's date
+- eBay sold listings are most reliable`;
+
+  const userPrompt = usingLooseFallback
+    ? `Extract approximate price points for this card (no exact matches found):
 Card: ${card.title}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
 Variation: ${card.variation || "None"}
 Grade: ${card.grade || "Raw/Ungraded"}
 
+Extract the best available pricing from these listings (acknowledge data is approximate):
+${searchContext}
+
+Return JSON with pricePoints array, estimatedValue, salesFound, confidence (max "medium"), and confidenceReason.`
+    : `Extract STRICT MATCH price points for this card:
+Card: ${card.title}
+Card Number: ${extractCardNumber(card.title) || "Not specified"}
+Set: ${card.set || "Unknown"}
+Year: ${card.year || "Unknown"}
+Variation: ${card.variation || "None"}
+Grade: ${card.grade || "Raw/Ungraded"}
+
+IMPORTANT: Only include prices from listings that match:
+- Same card number (if specified above)
+- Same grader (${parseGradeInfo(card.grade).grader?.toUpperCase() || "any"})
+- Same grade number
+- NO qualifiers like (ST), (OC), etc.
+
 Search results:
 ${searchContext}
 
-Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and confidenceReason.`,
-      },
+Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and confidenceReason.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
     ],
     temperature: 0.2,
     max_tokens: 1500,
