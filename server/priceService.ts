@@ -376,13 +376,25 @@ function isStrictComp(
   const listingHasParallel = parallelKeywords.some(kw => combined.includes(kw.toLowerCase()));
   const userSpecifiedVariation = card.variation && card.variation.trim().length > 0;
   
-  if (!userSpecifiedVariation && listingHasParallel) {
+  // These "variations" are actually just base subset names, NOT premium parallels
+  // They should be treated as base cards for matching purposes
+  const baseSubsetNames = [
+    "rated rookie", "rr", "rookie", "rc", "base", "base set",
+    "rookie card", "1st edition", "first edition",
+  ];
+  const variationLower = (card.variation || "").toLowerCase().trim();
+  const isBaseSubsetName = baseSubsetNames.some(name => variationLower.includes(name) || variationLower === name);
+  
+  // Treat base subset names as equivalent to no variation
+  const effectivelyHasVariation = userSpecifiedVariation && !isBaseSubsetName;
+  
+  if (!effectivelyHasVariation && listingHasParallel) {
     // User wants base card but listing is a parallel - not strict
     const detectedParallel = parallelKeywords.find(kw => combined.includes(kw.toLowerCase()));
     return { isStrict: false, excludeReason: `Base card vs parallel mismatch: listing has "${detectedParallel}"` };
   }
   
-  if (userSpecifiedVariation && !listingHasParallel) {
+  if (effectivelyHasVariation && !listingHasParallel) {
     // User wants specific parallel but listing appears to be base card - not strict
     return { isStrict: false, excludeReason: `Parallel "${card.variation}" vs base card mismatch` };
   }
