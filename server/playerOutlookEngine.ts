@@ -177,10 +177,29 @@ async function generatePlayerOutlookAI(
   marketRealityCheck: string[];
   verdict: PlayerVerdictResult;
   confidence: DataConfidence;
+  dataQuality: DataConfidence;
 }> {
-  const prompt = `You are a seasoned sports card market analyst known for honest, grounded assessments. Analyze the investment outlook for ${playerName} in ${sport}.
+  // Build the system message with strict guardrails
+  const systemMessage = `You are MyDisplayCase Player Outlook, a skeptical sports-card market analyst. You help collectors decide whether to invest in a player like a stock, and choose the right card exposure (Premium/Growth/Core/Speculative) based on risk, liquidity, and timing.
 
-PLAYER CLASSIFICATION (from our rules engine):
+Style rules (non-negotiable):
+- Be clear, direct, and grounded. No hype. No marketing fluff.
+- Never invent facts, stats, awards, or news. If unknown, say "Unknown" and proceed with conditional reasoning.
+- No fake precision (no percentages, no "72% upside").
+- Every analysis must include one uncomfortable truth under "Market Reality Check."
+- Verdict must be one of: BUY / WATCH / AVOID, and must include a modifier: (Momentum / Speculative / Value / Long-Term / Late Cycle).
+- Keep all sections scannable: bullets + short sentences. No long paragraphs.
+
+Reasoning rules:
+- Use "If X, then Y" logic.
+- Separate "Conviction (Thesis Confidence)" from "Price certainty."
+
+Output format rules:
+- Return valid JSON only, matching the schema provided. Do not include markdown, commentary, or extra keys.`;
+
+  const prompt = `Analyze the investment outlook for ${playerName} in ${sport}.
+
+PLAYER DATA (from our classification engine):
 - Career Stage: ${classification.stage}
 - Position: ${classification.position || "Unknown"}
 - Team: ${classification.team || "Unknown"}
@@ -189,53 +208,41 @@ PLAYER CLASSIFICATION (from our rules engine):
 - Risk Level: ${classification.baseRisk}
 - Investment Horizon: ${classification.baseHorizon}
 
-${newsSnippets.length > 0 ? `RECENT NEWS CONTEXT:\n${newsSnippets.map(s => `- ${s}`).join("\n")}` : "No recent news available."}
+${newsSnippets.length > 0 ? `RECENT NEWS SIGNALS:\n${newsSnippets.map(s => `- ${s}`).join("\n")}` : "No recent news available - use conditional reasoning."}
 
 RESPOND IN EXACTLY THIS JSON FORMAT:
 {
   "playerInfo": {
-    "position": "<position if known, or best guess>",
-    "team": "<current team if known>",
+    "position": "<position if known, or 'Unknown'>",
+    "team": "<current team if known, or 'Unknown'>",
     "rookieYear": <year as number or null>,
-    "inferred": <true if you had to guess position/team>
+    "inferredFields": ["<list any fields you guessed: 'position', 'team', 'rookieYear'>"]
   },
   "thesis": [
-    "<bullet 1: main momentum/hype factor>",
+    "<bullet 1: main momentum/hype factor - SPECIFIC to this player>",
     "<bullet 2: performance or role factor>",
     "<bullet 3: market behavior observation>",
-    "<bullet 4: key risk or what could change>",
-    "<bullet 5 optional: secondary factor>"
+    "<bullet 4: key risk or what could change>"
   ],
   "marketRealityCheck": [
-    "<uncomfortable truth 1: honest skeptical observation that builds trust>",
-    "<uncomfortable truth 2: historical cautionary note or what could go wrong>",
-    "<uncomfortable truth 3 optional: current market pricing vs reality>"
+    "<uncomfortable truth 1: honest skeptical observation>",
+    "<uncomfortable truth 2: historical cautionary note or pricing vs reality>"
   ],
   "verdict": {
-    "action": "<BUY or WATCH or AVOID>",
-    "modifier": "<Speculative or Momentum or Value or Long-Term or Late Cycle>",
-    "summary": "<2-4 sentence plain language summary of why>",
+    "action": "BUY|WATCH|AVOID",
+    "modifier": "Momentum|Speculative|Value|Long-Term|Late Cycle",
+    "summary": "<2-4 sentence plain language summary>",
     "whatMustBeTrue": [
       "<condition 1 for thesis to work>",
-      "<condition 2>",
-      "<condition 3 optional>"
+      "<condition 2>"
     ]
   },
-  "confidence": "<HIGH or MEDIUM or LOW based on how certain you are>"
+  "confidence": "HIGH|MEDIUM|LOW",
+  "dataQuality": "HIGH|MEDIUM|LOW"
 }
 
-TONE RULES (CRITICAL - follow these exactly):
-- AVOID hype language: never use "elite", "can't miss", "skyrocketing", "must own"
-- PREFER grounded phrasing: "short leash", "fragile demand", "projection-heavy", "limited proof"
-- NO percentages or fake precision (no "80% likely" or "3x upside")
-- USE conditional language: "If X happens, Y follows", "This works only if...", "Market currently prices in..."
-- BE SPECIFIC: reference team context, position premium, historical patterns for this sport/position
-
-MARKET REALITY CHECK MUST:
-- Include at least ONE uncomfortable truth that acknowledges skeptical viewpoints
-- Reference historical patterns where similar players disappointed collectors
-- Acknowledge when current pricing is based on projection vs proven performance
-- Build trust by showing you see both sides, not just the bullish case
+ANTI-FLUFF CHECK (critical):
+Before finalizing, verify: if any thesis bullet could apply to 10+ random players, rewrite it to be more specific to ${playerName} OR mark the missing input as Unknown and use conditional language.
 
 MODIFIER SELECTION:
 - "Speculative": High upside, high downside, projection-driven (rookies, unproven talent)
@@ -244,24 +251,21 @@ MODIFIER SELECTION:
 - "Long-Term": Slow burn, fundamentals-driven (proven stars, HOF trajectory)
 - "Late Cycle": Risky entry even if still hot (prices reflect best-case, limited upside)
 
-RULES:
-- Be opinionated but transparent about uncertainty
-- Do NOT hallucinate stats or percentages
-- Do NOT guarantee returns
-- Use the stock metaphor (player = stock, cards = exposure)
-- Keep bullets SHORT and punchy (max 15 words each)
-- If you don't know something, say "Unknown" or mark inferred: true
-- 3-5 thesis bullets, 2-3 marketRealityCheck bullets, 2-3 whatMustBeTrue conditions`;
+TONE ENFORCEMENT:
+- NEVER use: "elite", "can't miss", "skyrocketing", "must own", "generational"
+- PREFER: "short leash", "fragile demand", "projection-heavy", "limited proof", "if X then Y"
+- NO percentages or fake precision
+- Reference team context, position premium, historical patterns for ${sport}`;
 
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
-        { role: "system", content: "You are a sports card market analyst. Respond only with valid JSON." },
+        { role: "system", content: systemMessage },
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 1200,
     });
     
     const content = response.choices[0]?.message?.content || "{}";
@@ -282,15 +286,26 @@ RULES:
       m.toLowerCase().replace("-", " ") === rawModifier.toLowerCase().replace("-", " ")
     ) || VERDICT_MODIFIER.SPECULATIVE;
     
+    // Determine inferred fields
+    const inferredFields: string[] = parsed.playerInfo?.inferredFields || [];
+    if (!classification.position && parsed.playerInfo?.position) inferredFields.push("position");
+    if (!classification.team && parsed.playerInfo?.team) inferredFields.push("team");
+    
+    // Determine data quality
+    const dataQuality = (["HIGH", "MEDIUM", "LOW"].includes(parsed.dataQuality) 
+      ? parsed.dataQuality 
+      : newsSnippets.length >= 3 ? "MEDIUM" : "LOW") as DataConfidence;
+    
     return {
       playerInfo: {
         name: playerName,
         sport,
-        position: parsed.playerInfo?.position || classification.position,
-        team: parsed.playerInfo?.team || classification.team,
+        position: parsed.playerInfo?.position || classification.position || "Unknown",
+        team: parsed.playerInfo?.team || classification.team || "Unknown",
         stage: classification.stage,
         rookieYear: parsed.playerInfo?.rookieYear || classification.rookieYear,
-        inferred: parsed.playerInfo?.inferred ?? true,
+        inferred: inferredFields.length > 0,
+        inferredFields,
       },
       thesis: parsed.thesis || [
         "Market data for this player is limited",
@@ -312,6 +327,7 @@ RULES:
       confidence: (["HIGH", "MEDIUM", "LOW"].includes(parsed.confidence) 
         ? parsed.confidence 
         : "LOW") as DataConfidence,
+      dataQuality,
     };
   } catch (error) {
     console.error("[PlayerOutlook] AI generation error:", error);
@@ -321,11 +337,12 @@ RULES:
       playerInfo: {
         name: playerName,
         sport,
-        position: classification.position,
-        team: classification.team,
+        position: classification.position || "Unknown",
+        team: classification.team || "Unknown",
         stage: classification.stage,
         rookieYear: classification.rookieYear,
         inferred: true,
+        inferredFields: ["position", "team"],
       },
       thesis: [
         "Unable to generate detailed analysis at this time",
@@ -343,6 +360,7 @@ RULES:
         whatMustBeTrue: ["Analysis system needs to be available"],
       },
       confidence: "LOW",
+      dataQuality: "LOW",
     };
   }
 }
@@ -403,7 +421,7 @@ async function generateFreshOutlook(
   const classification = classifyPlayer(classificationInput);
   
   // Step 3: Generate AI narrative
-  const { playerInfo, thesis, marketRealityCheck, verdict, confidence } = await generatePlayerOutlookAI(
+  const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality } = await generatePlayerOutlookAI(
     playerName,
     sport,
     classification,
@@ -430,9 +448,11 @@ async function generateFreshOutlook(
     notes: [
       snippets.length === 0 ? "Limited news data available" : `${snippets.length} recent news items analyzed`,
       `Classification: ${classification.stage} stage, ${classification.baseTemperature} market`,
+      "We use comps as supporting evidence — not as the decision driver.",
     ],
     newsSnippets: snippets.slice(0, 3),
     lastUpdated: new Date().toISOString(),
+    dataQuality,
   };
   
   // Step 7: Build response

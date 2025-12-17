@@ -1021,6 +1021,7 @@ export type PlayerInfo = {
   stage: PlayerStage;
   rookieYear?: number;
   inferred?: boolean; // True if position/team were AI-inferred
+  inferredFields?: string[]; // Which fields were inferred: "position", "team", "rookieYear"
 };
 
 // Investment Verdict with explanation
@@ -1053,6 +1054,7 @@ export type EvidenceData = {
   notes: string[]; // e.g., ["thin comps", "match quality medium"]
   newsSnippets?: string[]; // Recent news/hype if available
   lastUpdated?: string;
+  dataQuality?: DataConfidence; // Overall data quality: HIGH, MEDIUM, LOW
 };
 
 // Full Player Outlook Response
