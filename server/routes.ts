@@ -1246,6 +1246,263 @@ Allow: /
     }
   });
 
+  // ============================================
+  // Card Outlook AI 2.0 - Deterministic Signal-Based Analysis
+  // "AI should explain, not decide"
+  // ============================================
+
+  // Generate full AI 2.0 outlook for a card (Pro feature)
+  app.post("/api/cards/:cardId/outlook-v2", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+      const userId = req.user.claims.sub;
+
+      // Check Pro subscription
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        return res.status(403).json({ 
+          message: "Card Outlook AI 2.0 is a Pro feature. Upgrade to Pro to get signal-based investment insights." 
+        });
+      }
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      // Verify user owns this card
+      const displayCase = await storage.getDisplayCaseByIdAndUser(card.displayCaseId, userId);
+      if (!displayCase) {
+        return res.status(403).json({ message: "You don't have permission to analyze this card" });
+      }
+
+      // Import the outlook engine dynamically to avoid circular dependencies
+      const { computeAllSignals, generateOutlookExplanation } = await import("./outlookEngine");
+      const { lookupEnhancedCardPrice } = await import("./priceService");
+
+      // First, get enhanced price data with individual price points
+      console.log(`[Outlook 2.0] Fetching enhanced price data for card ${cardId}`);
+      const priceData = await lookupEnhancedCardPrice({
+        title: card.title,
+        set: card.set,
+        year: card.year,
+        variation: card.variation,
+        grade: card.grade,
+      });
+
+      // Convert price points to the schema format
+      const pricePointsForSchema = priceData.pricePoints.map(pp => ({
+        date: pp.date,
+        price: pp.price,
+        source: pp.source,
+        url: pp.url,
+      }));
+
+      // Compute all signals using deterministic engine
+      console.log(`[Outlook 2.0] Computing signals for card ${cardId}`);
+      const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
+
+      // Generate AI explanation (AI explains, doesn't decide)
+      console.log(`[Outlook 2.0] Generating AI explanation for ${signals.action}`);
+      const explanation = await generateOutlookExplanation(card, signals, priceData.pricePoints, priceData.estimatedValue);
+
+      // Store outlook in the new card_outlooks table
+      const outlookData = {
+        cardId,
+        pricePoints: pricePointsForSchema,
+        marketValue: priceData.estimatedValue ? Math.round(priceData.estimatedValue * 100) : null, // Store in cents
+        priceMin: priceData.pricePoints.length > 0 ? Math.round(Math.min(...priceData.pricePoints.map(p => p.price)) * 100) : null,
+        priceMax: priceData.pricePoints.length > 0 ? Math.round(Math.max(...priceData.pricePoints.map(p => p.price)) * 100) : null,
+        compCount: priceData.salesFound,
+        trendScore: signals.trendScore,
+        liquidityScore: signals.liquidityScore,
+        volatilityScore: signals.volatilityScore,
+        sportScore: signals.sportScore,
+        positionScore: signals.positionScore,
+        cardTypeScore: signals.cardTypeScore,
+        demandScore: signals.demandScore,
+        momentumScore: signals.momentumScore,
+        qualityScore: signals.qualityScore,
+        upsideScore: signals.upsideScore,
+        riskScore: signals.riskScore,
+        action: signals.action,
+        actionReasons: signals.actionReasons,
+        careerStageAuto: signals.careerStageAuto,
+        dataConfidence: signals.dataConfidence,
+        confidenceReason: signals.confidenceReason,
+        explanationShort: explanation.short,
+        explanationLong: explanation.long,
+        explanationBullets: explanation.bullets,
+      };
+
+      await storage.upsertCardOutlook(cardId, outlookData);
+
+      // Also update the card's estimated value
+      if (priceData.estimatedValue) {
+        await storage.updateCard(cardId, { estimatedValue: priceData.estimatedValue });
+      }
+
+      // Return the full outlook
+      res.json({
+        cardId,
+        card: {
+          id: card.id,
+          title: card.title,
+          playerName: card.playerName,
+          sport: card.sport,
+          position: card.position,
+          grade: card.grade,
+          year: card.year,
+          set: card.set,
+          variation: card.variation,
+        },
+        market: {
+          value: priceData.estimatedValue,
+          min: priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map(p => p.price)) : null,
+          max: priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map(p => p.price)) : null,
+          compCount: priceData.salesFound,
+          pricePoints: priceData.pricePoints,
+        },
+        signals: {
+          trend: signals.trendScore,
+          liquidity: signals.liquidityScore,
+          volatility: signals.volatilityScore,
+          sport: signals.sportScore,
+          position: signals.positionScore,
+          cardType: signals.cardTypeScore,
+          demand: signals.demandScore,
+          momentum: signals.momentumScore,
+          quality: signals.qualityScore,
+          upside: signals.upsideScore,
+          risk: signals.riskScore,
+        },
+        action: signals.action,
+        actionReasons: signals.actionReasons,
+        careerStage: signals.careerStageAuto,
+        confidence: {
+          level: signals.dataConfidence,
+          reason: signals.confidenceReason,
+        },
+        explanation: {
+          short: explanation.short,
+          long: explanation.long,
+          bullets: explanation.bullets,
+        },
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error generating outlook v2:", error);
+      res.status(500).json({ message: "Failed to generate card outlook" });
+    }
+  });
+
+  // Get cached AI 2.0 outlook for a card
+  app.get("/api/cards/:cardId/outlook-v2", async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+      const userId = req.user?.claims?.sub;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      // Check if user is Pro for full explanation
+      let isPro = false;
+      if (userId) {
+        const user = await storage.getUser(userId);
+        isPro = user?.subscriptionStatus === "PRO";
+      }
+
+      // Get cached outlook from card_outlooks table
+      const outlook = await storage.getCardOutlook(cardId);
+      
+      if (outlook) {
+        const hoursSinceGenerated = outlook.updatedAt 
+          ? (Date.now() - new Date(outlook.updatedAt).getTime()) / (1000 * 60 * 60)
+          : 999;
+        
+        return res.json({
+          cardId,
+          card: {
+            id: card.id,
+            title: card.title,
+            playerName: card.playerName,
+            sport: card.sport,
+            position: card.position,
+            grade: card.grade,
+          },
+          market: {
+            value: outlook.marketValue ? outlook.marketValue / 100 : null,
+            min: outlook.priceMin ? outlook.priceMin / 100 : null,
+            max: outlook.priceMax ? outlook.priceMax / 100 : null,
+            compCount: outlook.compCount,
+            pricePoints: isPro ? outlook.pricePoints : null,
+          },
+          signals: isPro ? {
+            trend: outlook.trendScore,
+            liquidity: outlook.liquidityScore,
+            volatility: outlook.volatilityScore,
+            sport: outlook.sportScore,
+            position: outlook.positionScore,
+            cardType: outlook.cardTypeScore,
+            demand: outlook.demandScore,
+            momentum: outlook.momentumScore,
+            quality: outlook.qualityScore,
+            upside: outlook.upsideScore,
+            risk: outlook.riskScore,
+          } : {
+            upside: outlook.upsideScore,
+            risk: outlook.riskScore,
+          },
+          action: outlook.action,
+          actionReasons: isPro ? outlook.actionReasons : null,
+          careerStage: outlook.careerStageAuto,
+          confidence: {
+            level: outlook.dataConfidence,
+            reason: isPro ? outlook.confidenceReason : null,
+          },
+          explanation: isPro ? {
+            short: outlook.explanationShort,
+            long: outlook.explanationLong,
+            bullets: outlook.explanationBullets,
+          } : {
+            short: outlook.explanationShort,
+            long: null,
+            bullets: null,
+          },
+          generatedAt: outlook.updatedAt,
+          cached: true,
+          stale: hoursSinceGenerated > 168, // Stale after 7 days
+          proRequired: !isPro,
+        });
+      }
+
+      // No cached data - return minimal info
+      res.json({
+        cardId,
+        card: {
+          id: card.id,
+          title: card.title,
+        },
+        cached: false,
+        needsGeneration: true,
+        proRequired: !isPro,
+      });
+    } catch (error) {
+      console.error("Error getting outlook v2:", error);
+      res.status(500).json({ message: "Failed to get card outlook" });
+    }
+  });
+
   // Object Storage routes - allows public access for public objects
   app.get("/objects/:objectPath(*)", async (req: any, res) => {
     // Get userId if authenticated, but don't require authentication

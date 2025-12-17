@@ -549,6 +549,72 @@ export const priceHistoryRelations = relations(priceHistory, ({ one }) => ({
   }),
 }));
 
+// Card Outlooks table - comprehensive market intelligence for each card
+// This is the "source of truth" for all card outlook data
+export const cardOutlooks = pgTable("card_outlooks", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }).unique(),
+  
+  // Market Value (stored in cents for precision)
+  marketValue: integer("market_value"),
+  priceMin: integer("price_min"),
+  priceMax: integer("price_max"),
+  compCount: integer("comp_count"),
+  pricePoints: jsonb("price_points").$type<Array<{
+    date: string;
+    price: number;
+    source: string;
+    url?: string;
+  }>>().default([]),
+  
+  // Computed Signal Scores (1-10 scale)
+  trendScore: integer("trend_score"),
+  liquidityScore: integer("liquidity_score"),
+  volatilityScore: integer("volatility_score"),
+  sportScore: integer("sport_score"),
+  positionScore: integer("position_score"),
+  cardTypeScore: integer("card_type_score"),
+  
+  // Composite Scores (0-100 scale)
+  demandScore: integer("demand_score"),
+  momentumScore: integer("momentum_score"),
+  qualityScore: integer("quality_score"),
+  upsideScore: integer("upside_score"),
+  riskScore: integer("risk_score"),
+  
+  // Action & Confidence (deterministic, not AI-decided)
+  action: varchar("action", { length: 20 }), // BUY | WATCH | SELL | LONG_HOLD | LITTLE_VALUE
+  actionReasons: jsonb("action_reasons").$type<string[]>().default([]),
+  dataConfidence: varchar("data_confidence", { length: 10 }), // HIGH | MEDIUM | LOW
+  confidenceReason: text("confidence_reason"),
+  
+  // AI-generated explanations (explains the computed action)
+  explanationShort: text("explanation_short"),
+  explanationLong: text("explanation_long"),
+  explanationBullets: jsonb("explanation_bullets").$type<string[]>().default([]),
+  
+  // Career stage detection
+  careerStageAuto: varchar("career_stage_auto", { length: 20 }), // ROOKIE | RISING | ELITE | VETERAN | RETIRED | LEGEND | UNKNOWN
+  careerStageOverride: varchar("career_stage_override", { length: 20 }),
+  
+  // Time horizon for outlook (months)
+  timeHorizon: integer("time_horizon").default(12),
+  
+  // Cache management
+  updatedAt: timestamp("updated_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+}, (table) => [
+  index("idx_card_outlooks_card_id").on(table.cardId),
+  index("idx_card_outlooks_action").on(table.action),
+]);
+
+export const cardOutlooksRelations = relations(cardOutlooks, ({ one }) => ({
+  card: one(cards, {
+    fields: [cardOutlooks.cardId],
+    references: [cards.id],
+  }),
+}));
+
 // User Alert Settings table - global user preferences for alerts
 export const userAlertSettings = pgTable("user_alert_settings", {
   id: serial("id").primaryKey(),
@@ -588,3 +654,53 @@ export const insertUserAlertSettingsSchema = createInsertSchema(userAlertSetting
 });
 export type InsertUserAlertSettings = z.infer<typeof insertUserAlertSettingsSchema>;
 export type UserAlertSettings = typeof userAlertSettings.$inferSelect;
+
+// Types and schemas for card outlooks
+export const insertCardOutlookSchema = createInsertSchema(cardOutlooks).omit({
+  id: true,
+  updatedAt: true,
+});
+export type InsertCardOutlook = z.infer<typeof insertCardOutlookSchema>;
+export type CardOutlook = typeof cardOutlooks.$inferSelect;
+export type CardOutlookWithCard = CardOutlook & { card: Card };
+
+// Price point type for outlook data
+export type PricePoint = {
+  date: string;
+  price: number;
+  source: string;
+  url?: string;
+};
+
+// Career stage enum for type safety
+export const CAREER_STAGES = {
+  ROOKIE: "ROOKIE",
+  RISING: "RISING",
+  ELITE: "ELITE",
+  VETERAN: "VETERAN",
+  RETIRED: "RETIRED",
+  LEGEND: "LEGEND",
+  UNKNOWN: "UNKNOWN",
+} as const;
+
+export type CareerStage = keyof typeof CAREER_STAGES;
+
+// Outlook action enum for type safety
+export const OUTLOOK_ACTIONS = {
+  BUY: "BUY",
+  WATCH: "WATCH",
+  SELL: "SELL",
+  LONG_HOLD: "LONG_HOLD",
+  LITTLE_VALUE: "LITTLE_VALUE",
+} as const;
+
+export type OutlookAction = keyof typeof OUTLOOK_ACTIONS;
+
+// Data confidence enum
+export const DATA_CONFIDENCE = {
+  HIGH: "HIGH",
+  MEDIUM: "MEDIUM",
+  LOW: "LOW",
+} as const;
+
+export type DataConfidence = keyof typeof DATA_CONFIDENCE;

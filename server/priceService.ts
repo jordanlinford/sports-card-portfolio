@@ -22,6 +22,24 @@ interface PriceLookupResult {
   details?: string;
 }
 
+// Enhanced price data for Card Outlook AI 2.0
+interface PricePoint {
+  date: string;
+  price: number;
+  source: string;
+  url?: string;
+}
+
+interface EnhancedPriceLookupResult {
+  estimatedValue: number | null;
+  pricePoints: PricePoint[];
+  salesFound: number;
+  confidence: "high" | "medium" | "low";
+  confidenceReason: string;
+  details?: string;
+  rawSearchResults?: Array<{ title: string; snippet: string; link: string }>;
+}
+
 async function searchCardPrices(query: string): Promise<any> {
   const serperApiKey = process.env.SERPER_API_KEY;
   if (!serperApiKey) {
@@ -239,3 +257,201 @@ export async function lookupMultipleCardPrices(
   
   return results;
 }
+
+// Enhanced price lookup for Card Outlook AI 2.0
+// Extracts 8-20 individual price points with dates, sources, and URLs
+async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<EnhancedPriceLookupResult | null> {
+  const searchResults = await searchCardPrices(query);
+  
+  const organicResults = searchResults.organic || [];
+  const relevantResults = organicResults.filter((result: any) => {
+    const title = (result.title || "").toLowerCase();
+    const snippet = (result.snippet || "").toLowerCase();
+    const link = (result.link || "").toLowerCase();
+    return title.includes("price") || title.includes("sold") || title.includes("value") ||
+           title.includes("auction") || 
+           snippet.includes("$") || snippet.includes("price") || snippet.includes("sold") ||
+           link.includes("ebay.com") || link.includes("psacard.com") || 
+           link.includes("sportscardspro.com") || link.includes("130point.com") ||
+           link.includes("pricecharting.com");
+  });
+
+  if (relevantResults.length === 0) {
+    return null;
+  }
+
+  const rawResults = relevantResults.slice(0, 12).map((r: any) => ({
+    title: r.title || "",
+    snippet: r.snippet || "",
+    link: r.link || "",
+  }));
+
+  const searchContext = rawResults
+    .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet}\nURL: ${r.link}`)
+    .join("\n\n");
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: `You are a sports card pricing expert. Extract INDIVIDUAL price points from search results.
+
+Your task:
+1. Find ALL individual prices mentioned in the search results
+2. For each price, extract: price amount, approximate date (if visible), source name, and source URL
+3. Look for: eBay sold prices, auction results, price guide values, recent sales
+
+Return ONLY a JSON object with:
+{
+  "pricePoints": [
+    { "date": "2024-12-01", "price": 299, "source": "eBay Sold", "url": "https://..." },
+    { "date": "2024-11-15", "price": 350, "source": "130point", "url": "https://..." }
+  ],
+  "estimatedValue": number (average of all prices found),
+  "salesFound": number (total price points extracted),
+  "confidence": "high" | "medium" | "low",
+  "confidenceReason": string (explain why this confidence level, e.g., "12 recent sold comps in last 90 days")
+}
+
+RULES:
+- Extract up to 20 individual price points
+- If no date is visible, use today's date
+- Match the card's grade (PSA 10, PSA 9, etc.) - don't mix grades
+- Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
+- eBay sold listings are most reliable
+- Be aggressive - extract every price you can find`,
+      },
+      {
+        role: "user",
+        content: `Extract all price points for this card:
+Card: ${card.title}
+Set: ${card.set || "Unknown"}
+Year: ${card.year || "Unknown"}
+Variation: ${card.variation || "None"}
+Grade: ${card.grade || "Raw/Ungraded"}
+
+Search results:
+${searchContext}
+
+Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and confidenceReason.`,
+      },
+    ],
+    temperature: 0.2,
+    max_tokens: 1500,
+  });
+
+  const responseText = completion.choices[0]?.message?.content || "";
+  
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      const pricePoints: PricePoint[] = (parsed.pricePoints || []).map((pp: any) => ({
+        date: pp.date || new Date().toISOString().split('T')[0],
+        price: typeof pp.price === 'number' ? pp.price : parseFloat(pp.price) || 0,
+        source: pp.source || "Unknown",
+        url: pp.url,
+      })).filter((pp: PricePoint) => pp.price > 0);
+      
+      if (pricePoints.length > 0 || parsed.estimatedValue > 0) {
+        return {
+          estimatedValue: parsed.estimatedValue || (pricePoints.length > 0 
+            ? pricePoints.reduce((sum, pp) => sum + pp.price, 0) / pricePoints.length 
+            : null),
+          pricePoints,
+          salesFound: pricePoints.length || parsed.salesFound || 0,
+          confidence: parsed.confidence || "medium",
+          confidenceReason: parsed.confidenceReason || `${pricePoints.length} price points found`,
+          rawSearchResults: rawResults,
+        };
+      }
+    } catch {
+      console.error("Failed to parse enhanced price response:", responseText);
+    }
+  }
+
+  return null;
+}
+
+export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedPriceLookupResult> {
+  const queries = buildSearchQueries(card);
+  const allPricePoints: PricePoint[] = [];
+  const allRawResults: Array<{ title: string; snippet: string; link: string }> = [];
+  
+  try {
+    // Try multiple queries to gather more price data
+    for (const query of queries.slice(0, 2)) { // Use first 2 queries
+      console.log(`[Enhanced] Trying search query: ${query}`);
+      const result = await tryEnhancedSearchQuery(query, card);
+      
+      if (result) {
+        // Merge price points, avoiding duplicates by URL
+        for (const pp of result.pricePoints) {
+          const isDuplicate = allPricePoints.some(
+            existing => existing.url && pp.url && existing.url === pp.url
+          );
+          if (!isDuplicate) {
+            allPricePoints.push(pp);
+          }
+        }
+        
+        // Merge raw results
+        if (result.rawSearchResults) {
+          for (const raw of result.rawSearchResults) {
+            const isDuplicate = allRawResults.some(existing => existing.link === raw.link);
+            if (!isDuplicate) {
+              allRawResults.push(raw);
+            }
+          }
+        }
+      }
+      
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    // Calculate final values
+    const salesFound = allPricePoints.length;
+    const estimatedValue = salesFound > 0 
+      ? allPricePoints.reduce((sum, pp) => sum + pp.price, 0) / salesFound 
+      : null;
+    
+    // Determine confidence based on data quality
+    let confidence: "high" | "medium" | "low";
+    let confidenceReason: string;
+    
+    if (salesFound >= 10) {
+      confidence = "high";
+      confidenceReason = `${salesFound} price points from multiple sources`;
+    } else if (salesFound >= 4) {
+      confidence = "medium";
+      confidenceReason = `${salesFound} price points found - moderate data coverage`;
+    } else if (salesFound >= 1) {
+      confidence = "low";
+      confidenceReason = `Only ${salesFound} price point(s) found - sparse data`;
+    } else {
+      confidence = "low";
+      confidenceReason = "No sold listings found";
+    }
+
+    return {
+      estimatedValue,
+      pricePoints: allPricePoints.slice(0, 20), // Cap at 20
+      salesFound,
+      confidence,
+      confidenceReason,
+      rawSearchResults: allRawResults.slice(0, 15),
+    };
+  } catch (error) {
+    console.error("Enhanced price lookup error:", error);
+    return {
+      estimatedValue: null,
+      pricePoints: [],
+      salesFound: 0,
+      confidence: "low",
+      confidenceReason: `Lookup failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+    };
+  }
+}
+
+export { type EnhancedPriceLookupResult, type PricePoint };

@@ -18,6 +18,7 @@ import {
   priceAlerts,
   priceHistory,
   userAlertSettings,
+  cardOutlooks,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -53,6 +54,10 @@ import {
   type PriceHistory,
   type UserAlertSettings,
   type InsertUserAlertSettings,
+  type CardOutlook,
+  type InsertCardOutlook,
+  type CardOutlookWithCard,
+  type PricePoint,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -117,6 +122,14 @@ export interface IStorage {
   }): Promise<Card | undefined>;
   deleteCard(id: number): Promise<void>;
   getMaxSortOrder(displayCaseId: number): Promise<number>;
+
+  // Card Outlook operations (new intelligence system)
+  getCardOutlook(cardId: number): Promise<CardOutlook | undefined>;
+  getCardOutlookWithCard(cardId: number): Promise<CardOutlookWithCard | undefined>;
+  upsertCardOutlook(cardId: number, data: Partial<InsertCardOutlook>): Promise<CardOutlook>;
+  deleteCardOutlook(cardId: number): Promise<void>;
+  getExpiredOutlooks(limit?: number): Promise<CardOutlook[]>;
+  updateOutlookPricePoints(cardId: number, pricePoints: PricePoint[]): Promise<CardOutlook | undefined>;
 
   // Comment operations
   getComments(displayCaseId: number): Promise<CommentWithUser[]>;
@@ -686,6 +699,77 @@ export class DatabaseStorage implements IStorage {
     }
 
     return Math.max(...caseCards.map((c) => c.sortOrder));
+  }
+
+  // Card Outlook operations (new intelligence system)
+  async getCardOutlook(cardId: number): Promise<CardOutlook | undefined> {
+    const [outlook] = await db
+      .select()
+      .from(cardOutlooks)
+      .where(eq(cardOutlooks.cardId, cardId));
+    return outlook;
+  }
+
+  async getCardOutlookWithCard(cardId: number): Promise<CardOutlookWithCard | undefined> {
+    const [outlook] = await db
+      .select()
+      .from(cardOutlooks)
+      .where(eq(cardOutlooks.cardId, cardId));
+    
+    if (!outlook) return undefined;
+    
+    const [card] = await db.select().from(cards).where(eq(cards.id, cardId));
+    if (!card) return undefined;
+    
+    return { ...outlook, card };
+  }
+
+  async upsertCardOutlook(cardId: number, data: Partial<InsertCardOutlook>): Promise<CardOutlook> {
+    const existing = await this.getCardOutlook(cardId);
+    
+    // Build update data excluding cardId (it's the key)
+    const updateData = { ...data } as Record<string, unknown>;
+    delete updateData.cardId;
+    updateData.updatedAt = new Date();
+    
+    if (existing) {
+      const [updated] = await db
+        .update(cardOutlooks)
+        .set(updateData)
+        .where(eq(cardOutlooks.cardId, cardId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(cardOutlooks)
+        .values({ 
+          cardId,
+          ...updateData,
+        } as typeof cardOutlooks.$inferInsert)
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteCardOutlook(cardId: number): Promise<void> {
+    await db.delete(cardOutlooks).where(eq(cardOutlooks.cardId, cardId));
+  }
+
+  async getExpiredOutlooks(limit: number = 100): Promise<CardOutlook[]> {
+    return db
+      .select()
+      .from(cardOutlooks)
+      .where(sql`${cardOutlooks.expiresAt} IS NOT NULL AND ${cardOutlooks.expiresAt} < NOW()`)
+      .limit(limit);
+  }
+
+  async updateOutlookPricePoints(cardId: number, pricePoints: PricePoint[]): Promise<CardOutlook | undefined> {
+    const [updated] = await db
+      .update(cardOutlooks)
+      .set({ pricePoints, updatedAt: new Date() })
+      .where(eq(cardOutlooks.cardId, cardId))
+      .returning();
+    return updated;
   }
 
   async reorderCards(displayCaseId: number, cardIds: number[]): Promise<void> {
