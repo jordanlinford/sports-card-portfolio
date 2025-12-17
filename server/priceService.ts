@@ -82,6 +82,58 @@ const PREMIUM_VARIATION_KEYWORDS = [
   "black finite", "gold finite", "color", "parallel", "insert", "ssp", "rookie kings"
 ];
 
+// Retail sites that show asking prices, not sold prices - exclude these
+const RETAIL_ASKING_PRICE_DOMAINS = [
+  "cardcollector2.com",
+  "gamestop.com",
+  "target.com",
+  "walmart.com",
+  "amazon.com",
+  "all-u-re.com",
+  "fanatics.com",
+  "fanaticscollect.com",
+  "ardenfair.com",
+  "solisdepot.com",
+];
+
+// Check if a URL is from a retail site that shows asking prices (not sold)
+function isRetailAskingPrice(url: string): boolean {
+  const lower = url.toLowerCase();
+  return RETAIL_ASKING_PRICE_DOMAINS.some(domain => lower.includes(domain));
+}
+
+// Check if a result is from a different set than specified
+// e.g., "Donruss" vs "Donruss Optic" are different products
+function isWrongSet(resultText: string, cardSet: string | null | undefined): boolean {
+  if (!cardSet) return false;
+  
+  const resultLower = resultText.toLowerCase();
+  const setLower = cardSet.toLowerCase();
+  
+  // If card is "Donruss" (not Optic), exclude results that mention "Donruss Optic"
+  if (setLower === "donruss" && !setLower.includes("optic")) {
+    if (resultLower.includes("donruss optic") || resultLower.includes("optic")) {
+      return true;
+    }
+  }
+  
+  // If card is "Prizm" (not Select), exclude results mentioning "Select"
+  if (setLower === "prizm" && !setLower.includes("select")) {
+    if (resultLower.includes("select")) {
+      return true;
+    }
+  }
+  
+  // If card is "Topps" (not Chrome), exclude results mentioning "Topps Chrome"
+  if (setLower === "topps" && !setLower.includes("chrome")) {
+    if (resultLower.includes("topps chrome") || resultLower.includes("chrome")) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 // Baseline price ranges for common base cards when no comps found
 // Format: { sport: { modern: { set_type: { graded_10: range, graded_9: range, raw: range } } } }
 const BASE_CARD_PRICE_BASELINES: Record<string, Record<string, { psa10: [number, number]; psa9: [number, number]; raw: [number, number] }>> = {
@@ -1395,7 +1447,36 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       console.log(`[Enhanced] Using ${strictPricePoints.length} strict comps (ignored ${loosePricePoints.length} loose)`);
     }
 
-    // CRITICAL: When no variation is specified, filter out premium variations
+    // FILTER 1: Exclude retail asking prices (not sold prices)
+    // Sites like CardCollector2 show $900 asking prices that inflate estimates
+    const beforeRetailFilter = allPricePoints.length;
+    allPricePoints = allPricePoints.filter(pp => {
+      const url = pp.url || "";
+      if (isRetailAskingPrice(url)) {
+        console.log(`[RETAIL FILTER] Excluded asking price from retail site: "${pp.source}" - $${pp.price} (${url})`);
+        return false;
+      }
+      return true;
+    });
+    if (beforeRetailFilter > allPricePoints.length) {
+      console.log(`[RETAIL FILTER] Removed ${beforeRetailFilter - allPricePoints.length} retail asking prices, ${allPricePoints.length} remain`);
+    }
+
+    // FILTER 2: Exclude results from wrong sets (Donruss vs Donruss Optic, etc.)
+    const beforeSetFilter = allPricePoints.length;
+    allPricePoints = allPricePoints.filter(pp => {
+      const sourceText = pp.source || "";
+      if (isWrongSet(sourceText, card.set)) {
+        console.log(`[SET FILTER] Excluded wrong set: "${pp.source}" - $${pp.price} (card set: ${card.set})`);
+        return false;
+      }
+      return true;
+    });
+    if (beforeSetFilter > allPricePoints.length) {
+      console.log(`[SET FILTER] Removed ${beforeSetFilter - allPricePoints.length} wrong-set results, ${allPricePoints.length} remain`);
+    }
+
+    // FILTER 3: When no variation is specified, filter out premium variations
     // This prevents Downtown ($400) from contaminating base card ($25) estimates
     if (!card.variation) {
       const beforeFilter = allPricePoints.length;
