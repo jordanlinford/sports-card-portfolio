@@ -408,8 +408,7 @@ export default function PlayerOutlookPage() {
 
   const outlookMutation = useMutation({
     mutationFn: async (data: { playerName: string; sport: string }) => {
-      const response = await apiRequest("POST", "/api/player-outlook", data);
-      return response.json();
+      return await apiRequest("POST", "/api/player-outlook", data);
     },
     onSuccess: (data) => {
       setOutlookData(data);
