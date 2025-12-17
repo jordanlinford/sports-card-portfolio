@@ -903,6 +903,21 @@ async function runFetchJob(job: FetchJob): Promise<void> {
       ? filteredComps.reduce((s, c) => s + c.matchScore, 0) / filteredComps.length
       : 0;
     
+    // Calculate price IQR (interquartile range) for dispersion measurement
+    let priceIqr: number | null = null;
+    if (filteredComps.length >= 4) {
+      const sortedPrices = filteredComps.map(c => c.totalPrice).sort((a, b) => a - b);
+      const q1Idx = Math.floor(sortedPrices.length * 0.25);
+      const q3Idx = Math.floor(sortedPrices.length * 0.75);
+      priceIqr = sortedPrices[q3Idx] - sortedPrices[q1Idx];
+    }
+    
+    // Track if query was broadened
+    const queryBroadened = queriesUsed.length > 1;
+    if (queryBroadened) {
+      recordQueryBroadened();
+    }
+    
     // Determine confidence (not fallback since we have real eBay data)
     const confidence = calculateConfidence(summary.soldCount, avgMatchScore, false);
     
@@ -914,7 +929,7 @@ async function runFetchJob(job: FetchJob): Promise<void> {
     const expiryHours = summary.soldCount >= 15 ? 168 : summary.soldCount <= 5 ? 24 : 72;
     const expiresAt = new Date(now.getTime() + expiryHours * 60 * 60 * 1000);
     
-    // Update cache with ladder results
+    // Update cache with ladder results (reset failure count on success)
     await db.update(marketCompsCache)
       .set({
         soldCount: summary.soldCount,
@@ -922,8 +937,12 @@ async function runFetchJob(job: FetchJob): Promise<void> {
         summaryJson: summary,
         confidence,
         avgMatchScore,
+        priceIqr,
+        queryBroadened,
+        ladderStepsUsed: queriesUsed.length,
         fetchStatus: wasBlocked ? "blocked" : "complete",
         fetchError: lastError || null,
+        failureCount: 0, // Reset on success
         pagesScraped: totalPagesScraped,
         itemsFound: allComps.length, // Total items collected
         itemsKept: filteredComps.length,
@@ -932,27 +951,43 @@ async function runFetchJob(job: FetchJob): Promise<void> {
       })
       .where(eq(marketCompsCache.queryHash, queryHash));
     
+    // Record success for observability
+    recordRefreshSuccess();
+    
     const duration = Date.now() - startTime;
-    console.log(`[eBay Comps] Fetch complete for ${queryHash}: ${filteredComps.length} comps, ${confidence} confidence, ${queriesUsed.length} ladder steps, ${duration}ms`);
+    console.log(`[eBay Comps] Fetch complete for ${queryHash}: ${filteredComps.length} comps, ${confidence} confidence, ${queriesUsed.length} ladder steps, IQR=$${priceIqr?.toFixed(2) || 'N/A'}, ${duration}ms`);
     
   } catch (err) {
     console.error(`[eBay Comps] Fetch job error:`, err);
     
-    // Mark as failed with LOW confidence
+    // Record failure for observability
+    recordRefreshFailed();
+    
+    // Mark as failed with LOW confidence, increment failure count
     const now = new Date();
     const failedExpiryHours = 1; // Retry in 1 hour
     const expiresAt = new Date(now.getTime() + failedExpiryHours * 60 * 60 * 1000);
+    
+    // Get current failure count to increment
+    const existing = await db.select({ failureCount: marketCompsCache.failureCount })
+      .from(marketCompsCache)
+      .where(eq(marketCompsCache.queryHash, queryHash))
+      .limit(1);
+    const currentFailures = existing[0]?.failureCount || 0;
     
     await db.update(marketCompsCache)
       .set({
         fetchStatus: "failed",
         fetchError: err instanceof Error ? err.message : String(err),
+        failureCount: currentFailures + 1, // Increment failure count
         confidence: "LOW", // Always LOW for failed
         soldCount: 0, // Reset - no reliable data
         lastFetchedAt: now,
         expiresAt
       })
       .where(eq(marketCompsCache.queryHash, queryHash));
+    
+    console.log(`[eBay Comps] Failure #${currentFailures + 1} for ${queryHash}`);
     
   } finally {
     // Remove from active jobs
@@ -964,15 +999,89 @@ async function runFetchJob(job: FetchJob): Promise<void> {
 // CACHE ACCESS (Stale-While-Revalidate Pattern)
 // ============================================================================
 
+// Maximum age to serve stale data (30 days) - refuse to serve ancient comps
+const MAX_STALE_DAYS = 30;
+const MAX_STALE_MS = MAX_STALE_DAYS * 24 * 60 * 60 * 1000;
+
 interface CacheResult {
   data: MarketCompsCache | null;
   isStale: boolean;
   needsRefresh: boolean;
+  isTooOld?: boolean; // True if data is older than MAX_STALE_DAYS
+}
+
+// Observability counters
+const cacheStats = {
+  freshHits: 0,
+  staleHits: 0,
+  misses: 0,
+  tooOldRejections: 0,
+  refreshTriggered: 0,
+  refreshSuccess: 0,
+  refreshFailed: 0,
+  queryBroadened: 0,
+};
+
+/**
+ * Get cache stats for observability
+ */
+export function getCacheStats() {
+  const total = cacheStats.freshHits + cacheStats.staleHits + cacheStats.misses;
+  return {
+    ...cacheStats,
+    total,
+    hitRate: total > 0 ? ((cacheStats.freshHits + cacheStats.staleHits) / total * 100).toFixed(1) + '%' : '0%',
+    freshHitRate: total > 0 ? (cacheStats.freshHits / total * 100).toFixed(1) + '%' : '0%',
+    staleHitRate: total > 0 ? (cacheStats.staleHits / total * 100).toFixed(1) + '%' : '0%',
+    refreshSuccessRate: cacheStats.refreshTriggered > 0 
+      ? (cacheStats.refreshSuccess / cacheStats.refreshTriggered * 100).toFixed(1) + '%' 
+      : '0%',
+  };
+}
+
+/**
+ * Reset cache stats (useful for testing or daily reset)
+ */
+export function resetCacheStats() {
+  cacheStats.freshHits = 0;
+  cacheStats.staleHits = 0;
+  cacheStats.misses = 0;
+  cacheStats.tooOldRejections = 0;
+  cacheStats.refreshTriggered = 0;
+  cacheStats.refreshSuccess = 0;
+  cacheStats.refreshFailed = 0;
+  cacheStats.queryBroadened = 0;
+}
+
+/**
+ * Increment refresh success counter (called after successful job)
+ */
+export function recordRefreshSuccess() {
+  cacheStats.refreshSuccess++;
+}
+
+/**
+ * Increment refresh failed counter (called after failed job)
+ */
+export function recordRefreshFailed() {
+  cacheStats.refreshFailed++;
+}
+
+/**
+ * Increment query broadened counter
+ */
+export function recordQueryBroadened() {
+  cacheStats.queryBroadened++;
 }
 
 /**
  * Get cached comps with stale-while-revalidate pattern.
  * Returns stale data immediately while triggering background refresh.
+ * 
+ * Key behaviors:
+ * - Fresh data: Return immediately
+ * - Stale data (< 30 days): Return immediately, trigger background refresh
+ * - Ancient data (> 30 days): Return null, trigger refresh (refuse to serve)
  */
 export async function getCachedCompsWithSWR(
   queryHash: string,
@@ -987,17 +1096,39 @@ export async function getCachedCompsWithSWR(
     .limit(1);
   
   if (results.length === 0) {
+    cacheStats.misses++;
     return { data: null, isStale: false, needsRefresh: true };
   }
   
   const cached = results[0];
   const expiresAt = cached.expiresAt ? new Date(cached.expiresAt) : null;
+  const lastFetchedAt = cached.lastFetchedAt ? new Date(cached.lastFetchedAt) : null;
   const isStale = !expiresAt || expiresAt <= now;
   const isFetching = cached.fetchStatus === "fetching";
+  
+  // Check if data is too old to serve (max stale cutoff)
+  const dataAge = lastFetchedAt ? now.getTime() - lastFetchedAt.getTime() : MAX_STALE_MS + 1;
+  const isTooOld = dataAge > MAX_STALE_MS;
+  
+  if (isTooOld && (cached.fetchStatus === "complete" || cached.compsJson)) {
+    cacheStats.tooOldRejections++;
+    console.log(`[eBay Comps] SWR: Data too old (${Math.floor(dataAge / 86400000)} days) for ${queryHash}, refusing to serve`);
+    
+    // Trigger refresh if not already fetching
+    if (!isFetching && canonicalQuery && filters) {
+      cacheStats.refreshTriggered++;
+      enqueueFetchJob(canonicalQuery, queryHash, filters).catch(err => {
+        console.error(`[eBay Comps] SWR refresh for ancient data failed:`, err);
+      });
+    }
+    
+    return { data: null, isStale: true, needsRefresh: true, isTooOld: true };
+  }
   
   // If stale and not already fetching, trigger background refresh
   const needsRefresh = isStale && !isFetching;
   if (needsRefresh && canonicalQuery && filters) {
+    cacheStats.refreshTriggered++;
     console.log(`[eBay Comps] SWR: Serving stale data for ${queryHash}, triggering background refresh`);
     // Don't await - let it run in background
     enqueueFetchJob(canonicalQuery, queryHash, filters).catch(err => {
@@ -1007,10 +1138,16 @@ export async function getCachedCompsWithSWR(
   
   // Return cached data even if stale (SWR pattern)
   if (cached.fetchStatus === "complete" || cached.compsJson) {
+    if (isStale) {
+      cacheStats.staleHits++;
+    } else {
+      cacheStats.freshHits++;
+    }
     console.log(`[eBay Comps] Cache ${isStale ? "stale" : "fresh"} hit for ${queryHash}`);
     return { data: cached, isStale, needsRefresh };
   }
   
+  cacheStats.misses++;
   return { data: null, isStale: false, needsRefresh: true };
 }
 

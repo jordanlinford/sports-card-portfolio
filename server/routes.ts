@@ -2458,6 +2458,42 @@ Allow: /
     }
   });
 
+  // Admin: Cache observability stats
+  app.get("/api/admin/cache/stats", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getCacheStats } = await import("./ebayCompsService");
+      const stats = getCacheStats();
+      res.json({
+        ...stats,
+        description: {
+          freshHits: "Requests served from fresh cache",
+          staleHits: "Requests served from stale cache (refresh triggered)",
+          misses: "Requests with no cached data",
+          tooOldRejections: "Requests rejected due to data > 30 days old",
+          refreshTriggered: "Background refresh jobs started",
+          refreshSuccess: "Successful refresh completions",
+          refreshFailed: "Failed refresh attempts",
+          queryBroadened: "Queries that required search broadening",
+        }
+      });
+    } catch (error) {
+      console.error("Error getting cache stats:", error);
+      res.status(500).json({ message: "Failed to get cache stats" });
+    }
+  });
+
+  // Admin: Reset cache stats (for new monitoring period)
+  app.post("/api/admin/cache/stats/reset", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { resetCacheStats } = await import("./ebayCompsService");
+      resetCacheStats();
+      res.json({ success: true, message: "Cache stats reset" });
+    } catch (error) {
+      console.error("Error resetting cache stats:", error);
+      res.status(500).json({ message: "Failed to reset cache stats" });
+    }
+  });
+
   // Portfolio Analytics
   app.get("/api/analytics", isAuthenticated, async (req: any, res) => {
     try {

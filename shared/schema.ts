@@ -827,9 +827,15 @@ export const marketCompsCache = pgTable("market_comps_cache", {
   // Fetch status
   fetchStatus: varchar("fetch_status", { length: 20 }).default("pending").notNull(), // pending | fetching | complete | failed | blocked
   fetchError: text("fetch_error"),
+  failureCount: integer("failure_count").default(0).notNull(), // Track consecutive failures
   pagesScraped: integer("pages_scraped").default(0),
   itemsFound: integer("items_found").default(0),
   itemsKept: integer("items_kept").default(0),
+  
+  // Quality metrics
+  priceIqr: real("price_iqr"), // Interquartile range for price dispersion
+  queryBroadened: boolean("query_broadened").default(false), // Whether query was broadened to get results
+  ladderStepsUsed: integer("ladder_steps_used").default(1), // How many broadening steps were used
   
   // Cache management
   lastFetchedAt: timestamp("last_fetched_at"),
