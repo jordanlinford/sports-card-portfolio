@@ -63,11 +63,14 @@ function recordFreeUserLookup(userId: string) {
 }
 
 // Portfolio Intelligence Rate Limiting (even Pro users to prevent abuse)
-const PORTFOLIO_AI_RATE_LIMIT_MS = 60000; // 1 minute between portfolio AI calls per user
-const portfolioAILastCall = new Map<string, number>();
+// Separate maps for each endpoint so they don't block each other
+const PORTFOLIO_AI_RATE_LIMIT_MS = 60000; // 1 minute between calls per endpoint
+const portfolioOutlookLastCall = new Map<string, number>();
+const nextBuysLastCall = new Map<string, number>();
 
-function checkPortfolioAIRateLimit(userId: string): { allowed: boolean; retryAfter?: number } {
-  const lastCall = portfolioAILastCall.get(userId);
+function checkPortfolioAIRateLimit(userId: string, endpoint: 'outlook' | 'nextbuys'): { allowed: boolean; retryAfter?: number } {
+  const lastCallMap = endpoint === 'outlook' ? portfolioOutlookLastCall : nextBuysLastCall;
+  const lastCall = lastCallMap.get(userId);
   const now = Date.now();
   
   if (lastCall && (now - lastCall) < PORTFOLIO_AI_RATE_LIMIT_MS) {
@@ -78,19 +81,20 @@ function checkPortfolioAIRateLimit(userId: string): { allowed: boolean; retryAft
   return { allowed: true };
 }
 
-function recordPortfolioAICall(userId: string) {
-  portfolioAILastCall.set(userId, Date.now());
+function recordPortfolioAICall(userId: string, endpoint: 'outlook' | 'nextbuys') {
+  const lastCallMap = endpoint === 'outlook' ? portfolioOutlookLastCall : nextBuysLastCall;
+  lastCallMap.set(userId, Date.now());
   
   // Cleanup old entries
-  if (portfolioAILastCall.size > 500) {
+  if (lastCallMap.size > 500) {
     const now = Date.now();
     const keysToDelete: string[] = [];
-    portfolioAILastCall.forEach((time, id) => {
+    lastCallMap.forEach((time, id) => {
       if (now - time > PORTFOLIO_AI_RATE_LIMIT_MS * 5) {
         keysToDelete.push(id);
       }
     });
-    keysToDelete.forEach(id => portfolioAILastCall.delete(id));
+    keysToDelete.forEach(id => lastCallMap.delete(id));
   }
 }
 
@@ -4222,7 +4226,7 @@ Allow: /
       }
 
       // Rate limit even Pro users to prevent abuse (1 call per minute)
-      const rateCheck = checkPortfolioAIRateLimit(userId);
+      const rateCheck = checkPortfolioAIRateLimit(userId, 'outlook');
       if (!rateCheck.allowed) {
         return res.status(429).json({ 
           message: `Please wait ${rateCheck.retryAfter} seconds before refreshing.`,
@@ -4232,7 +4236,7 @@ Allow: /
       }
 
       console.log(`[Portfolio Outlook] Generating for user ${userId}...`);
-      recordPortfolioAICall(userId);
+      recordPortfolioAICall(userId, 'outlook');
       const snapshot = await generatePortfolioOutlook(userId);
       
       res.json({ 
@@ -4311,7 +4315,7 @@ Allow: /
       }
 
       // Rate limit even Pro users to prevent abuse (1 call per minute)
-      const rateCheck = checkPortfolioAIRateLimit(userId);
+      const rateCheck = checkPortfolioAIRateLimit(userId, 'nextbuys');
       if (!rateCheck.allowed) {
         return res.status(429).json({ 
           message: `Please wait ${rateCheck.retryAfter} seconds before refreshing.`,
@@ -4321,7 +4325,7 @@ Allow: /
       }
 
       console.log(`[Next Buys] Generating for user ${userId}...`);
-      recordPortfolioAICall(userId);
+      recordPortfolioAICall(userId, 'nextbuys');
       const buys = await generateNextBuys(userId);
       const limitedBuys = buys.slice(0, 7);
       
