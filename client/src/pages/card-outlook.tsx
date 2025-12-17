@@ -314,10 +314,25 @@ export default function CardOutlookPage() {
   const generateMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", `/api/cards/${cardId}/outlook-v2`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to generate outlook");
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cards", cardId, "outlook-v2"] });
+      toast({
+        title: "Outlook Generated",
+        description: "Market analysis complete. View the results below.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to generate outlook",
+        variant: "destructive",
+      });
     },
   });
 
