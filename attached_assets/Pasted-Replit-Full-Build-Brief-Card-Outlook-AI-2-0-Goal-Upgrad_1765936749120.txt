@@ -1,0 +1,402 @@
+Replit Full Build Brief: Card Outlook AI 2.0
+Goal
+
+Upgrade MyDisplayCase’s Buy / Watch / Sell feature so it becomes useful, honest, and trusted by collectors, with minimal user input and a dedicated single-card view. The existing Outlook currently lives inside Display Cases and requires too much manual input (player tier). We need to rebuild the feature as a true single-card intelligence system that display cases can consume.
+
+Success Criteria
+
+A collector can:
+
+Click a single card and immediately see:
+
+Market value estimate
+
+Trend direction + chart
+
+Liquidity indicator
+
+Volatility indicator
+
+Market Outlook (BUY / WATCH / SELL / LONG HOLD)
+
+Data Confidence (High/Med/Low) with a clear reason
+
+Short explanation they agree with (no manual tier selection)
+
+The system auto-detects player career stage (rookie/rising/elite/legend/retired) most of the time.
+
+User inputs required:
+
+Only “Sports vs TCG” (and optionally time horizon 6/12/24 mo)
+
+Everything else inferred from stored card info + market data
+
+Scope Overview
+A) New Single Card Intelligence UI
+
+Create a new route/page:
+
+/card/:cardId/outlook (or equivalent)
+
+This page is the “source of truth” for Outlook and signals
+
+UI Sections (in order):
+
+Hero: Card image + name + grade + set + variation
+
+Market Value: estimated value + last updated + mini chart
+
+Market Outlook: BUY/WATCH/SELL/LONG HOLD + confidence badge
+
+Why (short explanation, 2–4 bullets max)
+
+Signals (expandable):
+
+Demand (Liquidity)
+
+Momentum (Trend)
+
+Risk (Volatility)
+
+Quality (Card type / rarity / grade)
+
+Career Stage (auto-detected, editable override)
+
+Actions:
+
+Refresh Outlook
+
+Set Price Alert
+
+Mark “Open to offers”
+
+Share (image export with data overlay)
+
+B) Data & Models
+
+Create/extend a persistent model (DB table/collection):
+card_outlooks
+
+cardId
+
+marketValue (number)
+
+pricePoints[]: {date, price, source, url}
+
+trendScore (1–10)
+
+liquidityScore (1–10)
+
+volatilityScore (1–10)
+
+sportScore (1–10)
+
+positionScore (1–10)
+
+cardTypeScore (1–10)
+
+demandScore (0–100)
+
+momentumScore (0–100)
+
+qualityScore (0–100)
+
+upsideScore (0–100) (existing)
+
+riskScore (0–100) (existing)
+
+action: BUY|WATCH|SELL|LONG_HOLD|LITTLE_VALUE
+
+dataConfidence: HIGH|MEDIUM|LOW
+
+confidenceReason: string (short)
+
+explanationShort: string
+
+explanationLong: string (Pro)
+
+careerStageAuto: enum (ROOKIE/RISING/ELITE/VETERAN/RETIRED/LEGEND/UNKNOWN)
+
+careerStageOverride: enum|null
+
+timeHorizon: 6|12|24
+
+updatedAt
+
+expiresAt (TTL caching)
+
+C) Auto-Detection (Reduce Manual Inputs)
+1) Auto-detect player career stage
+
+Implement a deterministic inference first (fast + reliable), then optionally AI fallback.
+
+Inputs:
+
+playerName
+
+sport
+
+year (card year)
+
+rookie flag (if known)
+
+team (if known)
+
+(optional) external lookup via search: “player age”, “player retired”, “draft year”, etc.
+
+Rules (starter):
+
+If sport=TCG: careerStageAuto = UNKNOWN (no career stage)
+
+If “rookie” in title or set/year matches known rookie year pattern → ROOKIE
+
+If player is retired (detected via search snippets / Wikipedia summary result) → RETIRED or LEGEND
+
+If active and early-career (first pro year within last 1–2 seasons) → ROOKIE/RISING
+
+If active and 5–10+ seasons → VETERAN/ELITE depending on popularity proxy (liquidity + value)
+Allow override in UI but hide it behind “Edit”.
+
+2) Auto-detect card type / rarity / variation
+
+Parse from your existing stored fields + title patterns:
+
+PSA/BGS/SGC grade
+
+rookie keywords
+
+auto keywords
+
+numbered formats (/99, /25 etc)
+
+parallels (Prizm, Refractor, Holo, Gold, etc)
+Map to cardTypeScore.
+
+D) Market Data Pipeline (Keep current approach, make it stronger)
+
+We will continue using search-based market data (Serper API) for now. No eBay API dependency.
+
+Enhancements:
+
+Force “sold” intent queries:
+
+"player card year set variation grade" ebay sold
+
+130point "player year set variation grade"
+
+sportscardspro "player year set variation grade"
+
+Extract multiple price points (not just average):
+
+Aim for 8–20 recent prices
+
+Store source URLs + date when available
+
+If only 1–3 datapoints exist:
+
+allow estimate but set Data Confidence LOW and explain why
+
+E) Signal Computation (Replace vague “AI decides” with measurable signals)
+
+Compute these from pricePoints[]:
+
+Liquidity score (1–10)
+
+Based on count of sold comps:
+
+0 comps in 365d → 1
+
+1–2 in 365d → 2
+
+3–5 → 4
+
+6–10 → 6
+
+11–20 → 8
+
+20+ → 10
+Prefer 90d, fallback to 365d with confidence penalty.
+
+Trend score (1–10)
+
+Compute slope or % change across time:
+
+Use 180d as primary, 90d secondary, 365d context
+
+Normalize: 1=strong down, 5=flat, 10=strong up
+
+Volatility score (1–10)
+
+Coefficient of variation (stddev/mean):
+
+<5% → 1
+
+5–10% → 3
+
+10–20% → 5
+
+20–35% → 7
+
+35%+ → 10
+
+Sport score (1–10)
+
+Static mapping
+
+Position score (1–10)
+
+Static mapping by sport
+
+Card type score (1–10)
+
+Based on rarity/brand/grade
+
+Composite scores
+
+demandScore = weighted(liquidity, sport, position)
+
+momentumScore = weighted(trend, -volatility)
+
+qualityScore = weighted(cardType, careerStageAuto)
+
+Action logic (deterministic)
+
+We must avoid AI “vibes” here.
+
+LITTLE_VALUE:
+
+qualityScore low AND demandScore low AND marketValue below threshold (configurable)
+
+LONG_HOLD:
+
+careerStageAuto in (RETIRED, LEGEND) AND volatility low AND demand medium+
+
+SELL:
+
+trend high (recent run-up) AND liquidity high AND volatility rising OR momentum decelerating
+
+BUY:
+
+quality high AND trend low/flat (recent dip) AND liquidity medium+
+
+WATCH:
+
+default
+
+AI should explain, not decide.
+
+Data Confidence (deterministic)
+
+HIGH: 10+ comps in last 180d AND low volatility OR strong source agreement
+
+MEDIUM: 4–9 comps OR mixed sources OR moderate volatility
+
+LOW: <=3 comps OR no dates OR high variance across sources
+Generate confidenceReason (e.g., “12 recent sold comps in last 90 days with tight price range”).
+
+Explanation generation (AI)
+
+Use GPT-4o-mini only to:
+
+Summarize why (based on computed signals + top evidence points)
+
+Produce short explanation bullets
+
+Produce long explanation for Pro
+
+AI input must include:
+
+signals
+
+5–10 sampled comps (prices + dates + sources)
+
+card metadata
+
+AI output must be constrained to:
+
+One action (already computed)
+
+2–4 bullet reasons
+
+1 short paragraph
+
+Optional long explanation
+
+Integration with Display Cases (Important)
+
+Update Display Case card tiles to show:
+
+action badge + confidence
+
+current value
+
+small sparkline
+Clicking a card opens Single Card Outlook page.
+
+Display cases should NOT run the generator directly—only display latest cached outlook (with “refresh” button on the card page).
+
+User Flow
+
+User uploads/adds a card (minimal fields)
+
+System tries to infer missing metadata (variation, rookie, etc.)
+
+User opens the card → sees “Generate Outlook”
+
+Outlook runs, caches, appears everywhere
+
+User can set alerts or mark open-to-offers
+
+Engineering Tasks Checklist
+
+Create DB schema for card_outlooks
+
+Create endpoint: POST /api/cards/:id/outlook/generate
+
+Create endpoint: GET /api/cards/:id/outlook
+
+Implement price extraction + pricePoints storage
+
+Implement signal computations + deterministic action + confidence
+
+Implement AI explanation generator using computed signals
+
+Create Single Card Outlook UI page
+
+Integrate Display Cases to show outlook badge + value
+
+Add optional manual override for career stage (advanced)
+
+Add logging + error handling:
+
+store raw search results for debugging
+
+store parse failures
+
+Guardrails & Honesty
+
+UI must label confidence as Data Confidence
+
+Always show “last updated” timestamp
+
+If low confidence, show warning: “Sparse sales data—use cautiously”
+
+Never imply guaranteed prediction
+
+Questions to ask Replit (so they don’t derail)
+
+Confirm current stack and where card data lives
+
+Confirm how cards are identified (cardId) and how display cases reference them
+
+Confirm how caching is currently done and where to store TTL
+
+If you paste that to Replit, they’ll have a real blueprint.
+
+If you want, I can also give you:
+
+A slimmer “Phase 1 vs Phase 2” version (if Replit balks at scope)
+
+Exact UI wireframe copy (headline, labels, badges)
+
+The deterministic rules in clean pseudocode for implementation
