@@ -321,6 +321,17 @@ function isStrictComp(
     return { isStrict: false, excludeReason: "COMC marketplace shows mixed listings, not reliable comps" };
   }
   
+  // HARD GATE 0.5: Set prefix mismatches - "Clearly Donruss" vs "Donruss" are DIFFERENT products
+  const setLower = (card.set || "").toLowerCase();
+  const hasClearlyPrefix = combined.includes("clearly");
+  const cardIsClearly = setLower.includes("clearly");
+  if (hasClearlyPrefix && !cardIsClearly) {
+    return { isStrict: false, excludeReason: "Set mismatch: 'Clearly Donruss' vs regular 'Donruss'" };
+  }
+  if (cardIsClearly && !hasClearlyPrefix) {
+    return { isStrict: false, excludeReason: "Set mismatch: regular 'Donruss' vs 'Clearly Donruss'" };
+  }
+  
   // HARD GATE 1: Card number must match exactly if both have one
   // Use explicit cardNumber field if provided, otherwise extract from title
   const cardNumber = card.cardNumber || extractCardNumber(card.title);
