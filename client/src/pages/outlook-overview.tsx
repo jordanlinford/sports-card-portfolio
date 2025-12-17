@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { 
   Zap, 
   TrendingUp, 
@@ -835,6 +835,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
   onAnalyze?: () => void;
 }) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -845,6 +846,8 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
       queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
       toast({ title: "Outlook generated", description: `Analysis complete for ${card.title}` });
       onAnalyze?.();
+      // Navigate to the outlook details page so user can see results immediately
+      navigate(`/card/${card.id}/outlook`);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -854,8 +857,18 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
   const hasOutlook = card.outlookAction !== null;
   const isBigMover = card.outlookBigMover === true;
 
+  const handleRowClick = () => {
+    if (hasOutlook && isPro) {
+      navigate(`/card/${card.id}/outlook`);
+    }
+  };
+
   return (
-    <div className="flex items-center gap-4 p-4 border rounded-lg hover-elevate" data-testid={`outlook-row-${card.id}`}>
+    <div 
+      className={`flex items-center gap-4 p-4 border rounded-lg hover-elevate ${hasOutlook && isPro ? 'cursor-pointer' : ''}`} 
+      data-testid={`outlook-row-${card.id}`}
+      onClick={handleRowClick}
+    >
       <div className="relative h-16 w-16 rounded-md overflow-hidden bg-muted flex-shrink-0">
         {card.imagePath ? (
           <img 
@@ -919,7 +932,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
           <Button 
             size="sm" 
             variant="outline"
-            onClick={() => generateMutation.mutate()}
+            onClick={(e) => { e.stopPropagation(); generateMutation.mutate(); }}
             disabled={generateMutation.isPending}
             data-testid={`button-generate-outlook-${card.id}`}
           >
