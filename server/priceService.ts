@@ -94,6 +94,8 @@ const RETAIL_ASKING_PRICE_DOMAINS = [
   "fanaticscollect.com",
   "ardenfair.com",
   "solisdepot.com",
+  "aokarate.com",
+  "gorctrails.com",
 ];
 
 // Check if a URL is from a retail site that shows asking prices (not sold)
@@ -1054,11 +1056,15 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
 
   // CRITICAL: When no variation specified, exclude premium variations from search results
   // This prevents Downtown/Refractor/Auto results from contaminating base card pricing
+  // IMPORTANT: Only check TITLE and URL, not snippet - price guide pages list ALL variants
+  // in their content, so snippet will always mention Gold/Blue/etc even for base card results
   if (!card.variation) {
     const beforeFilter = rawResults.length;
     rawResults = rawResults.filter((r: any) => {
-      const combinedText = `${r.title} ${r.snippet}`.toLowerCase();
-      const isPremium = containsPremiumVariation(combinedText);
+      // Only filter if the TITLE or URL contains premium keywords
+      // Snippets often list all variants on the page, so we ignore them
+      const titleAndUrl = `${r.title} ${r.link}`.toLowerCase();
+      const isPremium = containsPremiumVariation(titleAndUrl);
       if (isPremium) {
         console.log(`[SEARCH FILTER] Excluded premium result: "${r.title.substring(0, 60)}..."`);
       }
