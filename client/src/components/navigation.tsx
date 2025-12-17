@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LayoutGrid, LogOut, User, Crown, Search, Compass, Shield, BarChart3, Bookmark, HandCoins, MessageSquare, Settings, Zap, Star } from "lucide-react";
+import { LayoutGrid, LogOut, User, Crown, Search, Compass, Shield, BarChart3, Bookmark, HandCoins, MessageSquare, Settings, Zap, Star, Gem } from "lucide-react";
 
 export function Navigation() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -157,6 +157,12 @@ export function Navigation() {
                       <Link href="/watchlist" className="flex items-center gap-2 cursor-pointer" data-testid="link-watchlist">
                         <Star className="h-4 w-4" />
                         Player Watchlist
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/hidden-gems" className="flex items-center gap-2 cursor-pointer" data-testid="link-hidden-gems">
+                        <Gem className="h-4 w-4" />
+                        Hidden Gems
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>

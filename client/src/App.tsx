@@ -33,6 +33,7 @@ import CardOutlookPage from "@/pages/card-outlook";
 import OutlookOverviewPage from "@/pages/outlook-overview";
 import PlayerOutlookPage from "@/pages/player-outlook";
 import WatchlistPage from "@/pages/watchlist";
+import HiddenGemsPage from "@/pages/hidden-gems";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -78,6 +79,7 @@ function Router() {
           <Route path="/outlook" component={OutlookOverviewPage} />
           <Route path="/player-outlook" component={PlayerOutlookPage} />
           <Route path="/watchlist" component={WatchlistPage} />
+          <Route path="/hidden-gems" component={HiddenGemsPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />

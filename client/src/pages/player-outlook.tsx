@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { 
   Search,
   TrendingUp,
@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier } from "@shared/schema";
+import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
   switch (temp) {
@@ -337,6 +337,85 @@ function MarketRealityCheckCard({ checks }: { checks: string[] }) {
   );
 }
 
+function DiscountAnalysisCard({ analysis }: { analysis?: DiscountAnalysis }) {
+  const [isOpen, setIsOpen] = useState(true);
+  
+  if (!analysis || (!analysis.whyDiscounted?.length && !analysis.repricingCatalysts?.length && !analysis.trapRisks?.length)) {
+    return null;
+  }
+  
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card className="border-emerald-500/30 bg-emerald-500/5" data-testid="card-discount-analysis">
+        <CollapsibleTrigger className="w-full">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Target className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                Hidden Gem Analysis
+              </CardTitle>
+              {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </div>
+            <CardDescription>Why this player might be underpriced and what could change</CardDescription>
+          </CardHeader>
+        </CollapsibleTrigger>
+        
+        <CollapsibleContent>
+          <CardContent className="space-y-4">
+            {analysis.whyDiscounted && analysis.whyDiscounted.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Why Discounted</h4>
+                <ul className="space-y-2">
+                  {analysis.whyDiscounted.map((reason, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <span className="text-emerald-600 dark:text-emerald-400 mt-1">
+                        <DollarSign className="h-4 w-4" />
+                      </span>
+                      <span className="text-foreground">{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {analysis.repricingCatalysts && analysis.repricingCatalysts.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Repricing Catalysts</h4>
+                <ul className="space-y-2">
+                  {analysis.repricingCatalysts.map((catalyst, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <span className="text-blue-600 dark:text-blue-400 mt-1">
+                        <TrendingUp className="h-4 w-4" />
+                      </span>
+                      <span className="text-foreground">{catalyst}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {analysis.trapRisks && analysis.trapRisks.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Trap Risks</h4>
+                <ul className="space-y-2">
+                  {analysis.trapRisks.map((risk, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <span className="text-red-600 dark:text-red-400 mt-1">
+                        <AlertTriangle className="h-4 w-4" />
+                      </span>
+                      <span className="text-foreground">{risk}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
 function ExposureRecommendations({ exposures }: { exposures: PlayerOutlookResponse["exposures"] }) {
   return (
     <Card data-testid="card-exposures">
@@ -471,10 +550,12 @@ function EvidencePanel({ evidence, cacheStatus }: { evidence: PlayerOutlookRespo
 export default function PlayerOutlookPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const search = useSearch();
   const [playerName, setPlayerName] = useState("");
   const [sport, setSport] = useState("football");
   const [outlookData, setOutlookData] = useState<PlayerOutlookResponse | null>(null);
   const [outlookSport, setOutlookSport] = useState<string>("football");
+  const initialSearchDone = useRef(false);
 
   const playerKey = outlookData?.player?.name 
     ? `${outlookSport.toLowerCase()}:${outlookData.player.name.toLowerCase().trim().replace(/\s+/g, "_")}`
@@ -572,6 +653,27 @@ export default function PlayerOutlookPage() {
       });
     },
   });
+
+  useEffect(() => {
+    if (initialSearchDone.current) return;
+    const params = new URLSearchParams(search);
+    const urlPlayer = params.get("player");
+    const urlSport = params.get("sport");
+    
+    if (urlPlayer) {
+      setPlayerName(urlPlayer);
+      if (urlSport && ["football", "basketball", "baseball", "hockey", "soccer"].includes(urlSport)) {
+        setSport(urlSport);
+      }
+      initialSearchDone.current = true;
+      setTimeout(() => {
+        outlookMutation.mutate({ 
+          playerName: urlPlayer, 
+          sport: urlSport || sport 
+        });
+      }, 100);
+    }
+  }, [search]);
 
   const handleSearch = () => {
     if (!playerName.trim()) {
@@ -674,6 +776,8 @@ export default function PlayerOutlookPage() {
           <MarketRealityCheckCard checks={outlookData.marketRealityCheck} />
           
           <VerdictCard verdict={outlookData.verdict} confidence={outlookData.snapshot.confidence} />
+          
+          <DiscountAnalysisCard analysis={outlookData.discountAnalysis} />
           
           <ExposureRecommendations exposures={outlookData.exposures} />
           

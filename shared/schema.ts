@@ -1057,6 +1057,13 @@ export type EvidenceData = {
   dataQuality?: DataConfidence; // Overall data quality: HIGH, MEDIUM, LOW
 };
 
+// Discount Analysis - explains why a player might be cheap and what could change
+export type DiscountAnalysis = {
+  whyDiscounted: string[]; // Top 2-4 hypotheses for why cards are underpriced
+  repricingCatalysts: string[]; // What events could cause market to reprice
+  trapRisks: string[]; // What could confirm the discount is justified (stay cheap or drop)
+};
+
 // Full Player Outlook Response
 export type PlayerOutlookResponse = {
   player: PlayerInfo;
@@ -1064,6 +1071,7 @@ export type PlayerOutlookResponse = {
   thesis: string[]; // 3-6 bullet points
   marketRealityCheck: string[]; // 2-3 uncomfortable truths that build credibility
   verdict: PlayerVerdictResult;
+  discountAnalysis?: DiscountAnalysis; // Only populated for BUY/WATCH verdicts
   exposures: ExposureRecommendation[];
   evidence: EvidenceData;
   generatedAt: string;

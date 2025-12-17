@@ -237,6 +237,19 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
       "<condition 2>"
     ]
   },
+  "discountAnalysis": {
+    "whyDiscounted": [
+      "<reason 1: main hypothesis for why cards are underpriced relative to talent/performance>",
+      "<reason 2: secondary factor (market size, narrative gap, supply, belief inertia, etc.)>"
+    ],
+    "repricingCatalysts": [
+      "<event 1: what would cause the market to reprice higher>",
+      "<event 2: secondary catalyst>"
+    ],
+    "trapRisks": [
+      "<risk 1: what could confirm the discount is justified (player stays cheap or drops)>"
+    ]
+  },
   "confidence": "HIGH|MEDIUM|LOW",
   "dataQuality": "HIGH|MEDIUM|LOW"
 }
@@ -250,6 +263,19 @@ MODIFIER SELECTION:
 - "Value": Mispriced or dip opportunity (post-injury recovery, narrative fatigue)
 - "Long-Term": Slow burn, fundamentals-driven (proven stars, HOF trajectory)
 - "Late Cycle": Risky entry even if still hot (prices reflect best-case, limited upside)
+
+DISCOUNT ANALYSIS LOGIC (apply to BUY/WATCH verdicts):
+- whyDiscounted: Explain WHY cards might be cheap using these lenses:
+  * Market size / hobby ceiling (smaller market teams cap casual demand)
+  * Narrative gap (fewer viral moments, less media gravity)
+  * Position/archetype premium (game managers get discounted vs. "superhero" types)
+  * Belief inertia (draft capital anchoring, pre-draft hype lag)
+  * Supply pressure (heavy product releases, parallel flooding)
+  * Liquidity discount (no obvious "chase card" exit paths)
+  * Time horizon mismatch (market hates slow burns)
+  * Role fragility (coach changes, competition, short leash)
+- repricingCatalysts: What SPECIFIC events would flip pricing (playoff wins, prime-time moments, iconic card emerging)
+- trapRisks: What would CONFIRM the discount is justified (more of same, ceiling exposed, situation worsens)
 
 TONE ENFORCEMENT:
 - NEVER use: "elite", "can't miss", "skyrocketing", "must own", "generational"
@@ -265,7 +291,7 @@ TONE ENFORCEMENT:
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 1200,
+      max_tokens: 1600,
     });
     
     const content = response.choices[0]?.message?.content || "{}";
@@ -324,6 +350,11 @@ TONE ENFORCEMENT:
         summary: parsed.verdict?.summary || "Insufficient data to make a confident recommendation. Monitor for more signals.",
         whatMustBeTrue: parsed.verdict?.whatMustBeTrue || ["More data needed"],
       },
+      discountAnalysis: parsed.discountAnalysis ? {
+        whyDiscounted: parsed.discountAnalysis.whyDiscounted || [],
+        repricingCatalysts: parsed.discountAnalysis.repricingCatalysts || [],
+        trapRisks: parsed.discountAnalysis.trapRisks || [],
+      } : undefined,
       confidence: (["HIGH", "MEDIUM", "LOW"].includes(parsed.confidence) 
         ? parsed.confidence 
         : "LOW") as DataConfidence,
