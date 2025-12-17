@@ -363,6 +363,84 @@ export function computeAction(
   return { action: "WATCH", reasons };
 }
 
+// Big Mover Detection
+// Flags cards with asymmetric upside potential (high upside + moderate risk + liquidity + non-parabolic)
+interface BigMoverResult {
+  flag: boolean;
+  reason: string | null;
+}
+
+export function computeBigMover(
+  upsideScore: number,
+  riskScore: number,
+  liquidityScore: number,
+  trendScore: number,
+  volatilityScore: number,
+  careerStage: string | null | undefined,
+  dataConfidence: "HIGH" | "MEDIUM" | "LOW"
+): BigMoverResult {
+  // Big Mover requires:
+  // 1. High upside (≥65)
+  // 2. Moderate risk (25-60) - not too risky, not too safe
+  // 3. Decent liquidity (≥4) - can actually trade the card
+  // 4. Price not already parabolic (trend ≤ 7) - room to grow
+  // 5. Not LOW confidence - need reliable data
+  // 6. Not already at peak volatility (≤7) - not a bubble
+  
+  if (dataConfidence === "LOW") {
+    return { flag: false, reason: null };
+  }
+  
+  const highUpside = upsideScore >= 65;
+  const moderateRisk = riskScore >= 25 && riskScore <= 60;
+  const hasLiquidity = liquidityScore >= 4;
+  const notParabolic = trendScore <= 7;
+  const notBubble = volatilityScore <= 7;
+  
+  if (!highUpside || !moderateRisk || !hasLiquidity || !notParabolic || !notBubble) {
+    return { flag: false, reason: null };
+  }
+  
+  // Build the reason based on what makes this a Big Mover
+  const reasons: string[] = [];
+  
+  // Career stage insights
+  if (careerStage === "ROOKIE") {
+    reasons.push("First-year player with breakout potential");
+  } else if (careerStage === "RISING") {
+    reasons.push("Rising talent not yet priced at peak");
+  } else if (careerStage === "ELITE") {
+    reasons.push("Elite performer with room for legacy appreciation");
+  }
+  
+  // Market condition insights
+  if (trendScore <= 4) {
+    reasons.push("Currently undervalued relative to quality");
+  } else if (trendScore <= 6) {
+    reasons.push("Stable pricing leaves room for catalysts");
+  }
+  
+  // Liquidity insight
+  if (liquidityScore >= 7) {
+    reasons.push("High liquidity allows easy entry/exit");
+  }
+  
+  // Risk profile
+  if (riskScore <= 40) {
+    reasons.push("Favorable risk/reward profile");
+  }
+  
+  // Default reason if none specific
+  if (reasons.length === 0) {
+    reasons.push("Asymmetric upside if key events occur");
+  }
+  
+  return {
+    flag: true,
+    reason: reasons.join(". ") + "."
+  };
+}
+
 // Data Confidence Computation
 export function computeDataConfidence(
   pricePoints: PricePoint[],
@@ -430,6 +508,10 @@ export interface ComputedOutlookSignals {
   
   // Career stage
   careerStageAuto: string;
+  
+  // Big Mover flag
+  bigMoverFlag: boolean;
+  bigMoverReason: string | null;
 }
 
 // AI Explanation Generator
@@ -557,6 +639,17 @@ export function computeAllSignals(
     careerStageAuto
   );
   
+  // Compute Big Mover flag
+  const { flag: bigMoverFlag, reason: bigMoverReason } = computeBigMover(
+    upsideScore,
+    riskScore,
+    liquidityScore,
+    trendScore,
+    volatilityScore,
+    careerStageAuto,
+    dataConfidence
+  );
+  
   return {
     trendScore,
     liquidityScore,
@@ -574,5 +667,7 @@ export function computeAllSignals(
     dataConfidence,
     confidenceReason,
     careerStageAuto,
+    bigMoverFlag,
+    bigMoverReason,
   };
 }

@@ -1337,6 +1337,8 @@ Allow: /
         explanationShort: explanation.short,
         explanationLong: explanation.long,
         explanationBullets: explanation.bullets,
+        bigMoverFlag: signals.bigMoverFlag,
+        bigMoverReason: signals.bigMoverReason,
       };
 
       await storage.upsertCardOutlook(cardId, outlookData);
@@ -1391,6 +1393,10 @@ Allow: /
           short: explanation.short,
           long: explanation.long,
           bullets: explanation.bullets,
+        },
+        bigMover: {
+          flag: signals.bigMoverFlag,
+          reason: signals.bigMoverReason,
         },
         generatedAt: new Date().toISOString(),
       });
@@ -1478,6 +1484,10 @@ Allow: /
             short: outlook.explanationShort,
             long: null,
             bullets: null,
+          },
+          bigMover: {
+            flag: outlook.bigMoverFlag ?? false,
+            reason: isPro ? outlook.bigMoverReason : null,
           },
           generatedAt: outlook.updatedAt,
           cached: true,
