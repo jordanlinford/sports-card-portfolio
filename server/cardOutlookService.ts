@@ -1508,9 +1508,9 @@ function generateEditorialFallbackShort(
 ): string {
   const playerName = card.playerName || card.title;
   
-  // LEGACY_HOLD special handling
+  // LEGACY_HOLD special handling - collector-native conversational tone
   if (action === "LEGACY_HOLD") {
-    return `${playerName} is a classic vintage card with proven long-term demand. Value varies by eye appeal and condition. Best suited as a personal collection hold.`;
+    return `${playerName} is a classic vintage card with steady collector interest that trades infrequently. Best suited as a long-term personal collection hold rather than a short-term move.`;
   }
   
   if (legacyTier === "HOF" || legacyTier === "LEGEND_DECEASED") {
@@ -1553,13 +1553,12 @@ function generateEditorialFallbackLong(
   const playerName = card.playerName || card.title;
   const parts: string[] = [];
   
-  // LEGACY_HOLD special handling - vintage collector pieces
+  // LEGACY_HOLD special handling - collector-native conversational tone
   if (action === "LEGACY_HOLD") {
-    parts.push(`${playerName} is a classic vintage card with proven long-term demand.`);
-    parts.push(`Prices vary widely due to eye appeal and condition grading nuances - this is normal for vintage.`);
-    parts.push(`The thin market means sales are infrequent, creating wide price spreads between listings.`);
-    parts.push(`This is best held as part of a personal collection rather than a short-term trade.`);
-    parts.push(`Overall view: LEGACY HOLD - stable long-term asset.`);
+    parts.push(`${playerName} is a classic vintage card with steady collector interest.`);
+    parts.push(`Demand is stable, but trades are infrequent, which leads to wide pricing spreads.`);
+    parts.push(`The range you see reflects eye appeal and condition differences - that's normal for vintage.`);
+    parts.push(`This is best suited as a long-term personal collection hold rather than a short-term flip.`);
     return parts.join(" ");
   }
   

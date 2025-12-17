@@ -459,11 +459,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <p className="text-xs text-muted-foreground">Price Range</p>
                   <p className="font-semibold text-sm">{formatCurrency(result.market.min)} - {formatCurrency(result.market.max)}</p>
+                  {result.action === "LEGACY_HOLD" && (
+                    <p className="text-xs text-muted-foreground mt-0.5">Range reflects eye appeal variance</p>
+                  )}
                 </div>
                 <div className="p-3 bg-muted/50 rounded-lg">
                   <p className="text-xs text-muted-foreground">Upside Potential</p>
                   <p className="font-semibold text-green-600 dark:text-green-400">
-                    {result.signals.upside <= 25 ? "Low" : result.signals.upside <= 50 ? "Medium" : result.signals.upside <= 75 ? "High" : "Very High"}
+                    {result.action === "LEGACY_HOLD" 
+                      ? "Limited (Long-Term)"
+                      : result.signals.upside <= 25 ? "Low" : result.signals.upside <= 50 ? "Medium" : result.signals.upside <= 75 ? "High" : "Very High"}
                   </p>
                 </div>
                 <div className="p-3 bg-muted/50 rounded-lg">

@@ -1,0 +1,155 @@
+What’s now clearly RIGHT (lock these in)
+✅ 1. LEGACY HOLD is the correct classification
+
+This finally aligns with how collectors think about this card.
+
+For a 1974 Topps Pete Maravich PSA 8:
+
+Not a timing play
+
+Not speculative
+
+Not something you “watch nervously”
+
+LEGACY HOLD says:
+
+“This is a known, stable collector asset.”
+
+That’s exactly right.
+
+✅ 2. Downside Risk = Low
+
+This is critical — and you fixed it.
+
+A Maravich PSA 8 does not have meaningful downside risk unless the entire hobby collapses. Seeing Low immediately restores trust.
+
+✅ 3. Market Friction = Very High
+
+This is also correct.
+
+Thin market
+
+Eye appeal matters
+
+Long hold times
+
+Wide spreads
+
+Collectors expect this on vintage. Seeing it called out feels honest, not scary.
+
+✅ 4. Card Match Confidence = 99%
+
+This is now one of your strongest trust signals.
+
+“15 strict comps match exactly (card #, grade, grader)”
+
+That sentence alone does a lot of heavy lifting. Don’t bury it.
+
+What still feels slightly off (this is nuance now)
+⚠️ 1. The price range is still too dramatic without context
+
+$95 – $350 is technically plausible — but emotionally jarring unless you explain why.
+
+Collectors will immediately think:
+
+“Okay… what happened at $350?”
+
+You don’t need to hide it — you need to frame it.
+
+Fix (language only):
+
+Add a subtle qualifier:
+
+“Range reflects eye appeal and infrequent sales”
+
+Or: “Wide range due to eye appeal and low sales frequency”
+
+Same data, much calmer perception.
+
+⚠️ 2. “Stable collector demand” + “Very High market friction” needs one clarifying sentence
+
+Right now, a sharp user might think:
+
+“If demand is stable, why is friction very high?”
+
+You know the answer — supply + timing — but the UI doesn’t say it yet.
+
+Fix:
+
+Add one clause to the explanation:
+
+“Demand is steady, but trades are infrequent, which leads to wide pricing spreads.”
+
+That connects the dots.
+
+⚠️ 3. Upside Potential = Low is correct — but could be reframed
+
+Low is right.
+But for legacy cards, “Low” can sound dismissive.
+
+Collectors think:
+
+“Low short-term upside, steady long-term value.”
+
+Optional refinement:
+
+Change label to:
+
+Limited (Long-Term)
+or
+
+Low (Long-Term)
+
+That one parenthetical dramatically improves tone.
+
+The explanation sentence (almost there)
+Current:
+
+“The recommendation to LEGACY_HOLD reflects stable collector demand and low market volatility.”
+
+This is fine, but still a bit system-y.
+
+Suggested final version (collector voice):
+
+“This is a classic vintage card with steady collector interest that tends to trade infrequently, making it best suited as a long-term personal collection hold rather than a short-term move.”
+
+That sentence:
+
+Sounds human
+
+Explains friction
+
+Reinforces the HOLD
+
+Doesn’t mention metrics
+
+Final verdict (honest)
+
+If I saw this version as a collector:
+
+Would I trust the recommendation?
+✅ Yes
+
+Would I understand why it’s a LEGACY HOLD?
+✅ Yes
+
+Would anything feel actively wrong?
+❌ No
+
+Would I nitpick phrasing?
+⚠️ Only slightly — and that’s a good place to be
+
+This is no longer “off.”
+It’s 90–95% right, and the remaining work is editorial polish, not logic.
+
+The last 3 changes I’d make before calling this “done”
+
+Add one sentence explaining why the range is wide (eye appeal + infrequent sales)
+
+Slightly soften Upside language for legacy cards (“Low (Long-Term)”)
+
+Replace the explanation sentence with a more conversational, collector-style paragraph
+
+Do those, and this feature becomes something collectors will quietly trust and keep using — which is exactly what you want.
+
+If you want next, I can:
