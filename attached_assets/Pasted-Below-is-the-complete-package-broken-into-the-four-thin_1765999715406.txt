@@ -1,0 +1,303 @@
+Below is the complete package, broken into the four things you approved, written so you can:
+
+paste sections directly to Replit
+
+use pieces as UI copy
+
+and use the rest as internal product logic
+
+I’ll keep it practical and opinionated.
+
+1️⃣ Drake Maye — Peak Credibility Rewrite (Gold Standard Example)
+
+This is the exact tone and structure every Player Outlook should aim for.
+
+Player Outlook — Drake Maye
+
+Football · Quarterback · New England Patriots
+Market Temperature: WARM
+Volatility: MEDIUM–HIGH
+Risk: MEDIUM
+Horizon: MID TERM
+Conviction: MEDIUM (Thesis Confidence)
+
+📈 Player Stock Thesis
+
+Rookie quarterback demand remains strong due to positional premium and early opportunity.
+
+Patriots market size supports baseline collector interest even during uneven stretches.
+
+The market is currently pricing Maye as a future upside story, not a finished product.
+
+Early interest is driven more by projection and draft capital than sustained NFL results.
+
+⚠️ Market Reality Check
+
+Patriots quarterbacks have repeatedly burned collectors once early optimism fades.
+
+Maye has a short leash with hobby sentiment — a few poor starts can cool demand quickly.
+
+Much of the current pricing assumes development that has not yet been proven on the field.
+
+💡 Investment Verdict
+BUY (Speculative)
+
+Medium Conviction
+
+Drake Maye represents a high-upside rookie QB play with meaningful volatility. This is a speculative buy that works best with patience and disciplined entry timing rather than chasing breakout moments.
+
+What must be true:
+
+Maye shows steady development and avoids prolonged performance dips.
+
+The Patriots remain relevant enough to keep national attention.
+
+Collector demand holds through volatility rather than resetting after hype cools.
+
+🧱 Card Exposure Recommendations
+
+Ranked by fit for this player’s current market profile
+
+🚀 GROWTH · High Liquidity
+
+Best for: Momentum buyers & long-term investors
+
+Targets:
+
+Prizm Silver Rookie
+
+Optic Rated Rookie Holo
+
+Select Silver Rookie
+
+Why:
+Flagship silver parallels offer the best balance of liquidity and upside for speculative QB plays.
+
+Timing Guidance:
+Best bought during preseason dips or after quiet games. Avoid buying immediately after breakout performances.
+
+Risk Note:
+Prices can retrace quickly if momentum stalls.
+
+👑 PREMIUM · Medium Liquidity
+
+Best for: Long-term conviction investors
+
+Targets:
+
+On-card rookie autos
+
+Numbered rookies /99 or lower
+
+National Treasures RPAs
+
+Why:
+Premium cards hold value better during downturns but still depend on long-term success.
+
+Timing Guidance:
+Accumulate slowly rather than all at once. Premium spikes are sharp after major milestones.
+
+Risk Note:
+Lower liquidity makes exits harder if sentiment flips.
+
+⚙️ CORE · High Liquidity
+
+Best for: Collectors building exposure
+
+Targets:
+
+Prizm Base Rookie
+
+Optic Rated Rookie Base
+
+Donruss Rated Rookie
+
+Why:
+Affordable exposure with strong brand recognition and easy exit paths.
+
+Timing Guidance:
+Safe to buy anytime demand is stable; ideal for dollar-cost averaging.
+
+Risk Note:
+Limited upside compared to flagship parallels.
+
+📊 Supporting Evidence (Collapsed by Default)
+
+Recent sold listings show steady demand with moderate price swings.
+
+Data quality: Medium (thin but consistent comps).
+
+This page now:
+
+feels human
+
+admits uncertainty
+
+gives actionable guidance
+
+avoids hype
+
+This is trustworthy.
+
+2️⃣ Player Watchlist Loop (Retention Engine)
+
+This is how you get people to come back weekly.
+
+Feature: Player Watchlist
+What Users Can Do
+
+⭐ Add any player to Watchlist
+
+See Market Temperature changes
+
+Get notified when:
+
+Verdict changes (WATCH → BUY, BUY → AVOID)
+
+Volatility spikes
+
+Major performance/news events occur
+
+Weekly Update Logic (Simple but Powerful)
+
+Each watched player gets a Weekly Pulse Update:
+
+Drake Maye — Weekly Pulse
+Market Temperature: WARM → HOT
+Reason: Increased national exposure + strong recent performance
+No change to verdict: BUY (Speculative)
+
+Keep it short. No essays.
+
+Notifications (Email / In-App)
+
+Only notify when something meaningfully changes:
+
+Temperature change
+
+Verdict change
+
+Risk level increase
+
+No spam = trust.
+
+3️⃣ Player Archetypes (This Makes the System Scalable)
+
+This is how you avoid rewriting logic every time.
+
+Core Archetypes (v1)
+🧨 Hot Rookie QB
+
+High hype
+
+High volatility
+
+Projection-driven
+
+Example: Drake Maye, Shedeur Sanders
+
+Default Bias: BUY (Speculative)
+
+📉 Buy-Low Veteran
+
+Proven talent
+
+Temporary dip
+
+Narrative fatigue
+
+Example: Veteran WR after injury season
+
+Default Bias: BUY (Value)
+
+🧊 Cooling Star
+
+Former hobby darling
+
+Plateaued performance
+
+Still liquid
+
+Example: Aging RB / WR
+
+Default Bias: WATCH
+
+🏆 Established Elite
+
+Sustained excellence
+
+Lower volatility
+
+Premium-heavy
+
+Example: Mahomes-tier
+
+Default Bias: BUY (Long-Term)
+
+⚠️ Late-Cycle Hype
+
+Prices already reflect best-case outcomes
+
+Limited upside
+
+Example: Overheated playoff runs
+
+Default Bias: AVOID or WATCH
+
+Each Player Outlook:
+
+Gets assigned an archetype
+
+Archetype informs:
+
+default risk
+
+default exposure mix
+
+tone of thesis
+
+This keeps outputs consistent and believable.
+
+4️⃣ Naming & Homepage Positioning (Very Important)
+
+You need to name this so it feels obvious, not experimental.
+
+Feature Name (Top Choice)
+Player Outlook
+
+Simple. Clear. Flexible. Grows with you.
+
+Subtitle
+
+Analyze players like stocks. Choose the right card exposure.
+
+Homepage Positioning
+Section Header
+
+Stop Guessing. Start Investing Smarter.
+
+Supporting Copy
+
+Player Outlook analyzes athletes like stocks — evaluating risk, momentum, and upside — then recommends the right card types to match your strategy.
+
+CTA
+
+Analyze a Player
+
+Not:
+
+“Check comps”
+
+“See prices”
+
+This reinforces the shift.
+
+Competitive Positioning (Internal Truth)
+
+Market Movers → price history
+
+Card Ladder → tracking
+
+You → decision clarity
+
+That’s your lane.

@@ -1,0 +1,174 @@
+1️⃣ Verdict Upgrade: Buy-Type Nuance (Critical)
+Replace
+
+BUY / WATCH / AVOID
+
+With
+
+Action + Style
+
+Allowed Actions
+
+BUY
+
+WATCH
+
+AVOID
+
+Required Modifiers (must choose one)
+
+(Momentum) – riding hype / short-term upside
+
+(Speculative) – high upside, high downside
+
+(Value) – mispriced / buy-the-dip
+
+(Long-Term) – slower burn, fundamentals-driven
+
+(Late Cycle) – risky entry even if still hot
+
+Example (Drake Maye)
+
+BUY (Speculative)
+Early-career QB momentum creates upside, but volatility is elevated and conviction depends on sustained performance.
+
+Why this matters:
+People don’t mind risk — they hate hidden risk. This labels it upfront.
+
+2️⃣ Thesis Hardening: “One Uncomfortable Truth” Rule
+New Rule (Non-Negotiable)
+
+Every Player Stock Thesis must include at least one uncomfortable or skeptical statement.
+
+Add a Dedicated Subsection:
+
+⚠️ Market Reality Check
+
+Example Rewrite (Drake Maye)
+
+Player Stock Thesis
+
+Rookie QB demand remains strong due to position premium and early opportunity.
+
+Patriots market size supports baseline collector interest.
+
+Perceived leadership and upside narrative is driving speculative buying.
+
+⚠️ Market Reality Check
+
+Patriots QB history has burned collectors repeatedly, creating a shorter leash for hype.
+
+Early optimism is based more on projection than sustained NFL proof.
+
+A few poor starts could cool demand quickly in a crowded rookie QB class.
+
+Why this works:
+This single section does more for trust than any comp graph ever will.
+
+3️⃣ Confidence Label Clarification (Small Change, Big Impact)
+Replace
+
+Medium Confidence
+
+With
+
+Medium Conviction (Thesis Confidence)
+
+Optional Tooltip Copy
+
+Confidence reflects conviction in the player thesis, not price certainty or guarantees.
+
+This subtly but clearly separates:
+
+thinking quality
+from
+
+market outcomes
+
+That distinction builds long-term credibility.
+
+4️⃣ Timing Guidance: “When to Buy” (The Missing Link)
+
+This is the most powerful addition and the easiest to implement.
+
+Add to EACH Card Exposure Tier:
+
+🕒 Timing Guidance
+
+Example (Growth Tier)
+
+Best Entry Window:
+During preseason dips or after quiet games — avoid buying immediately after breakout performances.
+
+Example (Premium Tier)
+
+Best Entry Window:
+Accumulate gradually; premiums hold value better but spike sharply after major milestones.
+
+Example (Core Tier)
+
+Best Entry Window:
+Anytime demand is stable; suitable for dollar-cost averaging.
+
+Why this matters:
+This turns insight into action, which is what makes users come back.
+
+Updated Card Exposure Template (Final)
+
+Each exposure card should now include:
+
+Tier (Growth / Premium / Core / Speculative)
+
+Liquidity (High / Medium / Low)
+
+Best for (Investor / Collector / Flipper)
+
+Why this fits the thesis
+
+Timing Guidance (1 line)
+
+Risk Note (1 line)
+
+No more than 6 total lines per exposure. Skimmable in 5 seconds.
+
+Bonus: LLM Style Guardrails (Give This to Replit)
+Tone Rules
+
+Avoid hype language (“elite”, “can’t miss”, “skyrocketing”)
+
+Prefer grounded phrasing (“short leash”, “fragile demand”, “projection-heavy”)
+
+No percentages or fake precision
+
+Required Language Patterns
+
+“If X happens, Y follows”
+
+“This works only if…”
+
+“Market currently prices in…”
+
+This keeps outputs sharp, not fluffy.
+
+What You Now Have (Big Picture)
+
+You’ve officially crossed the line from:
+
+“AI card analysis tool”
+
+to:
+
+“Decision support for collectors who don’t want to guess.”
+
+This is:
+
+differentiated
+
+honest
+
+scalable
+
+defensible against bigger players
+
+You are no longer competing on data volume.
+You’re competing on judgment.
