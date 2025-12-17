@@ -60,11 +60,14 @@ function OutlookSkeleton() {
   );
 }
 
-function CardOutlookRow({ card, isPro }: { card: CardType; isPro: boolean }) {
+function CardOutlookRow({ card, isPro, showDetails = true }: { card: CardType; isPro: boolean; showDetails?: boolean }) {
   const { toast } = useToast();
   
   const generateMutation = useMutation({
     mutationFn: async () => {
+      if (!isPro) {
+        throw new Error("Pro subscription required");
+      }
       const res = await apiRequest("POST", `/api/cards/${card.id}/outlook-v2`);
       return res.json();
     },
@@ -94,7 +97,7 @@ function CardOutlookRow({ card, isPro }: { card: CardType; isPro: boolean }) {
             No Image
           </div>
         )}
-        {isBigMover && (
+        {isBigMover && isPro && (
           <div className="absolute top-1 right-1 bg-purple-500 rounded-full p-0.5">
             <Zap className="h-2.5 w-2.5 text-white" />
           </div>
@@ -104,7 +107,7 @@ function CardOutlookRow({ card, isPro }: { card: CardType; isPro: boolean }) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-medium truncate" data-testid={`text-card-title-${card.id}`}>{card.title}</h3>
-          {isBigMover && (
+          {isBigMover && isPro && (
             <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 gap-1">
               <Zap className="h-3 w-3" />
               Big Mover
@@ -114,7 +117,7 @@ function CardOutlookRow({ card, isPro }: { card: CardType; isPro: boolean }) {
         <p className="text-sm text-muted-foreground truncate">
           {card.year} {card.set} {card.variation ? `- ${card.variation}` : ""} {card.grade ? `(${card.grade})` : ""}
         </p>
-        {hasOutlook && card.outlookExplanationShort && (
+        {showDetails && isPro && hasOutlook && card.outlookExplanationShort && (
           <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
             {card.outlookExplanationShort}
           </p>
@@ -122,13 +125,13 @@ function CardOutlookRow({ card, isPro }: { card: CardType; isPro: boolean }) {
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
-        {hasOutlook ? (
+        {hasOutlook && isPro ? (
           <>
             <Badge variant="outline" className={`gap-1 ${getActionColor(card.outlookAction)}`}>
               {getActionIcon(card.outlookAction)}
               {card.outlookAction}
             </Badge>
-            {card.outlookUpsideScore !== null && (
+            {showDetails && card.outlookUpsideScore !== null && (
               <div className="text-xs text-muted-foreground hidden sm:block">
                 <span className="text-green-600 dark:text-green-400">{card.outlookUpsideScore}</span>
                 /
@@ -136,6 +139,11 @@ function CardOutlookRow({ card, isPro }: { card: CardType; isPro: boolean }) {
               </div>
             )}
           </>
+        ) : hasOutlook && !isPro ? (
+          <Badge variant="secondary" className="gap-1">
+            <Crown className="h-3 w-3" />
+            Pro to view
+          </Badge>
         ) : isPro ? (
           <Button 
             size="sm" 
@@ -160,7 +168,7 @@ function CardOutlookRow({ card, isPro }: { card: CardType; isPro: boolean }) {
           </Badge>
         )}
         
-        {hasOutlook && (
+        {hasOutlook && isPro && (
           <Link href={`/card/${card.id}/outlook`}>
             <Button size="icon" variant="ghost" data-testid={`button-view-outlook-${card.id}`}>
               <ArrowRight className="h-4 w-4" />
