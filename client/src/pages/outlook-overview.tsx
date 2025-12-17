@@ -107,6 +107,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [title, setTitle] = useState("");
   const [year, setYear] = useState("");
   const [set, setSet] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
   const [variation, setVariation] = useState("");
   const [grade, setGrade] = useState("");
   const [grader, setGrader] = useState("");
@@ -158,6 +159,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         title,
         year: year || undefined,
         set: set || undefined,
+        cardNumber: cardNumber || undefined,
         variation: variation || undefined,
         grade: grade || undefined,
         grader: grader || undefined,
@@ -182,6 +184,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         title: result.tempCard.title,
         year: result.tempCard.year ? parseInt(result.tempCard.year) : null,
         set: result.tempCard.set || null,
+        cardNumber: cardNumber || null,
         variation: result.tempCard.variation || null,
         grade: result.tempCard.grade || null,
         grader: result.tempCard.grader || null,
@@ -207,6 +210,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setTitle("");
     setYear("");
     setSet("");
+    setCardNumber("");
     setVariation("");
     setGrade("");
     setGrader("");
@@ -319,6 +323,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       value={set}
                       onChange={(e) => setSet(e.target.value)}
                       data-testid="input-quick-set"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cardNumber">Card #</Label>
+                    <Input
+                      id="cardNumber"
+                      placeholder="e.g., 23"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                      data-testid="input-quick-card-number"
                     />
                   </div>
                   <div className="space-y-2">

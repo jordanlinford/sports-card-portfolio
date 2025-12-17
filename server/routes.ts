@@ -1569,7 +1569,7 @@ Allow: /
   app.post("/api/outlook/quick-analyze", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { title, year, set, variation, grade, grader, imagePath } = req.body;
+      const { title, year, set, cardNumber, variation, grade, grader, imagePath } = req.body;
 
       if (!title) {
         return res.status(400).json({ message: "Card title is required" });
@@ -1599,6 +1599,7 @@ Allow: /
         title,
         year: year ? parseInt(year) : null,
         set: set || null,
+        cardNumber: cardNumber || null,
         variation: variation || null,
         grade: grade || null,
         grader: grader || null,
