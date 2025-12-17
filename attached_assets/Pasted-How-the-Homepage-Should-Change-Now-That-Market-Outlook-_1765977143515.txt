@@ -1,0 +1,127 @@
+How the Homepage Should Change (Now That Market Outlook Exists)
+
+Your homepage should pivot from:
+
+“Look at your cards beautifully”
+
+To:
+
+“Know what your cards are worth — and where they’re going.”
+
+Display cases are still important, but Market Outlook becomes the hero.
+
+⸻
+
+A. Above-the-Fold (This Is the Most Important Change)
+
+Current problem (likely):
+	•	Too abstract
+	•	Too collector-focused
+	•	Value not immediately measurable
+
+New Above-the-Fold Structure:
+
+Headline
+
+See where your card’s value is headed — before you buy, sell, or grade
+
+Subheadline
+
+Real sales data + AI market signals.
+Free users get 3 outlooks/month. Pro users get unlimited.
+
+Primary CTA
+	•	🔍 Run a Free Market Outlook
+
+Secondary CTA
+	•	💎 Upgrade for Unlimited Outlooks
+
+This immediately:
+	•	Anchors value in money
+	•	Sets up the free → paid conversion
+	•	Makes the tool feel expensive (but accessible)
+
+⸻
+
+B. Immediate Proof Section (Right Under the Hero)
+
+You need to show the output, not explain it.
+
+Section Title
+
+What a Market Outlook Shows You
+
+4-column visual or cards
+	•	📈 Price trend (30 / 90 / 180 days)
+	•	🔄 Volatility & liquidity
+	•	🧠 AI outlook (Bullish / Neutral / Risky)
+	•	💡 Action suggestion (Hold / Buy / Grade / Sell)
+
+Key line underneath
+
+Based on real sales — not guesses or hype.
+
+This builds trust fast.
+
+⸻
+
+C. Freemium Framing (This Is Where Conversion Happens)
+
+You should explicitly explain the limit, but position it as generous.
+
+Section Title
+
+Try It Free. Upgrade When It Pays for Itself.
+
+Two columns
+
+Free
+	•	✅ 3 Market Outlooks per month
+	•	✅ Real sales comps
+	•	✅ Basic AI outlook
+	•	❌ Limited history depth
+	•	❌ No saved outlooks
+
+Pro
+	•	🚀 Unlimited Market Outlooks
+	•	📊 Deeper historical trends
+	•	💾 Save & track cards over time
+	•	🧠 Advanced AI signals
+	•	🖼️ Full Display Case features
+
+CTA
+	•	“Unlock Unlimited Market Outlooks”
+
+This makes Pro feel inevitable for anyone serious.
+
+⸻
+
+D. Reposition Display Cases (Important Shift)
+
+Display Cases should move down the page and be reframed as a benefit of insight.
+
+Instead of:
+
+“Show off your collection”
+
+Use:
+
+“Show off collections backed by data.”
+
+Tie it directly to Market Outlook:
+	•	Cards in display cases show:
+	•	Last outlook status
+	•	Trend arrows
+	•	Confidence badge (High / Medium / Speculative)
+
+This keeps Display Cases relevant without leading with them.
+
+⸻
+
+E. Homepage Flow (TL;DR)
+	1.	Hero: Market Outlook value
+	2.	Proof: What insights you get
+	3.	Freemium: 3 free vs unlimited
+	4.	Use cases: Buy smarter / Sell smarter / Grade smarter
+	5.	Display Cases: Social + data-backed
+	6.	Final CTA: Run your first outlook
