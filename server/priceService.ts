@@ -435,8 +435,15 @@ function isStrictComp(
   }
   
   if (effectivelyHasVariation && !listingHasParallel) {
-    // User wants specific parallel but listing appears to be base card - not strict
-    return { isStrict: false, excludeReason: `Parallel "${card.variation}" vs base card mismatch` };
+    // Check if listing contains the user's variation name (for insert sets like "Bomb Squad", "Downtown", etc.)
+    const variationLowerCheck = (card.variation || "").toLowerCase().trim();
+    if (variationLowerCheck && combined.includes(variationLowerCheck)) {
+      // Listing has the variation name, so it's a match even without parallel keywords
+      // This handles insert sets that aren't color parallels
+    } else {
+      // User wants specific parallel but listing appears to be base card - not strict
+      return { isStrict: false, excludeReason: `Parallel "${card.variation}" vs base card mismatch` };
+    }
   }
   
   return { isStrict: true, excludeReason: null };
