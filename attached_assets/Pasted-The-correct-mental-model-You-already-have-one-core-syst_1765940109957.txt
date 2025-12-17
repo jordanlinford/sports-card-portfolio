@@ -1,0 +1,173 @@
+The correct mental model
+
+You already have one core system:
+
+Card Outlook (Market Outlook / Buy–Watch–Sell)
+
+That system answers:
+
+“What should I do with this card right now?”
+
+Big Mover answers:
+
+“What could cause outsized movement later?”
+
+Those are the same decision system, viewed through two lenses:
+
+Near-term action
+
+Event-driven upside
+
+So yes — Big Mover should not be a separate feature.
+It should be a signal inside the existing predictor.
+
+The right way to integrate it (clean, elegant)
+Think of your predictor as a layered model
+
+Your predictor already computes:
+
+Upside
+
+Risk
+
+Confidence
+
+Action (BUY / WATCH / SELL / LONG HOLD)
+
+Big Mover becomes a modifier, not a destination.
+
+Conceptually:
+
+Base Outlook = risk-adjusted recommendation
+
+Big Mover = conditional upside flag
+
+How this looks in the product (UX)
+On the Single-Card Outlook page
+
+You do not add a new action.
+
+You add a secondary signal:
+
+Market Outlook: WATCH
+Big Mover Potential: 🔥 High
+Why: Rookie QB, flagship card, flat pricing, high event sensitivity
+
+This preserves:
+
+Simplicity
+
+Trust
+
+Mental continuity
+
+In Display Cases / Lists
+
+Instead of:
+
+“Big Movers page”
+
+You surface:
+
+🔥 icon
+
+“High Upside” badge
+
+Rare, subtle, meaningful.
+
+How it fits into your existing scoring (no rebuild)
+
+You already compute:
+
+Upside Score (0–100)
+
+Risk Score (0–100)
+
+That’s perfect.
+
+Big Mover logic can be:
+
+BigMoverFlag =
+UpsideScore is high
+AND RiskScore is moderate
+AND Trend is not already parabolic
+AND Liquidity exists
+
+No new model required.
+
+Why this is better than a standalone feature
+1. Avoids feature bloat
+
+Collectors don’t want:
+
+“Outlook”
+
+“Big Mover”
+
+“Top Gainer”
+
+“Hot Cards”
+
+They want one trusted system.
+
+2. Preserves trust
+
+If Big Mover lived separately, users would ask:
+
+“Why does this say BUY but Big Mover says something else?”
+
+Keeping it inside one predictor avoids contradictions.
+
+3. Makes marketing cleaner
+
+You can say:
+
+“Our Outlook includes conditional Big Mover detection.”
+
+That sounds smart, not gimmicky.
+
+The one thing you must be careful about
+❌ Do not over-trigger Big Mover
+
+If everything is a Big Mover, nothing is.
+
+Rules of thumb:
+
+≤5% of cards get Big Mover flag
+
+Most weeks: 0–2 per collection
+
+Confidence must not be LOW
+
+Rarity is the feature.
+
+How to explain this to collectors (language matters)
+
+Never say:
+
+“AI thinks this will explode”
+
+Always say:
+
+“This card has asymmetric upside if key events occur.”
+
+That wording is defensible, honest, and intelligent.
+
+What to tell Replit (short version)
+
+You can send this:
+
+Big Mover should be implemented as a secondary signal within the existing Card Outlook system, not as a separate feature.
+
+It should activate only when upside is high, risk is moderate, liquidity exists, and price is not already parabolic.
+
+In the UI, show it as a “Big Mover Potential” badge or icon alongside the main BUY/WATCH/SELL recommendation.
+
+The Big Mover signal should explain why upside is asymmetric and reference event sensitivity, without predicting outcomes.
+
+Final confirmation (no ambiguity)
+
+✔ Yes, Big Mover belongs inside your existing predictor
+✔ It should be a modifier, not an action
+✔ It strengthens the core feature instead of distracting from it
+✔ It gives you a powerful marketing hook without product sprawl
