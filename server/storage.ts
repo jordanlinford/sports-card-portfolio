@@ -751,6 +751,32 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async countUserMonthlyOutlookGenerations(userId: string): Promise<number> {
+    const userCases = await db.select({ id: displayCases.id })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+    
+    if (userCases.length === 0) return 0;
+    
+    const caseIds = userCases.map(c => c.id);
+    
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(cards)
+      .where(
+        and(
+          inArray(cards.displayCaseId, caseIds),
+          sql`${cards.outlookGeneratedAt} >= ${startOfMonth}`
+        )
+      );
+    
+    return result?.count || 0;
+  }
+
   async deleteCardOutlook(cardId: number): Promise<void> {
     await db.delete(cardOutlooks).where(eq(cardOutlooks.cardId, cardId));
   }

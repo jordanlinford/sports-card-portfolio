@@ -271,6 +271,27 @@ Allow: /
   });
 
   // Onboarding status - check if user needs onboarding (has 0 display cases or 0 cards)
+  app.get("/api/user/outlook-usage", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const isPro = user?.subscriptionStatus === "PRO";
+      const FREE_TIER_LIMIT = 3;
+      
+      const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
+      
+      res.json({
+        used: monthlyCount,
+        limit: isPro ? null : FREE_TIER_LIMIT,
+        remaining: isPro ? null : Math.max(0, FREE_TIER_LIMIT - monthlyCount),
+        isPro,
+      });
+    } catch (error) {
+      console.error("Error getting outlook usage:", error);
+      res.status(500).json({ message: "Failed to get outlook usage" });
+    }
+  });
+
   app.get("/api/user/onboarding-status", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -1257,12 +1278,21 @@ Allow: /
       const cardId = parseInt(req.params.cardId);
       const userId = req.user.claims.sub;
 
-      // Check Pro subscription
+      // Check subscription - free users get 3 analyses per month
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
-        return res.status(403).json({ 
-          message: "Card Outlook AI 2.0 is a Pro feature. Upgrade to Pro to get signal-based investment insights." 
-        });
+      const isPro = user?.subscriptionStatus === "PRO";
+      const FREE_TIER_LIMIT = 3;
+      
+      if (!isPro) {
+        const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
+        if (monthlyCount >= FREE_TIER_LIMIT) {
+          return res.status(403).json({ 
+            message: `You've used all ${FREE_TIER_LIMIT} free Market Outlook analyses this month. Upgrade to Pro for unlimited analyses.`,
+            usageExceeded: true,
+            used: monthlyCount,
+            limit: FREE_TIER_LIMIT
+          });
+        }
       }
 
       if (isNaN(cardId)) {

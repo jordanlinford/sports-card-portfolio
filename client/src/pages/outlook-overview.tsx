@@ -15,13 +15,15 @@ import {
   AlertTriangle,
   Crown,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Sparkles
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 type CaseWithCards = DisplayCase & { cards: CardType[] };
+type UsageInfo = { used: number; limit: number | null; remaining: number | null; isPro: boolean };
 
 function getActionIcon(action: string | null) {
   switch (action) {
@@ -60,20 +62,29 @@ function OutlookSkeleton() {
   );
 }
 
-function CardOutlookRow({ card, isPro, showDetails = true }: { card: CardType; isPro: boolean; showDetails?: boolean }) {
+function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, onAnalyze }: { 
+  card: CardType; 
+  isPro: boolean; 
+  showDetails?: boolean;
+  canAnalyze?: boolean;
+  onAnalyze?: () => void;
+}) {
   const { toast } = useToast();
   
   const generateMutation = useMutation({
     mutationFn: async () => {
-      if (!isPro) {
-        throw new Error("Pro subscription required");
-      }
       const res = await apiRequest("POST", `/api/cards/${card.id}/outlook-v2`);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to generate outlook");
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
       toast({ title: "Outlook generated", description: `Analysis complete for ${card.title}` });
+      onAnalyze?.();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -144,7 +155,7 @@ function CardOutlookRow({ card, isPro, showDetails = true }: { card: CardType; i
             <Crown className="h-3 w-3" />
             Pro to view
           </Badge>
-        ) : isPro ? (
+        ) : canAnalyze ? (
           <Button 
             size="sm" 
             variant="outline"
@@ -162,10 +173,12 @@ function CardOutlookRow({ card, isPro, showDetails = true }: { card: CardType; i
             )}
           </Button>
         ) : (
-          <Badge variant="secondary" className="gap-1">
-            <Crown className="h-3 w-3" />
-            Pro
-          </Badge>
+          <Link href="/upgrade">
+            <Badge variant="secondary" className="gap-1 cursor-pointer">
+              <Crown className="h-3 w-3" />
+              Upgrade
+            </Badge>
+          </Link>
         )}
         
         {hasOutlook && isPro && (
@@ -188,6 +201,13 @@ export default function OutlookOverviewPage() {
     queryKey: ["/api/display-cases"],
     enabled: isAuthenticated,
   });
+
+  const { data: usage } = useQuery<UsageInfo>({
+    queryKey: ["/api/user/outlook-usage"],
+    enabled: isAuthenticated,
+  });
+
+  const canAnalyze = isPro || (usage?.remaining != null && usage.remaining > 0);
 
   const allCards = cases?.flatMap(c => c.cards) || [];
   const cardsWithOutlook = allCards.filter(c => c.outlookAction !== null);
@@ -225,12 +245,38 @@ export default function OutlookOverviewPage() {
 
       {!isPro && (
         <Card className="mb-6 border-primary/20 bg-primary/5">
-          <CardContent className="flex items-center justify-between gap-4 py-4">
+          <CardContent className="flex items-center justify-between gap-4 py-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <Crown className="h-6 w-6 text-primary" />
+              {usage?.remaining != null && usage.remaining > 0 ? (
+                <Sparkles className="h-6 w-6 text-primary" />
+              ) : (
+                <Crown className="h-6 w-6 text-primary" />
+              )}
               <div>
-                <p className="font-medium">Upgrade to Pro for full Market Outlook</p>
-                <p className="text-sm text-muted-foreground">Get AI recommendations, Big Mover alerts, and detailed analysis for all your cards.</p>
+                {usage?.remaining != null && usage.remaining > 0 ? (
+                  <>
+                    <p className="font-medium">
+                      {usage.remaining} free {usage.remaining === 1 ? "analysis" : "analyses"} remaining this month
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Upgrade to Pro for unlimited analyses, Big Mover alerts, and full insights.
+                    </p>
+                  </>
+                ) : usage?.remaining === 0 ? (
+                  <>
+                    <p className="font-medium">You've used all free analyses this month</p>
+                    <p className="text-sm text-muted-foreground">
+                      Upgrade to Pro for unlimited analyses and full access to Market Outlook.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-medium">Get 3 free analyses per month</p>
+                    <p className="text-sm text-muted-foreground">
+                      Upgrade to Pro for unlimited analyses, Big Mover alerts, and detailed insights.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
             <Link href="/upgrade">
@@ -300,7 +346,7 @@ export default function OutlookOverviewPage() {
               </p>
               <div className="space-y-2">
                 {bigMovers.map(card => (
-                  <CardOutlookRow key={card.id} card={card} isPro={isPro} />
+                  <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
                 ))}
               </div>
             </div>
@@ -317,7 +363,7 @@ export default function OutlookOverviewPage() {
               </div>
               <div className="space-y-2">
                 {buyCards.map(card => (
-                  <CardOutlookRow key={card.id} card={card} isPro={isPro} />
+                  <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
                 ))}
               </div>
             </div>
@@ -334,7 +380,7 @@ export default function OutlookOverviewPage() {
               </div>
               <div className="space-y-2">
                 {sellCards.map(card => (
-                  <CardOutlookRow key={card.id} card={card} isPro={isPro} />
+                  <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
                 ))}
               </div>
             </div>
@@ -351,7 +397,7 @@ export default function OutlookOverviewPage() {
               </div>
               <div className="space-y-2">
                 {holdCards.map(card => (
-                  <CardOutlookRow key={card.id} card={card} isPro={isPro} />
+                  <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
                 ))}
               </div>
             </div>
@@ -368,7 +414,7 @@ export default function OutlookOverviewPage() {
               </div>
               <div className="space-y-2">
                 {watchCards.map(card => (
-                  <CardOutlookRow key={card.id} card={card} isPro={isPro} />
+                  <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
                 ))}
               </div>
             </div>
@@ -388,7 +434,7 @@ export default function OutlookOverviewPage() {
               </p>
               <div className="space-y-2">
                 {cardsWithoutOutlook.slice(0, 10).map(card => (
-                  <CardOutlookRow key={card.id} card={card} isPro={isPro} />
+                  <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
                 ))}
                 {cardsWithoutOutlook.length > 10 && (
                   <p className="text-sm text-muted-foreground text-center py-2">
