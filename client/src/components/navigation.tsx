@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LayoutGrid, LogOut, User, Crown, Search, Compass, Shield, BarChart3, Bookmark, HandCoins, MessageSquare, Settings, Zap, Star, Gem } from "lucide-react";
+import { LayoutGrid, LogOut, User, Crown, Search, Compass, Shield, BarChart3, Bookmark, HandCoins, MessageSquare, Settings, Zap, Star, Gem, TrendingUp } from "lucide-react";
 
 export function Navigation() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -151,6 +151,12 @@ export function Navigation() {
                       <Link href="/outlook" className="flex items-center gap-2 cursor-pointer" data-testid="link-outlook">
                         <Zap className="h-4 w-4" />
                         Market Outlook
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/player-outlook" className="flex items-center gap-2 cursor-pointer" data-testid="link-player-analysis">
+                        <TrendingUp className="h-4 w-4" />
+                        Player Analysis
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
