@@ -68,6 +68,112 @@ const GRADER_WEIGHTS: Record<string, number> = {
 const GRADE_QUALIFIERS = ["st", "oc", "mc", "mk", "pd"];
 const QUALIFIER_GRADE_PENALTY = 1.5; // Downgrade by 1.5 grade points
 
+// Insert/parallel keywords to exclude when user hasn't specified a variation
+// These are expensive variants that should not match base card searches
+const PREMIUM_VARIATION_KEYWORDS = [
+  "downtown", "kaboom", "disco", "gold", "silver", "prizm", "refractor",
+  "auto", "autograph", "signature", "patch", "relic", "jersey", "mem",
+  "numbered", "/10", "/25", "/50", "/75", "/99", "/100", "/149", "/199", "/250",
+  "ssp", "sp ", "case hit", "1/1", "one of one", "superfractor",
+  "mosaic", "optic holo", "ice", "wave", "shock", "velocity", "neon",
+  "cosmic", "no huddle", "downtown!", "genesis", "color blast",
+  "lazer", "laser", "blue", "red", "green", "orange", "purple", "pink",
+  "cracked ice", "fast break", "my house", "fireworks", "stained glass",
+  "black finite", "gold finite", "color", "parallel", "insert", "ssp", "rookie kings"
+];
+
+// Baseline price ranges for common base cards when no comps found
+// Format: { sport: { modern: { set_type: { graded_10: range, graded_9: range, raw: range } } } }
+const BASE_CARD_PRICE_BASELINES: Record<string, Record<string, { psa10: [number, number]; psa9: [number, number]; raw: [number, number] }>> = {
+  football: {
+    donruss: { psa10: [15, 40], psa9: [8, 20], raw: [2, 8] },
+    prizm: { psa10: [25, 60], psa9: [12, 30], raw: [5, 15] },
+    topps: { psa10: [20, 50], psa9: [10, 25], raw: [3, 10] },
+    select: { psa10: [20, 45], psa9: [10, 22], raw: [4, 12] },
+    mosaic: { psa10: [18, 40], psa9: [9, 20], raw: [3, 10] },
+    chronicles: { psa10: [12, 30], psa9: [6, 15], raw: [2, 6] },
+    optic: { psa10: [20, 50], psa9: [10, 25], raw: [4, 12] },
+  },
+  basketball: {
+    prizm: { psa10: [30, 80], psa9: [15, 40], raw: [8, 20] },
+    donruss: { psa10: [12, 35], psa9: [6, 18], raw: [2, 8] },
+    topps: { psa10: [25, 60], psa9: [12, 30], raw: [5, 15] },
+    select: { psa10: [25, 55], psa9: [12, 28], raw: [5, 15] },
+    mosaic: { psa10: [20, 50], psa9: [10, 25], raw: [4, 12] },
+    optic: { psa10: [25, 60], psa9: [12, 30], raw: [5, 15] },
+    hoops: { psa10: [10, 25], psa9: [5, 12], raw: [1, 5] },
+  },
+  baseball: {
+    topps: { psa10: [15, 40], psa9: [8, 20], raw: [2, 8] },
+    bowman: { psa10: [20, 50], psa9: [10, 25], raw: [4, 12] },
+    donruss: { psa10: [10, 30], psa9: [5, 15], raw: [2, 6] },
+    prizm: { psa10: [20, 50], psa9: [10, 25], raw: [4, 12] },
+  },
+};
+
+// Check if a result contains premium variation keywords
+function containsPremiumVariation(text: string): boolean {
+  const lower = text.toLowerCase();
+  return PREMIUM_VARIATION_KEYWORDS.some(keyword => lower.includes(keyword));
+}
+
+// Get baseline price range for a base card
+function getBaselinePrice(card: CardInfo): { low: number; high: number; mid: number } | null {
+  // Only use baseline for cards without specified variation
+  if (card.variation) return null;
+  
+  // Determine sport from set or title
+  let sport = "football"; // default
+  const setLower = (card.set || "").toLowerCase();
+  const titleLower = card.title.toLowerCase();
+  
+  if (setLower.includes("hoops") || titleLower.includes("nba") || titleLower.includes("basketball")) {
+    sport = "basketball";
+  } else if (setLower.includes("topps") && !setLower.includes("football") && !setLower.includes("chrome")) {
+    sport = "baseball";
+  } else if (setLower.includes("bowman")) {
+    sport = "baseball";
+  }
+  
+  const sportBaselines = BASE_CARD_PRICE_BASELINES[sport];
+  if (!sportBaselines) return null;
+  
+  // Find matching set
+  let setKey: string | null = null;
+  for (const key of Object.keys(sportBaselines)) {
+    if (setLower.includes(key)) {
+      setKey = key;
+      break;
+    }
+  }
+  
+  if (!setKey) {
+    // Default to donruss-like pricing
+    setKey = "donruss";
+  }
+  
+  const setBaseline = sportBaselines[setKey];
+  if (!setBaseline) return null;
+  
+  // Determine grade tier
+  const grade = (card.grade || "").toLowerCase();
+  let priceRange: [number, number];
+  
+  if (grade.includes("10")) {
+    priceRange = setBaseline.psa10;
+  } else if (grade.includes("9")) {
+    priceRange = setBaseline.psa9;
+  } else {
+    priceRange = setBaseline.raw;
+  }
+  
+  return {
+    low: priceRange[0],
+    high: priceRange[1],
+    mid: Math.round((priceRange[0] + priceRange[1]) / 2),
+  };
+}
+
 // Extract card number from title (e.g., "#10", "#304")
 function extractCardNumber(text: string): string | null {
   const match = text.match(/#(\d+)/);
@@ -671,24 +777,27 @@ function buildSearchQueries(card: CardInfo): string[] {
   const queries: string[] = [];
   const cleanTitle = cleanCardTitle(card.title);
   
-  // Primary query: player name + set + year + variation + grade + "value" or "price" for pricing info
-  // Variation is important for parallel cards like Refractor, Prizm, Auto, /25, etc.
+  // IMPORTANT: When no variation is specified, add "base" to filter out expensive inserts
+  // This prevents Downtown ($400) from matching when user wants base Donruss ($25)
+  const variationOrBase = card.variation || "base";
+  
+  // Primary query: player name + set + year + variation/base + grade + "value" or "price" for pricing info
   const primaryParts: string[] = [];
   if (cleanTitle) primaryParts.push(cleanTitle);
   if (card.set) primaryParts.push(card.set);
   if (card.year) primaryParts.push(String(card.year));
-  if (card.variation) primaryParts.push(card.variation);
+  primaryParts.push(variationOrBase);
   if (card.grade) primaryParts.push(card.grade);
   queries.push(primaryParts.join(" ") + " value price");
   
-  // Secondary query: search PSA auction prices specifically (include variation)
-  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${card.variation || ""} ${card.grade || ""} auction price sold`);
+  // Secondary query: search PSA auction prices specifically (include variation/base)
+  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${variationOrBase} ${card.grade || ""} auction price sold`);
   
-  // Tertiary query: player name + year + variation + grade + "rookie card value"
-  queries.push(`${cleanTitle} ${card.year || ""} ${card.variation || ""} ${card.grade || ""} rookie card value`);
+  // Tertiary query: player name + year + variation/base + grade + "rookie card value"
+  queries.push(`${cleanTitle} ${card.year || ""} ${variationOrBase} ${card.grade || ""} rookie card value`);
   
-  // Fourth query: simpler version targeting price guides (include variation)
-  queries.push(`${cleanTitle} ${card.set || ""} ${card.variation || ""} ${card.grade || ""} price guide`);
+  // Fourth query: simpler version targeting price guides (include variation/base)
+  queries.push(`${cleanTitle} ${card.set || ""} ${variationOrBase} ${card.grade || ""} price guide`);
   
   return queries;
 }
@@ -873,11 +982,34 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
     return null;
   }
 
-  const rawResults = relevantResults.slice(0, 12).map((r: any) => ({
+  let rawResults = relevantResults.slice(0, 12).map((r: any) => ({
     title: r.title || "",
     snippet: r.snippet || "",
     link: r.link || "",
   }));
+
+  // CRITICAL: When no variation specified, exclude premium variations from search results
+  // This prevents Downtown/Refractor/Auto results from contaminating base card pricing
+  if (!card.variation) {
+    const beforeFilter = rawResults.length;
+    rawResults = rawResults.filter((r: any) => {
+      const combinedText = `${r.title} ${r.snippet}`.toLowerCase();
+      const isPremium = containsPremiumVariation(combinedText);
+      if (isPremium) {
+        console.log(`[SEARCH FILTER] Excluded premium result: "${r.title.substring(0, 60)}..."`);
+      }
+      return !isPremium;
+    });
+    if (beforeFilter > rawResults.length) {
+      console.log(`[SEARCH FILTER] Removed ${beforeFilter - rawResults.length} premium variation results, ${rawResults.length} remain`);
+    }
+    
+    // If all results were premium, return null - let baseline fallback handle it
+    if (rawResults.length === 0) {
+      console.log(`[SEARCH FILTER] All results were premium variations - deferring to baseline fallback`);
+      return null;
+    }
+  }
 
   // Filter to STRICT comps only for GPT price extraction
   const { strict: strictResults, loose: looseResults } = filterToStrictComps(rawResults, card);
@@ -1254,13 +1386,58 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
     
     // CRITICAL: Prioritize strict comps across ALL queries
     // Only fall back to loose if NO strict comps found from ANY query
-    const allPricePoints = strictPricePoints.length > 0 ? strictPricePoints : loosePricePoints;
+    let allPricePoints = strictPricePoints.length > 0 ? strictPricePoints : loosePricePoints;
     const usingLooseFallback = strictPricePoints.length === 0 && loosePricePoints.length > 0;
     
     if (usingLooseFallback) {
       console.log(`[Enhanced] WARNING: No strict comps found, using ${loosePricePoints.length} loose comps`);
     } else if (strictPricePoints.length > 0) {
       console.log(`[Enhanced] Using ${strictPricePoints.length} strict comps (ignored ${loosePricePoints.length} loose)`);
+    }
+
+    // CRITICAL: When no variation is specified, filter out premium variations
+    // This prevents Downtown ($400) from contaminating base card ($25) estimates
+    if (!card.variation) {
+      const beforeFilter = allPricePoints.length;
+      allPricePoints = allPricePoints.filter(pp => {
+        const sourceText = pp.source.toLowerCase();
+        const isPremium = containsPremiumVariation(sourceText);
+        if (isPremium) {
+          console.log(`[BASE CARD FILTER] Excluded premium variation: "${pp.source}" - $${pp.price}`);
+        }
+        return !isPremium;
+      });
+      if (beforeFilter > allPricePoints.length) {
+        console.log(`[BASE CARD FILTER] Filtered ${beforeFilter - allPricePoints.length} premium variation comps, ${allPricePoints.length} remain`);
+      }
+    }
+
+    // BASELINE FALLBACK: When no valid comps found for base cards, use baseline range
+    if (allPricePoints.length === 0 && !card.variation) {
+      const baseline = getBaselinePrice(card);
+      if (baseline) {
+        console.log(`[BASELINE] No comps found, using baseline estimate: $${baseline.low}-$${baseline.high} (mid: $${baseline.mid})`);
+        return {
+          estimatedValue: baseline.mid,
+          pricePoints: [{
+            date: new Date().toISOString().split('T')[0],
+            price: baseline.mid,
+            source: `Baseline estimate for ${card.set || 'base'} cards ($${baseline.low}-$${baseline.high} range)`,
+          }],
+          salesFound: 0,
+          confidence: "low",
+          confidenceReason: `Baseline estimate used (no recent comps found). Typical range: $${baseline.low}-$${baseline.high}`,
+          rawSearchResults: allRawResults.slice(0, 15),
+          matchConfidence: {
+            tier: "LOW" as const,
+            score: 0.3,
+            reason: "Baseline estimate - no live comps",
+            matchedComps: 0,
+            totalComps: 0,
+            samples: [],
+          },
+        };
+      }
     }
 
     // Apply IQR-based extreme outlier filter
