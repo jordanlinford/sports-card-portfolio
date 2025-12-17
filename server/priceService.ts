@@ -1287,8 +1287,9 @@ Return JSON with pricePoints array (all prices found), estimatedValue, salesFoun
       const parsed = JSON.parse(jsonMatch[0]);
       const cardGrader = card.grader?.toLowerCase() || parseGradeInfo(card.grade).grader;
       // Premium variation keywords that indicate higher-value parallels
+      // NOTE: "pristine" removed - handled by isBGSPremium() to avoid false positives on "pristineauction.com"
       const PREMIUM_KEYWORDS = [
-        "pristine", "black label", "gem mint", "gold label",
+        "black label", "gold label",
         "silver", "gold", "hyper", "shimmer", "wave", "camo", 
         "kaboom", "downtown", "case hit", "ssp", "sp ",
         "refractor", "prizm", "auto", "autograph", "numbered", "/10", "/25", "/50", "/99",
