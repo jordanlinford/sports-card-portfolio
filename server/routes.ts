@@ -1771,6 +1771,7 @@ Allow: /
       // Import the outlook engine dynamically
       const { computeAllSignals, generateOutlookExplanation } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
+      const { calculateValuation } = await import("./valuationService");
 
       // Fetch enhanced price data
       console.log(`[Quick Analyze] Fetching price data for: ${title}`);
@@ -1853,6 +1854,55 @@ Allow: /
         ebayCompsStatus = "failed";
       }
 
+      // Generate modeled estimate as fallback when no eBay comps
+      let modeledEstimate: {
+        low: number;
+        mid: number;
+        high: number;
+        methodology: string;
+        referenceComps: Array<{ cardType: string; estimatedValue: number; liquidity: string }>;
+      } | null = null;
+
+      const noLiveData = !priceData.estimatedValue || priceData.salesFound === 0;
+      if (noLiveData) {
+        // Try to generate a heuristic-based estimate
+        // Infer sport from title/set if possible
+        const titleLower = title.toLowerCase();
+        const setLower = (set || '').toLowerCase();
+        let inferredSport = 'football'; // default
+        if (setLower.includes('basketball') || setLower.includes('prizm draft') || setLower.includes('hoops')) {
+          inferredSport = 'basketball';
+        } else if (setLower.includes('topps') && !setLower.includes('football')) {
+          inferredSport = 'baseball';
+        }
+        
+        // Determine if this is a rookie card from the year
+        const cardYear = year ? parseInt(year) : new Date().getFullYear();
+        const currentYear = new Date().getFullYear();
+        const yearsActive = currentYear - cardYear;
+        
+        // Build a classification for the valuation service
+        const classification = {
+          position: undefined as string | undefined,
+          team: undefined as string | undefined,
+          stage: yearsActive <= 1 ? 'ROOKIE' as const : yearsActive <= 3 ? 'YEAR_2' as const : 'PRIME' as const,
+          baseTemperature: 'NEUTRAL' as const,
+          baseVolatility: 'MEDIUM' as const,
+          baseRisk: 'MEDIUM' as const,
+          baseHorizon: 'MID' as const,
+        };
+        
+        const valuation = calculateValuation(inferredSport, classification);
+        modeledEstimate = {
+          low: valuation.estimatedRange.low,
+          mid: valuation.estimatedRange.mid,
+          high: valuation.estimatedRange.high,
+          methodology: valuation.methodology,
+          referenceComps: valuation.referenceComps,
+        };
+        console.log(`[Quick Analyze] Using modeled estimate: $${modeledEstimate.low}-$${modeledEstimate.high}`);
+      }
+
       // Compute signals
       console.log(`[Quick Analyze] Computing signals`);
       const signals = computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
@@ -1893,6 +1943,15 @@ Allow: /
           max: filteredPriceData.max,
           compCount: priceData.salesFound,
           pricePoints: isPro ? priceData.pricePoints : null,
+          // Modeled estimate fallback when no live data
+          modeledEstimate: modeledEstimate ? {
+            low: modeledEstimate.low,
+            mid: modeledEstimate.mid,
+            high: modeledEstimate.high,
+            methodology: modeledEstimate.methodology,
+            referenceComps: modeledEstimate.referenceComps,
+            source: "MODEL" as const,
+          } : null,
         },
         signals: isPro ? {
           trend: signals.trendScore,

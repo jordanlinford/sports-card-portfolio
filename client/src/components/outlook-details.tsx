@@ -55,6 +55,14 @@ export type OutlookDisplayData = {
       source: string;
       url?: string;
     }>;
+    modeledEstimate?: {
+      low: number;
+      mid: number;
+      high: number;
+      methodology: string;
+      referenceComps: Array<{ cardType: string; estimatedValue: number; liquidity: string }>;
+      source: "MODEL";
+    } | null;
   };
   signals: {
     trend?: number;
@@ -273,17 +281,40 @@ export function OutlookDetails({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-3xl font-bold" data-testid="text-market-value">
-                {formatCurrency(data.market?.value)}
-              </div>
-              {data.market?.min != null && data.market?.max != null && (
-                <div className="text-sm text-muted-foreground">
-                  Range: {formatCurrency(data.market.min)} - {formatCurrency(data.market.max)}
-                </div>
-              )}
-              {data.market?.compCount != null && (
-                <div className="text-sm text-muted-foreground">
-                  Based on {data.market.compCount} comp{data.market.compCount !== 1 ? 's' : ''}
+              {data.market?.value != null ? (
+                <>
+                  <div className="text-3xl font-bold" data-testid="text-market-value">
+                    {formatCurrency(data.market.value)}
+                  </div>
+                  {data.market?.min != null && data.market?.max != null && (
+                    <div className="text-sm text-muted-foreground">
+                      Range: {formatCurrency(data.market.min)} - {formatCurrency(data.market.max)}
+                    </div>
+                  )}
+                  {data.market?.compCount != null && data.market.compCount > 0 && (
+                    <div className="text-sm text-muted-foreground">
+                      Based on {data.market.compCount} comp{data.market.compCount !== 1 ? 's' : ''}
+                    </div>
+                  )}
+                </>
+              ) : data.market?.modeledEstimate ? (
+                <>
+                  <div className="flex items-center justify-end gap-2 mb-1">
+                    <Badge variant="secondary" className="text-xs">Modeled</Badge>
+                  </div>
+                  <div className="text-2xl font-bold text-muted-foreground" data-testid="text-market-value">
+                    ${data.market.modeledEstimate.low} - ${data.market.modeledEstimate.high}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Mid: ${data.market.modeledEstimate.mid}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    No live comps found
+                  </div>
+                </>
+              ) : (
+                <div className="text-3xl font-bold text-muted-foreground" data-testid="text-market-value">
+                  N/A
                 </div>
               )}
             </div>

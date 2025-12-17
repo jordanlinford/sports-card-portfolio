@@ -207,7 +207,20 @@ type CompsData = {
 
 type QuickAnalyzeResult = {
   tempCard: { title: string; year?: string; set?: string; variation?: string; grade?: string; grader?: string; imagePath?: string };
-  market: { value: number | null; min: number | null; max: number | null; compCount: number };
+  market: { 
+    value: number | null; 
+    min: number | null; 
+    max: number | null; 
+    compCount: number;
+    modeledEstimate?: {
+      low: number;
+      mid: number;
+      high: number;
+      methodology: string;
+      referenceComps: Array<{ cardType: string; estimatedValue: number; liquidity: string }>;
+      source: "MODEL";
+    } | null;
+  };
   signals: { upside: number; downsideRisk: number; marketFriction: number };
   action: string;
   actionReasons: string[] | null;
@@ -791,6 +804,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       min: result.market.min,
                       max: result.market.max,
                       compCount: result.matchConfidence?.totalComps ?? result.comps?.soldCount ?? result.market.compCount,
+                      modeledEstimate: result.market.modeledEstimate,
                     },
                     signals: result.signals,
                     action: result.action,
