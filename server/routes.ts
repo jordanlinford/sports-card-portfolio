@@ -1179,7 +1179,7 @@ Allow: /
 
       // Return cached outlook if available
       if (card.outlookAction && card.outlookGeneratedAt) {
-        // Derive new metrics from legacy riskScore for backward compatibility
+        // Use the stored riskScore directly for backward compatibility
         const legacyRisk = card.outlookRiskScore || 50;
         return res.json({
           cardId: card.id,
@@ -1188,6 +1188,7 @@ Allow: /
           position: card.position,
           action: card.outlookAction,
           upsideScore: card.outlookUpsideScore,
+          riskScore: legacyRisk, // Frontend expects riskScore
           downsideRisk: Math.round(legacyRisk * 0.6),
           marketFriction: Math.round(legacyRisk * 0.4),
           confidenceScore: card.outlookConfidenceScore,
@@ -1210,6 +1211,7 @@ Allow: /
         position: card.position,
         action: quickOutlook.action,
         upsideScore: quickOutlook.upsideScore,
+        riskScore: quickOutlook.riskScore, // Frontend expects riskScore
         downsideRisk: Math.round(quickOutlook.riskScore * 0.6),
         marketFriction: Math.round(quickOutlook.riskScore * 0.4),
         confidenceScore: quickOutlook.confidenceScore,

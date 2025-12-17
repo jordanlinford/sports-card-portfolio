@@ -272,8 +272,7 @@ export default function CardOutlookPage() {
 
   const addToCaseMutation = useMutation({
     mutationFn: async ({ caseId, cardData }: { caseId: number; cardData: any }) => {
-      const res = await apiRequest("POST", `/api/display-cases/${caseId}/cards`, cardData);
-      return res.json();
+      return await apiRequest("POST", `/api/display-cases/${caseId}/cards`, cardData);
     },
     onSuccess: () => {
       setShowAddToCaseModal(false);
@@ -314,12 +313,7 @@ export default function CardOutlookPage() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/cards/${cardId}/outlook-v2`);
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to generate outlook");
-      }
-      return res.json();
+      return await apiRequest("POST", `/api/cards/${cardId}/outlook-v2`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cards", cardId, "outlook-v2"] });
