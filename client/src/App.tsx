@@ -29,6 +29,7 @@ import OffersPage from "@/pages/offers";
 import MessagesPage from "@/pages/messages";
 import SettingsPage from "@/pages/settings";
 import OnboardingPage from "@/pages/onboarding";
+import CardOutlookPage from "@/pages/card-outlook";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -65,8 +66,10 @@ function Router() {
           <Route path="/case/:id" component={CaseView} />
           <Route path="/cases/:id" component={CaseView} />
           <Route path="/admin" component={AdminDashboard} />
+          <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
         </>
       )}
+      <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
       <Route component={NotFound} />
     </Switch>
   );
