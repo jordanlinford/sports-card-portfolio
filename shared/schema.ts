@@ -966,6 +966,16 @@ export const PLAYER_VERDICT = {
 } as const;
 export type PlayerVerdict = keyof typeof PLAYER_VERDICT;
 
+// Verdict Modifier - Adds nuance to the verdict
+export const VERDICT_MODIFIER = {
+  SPECULATIVE: "Speculative",   // High upside, high downside
+  MOMENTUM: "Momentum",         // Riding hype / short-term upside
+  VALUE: "Value",               // Mispriced / buy-the-dip
+  LONG_TERM: "Long-Term",       // Slower burn, fundamentals-driven
+  LATE_CYCLE: "Late Cycle",     // Risky entry even if still hot
+} as const;
+export type VerdictModifier = typeof VERDICT_MODIFIER[keyof typeof VERDICT_MODIFIER];
+
 // Stock Tier - Card exposure type
 export const STOCK_TIER = {
   PREMIUM: "PREMIUM",         // Blue chip: autos, low serial, case hits
@@ -1016,6 +1026,7 @@ export type PlayerInfo = {
 // Investment Verdict with explanation
 export type PlayerVerdictResult = {
   action: PlayerVerdict;
+  modifier: VerdictModifier; // Speculative, Momentum, Value, Long-Term, Late Cycle
   summary: string; // 2-4 sentence explanation
   whatMustBeTrue?: string[]; // Simple checklist for the thesis to work
 };
@@ -1028,6 +1039,7 @@ export type ExposureRecommendation = {
   liquidity: LiquidityLevel;
   riskNote: string;
   buyerProfile: BuyerProfile;
+  timingGuidance?: string; // When to buy guidance
 };
 
 // Evidence Panel - Supporting data (collapsed by default)
@@ -1048,6 +1060,7 @@ export type PlayerOutlookResponse = {
   player: PlayerInfo;
   snapshot: PlayerSnapshot;
   thesis: string[]; // 3-6 bullet points
+  marketRealityCheck: string[]; // 2-3 uncomfortable truths that build credibility
   verdict: PlayerVerdictResult;
   exposures: ExposureRecommendation[];
   evidence: EvidenceData;

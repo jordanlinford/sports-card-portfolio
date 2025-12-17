@@ -14,7 +14,9 @@ import type {
   MarketTemperature,
   PlayerVerdict,
   DataConfidence,
+  VerdictModifier,
 } from "@shared/schema";
+import { VERDICT_MODIFIER } from "@shared/schema";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
@@ -172,10 +174,11 @@ async function generatePlayerOutlookAI(
 ): Promise<{
   playerInfo: PlayerInfo;
   thesis: string[];
+  marketRealityCheck: string[];
   verdict: PlayerVerdictResult;
   confidence: DataConfidence;
 }> {
-  const prompt = `You are a sports card market analyst. Analyze the investment outlook for ${playerName} in ${sport}.
+  const prompt = `You are a seasoned sports card market analyst known for honest, grounded assessments. Analyze the investment outlook for ${playerName} in ${sport}.
 
 PLAYER CLASSIFICATION (from our rules engine):
 - Career Stage: ${classification.stage}
@@ -201,11 +204,16 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
     "<bullet 2: performance or role factor>",
     "<bullet 3: market behavior observation>",
     "<bullet 4: key risk or what could change>",
-    "<bullet 5 optional: secondary factor>",
-    "<bullet 6 optional: additional context>"
+    "<bullet 5 optional: secondary factor>"
+  ],
+  "marketRealityCheck": [
+    "<uncomfortable truth 1: honest skeptical observation that builds trust>",
+    "<uncomfortable truth 2: historical cautionary note or what could go wrong>",
+    "<uncomfortable truth 3 optional: current market pricing vs reality>"
   ],
   "verdict": {
     "action": "<BUY or WATCH or AVOID>",
+    "modifier": "<Speculative or Momentum or Value or Long-Term or Late Cycle>",
     "summary": "<2-4 sentence plain language summary of why>",
     "whatMustBeTrue": [
       "<condition 1 for thesis to work>",
@@ -216,6 +224,26 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
   "confidence": "<HIGH or MEDIUM or LOW based on how certain you are>"
 }
 
+TONE RULES (CRITICAL - follow these exactly):
+- AVOID hype language: never use "elite", "can't miss", "skyrocketing", "must own"
+- PREFER grounded phrasing: "short leash", "fragile demand", "projection-heavy", "limited proof"
+- NO percentages or fake precision (no "80% likely" or "3x upside")
+- USE conditional language: "If X happens, Y follows", "This works only if...", "Market currently prices in..."
+- BE SPECIFIC: reference team context, position premium, historical patterns for this sport/position
+
+MARKET REALITY CHECK MUST:
+- Include at least ONE uncomfortable truth that acknowledges skeptical viewpoints
+- Reference historical patterns where similar players disappointed collectors
+- Acknowledge when current pricing is based on projection vs proven performance
+- Build trust by showing you see both sides, not just the bullish case
+
+MODIFIER SELECTION:
+- "Speculative": High upside, high downside, projection-driven (rookies, unproven talent)
+- "Momentum": Riding current hype, short-term window (hot streaks, trending players)
+- "Value": Mispriced or dip opportunity (post-injury recovery, narrative fatigue)
+- "Long-Term": Slow burn, fundamentals-driven (proven stars, HOF trajectory)
+- "Late Cycle": Risky entry even if still hot (prices reflect best-case, limited upside)
+
 RULES:
 - Be opinionated but transparent about uncertainty
 - Do NOT hallucinate stats or percentages
@@ -223,7 +251,7 @@ RULES:
 - Use the stock metaphor (player = stock, cards = exposure)
 - Keep bullets SHORT and punchy (max 15 words each)
 - If you don't know something, say "Unknown" or mark inferred: true
-- 3-6 thesis bullets, 2-3 whatMustBeTrue conditions`;
+- 3-5 thesis bullets, 2-3 marketRealityCheck bullets, 2-3 whatMustBeTrue conditions`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -246,6 +274,14 @@ RULES:
     
     const parsed = JSON.parse(jsonMatch[0]);
     
+    // Validate and normalize modifier
+    const validModifiers = Object.values(VERDICT_MODIFIER);
+    const rawModifier = parsed.verdict?.modifier || "Speculative";
+    const normalizedModifier = validModifiers.find(m => 
+      m.toLowerCase() === rawModifier.toLowerCase() || 
+      m.toLowerCase().replace("-", " ") === rawModifier.toLowerCase().replace("-", " ")
+    ) || VERDICT_MODIFIER.SPECULATIVE;
+    
     return {
       playerInfo: {
         name: playerName,
@@ -261,10 +297,15 @@ RULES:
         "Performance signals are unclear",
         "Proceed with caution and verify independently",
       ],
+      marketRealityCheck: parsed.marketRealityCheck || [
+        "Limited historical data makes pattern matching difficult",
+        "Collector sentiment can shift quickly without warning",
+      ],
       verdict: {
         action: (["BUY", "WATCH", "AVOID"].includes(parsed.verdict?.action) 
           ? parsed.verdict.action 
           : "WATCH") as PlayerVerdict,
+        modifier: normalizedModifier as VerdictModifier,
         summary: parsed.verdict?.summary || "Insufficient data to make a confident recommendation. Monitor for more signals.",
         whatMustBeTrue: parsed.verdict?.whatMustBeTrue || ["More data needed"],
       },
@@ -291,8 +332,13 @@ RULES:
         "Check back later for updated outlook",
         "Consider researching this player independently",
       ],
+      marketRealityCheck: [
+        "Analysis system temporarily unavailable",
+        "Verify any investment decisions with independent research",
+      ],
       verdict: {
         action: "WATCH",
+        modifier: VERDICT_MODIFIER.SPECULATIVE as VerdictModifier,
         summary: "Analysis temporarily unavailable. Defaulting to WATCH recommendation.",
         whatMustBeTrue: ["Analysis system needs to be available"],
       },
@@ -357,7 +403,7 @@ async function generateFreshOutlook(
   const classification = classifyPlayer(classificationInput);
   
   // Step 3: Generate AI narrative
-  const { playerInfo, thesis, verdict, confidence } = await generatePlayerOutlookAI(
+  const { playerInfo, thesis, marketRealityCheck, verdict, confidence } = await generatePlayerOutlookAI(
     playerName,
     sport,
     classification,
@@ -394,6 +440,7 @@ async function generateFreshOutlook(
     player: playerInfo,
     snapshot,
     thesis,
+    marketRealityCheck,
     verdict,
     exposures,
     evidence,

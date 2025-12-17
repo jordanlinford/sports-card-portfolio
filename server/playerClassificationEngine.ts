@@ -457,6 +457,11 @@ export function getExposureRecommendations(
         ? "Injury or decline could impact values." 
         : "Established value, lower risk profile.",
       buyerProfile: "INVESTOR",
+      timingGuidance: stage === "ROOKIE"
+        ? "Wait for dips after quiet games. Avoid buying immediately after breakout moments."
+        : stage === "RETIRED_HOF"
+        ? "Accumulate gradually. Premiums hold value but spike sharply around HOF announcements."
+        : "Best bought during offseason dips or after losses. Avoid chasing breakout game spikes.",
     });
   }
   
@@ -479,6 +484,11 @@ export function getExposureRecommendations(
         ? "Young player volatility. Watch performance closely."
         : "Market can shift on injury news or role changes.",
       buyerProfile: stage === "ROOKIE" ? "FLIPPER" : "INVESTOR",
+      timingGuidance: stage === "ROOKIE"
+        ? "Best during preseason dips or after quiet games. Avoid buying post-breakout."
+        : stage === "YEAR_2"
+        ? "Buy before expected breakout moments. Sell into hype if momentum stalls."
+        : "Accumulate on red days. These have strong floors if fundamentals hold.",
     });
   }
   
@@ -491,6 +501,7 @@ export function getExposureRecommendations(
       liquidity: "HIGH",
       riskNote: "Standard market risk. Easy to exit if needed.",
       buyerProfile: "COLLECTOR",
+      timingGuidance: "Safe to buy anytime demand is stable. Ideal for dollar-cost averaging.",
     });
   }
   
@@ -505,6 +516,7 @@ export function getExposureRecommendations(
       liquidity: "HIGH",
       riskNote: "Limited upside but minimal capital at risk.",
       buyerProfile: "BUDGET",
+      timingGuidance: "No rush. Wait for bulk deals or lot purchases to maximize value.",
     });
   }
   
@@ -525,6 +537,9 @@ export function getExposureRecommendations(
       liquidity: "LOW",
       riskNote: "Difficult to sell. Only allocate what you can lose.",
       buyerProfile: "FLIPPER",
+      timingGuidance: stage === "PROSPECT"
+        ? "Buy before draft. Sell immediately into post-draft hype unless you're truly long."
+        : "Only enter on dips. Exit quickly into any momentum spikes.",
     });
   }
   
