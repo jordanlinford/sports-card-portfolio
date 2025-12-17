@@ -124,6 +124,12 @@ function getEffectiveGrade(gradeNum: number | null, hasQualifier: boolean): numb
   return gradeNum;
 }
 
+// Check if card is vintage (pre-2000) - grader matching must be strict for vintage
+function isVintageCard(card: CardInfo): boolean {
+  if (!card.year) return false; // If no year, assume modern (less strict)
+  return card.year < 2000;
+}
+
 // Check if listing is a STRICT comp (exact match, eligible to define value)
 function isStrictComp(
   listingTitle: string,
@@ -155,12 +161,21 @@ function isStrictComp(
     return { isStrict: false, excludeReason: `Has qualifier: ${listingGrade.qualifiers.join(", ")}` };
   }
   
-  // HARD GATE 3: Grader must match for strict comp (PSA card needs PSA comps)
-  // Use explicit grader field if available, otherwise extract from grade string
+  // HARD GATE 3: Grader must match for strict comp
+  // VINTAGE (pre-2000): ALWAYS require exact grader match - PSA 9 vs PSA 10 can be thousands different
+  // MODERN (2000+): Allow grader mismatch as loose comp (less price variance between graders)
   const cardGrade = parseGradeInfo(card.grade);
   const effectiveCardGrader = card.grader?.toLowerCase() || cardGrade.grader;
+  const isVintage = isVintageCard(card);
+  
   if (effectiveCardGrader && listingGrade.grader && effectiveCardGrader !== listingGrade.grader) {
-    return { isStrict: false, excludeReason: `Grader mismatch: ${effectiveCardGrader.toUpperCase()} vs ${listingGrade.grader.toUpperCase()}` };
+    if (isVintage) {
+      // Vintage: strict grader match required - reject as non-comp entirely
+      return { isStrict: false, excludeReason: `Vintage card grader mismatch: ${effectiveCardGrader.toUpperCase()} vs ${listingGrade.grader.toUpperCase()}` };
+    } else {
+      // Modern: allow as loose comp
+      return { isStrict: false, excludeReason: `Grader mismatch (modern): ${effectiveCardGrader.toUpperCase()} vs ${listingGrade.grader.toUpperCase()}` };
+    }
   }
   
   // HARD GATE 4: Variation/parallel mismatch - base cards should not match parallels
@@ -1055,6 +1070,41 @@ Return JSON with pricePoints array, estimatedValue, salesFound, confidence, and 
   return null;
 }
 
+// Filter out price points that deviate more than 25% from the mean
+// This helps suppress outliers when using loose comps as fallback
+function filterMeanDeviationOutliers(
+  pricePoints: PricePoint[],
+  maxDeviationPercent: number = 25
+): { filtered: PricePoint[]; removed: PricePoint[]; mean: number | null } {
+  if (pricePoints.length < 2) {
+    return { filtered: pricePoints, removed: [], mean: pricePoints[0]?.price ?? null };
+  }
+  
+  const mean = pricePoints.reduce((sum, pp) => sum + pp.price, 0) / pricePoints.length;
+  const threshold = mean * (maxDeviationPercent / 100);
+  
+  const filtered: PricePoint[] = [];
+  const removed: PricePoint[] = [];
+  
+  for (const pp of pricePoints) {
+    const deviation = Math.abs(pp.price - mean);
+    if (deviation <= threshold) {
+      filtered.push(pp);
+    } else {
+      removed.push(pp);
+      console.log(`[OUTLIER FILTER] Excluded "$${pp.price}" from "${pp.source}" - ${((deviation / mean) * 100).toFixed(1)}% from mean ($${mean.toFixed(2)})`);
+    }
+  }
+  
+  // If we removed too many (>50%), fall back to original to avoid losing all data
+  if (filtered.length < pricePoints.length * 0.5 && filtered.length < 2) {
+    console.log(`[OUTLIER FILTER] Too aggressive - reverting to original ${pricePoints.length} comps`);
+    return { filtered: pricePoints, removed: [], mean };
+  }
+  
+  return { filtered, removed, mean };
+}
+
 export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedPriceLookupResult> {
   const queries = buildSearchQueries(card);
   const allPricePoints: PricePoint[] = [];
@@ -1091,11 +1141,18 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
 
-    // Calculate final values
-    const salesFound = allPricePoints.length;
-    const estimatedValue = salesFound > 0 
-      ? allPricePoints.reduce((sum, pp) => sum + pp.price, 0) / salesFound 
-      : null;
+    // Apply 25% mean deviation filter to suppress outliers
+    // This is especially important when using loose comps as fallback
+    const { filtered: filteredPricePoints, removed: removedOutliers, mean } = 
+      filterMeanDeviationOutliers(allPricePoints, 25);
+    
+    if (removedOutliers.length > 0) {
+      console.log(`[OUTLIER FILTER] Removed ${removedOutliers.length} of ${allPricePoints.length} comps (>25% from mean)`);
+    }
+
+    // Calculate final values using filtered price points
+    const salesFound = filteredPricePoints.length;
+    const estimatedValue = mean; // Use mean from filter (calculated before filtering)
     
     // Compute card match confidence from raw search results
     const matchConfidence = computeCardMatchConfidence(allRawResults, card);
@@ -1118,6 +1175,11 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       confidenceReason = "No sold listings found";
     }
     
+    // Note if outliers were removed
+    if (removedOutliers.length > 0) {
+      confidenceReason = `${confidenceReason} (${removedOutliers.length} outliers filtered)`;
+    }
+    
     // Downgrade market confidence if match confidence is LOW
     if (matchConfidence.tier === "LOW" && confidence !== "low") {
       confidence = matchConfidence.tier === "LOW" && confidence === "high" ? "medium" : "low";
@@ -1126,7 +1188,7 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
 
     return {
       estimatedValue,
-      pricePoints: allPricePoints.slice(0, 20), // Cap at 20
+      pricePoints: filteredPricePoints.slice(0, 20), // Cap at 20
       salesFound,
       confidence,
       confidenceReason,
