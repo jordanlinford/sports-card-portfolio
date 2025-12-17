@@ -29,6 +29,7 @@ export function getSession() {
     ttl: sessionTtl,
     tableName: "sessions",
   });
+  const isProduction = process.env.NODE_ENV === "production";
   return session({
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
@@ -36,7 +37,8 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: true, // Always true for Replit (uses HTTPS)
+      sameSite: "none" as const, // Required for cross-origin auth flows
       maxAge: sessionTtl,
     },
   });
