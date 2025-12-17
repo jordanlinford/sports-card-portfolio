@@ -39,6 +39,7 @@ import {
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { OutlookDetails, type OutlookDisplayData } from "@/components/outlook-details";
 
 type CaseWithCards = DisplayCase & { cards: CardType[] };
 type UsageInfo = { used: number; limit: number | null; remaining: number | null; isPro: boolean };
@@ -421,235 +422,113 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
               </div>
             </>
           ) : (
-            <div className="space-y-4">
-              <div className="flex gap-4">
-                {previewUrl && (
-                  <div className="flex-shrink-0 w-24 h-32 rounded-lg overflow-hidden border bg-muted/30">
-                    <img src={previewUrl} alt="Card" className="w-full h-full object-contain" />
+            <Dialog open={!!result} onOpenChange={(open) => !open && resetForm()}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader className="flex flex-row items-center justify-between gap-4 pb-4 border-b">
+                  <div>
+                    <DialogTitle className="text-xl">Quick Card Check Result</DialogTitle>
+                    <DialogDescription>
+                      Market analysis for {result.tempCard.title}
+                    </DialogDescription>
                   </div>
-                )}
-                <div className="flex-1">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div>
-                      <h3 className="font-semibold text-lg">{result.tempCard.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {result.tempCard.year} {result.tempCard.set} {result.tempCard.variation ? `- ${result.tempCard.variation}` : ""} {result.tempCard.grade ? `(${result.tempCard.grade})` : ""}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant="outline" className={`gap-1 ${getActionColor(result.action)}`}>
-                        {getActionIcon(result.action)}
-                        {getActionLabel(result.action)}
-                      </Badge>
-                      {result.bigMover.flag && (
-                        <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 gap-1">
-                          <Zap className="h-3 w-3" />
-                          Big Mover
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Est. Value</p>
-                  <p className="font-semibold" data-testid="text-quick-value">{formatCurrency(result.market.value)}</p>
-                </div>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Price Range</p>
-                  <p className="font-semibold text-sm">{formatCurrency(result.market.min)} - {formatCurrency(result.market.max)}</p>
-                  {result.action === "LEGACY_HOLD" && (
-                    <p className="text-xs text-muted-foreground mt-0.5">Range reflects eye appeal variance</p>
-                  )}
-                </div>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Upside Potential</p>
-                  <p className="font-semibold text-green-600 dark:text-green-400">
-                    {result.action === "LEGACY_HOLD" 
-                      ? "Limited (Long-Term)"
-                      : result.signals.upside <= 25 ? "Low" : result.signals.upside <= 50 ? "Medium" : result.signals.upside <= 75 ? "High" : "Very High"}
-                  </p>
-                </div>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Downside Risk</p>
-                  <p className={`font-semibold ${result.signals.downsideRisk <= 25 ? "text-green-600 dark:text-green-400" : result.signals.downsideRisk <= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
-                    {result.signals.downsideRisk <= 25 ? "Low" : result.signals.downsideRisk <= 50 ? "Medium" : result.signals.downsideRisk <= 75 ? "High" : "Very High"}
-                  </p>
-                </div>
-                <div className="p-3 bg-muted/50 rounded-lg">
-                  <p className="text-xs text-muted-foreground">Market Friction</p>
-                  <p className={`font-semibold ${result.signals.marketFriction <= 25 ? "text-green-600 dark:text-green-400" : result.signals.marketFriction <= 50 ? "text-yellow-600 dark:text-yellow-400" : "text-red-600 dark:text-red-400"}`}>
-                    {result.signals.marketFriction <= 25 ? "Low" : result.signals.marketFriction <= 50 ? "Medium" : result.signals.marketFriction <= 75 ? "High" : "Very High"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {result.action === "LEGACY_HOLD"
-                      ? (result.signals.marketFriction > 75 
-                          ? "Thin market—eye appeal drives big spreads." 
-                          : "Sells slowly—patient pricing works best.")
-                      : result.signals.marketFriction <= 25 
-                        ? "Easy to move—buyers are plentiful."
-                        : result.signals.marketFriction <= 50 
-                          ? "Usually sellable, but timing matters."
-                          : result.signals.marketFriction <= 75 
-                            ? "May take a while to sell at a fair price."
-                            : "Trades infrequently—expect wide spreads."}
-                  </p>
-                </div>
-              </div>
-
-              {result.explanation.short && (
-                <div className="p-4 bg-muted/30 rounded-lg">
-                  <p className="text-sm">{result.explanation.short}</p>
-                </div>
-              )}
-
-              {result.bigMover.reason && result.isPro && (
-                <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-4 w-4 text-purple-500" />
-                    <span className="font-medium text-sm">Big Mover Potential</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{result.bigMover.reason}</p>
-                </div>
-              )}
-
-              {result.matchConfidence && (
-                <div className={`p-4 rounded-lg border ${
-                  result.matchConfidence.tier === "HIGH" 
-                    ? "bg-green-500/5 border-green-500/20" 
-                    : result.matchConfidence.tier === "MEDIUM"
-                    ? "bg-yellow-500/5 border-yellow-500/20"
-                    : "bg-red-500/5 border-red-500/20"
-                }`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    {result.matchConfidence.tier === "HIGH" && <CheckCircle className="h-4 w-4 text-green-500" />}
-                    {result.matchConfidence.tier === "MEDIUM" && <AlertTriangle className="h-4 w-4 text-yellow-500" />}
-                    {result.matchConfidence.tier === "LOW" && <XCircle className="h-4 w-4 text-red-500" />}
-                    <span className="font-medium text-sm">Card Match Confidence</span>
-                    <Badge 
-                      variant={result.matchConfidence.tier === "HIGH" ? "default" : result.matchConfidence.tier === "MEDIUM" ? "secondary" : "destructive"}
-                      className="text-xs ml-1"
-                      data-testid="badge-match-confidence"
-                    >
-                      {result.matchConfidence.tier} ({Math.round(result.matchConfidence.score * 100)}%)
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{result.matchConfidence.reason}</p>
-                  {result.matchConfidence.tier === "LOW" && (
-                    <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2 font-medium">
-                      Pricing data may not accurately reflect this exact card.
-                    </p>
-                  )}
-                  
-                  {result.matchConfidence.samples && result.matchConfidence.samples.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-border/50">
-                      <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3" />
-                        Recent Comps ({result.matchConfidence.samples.length} shown)
-                      </p>
-                      <div className="space-y-2">
-                        {result.matchConfidence.samples.map((comp, idx) => (
-                          <div key={idx} className="flex items-center justify-between gap-2 text-sm bg-background/50 rounded-md p-2">
-                            <div className="flex-1 min-w-0">
-                              <p className="truncate text-xs" title={comp.title}>{comp.title}</p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Badge variant="outline" className="text-xs">
-                                {Math.round(comp.matchScore * 100)}% match
-                              </Badge>
-                              <span className="font-semibold text-green-600 dark:text-green-400">
-                                {formatCurrency(comp.price)}
-                              </span>
-                              {comp.url && (
-                                <a 
-                                  href={comp.url} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-muted-foreground hover:text-foreground"
-                                  data-testid={`link-comp-${idx}`}
-                                >
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              )}
-                            </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                      <DialogTrigger asChild>
+                        <Button data-testid="button-add-to-collection">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add to Collection
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add to Display Case</DialogTitle>
+                          <DialogDescription>
+                            Choose which display case to add "{result.tempCard.title}" to.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 pt-4">
+                          <div className="space-y-2">
+                            <Label>Select Display Case</Label>
+                            <Select value={selectedCaseId} onValueChange={setSelectedCaseId}>
+                              <SelectTrigger data-testid="select-display-case">
+                                <SelectValue placeholder="Choose a display case" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {userCases.map((c) => (
+                                  <SelectItem key={c.id} value={c.id.toString()}>
+                                    {c.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="flex gap-2 pt-2 flex-wrap">
-                <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-                  <DialogTrigger asChild>
-                    <Button data-testid="button-add-to-collection">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add to Collection
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add to Display Case</DialogTitle>
-                      <DialogDescription>
-                        Choose which display case to add "{result.tempCard.title}" to.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label>Select Display Case</Label>
-                        <Select value={selectedCaseId} onValueChange={setSelectedCaseId}>
-                          <SelectTrigger data-testid="select-display-case">
-                            <SelectValue placeholder="Choose a display case" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {userCases.map((c) => (
-                              <SelectItem key={c.id} value={c.id.toString()}>
-                                {c.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {userCases.length === 0 && (
-                        <p className="text-sm text-muted-foreground">
-                          You don't have any display cases yet. Create one first from your dashboard.
-                        </p>
-                      )}
-                      <div className="flex gap-2 justify-end">
-                        <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={() => addToCollectionMutation.mutate()}
-                          disabled={!selectedCaseId || addToCollectionMutation.isPending}
-                          data-testid="button-confirm-add"
-                        >
-                          {addToCollectionMutation.isPending ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Adding...
-                            </>
-                          ) : (
-                            "Add Card"
+                          {userCases.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                              You don't have any display cases yet. Create one first from your dashboard.
+                            </p>
                           )}
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                <Button
-                  variant="outline"
-                  onClick={resetForm}
-                  data-testid="button-quick-reset"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  Check Another Card
-                </Button>
-              </div>
-            </div>
+                          <div className="flex gap-2 justify-end">
+                            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={() => addToCollectionMutation.mutate()}
+                              disabled={!selectedCaseId || addToCollectionMutation.isPending}
+                              data-testid="button-confirm-add"
+                            >
+                              {addToCollectionMutation.isPending ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Adding...
+                                </>
+                              ) : (
+                                "Add Card"
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                    <Button
+                      variant="outline"
+                      onClick={resetForm}
+                      data-testid="button-quick-reset"
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Check Another
+                    </Button>
+                  </div>
+                </DialogHeader>
+                <OutlookDetails 
+                  data={{
+                    card: {
+                      title: result.tempCard.title,
+                      year: result.tempCard.year,
+                      set: result.tempCard.set,
+                      variation: result.tempCard.variation,
+                      grade: result.tempCard.grade ? `${result.tempCard.grader || ''} ${result.tempCard.grade}`.trim() : null,
+                      imagePath: previewUrl || result.tempCard.imagePath,
+                    },
+                    market: {
+                      value: result.market.value,
+                      min: result.market.min,
+                      max: result.market.max,
+                      compCount: result.market.compCount,
+                    },
+                    signals: result.signals,
+                    action: result.action,
+                    actionReasons: result.actionReasons,
+                    confidence: result.confidence,
+                    matchConfidence: result.matchConfidence,
+                    explanation: result.explanation,
+                    bigMover: result.bigMover,
+                    isPro: result.isPro,
+                  }}
+                  cardImageUrl={previewUrl}
+                  showDetailedSignals={result.isPro}
+                />
+              </DialogContent>
+            </Dialog>
           )}
         </CardContent>
       )}

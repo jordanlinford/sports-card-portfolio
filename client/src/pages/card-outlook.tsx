@@ -76,6 +76,7 @@ type OutlookData = {
     year?: number;
     set?: string;
     variation?: string;
+    imagePath?: string;
   };
   market: {
     value: number | null;
@@ -436,6 +437,18 @@ export default function CardOutlookPage() {
         <Card className="mb-6">
           <CardHeader>
             <div className="flex flex-col sm:flex-row gap-4">
+              {outlook.card.imagePath && (
+                <div className="flex-shrink-0">
+                  <div className="w-24 h-32 sm:w-28 sm:h-36 rounded-lg overflow-hidden border bg-muted/30">
+                    <img 
+                      src={outlook.card.imagePath.startsWith('/objects/') ? outlook.card.imagePath : `/objects/${outlook.card.imagePath}`}
+                      alt={outlook.card.title} 
+                      className="w-full h-full object-contain"
+                      data-testid="img-card"
+                    />
+                  </div>
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <CardTitle className="text-xl sm:text-2xl mb-2" data-testid="text-card-title">
                   {outlook.card.title}

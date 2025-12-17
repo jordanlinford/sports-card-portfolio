@@ -1514,6 +1514,10 @@ Allow: /
             sport: card.sport,
             position: card.position,
             grade: card.grade,
+            year: card.year,
+            set: card.set,
+            variation: card.variation,
+            imagePath: card.imagePath,
           },
           market: {
             value: outlook.marketValue ? outlook.marketValue / 100 : null,
@@ -1573,6 +1577,11 @@ Allow: /
         card: {
           id: card.id,
           title: card.title,
+          year: card.year,
+          set: card.set,
+          variation: card.variation,
+          grade: card.grade,
+          imagePath: card.imagePath,
         },
         cached: false,
         needsGeneration: true,
