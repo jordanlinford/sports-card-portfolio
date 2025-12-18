@@ -15,7 +15,14 @@ let openaiClient: OpenAI | null = null;
 
 function getOpenAI(): OpenAI {
   if (!openaiClient) {
-    const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    // Prefer OPENAI_API_KEY first, fall back to AI_INTEGRATIONS only if it's not a placeholder
+    let apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      const aiIntegrationsKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+      if (aiIntegrationsKey && !aiIntegrationsKey.includes('DUMMY')) {
+        apiKey = aiIntegrationsKey;
+      }
+    }
     openaiClient = new OpenAI({ apiKey });
   }
   return openaiClient;
