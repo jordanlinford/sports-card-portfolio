@@ -4176,7 +4176,7 @@ Allow: /
   // GET /api/portfolio/outlook - Get latest portfolio outlook snapshot
   app.get("/api/portfolio/outlook", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Not authenticated" });
       }
@@ -4203,7 +4203,7 @@ Allow: /
   // POST /api/portfolio/outlook/generate - Generate new portfolio outlook
   app.post("/api/portfolio/outlook/generate", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Not authenticated" });
       }
@@ -4253,7 +4253,7 @@ Allow: /
   // GET /api/portfolio/profile - Get raw portfolio profile (for debugging/display)
   app.get("/api/portfolio/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Not authenticated" });
       }
@@ -4271,7 +4271,7 @@ Allow: /
   // GET /api/portfolio/next-buys - Get latest next buys recommendations
   app.get("/api/portfolio/next-buys", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Not authenticated" });
       }
@@ -4293,7 +4293,7 @@ Allow: /
   // POST /api/portfolio/next-buys/generate - Generate new next buys recommendations
   app.post("/api/portfolio/next-buys/generate", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Not authenticated" });
       }
