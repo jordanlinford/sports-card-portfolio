@@ -117,31 +117,71 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
   try {
     // Use current year to get the latest news
     const currentYear = new Date().getFullYear();
-    // First query focuses on player's current status and performance
-    const response = await fetch("https://google.serper.dev/news", {
-      method: "POST",
-      headers: {
-        "X-API-KEY": SERPER_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        q: `${playerName} ${sport} ${currentYear}`,
-        num: 8,
+    
+    // Run two parallel queries for better coverage
+    const [generalResponse, performanceResponse] = await Promise.all([
+      // Query 1: General news about the player
+      fetch("https://google.serper.dev/news", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": SERPER_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          q: `${playerName} ${sport} ${currentYear}`,
+          num: 6,
+        }),
       }),
+      // Query 2: Specific game performance and stats
+      fetch("https://google.serper.dev/news", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": SERPER_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          q: `${playerName} points game stats NBA`,
+          num: 4,
+        }),
+      }),
+    ]);
+    
+    let allNews: any[] = [];
+    
+    if (generalResponse.ok) {
+      const data = await generalResponse.json();
+      allNews = [...(data.news || [])];
+    }
+    
+    if (performanceResponse.ok) {
+      const data = await performanceResponse.json();
+      allNews = [...allNews, ...(data.news || [])];
+    }
+    
+    if (allNews.length === 0) {
+      return { momentum: "flat", newsHype: "none", snippets: [] };
+    }
+    
+    // Deduplicate and prioritize news that mentions specific stats or team
+    const seen = new Set<string>();
+    const uniqueNews = allNews.filter((n: any) => {
+      const key = (n.title || "").toLowerCase().slice(0, 50);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
     
-    if (!response.ok) {
-      return { momentum: "flat", newsHype: "none", snippets: [] };
-    }
+    // Prioritize snippets that mention points, drafted, or team names
+    const priorityKeywords = ["points", "drafted", "mavericks", "dallas", "scored", "game", "debut", "rookie"];
+    const sortedNews = uniqueNews.sort((a: any, b: any) => {
+      const aText = ((a.snippet || "") + " " + (a.title || "")).toLowerCase();
+      const bText = ((b.snippet || "") + " " + (b.title || "")).toLowerCase();
+      const aScore = priorityKeywords.filter(kw => aText.includes(kw)).length;
+      const bScore = priorityKeywords.filter(kw => bText.includes(kw)).length;
+      return bScore - aScore;
+    });
     
-    const data = await response.json();
-    const news = data.news || [];
-    
-    if (news.length === 0) {
-      return { momentum: "flat", newsHype: "none", snippets: [] };
-    }
-    
-    const snippets = news.slice(0, 3).map((n: any) => n.snippet || n.title);
+    const snippets = sortedNews.slice(0, 5).map((n: any) => n.snippet || n.title);
     
     // Analyze sentiment from snippets
     const positiveKeywords = ["surge", "rising", "hot", "breakout", "mvp", "record", "star", "elite", "best"];
@@ -160,7 +200,7 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
     
     const momentum = positiveCount > negativeCount + 1 ? "up" : 
                      negativeCount > positiveCount + 1 ? "down" : "flat";
-    const newsHype = news.length >= 5 ? "high" : news.length >= 3 ? "medium" : news.length >= 1 ? "low" : "none";
+    const newsHype = allNews.length >= 5 ? "high" : allNews.length >= 3 ? "medium" : allNews.length >= 1 ? "low" : "none";
     
     return { momentum, newsHype, snippets };
   } catch (error) {
