@@ -18,14 +18,14 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
 
   try {
     await transporter.sendMail({
-      from: `"MyDisplayCase" <${process.env.ZOHO_EMAIL}>`,
+      from: `"Sports Card Portfolio" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
-      subject: "Welcome to MyDisplayCase!",
+      subject: "Welcome to Sports Card Portfolio!",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #f59e0b;">Welcome to MyDisplayCase!</h1>
+          <h1 style="color: #f59e0b;">Welcome to Sports Card Portfolio!</h1>
           <p>Hi ${userName || "Collector"},</p>
-          <p>Thank you for joining MyDisplayCase! We're excited to help you showcase your card collection.</p>
+          <p>Thank you for joining Sports Card Portfolio! We're excited to help you track and grow your collection.</p>
           <p>Here's what you can do:</p>
           <ul>
             <li>Create digital display cases to organize your cards</li>
@@ -34,7 +34,7 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
             <li>Get AI-powered price lookups and insights</li>
           </ul>
           <p>Get started by uploading your first card!</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The MyDisplayCase Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The Sports Card Portfolio Team</p>
         </div>
       `,
     });
@@ -55,14 +55,14 @@ export async function sendPaymentConfirmationEmail(
 
   try {
     await transporter.sendMail({
-      from: `"MyDisplayCase" <${process.env.ZOHO_EMAIL}>`,
+      from: `"Sports Card Portfolio" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
-      subject: "Welcome to MyDisplayCase Pro!",
+      subject: "Welcome to Sports Card Portfolio Pro!",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #f59e0b;">You're Now a Pro Member!</h1>
           <p>Hi ${userName || "Collector"},</p>
-          <p>Thank you for upgrading to MyDisplayCase Pro! Your subscription is now active.</p>
+          <p>Thank you for upgrading to Sports Card Portfolio Pro! Your subscription is now active.</p>
           <p>You now have access to:</p>
           <ul>
             <li>Unlimited display cases</li>
@@ -72,7 +72,7 @@ export async function sendPaymentConfirmationEmail(
             <li>Priority support</li>
           </ul>
           <p>Enjoy your Pro features!</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The MyDisplayCase Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The Sports Card Portfolio Team</p>
         </div>
       `,
     });
@@ -100,7 +100,7 @@ export async function sendPriceAlertEmail(
 
   try {
     await transporter.sendMail({
-      from: `"MyDisplayCase" <${process.env.ZOHO_EMAIL}>`,
+      from: `"Sports Card Portfolio" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: `Price Alert: ${cardTitle} has ${direction} $${threshold}`,
       html: `
@@ -113,8 +113,8 @@ export async function sendPriceAlertEmail(
             <p style="margin: 0 0 10px 0;"><strong>Your Alert:</strong> Notify when price goes ${alertType} $${threshold.toFixed(2)}</p>
             <p style="margin: 0;"><strong>Current Price:</strong> $${currentPrice.toFixed(2)} (${emoji})</p>
           </div>
-          <p>Log in to MyDisplayCase to view your card and take action.</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The MyDisplayCase Team</p>
+          <p>Log in to Sports Card Portfolio to view your card and take action.</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The Sports Card Portfolio Team</p>
         </div>
       `,
     });
@@ -167,7 +167,7 @@ export async function sendWeeklyDigestEmail(
 
   try {
     await transporter.sendMail({
-      from: `"MyDisplayCase" <${process.env.ZOHO_EMAIL}>`,
+      from: `"Sports Card Portfolio" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: "Your Weekly Collection Digest",
       html: `
@@ -209,8 +209,8 @@ export async function sendWeeklyDigestEmail(
             </table>
           ` : ""}
 
-          <p style="margin-top: 30px;">Log in to MyDisplayCase to explore your full collection.</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The MyDisplayCase Team</p>
+          <p style="margin-top: 30px;">Log in to Sports Card Portfolio to explore your full collection.</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The Sports Card Portfolio Team</p>
           
           <p style="margin-top: 30px; font-size: 12px; color: #9ca3af;">
             To unsubscribe from weekly digests, update your notification preferences in your account settings.

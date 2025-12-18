@@ -462,10 +462,10 @@ export default function Landing() {
           <div className="flex flex-col items-center text-center">
             <div className="flex items-center gap-2 mb-4">
               <LayoutGrid className="h-6 w-6 text-primary" />
-              <span className="text-lg font-semibold">MyDisplayCase</span>
+              <span className="text-lg font-semibold">Sports Card Portfolio</span>
             </div>
             <p className="text-muted-foreground text-sm max-w-md mb-6">
-              MyDisplayCase is evolving into Sports Card Portfolio — the long-term home for serious collectors.
+              The long-term home for serious collectors who treat cards like assets.
             </p>
             <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
               <Link href="/terms-of-service" className="hover:text-foreground transition-colors">

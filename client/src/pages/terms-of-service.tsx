@@ -2,10 +2,10 @@ import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 export default function TermsOfService() {
-  const lastUpdated = "December 7, 2024";
-  const companyName = "MyDisplayCase";
-  const websiteUrl = "mydisplaycase.io";
-  const contactEmail = "support@mydisplaycase.io";
+  const lastUpdated = "December 18, 2024";
+  const companyName = "Sports Card Portfolio";
+  const websiteUrl = "sportscardportfolio.com";
+  const contactEmail = "support@sportscardportfolio.com";
 
   return (
     <div className="min-h-screen bg-background">

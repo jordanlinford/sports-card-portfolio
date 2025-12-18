@@ -1,4 +1,4 @@
-# MyDisplayCase.com Design Guidelines
+# Sports Card Portfolio Design Guidelines
 
 ## Design Approach
 

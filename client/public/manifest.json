@@ -1,7 +1,7 @@
 {
-  "name": "MyDisplayCase",
-  "short_name": "DisplayCase",
-  "description": "Create beautiful digital display cases for your sports cards, trading cards, and collectibles. Share your passion with the world.",
+  "name": "Sports Card Portfolio",
+  "short_name": "SCP",
+  "description": "AI-powered portfolio management for sports card collectors. Real market data, investment insights, and beautiful digital portfolios.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -92,7 +92,7 @@ export function Navigation() {
             <div className="flex items-center gap-2">
               <LayoutGrid className="h-6 w-6 text-primary" />
               <span className="text-lg font-semibold hidden sm:inline" data-testid="text-logo">
-                MyDisplayCase
+                Sports Card Portfolio
               </span>
             </div>
           </Link>

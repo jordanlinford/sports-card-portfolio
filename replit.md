@@ -1,7 +1,7 @@
-# MyDisplayCase
+# Sports Card Portfolio
 
 ## Overview
-MyDisplayCase is a web application designed for collectors to digitally showcase their card collections (sports, trading, and other collectibles). It enables users to upload, organize, and share their collections, with an optional Pro subscription for advanced features. The platform aims to provide a visually appealing and functional environment for managing and displaying card collections.
+Sports Card Portfolio is a web application designed for collectors to track, analyze, and grow their sports card collections. It provides AI-powered market intelligence, real eBay comps, and investment-focused tools that treat players like stocks. The platform enables users to manage portfolios, get personalized buy recommendations, and share their collections — with Pro features for serious collectors.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

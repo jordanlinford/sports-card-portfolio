@@ -291,10 +291,10 @@ Allow: /
       
       // Build compelling title
       const title = displayCase.name;
-      const fullTitle = `${title} | ${cardCount} Cards | MyDisplayCase`;
+      const fullTitle = `${title} | ${cardCount} Cards | Sports Card Portfolio`;
       
       // Alt text for image
-      const imageAlt = `${displayCase.name} - Card collection on MyDisplayCase`;
+      const imageAlt = `${displayCase.name} - Card collection on Sports Card Portfolio`;
 
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -313,7 +313,7 @@ Allow: /
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="${imageAlt}">
-  <meta property="og:site_name" content="MyDisplayCase">
+  <meta property="og:site_name" content="Sports Card Portfolio">
   <meta property="og:locale" content="en_US">
   
   <!-- Twitter -->
