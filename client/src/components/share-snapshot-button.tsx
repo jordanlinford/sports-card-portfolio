@@ -47,15 +47,24 @@ export function ShareSnapshotButton({
       
       if (data.success && data.shareUrl) {
         const fullUrl = `${window.location.origin}${data.shareUrl}`;
-        await navigator.clipboard.writeText(fullUrl);
-        setCopied(true);
         
-        toast({
-          title: "Link copied",
-          description: "Share link has been copied to your clipboard.",
-        });
-
-        setTimeout(() => setCopied(false), 2000);
+        // Try clipboard API first, fallback to manual copy prompt
+        try {
+          await navigator.clipboard.writeText(fullUrl);
+          setCopied(true);
+          toast({
+            title: "Link copied",
+            description: "Share link has been copied to your clipboard.",
+          });
+          setTimeout(() => setCopied(false), 2000);
+        } catch (clipboardError) {
+          // Clipboard failed (common on mobile) - show the link to copy manually
+          toast({
+            title: "Share link created",
+            description: fullUrl,
+            duration: 10000, // Show longer so user can copy
+          });
+        }
       }
     } catch (error) {
       console.error("Failed to create share link:", error);
