@@ -30,31 +30,71 @@ export async function fetchPlayerNews(playerName: string | null | undefined, spo
     const sportQuery = sport ? ` ${sport}` : "";
     // Use current year to ensure we get the most recent news
     const currentYear = new Date().getFullYear();
-    const response = await fetch("https://google.serper.dev/news", {
-      method: "POST",
-      headers: {
-        "X-API-KEY": SERPER_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        q: `${playerName}${sportQuery} ${currentYear}`,
-        num: 5,
+    
+    // Run two parallel queries for better coverage
+    const [generalResponse, performanceResponse] = await Promise.all([
+      // Query 1: General news about the player
+      fetch("https://google.serper.dev/news", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": SERPER_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          q: `${playerName}${sportQuery} ${currentYear}`,
+          num: 6,
+        }),
       }),
+      // Query 2: Specific game performance and stats
+      fetch("https://google.serper.dev/news", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": SERPER_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          q: `${playerName} points game stats`,
+          num: 4,
+        }),
+      }),
+    ]);
+
+    let allNews: any[] = [];
+    
+    if (generalResponse.ok) {
+      const data = await generalResponse.json();
+      allNews = [...(data.news || [])];
+    }
+    
+    if (performanceResponse.ok) {
+      const data = await performanceResponse.json();
+      allNews = [...allNews, ...(data.news || [])];
+    }
+
+    if (allNews.length === 0) {
+      return { snippets: [], momentum: "flat", newsCount: 0 };
+    }
+
+    // Deduplicate and prioritize news that mentions specific stats or team
+    const seen = new Set<string>();
+    const uniqueNews = allNews.filter((n: any) => {
+      const key = (n.title || "").toLowerCase().slice(0, 50);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    
+    // Prioritize snippets that mention points, drafted, or team names
+    const priorityKeywords = ["points", "drafted", "scored", "game", "debut", "rookie", "nba", "nfl", "mlb"];
+    const sortedNews = uniqueNews.sort((a: any, b: any) => {
+      const aText = ((a.snippet || "") + " " + (a.title || "")).toLowerCase();
+      const bText = ((b.snippet || "") + " " + (b.title || "")).toLowerCase();
+      const aScore = priorityKeywords.filter(kw => aText.includes(kw)).length;
+      const bScore = priorityKeywords.filter(kw => bText.includes(kw)).length;
+      return bScore - aScore;
     });
 
-    if (!response.ok) {
-      console.log("[OutlookEngine] Serper API error:", response.status);
-      return { snippets: [], momentum: "flat", newsCount: 0 };
-    }
-
-    const data = await response.json();
-    const news = data.news || [];
-
-    if (news.length === 0) {
-      return { snippets: [], momentum: "flat", newsCount: 0 };
-    }
-
-    const snippets = news.slice(0, 5).map((n: any) => n.snippet || n.title);
+    const snippets = sortedNews.slice(0, 5).map((n: any) => n.snippet || n.title);
 
     // Analyze sentiment from snippets
     const positiveKeywords = ["surge", "rising", "hot", "breakout", "mvp", "record", "star", "elite", "best", "youngest", "historic", "amazing", "dominant"];
@@ -74,8 +114,8 @@ export async function fetchPlayerNews(playerName: string | null | undefined, spo
     const momentum = positiveCount > negativeCount + 1 ? "up" :
                      negativeCount > positiveCount + 1 ? "down" : "flat";
 
-    console.log(`[OutlookEngine] News for ${playerName}: ${news.length} articles, momentum: ${momentum}`);
-    return { snippets, momentum, newsCount: news.length };
+    console.log(`[OutlookEngine] News for ${playerName}: ${allNews.length} articles, momentum: ${momentum}`);
+    return { snippets, momentum, newsCount: allNews.length };
   } catch (error) {
     console.error("[OutlookEngine] News fetch error:", error);
     return { snippets: [], momentum: "flat", newsCount: 0 };
