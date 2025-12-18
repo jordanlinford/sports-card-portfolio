@@ -1,0 +1,216 @@
+Prompt 1 for Replit: Build the Investment Call component (UX + copy structure)
+
+Goal: Add a new top-of-page module that forces a clear action, with entry plan, what to buy/sell, and “what breaks it”. This component becomes the anchor of the entire page and everything else supports it.
+
+Instructions:
+
+Create a new React component named InvestmentCallCard and render it directly below the player header (name/team/position) and above Player Stock Thesis.
+
+The component must accept this prop shape:
+
+type InvestmentCall = {
+verdict: "ACCUMULATE" | "HOLD_CORE" | "TRADE_THE_HYPE" | "AVOID_NEW_MONEY" | "SPECULATIVE_FLYER";
+postureLabel: string; // e.g. "Buy on dips", "Hold, don’t chase", "Sell into spikes"
+confidence: "LOW" | "MEDIUM" | "HIGH";
+timeHorizon: "SHORT" | "MID" | "LONG";
+oneLineRationale: string; // tight, collector language
+whyBullets: string[]; // max 3
+actionPlan: {
+whatToDoNow: string; // one sentence
+entryPlan: string; // one sentence (timing/price behavior)
+positionSizing: string; // one sentence (e.g. “small position”, “core add”, etc.)
+};
+whatToBuy?: string[]; // card types (max 4)
+whatToSell?: string[]; // card types (max 4)
+whatToAvoid?: string[]; // card types (max 4)
+thesisBreakers: string[]; // max 3
+triggersToUpgrade?: string[]; // max 3 (what flips to stronger buy)
+triggersToDowngrade?: string[]; // max 3 (what flips to avoid/sell)
+};
+
+Visual spec:
+
+Card layout with a clear left “verdict badge” and right content.
+
+Make verdict unmissable.
+
+Show 3 compact chips under verdict: Confidence, Horizon, and a short “Posture” chip.
+
+Keep the body tight: One-line rationale, then three rows:
+A) Why this call (3 bullets max)
+B) Action plan (3 short lines)
+C) Thesis breakers (3 bullets max)
+
+If verdict is TRADE_THE_HYPE, show “What to sell” prominently; if ACCUMULATE show “What to buy” prominently; if AVOID_NEW_MONEY collapse buy/sell and show “What to avoid” plus “When to reconsider”.
+
+Do not use analyst words like “positional premium”, “volatility”, “market temperature” in visible copy. Convert those concepts into collector language.
+
+Integrate into the existing page:
+
+Replace the current “Investment Verdict” section with this new component. Do not show the old WATCH section anymore.
+
+Keep the older sections (Thesis, Reality Check, Exposure) but demote them visually so InvestmentCallCard is clearly the main decision.
+
+Provide a sample InvestmentCall object for Caleb Williams so the UI renders right away (use placeholder text if needed). Wire it to existing analysis output later.
+
+Deliverables:
+
+New component file: src/components/player/InvestmentCallCard.tsx
+
+Update page: src/pages/PlayerAnalysis.tsx (or equivalent) to render it and remove old verdict UI
+
+Minimal styling consistent with current design system and chips/badges
+
+Prompt 2 for Replit: Rewrite Caleb Williams analysis output using the new decisive framework
+
+Goal: Replace the existing Caleb prose with collector-first, decisive copy that matches the new InvestmentCall structure.
+
+Instructions:
+
+Create a new function that outputs an InvestmentCall object plus supporting sections:
+
+type PlayerAnalysisV2 = {
+investmentCall: InvestmentCall;
+thesis: string[]; // max 3, collector language, no generic filler
+realityCheck: string[]; // max 2, sharp and true
+exposureRecommendations: {
+growth: { cards: string[]; entry: string; avoid: string[] };
+premium: { cards: string[]; entry: string; avoid: string[] };
+core: { cards: string[]; entry: string; avoid: string[] };
+};
+};
+
+Implement a Caleb Williams example object that fixes credibility issues:
+
+Do not claim “playoff-contending season” unless you have real data.
+
+Do not call Chicago a “smaller market.”
+
+Avoid weak evidence like “two touchdown passes recently.”
+
+Use structural hobby truths:
+
+rookie QB hype is priced early
+
+prices react to perception shifts, not normal games
+
+downside is sharp if confidence cracks
+
+long-term value is earned via sustained production and narrative
+
+The Caleb Investment Call must be one of the five states. Do not use WATCH.
+Pick one based on the screenshot context (warm, medium risk, medium vol, mid-term). A reasonable default is HOLD_CORE or SPECULATIVE_FLYER depending on your intended stance; choose one and commit.
+
+Tight copy constraints:
+
+oneLineRationale: 18–24 words
+
+whyBullets: 3 bullets max, each under 14 words
+
+thesisBreakers: 3 bullets max
+
+actionPlan lines: each under 16 words
+
+No analyst phrasing.
+
+Update the UI to render thesis, reality check, and exposure from this new object (if you want, keep old sections but source copy from the new structure for Caleb at least).
+
+Deliverables:
+
+New file: src/analysis/examples/calebWilliams.v2.ts exporting PlayerAnalysisV2
+
+Update the player page to use this when player = “Caleb Williams” (until the generator is wired)
+
+Prompt 3 for Replit: Implement forced-decision scoring logic to stop “everything is WATCH”
+
+Goal: Add a deterministic mapping layer that always produces one of the five verdicts, using your existing signals (trend, liquidity, volatility, risk, hype/news, pricing vs comps). This can be heuristic now and improved later.
+
+Instructions:
+
+Create a scoring module that produces these normalized inputs (0–100):
+
+trendScore (direction + momentum)
+
+liquidityScore (how easy to exit quickly)
+
+volatilityScore (spread/instability)
+
+narrativeHeatScore (hype/news attention)
+
+injuryRoleRiskScore (role stability + injury)
+
+valuationScore (cheap vs expensive relative to your own baseline/comps)
+
+Create two derived signals:
+
+mispricingScore = valuationScore - narrativeHeatScore
+Interpretation: positive = undervalued vs hype; negative = overpriced vs hype
+
+downsideRiskScore = (injuryRoleRiskScore * 0.6) + (volatilityScore * 0.4)
+
+Implement a forced verdict function:
+
+function decideVerdict(input): InvestmentCall["verdict"]
+
+Rules (initial heuristics; tune later):
+
+If downsideRiskScore >= 75 AND valuationScore <= 45 -> AVOID_NEW_MONEY
+
+Else if mispricingScore <= -20 AND narrativeHeatScore >= 65 -> TRADE_THE_HYPE
+
+Else if mispricingScore >= 15 AND liquidityScore >= 55 AND downsideRiskScore <= 65 -> ACCUMULATE
+
+Else if valuationScore between 45–60 AND downsideRiskScore <= 70 -> HOLD_CORE
+
+Else -> SPECULATIVE_FLYER
+
+Confidence mapping:
+
+HIGH if liquidityScore >= 70 AND downsideRiskScore <= 55 AND (abs(mispricingScore) >= 15)
+
+MEDIUM if liquidityScore >= 50 AND downsideRiskScore <= 70
+
+LOW otherwise
+
+Action plan generator:
+Based on verdict, generate:
+
+postureLabel
+
+oneLineRationale template (collector language)
+
+whyBullets (pick top 3 reasons based on strongest signals)
+
+whatToBuy / whatToSell / whatToAvoid populated from your existing “Card Exposure Recommendations” logic
+
+thesisBreakers: generated from whichever risk component is most elevated
+
+Integrate this logic into your player analysis pipeline:
+
+Wherever you currently compute “WARM / vol / risk / mid term / watch”, replace verdict selection with decideVerdict().
+
+Ensure the UI always shows one of the five verdicts.
+
+Add logging for debugging:
+
+Log the normalized inputs and the chosen verdict for each analysis run (server and/or client console depending on architecture).
+
+Add a small “Why this verdict?” debug panel behind a toggle (not visible by default).
+
+Deliverables:
+
+New module: src/analysis/decision/decisionEngine.ts
+
+Update your analysis builder to use it and return InvestmentCall
+
+Remove “WATCH” from the system entirely (no enum, no UI)
+
+If you paste these into Replit sequentially, you will end up with:
+
+A decisive top-of-page module that makes the page feel like an investing tool.
+
+A corrected Caleb example that reads like the hobby.
+
+A forced-decision engine that guarantees clear actions across players.
+
+If you want me to tailor Prompt 3 to your exact current fields (what you already compute today), paste the object your analysis function returns (one example JSON) and I’ll rewrite Prompt 3 to match it exactly.

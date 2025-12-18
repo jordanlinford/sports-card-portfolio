@@ -45,7 +45,8 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
-import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis } from "@shared/schema";
+import { InvestmentCallCard } from "@/components/investment-call-card";
+import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis, InvestmentCall } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
   switch (temp) {
@@ -807,11 +808,20 @@ export default function PlayerOutlookPage() {
         <div className="space-y-6 animate-in fade-in duration-500">
           <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} />
           
+          {outlookData.investmentCall && (
+            <InvestmentCallCard 
+              call={outlookData.investmentCall} 
+              playerName={outlookData.player.name} 
+            />
+          )}
+          
           <ThesisCard thesis={outlookData.thesis} />
           
           <MarketRealityCheckCard checks={outlookData.marketRealityCheck} />
           
-          <VerdictCard verdict={outlookData.verdict} confidence={outlookData.snapshot.confidence} />
+          {!outlookData.investmentCall && (
+            <VerdictCard verdict={outlookData.verdict} confidence={outlookData.snapshot.confidence} />
+          )}
           
           <DiscountAnalysisCard analysis={outlookData.discountAnalysis} />
           
@@ -846,9 +856,9 @@ export default function PlayerOutlookPage() {
                     position: outlookData.player.position,
                     team: outlookData.player.team,
                     stage: outlookData.player.stage,
-                    outlook: outlookData.verdict.action,
+                    outlook: outlookData.investmentCall?.verdict || outlookData.verdict.action,
                     modifier: outlookData.verdict.modifier,
-                    summary: outlookData.verdict.summary,
+                    summary: outlookData.investmentCall?.oneLineRationale || outlookData.verdict.summary,
                     thesis: outlookData.thesis,
                     marketRealityCheck: outlookData.marketRealityCheck,
                     temperature: outlookData.snapshot.temperature,
@@ -860,6 +870,7 @@ export default function PlayerOutlookPage() {
                       cardTargets: exp.cardTargets,
                       why: exp.why,
                     })),
+                    investmentCall: outlookData.investmentCall,
                     generatedAt: outlookData.generatedAt,
                   }}
                 />

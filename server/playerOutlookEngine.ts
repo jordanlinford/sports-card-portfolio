@@ -4,6 +4,7 @@ import { playerOutlookCache } from "@shared/schema";
 import { eq, and, gt, lt } from "drizzle-orm";
 import { classifyPlayer, getExposureRecommendations, type ClassificationInput, type ClassificationOutput } from "./playerClassificationEngine";
 import { calculateValuation } from "./valuationService";
+import { generateInvestmentCall } from "./investmentDecisionEngine";
 import type {
   PlayerOutlookResponse,
   PlayerOutlookRequest,
@@ -16,6 +17,7 @@ import type {
   PlayerVerdict,
   DataConfidence,
   VerdictModifier,
+  InvestmentCall,
 } from "@shared/schema";
 import { VERDICT_MODIFIER } from "@shared/schema";
 
@@ -548,19 +550,49 @@ async function generateFreshOutlook(
     dataQuality,
   };
   
-  // Step 8: Build response
+  // Step 8: Generate Investment Call (new 5-state forced-decision system)
+  const momentumMap: Record<string, "UP" | "DOWN" | "STABLE"> = {
+    up: "UP",
+    down: "DOWN",
+    flat: "STABLE",
+  };
+  const hypeMap: Record<string, "HIGH" | "MEDIUM" | "LOW"> = {
+    high: "HIGH",
+    medium: "MEDIUM",
+    low: "LOW",
+    none: "LOW",
+  };
+  
+  const investmentCall = generateInvestmentCall({
+    stage: classification.stage,
+    temperature: classification.baseTemperature,
+    volatility: classification.baseVolatility,
+    risk: classification.baseRisk,
+    horizon: classification.baseHorizon,
+    confidence,
+    exposures,
+    thesis,
+    marketRealityCheck,
+    compData: evidence.compsSummary,
+    newsCount: snippets.length,
+    momentum: momentumMap[momentum] || "STABLE",
+    newsHype: hypeMap[newsHype] || "LOW",
+  });
+  
+  // Step 9: Build response
   const response: PlayerOutlookResponse = {
     player: playerInfo,
     snapshot,
     thesis,
     marketRealityCheck,
     verdict,
+    investmentCall,
     exposures,
     evidence,
     generatedAt: new Date().toISOString(),
   };
   
-  // Step 8: Save to cache
+  // Step 10: Save to cache
   await saveToCache(playerKey, sport, playerName, classification, response);
   
   return response;

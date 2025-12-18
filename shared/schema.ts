@@ -958,23 +958,80 @@ export const PLAYER_STAGE = {
 } as const;
 export type PlayerStage = keyof typeof PLAYER_STAGE;
 
-// Investment Verdict - The main action recommendation
+// Investment Verdict - The main action recommendation (5-state forced-decision system)
+export const INVESTMENT_VERDICT = {
+  ACCUMULATE: "ACCUMULATE",           // Buy on dips, build position
+  HOLD_CORE: "HOLD_CORE",             // Hold what you have, don't chase
+  TRADE_THE_HYPE: "TRADE_THE_HYPE",   // Sell into spikes, take profits
+  AVOID_NEW_MONEY: "AVOID_NEW_MONEY", // Stay away, don't add new money
+  SPECULATIVE_FLYER: "SPECULATIVE_FLYER", // Small lottery ticket position
+} as const;
+export type InvestmentVerdict = keyof typeof INVESTMENT_VERDICT;
+
+// Legacy verdict type for backward compatibility (deprecated - use InvestmentVerdict)
 export const PLAYER_VERDICT = {
-  BUY: "BUY",     // Accumulate cards for this player
-  WATCH: "WATCH", // Monitor, don't rush to buy
-  AVOID: "AVOID", // Stay away, high risk or declining
+  BUY: "BUY",
+  WATCH: "WATCH",
+  AVOID: "AVOID",
 } as const;
 export type PlayerVerdict = keyof typeof PLAYER_VERDICT;
 
-// Verdict Modifier - Adds nuance to the verdict
+// Posture labels for each verdict (collector-friendly)
+export const VERDICT_POSTURE: Record<InvestmentVerdict, string> = {
+  ACCUMULATE: "Buy on dips",
+  HOLD_CORE: "Hold, don't chase",
+  TRADE_THE_HYPE: "Sell into spikes",
+  AVOID_NEW_MONEY: "Stay away",
+  SPECULATIVE_FLYER: "Small lottery bet",
+} as const;
+
+// Verdict Modifier - Adds nuance to the verdict (legacy, kept for compatibility)
 export const VERDICT_MODIFIER = {
-  SPECULATIVE: "Speculative",   // High upside, high downside
-  MOMENTUM: "Momentum",         // Riding hype / short-term upside
-  VALUE: "Value",               // Mispriced / buy-the-dip
-  LONG_TERM: "Long-Term",       // Slower burn, fundamentals-driven
-  LATE_CYCLE: "Late Cycle",     // Risky entry even if still hot
+  SPECULATIVE: "Speculative",
+  MOMENTUM: "Momentum",
+  VALUE: "Value",
+  LONG_TERM: "Long-Term",
+  LATE_CYCLE: "Late Cycle",
 } as const;
 export type VerdictModifier = typeof VERDICT_MODIFIER[keyof typeof VERDICT_MODIFIER];
+
+// Investment Call Scoring Inputs (0-100 scale)
+export type InvestmentScores = {
+  trendScore: number;           // Direction + momentum (higher = uptrend)
+  liquidityScore: number;       // How easy to exit (higher = more liquid)
+  volatilityScore: number;      // Price instability (higher = more volatile)
+  narrativeHeatScore: number;   // Hype/news attention (higher = more buzz)
+  injuryRoleRiskScore: number;  // Role stability + injury risk (higher = more risky)
+  valuationScore: number;       // Cheap vs expensive vs comps (higher = cheaper)
+  // Derived signals
+  mispricingScore: number;      // valuationScore - narrativeHeatScore (+ = undervalued vs hype)
+  downsideRiskScore: number;    // (injuryRoleRiskScore * 0.6) + (volatilityScore * 0.4)
+};
+
+// Investment Call Action Plan
+export type InvestmentActionPlan = {
+  whatToDoNow: string;    // One sentence action
+  entryPlan: string;      // Timing/price behavior guidance
+  positionSizing: string; // Position size guidance
+};
+
+// Full Investment Call - The decisive recommendation
+export type InvestmentCall = {
+  verdict: InvestmentVerdict;
+  postureLabel: string;           // e.g., "Buy on dips"
+  confidence: DataConfidence;     // LOW, MEDIUM, HIGH
+  timeHorizon: InvestmentHorizon; // SHORT, MID, LONG
+  oneLineRationale: string;       // 18-24 words, collector language
+  whyBullets: string[];           // Max 3, each under 14 words
+  actionPlan: InvestmentActionPlan;
+  whatToBuy?: string[];           // Card types to accumulate (max 4)
+  whatToSell?: string[];          // Card types to sell (max 4)
+  whatToAvoid?: string[];         // Card types to avoid (max 4)
+  thesisBreakers: string[];       // Max 3 - what invalidates this call
+  triggersToUpgrade?: string[];   // What would flip to stronger buy (max 3)
+  triggersToDowngrade?: string[]; // What would flip to avoid/sell (max 3)
+  scores?: InvestmentScores;      // Optional: expose scoring for transparency
+};
 
 // Stock Tier - Card exposure type
 export const STOCK_TIER = {
@@ -1081,7 +1138,8 @@ export type PlayerOutlookResponse = {
   snapshot: PlayerSnapshot;
   thesis: string[]; // 3-6 bullet points
   marketRealityCheck: string[]; // 2-3 uncomfortable truths that build credibility
-  verdict: PlayerVerdictResult;
+  verdict: PlayerVerdictResult; // Legacy verdict (deprecated)
+  investmentCall?: InvestmentCall; // New 5-state forced-decision call
   discountAnalysis?: DiscountAnalysis; // Only populated for BUY/WATCH verdicts
   exposures: ExposureRecommendation[];
   evidence: EvidenceData;
