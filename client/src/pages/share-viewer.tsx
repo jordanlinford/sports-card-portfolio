@@ -240,33 +240,120 @@ function PortfolioOutlookView({ data }: { data: any }) {
   );
 }
 
+function getTemperatureLabel(temp: string) {
+  switch (temp) {
+    case "HOT": return { label: "Hot", color: "bg-red-500/20 text-red-700 dark:text-red-400" };
+    case "WARM": return { label: "Warm", color: "bg-orange-500/20 text-orange-700 dark:text-orange-400" };
+    case "NEUTRAL": return { label: "Neutral", color: "bg-slate-500/20 text-slate-700 dark:text-slate-400" };
+    case "COOLING": return { label: "Cooling", color: "bg-blue-500/20 text-blue-700 dark:text-blue-400" };
+    default: return { label: temp, color: "bg-muted text-muted-foreground" };
+  }
+}
+
 function PlayerOutlookView({ data }: { data: any }) {
+  const tempInfo = getTemperatureLabel(data.temperature || "NEUTRAL");
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-2xl font-bold">{data.playerName}</h2>
-          <p className="text-muted-foreground">{data.sport} {data.position && `- ${data.position}`}</p>
+          <p className="text-muted-foreground">
+            {data.sport} {data.position && `- ${data.position}`}
+            {data.team && ` | ${data.team}`}
+          </p>
         </div>
-        {data.outlook && (
-          <Badge className={`text-lg px-4 py-2 ${getActionColor(data.outlook)}`}>
-            {data.outlook}
-          </Badge>
-        )}
+        <div className="flex gap-2 flex-wrap">
+          {data.outlook && (
+            <Badge className={`text-lg px-4 py-2 ${getActionColor(data.outlook)}`}>
+              {data.modifier && `${data.modifier} `}{data.outlook}
+            </Badge>
+          )}
+          {data.temperature && (
+            <Badge className={tempInfo.color}>
+              {tempInfo.label}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {data.summary && (
         <Card>
           <CardHeader>
-            <CardTitle>Player Outlook</CardTitle>
+            <CardTitle>Investment Verdict</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">{data.summary}</p>
+            <p>{data.summary}</p>
           </CardContent>
         </Card>
       )}
 
-      {data.keyFactors && data.keyFactors.length > 0 && (
+      {data.thesis && data.thesis.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Thesis</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {data.thesis.map((point: string, index: number) => (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="h-2 w-2 rounded-full bg-primary mt-2 shrink-0" />
+                  <span>{point}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.marketRealityCheck && data.marketRealityCheck.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Market Reality Check
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {data.marketRealityCheck.map((check: string, index: number) => (
+                <div key={index} className="flex items-start gap-2">
+                  <div className="h-2 w-2 rounded-full bg-yellow-500 mt-2 shrink-0" />
+                  <span className="text-muted-foreground">{check}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.exposures && data.exposures.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Card Exposure Recommendations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {data.exposures.map((exp: any, index: number) => (
+                <div key={index} className="border-b last:border-0 pb-3 last:pb-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Badge variant="outline">{exp.tier}</Badge>
+                  </div>
+                  {exp.cardTargets && exp.cardTargets.length > 0 && (
+                    <p className="text-sm text-muted-foreground mb-1">
+                      {exp.cardTargets.join(", ")}
+                    </p>
+                  )}
+                  {exp.why && <p className="text-sm">{exp.why}</p>}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Backward compatibility for legacy snapshots */}
+      {data.keyFactors && data.keyFactors.length > 0 && !data.thesis && (
         <Card>
           <CardHeader>
             <CardTitle>Key Factors</CardTitle>
@@ -282,6 +369,12 @@ function PlayerOutlookView({ data }: { data: any }) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {data.generatedAt && (
+        <p className="text-xs text-center text-muted-foreground">
+          Generated {format(new Date(data.generatedAt), "MMM d, yyyy 'at' h:mm a")}
+        </p>
       )}
     </div>
   );
