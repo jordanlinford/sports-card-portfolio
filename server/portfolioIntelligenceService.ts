@@ -10,6 +10,7 @@ import type {
 } from "@shared/schema";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import OpenAI from "openai";
+import { fetchPlayerNews } from "./outlookEngine";
 
 let openaiClient: OpenAI | null = null;
 
@@ -278,7 +279,14 @@ You must be explainable. Avoid obvious takes. Use the user's actual exposures.
 Never claim certainty. Prefer "likely / tends to / historically" language.
 Return ONLY valid JSON matching the schema. No markdown, no extra keys.`;
 
-function buildPortfolioOutlookPrompt(profile: PortfolioProfile, riskSignals: RiskSignal[]): string {
+function buildPortfolioOutlookPrompt(profile: PortfolioProfile, riskSignals: RiskSignal[], playerNews: Record<string, string[]>): string {
+  // Build news section for top players
+  const newsSection = Object.entries(playerNews).length > 0 
+    ? `\nRECENT PLAYER NEWS (REAL-TIME - use this for current context, may supersede your training data):\n${Object.entries(playerNews).map(([player, snippets]) => 
+        `${player}:\n${snippets.map(s => `  - ${s}`).join('\n')}`
+      ).join('\n\n')}\n`
+    : "";
+
   return `Generate a portfolio outlook for this user based on the portfolio profile and risk signals.
 
 Portfolio Profile:
@@ -286,7 +294,7 @@ ${JSON.stringify(profile, null, 2)}
 
 Risk Signals:
 ${JSON.stringify(riskSignals, null, 2)}
-
+${newsSection}
 Required Output JSON schema:
 {
   "overallStance": "Speculative Growth | Balanced | Value | Legacy | Aggressive Speculation",
@@ -305,7 +313,8 @@ Rules:
 - Mention 2-3 concrete exposure facts (like "QB is 58% of value", "rookie+rising is 53%").
 - Use language that encourages planning: diversification, liquidity, cycle timing.
 - If concentration is high, recommend reducing it via next buys that diversify.
-- Keep it punchy and readable. No long paragraphs.`;
+- Keep it punchy and readable. No long paragraphs.
+- If RECENT PLAYER NEWS is provided, use it to inform your analysis about players in the portfolio. The news is real-time and supersedes outdated training data.`;
 }
 
 type AIOutlookResponse = {
@@ -332,6 +341,24 @@ export async function generatePortfolioOutlook(userId: string): Promise<Portfoli
     topPlayersConcentration: profile.concentration.topPlayers,
     topTeamsConcentration: profile.concentration.topTeams,
   };
+
+  // Fetch real-time news for top players in portfolio (up to 5)
+  const playerNews: Record<string, string[]> = {};
+  const topPlayerNames = profile.concentration.topPlayers.slice(0, 5).map(p => p.player);
+  
+  for (const playerName of topPlayerNames) {
+    if (playerName && playerName !== "Unknown") {
+      try {
+        const newsData = await fetchPlayerNews(playerName, null);
+        if (newsData.snippets.length > 0) {
+          playerNews[playerName] = newsData.snippets.slice(0, 3);
+        }
+      } catch (e) {
+        console.log(`[PortfolioOutlook] Failed to fetch news for ${playerName}`);
+      }
+    }
+  }
+  console.log(`[PortfolioOutlook] Fetched news for ${Object.keys(playerNews).length} players`);
 
   if (profile.cardCount === 0) {
     const emptySnapshot: InsertPortfolioSnapshot = {
@@ -365,7 +392,7 @@ export async function generatePortfolioOutlook(userId: string): Promise<Portfoli
       model: "gpt-4o",
       messages: [
         { role: "system", content: PORTFOLIO_OUTLOOK_SYSTEM_PROMPT },
-        { role: "user", content: buildPortfolioOutlookPrompt(profile, riskSignals) },
+        { role: "user", content: buildPortfolioOutlookPrompt(profile, riskSignals, playerNews) },
       ],
       temperature: 0.7,
       max_tokens: 1500,
