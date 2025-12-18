@@ -1,17 +1,27 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins, ArrowRightLeft } from "lucide-react";
+import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins, ArrowRightLeft, Trash2, ImagePlus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -69,8 +79,55 @@ export function CardDetailModal({
   const [isSaving, setIsSaving] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [showTradeModal, setShowTradeModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [refreshedValue, setRefreshedValue] = useState<number | null>(null);
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [newImagePreview, setNewImagePreview] = useState<string | undefined>(undefined);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  const deleteCardMutation = useMutation({
+    mutationFn: async () => {
+      if (!card) return;
+      await apiRequest("DELETE", `/api/display-cases/${displayCaseId}/cards/${card.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
+      toast({
+        title: "Card deleted",
+        description: "The card has been removed from your collection.",
+      });
+      onClose();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete the card. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const clearNewImage = () => {
+    setNewImageFile(null);
+    setNewImagePreview(undefined);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  };
 
   const { data: bookmarkStatus, refetch: refetchBookmark } = useQuery<{ hasBookmarked: boolean; bookmarkCount: number }>({
     queryKey: ["/api/cards", card?.id, "bookmark-status"],
@@ -193,6 +250,29 @@ export function CardDetailModal({
 
     setIsSaving(true);
     try {
+      // If there's a new image, upload it first
+      let newImagePath = null;
+      if (newImageFile) {
+        // Get signed upload URL
+        const uploadUrlRes = await apiRequest("POST", "/api/objects/upload");
+        const { uploadURL } = uploadUrlRes;
+
+        // Upload directly to cloud storage
+        await fetch(uploadURL, {
+          method: "PUT",
+          body: newImageFile,
+          headers: {
+            "Content-Type": newImageFile.type,
+          },
+        });
+
+        // Finalize and get the public path
+        const updateRes = await apiRequest("PUT", "/api/card-images", {
+          cardImageURL: uploadURL,
+        });
+        newImagePath = updateRes.objectPath;
+      }
+
       await apiRequest("PATCH", `/api/display-cases/${displayCaseId}/cards/${card.id}`, {
         title: formData.title.trim(),
         set: formData.set.trim() || null,
@@ -205,6 +285,7 @@ export function CardDetailModal({
         tags: formData.tags.length > 0 ? formData.tags : null,
         openToOffers: formData.openToOffers,
         minOfferAmount: formData.minOfferAmount ? parseFloat(formData.minOfferAmount) : null,
+        ...(newImagePath && { imagePath: newImagePath }),
       });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
@@ -213,6 +294,7 @@ export function CardDetailModal({
         description: "Your card details have been saved.",
       });
       setIsEditing(false);
+      clearNewImage();
     } catch (error) {
       toast({
         title: "Error",
@@ -228,6 +310,7 @@ export function CardDetailModal({
     if (!open) {
       setIsEditing(false);
       setTagInput("");
+      clearNewImage();
       if (card) {
         setFormData({
           title: card.title || "",
@@ -250,6 +333,7 @@ export function CardDetailModal({
   const handleCancel = () => {
     setIsEditing(false);
     setTagInput("");
+    clearNewImage();
     if (card) {
       setFormData({
         title: card.title || "",
@@ -321,28 +405,71 @@ export function CardDetailModal({
                 </Button>
               )}
               {canEdit && !isEditing && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsEditing(true)}
-                  data-testid="button-edit-card"
-                >
-                  <Edit2 className="w-3 h-3 mr-1" />
-                  Edit
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsEditing(true)}
+                    data-testid="button-edit-card"
+                  >
+                    <Edit2 className="w-3 h-3 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-destructive hover:text-destructive"
+                    data-testid="button-delete-card"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </>
               )}
             </div>
           </div>
         </DialogHeader>
 
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="aspect-[3/4] rounded-md overflow-hidden bg-muted">
+          <div className="aspect-[3/4] rounded-md overflow-hidden bg-muted relative">
             <img
-              src={card.imagePath}
+              src={newImagePreview || card.imagePath || ""}
               alt={card.title}
               className="w-full h-full object-contain"
               data-testid="img-card-detail"
             />
+            {isEditing && (
+              <div className="absolute bottom-2 left-2 right-2 flex gap-2">
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                  data-testid="input-card-image"
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => imageInputRef.current?.click()}
+                  data-testid="button-change-image"
+                >
+                  <ImagePlus className="w-3 h-3 mr-1" />
+                  {newImagePreview ? "Change" : "Replace Image"}
+                </Button>
+                {newImagePreview && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={clearNewImage}
+                    data-testid="button-cancel-image"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {isEditing ? (
@@ -776,6 +903,28 @@ export function CardDetailModal({
           onOpenChange={setShowTradeModal}
         />
       )}
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Card</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{card?.title}"? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteCardMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteCardMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteCardMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
