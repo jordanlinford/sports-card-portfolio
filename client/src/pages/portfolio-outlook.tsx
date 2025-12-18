@@ -26,6 +26,7 @@ import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PortfolioSnapshot, PortfolioExposures, RiskSignal, RecommendedAction } from "@shared/schema";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 
 function formatTimestamp(date: Date | string | null | undefined): string {
   if (!date) return "Unknown";
@@ -269,15 +270,38 @@ export default function PortfolioOutlookPage() {
             <ConfidenceBadge score={snapshot.confidenceScore} cardCount={snapshot.cardCount} />
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => handleGenerate(true)}
-          disabled={isRefreshing || generateMutation.isPending}
-          data-testid="button-refresh-outlook"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-          Refresh Analysis
-        </Button>
+        <div className="flex items-center gap-2">
+          <ShareSnapshotButton
+            snapshotType="portfolio_outlook"
+            title="Portfolio Outlook"
+            snapshotData={{
+              overallStance: snapshot.overallStance,
+              overallHealth: {
+                grade: snapshot.overallStance,
+                summary: snapshot.summaryShort,
+              },
+              portfolioValue: snapshot.portfolioValueEstimate,
+              cardCount: snapshot.cardCount,
+              primaryDriver: snapshot.primaryDriver,
+              confidenceScore: snapshot.confidenceScore,
+              riskSignals: riskSignals,
+              opportunities: opportunities,
+              watchouts: watchouts,
+              recommendations: actions.map(a => a.label),
+              exposures: exposures,
+              asOfDate: snapshot.asOfDate,
+            }}
+          />
+          <Button 
+            variant="outline" 
+            onClick={() => handleGenerate(true)}
+            disabled={isRefreshing || generateMutation.isPending}
+            data-testid="button-refresh-outlook"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+            Refresh Analysis
+          </Button>
+        </div>
       </div>
 
       <Card data-testid="card-verdict">

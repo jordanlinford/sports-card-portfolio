@@ -15,6 +15,7 @@ import {
   BarChart3
 } from "lucide-react";
 import type { Card as CardType } from "@shared/schema";
+import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import {
   BarChart,
   Bar,
@@ -129,9 +130,28 @@ export default function AnalyticsPage() {
           Back to Dashboard
         </Link>
 
-        <div className="flex items-center gap-3 mb-2">
-          <BarChart3 className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold" data-testid="text-analytics-title">Portfolio Analytics</h1>
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-2">
+          <div className="flex items-center gap-3">
+            <BarChart3 className="h-8 w-8 text-primary" />
+            <h1 className="text-3xl font-bold" data-testid="text-analytics-title">Portfolio Analytics</h1>
+          </div>
+          {analytics && analytics.totalCards > 0 && (
+            <ShareSnapshotButton
+              snapshotType="portfolio_analytics"
+              title="Portfolio Analytics"
+              snapshotData={{
+                totalValue: analytics.totalValue,
+                totalCards: analytics.totalCards,
+                totalCases: analytics.totalCases,
+                topCards: analytics.topCards.slice(0, 5).map((c: CardType) => ({
+                  title: c.title,
+                  estimatedValue: c.estimatedValue,
+                  previousValue: c.previousValue,
+                })),
+                valueByCase: analytics.valueByCase,
+              }}
+            />
+          )}
         </div>
         <p className="text-muted-foreground">
           Track your collection's value and performance

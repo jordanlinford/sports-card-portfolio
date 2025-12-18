@@ -36,6 +36,7 @@ import WatchlistPage from "@/pages/watchlist";
 import HiddenGemsPage from "@/pages/hidden-gems";
 import PortfolioOutlookPage from "@/pages/portfolio-outlook";
 import NextBuysPage from "@/pages/next-buys";
+import ShareViewer from "@/pages/share-viewer";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -61,6 +62,7 @@ function Router() {
       <Route path="/explore" component={Explore} />
       <Route path="/upgrade" component={Upgrade} />
       <Route path="/billing/success" component={BillingSuccess} />
+      <Route path="/share/:token" component={ShareViewer} />
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />

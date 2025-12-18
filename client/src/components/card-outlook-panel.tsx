@@ -34,6 +34,7 @@ import {
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Card as CardType } from "@shared/schema";
+import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 
 function safeCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined || isNaN(value)) return "-";
@@ -322,10 +323,34 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
               </Badge>
             )}
           </div>
-          <Badge className={`${getActionColor(outlook.action)} gap-1`} data-testid="badge-outlook-action">
-            {getActionIcon(outlook.action)}
-            {getActionLabel(outlook.action)}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <ShareSnapshotButton
+              snapshotType="card_outlook"
+              title={`${card.title} - Card Outlook`}
+              snapshotData={{
+                cardTitle: card.title,
+                playerName: outlook.playerName || card.playerName,
+                sport: outlook.sport || card.sport,
+                position: outlook.position || card.position,
+                action: outlook.action,
+                upsideScore: outlook.upsideScore,
+                riskScore: outlook.riskScore,
+                confidenceScore: outlook.confidenceScore,
+                explanation: outlook.explanation,
+                priceTargets: outlook.priceTargets,
+                projectedOutlook: outlook.projectedOutlook,
+                factors: outlook.factors,
+                generatedAt: outlook.generatedAt,
+              }}
+              cardId={card.id}
+              size="icon"
+              variant="ghost"
+            />
+            <Badge className={`${getActionColor(outlook.action)} gap-1`} data-testid="badge-outlook-action">
+              {getActionIcon(outlook.action)}
+              {getActionLabel(outlook.action)}
+            </Badge>
+          </div>
         </div>
         {outlook.generatedAt && (
           <CardDescription className="text-xs">

@@ -4342,4 +4342,132 @@ Allow: /
     }
   });
 
+  // ============================================================================
+  // Shared Snapshots - Public sharing of reports
+  // ============================================================================
+
+  // Helper to generate secure random token
+  function generateShareToken(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let token = '';
+    for (let i = 0; i < 32; i++) {
+      token += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return token;
+  }
+
+  // POST /api/snapshots - Create a shared snapshot
+  app.post("/api/snapshots", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { snapshotType, cardId, snapshotData, title } = req.body;
+      
+      if (!snapshotType || !snapshotData || !title) {
+        return res.status(400).json({ error: "Missing required fields: snapshotType, snapshotData, title" });
+      }
+
+      const validTypes = ['card_outlook', 'player_outlook', 'portfolio_analytics', 'portfolio_outlook'];
+      if (!validTypes.includes(snapshotType)) {
+        return res.status(400).json({ error: "Invalid snapshot type" });
+      }
+
+      const token = generateShareToken();
+      
+      const snapshot = await storage.createSharedSnapshot(userId, {
+        token,
+        snapshotType,
+        cardId: cardId || null,
+        snapshotData,
+        title,
+        expiresAt: null, // Never expires by default
+      });
+
+      res.json({ 
+        success: true, 
+        token: snapshot.token,
+        shareUrl: `/share/${snapshot.token}`
+      });
+    } catch (error) {
+      console.error("[Snapshots] Error creating:", error);
+      res.status(500).json({ error: "Failed to create snapshot" });
+    }
+  });
+
+  // GET /api/snapshots/:token - Get a shared snapshot (public - no auth required)
+  app.get("/api/snapshots/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const snapshot = await storage.getSharedSnapshotByToken(token);
+      if (!snapshot) {
+        return res.status(404).json({ error: "Snapshot not found" });
+      }
+
+      // Check expiration
+      if (snapshot.expiresAt && new Date(snapshot.expiresAt) < new Date()) {
+        return res.status(410).json({ error: "Snapshot has expired" });
+      }
+
+      // Increment view count
+      await storage.incrementSnapshotViewCount(token);
+
+      // Get owner info for display
+      const owner = await storage.getUser(snapshot.userId);
+      const ownerName = owner?.firstName 
+        ? `${owner.firstName}${owner.lastName ? ' ' + owner.lastName : ''}`
+        : owner?.handle || 'Collector';
+
+      res.json({
+        snapshotType: snapshot.snapshotType,
+        title: snapshot.title,
+        snapshotData: snapshot.snapshotData,
+        ownerName,
+        ownerHandle: owner?.handle,
+        ownerProfileImage: owner?.profileImageUrl,
+        createdAt: snapshot.createdAt,
+        viewCount: snapshot.viewCount + 1, // Include the current view
+      });
+    } catch (error) {
+      console.error("[Snapshots] Error fetching:", error);
+      res.status(500).json({ error: "Failed to fetch snapshot" });
+    }
+  });
+
+  // GET /api/my-snapshots - Get user's shared snapshots
+  app.get("/api/my-snapshots", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const snapshots = await storage.getUserSharedSnapshots(userId);
+      res.json(snapshots);
+    } catch (error) {
+      console.error("[Snapshots] Error fetching user snapshots:", error);
+      res.status(500).json({ error: "Failed to fetch snapshots" });
+    }
+  });
+
+  // DELETE /api/snapshots/:token - Delete a shared snapshot
+  app.delete("/api/snapshots/:token", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { token } = req.params;
+      await storage.deleteSharedSnapshot(token, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Snapshots] Error deleting:", error);
+      res.status(500).json({ error: "Failed to delete snapshot" });
+    }
+  });
+
 }
