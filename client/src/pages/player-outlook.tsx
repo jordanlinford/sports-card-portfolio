@@ -725,7 +725,7 @@ export default function PlayerOutlookPage() {
 
   if (authLoading) {
     return (
-      <div className="container max-w-4xl py-8 px-4">
+      <div className="container max-w-6xl py-8 px-4">
         <PlayerOutlookSkeleton />
       </div>
     );
@@ -733,7 +733,7 @@ export default function PlayerOutlookPage() {
 
   if (!user) {
     return (
-      <div className="container max-w-4xl py-8 px-4">
+      <div className="container max-w-6xl py-8 px-4">
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <h2 className="text-xl font-semibold mb-2">Sign in Required</h2>
@@ -748,7 +748,7 @@ export default function PlayerOutlookPage() {
   }
 
   return (
-    <div className="container max-w-4xl py-8 px-4 space-y-6">
+    <div className="container max-w-6xl py-8 px-4 space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold" data-testid="text-page-title">Player Outlook</h1>
         <p className="text-muted-foreground">
