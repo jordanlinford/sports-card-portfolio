@@ -1435,7 +1435,7 @@ Allow: /
       }
 
       // Import the outlook engine dynamically to avoid circular dependencies
-      const { computeAllSignals, generateOutlookExplanation } = await import("./outlookEngine");
+      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
       // First, get enhanced price data with individual price points
@@ -1475,10 +1475,18 @@ Allow: /
         finalActionReasons = [`Low card match confidence: ${matchConfidence.reason}`, ...finalActionReasons];
       }
 
+      // Fetch real-time player news for current context (sports cards only)
+      let newsSnippets: string[] = [];
+      if (card.cardCategory === "sports" && card.playerName) {
+        console.log(`[Outlook 2.0] Fetching real-time news for ${card.playerName}`);
+        const newsData = await fetchPlayerNews(card.playerName, card.sport);
+        newsSnippets = newsData.snippets;
+      }
+
       // Generate AI explanation (AI explains, doesn't decide)
       console.log(`[Outlook 2.0] Generating AI explanation for ${finalAction}`);
       const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
-      const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue);
+      const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue, newsSnippets);
 
       // Store outlook in the new card_outlooks table (use filtered min/max for tighter range)
       const outlookData = {
@@ -1814,7 +1822,7 @@ Allow: /
       };
 
       // Import the outlook engine dynamically
-      const { computeAllSignals, generateOutlookExplanation } = await import("./outlookEngine");
+      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
       // Fetch enhanced price data
@@ -1913,10 +1921,19 @@ Allow: /
         finalActionReasons = [`Low card match confidence: ${matchConfidence.reason}`, ...finalActionReasons];
       }
 
+      // Attempt to extract player name from title for news lookup
+      // Common formats: "2024 Prizm Cooper Flagg RC", "Cooper Flagg 2024 Topps Chrome"
+      // We'll try to use the title as-is for the news search since player name isn't explicitly provided
+      let newsSnippets: string[] = [];
+      const possiblePlayerName = title; // Use full title for search - Serper will find relevant news
+      console.log(`[Quick Analyze] Fetching real-time news for: ${possiblePlayerName}`);
+      const newsData = await fetchPlayerNews(possiblePlayerName, null);
+      newsSnippets = newsData.snippets;
+
       // Generate AI explanation
       console.log(`[Quick Analyze] Generating AI explanation for ${finalAction}`);
       const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
-      const explanation = await generateOutlookExplanation(tempCard as any, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue);
+      const explanation = await generateOutlookExplanation(tempCard as any, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue, newsSnippets);
 
       // Record usage for free tier tracking
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);

@@ -9,6 +9,79 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
 });
 
+// Fetch real-time news about a player using Serper API
+// This ensures AI explanations use current information, not outdated training data
+export async function fetchPlayerNews(playerName: string | null | undefined, sport: string | null | undefined): Promise<{
+  snippets: string[];
+  momentum: "up" | "flat" | "down";
+  newsCount: number;
+}> {
+  if (!playerName) {
+    return { snippets: [], momentum: "flat", newsCount: 0 };
+  }
+
+  const SERPER_API_KEY = process.env.SERPER_API_KEY;
+  if (!SERPER_API_KEY) {
+    console.log("[OutlookEngine] No SERPER_API_KEY - skipping news fetch");
+    return { snippets: [], momentum: "flat", newsCount: 0 };
+  }
+
+  try {
+    const sportQuery = sport ? ` ${sport}` : "";
+    // Use current year to ensure we get the most recent news
+    const currentYear = new Date().getFullYear();
+    const response = await fetch("https://google.serper.dev/news", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": SERPER_API_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        q: `${playerName}${sportQuery} ${currentYear}`,
+        num: 5,
+      }),
+    });
+
+    if (!response.ok) {
+      console.log("[OutlookEngine] Serper API error:", response.status);
+      return { snippets: [], momentum: "flat", newsCount: 0 };
+    }
+
+    const data = await response.json();
+    const news = data.news || [];
+
+    if (news.length === 0) {
+      return { snippets: [], momentum: "flat", newsCount: 0 };
+    }
+
+    const snippets = news.slice(0, 5).map((n: any) => n.snippet || n.title);
+
+    // Analyze sentiment from snippets
+    const positiveKeywords = ["surge", "rising", "hot", "breakout", "mvp", "record", "star", "elite", "best", "youngest", "historic", "amazing", "dominant"];
+    const negativeKeywords = ["decline", "falling", "injury", "benched", "struggling", "bust", "down", "trade", "concern", "slump"];
+
+    let positiveCount = 0;
+    let negativeCount = 0;
+    const combined = snippets.join(" ").toLowerCase();
+
+    positiveKeywords.forEach(kw => {
+      if (combined.includes(kw)) positiveCount++;
+    });
+    negativeKeywords.forEach(kw => {
+      if (combined.includes(kw)) negativeCount++;
+    });
+
+    const momentum = positiveCount > negativeCount + 1 ? "up" :
+                     negativeCount > positiveCount + 1 ? "down" : "flat";
+
+    console.log(`[OutlookEngine] News for ${playerName}: ${news.length} articles, momentum: ${momentum}`);
+    return { snippets, momentum, newsCount: news.length };
+  } catch (error) {
+    console.error("[OutlookEngine] News fetch error:", error);
+    return { snippets: [], momentum: "flat", newsCount: 0 };
+  }
+}
+
 // Static score mappings
 const SPORT_SCORES: Record<string, number> = {
   basketball: 10,
@@ -655,12 +728,18 @@ export async function generateOutlookExplanation(
   card: Card,
   signals: ComputedOutlookSignals,
   pricePoints: PricePoint[],
-  marketValue: number | null
+  marketValue: number | null,
+  newsSnippets: string[] = []
 ): Promise<OutlookExplanation> {
   // Sample top 5 price points for context
   const samplePrices = pricePoints.slice(0, 5).map(pp => 
     `$${pp.price} on ${pp.date} (${pp.source})`
   ).join(", ");
+
+  // Format news section for prompt
+  const newsSection = newsSnippets.length > 0 
+    ? `\nRECENT NEWS (use this for current player status - YOUR TRAINING DATA MAY BE OUTDATED):\n${newsSnippets.map(s => `- ${s}`).join("\n")}\n\nIMPORTANT: The news above is REAL-TIME from today. Use it to understand the player's CURRENT situation. Do NOT contradict this news with outdated information from your training data.`
+    : "";
 
   const prompt = `You are a sports card market analyst. Explain WHY the following action was computed for this card.
 
@@ -684,7 +763,7 @@ SIGNAL SCORES (these determined the action):
 REASONS (computed): ${signals.actionReasons.join("; ")}
 
 RECENT PRICES: ${samplePrices || "No recent data"}
-
+${newsSection}
 Generate a brief explanation of why ${signals.action} is the recommendation. Return JSON:
 {
   "bullets": ["reason 1", "reason 2", "reason 3"],
@@ -700,7 +779,8 @@ IMPORTANT RULES:
    - Waiting for catalyst (if neutral momentum)
    - Cooling after a run-up (if recent trend spike)
 4. Only mention "data uncertainty" or "limited comps" when Data Confidence is actually LOW.
-5. The explanation must never contradict the displayed confidence indicators.`;
+5. The explanation must never contradict the displayed confidence indicators.
+6. If RECENT NEWS is provided, USE IT to inform your explanation about the player's current status. The news is real-time and supersedes your training data.`;
 
 
   try {

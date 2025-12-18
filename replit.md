@@ -43,7 +43,7 @@ The application supports core functionalities including:
     - **Replit Auth**: OpenID Connect provider for user authentication.
     - **Replit Object Storage (Google Cloud Storage)**: Primary storage for card images and other files, with credentials managed via Replit Sidecar.
 - **Stripe**: Payment gateway for subscription management and processing, using Checkout Sessions for payments.
-- **OpenAI GPT & Serper API**: Used for AI-powered price lookups and generating detailed card outlook explanations.
+- **OpenAI GPT & Serper API**: Used for AI-powered price lookups and generating detailed card outlook explanations. Serper provides real-time news about players to ensure AI recommendations use current information rather than outdated training data.
 
 ### Frontend Libraries
 - **UI & Components**: Radix UI primitives, Uppy (for file uploads), date-fns, Lucide React (icons), shadcn/ui.

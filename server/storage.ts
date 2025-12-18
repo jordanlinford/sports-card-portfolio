@@ -277,7 +277,7 @@ export interface IStorage {
   getCachedPlayerOutlook(playerKey: string): Promise<PlayerOutlookCache | undefined>;
 
   // Shared Snapshot operations
-  createSharedSnapshot(userId: string, data: InsertSharedSnapshot): Promise<SharedSnapshot>;
+  createSharedSnapshot(userId: string, data: Omit<InsertSharedSnapshot, 'userId'>): Promise<SharedSnapshot>;
   getSharedSnapshotByToken(token: string): Promise<SharedSnapshot | undefined>;
   incrementSnapshotViewCount(token: string): Promise<void>;
   getUserSharedSnapshots(userId: string): Promise<SharedSnapshot[]>;
@@ -2320,7 +2320,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Shared Snapshot operations
-  async createSharedSnapshot(userId: string, data: InsertSharedSnapshot): Promise<SharedSnapshot> {
+  async createSharedSnapshot(userId: string, data: Omit<InsertSharedSnapshot, 'userId'>): Promise<SharedSnapshot> {
     const [snapshot] = await db
       .insert(sharedSnapshots)
       .values({
