@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
@@ -836,6 +837,23 @@ export default function PlayerOutlookPage() {
                   )}
                   {isWatching ? "Remove from Watchlist" : "Add to Watchlist"}
                 </Button>
+                <ShareSnapshotButton
+                  snapshotType="player_outlook"
+                  title={`${outlookData.player.name} Outlook`}
+                  snapshotData={{
+                    playerName: outlookData.player.name,
+                    sport: outlookData.player.sport,
+                    position: outlookData.player.position,
+                    team: outlookData.player.team,
+                    outlook: outlookData.verdict.action,
+                    summary: outlookData.verdict.summary,
+                    keyFactors: outlookData.thesis.slice(0, 4),
+                    temperature: outlookData.snapshot.temperature,
+                    modifier: outlookData.verdict.modifier,
+                    exposures: outlookData.exposures,
+                    generatedAt: outlookData.generatedAt,
+                  }}
+                />
                 <Button variant="outline" asChild>
                   <a 
                     href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(outlookData.player.name + " card")}&_sacat=0&LH_Sold=1`}

@@ -449,6 +449,11 @@ export function Navigation() {
                 <Zap className="h-4 w-4" />
               </Button>
             </Link>
+            <Link href="/hidden-gems">
+              <Button variant="ghost" size="sm" className={cn(isActive("/hidden-gems") && "bg-accent")} data-testid="button-nav-hidden-gems">
+                <Gem className="h-4 w-4" />
+              </Button>
+            </Link>
             <Link href="/player-outlook">
               <Button variant="ghost" size="sm" className={cn(isActive("/player-outlook") && "bg-accent")}>
                 <TrendingUp className="h-4 w-4" />
