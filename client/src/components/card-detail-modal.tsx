@@ -47,6 +47,9 @@ interface CardDetailModalProps {
 
 interface EditFormData {
   title: string;
+  playerName: string;
+  sport: string;
+  position: string;
   set: string;
   year: string;
   variation: string;
@@ -204,6 +207,9 @@ export function CardDetailModal({
   
   const [formData, setFormData] = useState<EditFormData>({
     title: "",
+    playerName: "",
+    sport: "",
+    position: "",
     set: "",
     year: "",
     variation: "",
@@ -221,6 +227,9 @@ export function CardDetailModal({
     if (card) {
       setFormData({
         title: card.title || "",
+        playerName: card.playerName || "",
+        sport: card.sport || "",
+        position: card.position || "",
         set: card.set || "",
         year: card.year?.toString() || "",
         variation: card.variation || "",
@@ -275,6 +284,9 @@ export function CardDetailModal({
 
       await apiRequest("PATCH", `/api/display-cases/${displayCaseId}/cards/${card.id}`, {
         title: formData.title.trim(),
+        playerName: formData.playerName.trim() || null,
+        sport: formData.sport.trim() || null,
+        position: formData.position.trim() || null,
         set: formData.set.trim() || null,
         year: formData.year ? parseInt(formData.year) : null,
         variation: formData.variation.trim() || null,
@@ -314,6 +326,9 @@ export function CardDetailModal({
       if (card) {
         setFormData({
           title: card.title || "",
+          playerName: card.playerName || "",
+          sport: card.sport || "",
+          position: card.position || "",
           set: card.set || "",
           year: card.year?.toString() || "",
           variation: card.variation || "",
@@ -337,6 +352,9 @@ export function CardDetailModal({
     if (card) {
       setFormData({
         title: card.title || "",
+        playerName: card.playerName || "",
+        sport: card.sport || "",
+        position: card.position || "",
         set: card.set || "",
         year: card.year?.toString() || "",
         variation: card.variation || "",
@@ -484,6 +502,41 @@ export function CardDetailModal({
                     placeholder="Card title"
                     data-testid="input-edit-title"
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <Label htmlFor="edit-player-name">Player Name</Label>
+                  <Input
+                    id="edit-player-name"
+                    value={formData.playerName}
+                    onChange={(e) => setFormData({ ...formData, playerName: e.target.value })}
+                    placeholder="e.g., LeBron James"
+                    data-testid="input-edit-player-name"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-sport">Sport</Label>
+                    <Input
+                      id="edit-sport"
+                      value={formData.sport}
+                      onChange={(e) => setFormData({ ...formData, sport: e.target.value })}
+                      placeholder="e.g., Basketball"
+                      data-testid="input-edit-sport"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-position">Position</Label>
+                    <Input
+                      id="edit-position"
+                      value={formData.position}
+                      onChange={(e) => setFormData({ ...formData, position: e.target.value })}
+                      placeholder="e.g., Point Guard"
+                      data-testid="input-edit-position"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">
