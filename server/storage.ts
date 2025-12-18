@@ -22,6 +22,7 @@ import {
   outlookUsage,
   playerWatchlist,
   playerOutlookCache,
+  sharedSnapshots,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -64,6 +65,8 @@ import {
   type PlayerWatchlist,
   type InsertPlayerWatchlist,
   type PlayerOutlookCache,
+  type SharedSnapshot,
+  type InsertSharedSnapshot,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -272,6 +275,13 @@ export interface IStorage {
 
   // Player Outlook Cache operations
   getCachedPlayerOutlook(playerKey: string): Promise<PlayerOutlookCache | undefined>;
+
+  // Shared Snapshot operations
+  createSharedSnapshot(userId: string, data: InsertSharedSnapshot): Promise<SharedSnapshot>;
+  getSharedSnapshotByToken(token: string): Promise<SharedSnapshot | undefined>;
+  incrementSnapshotViewCount(token: string): Promise<void>;
+  getUserSharedSnapshots(userId: string): Promise<SharedSnapshot[]>;
+  deleteSharedSnapshot(token: string, userId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2307,6 +2317,50 @@ export class DatabaseStorage implements IStorage {
       .from(playerOutlookCache)
       .where(eq(playerOutlookCache.playerKey, playerKey));
     return cached;
+  }
+
+  // Shared Snapshot operations
+  async createSharedSnapshot(userId: string, data: InsertSharedSnapshot): Promise<SharedSnapshot> {
+    const [snapshot] = await db
+      .insert(sharedSnapshots)
+      .values({
+        ...data,
+        userId,
+      })
+      .returning();
+    return snapshot;
+  }
+
+  async getSharedSnapshotByToken(token: string): Promise<SharedSnapshot | undefined> {
+    const [snapshot] = await db
+      .select()
+      .from(sharedSnapshots)
+      .where(eq(sharedSnapshots.token, token));
+    return snapshot;
+  }
+
+  async incrementSnapshotViewCount(token: string): Promise<void> {
+    await db
+      .update(sharedSnapshots)
+      .set({ viewCount: sql`${sharedSnapshots.viewCount} + 1` })
+      .where(eq(sharedSnapshots.token, token));
+  }
+
+  async getUserSharedSnapshots(userId: string): Promise<SharedSnapshot[]> {
+    return db
+      .select()
+      .from(sharedSnapshots)
+      .where(eq(sharedSnapshots.userId, userId))
+      .orderBy(desc(sharedSnapshots.createdAt));
+  }
+
+  async deleteSharedSnapshot(token: string, userId: string): Promise<void> {
+    await db
+      .delete(sharedSnapshots)
+      .where(and(
+        eq(sharedSnapshots.token, token),
+        eq(sharedSnapshots.userId, userId)
+      ));
   }
 }
 

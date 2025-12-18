@@ -1361,3 +1361,30 @@ export const nextBuys = pgTable("next_buys", {
 export type NextBuy = typeof nextBuys.$inferSelect;
 export type InsertNextBuy = typeof nextBuys.$inferInsert;
 export const insertNextBuySchema = createInsertSchema(nextBuys).omit({ id: true, createdAt: true });
+
+// Shared Snapshots - allows public viewing of private reports via token
+export const sharedSnapshots = pgTable("shared_snapshots", {
+  id: serial("id").primaryKey(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  snapshotType: varchar("snapshot_type", { length: 50 }).notNull(), // card_outlook, player_outlook, portfolio_analytics, portfolio_outlook
+  
+  // Reference IDs based on type
+  cardId: integer("card_id").references(() => cards.id, { onDelete: "cascade" }),
+  
+  // Snapshot data (JSON blob of the report at time of share)
+  snapshotData: jsonb("snapshot_data").notNull(),
+  
+  // Metadata
+  title: varchar("title", { length: 255 }).notNull(),
+  expiresAt: timestamp("expires_at"), // null = never expires
+  viewCount: integer("view_count").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_shared_snapshots_token").on(table.token),
+  index("idx_shared_snapshots_user").on(table.userId),
+]);
+
+export type SharedSnapshot = typeof sharedSnapshots.$inferSelect;
+export type InsertSharedSnapshot = typeof sharedSnapshots.$inferInsert;
+export const insertSharedSnapshotSchema = createInsertSchema(sharedSnapshots).omit({ id: true, createdAt: true, viewCount: true });
