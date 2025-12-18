@@ -115,6 +115,9 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
   }
   
   try {
+    // Use current year to get the latest news
+    const currentYear = new Date().getFullYear();
+    // First query focuses on player's current status and performance
     const response = await fetch("https://google.serper.dev/news", {
       method: "POST",
       headers: {
@@ -122,8 +125,8 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        q: `${playerName} ${sport} card value 2024`,
-        num: 5,
+        q: `${playerName} ${sport} ${currentYear}`,
+        num: 8,
       }),
     });
     
@@ -214,7 +217,10 @@ PLAYER DATA (from our classification engine):
 - Risk Level: ${classification.baseRisk}
 - Investment Horizon: ${classification.baseHorizon}
 
-${newsSnippets.length > 0 ? `RECENT NEWS SIGNALS:\n${newsSnippets.map(s => `- ${s}`).join("\n")}` : "No recent news available - use conditional reasoning."}
+${newsSnippets.length > 0 ? `CRITICAL - REAL-TIME NEWS (THIS IS GROUND TRUTH - YOUR TRAINING DATA MAY BE OUTDATED):
+${newsSnippets.map(s => `- ${s}`).join("\n")}
+
+IMPORTANT: The news above is from TODAY'S search results. If the news indicates the player has been drafted, traded, signed, or is playing in the NBA, you MUST use that information. Do NOT contradict this news with outdated information from your training data. For example, if news says a player was drafted or is playing in the NBA, they are NOT a prospect - they are a professional player.` : "No recent news available - use conditional reasoning."}
 
 RESPOND IN EXACTLY THIS JSON FORMAT:
 {
