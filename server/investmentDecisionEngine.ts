@@ -177,7 +177,8 @@ function decideVerdict(
   scores: InvestmentScores, 
   stage: PlayerStage | undefined,
   compsReliable: boolean,
-  overheated: boolean
+  overheated: boolean,
+  input: DecisionInput
 ): VerdictResult {
   const { downsideRiskScore, valuationScore, mispricingScore, narrativeHeatScore, liquidityScore } = scores;
 
@@ -222,28 +223,49 @@ function decideVerdict(
     return { verdict: "TRADE_THE_HYPE", reason: "Overheated with reliable comps - sell into spikes" };
   }
 
-  // PRECEDENCE 4: ACCUMULATE (strong value signals)
+  // PRECEDENCE 4: Early-career (ROOKIE/YEAR_2) default to SPECULATIVE unless clearly cheap
+  // Young players without reliable comps = uncertainty, not HOLD
+  const earlyCareer = stage === "ROOKIE" || stage === "YEAR_2";
+  if (!compsReliable && earlyCareer) {
+    // If clearly underpriced with good fundamentals, they can ACCUMULATE
+    if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
+      return { verdict: "ACCUMULATE", reason: "Early-career with compelling value" };
+    }
+    // Otherwise, speculative by default (not HOLD)
+    return { verdict: "SPECULATIVE_FLYER", reason: "Early-career without reliable comps - uncertainty" };
+  }
+
+  // PRECEDENCE 5: Mid-tier AVOID for active players with deteriorating setup
+  // Catches Daniel Jones types: low liquidity + bad signals
+  // Note: BUST/RETIRED/RETIRED_HOF already handled above, so only active stages reach here
+  const deteriorating = 
+    input.momentum === "DOWN" || 
+    input.risk === "HIGH" || 
+    input.volatility === "HIGH";
+  
+  if (!compsReliable && liquidityScore <= 35 && deteriorating) {
+    return { verdict: "AVOID_NEW_MONEY", reason: "Low liquidity with deteriorating signals" };
+  }
+
+  // PRECEDENCE 6: ACCUMULATE (strong value signals)
   if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
     return { verdict: "ACCUMULATE", reason: "Underpriced with good liquidity/risk profile" };
   }
 
-  // PRECEDENCE 5: AVOID_NEW_MONEY - NARROWED significantly
-  // Only fires for genuinely negative expected value situations:
-  // A) Extreme downside risk (≥70) with poor value
-  // B) Already handled: BUST stage (above)
+  // PRECEDENCE 7: AVOID_NEW_MONEY - extreme risk cases
+  // Only fires for genuinely negative expected value situations
   if (downsideRiskScore >= 70 && valuationScore <= 40) {
     return { verdict: "AVOID_NEW_MONEY", reason: "Extreme downside risk with poor valuation" };
   }
 
-  // PRECEDENCE 6: HOLD_CORE - widened to catch fairly priced stars
+  // PRECEDENCE 8: HOLD_CORE - widened to catch fairly priced stars
   // Stars who are "fully priced but not cheap" belong here, not AVOID
   if (downsideRiskScore < 70 && valuationScore >= 35) {
     return { verdict: "HOLD_CORE", reason: "Fair value with acceptable risk" };
   }
 
-  // PRECEDENCE 7: SPECULATIVE_FLYER is the home for uncertainty
+  // PRECEDENCE 9: SPECULATIVE_FLYER is the home for uncertainty
   // Modeled comps, prospects, thin markets - uncertainty ≠ avoidance
-  // This is the default for "I don't know enough, but upside exists"
   return { verdict: "SPECULATIVE_FLYER", reason: "High uncertainty - treat as lottery ticket" };
 }
 
@@ -554,7 +576,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const overheated = (scores.mispricingScore <= -20 && scores.narrativeHeatScore >= 65);
   
   // Get verdict with new precedence-based logic
-  const { verdict, reason } = decideVerdict(scores, input.stage, compsReliable, overheated);
+  const { verdict, reason } = decideVerdict(scores, input.stage, compsReliable, overheated, input);
   
   // Compute base confidence
   let confidence = computeConfidence(scores);
