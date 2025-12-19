@@ -1,0 +1,167 @@
+Fix verdict engine so “Trade the Hype” stops dominating when comps are modeled / thin
+
+Goal
+Our verdict engine currently selects TRADE_THE_HYPE too often because it triggers on narrativeHeat + mispricing even when we only have modeled comps or thin sold history. We need gating rules so TRADE_THE_HYPE is only used when we have reliable comps history. When comps are modeled or missing, overheated players should become AVOID_NEW_MONEY (“don’t chase at these prices”), not TRADE_THE_HYPE (“sell into spikes”).
+
+Requirements
+
+Implement a comps reliability gate using existing fields.
+
+Add hard precedence rules for BUST and RETIRED markets.
+
+Update TRADE_THE_HYPE selection to require reliable comps.
+
+Add a decisionDebug object returned by the engine for QA.
+
+Cap confidence when comps are not reliable or metadata is unknown.
+
+Step-by-step implementation
+
+A) Add helper flags inside the decision engine
+In the file where you decide verdict (decisionEngine.ts or equivalent), add:
+
+hasCompData = input.compData?.available === true
+
+compSource = input.compData?.source ?? "unknown"
+
+compsReliable = hasCompData && compSource !== "modeled"
+
+lowMeta = (input.team === "Unknown" || input.position === "Unknown" || input.team == null || input.position == null) // if team/position aren’t on DecisionInput, use whatever meta object you have in the player header. If you truly don’t have them here, skip lowMeta and only use comp gating.
+
+overheated = (scores.mispricingScore <= -20 && scores.narrativeHeatScore >= 65)
+
+B) Enforce verdict precedence in this exact order (do not reorder)
+Replace your current if/else chain with this precedence-based version:
+
+BUST override (hard)
+If input.stage === "BUST":
+
+return verdict = "AVOID_NEW_MONEY"
+
+confidence = "MEDIUM" (or LOW if you want)
+Rationale: busts should not be TRADE_THE_HYPE by default.
+
+Retired / HOF default (hard)
+If input.stage === "RETIRED" OR input.stage === "RETIRED_HOF":
+
+return verdict = "HOLD_CORE"
+
+confidence = "MEDIUM" unless comps are unreliable, then LOW
+Rationale: legends/vintage markets should not be treated as hype trades unless you have true sold-history spike evidence (we don’t right now).
+
+If metadata is unknown (hard safety)
+If lowMeta is true:
+
+if scores.downsideRiskScore >= 75: return "AVOID_NEW_MONEY"
+
+else return "SPECULATIVE_FLYER"
+
+confidence must be LOW
+Rationale: Unknown/Unknown should never produce a confident sell/buy call.
+
+Overheated with unreliable comps must become AVOID_NEW_MONEY (key fix)
+If overheated is true AND compsReliable is false:
+
+return verdict = "AVOID_NEW_MONEY"
+
+confidence = "LOW"
+Rationale: we cannot see “spikes” with modeled comps, so we cannot say “sell into spikes.” We can say “don’t chase at these prices.”
+
+TRADE_THE_HYPE allowed only when comps are reliable
+If overheated is true AND compsReliable is true:
+
+return verdict = "TRADE_THE_HYPE"
+
+confidence stays as computed (cap below still applies)
+Rationale: This becomes rare until our sold-history scraper improves.
+
+ACCUMULATE (unchanged, but allow even with modeled comps if liquidity/value are strong)
+If scores.mispricingScore >= 15 AND scores.liquidityScore >= 55 AND scores.downsideRiskScore <= 65:
+
+return verdict = "ACCUMULATE"
+
+HOLD_CORE band (widened)
+If scores.downsideRiskScore <= 70 AND scores.valuationScore >= 40 AND scores.valuationScore <= 70:
+
+return verdict = "HOLD_CORE"
+Note: keep using valuationScore as “value score” (higher = better value). If your meaning is different, rename it to valueScore and adjust.
+
+AVOID_NEW_MONEY (risk-driven)
+If scores.downsideRiskScore >= 75 AND scores.valuationScore <= 45:
+
+return verdict = "AVOID_NEW_MONEY"
+
+Fallback
+Else:
+
+return verdict = "SPECULATIVE_FLYER"
+
+C) Confidence capping rules (must apply after verdict selection)
+After selecting verdict, enforce:
+
+If compsReliable is false: confidence cannot exceed "LOW"
+
+If hasCompData is false: confidence must be "LOW"
+
+If lowMeta is true: confidence must be "LOW"
+
+Also adjust posture text by comps reliability:
+
+If verdict === "TRADE_THE_HYPE": postureLabel = "Sell into spikes"
+
+If verdict === "AVOID_NEW_MONEY" AND overheated === true: postureLabel = "Don’t chase at these prices"
+
+If verdict === "AVOID_NEW_MONEY" AND scores.downsideRiskScore >= 75: postureLabel = "Avoid downside"
+This keeps messaging consistent with what we actually know.
+
+D) Return decisionDebug for QA
+Add a decisionDebug object to your analysis output (hidden in UI behind a toggle). Include:
+
+decisionDebug: {
+stage: input.stage,
+temperature: input.temperature,
+compAvailable: hasCompData,
+compSource,
+compsReliable,
+overheated,
+trendScore: scores.trendScore,
+liquidityScore: scores.liquidityScore,
+volatilityScore: scores.volatilityScore,
+narrativeHeatScore: scores.narrativeHeatScore,
+valuationScore: scores.valuationScore,
+mispricingScore: scores.mispricingScore,
+downsideRiskScore: scores.downsideRiskScore,
+chosenVerdict: verdict,
+cappedConfidence: confidence
+}
+
+E) Update copy rules for modeled comps (UI text change)
+Wherever you show Trade the Hype explanation, ensure:
+
+If compData.source === "modeled", you NEVER display “Sell into spikes.”
+
+For overheated + modeled, show Avoid New Money copy:
+“This player is priced for best-case headlines. Don’t buy at these prices unless you’re comfortable with a fast pullback.”
+
+F) Add quick tests (even minimal)
+Add 4 small test cases (or debug asserts) to validate:
+
+Jayden Daniels example (compData.source = modeled, overheated true) → AVOID_NEW_MONEY (not TRADE_THE_HYPE), confidence LOW
+
+Bijan Robinson (cooling, undervalued, liquidity low) → HOLD_CORE or SPECULATIVE_FLYER depending on valuation band
+
+Tom Brady (RETIRED_HOF) → HOLD_CORE always
+
+Joe Namath with unknown meta OR retired → HOLD_CORE, never TRADE_THE_HYPE
+
+Acceptance criteria
+
+“Trade the Hype” becomes rare and requires compsReliable === true.
+
+Any player with compData.source === "modeled" cannot return TRADE_THE_HYPE.
+
+Unknown/Unknown header cases cannot return TRADE_THE_HYPE and must cap confidence LOW.
+
+Jayden Daniels example now returns AVOID_NEW_MONEY with “Don’t chase” language instead of “Sell into spikes.”
+
+If your DecisionInput does not currently include team/position, do not block implementation—just omit the lowMeta check and rely on comp gating. The comp gating is the core fix that will work immediately with your current pipeline.
