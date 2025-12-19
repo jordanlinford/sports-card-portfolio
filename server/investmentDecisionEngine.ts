@@ -728,14 +728,21 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const overheated = (scores.mispricingScore <= -20 && scores.narrativeHeatScore >= 65);
   
   // Get verdict with new precedence-based logic
-  const { verdict: rawVerdict, reason } = decideVerdict(scores, input.stage, compsReliable, overheated, input, roleStabilityScore);
+  const { verdict: rawVerdict, reason: rawReason } = decideVerdict(scores, input.stage, compsReliable, overheated, input, roleStabilityScore);
   
   // ACCUMULATE restriction: not allowed for low role stability (backup/uncertain)
   // Downgrade to SPECULATIVE_FLYER or HOLD_CORE based on context
   let verdict = rawVerdict;
+  let reason = rawReason;
   if (rawVerdict === "ACCUMULATE" && roleStabilityScore <= 55) {
     // Can't ACCUMULATE uncertain starters or below
-    verdict = roleStabilityScore <= 35 ? "SPECULATIVE_FLYER" : "HOLD_CORE";
+    if (roleStabilityScore <= 35) {
+      verdict = "SPECULATIVE_FLYER";
+      reason = "Uncertain role stability - treat as lottery ticket";
+    } else {
+      verdict = "HOLD_CORE";
+      reason = "Role uncertainty limits upside - stable hold only";
+    }
   }
   
   // Compute base confidence

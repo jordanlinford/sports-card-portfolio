@@ -767,6 +767,7 @@ async function generateFreshOutlook(
     newsHype: hypeMap[newsHype] || "LOW",
     team: playerInfo.team,
     position: playerInfo.position,
+    playerName: playerName,
   });
   
   // Step 9: Build response
