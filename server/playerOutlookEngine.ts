@@ -110,6 +110,7 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
   momentum: "up" | "flat" | "down";
   newsHype: "high" | "medium" | "low" | "none";
   snippets: string[];
+  isBust?: boolean;
 }> {
   const SERPER_API_KEY = process.env.SERPER_API_KEY;
   if (!SERPER_API_KEY) {
@@ -188,9 +189,12 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
     // Analyze sentiment from snippets
     const positiveKeywords = ["surge", "rising", "hot", "breakout", "mvp", "record", "star", "elite", "best"];
     const negativeKeywords = ["decline", "falling", "injury", "benched", "struggling", "bust", "down", "trade"];
+    // Keywords that indicate a player is a bust / career has stalled
+    const bustKeywords = ["3rd string", "third string", "backup", "released", "cut", "waived", "demoted", "benched", "practice squad", "bust", "failed", "out of league", "unsigned", "free agent"];
     
     let positiveCount = 0;
     let negativeCount = 0;
+    let bustIndicators = 0;
     const combined = snippets.join(" ").toLowerCase();
     
     positiveKeywords.forEach(kw => {
@@ -199,12 +203,17 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
     negativeKeywords.forEach(kw => {
       if (combined.includes(kw)) negativeCount++;
     });
+    bustKeywords.forEach(kw => {
+      if (combined.includes(kw)) bustIndicators++;
+    });
     
     const momentum = positiveCount > negativeCount + 1 ? "up" : 
                      negativeCount > positiveCount + 1 ? "down" : "flat";
     const newsHype = allNews.length >= 5 ? "high" : allNews.length >= 3 ? "medium" : allNews.length >= 1 ? "low" : "none";
+    // If multiple bust indicators found, flag as bust
+    const isBust = bustIndicators >= 2 || (bustIndicators >= 1 && negativeCount > positiveCount);
     
-    return { momentum, newsHype, snippets };
+    return { momentum, newsHype, snippets, isBust };
   } catch (error) {
     console.error("[PlayerOutlook] News fetch error:", error);
     return { momentum: "flat", newsHype: "none", snippets: [] };
@@ -505,7 +514,7 @@ async function generateFreshOutlook(
   playerKey: string
 ): Promise<PlayerOutlookResponse> {
   // Step 1: Get news signals
-  const { momentum, newsHype, snippets } = await getPlayerNewsSignals(playerName, sport);
+  const { momentum, newsHype, snippets, isBust } = await getPlayerNewsSignals(playerName, sport);
   
   // Step 2: Run classification engine
   const classificationInput: ClassificationInput = {
@@ -513,6 +522,8 @@ async function generateFreshOutlook(
     sport,
     recentMomentum: momentum,
     newsHype,
+    // If news indicates player is a bust, override career stage
+    careerStage: isBust ? "BUST" : undefined,
   };
   
   const classification = classifyPlayer(classificationInput);

@@ -170,7 +170,9 @@ export function classifyPlayer(input: ClassificationInput): ClassificationOutput
   
   // Base temperature by stage + momentum
   let baseTemperature: MarketTemperature = "NEUTRAL";
-  if (stage === "ROOKIE" || stage === "PROSPECT") {
+  if (stage === "BUST") {
+    baseTemperature = "COOLING"; // Bust players have no demand
+  } else if (stage === "ROOKIE" || stage === "PROSPECT") {
     baseTemperature = input.recentMomentum === "up" ? "HOT" : "WARM";
   } else if (stage === "YEAR_2") {
     baseTemperature = input.recentMomentum === "up" ? "HOT" : 
@@ -190,7 +192,9 @@ export function classifyPlayer(input: ClassificationInput): ClassificationOutput
   
   // Base volatility by stage
   let baseVolatility: VolatilityLevel = "MEDIUM";
-  if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "YEAR_2") {
+  if (stage === "BUST") {
+    baseVolatility = "HIGH"; // Bust players = highly volatile, uncertain future
+  } else if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "YEAR_2") {
     baseVolatility = "HIGH"; // Young players = volatile
   } else if (stage === "RETIRED" || stage === "RETIRED_HOF") {
     baseVolatility = "LOW"; // Retired = stable
@@ -200,7 +204,9 @@ export function classifyPlayer(input: ClassificationInput): ClassificationOutput
   
   // Base risk by stage + position
   let baseRisk: RiskLevel = "MEDIUM";
-  if (stage === "ROOKIE" || stage === "PROSPECT") {
+  if (stage === "BUST") {
+    baseRisk = "HIGH"; // Bust = highest risk, career may be over
+  } else if (stage === "ROOKIE" || stage === "PROSPECT") {
     baseRisk = "HIGH"; // Unproven
   } else if (stage === "YEAR_2") {
     baseRisk = "HIGH"; // Sophomore slump risk
@@ -220,7 +226,9 @@ export function classifyPlayer(input: ClassificationInput): ClassificationOutput
   
   // Base horizon by stage
   let baseHorizon: InvestmentHorizon = "MID";
-  if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "YEAR_2") {
+  if (stage === "BUST") {
+    baseHorizon = "SHORT"; // Exit position quickly if possible
+  } else if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "YEAR_2") {
     baseHorizon = "SHORT"; // Quick moves based on performance
   } else if (stage === "PRIME") {
     baseHorizon = "MID";
