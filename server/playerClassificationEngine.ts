@@ -150,28 +150,30 @@ function getPositionPremium(sport: string, position?: string): number {
   return sportPositions[position.toLowerCase()] ?? 5;
 }
 
-// Calculate career stage from rookie year
+// EXPLICIT SEASON YEAR - DO NOT use new Date().getFullYear()
+// Update this constant at the start of each NFL season
+const CURRENT_SEASON_YEAR = 2025;
+
+// Calculate career stage from rookie season year
+// Uses explicit season years for consistency and testability
 // CRITICAL: Never default to PRIME when unknown - use UNKNOWN stage instead
-function inferCareerStage(rookieYear?: number, currentYear: number = new Date().getFullYear()): PlayerStage {
-  // If no rookieYear provided, we cannot determine stage
-  if (!rookieYear) return "UNKNOWN";
+function inferCareerStage(rookieSeasonYear?: number): PlayerStage {
+  // If no rookieSeasonYear provided, we cannot determine stage
+  if (!rookieSeasonYear) return "UNKNOWN";
   
-  // Validate rookieYear is reasonable (not hallucinated by AI)
+  // Validate rookieSeasonYear is reasonable (not hallucinated by AI)
   // Reject years in the future or before 1950 (pre-modern era)
-  if (rookieYear > currentYear || rookieYear < 1950) return "UNKNOWN";
+  if (rookieSeasonYear > CURRENT_SEASON_YEAR || rookieSeasonYear < 1950) return "UNKNOWN";
   
-  const yearsInLeague = currentYear - rookieYear;
+  const yearsPro = CURRENT_SEASON_YEAR - rookieSeasonYear;
   
-  if (yearsInLeague < 0) return "PROSPECT";
-  if (yearsInLeague === 0) return "ROOKIE";
-  if (yearsInLeague === 1) return "YEAR_2";
-  // CRITICAL FIX: AI often misses rookie year by 1-2 years
-  // Players with 2-3 years calculated should be treated as early-career
-  // to catch cases like Nabers (2024 rookie misclassified as 2023)
-  if (yearsInLeague === 2) return "YEAR_2"; // Extended early-career window
-  if (yearsInLeague <= 6) return "PRIME";
-  if (yearsInLeague <= 12) return "VETERAN";
-  return "AGING";
+  // Simple 3-bucket mapping (clean and sufficient):
+  // yearsPro == 0 → ROOKIE (e.g., 2025 rookie in 2025 season)
+  // yearsPro == 1 → YEAR_2 (e.g., 2024 rookie in 2025 season)
+  // yearsPro >= 2 → PRIME (e.g., 2023 or earlier rookie)
+  if (yearsPro === 0) return "ROOKIE";
+  if (yearsPro === 1) return "YEAR_2";
+  return "PRIME";
 }
 
 // Classify player based on deterministic rules
