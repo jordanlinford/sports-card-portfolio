@@ -1,0 +1,132 @@
+What you need to add (minimum viable)
+Add a “Role Stability / Starter Certainty” score (0–100). This is the missing axis.
+
+The verdict engine cannot correctly separate:
+
+CeeDee Lamb (core hold)
+from
+
+Kenny Pickett (avoid)
+using just temperature/volatility/news and modeled comp ranges.
+
+You need a role signal.
+
+Given your constraints (scraper barely passable), the simplest workable approach is:
+
+Option A: Manual role tiers (fastest path, high impact)
+Create a small, editable dictionary in your app (or admin UI) that assigns players to a role tier:
+
+roleTier:
+
+FRANCHISE_CORE
+
+STARTER
+
+UNCERTAIN_STARTER
+
+BACKUP
+
+OUT_OF_LEAGUE
+
+Then map it to a numeric roleStabilityScore:
+
+FRANCHISE_CORE: 90
+
+STARTER: 75
+
+UNCERTAIN_STARTER: 45
+
+BACKUP: 25
+
+OUT_OF_LEAGUE: 10
+
+Then incorporate roleStabilityScore into downsideRiskScore:
+downsideRiskScore = max(existingDownsideRiskScore, 100 - roleStabilityScore)
+
+And add a decisive avoid rule:
+If roleStabilityScore <= 35 and stage is PRIME and compsReliable is false:
+→ AVOID_NEW_MONEY
+
+This immediately fixes:
+
+Pickett, Mac Jones, Ridder, Lance, Wiseman-type
+without needing better scraping.
+
+Option B: Lightweight automated heuristics (still no scraping)
+If you really want less manual work, you can infer roleTier from very basic metadata you likely have:
+
+team present or not
+
+current team depth chart status (you probably don’t have)
+
+whether the player appears in “starter” lists (needs web; not recommended for runtime)
+
+Realistically, Option A is the dependable approach for MVP.
+
+Why Trey Lance got ACCUMULATE
+That indicates your valueScore (valuationScore) and mispricing are marking him as “cheap,” and your liquidity is not low enough to block accumulate. That’s exactly the sort of call that will make users distrust the whole product.
+
+With roleStability in place, Lance will correctly move to:
+
+AVOID (most of the time)
+or SPECULATIVE (only if you explicitly want “lotto ticket” behavior)
+
+What to tell Replit (copy/paste)
+Paste this:
+
+Implement Role Stability to fix HOLD_CORE overuse for backups/bust-adjacent players
+
+Problem:
+Players with unstable careers (Pickett, Mac Jones, Ridder, Trey Lance, Wiseman) are being labeled HOLD_CORE or ACCUMULATE because our current inputs don’t capture “role certainty.” Modeled comps smooth signals and we lack a starter/backup axis.
+
+Solution:
+Add a roleTier (manual for MVP) and convert it into roleStabilityScore. Use it to override verdict selection.
+
+Steps:
+
+Add a simple JSON dictionary (can live in code for now) mapping playerId (or normalized player name) to roleTier:
+FRANCHISE_CORE, STARTER, UNCERTAIN_STARTER, BACKUP, OUT_OF_LEAGUE
+
+Convert roleTier → roleStabilityScore:
+FRANCHISE_CORE=90, STARTER=75, UNCERTAIN_STARTER=45, BACKUP=25, OUT_OF_LEAGUE=10
+Default if missing: 55 (neutral)
+
+In the scoring layer:
+
+Add roleStabilityScore to the computedScores object.
+
+Update downsideRiskScore to incorporate it:
+downsideRiskScore = max(existingDownsideRiskScore, 100 - roleStabilityScore)
+
+Add a hard avoid rule in decision engine:
+If roleStabilityScore <= 35 AND input.stage === "PRIME":
+return AVOID_NEW_MONEY (confidence LOW if compSource is modeled)
+
+Restrict ACCUMULATE:
+If roleStabilityScore <= 55, ACCUMULATE is not allowed (downgrade to SPECULATIVE_FLYER or HOLD_CORE based on value/liquidity).
+
+Add decisionDebug fields:
+roleTier, roleStabilityScore
+
+Seed initial mappings for these players to validate:
+Kenny Pickett -> BACKUP
+Mac Jones -> BACKUP
+Desmond Ridder -> BACKUP
+Trey Lance -> OUT_OF_LEAGUE (or BACKUP)
+James Wiseman -> UNCERTAIN_STARTER/BACKUP
+Mike Evans -> FRANCHISE_CORE
+CeeDee Lamb -> FRANCHISE_CORE
+Bo Nix / Drake Maye / Penix -> UNCERTAIN_STARTER (rookie QBs default)
+
+Acceptance:
+
+Pickett/Mac/Ridder/Lance/Wiseman no longer return HOLD_CORE or ACCUMULATE; they return AVOID_NEW_MONEY (or SPECULATIVE only if explicitly allowed).
+
+Core stars remain HOLD_CORE.
+
+Rookies remain SPECULATIVE.
+
+This is the minimum viable “fundamentals” axis required for cross-sport recommendations with limited comps reliability.
+
+Bottom line
+You can achieve what you want, but not purely with the data you’re currently feeding the engine. You need one additional signal (role stability). The good news is you can implement it in a very pragmatic way (manual tiers) and get to sane recommendations immediately, then automate it later when your data pipeline improves.

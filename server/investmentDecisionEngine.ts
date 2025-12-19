@@ -13,6 +13,93 @@ import type {
   VERDICT_POSTURE,
 } from "@shared/schema";
 
+// ============================================================
+// ROLE STABILITY SYSTEM
+// Captures "starter certainty" - the missing axis for accurate verdicts
+// ============================================================
+
+export type RoleTier = 
+  | "FRANCHISE_CORE"      // Undisputed star (CeeDee Lamb, Tyrese Maxey)
+  | "STARTER"             // Clear starter (Mike Evans, Jaylen Brown)
+  | "UNCERTAIN_STARTER"   // Role unclear (rookie QBs, players fighting for spot)
+  | "BACKUP"              // Not starting (Kenny Pickett, Mac Jones)
+  | "OUT_OF_LEAGUE"       // No team or inactive (Trey Lance, James Wiseman)
+  | "UNKNOWN";            // Default when we don't have info
+
+const ROLE_STABILITY_SCORES: Record<RoleTier, number> = {
+  FRANCHISE_CORE: 90,
+  STARTER: 75,
+  UNCERTAIN_STARTER: 45,
+  BACKUP: 25,
+  OUT_OF_LEAGUE: 10,
+  UNKNOWN: 55,  // Neutral default
+};
+
+// Manual role tier dictionary - seed with known players
+// Format: normalized player name (lowercase) -> RoleTier
+const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
+  // FRANCHISE_CORE - Undisputed stars
+  "ceedee lamb": "FRANCHISE_CORE",
+  "tyrese maxey": "FRANCHISE_CORE",
+  "jayson tatum": "FRANCHISE_CORE",
+  "ja morant": "FRANCHISE_CORE",
+  "anthony edwards": "FRANCHISE_CORE",
+  "luka doncic": "FRANCHISE_CORE",
+  "shai gilgeous-alexander": "FRANCHISE_CORE",
+  "victor wembanyama": "FRANCHISE_CORE",
+  "amon-ra st. brown": "FRANCHISE_CORE",
+  "justin jefferson": "FRANCHISE_CORE",
+  "tyreek hill": "FRANCHISE_CORE",
+  "josh allen": "FRANCHISE_CORE",
+  "patrick mahomes": "FRANCHISE_CORE",
+  "lamar jackson": "FRANCHISE_CORE",
+  "jalen hurts": "FRANCHISE_CORE",
+  "joe burrow": "FRANCHISE_CORE",
+  "shohei ohtani": "FRANCHISE_CORE",
+  "mike trout": "FRANCHISE_CORE",
+  "ronald acuna jr": "FRANCHISE_CORE",
+  "mookie betts": "FRANCHISE_CORE",
+  
+  // STARTER - Clear starters
+  "mike evans": "STARTER",
+  "jaylen brown": "STARTER",
+  "devin booker": "STARTER",
+  "brock purdy": "STARTER",
+  "c.j. stroud": "STARTER",
+  "cj stroud": "STARTER",
+  "caleb williams": "UNCERTAIN_STARTER",  // Rookie QB
+  "drake maye": "UNCERTAIN_STARTER",
+  "bo nix": "UNCERTAIN_STARTER",
+  "michael penix jr": "UNCERTAIN_STARTER",
+  
+  // BACKUP - Not starting
+  "kenny pickett": "BACKUP",
+  "mac jones": "BACKUP",
+  "desmond ridder": "BACKUP",
+  "sam howell": "BACKUP",
+  "zach wilson": "BACKUP",
+  
+  // OUT_OF_LEAGUE - No team or inactive
+  "trey lance": "OUT_OF_LEAGUE",
+  "james wiseman": "OUT_OF_LEAGUE",
+  "johnny manziel": "OUT_OF_LEAGUE",
+  "jamarcus russell": "OUT_OF_LEAGUE",
+};
+
+function normalizePlayerName(name: string): string {
+  return name.toLowerCase().trim();
+}
+
+export function getRoleTier(playerName: string): RoleTier {
+  const normalized = normalizePlayerName(playerName);
+  return ROLE_TIER_OVERRIDES[normalized] ?? "UNKNOWN";
+}
+
+export function getRoleStabilityScore(playerName: string): number {
+  const tier = getRoleTier(playerName);
+  return ROLE_STABILITY_SCORES[tier];
+}
+
 export type DecisionInput = {
   stage: PlayerStage;
   temperature: MarketTemperature;
@@ -35,6 +122,7 @@ export type DecisionInput = {
   newsHype?: "HIGH" | "MEDIUM" | "LOW";
   team?: string;
   position?: string;
+  playerName?: string;  // Required for role stability lookup
 };
 
 export type DecisionDebug = {
@@ -52,6 +140,8 @@ export type DecisionDebug = {
   valuationScore: number;
   mispricingScore: number;
   downsideRiskScore: number;
+  roleTier: RoleTier;
+  roleStabilityScore: number;
   chosenVerdict: InvestmentVerdict;
   cappedConfidence: DataConfidence;
   verdictReason: string;
@@ -180,7 +270,8 @@ function decideVerdict(
   stage: PlayerStage | undefined,
   compsReliable: boolean,
   overheated: boolean,
-  input: DecisionInput
+  input: DecisionInput,
+  roleStabilityScore: number = 55
 ): VerdictResult {
   const { downsideRiskScore, valuationScore, mispricingScore, liquidityScore } = scores;
 
@@ -197,12 +288,24 @@ function decideVerdict(
   // AVOID_NEW_MONEY = negative expected value (structural problem)
   // TRADE_THE_HYPE = timing-based exit (rare, needs reliable comps)
   //
-  // HARD RULE: AVOID_NEW_MONEY requires downsideRiskScore >= 70 OR stage === BUST
+  // HARD RULES:
+  // - AVOID_NEW_MONEY requires downsideRiskScore >= 70 OR stage === BUST
+  // - Low role stability (<=35) + non-reliable comps = AVOID_NEW_MONEY
+  // - ACCUMULATE not allowed for roleStabilityScore <= 55
   // ============================================================
 
   const earlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "UNKNOWN";
   const isPrime = stage === "PRIME";
   const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
+
+  // ============================================================
+  // PRECEDENCE 0: LOW ROLE STABILITY → AVOID_NEW_MONEY
+  // Backups/out-of-league players are structural avoid regardless of other signals
+  // Examples: Kenny Pickett, Mac Jones, Trey Lance, James Wiseman
+  // ============================================================
+  if (roleStabilityScore <= 35 && !compsReliable) {
+    return { verdict: "AVOID_NEW_MONEY", reason: "Low role stability - backup/out-of-league player" };
+  }
 
   // ============================================================
   // PRECEDENCE 1: BUST → AVOID_NEW_MONEY (always allowed)
@@ -593,6 +696,16 @@ function generateTriggers(verdict: InvestmentVerdict, input: DecisionInput): { u
 export function generateInvestmentCall(input: DecisionInput): InvestmentCall & { decisionDebug?: DecisionDebug } {
   const scores = computeScores(input);
   
+  // Get role stability info
+  const playerName = input.playerName ?? "";
+  const roleTier = getRoleTier(playerName);
+  const roleStabilityScore = getRoleStabilityScore(playerName);
+  
+  // Incorporate role stability into downsideRiskScore
+  // Low role stability = higher downside risk
+  const adjustedDownsideRisk = Math.max(scores.downsideRiskScore, 100 - roleStabilityScore);
+  scores.downsideRiskScore = adjustedDownsideRisk;
+  
   // Compute helper flags for gating logic
   const hasCompData = input.compData?.available === true;
   const compSource: "live" | "modeled" | "unknown" = input.compData?.source ?? "unknown";
@@ -615,7 +728,15 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const overheated = (scores.mispricingScore <= -20 && scores.narrativeHeatScore >= 65);
   
   // Get verdict with new precedence-based logic
-  const { verdict, reason } = decideVerdict(scores, input.stage, compsReliable, overheated, input);
+  const { verdict: rawVerdict, reason } = decideVerdict(scores, input.stage, compsReliable, overheated, input, roleStabilityScore);
+  
+  // ACCUMULATE restriction: not allowed for low role stability (backup/uncertain)
+  // Downgrade to SPECULATIVE_FLYER or HOLD_CORE based on context
+  let verdict = rawVerdict;
+  if (rawVerdict === "ACCUMULATE" && roleStabilityScore <= 55) {
+    // Can't ACCUMULATE uncertain starters or below
+    verdict = roleStabilityScore <= 35 ? "SPECULATIVE_FLYER" : "HOLD_CORE";
+  }
   
   // Compute base confidence
   let confidence = computeConfidence(scores);
@@ -654,13 +775,15 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     valuationScore: scores.valuationScore,
     mispricingScore: scores.mispricingScore,
     downsideRiskScore: scores.downsideRiskScore,
+    roleTier,
+    roleStabilityScore,
     chosenVerdict: verdict,
     cappedConfidence: confidence,
     verdictReason: reason,
   };
 
   console.log(`[InvestmentDecision] Verdict: ${verdict} (${reason}), Scores:`, JSON.stringify(scores));
-  console.log(`[InvestmentDecision] Debug: compsReliable=${compsReliable}, lowMeta=${lowMeta}, overheated=${overheated}`);
+  console.log(`[InvestmentDecision] Debug: compsReliable=${compsReliable}, lowMeta=${lowMeta}, overheated=${overheated}, roleTier=${roleTier}, roleStability=${roleStabilityScore}`);
 
   return {
     verdict,
