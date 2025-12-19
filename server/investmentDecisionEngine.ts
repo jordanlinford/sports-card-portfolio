@@ -144,8 +144,25 @@ function computeScores(input: DecisionInput): InvestmentScores {
   };
 }
 
-function decideVerdict(scores: InvestmentScores): InvestmentVerdict {
+function decideVerdict(scores: InvestmentScores, stage?: PlayerStage): InvestmentVerdict {
   const { downsideRiskScore, valuationScore, mispricingScore, narrativeHeatScore, liquidityScore } = scores;
+
+  // Retired players and HOF: their cards are stable legacy holds, not "hype to trade"
+  // News about retired legends (Brady, Moss, etc.) reflects nostalgia/legacy, not tradeable hype
+  const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
+  
+  if (isRetiredOrHOF) {
+    // For HOF players with good valuation, recommend accumulating on dips
+    if (stage === "RETIRED_HOF" && valuationScore >= 50 && liquidityScore >= 50) {
+      return "ACCUMULATE";
+    }
+    // For all retired players, default to HOLD_CORE - their value is stable
+    // Only deviate if fundamentals are truly bad (very low liquidity + high risk)
+    if (downsideRiskScore >= 80 && liquidityScore <= 30) {
+      return "AVOID_NEW_MONEY";
+    }
+    return "HOLD_CORE";
+  }
 
   if (downsideRiskScore >= 75 && valuationScore <= 45) {
     return "AVOID_NEW_MONEY";
@@ -428,7 +445,7 @@ function generateTriggers(verdict: InvestmentVerdict, input: DecisionInput): { u
 
 export function generateInvestmentCall(input: DecisionInput): InvestmentCall {
   const scores = computeScores(input);
-  const verdict = decideVerdict(scores);
+  const verdict = decideVerdict(scores, input.stage);
   const confidence = computeConfidence(scores);
 
   const triggers = generateTriggers(verdict, input);
