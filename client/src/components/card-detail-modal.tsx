@@ -23,6 +23,13 @@ import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins, ArrowRightLeft, Trash2, ImagePlus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -54,6 +61,9 @@ interface EditFormData {
   year: string;
   variation: string;
   grade: string;
+  grader: string;
+  careerStage: string;
+  isRookie: boolean;
   purchasePrice: string;
   estimatedValue: string;
   notes: string;
@@ -214,6 +224,9 @@ export function CardDetailModal({
     year: "",
     variation: "",
     grade: "",
+    grader: "",
+    careerStage: "",
+    isRookie: false,
     purchasePrice: "",
     estimatedValue: "",
     notes: "",
@@ -234,6 +247,9 @@ export function CardDetailModal({
         year: card.year?.toString() || "",
         variation: card.variation || "",
         grade: card.grade || "",
+        grader: card.grader || "",
+        careerStage: card.legacyTier || "",
+        isRookie: card.isRookie || false,
         purchasePrice: card.purchasePrice?.toString() || "",
         estimatedValue: card.estimatedValue?.toString() || "",
         notes: card.notes || "",
@@ -291,6 +307,9 @@ export function CardDetailModal({
         year: formData.year ? parseInt(formData.year) : null,
         variation: formData.variation.trim() || null,
         grade: formData.grade.trim() || null,
+        grader: formData.grader.trim() || null,
+        careerStage: formData.careerStage.trim() || null,
+        isRookie: formData.isRookie,
         purchasePrice: formData.purchasePrice ? parseFloat(formData.purchasePrice) : null,
         estimatedValue: formData.estimatedValue ? parseFloat(formData.estimatedValue) : null,
         notes: formData.notes.trim() || null,
@@ -333,6 +352,9 @@ export function CardDetailModal({
           year: card.year?.toString() || "",
           variation: card.variation || "",
           grade: card.grade || "",
+          grader: card.grader || "",
+          careerStage: card.legacyTier || "",
+          isRookie: card.isRookie || false,
           purchasePrice: card.purchasePrice?.toString() || "",
           estimatedValue: card.estimatedValue?.toString() || "",
           notes: card.notes || "",
@@ -359,6 +381,9 @@ export function CardDetailModal({
         year: card.year?.toString() || "",
         variation: card.variation || "",
         grade: card.grade || "",
+        grader: card.grader || "",
+        careerStage: card.legacyTier || "",
+        isRookie: card.isRookie || false,
         purchasePrice: card.purchasePrice?.toString() || "",
         estimatedValue: card.estimatedValue?.toString() || "",
         notes: card.notes || "",
@@ -573,15 +598,69 @@ export function CardDetailModal({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="edit-grade">Grade</Label>
-                  <Input
-                    id="edit-grade"
-                    value={formData.grade}
-                    onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
-                    placeholder="e.g., PSA 10"
-                    data-testid="input-edit-grade"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-grade">Grade</Label>
+                    <Input
+                      id="edit-grade"
+                      value={formData.grade}
+                      onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                      placeholder="e.g., PSA 10"
+                      data-testid="input-edit-grade"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-grader">Grading Company</Label>
+                    <Select
+                      value={formData.grader}
+                      onValueChange={(value) => setFormData({ ...formData, grader: value })}
+                    >
+                      <SelectTrigger id="edit-grader" data-testid="select-edit-grader">
+                        <SelectValue placeholder="Select grader" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="PSA">PSA</SelectItem>
+                        <SelectItem value="BGS">BGS (Beckett)</SelectItem>
+                        <SelectItem value="SGC">SGC</SelectItem>
+                        <SelectItem value="CGC">CGC</SelectItem>
+                        <SelectItem value="CSG">CSG</SelectItem>
+                        <SelectItem value="RAW">Raw (Ungraded)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label htmlFor="edit-career-stage">Career Stage</Label>
+                    <Select
+                      value={formData.careerStage}
+                      onValueChange={(value) => setFormData({ ...formData, careerStage: value })}
+                    >
+                      <SelectTrigger id="edit-career-stage" data-testid="select-edit-career-stage">
+                        <SelectValue placeholder="Select stage" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ROOKIE">Rookie (1st-2nd year)</SelectItem>
+                        <SelectItem value="RISING">Rising (3rd-5th year)</SelectItem>
+                        <SelectItem value="PRIME">Prime (Peak performance)</SelectItem>
+                        <SelectItem value="VETERAN">Veteran (Declining)</SelectItem>
+                        <SelectItem value="RETIRED">Retired</SelectItem>
+                        <SelectItem value="LEGEND">Legend / HOF</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-6">
+                    <Switch
+                      id="edit-is-rookie"
+                      checked={formData.isRookie}
+                      onCheckedChange={(checked) => setFormData({ ...formData, isRookie: checked })}
+                      data-testid="switch-edit-is-rookie"
+                    />
+                    <Label htmlFor="edit-is-rookie" className="font-normal">Rookie Card</Label>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
