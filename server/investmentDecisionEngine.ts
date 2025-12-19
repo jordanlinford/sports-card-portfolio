@@ -182,124 +182,101 @@ function decideVerdict(
   overheated: boolean,
   input: DecisionInput
 ): VerdictResult {
-  const { downsideRiskScore, valuationScore, mispricingScore, narrativeHeatScore, liquidityScore } = scores;
+  const { downsideRiskScore, valuationScore, mispricingScore, liquidityScore } = scores;
 
   // ============================================================
-  // CALIBRATED VERDICT LOGIC (Dec 2024)
-  // Key insight: "unknown expected value" ≠ "negative expected value"
+  // CALIBRATED VERDICT LOGIC (Dec 2024 - Final)
+  // 
+  // CRITICAL INSIGHT: Separate confidence from direction
+  // - Modeled comps → cap confidence, NOT imply negative EV
+  // - AVOID requires STRUCTURAL problems, not just uncertainty
   //
   // ACCUMULATE = positive expected value
   // HOLD_CORE = neutral expected value  
   // SPECULATIVE_FLYER = unknown expected value (uncertainty)
   // AVOID_NEW_MONEY = negative expected value (structural problem)
   // TRADE_THE_HYPE = timing-based exit (rare, needs reliable comps)
+  //
+  // HARD RULE: AVOID_NEW_MONEY requires downsideRiskScore >= 70 OR stage === BUST
   // ============================================================
 
-  // PRECEDENCE 1: BUST → AVOID_NEW_MONEY by default
-  // Busts represent failure, not uncertainty. Speculative is reserved for
-  // rare cases with exceptional value + liquidity.
+  const earlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "UNKNOWN";
+  const isPrime = stage === "PRIME";
+  const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
+
+  // ============================================================
+  // PRECEDENCE 1: BUST → AVOID_NEW_MONEY (always allowed)
+  // Busts have structural career problems = negative EV
+  // ============================================================
   if (stage === "BUST") {
-    // Only allow SPECULATIVE for busts with exceptional value (dead cat bounce lotto)
-    if (valuationScore >= 75 && liquidityScore >= 45) {
-      return { verdict: "SPECULATIVE_FLYER", reason: "BUST with exceptional value - dead cat bounce potential" };
-    }
-    return { verdict: "AVOID_NEW_MONEY", reason: "BUST - career stalled, avoid new money" };
+    return { verdict: "AVOID_NEW_MONEY", reason: "BUST - career stalled, structural problem" };
   }
 
-  // PRECEDENCE 2: Retired / HOF → HOLD_CORE by default
-  // Legends/vintage markets should not be treated as hype trades
-  const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
+  // ============================================================
+  // PRECEDENCE 2: Retired / HOF → HOLD_CORE
+  // Legacy markets are stable, not speculative
+  // ============================================================
   if (isRetiredOrHOF) {
+    // HOF with good fundamentals can ACCUMULATE
     if (stage === "RETIRED_HOF" && valuationScore >= 50 && liquidityScore >= 50) {
       return { verdict: "ACCUMULATE", reason: "HOF with good value/liquidity" };
-    }
-    if (downsideRiskScore >= 80 && liquidityScore <= 30) {
-      return { verdict: "AVOID_NEW_MONEY", reason: "Retired with poor fundamentals" };
     }
     return { verdict: "HOLD_CORE", reason: "Retired/HOF - stable legacy hold" };
   }
 
+  // ============================================================
   // PRECEDENCE 3: TRADE_THE_HYPE (rare - requires reliable comps)
   // Only fires when we have live comps data showing actual price spikes
+  // ============================================================
   if (overheated && compsReliable) {
     return { verdict: "TRADE_THE_HYPE", reason: "Overheated with reliable comps - sell into spikes" };
   }
 
-  // PRECEDENCE 4: Early-career or UNKNOWN stage default to SPECULATIVE unless clearly cheap
-  // Young/unknown players without reliable comps = uncertainty, not HOLD
-  const earlyCareerOrUnknown = stage === "ROOKIE" || stage === "YEAR_2" || stage === "UNKNOWN";
-  if (!compsReliable && earlyCareerOrUnknown) {
-    // If clearly underpriced with good fundamentals, they can ACCUMULATE
+  // ============================================================
+  // PRECEDENCE 4: AVOID_NEW_MONEY - ONLY for genuine negative EV
+  // HARD RULE: Requires downsideRiskScore >= 70
+  // This prevents AVOID from being the default for uncertain situations
+  // ============================================================
+  if (downsideRiskScore >= 70) {
+    // Early-career needs even higher threshold (75) since uncertainty is expected
+    if (earlyCareer && downsideRiskScore < 75) {
+      // Don't AVOID rookies at 70-74 downside - that's expected volatility
+      // Fall through to SPECULATIVE
+    } else {
+      return { verdict: "AVOID_NEW_MONEY", reason: "High downside risk - structural concern" };
+    }
+  }
+
+  // ============================================================
+  // PRECEDENCE 5: Early-career → SPECULATIVE_FLYER default
+  // Rookies/YEAR_2/UNKNOWN are uncertain, not negative
+  // ============================================================
+  if (earlyCareer) {
+    // Accumulate exception: clearly underpriced with good fundamentals
     if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
-      return { verdict: "ACCUMULATE", reason: "Early-career/unknown with compelling value" };
+      return { verdict: "ACCUMULATE", reason: "Early-career with compelling value" };
     }
-    // Extreme downside risk → AVOID even for rookies
-    if (downsideRiskScore >= 75) {
-      return { verdict: "AVOID_NEW_MONEY", reason: "Early-career with extreme downside risk" };
-    }
-    // Otherwise, speculative by default (not HOLD)
-    return { verdict: "SPECULATIVE_FLYER", reason: "Early-career/unknown without reliable comps - uncertainty" };
+    // Default for early-career: SPECULATIVE (uncertainty, not avoidance)
+    return { verdict: "SPECULATIVE_FLYER", reason: "Early-career - high uncertainty, treat as lottery" };
   }
 
   // ============================================================
-  // PRIME PLAYER HANDLING (with modeled comps)
-  // Key insight: PRIME vets should NOT auto-fall into SPECULATIVE
-  // We need to distinguish stable cores from shaky starters/backups
+  // PRECEDENCE 6: PRIME players → HOLD_CORE or ACCUMULATE
+  // Established players should not be SPECULATIVE or AVOID by default
   // ============================================================
-  const isPrime = stage === "PRIME";
-  
-  // PRECEDENCE 5: Veteran Core Override (Mike Evans, Derrick Henry)
-  // Stable PRIME players with modeled comps → HOLD_CORE, not SPECULATIVE
-  const stableCoreProfile = isPrime && liquidityScore >= 55 && downsideRiskScore <= 60;
-  if (!compsReliable && stableCoreProfile) {
-    return { verdict: "HOLD_CORE", reason: "Veteran core - stable profile with modeled comps" };
-  }
-  
-  // PRECEDENCE 6: Shaky Market Avoid (Kenny Pickett, Mac Jones)
-  // PRIME players with weak demand signals → AVOID, not SPECULATIVE
-  // Low liquidity + low trend = nobody wants this player's cards
-  const weakDemandProfile = isPrime && liquidityScore <= 45 && scores.trendScore <= 55;
-  if (!compsReliable && weakDemandProfile) {
-    return { verdict: "AVOID_NEW_MONEY", reason: "Weak market demand - thin liquidity with poor trend" };
-  }
-
-  // PRECEDENCE 7: Mid-tier AVOID for active players with deteriorating setup
-  // Catches Daniel Jones types: low liquidity + bad signals
-  // Note: BUST/RETIRED/RETIRED_HOF already handled above, so only active stages reach here
-  const deteriorating = 
-    input.momentum === "DOWN" || 
-    input.risk === "HIGH" || 
-    input.volatility === "HIGH";
-  
-  if (!compsReliable && liquidityScore <= 35 && deteriorating) {
-    return { verdict: "AVOID_NEW_MONEY", reason: "Low liquidity with deteriorating signals" };
-  }
-
-  // PRECEDENCE 8: ACCUMULATE (strong value signals)
-  if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
-    return { verdict: "ACCUMULATE", reason: "Underpriced with good liquidity/risk profile" };
-  }
-
-  // PRECEDENCE 9: AVOID_NEW_MONEY - extreme risk cases
-  // Only fires for genuinely negative expected value situations
-  if (downsideRiskScore >= 70 && valuationScore <= 40) {
-    return { verdict: "AVOID_NEW_MONEY", reason: "Extreme downside risk with poor valuation" };
-  }
-
-  // PRECEDENCE 10: HOLD_CORE - widened to catch fairly priced stars
-  // Stars who are "fully priced but not cheap" belong here, not AVOID
-  if (downsideRiskScore < 70 && valuationScore >= 35) {
-    return { verdict: "HOLD_CORE", reason: "Fair value with acceptable risk" };
-  }
-  
-  // PRECEDENCE 11: PRIME players who don't match other criteria → HOLD_CORE fallback
-  // PRIME vets should not default to SPECULATIVE - they are established
   if (isPrime) {
-    return { verdict: "HOLD_CORE", reason: "Established player - default to hold" };
+    // Accumulate: clearly underpriced with good setup
+    if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
+      return { verdict: "ACCUMULATE", reason: "Proven player with compelling value" };
+    }
+    // Default for PRIME: HOLD_CORE (neutral EV, not uncertain)
+    return { verdict: "HOLD_CORE", reason: "Established player - stable core hold" };
   }
 
-  // PRECEDENCE 12: SPECULATIVE_FLYER as final fallback
-  // Should only reach here for edge cases not covered above
+  // ============================================================
+  // PRECEDENCE 7: Fallback - SPECULATIVE_FLYER
+  // Edge cases only (should rarely reach here)
+  // ============================================================
   return { verdict: "SPECULATIVE_FLYER", reason: "High uncertainty - treat as lottery ticket" };
 }
 
