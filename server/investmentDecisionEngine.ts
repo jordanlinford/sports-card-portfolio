@@ -177,7 +177,6 @@ function decideVerdict(
   scores: InvestmentScores, 
   stage: PlayerStage | undefined,
   compsReliable: boolean,
-  lowMeta: boolean,
   overheated: boolean
 ): VerdictResult {
   const { downsideRiskScore, valuationScore, mispricingScore, narrativeHeatScore, liquidityScore } = scores;
@@ -204,16 +203,12 @@ function decideVerdict(
     return { verdict: "HOLD_CORE", reason: "Retired/HOF - stable legacy hold" };
   }
 
-  // PRECEDENCE 3: If metadata is unknown (hard safety)
-  // Unknown/Unknown should never produce a confident sell/buy call
-  if (lowMeta) {
-    if (downsideRiskScore >= 75) {
-      return { verdict: "AVOID_NEW_MONEY", reason: "Unknown metadata + high risk" };
-    }
-    return { verdict: "SPECULATIVE_FLYER", reason: "Unknown metadata - insufficient info" };
-  }
+  // NOTE: lowMeta is no longer a hard verdict gate
+  // It only affects confidence capping (see below in generateInvestmentCall)
+  // This prevents established superstars from getting SPECULATIVE_FLYER 
+  // just because position wasn't inferred
 
-  // PRECEDENCE 4: Overheated with unreliable comps → AVOID_NEW_MONEY (key fix)
+  // PRECEDENCE 3: Overheated with unreliable comps → AVOID_NEW_MONEY (key fix)
   // We cannot see "spikes" with modeled comps, so we cannot say "sell into spikes"
   // We can say "don't chase at these prices"
   if (overheated && !compsReliable) {
@@ -552,7 +547,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const overheated = (scores.mispricingScore <= -20 && scores.narrativeHeatScore >= 65);
   
   // Get verdict with new precedence-based logic
-  const { verdict, reason } = decideVerdict(scores, input.stage, compsReliable, lowMeta, overheated);
+  const { verdict, reason } = decideVerdict(scores, input.stage, compsReliable, overheated);
   
   // Compute base confidence
   let confidence = computeConfidence(scores);
