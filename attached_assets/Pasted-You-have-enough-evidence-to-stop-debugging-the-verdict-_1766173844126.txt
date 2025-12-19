@@ -1,0 +1,199 @@
+You have enough evidence to stop debugging the verdict engine and move upstream: the stage classifier is wrong, and it is the single reason Nabers (and likely other rookies) are landing HOLD_CORE instead of SPECULATIVE_FLYER.
+
+Nabers debug confirms it:
+
+stage: "PRIME" (incorrect)
+
+compSource: modeled (so compsReliable false)
+
+narrativeHeat: 85 (high)
+
+early-career rule never fires because stage isn’t ROOKIE/YEAR_2
+
+verdict falls into HOLD_CORE band
+
+Two things to fix immediately
+
+Fix the stage classification source-of-truth
+Right now the classifier is either:
+
+guessing stage from market signals (temperature, trend, etc.), or
+
+failing to identify rookies reliably (missing draft year / rookie year mapping), or
+
+falling back to PRIME when unsure
+
+You need a deterministic rookie detector that does not rely on scraped comps or narrative.
+
+Fix confidence capping
+Your debug shows cappedConfidence is MEDIUM even though:
+
+compSource is modeled (compsReliable false)
+
+Your earlier rule was: if compsReliable is false, confidence cannot exceed LOW. That is currently not being enforced, or it is being overwritten later.
+
+So there are two bugs:
+
+stage assignment
+
+confidence cap enforcement order
+
+How to fix stage classification across sports (simple, robust, no scraping dependency)
+
+You need a single player metadata object per player that includes at least one of:
+
+rookieYear (preferred)
+
+draftYear (for NFL/NBA/NHL/MLB)
+
+proDebutYear (best for MLB)
+
+firstSeasonYear
+
+yearsPro (computed)
+
+If you don’t have those fields consistently, add them now and backfill for your “launch players.” This is a product requirement, not a model tweak.
+
+Stage should be computed like this (cross-sport safe):
+
+Inputs:
+
+currentSeasonYear (or just currentYear)
+
+rookieYear OR proDebutYear OR draftYear (in that precedence order)
+
+isRetired
+
+isHOF (optional)
+
+bustFlag (optional, can be manual list initially)
+
+Stage rules:
+
+if bustFlag true → BUST
+
+else if isRetired and isHOF → RETIRED_HOF
+
+else if isRetired → RETIRED
+
+else if rookieYear/proDebutYear/draftYear is missing → UNKNOWN_STAGE (do not default to PRIME)
+
+else yearsPro = currentYear - rookieYear (or proDebutYear)
+
+yearsPro <= 0 → ROOKIE
+
+yearsPro == 1 → YEAR_2
+
+yearsPro in [2,3] → PRIME
+
+yearsPro >= 4 → VETERAN/PRIME (you can keep PRIME if you only have one bucket)
+
+Key: Never default to PRIME when you’re unsure. Default to UNKNOWN_STAGE and let UNKNOWN map to SPECULATIVE_FLYER (low confidence).
+
+This one change prevents rookies from being mis-bucketed.
+
+Replit copy/paste instruction to fix the stage classifier
+
+Paste this into Replit.
+
+Update Stage Classification Engine (Critical Bug Fix)
+
+Problem:
+Rookies like Malik Nabers (2024 rookie) are being classified as stage="PRIME". This breaks early-career logic and causes HOLD_CORE outcomes incorrectly.
+
+Requirements:
+
+Stage must be derived from player metadata (rookieYear/proDebutYear/draftYear), not from market signals like temperature or trend.
+
+If stage cannot be confidently determined, return "UNKNOWN" not "PRIME".
+
+Ensure confidence capping is enforced: if compSource is "modeled" (compsReliable false), confidence cannot exceed LOW.
+
+Implementation steps:
+
+A) Find the stage classification function (e.g., classifyStage(), determineStage(), getStageFromPlayer(), etc.). Replace logic with:
+
+Inputs required on the player object:
+
+rookieYear?: number
+
+proDebutYear?: number
+
+draftYear?: number
+
+isRetired?: boolean
+
+isHOF?: boolean
+
+isBust?: boolean (optional; can be computed from a small manual list initially)
+
+Add a helper:
+
+function getRookieBaseYear(player): number | null {
+return player.rookieYear ?? player.proDebutYear ?? player.draftYear ?? null;
+}
+
+function classifyStage(player, currentYear): Stage {
+if (player.isBust) return "BUST";
+if (player.isRetired && player.isHOF) return "RETIRED_HOF";
+if (player.isRetired) return "RETIRED";
+
+const baseYear = getRookieBaseYear(player);
+if (!baseYear) return "UNKNOWN";
+
+const yearsPro = currentYear - baseYear;
+
+if (yearsPro <= 0) return "ROOKIE";
+if (yearsPro === 1) return "YEAR_2";
+if (yearsPro <= 3) return "PRIME";
+return "PRIME"; // or "VETERAN" if you add it later
+}
+
+B) Ensure Malik Nabers has rookieYear=2024 (or proDebutYear=2024). If we don’t store this yet, add it to the player metadata source used by the analysis pipeline. For now, backfill for test players.
+
+C) Remove any fallback that sets stage="PRIME" when unknown. Replace with "UNKNOWN".
+
+D) Update decision engine to treat stage="UNKNOWN" like early-career/low-data:
+
+If compsReliable false AND stage is UNKNOWN → SPECULATIVE_FLYER (confidence LOW) unless downsideRisk >= 75 then AVOID_NEW_MONEY.
+
+E) Fix confidence cap enforcement:
+At the end of verdict selection, enforce:
+
+if compsReliable false → confidence = "LOW"
+
+never allow "MEDIUM/HIGH" when compSource is "modeled" or compAvailable false
+
+Deliverables:
+
+Stage classification uses metadata years, not market signals
+
+Malik Nabers stage becomes ROOKIE and verdict becomes SPECULATIVE_FLYER (with modeled comps)
+
+confidence is LOW when compSource is modeled
+
+What you should re-test immediately after stage fix
+
+Run these again:
+
+Malik Nabers (should become SPECULATIVE_FLYER, LOW confidence)
+
+Marvin Harrison Jr. (should become SPECULATIVE_FLYER, LOW confidence)
+
+Amon-Ra (should remain HOLD_CORE)
+
+Daniel Jones (should remain AVOID)
+
+One more important note on your current debug
+
+Your confidence cap is not working. That is separate from stage.
+
+In the debug:
+
+compSource: modeled
+
+compsReliable: false
+
+cappedConfidence: MEDIUM
+
+That should never happen. If you do only one thing beyond stage: enforce confidence cap at the very end of the pipeline and do not allow later overrides.
