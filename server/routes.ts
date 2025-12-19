@@ -868,7 +868,16 @@ Allow: /
         return res.status(404).json({ message: "Display case not found" });
       }
 
-      const parsed = insertCardSchema.safeParse(req.body);
+      // Map frontend careerStage field to legacyTier for storage
+      // The inferCareerStage function reads from legacyTier
+      const { careerStage, ...restBody } = req.body;
+      const cardData = {
+        ...restBody,
+        // Always include legacyTier (set to careerStage value or preserve existing/null)
+        legacyTier: careerStage || restBody.legacyTier || null,
+      };
+
+      const parsed = insertCardSchema.safeParse(cardData);
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
       }
@@ -929,7 +938,15 @@ Allow: /
         return res.status(404).json({ message: "Card not found" });
       }
 
-      const updatedCard = await storage.updateCard(cardId, req.body);
+      // Map frontend careerStage field to legacyTier for storage
+      const { careerStage, ...restBody } = req.body;
+      const updateData = {
+        ...restBody,
+        // If careerStage is explicitly provided, update legacyTier
+        ...(careerStage !== undefined ? { legacyTier: careerStage || null } : {}),
+      };
+
+      const updatedCard = await storage.updateCard(cardId, updateData);
       res.json(updatedCard);
     } catch (error) {
       console.error("Error updating card:", error);

@@ -102,6 +102,12 @@ const addCardSchema = z.object({
   estimatedValue: z.coerce.number().min(0).optional().or(z.literal("")),
   // Card category for outlook scoring
   cardCategory: z.enum(["sports", "tcg", "non_sport"]).default("sports"),
+  // Sports card fields for portfolio analytics
+  playerName: z.string().max(255).optional(),
+  sport: z.enum(["football", "basketball", "baseball", "hockey", "soccer"]).optional(),
+  grader: z.enum(["PSA", "BGS", "SGC", "CGC", "HGA", "CSG", "other"]).optional(),
+  careerStage: z.enum(["ROOKIE", "RISING", "PRIME", "VETERAN", "RETIRED", "LEGEND"]).optional(),
+  isRookie: z.boolean().optional(),
   // TCG/Non-Sport fields
   characterTier: z.string().optional(),
   rarityTier: z.string().optional(),
@@ -140,7 +146,7 @@ function SortableCardTile({ card, onDelete, onClick }: { card: CardType; onDelet
     >
       <div className="aspect-square relative" onClick={onClick}>
         <img
-          src={card.imagePath}
+          src={card.imagePath || undefined}
           alt={card.title}
           className="w-full h-full object-cover pointer-events-none"
         />
@@ -249,6 +255,13 @@ export default function CaseEdit() {
       purchasePrice: "",
       estimatedValue: "",
       cardCategory: "sports",
+      // Sports card fields
+      playerName: "",
+      sport: undefined,
+      grader: undefined,
+      careerStage: undefined,
+      isRookie: false,
+      // TCG/Non-Sport fields
       characterTier: "",
       rarityTier: "",
       eraPrestige: "",
@@ -1022,6 +1035,128 @@ export default function CaseEdit() {
                           </FormItem>
                         )}
                       />
+
+                      {cardForm.watch("cardCategory") === "sports" && (
+                        <div className="space-y-4 p-3 rounded-md bg-muted/50">
+                          <p className="text-xs text-muted-foreground font-medium">Sports Card Details (for Portfolio Analytics)</p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <FormField
+                              control={cardForm.control}
+                              name="playerName"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Player Name</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="e.g., Patrick Mahomes"
+                                      {...field}
+                                      data-testid="input-player-name"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={cardForm.control}
+                              name="sport"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Sport</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-sport">
+                                        <SelectValue placeholder="Select sport" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="football">Football</SelectItem>
+                                      <SelectItem value="basketball">Basketball</SelectItem>
+                                      <SelectItem value="baseball">Baseball</SelectItem>
+                                      <SelectItem value="hockey">Hockey</SelectItem>
+                                      <SelectItem value="soccer">Soccer</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={cardForm.control}
+                              name="grader"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Grading Company</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-grader">
+                                        <SelectValue placeholder="Select grader (or Raw)" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="PSA">PSA</SelectItem>
+                                      <SelectItem value="BGS">BGS (Beckett)</SelectItem>
+                                      <SelectItem value="SGC">SGC</SelectItem>
+                                      <SelectItem value="CGC">CGC</SelectItem>
+                                      <SelectItem value="HGA">HGA</SelectItem>
+                                      <SelectItem value="CSG">CSG</SelectItem>
+                                      <SelectItem value="other">Other / Raw</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={cardForm.control}
+                              name="careerStage"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Career Stage</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger data-testid="select-career-stage">
+                                        <SelectValue placeholder="Select stage" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="ROOKIE">Rookie (1st-2nd year)</SelectItem>
+                                      <SelectItem value="RISING">Rising (3rd-5th year)</SelectItem>
+                                      <SelectItem value="PRIME">Prime (Peak performance)</SelectItem>
+                                      <SelectItem value="VETERAN">Veteran (Declining)</SelectItem>
+                                      <SelectItem value="RETIRED">Retired</SelectItem>
+                                      <SelectItem value="LEGEND">Legend / HOF</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={cardForm.control}
+                            name="isRookie"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center gap-2">
+                                <FormControl>
+                                  <input
+                                    type="checkbox"
+                                    checked={field.value || false}
+                                    onChange={field.onChange}
+                                    className="h-4 w-4 rounded border-input"
+                                    data-testid="checkbox-is-rookie"
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-xs font-normal">This is a rookie card</FormLabel>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
 
                       {(cardForm.watch("cardCategory") === "tcg" || cardForm.watch("cardCategory") === "non_sport") && (
                         <div className="space-y-4 p-3 rounded-md bg-muted/50">

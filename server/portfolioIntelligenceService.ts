@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { cards, displayCases, playerWatchlist, portfolioSnapshots, nextBuys } from "@shared/schema";
+import { cards, displayCases, playerWatchlist, portfolioSnapshots, nextBuys, cardOutlooks } from "@shared/schema";
 import type { 
   PortfolioProfile, 
   PortfolioExposures, 
@@ -32,7 +32,36 @@ function getOpenAI(): OpenAI {
 type CareerStage = "Rookie" | "Rising" | "Prime" | "Decline" | "Retired" | "Unknown";
 
 function inferCareerStage(card: any): CareerStage {
+  // First check user-entered career stage override
+  if (card.careerStageOverride) {
+    const override = card.careerStageOverride.toUpperCase();
+    if (override === "ROOKIE") return "Rookie";
+    if (override === "RISING") return "Rising";
+    if (override === "PRIME" || override === "ELITE") return "Prime";
+    if (override === "VETERAN" || override === "DECLINE") return "Decline";
+    if (override === "RETIRED" || override === "LEGEND") return "Retired";
+  }
+  // Then check auto-detected career stage
+  if (card.careerStageAuto) {
+    const auto = card.careerStageAuto.toUpperCase();
+    if (auto === "ROOKIE") return "Rookie";
+    if (auto === "RISING") return "Rising";
+    if (auto === "PRIME" || auto === "ELITE") return "Prime";
+    if (auto === "VETERAN" || auto === "DECLINE") return "Decline";
+    if (auto === "RETIRED" || auto === "LEGEND") return "Retired";
+  }
+  // Check legacyTier field on card (may contain career stage info)
+  if (card.legacyTier) {
+    const tier = card.legacyTier.toUpperCase();
+    if (tier === "ROOKIE") return "Rookie";
+    if (tier === "RISING" || tier === "BREAKOUT") return "Rising";
+    if (tier === "PRIME" || tier === "ELITE" || tier === "PEAK") return "Prime";
+    if (tier === "VETERAN" || tier === "DECLINE" || tier === "DECLINING") return "Decline";
+    if (tier === "RETIRED" || tier === "LEGEND" || tier === "HOF") return "Retired";
+  }
+  // Fall back to isRookie flag
   if (card.isRookie) return "Rookie";
+  // Fall back to age-based inference
   if (card.playerAge) {
     if (card.playerAge <= 24) return "Rising";
     if (card.playerAge <= 30) return "Prime";
@@ -51,13 +80,30 @@ function inferTeamMarketSize(teamMarket: string | null): "Large" | "Mid" | "Smal
   return "Unknown";
 }
 
-function normalizeGrader(grader: string | null): string {
-  if (!grader) return "Raw";
-  const normalized = grader.toUpperCase().trim();
-  if (normalized.includes("PSA")) return "PSA";
-  if (normalized.includes("BGS") || normalized.includes("BECKETT")) return "BGS";
-  if (normalized.includes("SGC")) return "SGC";
-  if (normalized.includes("CGC")) return "CGC";
+function normalizeGrader(grader: string | null, grade: string | null = null): string {
+  // First check the grader field
+  if (grader) {
+    const normalized = grader.toUpperCase().trim();
+    if (normalized.includes("PSA")) return "PSA";
+    if (normalized.includes("BGS") || normalized.includes("BECKETT")) return "BGS";
+    if (normalized.includes("SGC")) return "SGC";
+    if (normalized.includes("CGC")) return "CGC";
+    if (normalized.includes("HGA")) return "HGA";
+    if (normalized.includes("CSG")) return "CSG";
+    if (normalized !== "RAW" && normalized !== "") return "Other";
+  }
+  // If no grader field, try to parse it from the grade field (e.g., "PSA 10", "BGS 9.5")
+  if (grade) {
+    const gradeUpper = grade.toUpperCase().trim();
+    if (gradeUpper.startsWith("PSA") || gradeUpper.includes("PSA ")) return "PSA";
+    if (gradeUpper.startsWith("BGS") || gradeUpper.includes("BGS ") || gradeUpper.includes("BECKETT")) return "BGS";
+    if (gradeUpper.startsWith("SGC") || gradeUpper.includes("SGC ")) return "SGC";
+    if (gradeUpper.startsWith("CGC") || gradeUpper.includes("CGC ")) return "CGC";
+    if (gradeUpper.startsWith("HGA") || gradeUpper.includes("HGA ")) return "HGA";
+    if (gradeUpper.startsWith("CSG") || gradeUpper.includes("CSG ")) return "CSG";
+    // Check if grade looks like a numeric grade (indicates graded card)
+    if (/^\d+(\.\d+)?$/.test(gradeUpper) || /^(GEM\s*)?MINT/.test(gradeUpper)) return "Other";
+  }
   return "Raw";
 }
 
@@ -77,9 +123,14 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
       teamMarketSize: cards.teamMarketSize,
       salesLast30Days: cards.salesLast30Days,
       displayCaseId: cards.displayCaseId,
+      legacyTier: cards.legacyTier,
+      // Join with cardOutlooks for career stage
+      careerStageOverride: cardOutlooks.careerStageOverride,
+      careerStageAuto: cardOutlooks.careerStageAuto,
     })
     .from(cards)
     .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+    .leftJoin(cardOutlooks, eq(cards.id, cardOutlooks.cardId))
     .where(eq(displayCases.userId, userId));
 
   const cardCount = userCards.length;
@@ -114,7 +165,7 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
     const market = inferTeamMarketSize(card.teamMarketSize);
     teamMarkets[market] = (teamMarkets[market] || 0) + weight;
 
-    const grader = normalizeGrader(card.grader);
+    const grader = normalizeGrader(card.grader, card.grade);
     grades[grader] = (grades[grader] || 0) + weight;
 
     const playerName = card.playerName || "Unknown";
