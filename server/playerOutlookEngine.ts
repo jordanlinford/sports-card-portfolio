@@ -110,7 +110,7 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
   momentum: "up" | "flat" | "down";
   newsHype: "high" | "medium" | "low" | "none";
   snippets: string[];
-  isBust?: boolean;
+  detectedStage?: "BUST" | "RETIRED" | "RETIRED_HOF";
 }> {
   const SERPER_API_KEY = process.env.SERPER_API_KEY;
   if (!SERPER_API_KEY) {
@@ -191,10 +191,19 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
     const negativeKeywords = ["decline", "falling", "injury", "benched", "struggling", "bust", "down", "trade"];
     // Keywords that indicate a player is a bust / career has stalled
     const bustKeywords = ["3rd string", "third string", "backup", "released", "cut", "waived", "demoted", "benched", "practice squad", "bust", "failed", "out of league", "unsigned", "free agent"];
+    // Keywords that indicate player is deceased
+    const deceasedKeywords = ["passed away", "died", "death of", "rip ", "r.i.p.", "in memoriam", "funeral", "obituary", "late great", "remembered", "tribute to", "legacy of", "1934-", "1940-", "1950-", "1960-", "1970-"];
+    // Keywords that indicate player is retired/HOF
+    const retiredHofKeywords = ["hall of fame", "hof", "inducted", "enshrinement", "canton", "cooperstown", "springfield", "retired jersey", "jersey retirement", "ring of honor", "former nfl", "former nba", "former mlb", "former nhl", "legendary", "all-time great", "greatest of all time", "goat"];
+    // Keywords that indicate player is simply retired (not HOF)
+    const retiredKeywords = ["retired", "retirement", "hung up", "called it a career", "final season", "last game", "farewell tour"];
     
     let positiveCount = 0;
     let negativeCount = 0;
     let bustIndicators = 0;
+    let deceasedIndicators = 0;
+    let hofIndicators = 0;
+    let retiredIndicators = 0;
     const combined = snippets.join(" ").toLowerCase();
     
     positiveKeywords.forEach(kw => {
@@ -206,14 +215,39 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
     bustKeywords.forEach(kw => {
       if (combined.includes(kw)) bustIndicators++;
     });
+    deceasedKeywords.forEach(kw => {
+      if (combined.includes(kw)) deceasedIndicators++;
+    });
+    retiredHofKeywords.forEach(kw => {
+      if (combined.includes(kw)) hofIndicators++;
+    });
+    retiredKeywords.forEach(kw => {
+      if (combined.includes(kw)) retiredIndicators++;
+    });
     
     const momentum = positiveCount > negativeCount + 1 ? "up" : 
                      negativeCount > positiveCount + 1 ? "down" : "flat";
     const newsHype = allNews.length >= 5 ? "high" : allNews.length >= 3 ? "medium" : allNews.length >= 1 ? "low" : "none";
-    // If multiple bust indicators found, flag as bust
-    const isBust = bustIndicators >= 2 || (bustIndicators >= 1 && negativeCount > positiveCount);
     
-    return { momentum, newsHype, snippets, isBust };
+    // Determine detected career stage from news
+    let detectedStage: "BUST" | "RETIRED" | "RETIRED_HOF" | undefined = undefined;
+    if (deceasedIndicators >= 1 || hofIndicators >= 2) {
+      // Deceased or strong HOF indicators = RETIRED_HOF (legacy player)
+      detectedStage = "RETIRED_HOF";
+    } else if (hofIndicators >= 1) {
+      // Single HOF mention = likely RETIRED_HOF
+      detectedStage = "RETIRED_HOF";
+    } else if (retiredIndicators >= 1) {
+      // Retired but not HOF
+      detectedStage = "RETIRED";
+    } else if (bustIndicators >= 2 || (bustIndicators >= 1 && negativeCount > positiveCount)) {
+      // Multiple bust indicators = BUST
+      detectedStage = "BUST";
+    }
+    
+    console.log(`[PlayerOutlook] News analysis: deceased=${deceasedIndicators}, hof=${hofIndicators}, retired=${retiredIndicators}, bust=${bustIndicators} → stage=${detectedStage || "none"}`);
+    
+    return { momentum, newsHype, snippets, detectedStage };
   } catch (error) {
     console.error("[PlayerOutlook] News fetch error:", error);
     return { momentum: "flat", newsHype: "none", snippets: [] };
@@ -514,19 +548,20 @@ async function generateFreshOutlook(
   playerKey: string
 ): Promise<PlayerOutlookResponse> {
   // Step 1: Get news signals
-  const { momentum, newsHype, snippets, isBust } = await getPlayerNewsSignals(playerName, sport);
+  const { momentum, newsHype, snippets, detectedStage } = await getPlayerNewsSignals(playerName, sport);
   
   // Step 2: Run classification engine
+  // If news detected a special stage (BUST, RETIRED, RETIRED_HOF), use it
   const classificationInput: ClassificationInput = {
     playerName,
     sport,
     recentMomentum: momentum,
     newsHype,
-    // If news indicates player is a bust, override career stage
-    careerStage: isBust ? "BUST" : undefined,
+    careerStage: detectedStage,
   };
   
   const classification = classifyPlayer(classificationInput);
+  console.log(`[PlayerOutlook] Classification for ${playerName}: stage=${classification.stage}, temp=${classification.baseTemperature}`);
   
   // Step 3: Generate AI narrative
   const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality } = await generatePlayerOutlookAI(
