@@ -105,6 +105,69 @@ async function saveToCache(
     });
 }
 
+// Known legendary players who are deceased or Hall of Famers
+// These players should ALWAYS be classified as RETIRED_HOF regardless of news
+const KNOWN_LEGENDS: Record<string, string[]> = {
+  // Baseball legends (deceased or HOF)
+  baseball: [
+    "babe ruth", "lou gehrig", "ty cobb", "jackie robinson", "willie mays", "hank aaron",
+    "mickey mantle", "ted williams", "joe dimaggio", "roberto clemente", "satchel paige",
+    "cy young", "honus wagner", "stan musial", "sandy koufax", "bob gibson", "nolan ryan",
+    "cal ripken", "tony gwynn", "ken griffey", "derek jeter", "mariano rivera", "wade boggs",
+    "johnny bench", "yogi berra", "ernie banks", "brooks robinson", "frank robinson",
+    "reggie jackson", "rod carew", "george brett", "mike schmidt", "ozzie smith",
+    "kirby puckett", "ryne sandberg", "chipper jones", "greg maddux", "tom glavine",
+    "john smoltz", "pedro martinez", "randy johnson", "roy halladay", "christy mathewson",
+    "walter johnson", "grover alexander", "lefty grove", "warren spahn", "bob feller",
+  ],
+  // Football legends (deceased or HOF)
+  football: [
+    "bart starr", "johnny unitas", "joe montana", "tom brady", "peyton manning", "dan marino",
+    "john elway", "brett favre", "drew brees", "aaron rodgers", "terry bradshaw", "roger staubach",
+    "joe namath", "jim brown", "walter payton", "barry sanders", "emmitt smith", "jerry rice",
+    "randy moss", "terrell owens", "michael irvin", "cris carter", "deion sanders", "dick butkus",
+    "ray lewis", "lawrence taylor", "reggie white", "bruce smith", "mike singletary", "ronnie lott",
+    "ed reed", "troy polamalu", "chuck bednarik", "jack lambert", "mean joe greene", "alan page",
+    "jim thorpe", "red grange", "don hutson", "otto graham", "sammy baugh", "gale sayers",
+    "earl campbell", "tony dorsett", "eric dickerson", "marshall faulk", "ladainian tomlinson",
+    "jim kelly", "steve young", "warren moon", "fran tarkenton", "dan fouts", "troy aikman",
+  ],
+  // Basketball legends (deceased or HOF)
+  basketball: [
+    "michael jordan", "lebron james", "kobe bryant", "kareem abdul-jabbar", "magic johnson",
+    "larry bird", "bill russell", "wilt chamberlain", "shaquille oneal", "tim duncan",
+    "hakeem olajuwon", "oscar robertson", "jerry west", "elgin baylor", "julius erving",
+    "isaiah thomas", "john stockton", "karl malone", "charles barkley", "scottie pippen",
+    "david robinson", "patrick ewing", "allen iverson", "kevin garnett", "dirk nowitzki",
+    "steve nash", "ray allen", "paul pierce", "dwyane wade", "chris bosh", "tony parker",
+    "manu ginobili", "pete maravich", "george mikan", "bob cousy", "bob pettit", "elvin hayes",
+    "moses malone", "dominique wilkins", "clyde drexler", "gary payton", "reggie miller",
+    "chris mullin", "kevin mchale", "robert parish", "james worthy", "dennis rodman",
+  ],
+  // Hockey legends
+  hockey: [
+    "wayne gretzky", "mario lemieux", "gordie howe", "bobby orr", "maurice richard",
+    "jean beliveau", "guy lafleur", "mark messier", "steve yzerman", "jaromir jagr",
+    "patrick roy", "martin brodeur", "dominik hasek", "sidney crosby", "alexander ovechkin",
+    "bobby hull", "stan mikita", "phil esposito", "marcel dionne", "mike bossy", "denis potvin",
+    "ray bourque", "chris chelios", "nicklas lidstrom", "scott stevens", "brian leetch",
+  ],
+};
+
+// Check if player is a known legend
+function isKnownLegend(playerName: string, sport: string): boolean {
+  const normalizedName = playerName.toLowerCase().trim();
+  const sportLegends = KNOWN_LEGENDS[sport.toLowerCase()] || [];
+  
+  // Check all sports if sport doesn't match
+  const allLegends = Object.values(KNOWN_LEGENDS).flat();
+  const legendsToCheck = sportLegends.length > 0 ? sportLegends : allLegends;
+  
+  return legendsToCheck.some(legend => 
+    normalizedName.includes(legend) || legend.includes(normalizedName)
+  );
+}
+
 // Use Serper to get news/hype signals about the player
 async function getPlayerNewsSignals(playerName: string, sport: string): Promise<{
   momentum: "up" | "flat" | "down";
@@ -112,6 +175,17 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
   snippets: string[];
   detectedStage?: "BUST" | "RETIRED" | "RETIRED_HOF";
 }> {
+  // First check if this is a known legend - override everything
+  if (isKnownLegend(playerName, sport)) {
+    console.log(`[PlayerOutlook] ${playerName} is a known legend → RETIRED_HOF`);
+    return { 
+      momentum: "flat", 
+      newsHype: "low", 
+      snippets: [], 
+      detectedStage: "RETIRED_HOF" 
+    };
+  }
+
   const SERPER_API_KEY = process.env.SERPER_API_KEY;
   if (!SERPER_API_KEY) {
     return { momentum: "flat", newsHype: "none", snippets: [] };
