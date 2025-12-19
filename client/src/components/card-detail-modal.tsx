@@ -642,12 +642,14 @@ export function CardDetailModal({
                         <SelectValue placeholder="AI will detect" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ROOKIE">Rookie (1st-2nd year)</SelectItem>
-                        <SelectItem value="RISING">Rising (3rd-5th year)</SelectItem>
-                        <SelectItem value="PRIME">Prime (Peak performance)</SelectItem>
-                        <SelectItem value="VETERAN">Veteran (Declining)</SelectItem>
+                        <SelectItem value="PROSPECT">Rookie / Prospect (1st-2nd year)</SelectItem>
+                        <SelectItem value="RISING_STAR">Rising Star (3rd-5th year)</SelectItem>
+                        <SelectItem value="STAR">Established Star</SelectItem>
+                        <SelectItem value="SUPERSTAR">Superstar (MVP-caliber)</SelectItem>
+                        <SelectItem value="AGING_VET">Veteran (Declining)</SelectItem>
                         <SelectItem value="RETIRED">Retired</SelectItem>
-                        <SelectItem value="LEGEND">Legend / HOF</SelectItem>
+                        <SelectItem value="HOF">Hall of Fame</SelectItem>
+                        <SelectItem value="LEGEND_DECEASED">Legend (Deceased)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">Set once - AI uses this for analysis</p>

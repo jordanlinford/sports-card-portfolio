@@ -978,6 +978,27 @@ function normalizePositionScore(positionScore: number): number {
 }
 
 // NEW: Lifecycle-aware upside calculation
+// Map user-facing career stages to internal LegacyTier values
+function normalizeLegacyTier(tier: string | null): LegacyTier {
+  if (!tier) return "STAR";
+  
+  // Handle exact matches first
+  if (tier in LIFECYCLE_PROFILES) {
+    return tier as LegacyTier;
+  }
+  
+  // Map old/alternate values to internal values
+  const tierMap: Record<string, LegacyTier> = {
+    "ROOKIE": "PROSPECT",
+    "RISING": "RISING_STAR",
+    "PRIME": "SUPERSTAR",
+    "VETERAN": "AGING_VET",
+    "LEGEND": "HOF",
+  };
+  
+  return tierMap[tier] || "STAR";
+}
+
 function calculateLifecycleAwareUpside(
   card: Card,
   cardTypeScore: number,
@@ -986,7 +1007,7 @@ function calculateLifecycleAwareUpside(
   marketStability: number,
   sportConfig: SportConfig | null
 ): number {
-  const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
+  const legacyTier = normalizeLegacyTier(card.legacyTier);
   const profile = LIFECYCLE_PROFILES[legacyTier];
   
   // Start with the base range for this lifecycle stage
@@ -1038,7 +1059,7 @@ function calculateLifecycleAwareRisk(
   marketStability: number,
   sportConfig: SportConfig | null
 ): number {
-  const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
+  const legacyTier = normalizeLegacyTier(card.legacyTier);
   const profile = LIFECYCLE_PROFILES[legacyTier];
   
   // Start with the base range for this lifecycle stage
@@ -1086,7 +1107,7 @@ function calculateLifecycleAwareConfidence(
   marketStability: number,
   accolades: DetectedAccolades
 ): number {
-  const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
+  const legacyTier = normalizeLegacyTier(card.legacyTier);
   const profile = LIFECYCLE_PROFILES[legacyTier];
   
   // Start with the confidence floor for this lifecycle stage
