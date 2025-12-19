@@ -181,16 +181,29 @@ function decideVerdict(
 ): VerdictResult {
   const { downsideRiskScore, valuationScore, mispricingScore, narrativeHeatScore, liquidityScore } = scores;
 
-  // PRECEDENCE 1: BUST override (hard)
-  // Busts should not be TRADE_THE_HYPE by default
+  // ============================================================
+  // CALIBRATED VERDICT LOGIC (Dec 2024)
+  // Key insight: "unknown expected value" ≠ "negative expected value"
+  //
+  // ACCUMULATE = positive expected value
+  // HOLD_CORE = neutral expected value  
+  // SPECULATIVE_FLYER = unknown expected value (uncertainty)
+  // AVOID_NEW_MONEY = negative expected value (structural problem)
+  // TRADE_THE_HYPE = timing-based exit (rare, needs reliable comps)
+  // ============================================================
+
+  // PRECEDENCE 1: BUST → AVOID_NEW_MONEY by default
+  // Busts represent failure, not uncertainty. Speculative is reserved for
+  // rare cases with exceptional value + liquidity.
   if (stage === "BUST") {
-    if (valuationScore >= 60 && liquidityScore >= 40) {
-      return { verdict: "SPECULATIVE_FLYER", reason: "BUST with some upside potential" };
+    // Only allow SPECULATIVE for busts with exceptional value (dead cat bounce lotto)
+    if (valuationScore >= 75 && liquidityScore >= 45) {
+      return { verdict: "SPECULATIVE_FLYER", reason: "BUST with exceptional value - dead cat bounce potential" };
     }
-    return { verdict: "AVOID_NEW_MONEY", reason: "BUST - career stalled" };
+    return { verdict: "AVOID_NEW_MONEY", reason: "BUST - career stalled, avoid new money" };
   }
 
-  // PRECEDENCE 2: Retired / HOF default (hard)
+  // PRECEDENCE 2: Retired / HOF → HOLD_CORE by default
   // Legends/vintage markets should not be treated as hype trades
   const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
   if (isRetiredOrHOF) {
@@ -203,41 +216,35 @@ function decideVerdict(
     return { verdict: "HOLD_CORE", reason: "Retired/HOF - stable legacy hold" };
   }
 
-  // NOTE: lowMeta is no longer a hard verdict gate
-  // It only affects confidence capping (see below in generateInvestmentCall)
-  // This prevents established superstars from getting SPECULATIVE_FLYER 
-  // just because position wasn't inferred
-
-  // PRECEDENCE 3: Overheated with unreliable comps → AVOID_NEW_MONEY (key fix)
-  // We cannot see "spikes" with modeled comps, so we cannot say "sell into spikes"
-  // We can say "don't chase at these prices"
-  if (overheated && !compsReliable) {
-    return { verdict: "AVOID_NEW_MONEY", reason: "Overheated but no reliable comps to confirm spikes" };
-  }
-
-  // PRECEDENCE 5: TRADE_THE_HYPE allowed only when comps are reliable
-  // This becomes rare until our sold-history scraper improves
+  // PRECEDENCE 3: TRADE_THE_HYPE (rare - requires reliable comps)
+  // Only fires when we have live comps data showing actual price spikes
   if (overheated && compsReliable) {
-    return { verdict: "TRADE_THE_HYPE", reason: "Overheated with reliable comps data" };
+    return { verdict: "TRADE_THE_HYPE", reason: "Overheated with reliable comps - sell into spikes" };
   }
 
-  // PRECEDENCE 6: ACCUMULATE (unchanged, allow even with modeled comps if liquidity/value are strong)
+  // PRECEDENCE 4: ACCUMULATE (strong value signals)
   if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
     return { verdict: "ACCUMULATE", reason: "Underpriced with good liquidity/risk profile" };
   }
 
-  // PRECEDENCE 7: HOLD_CORE band (widened)
-  if (downsideRiskScore <= 70 && valuationScore >= 40 && valuationScore <= 70) {
+  // PRECEDENCE 5: AVOID_NEW_MONEY - NARROWED significantly
+  // Only fires for genuinely negative expected value situations:
+  // A) Extreme downside risk (≥70) with poor value
+  // B) Already handled: BUST stage (above)
+  if (downsideRiskScore >= 70 && valuationScore <= 40) {
+    return { verdict: "AVOID_NEW_MONEY", reason: "Extreme downside risk with poor valuation" };
+  }
+
+  // PRECEDENCE 6: HOLD_CORE - widened to catch fairly priced stars
+  // Stars who are "fully priced but not cheap" belong here, not AVOID
+  if (downsideRiskScore < 70 && valuationScore >= 35) {
     return { verdict: "HOLD_CORE", reason: "Fair value with acceptable risk" };
   }
 
-  // PRECEDENCE 8: AVOID_NEW_MONEY (risk-driven)
-  if (downsideRiskScore >= 75 && valuationScore <= 45) {
-    return { verdict: "AVOID_NEW_MONEY", reason: "High risk + poor valuation" };
-  }
-
-  // PRECEDENCE 9: Fallback
-  return { verdict: "SPECULATIVE_FLYER", reason: "Does not fit other categories" };
+  // PRECEDENCE 7: SPECULATIVE_FLYER is the home for uncertainty
+  // Modeled comps, prospects, thin markets - uncertainty ≠ avoidance
+  // This is the default for "I don't know enough, but upside exists"
+  return { verdict: "SPECULATIVE_FLYER", reason: "High uncertainty - treat as lottery ticket" };
 }
 
 function computeConfidence(scores: InvestmentScores): DataConfidence {
