@@ -233,11 +233,37 @@ function decideVerdict(
     if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
       return { verdict: "ACCUMULATE", reason: "Early-career/unknown with compelling value" };
     }
+    // Extreme downside risk → AVOID even for rookies
+    if (downsideRiskScore >= 75) {
+      return { verdict: "AVOID_NEW_MONEY", reason: "Early-career with extreme downside risk" };
+    }
     // Otherwise, speculative by default (not HOLD)
     return { verdict: "SPECULATIVE_FLYER", reason: "Early-career/unknown without reliable comps - uncertainty" };
   }
 
-  // PRECEDENCE 5: Mid-tier AVOID for active players with deteriorating setup
+  // ============================================================
+  // PRIME PLAYER HANDLING (with modeled comps)
+  // Key insight: PRIME vets should NOT auto-fall into SPECULATIVE
+  // We need to distinguish stable cores from shaky starters/backups
+  // ============================================================
+  const isPrime = stage === "PRIME";
+  
+  // PRECEDENCE 5: Veteran Core Override (Mike Evans, Derrick Henry)
+  // Stable PRIME players with modeled comps → HOLD_CORE, not SPECULATIVE
+  const stableCoreProfile = isPrime && liquidityScore >= 55 && downsideRiskScore <= 60;
+  if (!compsReliable && stableCoreProfile) {
+    return { verdict: "HOLD_CORE", reason: "Veteran core - stable profile with modeled comps" };
+  }
+  
+  // PRECEDENCE 6: Shaky Market Avoid (Kenny Pickett, Mac Jones)
+  // PRIME players with weak demand signals → AVOID, not SPECULATIVE
+  // Low liquidity + low trend = nobody wants this player's cards
+  const weakDemandProfile = isPrime && liquidityScore <= 45 && scores.trendScore <= 55;
+  if (!compsReliable && weakDemandProfile) {
+    return { verdict: "AVOID_NEW_MONEY", reason: "Weak market demand - thin liquidity with poor trend" };
+  }
+
+  // PRECEDENCE 7: Mid-tier AVOID for active players with deteriorating setup
   // Catches Daniel Jones types: low liquidity + bad signals
   // Note: BUST/RETIRED/RETIRED_HOF already handled above, so only active stages reach here
   const deteriorating = 
@@ -249,25 +275,31 @@ function decideVerdict(
     return { verdict: "AVOID_NEW_MONEY", reason: "Low liquidity with deteriorating signals" };
   }
 
-  // PRECEDENCE 6: ACCUMULATE (strong value signals)
+  // PRECEDENCE 8: ACCUMULATE (strong value signals)
   if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
     return { verdict: "ACCUMULATE", reason: "Underpriced with good liquidity/risk profile" };
   }
 
-  // PRECEDENCE 7: AVOID_NEW_MONEY - extreme risk cases
+  // PRECEDENCE 9: AVOID_NEW_MONEY - extreme risk cases
   // Only fires for genuinely negative expected value situations
   if (downsideRiskScore >= 70 && valuationScore <= 40) {
     return { verdict: "AVOID_NEW_MONEY", reason: "Extreme downside risk with poor valuation" };
   }
 
-  // PRECEDENCE 8: HOLD_CORE - widened to catch fairly priced stars
+  // PRECEDENCE 10: HOLD_CORE - widened to catch fairly priced stars
   // Stars who are "fully priced but not cheap" belong here, not AVOID
   if (downsideRiskScore < 70 && valuationScore >= 35) {
     return { verdict: "HOLD_CORE", reason: "Fair value with acceptable risk" };
   }
+  
+  // PRECEDENCE 11: PRIME players who don't match other criteria → HOLD_CORE fallback
+  // PRIME vets should not default to SPECULATIVE - they are established
+  if (isPrime) {
+    return { verdict: "HOLD_CORE", reason: "Established player - default to hold" };
+  }
 
-  // PRECEDENCE 9: SPECULATIVE_FLYER is the home for uncertainty
-  // Modeled comps, prospects, thin markets - uncertainty ≠ avoidance
+  // PRECEDENCE 12: SPECULATIVE_FLYER as final fallback
+  // Should only reach here for edge cases not covered above
   return { verdict: "SPECULATIVE_FLYER", reason: "High uncertainty - treat as lottery ticket" };
 }
 
