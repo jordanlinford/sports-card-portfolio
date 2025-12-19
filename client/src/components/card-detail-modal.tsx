@@ -639,7 +639,7 @@ export function CardDetailModal({
                       onValueChange={(value) => setFormData({ ...formData, careerStage: value })}
                     >
                       <SelectTrigger id="edit-career-stage" data-testid="select-edit-career-stage">
-                        <SelectValue placeholder="Select stage" />
+                        <SelectValue placeholder="AI will detect" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="ROOKIE">Rookie (1st-2nd year)</SelectItem>
@@ -650,6 +650,7 @@ export function CardDetailModal({
                         <SelectItem value="LEGEND">Legend / HOF</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">Set once - AI uses this for analysis</p>
                   </div>
 
                   <div className="flex items-center space-x-2 pt-6">
