@@ -1,0 +1,160 @@
+You’ve fixed stage, but your calibration just swung too far in the other direction: SPECULATIVE is now acting as the default for almost everything, including veterans and obvious avoids. That means one of your “modern active uncertain” gates is firing too broadly, or your AVOID criteria are too strict / never reached because the inputs aren’t triggering “deteriorating.”
+
+What the results tell us
+
+The early-career rule is working
+Williams, Daniels, MHJ, Bowers, Addison all landing SPECULATIVE is reasonable given modeled comps.
+
+The veteran core market is broken
+Evans and Henry should not be SPECULATIVE by default. If they are, your logic is treating “modeled comps” as “uncertain” even for stable, liquid legacy-curve veterans, which makes the product less useful.
+
+Your AVOID trigger is not capturing “structurally shaky starters / backups”
+Pickett should be AVOID. Mac Jones probably AVOID. If they’re SPECULATIVE, your “deteriorating” condition isn’t being met (momentum/risk/volatility inputs aren’t high), or you’re not using role/starting-status as an input.
+
+Nacua → ACCUMULATE might be fine, but it also suggests your valueScore/mispricing is being computed in a way that can mark a popular young star as “undervalued.” That’s possible, but make sure it’s not a systemic cheapness bug.
+
+Why SPECULATIVE is dominating
+
+With modeled comps, your engine likely has a rule like:
+“If compsReliable is false and (earlyCareer OR unknown OR thin) → SPECULATIVE.”
+
+But your current output suggests that rule is applying beyond early career — effectively:
+“If compsReliable is false → SPECULATIVE.”
+
+That will drown the product because most of your comps are modeled.
+
+You need to separate:
+
+“modeled comps” (we still know enough to classify stable vets as HOLD_CORE)
+from
+
+“no comps / unknown metadata / early career” (SPECULATIVE)
+
+The fix is a narrow set of overrides and one stronger AVOID pathway.
+
+Targeted changes to make right now
+
+Change 1: Add “Veteran Core Override” (prevents Evans/Henry becoming speculative)
+
+If stage is PRIME (yearsPro >= 2) AND downsideRiskScore <= 60 AND liquidityScore >= 55:
+
+default to HOLD_CORE even if compSource is modeled
+
+This is how you keep established stars/vets from being treated like lottery tickets.
+
+Change 2: Add “Shaky Starter / Backup Avoid” rule (catches Pickett/Mac Jones)
+
+Right now you’re using:
+
+momentum DOWN or risk HIGH or volatility HIGH
+But your inputs may not label these players as HIGH risk or DOWN momentum consistently.
+
+You need a specific “role risk” proxy from what you already have.
+
+If you don’t have depth charts, use stage + temperature + liquidity as a crude proxy:
+
+COOLING or COLD markets + low liquidity + not early-career + mediocre trend should be AVOID.
+
+Rule:
+If stage is PRIME and compsReliable is false and liquidityScore <= 45 and trendScore <= 55:
+
+AVOID_NEW_MONEY
+
+This will catch players whose markets are thin and not rising, which is a good proxy for “nobody wants this.”
+
+Change 3: Tighten SPECULATIVE to what it’s meant for
+
+SPECULATIVE should mainly be:
+
+ROOKIE / YEAR_2 with modeled comps
+
+UNKNOWN stage/meta
+
+players with thin liquidity but also high upside signals
+
+For PRIME veterans, SPECULATIVE should require a reason:
+
+liquidity low OR downside risk high OR unknown metadata
+
+Replit copy/paste instructions (minimal patch)
+
+Add these blocks in your decision engine after Bust/Retired overrides and before the “modeled comps speculative” logic.
+
+Block A: Veteran Core Override (stops Mike Evans / Derrick Henry going speculative)
+
+const isPrime = input.stage === "PRIME";
+const stableCoreProfile =
+  isPrime &&
+  scores.liquidityScore >= 55 &&
+  scores.downsideRiskScore <= 60;
+
+if (!compsReliable && stableCoreProfile) {
+  return finalize("HOLD_CORE", { forceConfidence: "LOW" });
+}
+
+
+Block B: Shaky Market Avoid (catches Pickett/Mac Jones when modeled)
+
+const weakDemandProfile =
+  isPrime &&
+  scores.liquidityScore <= 45 &&
+  scores.trendScore <= 55;
+
+if (!compsReliable && weakDemandProfile) {
+  return finalize("AVOID_NEW_MONEY", { forceConfidence: "LOW" });
+}
+
+
+Block C: Restrict SPECULATIVE default to early-career + unknown
+
+Replace any broad rule that says “if !compsReliable -> speculative” with:
+
+const earlyCareer = input.stage === "ROOKIE" || input.stage === "YEAR_2";
+const unknownStage = input.stage === "UNKNOWN";
+
+if (!compsReliable && (earlyCareer || unknownStage)) {
+  // accumulate exception
+  if (scores.mispricingScore >= 15 && scores.liquidityScore >= 55 && scores.downsideRiskScore <= 65) {
+    return finalize("ACCUMULATE", { forceConfidence: "LOW" });
+  }
+  // avoid exception for extreme downside
+  if (scores.downsideRiskScore >= 75) {
+    return finalize("AVOID_NEW_MONEY", { forceConfidence: "LOW" });
+  }
+  return finalize("SPECULATIVE_FLYER", { forceConfidence: "LOW" });
+}
+
+
+Important: This ensures PRIME players don’t auto-fall into SPECULATIVE just because comps are modeled.
+
+What you should re-test immediately (5 players)
+
+Run these 5 to confirm the patch:
+
+Kenny Pickett → AVOID_NEW_MONEY (LOW)
+
+Mac Jones → AVOID_NEW_MONEY or SPECULATIVE depending on liquidity/trend; should not be HOLD
+
+Mike Evans → HOLD_CORE (LOW)
+
+Derrick Henry → HOLD_CORE (LOW) or AVOID if your downside risk is truly high
+
+C.J. Stroud → HOLD_CORE (LOW) or SPECULATIVE only if your downside risk is high
+
+If Pickett is still SPECULATIVE, paste his debug object. The fix then is not thresholds; it’s that your trend/liquidity for him are not low enough, meaning your scoring layer is overstating demand.
+
+One more thing: your confidence cap
+
+You are still returning LOW confidence? You didn’t paste them this time. If any of these modeled comps results show MEDIUM, that cap is still leaking.
+
+Bottom line
+
+You’re now in the final tuning phase. The product is close — you just need:
+
+PRIME stable vets → HOLD by default, even with modeled comps
+
+PRIME weak demand → AVOID more often
+
+SPECULATIVE reserved for early-career/unknown and high-uncertainty setups
+
+Run the 5-player retest after this patch and paste the outputs.
