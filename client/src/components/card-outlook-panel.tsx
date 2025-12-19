@@ -6,7 +6,6 @@ import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -28,8 +27,7 @@ import {
   Clock,
   Info,
   Sun,
-  Trophy,
-  UserCog
+  Trophy
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -232,26 +230,6 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
       toast({
         title: "Generation Failed",
         description: error.message || "Failed to generate outlook",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const updateLifecycleMutation = useMutation({
-    mutationFn: async (legacyTier: string) => {
-      return await apiRequest("PATCH", `/api/cards/${card.id}/lifecycle`, { legacyTier });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cards", card.id, "outlook"] });
-      toast({
-        title: "Career Stage Updated",
-        description: "The career stage has been updated. Regenerate outlook to see updated scores.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Update Failed",
-        description: error.message || "Failed to update career stage",
         variant: "destructive",
       });
     },
@@ -606,46 +584,13 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
         {isPro && canEdit && (!card.cardCategory || card.cardCategory === "sports") && (
           <>
             <Separator />
-            <Collapsible>
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2 p-0 h-auto text-muted-foreground">
-                  <UserCog className="h-3.5 w-3.5" />
-                  Adjust Legacy Tier
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="pt-2 space-y-2">
+            <div className="space-y-2">
+              {card.legacyTier && (
                 <p className="text-xs text-muted-foreground">
-                  Override the player's legacy tier to adjust upside potential:
+                  Career Stage: <span className="font-medium text-foreground">{card.legacyTier.replace(/_/g, ' ')}</span>
+                  <span className="text-muted-foreground/70"> (edit card to change)</span>
                 </p>
-                <div className="flex items-center gap-2">
-                  <Select
-                    defaultValue={card.legacyTier || ""}
-                    onValueChange={(value) => updateLifecycleMutation.mutate(value)}
-                    disabled={updateLifecycleMutation.isPending}
-                  >
-                    <SelectTrigger className="flex-1" data-testid="select-lifecycle-override">
-                      <SelectValue placeholder="Auto-detect (default)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="PROSPECT">Prospect (Pre-Rookie)</SelectItem>
-                      <SelectItem value="RISING_STAR">Rising Star (Rookie/Sophomore)</SelectItem>
-                      <SelectItem value="STAR">Star (Peak Performance)</SelectItem>
-                      <SelectItem value="SUPERSTAR">Superstar (Elite Tier)</SelectItem>
-                      <SelectItem value="AGING_VET">Aging Veteran (Late Career)</SelectItem>
-                      <SelectItem value="RETIRED">Retired</SelectItem>
-                      <SelectItem value="HOF">Hall of Famer</SelectItem>
-                      <SelectItem value="LEGEND_DECEASED">Legend (Deceased)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {updateLifecycleMutation.isPending && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
-
-            <div className="pt-2">
+              )}
               <Button
                 variant="outline"
                 size="sm"

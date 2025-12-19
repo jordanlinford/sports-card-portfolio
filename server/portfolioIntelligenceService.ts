@@ -32,32 +32,39 @@ function getOpenAI(): OpenAI {
 type CareerStage = "Rookie" | "Rising" | "Prime" | "Decline" | "Retired" | "Unknown";
 
 function inferCareerStage(card: any): CareerStage {
-  // First check user-entered career stage override
-  if (card.careerStageOverride) {
-    const override = card.careerStageOverride.toUpperCase();
-    if (override === "ROOKIE") return "Rookie";
-    if (override === "RISING") return "Rising";
-    if (override === "PRIME" || override === "ELITE") return "Prime";
-    if (override === "VETERAN" || override === "DECLINE") return "Decline";
-    if (override === "RETIRED" || override === "LEGEND") return "Retired";
-  }
-  // Then check auto-detected career stage
-  if (card.careerStageAuto) {
-    const auto = card.careerStageAuto.toUpperCase();
-    if (auto === "ROOKIE") return "Rookie";
-    if (auto === "RISING") return "Rising";
-    if (auto === "PRIME" || auto === "ELITE") return "Prime";
-    if (auto === "VETERAN" || auto === "DECLINE") return "Decline";
-    if (auto === "RETIRED" || auto === "LEGEND") return "Retired";
-  }
-  // Check legacyTier field on card (may contain career stage info)
+  // Check legacyTier FIRST - this is the user-entered career stage from edit modal
   if (card.legacyTier) {
     const tier = card.legacyTier.toUpperCase();
+    // Handle standard internal enum values
+    if (tier === "PROSPECT") return "Rookie";
+    if (tier === "RISING_STAR") return "Rising";
+    if (tier === "STAR" || tier === "SUPERSTAR") return "Prime";
+    if (tier === "AGING_VET") return "Decline";
+    if (tier === "RETIRED" || tier === "HOF" || tier === "LEGEND_DECEASED") return "Retired";
+    // Handle legacy/alternate values
     if (tier === "ROOKIE") return "Rookie";
     if (tier === "RISING" || tier === "BREAKOUT") return "Rising";
     if (tier === "PRIME" || tier === "ELITE" || tier === "PEAK") return "Prime";
     if (tier === "VETERAN" || tier === "DECLINE" || tier === "DECLINING") return "Decline";
-    if (tier === "RETIRED" || tier === "LEGEND" || tier === "HOF") return "Retired";
+    if (tier === "LEGEND") return "Retired";
+  }
+  // Fall back to AI-detected career stage override
+  if (card.careerStageOverride) {
+    const override = card.careerStageOverride.toUpperCase();
+    if (override === "ROOKIE" || override === "PROSPECT") return "Rookie";
+    if (override === "RISING" || override === "RISING_STAR") return "Rising";
+    if (override === "PRIME" || override === "ELITE" || override === "STAR" || override === "SUPERSTAR") return "Prime";
+    if (override === "VETERAN" || override === "DECLINE" || override === "AGING_VET") return "Decline";
+    if (override === "RETIRED" || override === "LEGEND" || override === "HOF" || override === "LEGEND_DECEASED") return "Retired";
+  }
+  // Fall back to AI auto-detected career stage
+  if (card.careerStageAuto) {
+    const auto = card.careerStageAuto.toUpperCase();
+    if (auto === "ROOKIE" || auto === "PROSPECT") return "Rookie";
+    if (auto === "RISING" || auto === "RISING_STAR") return "Rising";
+    if (auto === "PRIME" || auto === "ELITE" || auto === "STAR" || auto === "SUPERSTAR") return "Prime";
+    if (auto === "VETERAN" || auto === "DECLINE" || auto === "AGING_VET") return "Decline";
+    if (auto === "RETIRED" || auto === "LEGEND" || auto === "HOF" || auto === "LEGEND_DECEASED") return "Retired";
   }
   // Fall back to isRookie flag
   if (card.isRookie) return "Rookie";
@@ -124,7 +131,7 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
       salesLast30Days: cards.salesLast30Days,
       displayCaseId: cards.displayCaseId,
       legacyTier: cards.legacyTier,
-      // Join with cardOutlooks for career stage
+      // Include AI-detected career stages as fallback
       careerStageOverride: cardOutlooks.careerStageOverride,
       careerStageAuto: cardOutlooks.careerStageAuto,
     })
