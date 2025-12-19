@@ -235,23 +235,25 @@ function decideVerdict(
   // ============================================================
   // PRECEDENCE 4: AVOID_NEW_MONEY - ONLY for genuine negative EV
   // HARD RULE: Requires downsideRiskScore >= 70
-  // CRITICAL GUARDRAIL: PRIME players with good liquidity (>= 55) can NEVER be AVOID
-  //                     unless downside is truly extreme (>= 80) - protects proven stars
+  // CRITICAL GUARDRAIL: Proven stars can NEVER be AVOID unless downside is extreme
   // ============================================================
   
-  // Proven prime = PRIME + good liquidity. These are established stars that shouldn't be AVOID
+  // Proven demand = established star based on market evidence
+  // Two ways to qualify:
+  // 1. PRIME + liquidity >= 55 (correctly classified prime)
+  // 2. Any stage + very high liquidity (>= 75) (market says they're established)
   // Examples: Tyrese Maxey, Amon-Ra St. Brown, CeeDee Lamb, Jayson Tatum
-  // They can only be AVOID if downside is catastrophic (>= 80)
-  const hasProvenDemand = isPrime && liquidityScore >= 55;
+  const hasProvenDemand = (isPrime && liquidityScore >= 55) || (liquidityScore >= 75);
   
   if (downsideRiskScore >= 70) {
-    // PRIME players with proven demand: only AVOID at truly extreme downside (>= 80)
-    if (hasProvenDemand && downsideRiskScore < 80) {
-      // Fall through to HOLD_CORE - these are "full price, keep what you have" situations
+    // Players with proven demand: only AVOID at truly extreme downside (>= 85)
+    // This protects established stars even if misclassified as UNKNOWN
+    if (hasProvenDemand && downsideRiskScore < 85) {
+      // Fall through to HOLD_CORE (for PRIME) or SPECULATIVE (for others)
       // NOT negative EV, just not a buy
     }
     // Early-career needs even higher threshold (75) since uncertainty is expected
-    else if (earlyCareer && downsideRiskScore < 75) {
+    else if (earlyCareer && !hasProvenDemand && downsideRiskScore < 75) {
       // Don't AVOID rookies at 70-74 downside - that's expected volatility
       // Fall through to SPECULATIVE
     } else {
@@ -260,8 +262,22 @@ function decideVerdict(
   }
 
   // ============================================================
-  // PRECEDENCE 5: Early-career → SPECULATIVE_FLYER default
-  // Rookies/YEAR_2/UNKNOWN are uncertain, not negative
+  // PRECEDENCE 5: Players with proven demand → HOLD_CORE
+  // High liquidity (>= 75) indicates established star, regardless of stage classification
+  // This catches misclassified players like Maxey/Amon-Ra who show as UNKNOWN
+  // ============================================================
+  if (hasProvenDemand && !isPrime) {
+    // Accumulate exception: clearly underpriced
+    if (mispricingScore >= 15 && downsideRiskScore <= 65) {
+      return { verdict: "ACCUMULATE", reason: "Established player with compelling value" };
+    }
+    // Default for proven demand: HOLD_CORE (market says they're established)
+    return { verdict: "HOLD_CORE", reason: "High market demand indicates established player - stable hold" };
+  }
+
+  // ============================================================
+  // PRECEDENCE 6: Early-career → SPECULATIVE_FLYER default
+  // Rookies/YEAR_2/UNKNOWN without proven demand are uncertain
   // ============================================================
   if (earlyCareer) {
     // Accumulate exception: clearly underpriced with good fundamentals
@@ -273,7 +289,7 @@ function decideVerdict(
   }
 
   // ============================================================
-  // PRECEDENCE 6: PRIME players → HOLD_CORE or ACCUMULATE
+  // PRECEDENCE 7: PRIME players → HOLD_CORE or ACCUMULATE
   // Established players should not be SPECULATIVE or AVOID by default
   // ============================================================
   if (isPrime) {
@@ -286,7 +302,7 @@ function decideVerdict(
   }
 
   // ============================================================
-  // PRECEDENCE 7: Fallback - SPECULATIVE_FLYER
+  // PRECEDENCE 8: Fallback - SPECULATIVE_FLYER
   // Edge cases only (should rarely reach here)
   // ============================================================
   return { verdict: "SPECULATIVE_FLYER", reason: "High uncertainty - treat as lottery ticket" };
