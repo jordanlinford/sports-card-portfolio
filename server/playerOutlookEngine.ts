@@ -765,6 +765,8 @@ async function generateFreshOutlook(
     newsCount: snippets.length,
     momentum: momentumMap[momentum] || "STABLE",
     newsHype: hypeMap[newsHype] || "LOW",
+    team: playerInfo.team,
+    position: playerInfo.position,
   });
   
   // Step 9: Build response

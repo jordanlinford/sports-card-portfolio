@@ -33,6 +33,28 @@ export type DecisionInput = {
   newsCount?: number;
   momentum?: "UP" | "DOWN" | "STABLE";
   newsHype?: "HIGH" | "MEDIUM" | "LOW";
+  team?: string;
+  position?: string;
+};
+
+export type DecisionDebug = {
+  stage: PlayerStage;
+  temperature: MarketTemperature;
+  compAvailable: boolean;
+  compSource: "live" | "modeled" | "unknown";
+  compsReliable: boolean;
+  lowMeta: boolean;
+  overheated: boolean;
+  trendScore: number;
+  liquidityScore: number;
+  volatilityScore: number;
+  narrativeHeatScore: number;
+  valuationScore: number;
+  mispricingScore: number;
+  downsideRiskScore: number;
+  chosenVerdict: InvestmentVerdict;
+  cappedConfidence: DataConfidence;
+  verdictReason: string;
 };
 
 function computeScores(input: DecisionInput): InvestmentScores {
@@ -146,53 +168,81 @@ function computeScores(input: DecisionInput): InvestmentScores {
   };
 }
 
-function decideVerdict(scores: InvestmentScores, stage?: PlayerStage): InvestmentVerdict {
+type VerdictResult = {
+  verdict: InvestmentVerdict;
+  reason: string;
+};
+
+function decideVerdict(
+  scores: InvestmentScores, 
+  stage: PlayerStage | undefined,
+  compsReliable: boolean,
+  lowMeta: boolean,
+  overheated: boolean
+): VerdictResult {
   const { downsideRiskScore, valuationScore, mispricingScore, narrativeHeatScore, liquidityScore } = scores;
 
-  // BUST players: Career stalled - always AVOID_NEW_MONEY
-  // Players like Zach Wilson whose careers have failed should never be "TRADE_THE_HYPE"
+  // PRECEDENCE 1: BUST override (hard)
+  // Busts should not be TRADE_THE_HYPE by default
   if (stage === "BUST") {
-    // If somehow they have decent valuation/liquidity, maybe speculative flyer
     if (valuationScore >= 60 && liquidityScore >= 40) {
-      return "SPECULATIVE_FLYER";
+      return { verdict: "SPECULATIVE_FLYER", reason: "BUST with some upside potential" };
     }
-    return "AVOID_NEW_MONEY";
+    return { verdict: "AVOID_NEW_MONEY", reason: "BUST - career stalled" };
   }
 
-  // Retired players and HOF: their cards are stable legacy holds, not "hype to trade"
-  // News about retired legends (Brady, Moss, etc.) reflects nostalgia/legacy, not tradeable hype
+  // PRECEDENCE 2: Retired / HOF default (hard)
+  // Legends/vintage markets should not be treated as hype trades
   const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
-  
   if (isRetiredOrHOF) {
-    // For HOF players with good valuation, recommend accumulating on dips
     if (stage === "RETIRED_HOF" && valuationScore >= 50 && liquidityScore >= 50) {
-      return "ACCUMULATE";
+      return { verdict: "ACCUMULATE", reason: "HOF with good value/liquidity" };
     }
-    // For all retired players, default to HOLD_CORE - their value is stable
-    // Only deviate if fundamentals are truly bad (very low liquidity + high risk)
     if (downsideRiskScore >= 80 && liquidityScore <= 30) {
-      return "AVOID_NEW_MONEY";
+      return { verdict: "AVOID_NEW_MONEY", reason: "Retired with poor fundamentals" };
     }
-    return "HOLD_CORE";
+    return { verdict: "HOLD_CORE", reason: "Retired/HOF - stable legacy hold" };
   }
 
-  if (downsideRiskScore >= 75 && valuationScore <= 45) {
-    return "AVOID_NEW_MONEY";
+  // PRECEDENCE 3: If metadata is unknown (hard safety)
+  // Unknown/Unknown should never produce a confident sell/buy call
+  if (lowMeta) {
+    if (downsideRiskScore >= 75) {
+      return { verdict: "AVOID_NEW_MONEY", reason: "Unknown metadata + high risk" };
+    }
+    return { verdict: "SPECULATIVE_FLYER", reason: "Unknown metadata - insufficient info" };
   }
 
-  if (mispricingScore <= -20 && narrativeHeatScore >= 65) {
-    return "TRADE_THE_HYPE";
+  // PRECEDENCE 4: Overheated with unreliable comps → AVOID_NEW_MONEY (key fix)
+  // We cannot see "spikes" with modeled comps, so we cannot say "sell into spikes"
+  // We can say "don't chase at these prices"
+  if (overheated && !compsReliable) {
+    return { verdict: "AVOID_NEW_MONEY", reason: "Overheated but no reliable comps to confirm spikes" };
   }
 
+  // PRECEDENCE 5: TRADE_THE_HYPE allowed only when comps are reliable
+  // This becomes rare until our sold-history scraper improves
+  if (overheated && compsReliable) {
+    return { verdict: "TRADE_THE_HYPE", reason: "Overheated with reliable comps data" };
+  }
+
+  // PRECEDENCE 6: ACCUMULATE (unchanged, allow even with modeled comps if liquidity/value are strong)
   if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
-    return "ACCUMULATE";
+    return { verdict: "ACCUMULATE", reason: "Underpriced with good liquidity/risk profile" };
   }
 
-  if (valuationScore >= 45 && valuationScore <= 60 && downsideRiskScore <= 70) {
-    return "HOLD_CORE";
+  // PRECEDENCE 7: HOLD_CORE band (widened)
+  if (downsideRiskScore <= 70 && valuationScore >= 40 && valuationScore <= 70) {
+    return { verdict: "HOLD_CORE", reason: "Fair value with acceptable risk" };
   }
 
-  return "SPECULATIVE_FLYER";
+  // PRECEDENCE 8: AVOID_NEW_MONEY (risk-driven)
+  if (downsideRiskScore >= 75 && valuationScore <= 45) {
+    return { verdict: "AVOID_NEW_MONEY", reason: "High risk + poor valuation" };
+  }
+
+  // PRECEDENCE 9: Fallback
+  return { verdict: "SPECULATIVE_FLYER", reason: "Does not fit other categories" };
 }
 
 function computeConfidence(scores: InvestmentScores): DataConfidence {
@@ -216,6 +266,28 @@ const POSTURE_LABELS: Record<InvestmentVerdict, string> = {
   AVOID_NEW_MONEY: "Stay away",
   SPECULATIVE_FLYER: "Small lottery bet",
 };
+
+function getContextAwarePostureLabel(
+  verdict: InvestmentVerdict, 
+  overheated: boolean, 
+  downsideRiskScore: number
+): string {
+  if (verdict === "TRADE_THE_HYPE") {
+    return "Sell into spikes";
+  }
+  
+  if (verdict === "AVOID_NEW_MONEY") {
+    if (overheated) {
+      return "Don't chase at these prices";
+    }
+    if (downsideRiskScore >= 75) {
+      return "Avoid downside risk";
+    }
+    return "Stay away";
+  }
+  
+  return POSTURE_LABELS[verdict];
+}
 
 function generateActionPlan(verdict: InvestmentVerdict, input: DecisionInput): InvestmentActionPlan {
   const { stage, temperature } = input;
@@ -455,19 +527,82 @@ function generateTriggers(verdict: InvestmentVerdict, input: DecisionInput): { u
   return triggers;
 }
 
-export function generateInvestmentCall(input: DecisionInput): InvestmentCall {
+export function generateInvestmentCall(input: DecisionInput): InvestmentCall & { decisionDebug?: DecisionDebug } {
   const scores = computeScores(input);
-  const verdict = decideVerdict(scores, input.stage);
-  const confidence = computeConfidence(scores);
+  
+  // Compute helper flags for gating logic
+  const hasCompData = input.compData?.available === true;
+  const compSource: "live" | "modeled" | "unknown" = input.compData?.source ?? "unknown";
+  const compsReliable = hasCompData && compSource === "live";
+  
+  // lowMeta: team or position is unknown/missing/placeholder
+  // Normalize and check for common placeholder values
+  const isUnknownValue = (val: string | undefined | null): boolean => {
+    if (val == null) return true;
+    const normalized = val.toLowerCase().trim();
+    return normalized === "unknown" || 
+           normalized === "n/a" || 
+           normalized === "tbd" || 
+           normalized === "" ||
+           normalized === "none";
+  };
+  const lowMeta = isUnknownValue(input.team) || isUnknownValue(input.position);
+  
+  // overheated: high narrative heat with negative mispricing
+  const overheated = (scores.mispricingScore <= -20 && scores.narrativeHeatScore >= 65);
+  
+  // Get verdict with new precedence-based logic
+  const { verdict, reason } = decideVerdict(scores, input.stage, compsReliable, lowMeta, overheated);
+  
+  // Compute base confidence
+  let confidence = computeConfidence(scores);
+  
+  // Confidence capping rules (must apply after verdict selection)
+  // Tier 1: If no comp data at all, or low metadata → cap at LOW
+  // Tier 2: If comps are modeled (not live) but metadata is solid → cap at MEDIUM
+  // Tier 3: If comps are reliable (live) and metadata is solid → use computed confidence
+  if (!hasCompData || lowMeta) {
+    confidence = "LOW";
+  } else if (!compsReliable) {
+    // Modeled comps with good metadata: cap at MEDIUM
+    if (confidence === "HIGH") {
+      confidence = "MEDIUM";
+    }
+  }
+  
+  // Get context-aware posture label
+  const postureLabel = getContextAwarePostureLabel(verdict, overheated, scores.downsideRiskScore);
 
   const triggers = generateTriggers(verdict, input);
   const cardTargets = generateCardTargets(verdict, input.exposures);
 
-  console.log(`[InvestmentDecision] Verdict: ${verdict}, Scores:`, JSON.stringify(scores));
+  // Build decisionDebug for QA
+  const decisionDebug: DecisionDebug = {
+    stage: input.stage,
+    temperature: input.temperature,
+    compAvailable: hasCompData,
+    compSource,
+    compsReliable,
+    lowMeta,
+    overheated,
+    trendScore: scores.trendScore,
+    liquidityScore: scores.liquidityScore,
+    volatilityScore: scores.volatilityScore,
+    narrativeHeatScore: scores.narrativeHeatScore,
+    valuationScore: scores.valuationScore,
+    mispricingScore: scores.mispricingScore,
+    downsideRiskScore: scores.downsideRiskScore,
+    chosenVerdict: verdict,
+    cappedConfidence: confidence,
+    verdictReason: reason,
+  };
+
+  console.log(`[InvestmentDecision] Verdict: ${verdict} (${reason}), Scores:`, JSON.stringify(scores));
+  console.log(`[InvestmentDecision] Debug: compsReliable=${compsReliable}, lowMeta=${lowMeta}, overheated=${overheated}`);
 
   return {
     verdict,
-    postureLabel: POSTURE_LABELS[verdict],
+    postureLabel,
     confidence,
     timeHorizon: input.horizon,
     oneLineRationale: generateOneLineRationale(verdict, input, scores),
@@ -478,6 +613,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall {
     triggersToUpgrade: triggers.upgrade,
     triggersToDowngrade: triggers.downgrade,
     scores,
+    decisionDebug,
   };
 }
 
