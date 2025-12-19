@@ -39,7 +39,7 @@ function inferCareerStage(card: any): CareerStage {
     if (tier === "PROSPECT") return "Rookie";
     if (tier === "RISING_STAR") return "Rising";
     if (tier === "STAR" || tier === "SUPERSTAR") return "Prime";
-    if (tier === "AGING_VET") return "Decline";
+    if (tier === "AGING_VET" || tier === "BUST") return "Decline";
     if (tier === "RETIRED" || tier === "HOF" || tier === "LEGEND_DECEASED") return "Retired";
     // Handle legacy/alternate values
     if (tier === "ROOKIE") return "Rookie";
@@ -54,7 +54,7 @@ function inferCareerStage(card: any): CareerStage {
     if (override === "ROOKIE" || override === "PROSPECT") return "Rookie";
     if (override === "RISING" || override === "RISING_STAR") return "Rising";
     if (override === "PRIME" || override === "ELITE" || override === "STAR" || override === "SUPERSTAR") return "Prime";
-    if (override === "VETERAN" || override === "DECLINE" || override === "AGING_VET") return "Decline";
+    if (override === "VETERAN" || override === "DECLINE" || override === "AGING_VET" || override === "BUST") return "Decline";
     if (override === "RETIRED" || override === "LEGEND" || override === "HOF" || override === "LEGEND_DECEASED") return "Retired";
   }
   // Fall back to AI auto-detected career stage
@@ -63,7 +63,7 @@ function inferCareerStage(card: any): CareerStage {
     if (auto === "ROOKIE" || auto === "PROSPECT") return "Rookie";
     if (auto === "RISING" || auto === "RISING_STAR") return "Rising";
     if (auto === "PRIME" || auto === "ELITE" || auto === "STAR" || auto === "SUPERSTAR") return "Prime";
-    if (auto === "VETERAN" || auto === "DECLINE" || auto === "AGING_VET") return "Decline";
+    if (auto === "VETERAN" || auto === "DECLINE" || auto === "AGING_VET" || auto === "BUST") return "Decline";
     if (auto === "RETIRED" || auto === "LEGEND" || auto === "HOF" || auto === "LEGEND_DECEASED") return "Retired";
   }
   // Fall back to isRookie flag

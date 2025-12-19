@@ -647,6 +647,7 @@ export function CardDetailModal({
                         <SelectItem value="STAR">Established Star</SelectItem>
                         <SelectItem value="SUPERSTAR">Superstar (MVP-caliber)</SelectItem>
                         <SelectItem value="AGING_VET">Veteran (Declining)</SelectItem>
+                        <SelectItem value="BUST">Bust / Career Stalled</SelectItem>
                         <SelectItem value="RETIRED">Retired</SelectItem>
                         <SelectItem value="HOF">Hall of Fame</SelectItem>
                         <SelectItem value="LEGEND_DECEASED">Legend (Deceased)</SelectItem>

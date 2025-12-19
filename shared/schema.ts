@@ -953,6 +953,7 @@ export const PLAYER_STAGE = {
   PRIME: "PRIME",           // Peak performance years
   VETERAN: "VETERAN",       // Later career, established
   AGING: "AGING",           // Declining performance
+  BUST: "BUST",             // Career stalled/failed (young player who didn't pan out)
   RETIRED: "RETIRED",       // No longer playing
   RETIRED_HOF: "RETIRED_HOF", // Hall of Fame bound
 } as const;

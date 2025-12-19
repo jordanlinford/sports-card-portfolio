@@ -21,6 +21,7 @@ export type LegacyTier =
   | "STAR" 
   | "SUPERSTAR" 
   | "AGING_VET" 
+  | "BUST"
   | "RETIRED" 
   | "HOF" 
   | "LEGEND_DECEASED";
@@ -192,6 +193,13 @@ const LIFECYCLE_PROFILES: Record<LegacyTier, LifecycleProfile> = {
     riskRange: { min: 35, max: 65 },
     confidenceFloor: 50,
     stabilityBonus: 0.1,
+  },
+  // Bust: Career stalled/failed - VERY LOW upside, HIGH risk
+  BUST: {
+    upsideRange: { min: 5, max: 20 },
+    riskRange: { min: 65, max: 90 },
+    confidenceFloor: 40,
+    stabilityBonus: 0,
   },
   // Retired (not HOF): VERY LOW upside (stable), LOW risk, HIGH confidence
   RETIRED: {
@@ -873,6 +881,7 @@ const LEGACY_SCORES: Record<LegacyTier, number> = {
   STAR: 0.95,
   SUPERSTAR: 1.0,
   AGING_VET: 0.7,
+  BUST: 0.3,            // Career stalled - low legacy value
   RETIRED: 0.8,
   HOF: 0.95,
   LEGEND_DECEASED: 1.0,
@@ -884,6 +893,7 @@ const PROSPECT_RISK_FACTORS: Record<LegacyTier, number> = {
   STAR: 0.4,
   SUPERSTAR: 0.3,
   AGING_VET: 0.8,
+  BUST: 1.1,            // Career stalled - highest risk
   RETIRED: 0.5,
   HOF: 0.3,
   LEGEND_DECEASED: 0.2,
@@ -1572,6 +1582,7 @@ function getLifecycleNarrative(legacyTier: LegacyTier, card: Card): string {
     STAR: "Established player, proven track record, moderate growth potential",
     SUPERSTAR: "Elite active player, premium pricing already reflects status",
     AGING_VET: "Past prime but still active, uncertain trajectory ahead",
+    BUST: "Career has stalled or failed to develop, limited value and high risk of further decline",
     RETIRED: "No longer playing, market has stabilized, value is established",
     HOF: "Hall of Fame inductee, fully priced-in legacy, minimal upside but very safe",
     LEGEND_DECEASED: "Historical legend, stable market, collector's piece with predictable value",

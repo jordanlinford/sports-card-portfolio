@@ -70,6 +70,7 @@ function computeScores(input: DecisionInput): InvestmentScores {
     PRIME: 65,
     VETERAN: 45,
     AGING: 30,
+    BUST: 15,           // Career stalled - very low trend/upside
     RETIRED: 35,
     RETIRED_HOF: 55,
   };
@@ -81,6 +82,7 @@ function computeScores(input: DecisionInput): InvestmentScores {
     PRIME: 35,
     VETERAN: 55,
     AGING: 70,
+    BUST: 85,           // Career stalled - high risk (could be cut, out of league)
     RETIRED: 20,
     RETIRED_HOF: 15,
   };
@@ -146,6 +148,16 @@ function computeScores(input: DecisionInput): InvestmentScores {
 
 function decideVerdict(scores: InvestmentScores, stage?: PlayerStage): InvestmentVerdict {
   const { downsideRiskScore, valuationScore, mispricingScore, narrativeHeatScore, liquidityScore } = scores;
+
+  // BUST players: Career stalled - always AVOID_NEW_MONEY
+  // Players like Zach Wilson whose careers have failed should never be "TRADE_THE_HYPE"
+  if (stage === "BUST") {
+    // If somehow they have decent valuation/liquidity, maybe speculative flyer
+    if (valuationScore >= 60 && liquidityScore >= 40) {
+      return "SPECULATIVE_FLYER";
+    }
+    return "AVOID_NEW_MONEY";
+  }
 
   // Retired players and HOF: their cards are stable legacy holds, not "hype to trade"
   // News about retired legends (Brady, Moss, etc.) reflects nostalgia/legacy, not tradeable hype
