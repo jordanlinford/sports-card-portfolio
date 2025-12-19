@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Link } from "wouter";
 import { 
   Search,
@@ -36,10 +37,12 @@ import {
   ChevronRight,
   RefreshCw,
   X,
+  User,
+  CreditCard,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { PlayerVerdict, StockTier, MarketTemperature, VerdictModifier, PlayerWatchlist } from "@shared/schema";
+import type { PlayerVerdict, StockTier, MarketTemperature, VerdictModifier, Watchlist as WatchlistType } from "@shared/schema";
 
 const LAUNCH_PLAYERS = [
   { name: "Drake Maye", sport: "football" },
@@ -125,34 +128,9 @@ function getModifierColor(modifier: VerdictModifier) {
   }
 }
 
-interface WatchlistItemWithOutlook extends PlayerWatchlist {
-  currentOutlook?: {
-    playerInfo: {
-      name: string;
-      team?: string | null;
-      position?: string | null;
-    };
-    verdict: {
-      action: PlayerVerdict;
-      modifier?: VerdictModifier | null;
-    };
-    snapshot: {
-      tier: StockTier;
-      temperature: MarketTemperature;
-    };
-    insight: {
-      oneLineSummary: string;
-    };
-  } | null;
-  changes?: {
-    verdictChanged: boolean;
-    previousVerdict?: PlayerVerdict;
-    modifierChanged?: boolean;
-    previousModifier?: VerdictModifier | null;
-    temperatureChanged?: boolean;
-    previousTemperature?: MarketTemperature;
-    changeCount: number;
-  } | null;
+// Unified watchlist item - supports both players and cards
+interface UnifiedWatchlistItem extends WatchlistType {
+  // Optional enriched data that may come from API
 }
 
 function WatchlistSkeleton() {
@@ -212,90 +190,67 @@ function EmptyWatchlist({ onSelectPlayer }: { onSelectPlayer: (name: string, spo
   );
 }
 
-function WatchlistItem({ 
+// Player watchlist item component
+function PlayerWatchlistItem({ 
   item, 
   onRemove, 
   onUpdateNotes 
 }: { 
-  item: WatchlistItemWithOutlook;
+  item: UnifiedWatchlistItem;
   onRemove: () => void;
   onUpdateNotes: (notes: string | null) => void;
 }) {
   const [notesDialogOpen, setNotesDialogOpen] = useState(false);
   const [notes, setNotes] = useState(item.notes || "");
-  const outlook = item.currentOutlook;
 
   const handleSaveNotes = () => {
     onUpdateNotes(notes.trim() || null);
     setNotesDialogOpen(false);
   };
 
-  const displayName = item.playerName || item.playerKey.split(":")[1]?.replace(/_/g, " ") || item.playerKey;
+  const displayName = item.playerName || item.playerKey?.split(":")[1]?.replace(/_/g, " ") || "Unknown Player";
 
   return (
-    <Card className="group" data-testid={`watchlist-item-${item.playerKey}`}>
+    <Card className="group" data-testid={`watchlist-item-${item.id}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-muted">
+            <User className="h-5 w-5 text-muted-foreground" />
+          </div>
+          
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-2">
-              <Link href={`/player-outlook?player=${encodeURIComponent(displayName)}&sport=${item.sport}`}>
-                <span className="font-semibold text-lg hover:underline cursor-pointer capitalize" data-testid={`link-player-${item.playerKey}`}>
-                  {outlook?.playerInfo?.name || displayName}
+              <Link href={`/player-outlook?player=${encodeURIComponent(displayName)}&sport=${item.sport || 'football'}`}>
+                <span className="font-semibold text-lg hover:underline cursor-pointer capitalize" data-testid={`link-player-${item.id}`}>
+                  {displayName}
                 </span>
               </Link>
-              {outlook?.playerInfo?.team && (
-                <span className="text-sm text-muted-foreground">
-                  {outlook.playerInfo.team}
-                </span>
-              )}
-              {outlook?.playerInfo?.position && (
-                <Badge variant="outline" className="text-xs">
-                  {outlook.playerInfo.position}
+              {item.sport && (
+                <Badge variant="outline" className="text-xs capitalize">
+                  {item.sport}
                 </Badge>
               )}
             </div>
 
-            {outlook ? (
-              <>
-                <div className="flex items-center gap-2 flex-wrap mb-2">
-                  <Badge className={`${getVerdictColor(outlook.verdict.action)} flex items-center gap-1`}>
-                    {getVerdictIcon(outlook.verdict.action)}
-                    {outlook.verdict.action}
-                  </Badge>
-                  {outlook.verdict.modifier && (
-                    <Badge className={`${getModifierColor(outlook.verdict.modifier)} text-xs`}>
-                      {outlook.verdict.modifier}
-                    </Badge>
-                  )}
-                  <Badge className={`${getTierColor(outlook.snapshot.tier)} flex items-center gap-1 text-xs`}>
-                    {getTierIcon(outlook.snapshot.tier)}
-                    {outlook.snapshot.tier}
-                  </Badge>
-                  <Badge className={`${getTemperatureColor(outlook.snapshot.temperature)} flex items-center gap-1 text-xs`}>
-                    {getTemperatureIcon(outlook.snapshot.temperature)}
-                    {outlook.snapshot.temperature}
-                  </Badge>
-                </div>
-
-                {item.changes?.verdictChanged && (
-                  <div className="flex items-center gap-2 text-sm mb-2">
-                    <AlertCircle className="h-4 w-4 text-amber-500" />
-                    <span className="text-amber-600 dark:text-amber-400">
-                      Verdict changed from {item.changes.previousVerdict} to {outlook.verdict.action}
-                    </span>
-                  </div>
-                )}
-
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {outlook.insight.oneLineSummary}
-                </p>
-              </>
-            ) : (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <RefreshCw className="h-4 w-4" />
-                <span className="text-sm">No analysis yet - view player to generate outlook</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              {item.verdictAtAdd && (
+                <Badge className={`${getVerdictColor(item.verdictAtAdd as PlayerVerdict)} flex items-center gap-1`}>
+                  {getVerdictIcon(item.verdictAtAdd as PlayerVerdict)}
+                  {item.verdictAtAdd}
+                </Badge>
+              )}
+              {item.actionAtAdd && (
+                <Badge variant="secondary" className="text-xs">
+                  {item.actionAtAdd}
+                </Badge>
+              )}
+              {item.temperatureAtAdd && (
+                <Badge className={`${getTemperatureColor(item.temperatureAtAdd as MarketTemperature)} flex items-center gap-1 text-xs`}>
+                  {getTemperatureIcon(item.temperatureAtAdd as MarketTemperature)}
+                  {item.temperatureAtAdd}
+                </Badge>
+              )}
+            </div>
 
             {item.notes && (
               <div className="mt-3 p-2 bg-muted/50 rounded-md">
@@ -312,12 +267,15 @@ function WatchlistItem({
                 <Clock className="h-3 w-3" />
                 Added {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "recently"}
               </span>
+              {item.source && (
+                <span className="text-muted-foreground">via {item.source}</span>
+              )}
             </div>
           </div>
 
           <div className="flex flex-col gap-2">
-            <Link href={`/player-outlook?player=${encodeURIComponent(item.playerKey)}&sport=${item.sport}`}>
-              <Button variant="outline" size="sm" data-testid={`button-view-${item.playerKey}`}>
+            <Link href={`/player-outlook?player=${encodeURIComponent(displayName)}&sport=${item.sport || 'football'}`}>
+              <Button variant="outline" size="sm" data-testid={`button-view-${item.id}`}>
                 View
                 <ArrowRight className="h-3 w-3 ml-1" />
               </Button>
@@ -325,14 +283,14 @@ function WatchlistItem({
 
             <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" data-testid={`button-notes-${item.playerKey}`}>
+                <Button variant="ghost" size="sm" data-testid={`button-notes-${item.id}`}>
                   <Edit3 className="h-3 w-3 mr-1" />
                   Notes
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Notes for {item.playerKey}</DialogTitle>
+                  <DialogTitle>Notes for {displayName}</DialogTitle>
                   <DialogDescription>
                     Add personal notes about this player to help track your investment thesis.
                   </DialogDescription>
@@ -360,7 +318,144 @@ function WatchlistItem({
               size="sm" 
               className="text-destructive hover:text-destructive"
               onClick={onRemove}
-              data-testid={`button-remove-${item.playerKey}`}
+              data-testid={`button-remove-${item.id}`}
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              Remove
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Card watchlist item component
+function CardWatchlistItem({ 
+  item, 
+  onRemove, 
+  onUpdateNotes 
+}: { 
+  item: UnifiedWatchlistItem;
+  onRemove: () => void;
+  onUpdateNotes: (notes: string | null) => void;
+}) {
+  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
+  const [notes, setNotes] = useState(item.notes || "");
+
+  const handleSaveNotes = () => {
+    onUpdateNotes(notes.trim() || null);
+    setNotesDialogOpen(false);
+  };
+
+  const displayName = item.cardTitle || `Card #${item.cardId}`;
+
+  return (
+    <Card className="group" data-testid={`watchlist-item-${item.id}`}>
+      <CardContent className="p-4">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-md bg-muted">
+            <CreditCard className="h-5 w-5 text-muted-foreground" />
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              {item.cardId ? (
+                <Link href={`/card/${item.cardId}/outlook`}>
+                  <span className="font-semibold text-lg hover:underline cursor-pointer" data-testid={`link-card-${item.id}`}>
+                    {displayName}
+                  </span>
+                </Link>
+              ) : (
+                <span className="font-semibold text-lg">{displayName}</span>
+              )}
+              <Badge variant="outline" className="text-xs">
+                Card
+              </Badge>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              {item.actionAtAdd && (
+                <Badge variant="secondary" className="text-xs">
+                  {item.actionAtAdd}
+                </Badge>
+              )}
+              {item.estimatedValueAtAdd && (
+                <Badge variant="outline" className="text-xs">
+                  ${item.estimatedValueAtAdd.toFixed(2)}
+                </Badge>
+              )}
+            </div>
+
+            {item.notes && (
+              <div className="mt-3 p-2 bg-muted/50 rounded-md">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+                  <FileText className="h-3 w-3" />
+                  <span>Your notes:</span>
+                </div>
+                <p className="text-sm">{item.notes}</p>
+              </div>
+            )}
+
+            <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Added {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "recently"}
+              </span>
+              {item.source && (
+                <span className="text-muted-foreground">via {item.source}</span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {item.cardId && (
+              <Link href={`/card/${item.cardId}/outlook`}>
+                <Button variant="outline" size="sm" data-testid={`button-view-${item.id}`}>
+                  View
+                  <ArrowRight className="h-3 w-3 ml-1" />
+                </Button>
+              </Link>
+            )}
+
+            <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" data-testid={`button-notes-${item.id}`}>
+                  <Edit3 className="h-3 w-3 mr-1" />
+                  Notes
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Notes for {displayName}</DialogTitle>
+                  <DialogDescription>
+                    Add personal notes about this card to help track your investment thesis.
+                  </DialogDescription>
+                </DialogHeader>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="e.g., Watch for PSA pop report changes..."
+                  className="min-h-[100px]"
+                  data-testid="input-notes"
+                />
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline">Cancel</Button>
+                  </DialogClose>
+                  <Button onClick={handleSaveNotes} data-testid="button-save-notes">
+                    Save Notes
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-destructive hover:text-destructive"
+              onClick={onRemove}
+              data-testid={`button-remove-${item.id}`}
             >
               <Trash2 className="h-3 w-3 mr-1" />
               Remove
@@ -376,40 +471,41 @@ export default function Watchlist() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<"all" | "players" | "cards">("all");
   const [sportFilter, setSportFilter] = useState<string>("all");
-  const [verdictFilter, setVerdictFilter] = useState<string>("all");
 
-  const { data: watchlist, isLoading } = useQuery<WatchlistItemWithOutlook[]>({
-    queryKey: ["/api/watchlist"],
+  // Use unified watchlist API
+  const { data: watchlist, isLoading } = useQuery<UnifiedWatchlistItem[]>({
+    queryKey: ["/api/unified-watchlist"],
     enabled: !!user,
   });
 
   const removeMutation = useMutation({
-    mutationFn: async (playerKey: string) => {
-      await apiRequest("DELETE", `/api/watchlist/${encodeURIComponent(playerKey)}`);
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/unified-watchlist/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/unified-watchlist"] });
       toast({
         title: "Removed from watchlist",
-        description: "Player has been removed from your watchlist.",
+        description: "Item has been removed from your watchlist.",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to remove player from watchlist.",
+        description: "Failed to remove item from watchlist.",
         variant: "destructive",
       });
     },
   });
 
   const updateNotesMutation = useMutation({
-    mutationFn: async ({ playerKey, notes }: { playerKey: string; notes: string | null }) => {
-      await apiRequest("PUT", `/api/watchlist/${encodeURIComponent(playerKey)}/notes`, { notes });
+    mutationFn: async ({ id, notes }: { id: number; notes: string | null }) => {
+      await apiRequest("PATCH", `/api/unified-watchlist/${id}`, { notes });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/unified-watchlist"] });
       toast({
         title: "Notes saved",
         description: "Your notes have been updated.",
@@ -454,32 +550,64 @@ export default function Watchlist() {
     );
   }
 
-  const filteredWatchlist = watchlist?.filter((item) => {
-    if (searchQuery && !item.playerKey.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false;
+  // Separate watchlist items by type
+  const playerItems = watchlist?.filter(item => item.itemType === "player") || [];
+  const cardItems = watchlist?.filter(item => item.itemType === "card") || [];
+  
+  // Apply filters based on active tab
+  const getFilteredItems = () => {
+    let items: UnifiedWatchlistItem[] = [];
+    
+    if (activeTab === "all") {
+      items = watchlist || [];
+    } else if (activeTab === "players") {
+      items = playerItems;
+    } else {
+      items = cardItems;
     }
-    if (sportFilter !== "all" && item.sport !== sportFilter) {
-      return false;
+    
+    // Apply search filter
+    if (searchQuery) {
+      items = items.filter(item => {
+        const searchable = item.itemType === "player" 
+          ? (item.playerName || item.playerKey || "").toLowerCase()
+          : (item.cardTitle || "").toLowerCase();
+        return searchable.includes(searchQuery.toLowerCase());
+      });
     }
-    if (verdictFilter !== "all" && item.currentOutlook?.verdict?.action !== verdictFilter) {
-      return false;
+    
+    // Apply sport filter (only for players)
+    if (sportFilter !== "all") {
+      items = items.filter(item => 
+        item.itemType !== "player" || item.sport === sportFilter
+      );
     }
-    return true;
-  });
+    
+    return items;
+  };
+  
+  const filteredWatchlist = getFilteredItems();
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
         <div className="flex items-center justify-between gap-4 flex-wrap mb-2">
-          <h1 className="text-3xl font-bold" data-testid="text-watchlist-title">Player Watchlist</h1>
+          <h1 className="text-3xl font-bold" data-testid="text-watchlist-title">My Watchlist</h1>
           {watchlist && watchlist.length > 0 && (
-            <Badge variant="secondary" className="text-sm">
-              {watchlist.length} player{watchlist.length !== 1 ? "s" : ""}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="text-sm">
+                {playerItems.length} player{playerItems.length !== 1 ? "s" : ""}
+              </Badge>
+              {cardItems.length > 0 && (
+                <Badge variant="outline" className="text-sm">
+                  {cardItems.length} card{cardItems.length !== 1 ? "s" : ""}
+                </Badge>
+              )}
+            </div>
           )}
         </div>
         <p className="text-muted-foreground">
-          Track players you're interested in and monitor changes to their market outlook.
+          Track players and cards you're interested in. Monitor changes to their market outlook.
         </p>
       </div>
 
@@ -489,11 +617,27 @@ export default function Watchlist() {
         <EmptyWatchlist onSelectPlayer={handleSelectLaunchPlayer} />
       ) : (
         <>
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="mb-6">
+            <TabsList>
+              <TabsTrigger value="all" data-testid="tab-all">
+                All ({watchlist.length})
+              </TabsTrigger>
+              <TabsTrigger value="players" data-testid="tab-players">
+                <User className="h-4 w-4 mr-1" />
+                Players ({playerItems.length})
+              </TabsTrigger>
+              <TabsTrigger value="cards" data-testid="tab-cards">
+                <CreditCard className="h-4 w-4 mr-1" />
+                Cards ({cardItems.length})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
           <div className="flex items-center gap-4 mb-6 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search players..."
+                placeholder={activeTab === "cards" ? "Search cards..." : "Search players..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -511,55 +655,53 @@ export default function Watchlist() {
               )}
             </div>
 
-            <Select value={sportFilter} onValueChange={setSportFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-sport">
-                <SelectValue placeholder="Sport" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Sports</SelectItem>
-                <SelectItem value="football">Football</SelectItem>
-                <SelectItem value="basketball">Basketball</SelectItem>
-                <SelectItem value="baseball">Baseball</SelectItem>
-                <SelectItem value="hockey">Hockey</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={verdictFilter} onValueChange={setVerdictFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-verdict">
-                <SelectValue placeholder="Verdict" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Verdicts</SelectItem>
-                <SelectItem value="BUY">BUY</SelectItem>
-                <SelectItem value="MONITOR">MONITOR</SelectItem>
-                <SelectItem value="AVOID">AVOID</SelectItem>
-              </SelectContent>
-            </Select>
+            {activeTab !== "cards" && (
+              <Select value={sportFilter} onValueChange={setSportFilter}>
+                <SelectTrigger className="w-[140px]" data-testid="select-sport">
+                  <SelectValue placeholder="Sport" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sports</SelectItem>
+                  <SelectItem value="football">Football</SelectItem>
+                  <SelectItem value="basketball">Basketball</SelectItem>
+                  <SelectItem value="baseball">Baseball</SelectItem>
+                  <SelectItem value="hockey">Hockey</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {filteredWatchlist && filteredWatchlist.length > 0 ? (
             <div className="space-y-4">
               {filteredWatchlist.map((item) => (
-                <WatchlistItem
-                  key={item.id}
-                  item={item}
-                  onRemove={() => removeMutation.mutate(item.playerKey)}
-                  onUpdateNotes={(notes) => updateNotesMutation.mutate({ playerKey: item.playerKey, notes })}
-                />
+                item.itemType === "player" ? (
+                  <PlayerWatchlistItem
+                    key={item.id}
+                    item={item}
+                    onRemove={() => removeMutation.mutate(item.id)}
+                    onUpdateNotes={(notes) => updateNotesMutation.mutate({ id: item.id, notes })}
+                  />
+                ) : (
+                  <CardWatchlistItem
+                    key={item.id}
+                    item={item}
+                    onRemove={() => removeMutation.mutate(item.id)}
+                    onUpdateNotes={(notes) => updateNotesMutation.mutate({ id: item.id, notes })}
+                  />
+                )
               ))}
             </div>
           ) : (
             <Card>
               <CardContent className="p-8 text-center">
                 <p className="text-muted-foreground">
-                  No players match your filters.
+                  No items match your filters.
                 </p>
                 <Button
                   variant="ghost"
                   onClick={() => {
                     setSearchQuery("");
                     setSportFilter("all");
-                    setVerdictFilter("all");
                   }}
                 >
                   Clear filters

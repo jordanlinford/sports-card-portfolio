@@ -598,29 +598,51 @@ export default function PlayerOutlookPage() {
     ? `${outlookSport.toLowerCase()}:${outlookData.player.name.toLowerCase().trim().replace(/\s+/g, "_")}`
     : null;
 
-  const { data: watchlistStatus, refetch: refetchWatchlistStatus } = useQuery<{ watching: boolean }>({
-    queryKey: ["/api/watchlist/check", playerKey],
+  // Cache watchlist item ID locally for immediate access after adding
+  const [cachedWatchlistItemId, setCachedWatchlistItemId] = useState<number | null>(null);
+
+  // Use unified watchlist API for player watchlist
+  const { data: watchlistStatus, refetch: refetchWatchlistStatus } = useQuery<{ watching: boolean; item?: { id: number } }>({
+    queryKey: ["/api/unified-watchlist/check", { type: "player", playerKey }],
     queryFn: async () => {
       if (!playerKey) return { watching: false };
-      const res = await fetch(`/api/watchlist/check/${encodeURIComponent(playerKey)}`);
-      if (!res.ok) throw new Error("Failed to check watchlist");
+      const res = await fetch(`/api/unified-watchlist/check?type=player&playerKey=${encodeURIComponent(playerKey)}`);
+      if (!res.ok) return { watching: false };
       return res.json();
     },
     enabled: !!playerKey && !!user,
   });
 
+  // Update cached ID when query returns
+  useEffect(() => {
+    if (watchlistStatus?.item?.id) {
+      setCachedWatchlistItemId(watchlistStatus.item.id);
+    } else if (!watchlistStatus?.watching) {
+      setCachedWatchlistItemId(null);
+    }
+  }, [watchlistStatus]);
+
   const addToWatchlistMutation = useMutation({
     mutationFn: async () => {
-      if (!outlookData) throw new Error("No outlook data");
-      return await apiRequest("POST", "/api/watchlist", {
+      if (!outlookData || !playerKey) throw new Error("No outlook data");
+      return await apiRequest("POST", "/api/unified-watchlist", {
+        itemType: "player",
+        playerKey,
         playerName: outlookData.player.name,
         sport: outlookSport,
-        currentOutlook: outlookData,
+        verdictAtAdd: outlookData.verdict?.verdict,
+        actionAtAdd: outlookData.verdict?.action,
+        temperatureAtAdd: outlookData.snapshot?.temperature,
+        source: "player-outlook",
       });
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
+      // Cache the returned ID immediately for instant removal availability
+      if (data?.id) {
+        setCachedWatchlistItemId(data.id);
+      }
       refetchWatchlistStatus();
-      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/unified-watchlist"] });
       toast({
         title: "Added to watchlist",
         description: `${outlookData?.player?.name} is now on your watchlist.`,
@@ -641,18 +663,24 @@ export default function PlayerOutlookPage() {
 
   const removeFromWatchlistMutation = useMutation({
     mutationFn: async () => {
-      if (!playerKey) throw new Error("No player key");
-      return await apiRequest("DELETE", `/api/watchlist/${encodeURIComponent(playerKey)}`);
+      // Use cached ID first, then fall back to query data
+      const watchlistId = cachedWatchlistItemId || watchlistStatus?.item?.id;
+      if (!watchlistId) {
+        throw new Error("Unable to remove - please refresh the page");
+      }
+      return await apiRequest("DELETE", `/api/unified-watchlist/${watchlistId}`);
     },
     onSuccess: () => {
+      setCachedWatchlistItemId(null);
       refetchWatchlistStatus();
-      queryClient.invalidateQueries({ queryKey: ["/api/watchlist"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/unified-watchlist"] });
       toast({
         title: "Removed from watchlist",
         description: `${outlookData?.player?.name} has been removed from your watchlist.`,
       });
     },
     onError: (error: any) => {
+      refetchWatchlistStatus();
       toast({
         title: "Error",
         description: error?.message || "Failed to remove from watchlist",
@@ -662,11 +690,19 @@ export default function PlayerOutlookPage() {
   });
 
   const isWatching = watchlistStatus?.watching ?? false;
+  const watchlistItemId = cachedWatchlistItemId || watchlistStatus?.item?.id;
   const isWatchlistLoading = addToWatchlistMutation.isPending || removeFromWatchlistMutation.isPending;
 
   const handleToggleWatchlist = () => {
-    if (isWatching) {
+    if (isWatching && watchlistItemId) {
       removeFromWatchlistMutation.mutate();
+    } else if (isWatching && !watchlistItemId) {
+      // Status says watching but no ID available - this shouldn't happen with caching
+      refetchWatchlistStatus();
+      toast({
+        title: "Syncing...",
+        description: "Please try again in a moment.",
+      });
     } else {
       addToWatchlistMutation.mutate();
     }

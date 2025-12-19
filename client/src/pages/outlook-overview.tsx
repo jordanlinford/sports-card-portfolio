@@ -35,6 +35,7 @@ import {
   ExternalLink,
   Database,
   Bug,
+  Star,
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -827,6 +828,25 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   );
 }
 
+// Helper to extract player name from card title (usually first part before year/set info)
+function extractPlayerName(cardTitle: string): string {
+  // Common patterns: "Patrick Mahomes 2023 Panini", "LeBron James Rookie", etc.
+  // Try to extract just the player name portion
+  const cleaned = cardTitle
+    .replace(/\d{4}/g, '') // Remove years
+    .replace(/\s+(PSA|BGS|SGC|CGC)\s*\d*/gi, '') // Remove grading
+    .replace(/\s+(Rookie|RC|Auto|Autograph|Refractor|Prizm|Mosaic|Chrome|Topps|Panini|Bowman|Select|Optic)/gi, '')
+    .replace(/\s+#\d+/g, '') // Remove card numbers
+    .trim();
+  
+  // Return first 2-3 words as likely player name, fallback to cleaned title
+  const words = cleaned.split(/\s+/).filter(w => w.length > 0);
+  if (words.length >= 2) {
+    return words.slice(0, 3).join(' ');
+  }
+  return cleaned || cardTitle;
+}
+
 function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, onAnalyze }: { 
   card: CardType; 
   isPro: boolean; 
@@ -836,6 +856,47 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
 }) {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  
+  // Use card's stored player name and sport, fallback to extraction from title
+  const playerName = card.playerName || extractPlayerName(card.title);
+  const sport = card.sport || 'football'; // Default to football if not specified
+  const playerKey = `${sport}:${playerName.toLowerCase().replace(/\s+/g, '_')}`;
+  
+  // Check if player is in watchlist
+  const { data: watchlistStatus } = useQuery({
+    queryKey: ['/api/unified-watchlist/check', { type: 'player', playerKey }],
+    queryFn: async () => {
+      const res = await fetch(`/api/unified-watchlist/check?type=player&playerKey=${encodeURIComponent(playerKey)}`);
+      if (!res.ok) return { watching: false };
+      return res.json();
+    },
+    enabled: card.outlookAction === 'MONITOR' && isPro,
+  });
+
+  // Add to watchlist mutation
+  const addToWatchlistMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/unified-watchlist', {
+        itemType: 'player',
+        playerKey,
+        playerName,
+        sport,
+        verdictAtAdd: card.outlookVerdict,
+        actionAtAdd: card.outlookAction,
+        temperatureAtAdd: card.outlookTemperature,
+        estimatedValueAtAdd: card.estimatedValue,
+        source: 'market-outlook',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/unified-watchlist'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/unified-watchlist/check', { type: 'player', playerKey }] });
+      toast({ title: 'Added to Watchlist', description: `${playerName} added to your watchlist` });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
   
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -856,6 +917,8 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
 
   const hasOutlook = card.outlookAction !== null;
   const isBigMover = card.outlookBigMover === true;
+  const isMonitor = card.outlookAction === 'MONITOR';
+  const isInWatchlist = watchlistStatus?.watching ?? false;
 
   const handleRowClick = () => {
     if (hasOutlook && isPro) {
@@ -921,6 +984,34 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
                 /
                 <span className="text-red-600 dark:text-red-400">{card.outlookRiskScore}</span>
               </div>
+            )}
+            {isMonitor && !isInWatchlist && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 text-yellow-600 dark:text-yellow-400 border-yellow-500/30"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addToWatchlistMutation.mutate();
+                }}
+                disabled={addToWatchlistMutation.isPending}
+                data-testid={`button-add-watchlist-${card.id}`}
+              >
+                {addToWatchlistMutation.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <>
+                    <Star className="h-3 w-3" />
+                    <span className="hidden sm:inline">Watch</span>
+                  </>
+                )}
+              </Button>
+            )}
+            {isMonitor && isInWatchlist && (
+              <Badge variant="outline" className="gap-1 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30">
+                <Star className="h-3 w-3 fill-current" />
+                Watching
+              </Badge>
             )}
           </>
         ) : hasOutlook && !isPro ? (
@@ -1199,6 +1290,9 @@ export default function OutlookOverviewPage() {
                   {monitorCards.length}
                 </Badge>
               </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                AI suggests monitoring these players. Add them to your personal watchlist to track outlook changes.
+              </p>
               <div className="space-y-2">
                 {monitorCards.map((card: CardType) => (
                   <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
