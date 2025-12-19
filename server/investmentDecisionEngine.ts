@@ -95,6 +95,7 @@ function computeScores(input: DecisionInput): InvestmentScores {
     BUST: 15,           // Career stalled - very low trend/upside
     RETIRED: 35,
     RETIRED_HOF: 55,
+    UNKNOWN: 50,        // Unknown stage - neutral assumption
   };
 
   const stageToInjuryRisk: Record<PlayerStage, number> = {
@@ -107,6 +108,7 @@ function computeScores(input: DecisionInput): InvestmentScores {
     BUST: 85,           // Career stalled - high risk (could be cut, out of league)
     RETIRED: 20,
     RETIRED_HOF: 15,
+    UNKNOWN: 60,        // Unknown stage - elevated risk due to uncertainty
   };
 
   const momentumToScore: Record<string, number> = {
@@ -223,16 +225,16 @@ function decideVerdict(
     return { verdict: "TRADE_THE_HYPE", reason: "Overheated with reliable comps - sell into spikes" };
   }
 
-  // PRECEDENCE 4: Early-career (ROOKIE/YEAR_2) default to SPECULATIVE unless clearly cheap
-  // Young players without reliable comps = uncertainty, not HOLD
-  const earlyCareer = stage === "ROOKIE" || stage === "YEAR_2";
-  if (!compsReliable && earlyCareer) {
+  // PRECEDENCE 4: Early-career or UNKNOWN stage default to SPECULATIVE unless clearly cheap
+  // Young/unknown players without reliable comps = uncertainty, not HOLD
+  const earlyCareerOrUnknown = stage === "ROOKIE" || stage === "YEAR_2" || stage === "UNKNOWN";
+  if (!compsReliable && earlyCareerOrUnknown) {
     // If clearly underpriced with good fundamentals, they can ACCUMULATE
     if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
-      return { verdict: "ACCUMULATE", reason: "Early-career with compelling value" };
+      return { verdict: "ACCUMULATE", reason: "Early-career/unknown with compelling value" };
     }
     // Otherwise, speculative by default (not HOLD)
-    return { verdict: "SPECULATIVE_FLYER", reason: "Early-career without reliable comps - uncertainty" };
+    return { verdict: "SPECULATIVE_FLYER", reason: "Early-career/unknown without reliable comps - uncertainty" };
   }
 
   // PRECEDENCE 5: Mid-tier AVOID for active players with deteriorating setup
@@ -581,17 +583,16 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   // Compute base confidence
   let confidence = computeConfidence(scores);
   
-  // Confidence capping rules (must apply after verdict selection)
-  // Tier 1: If no comp data at all, or low metadata → cap at LOW
-  // Tier 2: If comps are modeled (not live) but metadata is solid → cap at MEDIUM
-  // Tier 3: If comps are reliable (live) and metadata is solid → use computed confidence
-  if (!hasCompData || lowMeta) {
+  // Confidence capping rules (CRITICAL: enforce at the end, no overrides after this)
+  // If comps are not reliable (modeled or missing) → MUST be LOW
+  // Only allow MEDIUM/HIGH with reliable (live) comps
+  if (!compsReliable) {
+    // No reliable comps = LOW confidence, period
     confidence = "LOW";
-  } else if (!compsReliable) {
-    // Modeled comps with good metadata: cap at MEDIUM
-    if (confidence === "HIGH") {
-      confidence = "MEDIUM";
-    }
+  }
+  // lowMeta also forces LOW even with reliable comps (can't trust data)
+  if (lowMeta) {
+    confidence = "LOW";
   }
   
   // Get context-aware posture label

@@ -151,13 +151,24 @@ function getPositionPremium(sport: string, position?: string): number {
 }
 
 // Calculate career stage from rookie year
+// CRITICAL: Never default to PRIME when unknown - use UNKNOWN stage instead
 function inferCareerStage(rookieYear?: number, currentYear: number = new Date().getFullYear()): PlayerStage {
-  if (!rookieYear) return "PRIME"; // Default assumption
+  // If no rookieYear provided, we cannot determine stage
+  if (!rookieYear) return "UNKNOWN";
+  
+  // Validate rookieYear is reasonable (not hallucinated by AI)
+  // Reject years in the future or before 1950 (pre-modern era)
+  if (rookieYear > currentYear || rookieYear < 1950) return "UNKNOWN";
+  
   const yearsInLeague = currentYear - rookieYear;
   
   if (yearsInLeague < 0) return "PROSPECT";
   if (yearsInLeague === 0) return "ROOKIE";
   if (yearsInLeague === 1) return "YEAR_2";
+  // CRITICAL FIX: AI often misses rookie year by 1-2 years
+  // Players with 2-3 years calculated should be treated as early-career
+  // to catch cases like Nabers (2024 rookie misclassified as 2023)
+  if (yearsInLeague === 2) return "YEAR_2"; // Extended early-career window
   if (yearsInLeague <= 6) return "PRIME";
   if (yearsInLeague <= 12) return "VETERAN";
   return "AGING";
@@ -172,7 +183,8 @@ export function classifyPlayer(input: ClassificationInput): ClassificationOutput
   let baseTemperature: MarketTemperature = "NEUTRAL";
   if (stage === "BUST") {
     baseTemperature = "COOLING"; // Bust players have no demand
-  } else if (stage === "ROOKIE" || stage === "PROSPECT") {
+  } else if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "UNKNOWN") {
+    // UNKNOWN treated like early-career (high uncertainty)
     baseTemperature = input.recentMomentum === "up" ? "HOT" : "WARM";
   } else if (stage === "YEAR_2") {
     baseTemperature = input.recentMomentum === "up" ? "HOT" : 
@@ -194,8 +206,8 @@ export function classifyPlayer(input: ClassificationInput): ClassificationOutput
   let baseVolatility: VolatilityLevel = "MEDIUM";
   if (stage === "BUST") {
     baseVolatility = "HIGH"; // Bust players = highly volatile, uncertain future
-  } else if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "YEAR_2") {
-    baseVolatility = "HIGH"; // Young players = volatile
+  } else if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "YEAR_2" || stage === "UNKNOWN") {
+    baseVolatility = "HIGH"; // Young/unknown players = volatile
   } else if (stage === "RETIRED" || stage === "RETIRED_HOF") {
     baseVolatility = "LOW"; // Retired = stable
   } else if (stage === "PRIME" && positionPremium >= 7) {
@@ -206,8 +218,8 @@ export function classifyPlayer(input: ClassificationInput): ClassificationOutput
   let baseRisk: RiskLevel = "MEDIUM";
   if (stage === "BUST") {
     baseRisk = "HIGH"; // Bust = highest risk, career may be over
-  } else if (stage === "ROOKIE" || stage === "PROSPECT") {
-    baseRisk = "HIGH"; // Unproven
+  } else if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "UNKNOWN") {
+    baseRisk = "HIGH"; // Unproven or unknown
   } else if (stage === "YEAR_2") {
     baseRisk = "HIGH"; // Sophomore slump risk
   } else if (stage === "PRIME" && positionPremium >= 6) {
@@ -228,8 +240,8 @@ export function classifyPlayer(input: ClassificationInput): ClassificationOutput
   let baseHorizon: InvestmentHorizon = "MID";
   if (stage === "BUST") {
     baseHorizon = "SHORT"; // Exit position quickly if possible
-  } else if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "YEAR_2") {
-    baseHorizon = "SHORT"; // Quick moves based on performance
+  } else if (stage === "ROOKIE" || stage === "PROSPECT" || stage === "YEAR_2" || stage === "UNKNOWN") {
+    baseHorizon = "SHORT"; // Quick moves based on performance / high uncertainty
   } else if (stage === "PRIME") {
     baseHorizon = "MID";
   } else if (stage === "VETERAN" || stage === "AGING") {

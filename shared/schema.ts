@@ -956,6 +956,7 @@ export const PLAYER_STAGE = {
   BUST: "BUST",             // Career stalled/failed (young player who didn't pan out)
   RETIRED: "RETIRED",       // No longer playing
   RETIRED_HOF: "RETIRED_HOF", // Hall of Fame bound
+  UNKNOWN: "UNKNOWN",       // Cannot determine stage - treat as speculative
 } as const;
 export type PlayerStage = keyof typeof PLAYER_STAGE;
 
