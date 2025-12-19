@@ -341,6 +341,7 @@ async function generatePlayerOutlookAI(
   verdict: PlayerVerdictResult;
   confidence: DataConfidence;
   dataQuality: DataConfidence;
+  aiDetectedCareerStatus?: "ACTIVE" | "RETIRED" | "RETIRED_HOF" | "DECEASED" | "BUST";
   discountAnalysis?: {
     whyDiscounted: string[];
     repricingCatalysts: string[];
@@ -393,13 +394,28 @@ ${newsSnippets.map(s => `- ${s}`).join("\n")}
 
 IMPORTANT: The news above is from TODAY'S search results. If the news indicates the player has been drafted, traded, signed, or is playing in the NBA, you MUST use that information. Do NOT contradict this news with outdated information from your training data. For example, if news says a player was drafted or is playing in the NBA, they are NOT a prospect - they are a professional player.` : "No recent news available - use conditional reasoning."}
 
+CAREER STATUS RULES (CRITICAL - you MUST set careerStatus correctly):
+- "ACTIVE": Player is currently playing professionally
+- "RETIRED": Player has retired from professional play but is not a Hall of Famer
+- "RETIRED_HOF": Player is retired AND in the Hall of Fame (or clearly HOF-bound legend)
+- "DECEASED": Player has passed away (always set this if the player is deceased, even if they're also HOF)
+- "BUST": Player's career has failed/stalled (backup, out of league, never lived up to potential)
+
+Examples:
+- Babe Ruth → "DECEASED" (he died in 1948)
+- Bart Starr → "DECEASED" (he died in 2019)
+- Tom Brady → "RETIRED_HOF" (retired, will be HOF)
+- Zach Wilson → "BUST" (failed as starter, now backup/out of league)
+- Patrick Mahomes → "ACTIVE" (currently playing)
+
 RESPOND IN EXACTLY THIS JSON FORMAT:
 {
   "playerInfo": {
     "position": "<position if known, or 'Unknown'>",
     "team": "<current team if known, or 'Unknown'>",
     "rookieYear": <year as number or null>,
-    "inferredFields": ["<list any fields you guessed: 'position', 'team', 'rookieYear'>"]
+    "careerStatus": "ACTIVE|RETIRED|RETIRED_HOF|DECEASED|BUST",
+    "inferredFields": ["<list any fields you guessed: 'position', 'team', 'rookieYear', 'careerStatus'>"]
   },
   "thesis": [
     "<bullet 1: main momentum/hype factor - SPECIFIC to this player>",
@@ -505,6 +521,17 @@ TONE ENFORCEMENT:
       ? parsed.dataQuality 
       : newsSnippets.length >= 3 ? "MEDIUM" : "LOW") as DataConfidence;
     
+    // Extract AI-detected career status
+    const validCareerStatuses = ["ACTIVE", "RETIRED", "RETIRED_HOF", "DECEASED", "BUST"];
+    const rawCareerStatus = parsed.playerInfo?.careerStatus?.toUpperCase();
+    const aiDetectedCareerStatus = validCareerStatuses.includes(rawCareerStatus) 
+      ? rawCareerStatus as "ACTIVE" | "RETIRED" | "RETIRED_HOF" | "DECEASED" | "BUST"
+      : undefined;
+    
+    if (aiDetectedCareerStatus) {
+      console.log(`[PlayerOutlook] AI detected career status for ${playerName}: ${aiDetectedCareerStatus}`);
+    }
+    
     return {
       playerInfo: {
         name: playerName,
@@ -516,6 +543,7 @@ TONE ENFORCEMENT:
         inferred: inferredFields.length > 0,
         inferredFields,
       },
+      aiDetectedCareerStatus,
       thesis: parsed.thesis || [
         "Market data for this player is limited",
         "Performance signals are unclear",
@@ -638,27 +666,55 @@ async function generateFreshOutlook(
   console.log(`[PlayerOutlook] Classification for ${playerName}: stage=${classification.stage}, temp=${classification.baseTemperature}`);
   
   // Step 3: Generate AI narrative
-  const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality } = await generatePlayerOutlookAI(
+  const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality, aiDetectedCareerStatus } = await generatePlayerOutlookAI(
     playerName,
     sport,
     classification,
     snippets
   );
   
-  // Step 4: Get exposure recommendations
-  const exposures = getExposureRecommendations(classification, sport, playerName);
+  // Step 3.5: If AI detected a non-active career status (DECEASED, RETIRED_HOF, BUST, RETIRED),
+  // re-run classification with the AI's stage to get correct investment verdict
+  let finalClassification = classification;
+  if (aiDetectedCareerStatus && aiDetectedCareerStatus !== "ACTIVE") {
+    // Map AI career status to our PlayerStage enum
+    const stageMap: Record<string, PlayerStage> = {
+      "DECEASED": "RETIRED_HOF",    // Deceased legends = RETIRED_HOF for investment purposes
+      "RETIRED_HOF": "RETIRED_HOF",
+      "RETIRED": "RETIRED",
+      "BUST": "BUST",
+    };
+    const correctedStage = stageMap[aiDetectedCareerStatus];
+    
+    if (correctedStage && correctedStage !== classification.stage) {
+      console.log(`[PlayerOutlook] AI override: ${playerName} stage ${classification.stage} → ${correctedStage}`);
+      
+      // Re-run classification with corrected stage
+      const correctedInput: ClassificationInput = {
+        playerName,
+        sport,
+        recentMomentum: momentum,
+        newsHype,
+        careerStage: correctedStage,
+      };
+      finalClassification = classifyPlayer(correctedInput);
+    }
+  }
   
-  // Step 5: Build snapshot
+  // Step 4: Get exposure recommendations
+  const exposures = getExposureRecommendations(finalClassification, sport, playerName);
+  
+  // Step 5: Build snapshot (use finalClassification which may have been corrected by AI)
   const snapshot: PlayerSnapshot = {
-    temperature: classification.baseTemperature,
-    volatility: classification.baseVolatility,
-    risk: classification.baseRisk,
-    horizon: classification.baseHorizon,
+    temperature: finalClassification.baseTemperature,
+    volatility: finalClassification.baseVolatility,
+    risk: finalClassification.baseRisk,
+    horizon: finalClassification.baseHorizon,
     confidence,
   };
   
   // Step 6: Calculate valuation using heuristic model
-  const valuation = calculateValuation(sport, classification, verdict.modifier);
+  const valuation = calculateValuation(sport, finalClassification, verdict.modifier);
   
   // Step 7: Build evidence with modeled valuation
   const evidence: EvidenceData = {
@@ -673,7 +729,7 @@ async function generateFreshOutlook(
     referenceComps: valuation.referenceComps,
     notes: [
       snippets.length === 0 ? "Limited news data available" : `${snippets.length} recent news items analyzed`,
-      `Classification: ${classification.stage} stage, ${classification.baseTemperature} market`,
+      `Classification: ${finalClassification.stage} stage, ${finalClassification.baseTemperature} market`,
       valuation.methodology,
       "Modeled estimate - not live market data. Use as directional guidance.",
     ],
@@ -696,11 +752,11 @@ async function generateFreshOutlook(
   };
   
   const investmentCall = generateInvestmentCall({
-    stage: classification.stage,
-    temperature: classification.baseTemperature,
-    volatility: classification.baseVolatility,
-    risk: classification.baseRisk,
-    horizon: classification.baseHorizon,
+    stage: finalClassification.stage,
+    temperature: finalClassification.baseTemperature,
+    volatility: finalClassification.baseVolatility,
+    risk: finalClassification.baseRisk,
+    horizon: finalClassification.baseHorizon,
     confidence,
     exposures,
     thesis,
