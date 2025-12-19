@@ -2333,6 +2333,149 @@ Allow: /
     }
   });
 
+  // ====== UNIFIED WATCHLIST ROUTES (supports players AND cards) ======
+  
+  // Get unified watchlist (all items or filtered by type)
+  app.get("/api/unified-watchlist", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const itemType = req.query.type as "player" | "card" | undefined;
+      
+      const items = await storage.getUnifiedWatchlist(userId, itemType);
+      res.json(items);
+    } catch (error) {
+      console.error("Error getting unified watchlist:", error);
+      res.status(500).json({ message: "Failed to get watchlist" });
+    }
+  });
+
+  // Add item to unified watchlist (player or card)
+  app.post("/api/unified-watchlist", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { itemType, playerKey, playerName, sport, cardId, cardTitle, 
+              verdictAtAdd, actionAtAdd, temperatureAtAdd, estimatedValueAtAdd, source } = req.body;
+
+      if (!itemType || !["player", "card"].includes(itemType)) {
+        return res.status(400).json({ message: "itemType must be 'player' or 'card'" });
+      }
+
+      if (itemType === "player" && (!playerKey || !playerName)) {
+        return res.status(400).json({ message: "playerKey and playerName are required for player items" });
+      }
+
+      if (itemType === "card" && !cardId) {
+        return res.status(400).json({ message: "cardId is required for card items" });
+      }
+
+      // Check if already in watchlist
+      const existing = await storage.getUnifiedWatchlistItem(
+        userId, 
+        itemType, 
+        itemType === "player" ? playerKey : undefined,
+        itemType === "card" ? cardId : undefined
+      );
+
+      if (existing) {
+        return res.status(409).json({ 
+          message: `${itemType === "player" ? "Player" : "Card"} already in watchlist`, 
+          watching: true,
+          item: existing 
+        });
+      }
+
+      const item = await storage.addToUnifiedWatchlist({
+        userId,
+        itemType,
+        playerKey: itemType === "player" ? playerKey : null,
+        playerName: itemType === "player" ? playerName : null,
+        sport: itemType === "player" ? (sport || "football") : null,
+        cardId: itemType === "card" ? cardId : null,
+        cardTitle: itemType === "card" ? cardTitle : null,
+        verdictAtAdd,
+        actionAtAdd,
+        temperatureAtAdd,
+        estimatedValueAtAdd,
+        source,
+        notes: null,
+      });
+
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Error adding to unified watchlist:", error);
+      res.status(500).json({ message: "Failed to add to watchlist" });
+    }
+  });
+
+  // Remove item from unified watchlist by ID
+  app.delete("/api/unified-watchlist/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid watchlist item ID" });
+      }
+
+      const deleted = await storage.removeFromUnifiedWatchlist(id, userId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Item not in watchlist" });
+      }
+
+      res.json({ message: "Removed from watchlist", watching: false });
+    } catch (error) {
+      console.error("Error removing from unified watchlist:", error);
+      res.status(500).json({ message: "Failed to remove from watchlist" });
+    }
+  });
+
+  // Check if item is in unified watchlist
+  app.get("/api/unified-watchlist/check", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const itemType = req.query.type as "player" | "card";
+      const playerKey = req.query.playerKey as string | undefined;
+      const cardId = req.query.cardId ? parseInt(req.query.cardId as string) : undefined;
+
+      if (!itemType || !["player", "card"].includes(itemType)) {
+        return res.status(400).json({ message: "type query parameter must be 'player' or 'card'" });
+      }
+
+      const watching = await storage.isInUnifiedWatchlist(userId, itemType, playerKey, cardId);
+      const item = watching 
+        ? await storage.getUnifiedWatchlistItem(userId, itemType, playerKey, cardId)
+        : null;
+
+      res.json({ watching, item });
+    } catch (error) {
+      console.error("Error checking unified watchlist:", error);
+      res.status(500).json({ message: "Failed to check watchlist status" });
+    }
+  });
+
+  // Update unified watchlist item notes
+  app.patch("/api/unified-watchlist/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+      const { notes } = req.body;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid watchlist item ID" });
+      }
+
+      const updated = await storage.updateUnifiedWatchlistNotes(id, userId, notes);
+      if (!updated) {
+        return res.status(404).json({ message: "Item not in watchlist" });
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating unified watchlist:", error);
+      res.status(500).json({ message: "Failed to update watchlist" });
+    }
+  });
+
   // Object Storage routes - allows public access for public objects
   app.get("/objects/:objectPath(*)", async (req: any, res) => {
     // Get userId if authenticated, but don't require authentication

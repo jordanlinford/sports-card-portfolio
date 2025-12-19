@@ -1266,6 +1266,85 @@ export type WatchlistPlayerWithOutlook = PlayerWatchlist & {
 };
 
 // =============================================
+// UNIFIED WATCHLIST - Supports both players AND cards
+// =============================================
+
+export const WATCHLIST_ITEM_TYPES = ["player", "card"] as const;
+export type WatchlistItemType = (typeof WATCHLIST_ITEM_TYPES)[number];
+
+export const watchlist = pgTable("watchlist", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  
+  // Item type discriminator
+  itemType: varchar("item_type", { length: 20 }).notNull().$type<WatchlistItemType>(),
+  
+  // For player items
+  playerKey: varchar("player_key", { length: 128 }), // normalized: sport:playername
+  playerName: varchar("player_name", { length: 255 }),
+  sport: varchar("sport", { length: 50 }),
+  
+  // For card items
+  cardId: integer("card_id").references(() => cards.id, { onDelete: "cascade" }),
+  cardTitle: varchar("card_title", { length: 500 }), // Snapshot of card title at add time
+  
+  // Snapshot at time of adding (for change tracking)
+  verdictAtAdd: varchar("verdict_at_add", { length: 20 }), // BUY, MONITOR, SELL, HOLD
+  actionAtAdd: varchar("action_at_add", { length: 20 }), // For cards: BUY, MONITOR, SELL, etc.
+  temperatureAtAdd: varchar("temperature_at_add", { length: 20 }), // HOT, WARM, COLD
+  estimatedValueAtAdd: integer("estimated_value_at_add"), // For cards: value when added
+  
+  // User notes
+  notes: text("notes"),
+  
+  // Source tracking (where did user add from)
+  source: varchar("source", { length: 50 }), // MarketOutlook, PlayerOutlook, CardDetail, Manual
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_unified_watchlist_user").on(table.userId),
+  index("idx_unified_watchlist_type").on(table.itemType),
+  index("idx_unified_watchlist_player_key").on(table.playerKey),
+  index("idx_unified_watchlist_card_id").on(table.cardId),
+]);
+
+export const insertWatchlistSchema = createInsertSchema(watchlist).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertWatchlist = z.infer<typeof insertWatchlistSchema>;
+export type Watchlist = typeof watchlist.$inferSelect;
+
+// Extended type for watchlist with current data
+export type WatchlistItemWithDetails = Watchlist & {
+  // For player items
+  currentPlayerOutlook?: PlayerOutlookResponse;
+  ownedCards?: Card[]; // Cards in collection for this player
+  
+  // For card items  
+  card?: Card;
+  currentCardOutlook?: {
+    action: string;
+    estimatedValue: number | null;
+    confidence: string;
+    explanation: string;
+  };
+  
+  // Change tracking
+  changes?: {
+    verdictChanged: boolean;
+    actionChanged: boolean;
+    temperatureChanged: boolean;
+    valueChange?: number; // For cards: $ change since added
+    previousVerdict?: string;
+    previousAction?: string;
+    previousTemperature?: string;
+  };
+};
+
+// =============================================
 // PORTFOLIO INTELLIGENCE LAYER
 // =============================================
 

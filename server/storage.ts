@@ -23,6 +23,7 @@ import {
   playerWatchlist,
   playerOutlookCache,
   sharedSnapshots,
+  watchlist,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -67,6 +68,9 @@ import {
   type PlayerOutlookCache,
   type SharedSnapshot,
   type InsertSharedSnapshot,
+  type Watchlist,
+  type InsertWatchlist,
+  type WatchlistItemType,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -282,6 +286,14 @@ export interface IStorage {
   incrementSnapshotViewCount(token: string): Promise<void>;
   getUserSharedSnapshots(userId: string): Promise<SharedSnapshot[]>;
   deleteSharedSnapshot(token: string, userId: string): Promise<void>;
+
+  // Unified Watchlist operations (supports both players and cards)
+  getUnifiedWatchlist(userId: string, itemType?: WatchlistItemType): Promise<Watchlist[]>;
+  getUnifiedWatchlistItem(userId: string, itemType: WatchlistItemType, playerKey?: string, cardId?: number): Promise<Watchlist | undefined>;
+  addToUnifiedWatchlist(data: InsertWatchlist): Promise<Watchlist>;
+  removeFromUnifiedWatchlist(id: number, userId: string): Promise<boolean>;
+  updateUnifiedWatchlistNotes(id: number, userId: string, notes: string | null): Promise<Watchlist | undefined>;
+  isInUnifiedWatchlist(userId: string, itemType: WatchlistItemType, playerKey?: string, cardId?: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2361,6 +2373,91 @@ export class DatabaseStorage implements IStorage {
         eq(sharedSnapshots.token, token),
         eq(sharedSnapshots.userId, userId)
       ));
+  }
+
+  // Unified Watchlist operations
+  async getUnifiedWatchlist(userId: string, itemType?: WatchlistItemType): Promise<Watchlist[]> {
+    if (itemType) {
+      return db
+        .select()
+        .from(watchlist)
+        .where(and(
+          eq(watchlist.userId, userId),
+          eq(watchlist.itemType, itemType)
+        ))
+        .orderBy(desc(watchlist.createdAt));
+    }
+    return db
+      .select()
+      .from(watchlist)
+      .where(eq(watchlist.userId, userId))
+      .orderBy(desc(watchlist.createdAt));
+  }
+
+  async getUnifiedWatchlistItem(userId: string, itemType: WatchlistItemType, playerKey?: string, cardId?: number): Promise<Watchlist | undefined> {
+    if (itemType === 'player' && playerKey) {
+      const [item] = await db
+        .select()
+        .from(watchlist)
+        .where(and(
+          eq(watchlist.userId, userId),
+          eq(watchlist.itemType, 'player'),
+          eq(watchlist.playerKey, playerKey)
+        ));
+      return item;
+    }
+    if (itemType === 'card' && cardId) {
+      const [item] = await db
+        .select()
+        .from(watchlist)
+        .where(and(
+          eq(watchlist.userId, userId),
+          eq(watchlist.itemType, 'card'),
+          eq(watchlist.cardId, cardId)
+        ));
+      return item;
+    }
+    return undefined;
+  }
+
+  async addToUnifiedWatchlist(data: InsertWatchlist): Promise<Watchlist> {
+    const insertData = {
+      ...data,
+      itemType: data.itemType as "player" | "card",
+    };
+    const [item] = await db
+      .insert(watchlist)
+      .values(insertData)
+      .returning();
+    return item;
+  }
+
+  async removeFromUnifiedWatchlist(id: number, userId: string): Promise<boolean> {
+    const result = await db
+      .delete(watchlist)
+      .where(and(
+        eq(watchlist.id, id),
+        eq(watchlist.userId, userId)
+      ))
+      .returning();
+    return result.length > 0;
+  }
+
+  async updateUnifiedWatchlistNotes(id: number, userId: string, notes: string | null): Promise<Watchlist | undefined> {
+    const [updated] = await db
+      .update(watchlist)
+      .set({ notes, updatedAt: new Date() })
+      .where(and(
+        eq(watchlist.id, id),
+        eq(watchlist.userId, userId)
+      ))
+      .returning();
+    return updated;
+  }
+
+  async isInUnifiedWatchlist(userId: string, itemType: WatchlistItemType, playerKey?: string, cardId?: number): Promise<boolean> {
+    const item = await this.getUnifiedWatchlistItem(userId, itemType, playerKey, cardId);
+    return !!item;
   }
 }
 
