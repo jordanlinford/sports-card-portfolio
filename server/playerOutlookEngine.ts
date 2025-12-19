@@ -248,16 +248,28 @@ Reasoning rules:
 Output format rules:
 - Return valid JSON only, matching the schema provided. Do not include markdown, commentary, or extra keys.`;
 
+  // Calculate current year for context
+  const currentYear = new Date().getFullYear();
+  const yearsInLeague = classification.rookieYear ? currentYear - classification.rookieYear : null;
+  
   const prompt = `Analyze the investment outlook for ${playerName} in ${sport}.
 
-PLAYER DATA (from our classification engine):
-- Career Stage: ${classification.stage}
+CURRENT DATE: December ${currentYear}
+
+PLAYER DATA (from our classification engine - TRUST THIS OVER YOUR TRAINING DATA):
+- Career Stage: ${classification.stage}${classification.rookieYear ? ` (Drafted/Rookie Year: ${classification.rookieYear}, now in year ${yearsInLeague} of career)` : ""}
 - Position: ${classification.position || "Unknown"}
 - Team: ${classification.team || "Unknown"}
 - Market Temperature: ${classification.baseTemperature}
 - Volatility: ${classification.baseVolatility}
 - Risk Level: ${classification.baseRisk}
 - Investment Horizon: ${classification.baseHorizon}
+
+CRITICAL CAREER STAGE RULE:
+- ONLY use the word "rookie" if Career Stage above is "ROOKIE" (year 0-1 in the league)
+- If Career Stage is "YEAR_2", "PRIME", "VETERAN", "AGING", or "RETIRED", the player is NOT a rookie
+- For a player drafted in ${currentYear - 2} or earlier, they are NOT a rookie - they are an established player
+- Your training data may be outdated. The career stage above is calculated from current data.
 
 ${newsSnippets.length > 0 ? `CRITICAL - REAL-TIME NEWS (THIS IS GROUND TRUTH - YOUR TRAINING DATA MAY BE OUTDATED):
 ${newsSnippets.map(s => `- ${s}`).join("\n")}
