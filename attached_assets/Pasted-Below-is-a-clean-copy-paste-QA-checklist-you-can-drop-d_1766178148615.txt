@@ -1,0 +1,175 @@
+Below is a clean, copy-paste QA checklist you can drop directly into a Google Doc, Notion, or your Replit project README. This is designed to be run every time you touch scoring, stage logic, or verdict rules.
+
+No opinions, no ambiguity — just pass/fail.
+
+Investment Verdict Engine – Full QA Checklist
+
+Purpose
+Validate that the decision engine produces decisive, collector-sane outputs across all player market types, even with mostly modeled comps.
+
+For each player, record:
+
+Stage
+
+compSource
+
+Verdict
+
+Confidence
+
+Category 1: Rookie Hype (Unproven, High Attention)
+
+These should never default to HOLD_CORE.
+
+Player	Expected Stage	Expected Verdict	Confidence	Pass / Fail
+Caleb Williams (NFL)	ROOKIE	SPECULATIVE_FLYER or AVOID_NEW_MONEY	LOW	⬜
+Jayden Daniels (NFL)	ROOKIE	SPECULATIVE_FLYER or AVOID_NEW_MONEY	LOW	⬜
+Marvin Harrison Jr. (NFL)	ROOKIE	SPECULATIVE_FLYER	LOW	⬜
+Brock Bowers (NFL)	ROOKIE	SPECULATIVE_FLYER	LOW	⬜
+
+Fail conditions:
+
+Stage = PRIME
+
+Verdict = HOLD_CORE
+
+Confidence > LOW
+
+Category 2: Year-2 / Early Career Breakouts
+
+Should not be auto-AVOID and not always SPECULATIVE.
+
+Player	Expected Stage	Expected Verdict	Confidence	Pass / Fail
+Jordan Addison (NFL)	YEAR_2	SPECULATIVE_FLYER or HOLD_CORE	LOW	⬜
+Scoot Henderson (NBA)	YEAR_2	SPECULATIVE_FLYER	LOW	⬜
+
+Fail conditions:
+
+AVOID_NEW_MONEY without extreme downsideRisk
+
+ACCUMULATE unless clearly cheap
+
+Category 3: Proven “Blue-Chip” Stars
+
+These are core holds, not lottery tickets.
+
+Player	Expected Stage	Expected Verdict	Confidence	Pass / Fail
+Ja’Marr Chase (NFL)	PRIME	HOLD_CORE or ACCUMULATE	LOW	⬜
+CeeDee Lamb (NFL)	PRIME	HOLD_CORE	LOW	⬜
+Jayson Tatum (NBA)	PRIME	HOLD_CORE	LOW	⬜
+Anthony Edwards (NBA)	PRIME	HOLD_CORE	LOW	⬜
+
+Fail conditions:
+
+Verdict = SPECULATIVE_FLYER
+
+Verdict = AVOID_NEW_MONEY
+
+Category 4: Undervalued Buy Candidates
+
+ACCUMULATE should appear occasionally, not never.
+
+Player	Expected Stage	Expected Verdict	Confidence	Pass / Fail
+Amon-Ra St. Brown (NFL)	PRIME	HOLD_CORE or ACCUMULATE	LOW	⬜
+Tyrese Maxey (NBA)	PRIME	HOLD_CORE or ACCUMULATE	LOW	⬜
+
+Fail conditions:
+
+Always AVOID_NEW_MONEY
+
+Never ACCUMULATE when valueScore is high
+
+Category 5: Structurally Weak / Shaky Demand
+
+These should hit AVOID more often than HOLD.
+
+Player	Expected Stage	Expected Verdict	Confidence	Pass / Fail
+Kenny Pickett (NFL)	PRIME	AVOID_NEW_MONEY	LOW	⬜
+Mac Jones (NFL)	PRIME	AVOID_NEW_MONEY or SPECULATIVE_FLYER	LOW	⬜
+Killian Hayes (NBA)	BUST / PRIME	AVOID_NEW_MONEY	LOW	⬜
+
+Fail conditions:
+
+HOLD_CORE
+
+ACCUMULATE
+
+Category 6: Busts (Hard Avoids)
+
+Busts must never be speculative by default.
+
+Player	Expected Stage	Expected Verdict	Confidence	Pass / Fail
+Josh Rosen (NFL)	BUST	AVOID_NEW_MONEY	LOW	⬜
+James Wiseman (NBA)	BUST	AVOID_NEW_MONEY	LOW	⬜
+
+Fail conditions:
+
+SPECULATIVE_FLYER
+
+HOLD_CORE
+
+Category 7: Retired / Hall of Fame
+
+These must always be HOLD_CORE.
+
+Player	Expected Stage	Expected Verdict	Confidence	Pass / Fail
+Tom Brady (NFL)	RETIRED_HOF	HOLD_CORE	LOW–MEDIUM	⬜
+Peyton Manning (NFL)	RETIRED_HOF	HOLD_CORE	LOW–MEDIUM	⬜
+Kobe Bryant (NBA)	RETIRED_HOF	HOLD_CORE	LOW–MEDIUM	⬜
+
+Fail conditions:
+
+SPECULATIVE_FLYER
+
+AVOID_NEW_MONEY
+
+TRADE_THE_HYPE
+
+Category 8: Meme / Novelty Attention
+
+Attention without fundamentals = AVOID.
+
+Player	Expected Stage	Expected Verdict	Confidence	Pass / Fail
+LiAngelo Ball (NBA)	PRIME / UNKNOWN	AVOID_NEW_MONEY	LOW	⬜
+Johnny Juzang (NBA)	PRIME / UNKNOWN	AVOID_NEW_MONEY	LOW	⬜
+
+Fail conditions:
+
+HOLD_CORE
+
+SPECULATIVE_FLYER
+
+Category 9: Trade the Hype (Synthetic Only)
+
+TRADE_THE_HYPE should be rare until sold-history improves.
+
+Test Case	Setup	Expected Verdict	Pass / Fail
+Synthetic Spike Player	compSource = "live", spikeEvidence = true	TRADE_THE_HYPE	⬜
+
+Fail conditions:
+
+TRADE_THE_HYPE appears with modeled comps
+
+TRADE_THE_HYPE appears more than once in normal testing
+
+Global Engine Guardrails (Hard Rules)
+
+Check after every run:
+
+⬜ No ROOKIE has HOLD_CORE or MEDIUM/HIGH confidence
+⬜ No modeled comp returns MEDIUM or HIGH confidence
+⬜ SPECULATIVE_FLYER appears meaningfully (not zero, not everything)
+⬜ AVOID_NEW_MONEY is reserved for structural negatives
+⬜ HOLD_CORE dominates proven stars and retired legends
+
+When to Stop Tuning
+
+You are done tuning when:
+
+These tests pass twice in a row
+
+Changes in thresholds move only 1–2 players, not entire categories
+
+You can explain every verdict in one sentence without hedging
+
+At that point, lock the engine and move on to UX, copy, and trust-building.
