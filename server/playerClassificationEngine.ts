@@ -496,7 +496,7 @@ export function getExposureRecommendations(
         ? "Best during preseason dips or after quiet games. Avoid buying post-breakout."
         : stage === "YEAR_2"
         ? "Buy before expected breakout moments. Sell into hype if momentum stalls."
-        : "Accumulate on red days. These have strong floors if fundamentals hold.",
+        : "Buy during temporary dips (bad games, team losses) for better prices. Strong floor if fundamentals hold.",
     });
   }
   

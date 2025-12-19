@@ -210,7 +210,7 @@ function computeConfidence(scores: InvestmentScores): DataConfidence {
 }
 
 const POSTURE_LABELS: Record<InvestmentVerdict, string> = {
-  ACCUMULATE: "Buy on dips",
+  ACCUMULATE: "Buy during dips",
   HOLD_CORE: "Hold, don't chase",
   TRADE_THE_HYPE: "Sell into spikes",
   AVOID_NEW_MONEY: "Stay away",
@@ -225,7 +225,7 @@ function generateActionPlan(verdict: InvestmentVerdict, input: DecisionInput): I
       whatToDoNow: "Start building a position in flagship rookies and key parallels.",
       entryPlan: temperature === "COOLING" 
         ? "Buy now while prices are soft. The market is sleeping on this player."
-        : "Wait for a bad game or team loss to buy the dip at better prices.",
+        : "Wait for a temporary dip (bad game, team loss) to buy at better prices.",
       positionSizing: stage === "ROOKIE" || stage === "YEAR_2"
         ? "Core position - allocate 10-15% of your card budget here."
         : "Moderate position - 5-10% allocation is appropriate.",
