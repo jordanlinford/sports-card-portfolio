@@ -367,7 +367,7 @@ export default function PortfolioOutlookPage() {
                     .sort(([, a], [, b]) => (b as number) - (a as number))
                     .slice(0, 4)
                     .map(([stage, val]) => (
-                      <ExposureBar key={stage} label={stage} value={val as number} color="accent" />
+                      <ExposureBar key={stage} label={stage} value={val as number} color="primary" />
                     ))}
                 </div>
 
@@ -375,7 +375,7 @@ export default function PortfolioOutlookPage() {
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium">Top Players</h4>
                     {exposures.topPlayersConcentration.slice(0, 3).map((p) => (
-                      <ExposureBar key={p.player} label={p.player} value={p.pct} color="secondary" />
+                      <ExposureBar key={p.player} label={p.player} value={p.pct} color="primary" />
                     ))}
                   </div>
                 )}
