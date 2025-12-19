@@ -57,7 +57,7 @@ const LAUNCH_PLAYERS = [
 function getVerdictIcon(verdict: PlayerVerdict) {
   switch (verdict) {
     case "BUY": return <ShoppingCart className="h-4 w-4" />;
-    case "WATCH": return <EyeIcon className="h-4 w-4" />;
+    case "MONITOR": return <EyeIcon className="h-4 w-4" />;
     case "AVOID": return <Ban className="h-4 w-4" />;
     default: return null;
   }
@@ -66,7 +66,7 @@ function getVerdictIcon(verdict: PlayerVerdict) {
 function getVerdictColor(verdict: PlayerVerdict) {
   switch (verdict) {
     case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
-    case "WATCH": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+    case "MONITOR": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
     case "AVOID": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
     default: return "bg-muted text-muted-foreground";
   }
@@ -531,7 +531,7 @@ export default function Watchlist() {
               <SelectContent>
                 <SelectItem value="all">All Verdicts</SelectItem>
                 <SelectItem value="BUY">BUY</SelectItem>
-                <SelectItem value="WATCH">WATCH</SelectItem>
+                <SelectItem value="MONITOR">MONITOR</SelectItem>
                 <SelectItem value="AVOID">AVOID</SelectItem>
               </SelectContent>
             </Select>

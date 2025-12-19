@@ -306,7 +306,7 @@ export default function NextBuysPage() {
   }
 
   const buyCount = buys.filter(b => b.verdict === "BUY").length;
-  const watchCount = buys.filter(b => b.verdict === "WATCH").length;
+  const monitorCount = buys.filter(b => b.verdict === "MONITOR").length;
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-6">
@@ -345,7 +345,7 @@ export default function NextBuysPage() {
           {buyCount} BUY
         </Badge>
         <Badge variant="secondary">
-          {watchCount} WATCH
+          {monitorCount} MONITOR
         </Badge>
       </div>
 

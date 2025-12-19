@@ -608,7 +608,7 @@ export const cardOutlooks = pgTable("card_outlooks", {
   marketFriction: integer("market_friction"),
   
   // Action & Confidence (deterministic, not AI-decided)
-  action: varchar("action", { length: 20 }), // BUY | WATCH | SELL | LONG_HOLD | LITTLE_VALUE
+  action: varchar("action", { length: 20 }), // BUY | MONITOR | SELL | LONG_HOLD | LITTLE_VALUE
   actionReasons: jsonb("action_reasons").$type<string[]>().default([]),
   dataConfidence: varchar("data_confidence", { length: 10 }), // HIGH | MEDIUM | LOW
   confidenceReason: text("confidence_reason"),
@@ -717,7 +717,7 @@ export type CareerStage = keyof typeof CAREER_STAGES;
 // Outlook action enum for type safety
 export const OUTLOOK_ACTIONS = {
   BUY: "BUY",
-  WATCH: "WATCH",
+  MONITOR: "MONITOR",
   SELL: "SELL",
   LONG_HOLD: "LONG_HOLD",
   LEGACY_HOLD: "LEGACY_HOLD",
@@ -971,7 +971,7 @@ export type InvestmentVerdict = keyof typeof INVESTMENT_VERDICT;
 // Legacy verdict type for backward compatibility (deprecated - use InvestmentVerdict)
 export const PLAYER_VERDICT = {
   BUY: "BUY",
-  WATCH: "WATCH",
+  MONITOR: "MONITOR",
   AVOID: "AVOID",
 } as const;
 export type PlayerVerdict = keyof typeof PLAYER_VERDICT;
@@ -1140,7 +1140,7 @@ export type PlayerOutlookResponse = {
   marketRealityCheck: string[]; // 2-3 uncomfortable truths that build credibility
   verdict: PlayerVerdictResult; // Legacy verdict (deprecated)
   investmentCall?: InvestmentCall; // New 5-state forced-decision call
-  discountAnalysis?: DiscountAnalysis; // Only populated for BUY/WATCH verdicts
+  discountAnalysis?: DiscountAnalysis; // Only populated for BUY/MONITOR verdicts
   exposures: ExposureRecommendation[];
   evidence: EvidenceData;
   generatedAt: string;
@@ -1204,7 +1204,7 @@ export const playerWatchlist = pgTable("player_watchlist", {
   sport: varchar("sport", { length: 50 }).notNull().default("football"),
   
   // Snapshot at time of adding (for change tracking)
-  verdictAtAdd: varchar("verdict_at_add", { length: 20 }), // BUY, WATCH, AVOID
+  verdictAtAdd: varchar("verdict_at_add", { length: 20 }), // BUY, MONITOR, AVOID
   modifierAtAdd: varchar("modifier_at_add", { length: 50 }), // Momentum, Speculative, etc.
   temperatureAtAdd: varchar("temperature_at_add", { length: 20 }), // HOT, WARM, COLD
   
@@ -1229,7 +1229,7 @@ export const playerOutlookHistory = pgTable("player_outlook_history", {
   sport: varchar("sport", { length: 50 }).notNull(),
   
   // Core verdict fields for quick comparison
-  verdict: varchar("verdict", { length: 20 }).notNull(), // BUY, WATCH, AVOID
+  verdict: varchar("verdict", { length: 20 }).notNull(), // BUY, MONITOR, AVOID
   modifier: varchar("modifier", { length: 50 }).notNull(),
   temperature: varchar("temperature", { length: 20 }).notNull(),
   confidence: varchar("confidence", { length: 20 }).notNull(),
@@ -1398,7 +1398,7 @@ export const nextBuys = pgTable("next_buys", {
   overallScore: integer("overall_score"),
   
   // Verdict
-  verdict: varchar("verdict", { length: 20 }), // BUY, WATCH
+  verdict: varchar("verdict", { length: 20 }), // BUY, MONITOR
   
   // Explanation
   whyBullets: jsonb("why_bullets").$type<string[]>(),

@@ -13,7 +13,7 @@ function getOpenAI(): OpenAI | null {
   return openaiClient;
 }
 
-export type OutlookAction = "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE";
+export type OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE";
 
 export type LegacyTier = 
   | "PROSPECT" 
@@ -510,7 +510,7 @@ async function generateTCGExplanation(
     } else {
       short = `This ${rarityLabel} card shows buy potential based on its rarity tier and current market position.`;
     }
-  } else if (result.action === "WATCH") {
+  } else if (result.action === "MONITOR") {
     short = `Monitor this ${rarityLabel} card. ${heat === "HOT" ? "The franchise is currently popular but volatility is elevated." : "Market conditions suggest waiting for a better entry point."}`;
   } else {
     short = `Consider reducing exposure. ${charTier === "C_TIER_NICHE" || charTier === "D_TIER_COMMON" ? "Niche characters typically have limited upside." : "Current risk/reward balance favors taking profits."}`;
@@ -1250,8 +1250,8 @@ function determineAction(
   if (riskScore > upsideScore + 25 && riskScore >= 45) {
     return "SELL";
   }
-  // WATCH: Everything else - stable holds, uncertain situations, etc.
-  return "WATCH";
+  // MONITOR: Everything else - stable holds, uncertain situations, etc.
+  return "MONITOR";
 }
 
 function calculateProjectedOutlook(
@@ -1426,7 +1426,7 @@ async function generateEditorialExplanation(
 CRITICAL LANGUAGE RULES:
 - NEVER say "low demand" - instead say "high supply" (collectors understand supply gluts differently than demand issues)
 - Use collector-native language: "pricing spreads", "timing matters", "thin market", "overprinted era" instead of finance jargon
-- For WATCH recommendations, explain in practical terms: "This card trades inconsistently due to high supply, making pricing spreads wide and timing important"
+- For MONITOR recommendations, explain in practical terms: "This card trades inconsistently due to high supply, making pricing spreads wide and timing important"
 - Avoid phrases like "caution is warranted" - too formal. Instead: "worth monitoring", "timing your entry matters", "patience pays here"
 ${isLegacyHold ? `
 LEGACY HOLD SPECIAL RULES (this is a LEGACY_HOLD card):
@@ -1522,7 +1522,7 @@ const LEGACY_FORBIDDEN_PATTERNS = [
   /\bcaution\b/i,
   /\buncertain(?:ty)?\b/i,
   /\brisk(?:y|ier)?\b(?!.*low|.*minimal|.*limited)/i,  // risk unless framed as low
-  /\bWATCH\b/,  // Should never mention WATCH for LEGACY cards
+  /\bMONITOR\b/,  // Should never mention MONITOR for LEGACY cards
   /\bspeculat(?:ive|ion)\b/i,
   /\bdangerous\b/i,
   /\bavoid\b/i,

@@ -28,13 +28,13 @@ export function OutlookBadge({ action, size = "sm", className = "" }: OutlookBad
           textColor: "text-white",
           label: "SELL",
         };
-      case "WATCH":
+      case "MONITOR":
       default:
         return {
           icon: Eye,
           bgColor: "bg-yellow-500 dark:bg-yellow-600",
           textColor: "text-black dark:text-white",
-          label: "WATCH",
+          label: "MONITOR",
         };
     }
   };

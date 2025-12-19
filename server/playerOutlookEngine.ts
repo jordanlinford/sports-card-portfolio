@@ -238,7 +238,7 @@ Style rules (non-negotiable):
 - Never invent facts, stats, awards, or news. If unknown, say "Unknown" and proceed with conditional reasoning.
 - No fake precision (no percentages, no "72% upside").
 - Every analysis must include one uncomfortable truth under "Market Reality Check."
-- Verdict must be one of: BUY / WATCH / AVOID, and must include a modifier: (Momentum / Speculative / Value / Long-Term / Late Cycle).
+- Verdict must be one of: BUY / MONITOR / AVOID, and must include a modifier: (Momentum / Speculative / Value / Long-Term / Late Cycle).
 - Keep all sections scannable: bullets + short sentences. No long paragraphs.
 
 Reasoning rules:
@@ -283,7 +283,7 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
     "<uncomfortable truth 2: historical cautionary note or pricing vs reality>"
   ],
   "verdict": {
-    "action": "BUY|WATCH|AVOID",
+    "action": "BUY|MONITOR|AVOID",
     "modifier": "Momentum|Speculative|Value|Long-Term|Late Cycle",
     "summary": "<2-4 sentence plain language summary>",
     "whatMustBeTrue": [
@@ -397,9 +397,9 @@ TONE ENFORCEMENT:
         "Collector sentiment can shift quickly without warning",
       ],
       verdict: {
-        action: (["BUY", "WATCH", "AVOID"].includes(parsed.verdict?.action) 
+        action: (["BUY", "MONITOR", "AVOID"].includes(parsed.verdict?.action) 
           ? parsed.verdict.action 
-          : "WATCH") as PlayerVerdict,
+          : "MONITOR") as PlayerVerdict,
         modifier: normalizedModifier as VerdictModifier,
         summary: parsed.verdict?.summary || "Insufficient data to make a confident recommendation. Monitor for more signals.",
         whatMustBeTrue: parsed.verdict?.whatMustBeTrue || ["More data needed"],
@@ -439,9 +439,9 @@ TONE ENFORCEMENT:
         "Verify any investment decisions with independent research",
       ],
       verdict: {
-        action: "WATCH",
+        action: "MONITOR",
         modifier: VERDICT_MODIFIER.SPECULATIVE as VerdictModifier,
-        summary: "Analysis temporarily unavailable. Defaulting to WATCH recommendation.",
+        summary: "Analysis temporarily unavailable. Defaulting to MONITOR recommendation.",
         whatMustBeTrue: ["Analysis system needs to be available"],
       },
       confidence: "LOW",

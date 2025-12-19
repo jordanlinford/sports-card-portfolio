@@ -48,7 +48,7 @@ function getActionIcon(action: string | null) {
   switch (action) {
     case "BUY": return <ShoppingCart className="h-3 w-3" />;
     case "SELL": return <TrendingDown className="h-3 w-3" />;
-    case "WATCH": return <Eye className="h-3 w-3" />;
+    case "MONITOR": return <Eye className="h-3 w-3" />;
     case "LONG_HOLD": return <Clock className="h-3 w-3" />;
     case "LEGACY_HOLD": return <Trophy className="h-3 w-3" />;
     case "LITTLE_VALUE": return <MinusCircle className="h-3 w-3" />;
@@ -60,7 +60,7 @@ function getActionColor(action: string | null) {
   switch (action) {
     case "BUY": return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20";
     case "SELL": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
-    case "WATCH": return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20";
+    case "MONITOR": return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20";
     case "LONG_HOLD": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
     case "LEGACY_HOLD": return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
     case "LITTLE_VALUE": return "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
@@ -72,7 +72,7 @@ function getActionLabel(action: string | null): string {
   switch (action) {
     case "BUY": return "BUY";
     case "SELL": return "SELL";
-    case "WATCH": return "WATCH";
+    case "MONITOR": return "MONITOR";
     case "LONG_HOLD": return "LONG HOLD";
     case "LEGACY_HOLD": return "LEGACY HOLD";
     case "LITTLE_VALUE": return "LOW VALUE";
@@ -989,7 +989,7 @@ export default function OutlookOverviewPage() {
 
   const buyCards = cardsWithOutlook.filter(c => c.outlookAction === "BUY");
   const sellCards = cardsWithOutlook.filter(c => c.outlookAction === "SELL");
-  const watchCards = cardsWithOutlook.filter(c => c.outlookAction === "WATCH");
+  const monitorCards = cardsWithOutlook.filter(c => c.outlookAction === "MONITOR");
   const holdCards = cardsWithOutlook.filter(c => c.outlookAction === "LONG_HOLD");
 
   if (!isAuthenticated && !authLoading) {
@@ -1190,17 +1190,17 @@ export default function OutlookOverviewPage() {
             </div>
           )}
 
-          {watchCards.length > 0 && (
+          {monitorCards.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-4">
                 <Eye className="h-5 w-5 text-yellow-500" />
-                <h2 className="text-xl font-semibold">Watch List</h2>
+                <h2 className="text-xl font-semibold">Monitor List</h2>
                 <Badge variant="outline" className="bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20">
-                  {watchCards.length}
+                  {monitorCards.length}
                 </Badge>
               </div>
               <div className="space-y-2">
-                {watchCards.map(card => (
+                {monitorCards.map((card: CardType) => (
                   <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
                 ))}
               </div>

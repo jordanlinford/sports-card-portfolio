@@ -690,7 +690,7 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
       fitScore,
       momentumScore,
       overallScore,
-      verdict: overallScore >= 78 ? "BUY" : overallScore >= 60 ? "WATCH" : "SKIP",
+      verdict: overallScore >= 78 ? "BUY" : overallScore >= 60 ? "MONITOR" : "SKIP",
     };
   });
 

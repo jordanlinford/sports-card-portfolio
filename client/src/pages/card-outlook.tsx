@@ -140,7 +140,7 @@ type OutlookData = {
 
 const ACTION_STYLES: Record<string, { bg: string; border: string; icon: typeof TrendingUp; label: string }> = {
   BUY: { bg: "bg-green-500/20", border: "border-green-500", icon: TrendingUp, label: "Buy Signal" },
-  WATCH: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Activity, label: "Watch" },
+  MONITOR: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Activity, label: "Monitor" },
   SELL: { bg: "bg-red-500/20", border: "border-red-500", icon: TrendingDown, label: "Sell Signal" },
   LONG_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", icon: Clock, label: "Long Hold" },
   LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", icon: Info, label: "Low Value" },
@@ -356,7 +356,7 @@ export default function CardOutlookPage() {
   const needsGeneration = outlook?.needsGeneration || (!outlook?.action && !outlook?.cached);
   const isPro = user?.subscriptionStatus === "PRO";
   
-  const actionStyle = ACTION_STYLES[outlook?.action || "WATCH"] || ACTION_STYLES.WATCH;
+  const actionStyle = ACTION_STYLES[outlook?.action || "MONITOR"] || ACTION_STYLES.MONITOR;
   const ActionIcon = actionStyle.icon;
   const confidenceStyle = CONFIDENCE_STYLES[outlook?.confidence?.level || "LOW"] || CONFIDENCE_STYLES.LOW;
   const ConfidenceIcon = confidenceStyle.icon;

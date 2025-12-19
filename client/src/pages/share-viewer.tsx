@@ -33,7 +33,7 @@ function getActionColor(action: string): string {
   switch (action) {
     case "BUY": return "bg-green-500/20 text-green-700 dark:text-green-400";
     case "SELL": return "bg-red-500/20 text-red-700 dark:text-red-400";
-    case "WATCH": return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400";
+    case "MONITOR": return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400";
     case "LONG_HOLD": return "bg-blue-500/20 text-blue-700 dark:text-blue-400";
     case "LEGACY_HOLD": return "bg-purple-500/20 text-purple-700 dark:text-purple-400";
     default: return "bg-muted text-muted-foreground";
@@ -49,7 +49,7 @@ function CardOutlookView({ data }: { data: any }) {
           {data.playerName && <p className="text-muted-foreground">{data.playerName}</p>}
         </div>
         <Badge className={`text-lg px-4 py-2 ${getActionColor(data.action)}`}>
-          {data.action?.replace("_", " ") || "WATCH"}
+          {data.action?.replace("_", " ") || "MONITOR"}
         </Badge>
       </div>
 

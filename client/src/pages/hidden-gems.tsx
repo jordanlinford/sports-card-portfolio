@@ -53,7 +53,7 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     sport: "football",
     position: "QB",
     team: "Denver Broncos",
-    verdict: "WATCH",
+    verdict: "MONITOR",
     modifier: "Value",
     temperature: "NEUTRAL",
     tier: "GROWTH",
@@ -91,7 +91,7 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     sport: "football",
     position: "QB",
     team: "Minnesota Vikings",
-    verdict: "WATCH",
+    verdict: "MONITOR",
     modifier: "Speculative",
     temperature: "WARM",
     tier: "SPECULATIVE",
@@ -129,7 +129,7 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     sport: "football",
     position: "QB",
     team: "San Francisco 49ers",
-    verdict: "WATCH",
+    verdict: "MONITOR",
     modifier: "Value",
     temperature: "NEUTRAL",
     tier: "GROWTH",
@@ -211,7 +211,7 @@ const BASEBALL_GEMS: GemCandidate[] = [
 function getVerdictIcon(verdict: PlayerVerdict) {
   switch (verdict) {
     case "BUY": return <ShoppingCart className="h-4 w-4" />;
-    case "WATCH": return <EyeIcon className="h-4 w-4" />;
+    case "MONITOR": return <EyeIcon className="h-4 w-4" />;
     case "AVOID": return <Ban className="h-4 w-4" />;
     default: return null;
   }
@@ -220,7 +220,7 @@ function getVerdictIcon(verdict: PlayerVerdict) {
 function getVerdictColor(verdict: PlayerVerdict) {
   switch (verdict) {
     case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
-    case "WATCH": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+    case "MONITOR": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
     case "AVOID": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
     default: return "bg-muted text-muted-foreground";
   }

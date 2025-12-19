@@ -1467,11 +1467,11 @@ Allow: /
       // Get match confidence from price data
       const matchConfidence = priceData.matchConfidence;
       
-      // Override action to WATCH if match confidence is LOW
+      // Override action to MONITOR if match confidence is LOW
       let finalAction = signals.action;
       let finalActionReasons = [...signals.actionReasons];
       if (matchConfidence && matchConfidence.tier === "LOW") {
-        finalAction = "WATCH";
+        finalAction = "MONITOR";
         finalActionReasons = [`Low card match confidence: ${matchConfidence.reason}`, ...finalActionReasons];
       }
 
@@ -1913,11 +1913,11 @@ Allow: /
       // Get match confidence from price data
       const matchConfidence = priceData.matchConfidence;
       
-      // Override action to WATCH if match confidence is LOW
+      // Override action to MONITOR if match confidence is LOW
       let finalAction = signals.action;
       let finalActionReasons = [...signals.actionReasons];
       if (matchConfidence && matchConfidence.tier === "LOW") {
-        finalAction = "WATCH";
+        finalAction = "MONITOR";
         finalActionReasons = [`Low card match confidence: ${matchConfidence.reason}`, ...finalActionReasons];
       }
 

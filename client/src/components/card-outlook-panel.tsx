@@ -74,7 +74,7 @@ interface OutlookData {
   playerName: string | null;
   sport: string | null;
   position: string | null;
-  action: "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
+  action: "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
   upsideScore: number;
   riskScore: number;
   confidenceScore: number;
@@ -106,7 +106,7 @@ interface OutlookData {
   seasonalContext?: SeasonalContext;
 }
 
-type OutlookAction = "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
+type OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
 
 function getMarketFrictionFromLiquidity(liquidityScore?: number): number {
   if (liquidityScore === undefined || liquidityScore === null) return 50;
@@ -138,7 +138,7 @@ function getActionColor(action: OutlookAction): string {
       return "bg-green-600 text-white";
     case "SELL":
       return "bg-red-600 text-white";
-    case "WATCH":
+    case "MONITOR":
       return "bg-amber-500 text-white";
     case "LONG_HOLD":
       return "bg-blue-600 text-white";
@@ -157,7 +157,7 @@ function getActionIcon(action: OutlookAction) {
       return <ArrowUpRight className="h-4 w-4" />;
     case "SELL":
       return <ArrowDownRight className="h-4 w-4" />;
-    case "WATCH":
+    case "MONITOR":
       return <Minus className="h-4 w-4" />;
     case "LONG_HOLD":
       return <Clock className="h-4 w-4" />;
@@ -176,8 +176,8 @@ function getActionLabel(action: OutlookAction): string {
       return "BUY";
     case "SELL":
       return "SELL";
-    case "WATCH":
-      return "WATCH";
+    case "MONITOR":
+      return "MONITOR";
     case "LONG_HOLD":
       return "LONG HOLD";
     case "LEGACY_HOLD":

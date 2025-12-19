@@ -455,10 +455,10 @@ export function detectCareerStage(card: Card): string {
 }
 
 // Deterministic Action Logic
-export type OutlookAction = "BUY" | "WATCH" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE";
+export type OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE";
 
-// WATCH reason codes - differentiate WHY a card is WATCH
-export type WatchReason = 
+// MONITOR reason codes - differentiate WHY a card is MONITOR
+export type MonitorReason = 
   | "UNSTABLE_PRICING"   // Plenty of data but high variance/spread
   | "WAITING_CATALYST"   // Decent card but needs event trigger
   | "DATA_UNCERTAIN"     // Few comps or weak matches
@@ -468,7 +468,7 @@ export type WatchReason =
 interface ActionDecision {
   action: OutlookAction;
   reasons: string[];
-  watchReason?: WatchReason;
+  monitorReason?: MonitorReason;
 }
 
 export function computeAction(
@@ -557,41 +557,41 @@ export function computeAction(
     return { action: "BUY", reasons };
   }
   
-  // WATCH: Default - not clearly a buy or sell
-  // Determine the specific WATCH reason based on available signals
-  let watchReason: WatchReason = "NEUTRAL";
+  // MONITOR: Default - not clearly a buy or sell
+  // Determine the specific MONITOR reason based on available signals
+  let monitorReason: MonitorReason = "NEUTRAL";
   
   // UNSTABLE_PRICING: High volatility + decent liquidity (lots of data, just all over the place)
   if (volatilityScore >= 6 && liquidityScore >= 4) {
-    watchReason = "UNSTABLE_PRICING";
+    monitorReason = "UNSTABLE_PRICING";
     reasons.push("Price spread is wide—market hasn't settled on value");
     reasons.push("Timing matters more than conviction right now");
     if (momentumScore >= 40 && momentumScore <= 60) reasons.push("No clear momentum direction");
-    return { action: "WATCH", reasons, watchReason };
+    return { action: "MONITOR", reasons, monitorReason };
   }
   
   // COOLING_AFTER_RUN: Recent spike now retreating
   if (trendScore >= 5 && trendScore <= 7 && volatilityScore >= 5) {
-    watchReason = "COOLING_AFTER_RUN";
+    monitorReason = "COOLING_AFTER_RUN";
     reasons.push("Price ran up recently and is now settling");
     reasons.push("Wait for clearer direction before acting");
-    return { action: "WATCH", reasons, watchReason };
+    return { action: "MONITOR", reasons, monitorReason };
   }
   
   // DATA_UNCERTAIN: Low liquidity means not enough comps
   if (liquidityScore < 4) {
-    watchReason = "DATA_UNCERTAIN";
+    monitorReason = "DATA_UNCERTAIN";
     reasons.push("Limited recent sales make pricing uncertain");
     reasons.push("Need more market activity to gauge fair value");
-    return { action: "WATCH", reasons, watchReason };
+    return { action: "MONITOR", reasons, monitorReason };
   }
   
   // WAITING_CATALYST: Decent quality but neutral signals
   if (qualityScore >= 50 && momentumScore >= 40 && momentumScore <= 60) {
-    watchReason = "WAITING_CATALYST";
+    monitorReason = "WAITING_CATALYST";
     reasons.push("Solid card but waiting for a catalyst");
     reasons.push("Could move on news, performance, or market shifts");
-    return { action: "WATCH", reasons, watchReason };
+    return { action: "MONITOR", reasons, monitorReason };
   }
   
   // NEUTRAL: Generic fallback
@@ -599,7 +599,7 @@ export function computeAction(
   if (volatilityScore >= 5) reasons.push("Some price variance present");
   if (momentumScore >= 40 && momentumScore <= 60) reasons.push("Momentum is flat");
   
-  return { action: "WATCH", reasons, watchReason };
+  return { action: "MONITOR", reasons, monitorReason };
 }
 
 // Big Mover Detection
@@ -741,7 +741,7 @@ export interface ComputedOutlookSignals {
   // Action
   action: OutlookAction;
   actionReasons: string[];
-  watchReason?: WatchReason;  // Only set when action is WATCH
+  monitorReason?: MonitorReason;  // Only set when action is MONITOR
   
   // Confidence
   dataConfidence: "HIGH" | "MEDIUM" | "LOW";
@@ -814,7 +814,7 @@ Generate a brief explanation of why ${signals.action} is the recommendation. Ret
 IMPORTANT RULES:
 1. Keep explanations honest and data-driven. Reference the actual scores and prices.
 2. NEVER say "low confidence" or "uncertain data" when Data Confidence is HIGH or MEDIUM.
-3. If action is WATCH with HIGH confidence, explain WHY in terms of:
+3. If action is MONITOR with HIGH confidence, explain WHY in terms of:
    - Wide price spreads / market disagreement (if high variance)
    - Waiting for catalyst (if neutral momentum)
    - Cooling after a run-up (if recent trend spike)
@@ -840,24 +840,24 @@ IMPORTANT RULES:
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
-      // Guard: If WATCH with HIGH/MEDIUM confidence, sanitize all outputs
+      // Guard: If MONITOR with HIGH/MEDIUM confidence, sanitize all outputs
       // to prevent "low confidence" being mentioned when we actually have good data
       const lowConfidencePatterns = /low confidence|uncertain data|limited data|sparse data|few comps|data uncertain/i;
-      const needsSanitization = signals.action === "WATCH" && signals.dataConfidence !== "LOW";
+      const needsSanitization = signals.action === "MONITOR" && signals.dataConfidence !== "LOW";
       
-      let finalShort = parsed.short || getWatchReasonAwareFallback(signals);
+      let finalShort = parsed.short || getMonitorReasonAwareFallback(signals);
       let finalLong = parsed.long || `The ${signals.action} recommendation is based on computed market signals.`;
       let finalBullets = parsed.bullets || signals.actionReasons;
       
       if (needsSanitization) {
         // Check and override short if it contains contradictory language
         if (lowConfidencePatterns.test(finalShort)) {
-          finalShort = getWatchReasonAwareFallback(signals);
+          finalShort = getMonitorReasonAwareFallback(signals);
         }
         
         // Check and override long if needed
         if (lowConfidencePatterns.test(finalLong)) {
-          finalLong = `The WATCH recommendation reflects market conditions where prices vary widely. With ${signals.dataConfidence.toLowerCase()} confidence data (${signals.confidenceReason}), the spread in recent sales suggests the market hasn't settled on fair value yet. Timing matters more than conviction right now—wait for clearer price consensus before acting.`;
+          finalLong = `The MONITOR recommendation reflects market conditions where prices vary widely. With ${signals.dataConfidence.toLowerCase()} confidence data (${signals.confidenceReason}), the spread in recent sales suggests the market hasn't settled on fair value yet. Timing matters more than conviction right now—wait for clearer price consensus before acting.`;
         }
         
         // Filter out bullets that contain contradictory language
@@ -879,8 +879,8 @@ IMPORTANT RULES:
     console.error("Failed to generate AI explanation:", error);
   }
 
-  // Fallback to computed reasons - use watchReason-aware language
-  const shortExplanation = getWatchReasonAwareFallback(signals);
+  // Fallback to computed reasons - use monitorReason-aware language
+  const shortExplanation = getMonitorReasonAwareFallback(signals);
   
   return {
     bullets: signals.actionReasons,
@@ -889,11 +889,11 @@ IMPORTANT RULES:
   };
 }
 
-// Generate appropriate fallback explanation based on action and watchReason
+// Generate appropriate fallback explanation based on action and monitorReason
 // This ensures we never say "low confidence" when confidence is HIGH
-function getWatchReasonAwareFallback(signals: ComputedOutlookSignals): string {
-  // Non-WATCH actions get simple explanations
-  if (signals.action !== "WATCH") {
+function getMonitorReasonAwareFallback(signals: ComputedOutlookSignals): string {
+  // Non-MONITOR actions get simple explanations
+  if (signals.action !== "MONITOR") {
     switch (signals.action) {
       case "BUY":
         return "Quality opportunity at a favorable price point.";
@@ -910,8 +910,8 @@ function getWatchReasonAwareFallback(signals: ComputedOutlookSignals): string {
     }
   }
   
-  // WATCH explanations based on specific watchReason
-  switch (signals.watchReason) {
+  // MONITOR explanations based on specific monitorReason
+  switch (signals.monitorReason) {
     case "UNSTABLE_PRICING":
       return "Prices vary widely—market hasn't settled on fair value yet.";
     case "COOLING_AFTER_RUN":
@@ -956,7 +956,7 @@ export function computeAllSignals(
   const marketFriction = computeMarketFriction(liquidityScore, volatilityScore, pricePoints.length);
   
   // Compute action (pass cardYear for vintage detection)
-  const { action, reasons: actionReasons, watchReason } = computeAction(
+  const { action, reasons: actionReasons, monitorReason } = computeAction(
     qualityScore,
     demandScore,
     momentumScore,
@@ -1016,7 +1016,7 @@ export function computeAllSignals(
     marketFriction,
     action,
     actionReasons,
-    watchReason,
+    monitorReason,
     dataConfidence,
     confidenceReason,
     careerStageAuto,
