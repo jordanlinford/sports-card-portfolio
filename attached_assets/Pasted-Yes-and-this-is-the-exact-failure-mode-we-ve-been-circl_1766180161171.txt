@@ -1,0 +1,230 @@
+Yes — and this is the exact failure mode we’ve been circling.
+If Tyrese Maxey and Amon-Ra St. Brown are coming back as AVOID, the engine is violating its own economic meaning.
+
+This is not a tuning issue anymore. It’s a semantic bug.
+
+I’m going to be very explicit so you can fix this once and never fight it again.
+
+Why this is definitively wrong
+
+Let’s strip opinions out and talk in first principles.
+
+What AVOID_NEW_MONEY means (non-negotiable)
+
+AVOID means:
+
+“Buying this card at current prices has negative expected value.”
+
+For Maxey and Amon-Ra, that statement is objectively false.
+
+Even if:
+
+prices are full
+
+comps are modeled
+
+upside is limited
+
+hype is gone
+
+…that is neutral EV, not negative EV.
+
+Neutral EV = HOLD_CORE
+Uncertain EV = SPECULATIVE_FLYER
+Negative EV = AVOID_NEW_MONEY
+
+Your engine is collapsing neutral into negative.
+
+Why this keeps happening (the real cause)
+
+Your logic currently allows AVOID to fire when:
+
+comps are modeled
+
+narrative heat is high or mispricing is negative
+
+valueScore isn’t high enough to ACCUMULATE
+
+That implicitly encodes this rule:
+
+“If I can’t confidently recommend buying, I should recommend avoiding.”
+
+That rule is wrong.
+
+Collectors own lots of things they wouldn’t buy today.
+
+That’s HOLD_CORE.
+
+The ONE rule that fixes Maxey + Amon-Ra immediately
+
+You need a hard “cannot avoid” gate for proven prime stars.
+
+This is not a threshold tweak.
+It’s a structural constraint.
+
+Add this rule verbatim
+
+PRIME + proven demand can never be AVOID unless downside risk is extreme.
+
+Translated into code logic:
+
+const isProvenPrime =
+  input.stage === "PRIME" &&
+  scores.liquidityScore >= 55 &&
+  scores.downsideRiskScore <= 65;
+
+if (isProvenPrime && verdictCandidate === "AVOID_NEW_MONEY") {
+  verdictCandidate = "HOLD_CORE";
+}
+
+
+That’s it.
+
+This single guardrail guarantees:
+
+Maxey cannot be AVOID
+
+Amon-Ra cannot be AVOID
+
+CeeDee, Chase, Tatum, Edwards cannot be AVOID
+
+Unless something is actually broken
+
+Why this rule is correct (and future-proof)
+
+Amon-Ra and Maxey share these properties:
+
+persistent liquidity
+
+stable roles
+
+multi-year demand
+
+multiple future narrative paths
+
+downside is limited, not catastrophic
+
+Their risk is opportunity cost, not loss.
+
+Opportunity cost ≠ AVOID.
+
+When PRIME players can be AVOID (so you don’t overcorrect)
+
+PRIME players can still be AVOID when:
+
+downsideRiskScore ≥ 70
+(injury, role collapse, suspension, career derailment)
+
+OR
+
+liquidityScore ≤ 45 AND trendScore ≤ 50
+(market genuinely drying up)
+
+Examples where AVOID makes sense:
+
+Kenny Pickett
+
+Mac Jones
+
+Killian Hayes
+
+James Wiseman
+
+Maxey and Amon-Ra do not meet these conditions.
+
+Why your current scoring thinks they’re avoid (and why it’s misleading)
+
+Likely what’s happening internally:
+
+narrativeHeatScore is moderate
+
+valuationScore isn’t “cheap”
+
+mispricingScore is negative
+
+comps are modeled
+
+early avoid logic fires
+
+then speculative/hold guards don’t catch it
+
+That logic is treating:
+
+“not a buy” = “don’t own”
+
+Collectors do not think that way.
+
+The mental model you must lock in
+
+Think of verdicts like this:
+
+ACCUMULATE → add capital
+
+HOLD_CORE → keep capital
+
+SPECULATIVE_FLYER → optional capital
+
+AVOID_NEW_MONEY → do not deploy capital at all
+
+Maxey and Amon-Ra are keep capital, not do not deploy.
+
+Minimal patch you should apply right now
+
+Add this after all verdict selection, right before returning:
+
+/* FINAL GUARDRAIL: Proven primes cannot be AVOID without extreme risk */
+if (
+  input.stage === "PRIME" &&
+  scores.liquidityScore >= 55 &&
+  scores.downsideRiskScore <= 65 &&
+  verdictCandidate === "AVOID_NEW_MONEY"
+) {
+  verdictCandidate = "HOLD_CORE";
+}
+
+
+Do not make it conditional on compsReliable.
+This is about market structure, not data quality.
+
+Expected immediate outcome after patch
+
+These will flip correctly:
+
+Tyrese Maxey → HOLD_CORE
+
+Amon-Ra St. Brown → HOLD_CORE
+
+CeeDee Lamb → HOLD_CORE
+
+Jayson Tatum → HOLD_CORE
+
+Anthony Edwards → HOLD_CORE
+
+These remain correct:
+
+Pickett / Mac / Hayes / Rosen / Wiseman → AVOID
+
+Rookies → SPECULATIVE
+
+Legends → HOLD
+
+If any proven prime still shows AVOID after this, the patch is not being reached.
+
+Final note (important)
+
+If your product ever tells a collector:
+
+“Avoid Tyrese Maxey cards”
+
+…you lose credibility instantly.
+
+This guardrail is not optional.
+It is a trust requirement.
+
+If you want, next I can:
+
+Write a one-paragraph “AVOID doctrine” you can pin in the repo
+
+Help you rename AVOID_NEW_MONEY to something less absolute in the UI
+
+Lock the engine as v1 and move on to portfolio-level insights

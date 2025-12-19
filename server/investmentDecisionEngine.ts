@@ -235,11 +235,23 @@ function decideVerdict(
   // ============================================================
   // PRECEDENCE 4: AVOID_NEW_MONEY - ONLY for genuine negative EV
   // HARD RULE: Requires downsideRiskScore >= 70
-  // This prevents AVOID from being the default for uncertain situations
+  // CRITICAL GUARDRAIL: PRIME players with good liquidity (>= 55) can NEVER be AVOID
+  //                     unless downside is truly extreme (>= 80) - protects proven stars
   // ============================================================
+  
+  // Proven prime = PRIME + good liquidity. These are established stars that shouldn't be AVOID
+  // Examples: Tyrese Maxey, Amon-Ra St. Brown, CeeDee Lamb, Jayson Tatum
+  // They can only be AVOID if downside is catastrophic (>= 80)
+  const hasProvenDemand = isPrime && liquidityScore >= 55;
+  
   if (downsideRiskScore >= 70) {
+    // PRIME players with proven demand: only AVOID at truly extreme downside (>= 80)
+    if (hasProvenDemand && downsideRiskScore < 80) {
+      // Fall through to HOLD_CORE - these are "full price, keep what you have" situations
+      // NOT negative EV, just not a buy
+    }
     // Early-career needs even higher threshold (75) since uncertainty is expected
-    if (earlyCareer && downsideRiskScore < 75) {
+    else if (earlyCareer && downsideRiskScore < 75) {
       // Don't AVOID rookies at 70-74 downside - that's expected volatility
       // Fall through to SPECULATIVE
     } else {
