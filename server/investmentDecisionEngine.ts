@@ -241,9 +241,9 @@ function decideVerdict(
   // Proven demand = established star based on market evidence
   // Two ways to qualify:
   // 1. PRIME + liquidity >= 55 (correctly classified prime)
-  // 2. Any stage + very high liquidity (>= 75) (market says they're established)
+  // 2. Any stage + good liquidity (>= 60) (market says they're established)
   // Examples: Tyrese Maxey, Amon-Ra St. Brown, CeeDee Lamb, Jayson Tatum
-  const hasProvenDemand = (isPrime && liquidityScore >= 55) || (liquidityScore >= 75);
+  const hasProvenDemand = (isPrime && liquidityScore >= 55) || (liquidityScore >= 60);
   
   if (downsideRiskScore >= 70) {
     // Players with proven demand: only AVOID at truly extreme downside (>= 85)
