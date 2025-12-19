@@ -1,0 +1,253 @@
+What your current engine is doing (in plain English)
+
+Your system is implicitly saying:
+
+“If comps are modeled and I’m not extremely confident, the safest answer is AVOID.”
+
+That is not how collectors behave, and it makes the product unusable for its core purpose: helping people decide what to own, not just what to stay away from.
+
+Right now:
+
+AVOID_NEW_MONEY = default
+
+HOLD_CORE = retired legends only
+
+ACCUMULATE = extremely rare anomaly
+
+SPECULATIVE_FLYER = almost gone
+
+That’s not a healthy decision surface.
+
+The single root cause (this is the key insight)
+
+You are treating modeled comps as a liability instead of as baseline information.
+
+Modeled comps should:
+
+cap confidence
+
+prevent timing calls (TRADE)
+
+increase uncertainty
+
+They should not imply:
+
+“this is a bad investment”
+
+“stay away”
+
+Right now your logic equates:
+
+modeled comps → uncertainty → AVOID
+
+That is the error.
+
+The correct mental model (this fixes everything)
+
+You need to separate confidence from direction.
+
+Think of verdicts this way:
+
+Verdict	Meaning
+ACCUMULATE	Positive expected value
+HOLD_CORE	Neutral expected value
+SPECULATIVE_FLYER	Unknown expected value
+AVOID_NEW_MONEY	Negative expected value
+TRADE_THE_HYPE	Timing-based exit
+
+Modeled comps do NOT imply negative EV.
+They imply uncertain EV.
+
+Uncertain EV → SPECULATIVE_FLYER or HOLD_CORE
+Negative EV → AVOID_NEW_MONEY
+
+Right now, your engine is collapsing “uncertain” into “negative.”
+
+Why your current outputs are wrong (by category)
+Proven stars all being AVOID (this is fatal)
+
+CeeDee Lamb → AVOID ❌
+
+Tatum → AVOID ❌
+
+Edwards → AVOID ❌
+
+Amon-Ra → AVOID ❌
+
+Maxey → AVOID ❌
+
+These players should never be default AVOID unless:
+
+downsideRiskScore is extreme
+
+liquidity is collapsing
+
+role is disappearing
+
+Modeled comps alone cannot justify AVOID here.
+
+Rookies all being AVOID (also wrong)
+
+Williams / Daniels / MHJ / Bowers → AVOID ❌
+
+These should mostly be SPECULATIVE_FLYER, not AVOID.
+
+AVOID implies “this is a bad bet.”
+SPECULATIVE implies “this is unclear.”
+
+That distinction matters.
+
+Accumulate appearing in the wrong places
+
+Scoot Henderson → ACCUMULATE ⚠️
+
+Ja’Marr Chase → ACCUMULATE ⚠️
+
+This suggests your mispricing logic is firing too easily, while your HOLD logic is being bypassed by the “modeled comps → avoid” rule.
+
+The fix: ONE structural rule + TWO narrow exceptions
+
+You do not need to re-architect again.
+
+Rule #1 (non-negotiable, foundational)
+
+AVOID_NEW_MONEY is NOT allowed unless downsideRiskScore ≥ 70 OR stage == BUST
+
+This single rule will immediately fix 80% of the bad outputs.
+
+Translated:
+
+If downside risk is moderate or low → you cannot AVOID
+
+Modeled comps are not enough
+
+Hype is not enough
+
+“Fully priced” is not enough
+
+Exception #1: Structural busts
+
+AVOID is allowed if:
+
+stage == BUST
+OR
+
+PRIME player with:
+
+liquidityScore ≤ 40
+
+trendScore ≤ 50
+
+downsideRiskScore ≥ 60
+
+This keeps:
+
+Pickett
+
+Mac Jones
+
+Hayes
+
+Rosen
+
+Wiseman
+correctly in AVOID.
+
+Exception #2: Early-career uncertainty
+
+For ROOKIE / YEAR_2 with modeled comps:
+
+Default = SPECULATIVE_FLYER
+Only escalate to AVOID if:
+
+downsideRiskScore ≥ 75
+
+This fixes:
+
+Williams
+
+Daniels
+
+MHJ
+
+Bowers
+
+The correct default ladder (this is critical)
+
+When none of the strong conditions fire, the engine should fall back like this:
+
+ACCUMULATE → only when clearly cheap + liquid + low risk
+
+HOLD_CORE → default for proven players
+
+SPECULATIVE_FLYER → default for uncertainty
+
+AVOID_NEW_MONEY → only for negative EV
+
+Right now your ladder is inverted.
+
+Copy-paste patch for Replit (this is the final calibration)
+
+Add this after stage classification and before final verdict return.
+
+// HARD GUARDRAIL: AVOID requires real downside
+if (
+  verdictCandidate === "AVOID_NEW_MONEY" &&
+  scores.downsideRiskScore < 70 &&
+  input.stage !== "BUST"
+) {
+  // downgrade avoid → uncertainty
+  verdictCandidate =
+    input.stage === "ROOKIE" || input.stage === "YEAR_2"
+      ? "SPECULATIVE_FLYER"
+      : "HOLD_CORE";
+}
+
+// EARLY CAREER DEFAULT
+if (
+  !compsReliable &&
+  (input.stage === "ROOKIE" || input.stage === "YEAR_2") &&
+  scores.downsideRiskScore < 75
+) {
+  verdictCandidate = "SPECULATIVE_FLYER";
+}
+
+// PRIME STABLE DEFAULT
+if (
+  !compsReliable &&
+  input.stage === "PRIME" &&
+  scores.downsideRiskScore < 65 &&
+  scores.liquidityScore >= 55
+) {
+  verdictCandidate = "HOLD_CORE";
+}
+
+
+Do not touch your scoring functions yet.
+This patch alone will rebalance the engine.
+
+What your outputs SHOULD look like after this patch
+
+Expected corrections:
+
+Williams / Daniels / MHJ / Bowers → SPECULATIVE_FLYER
+
+CeeDee / Chase / Tatum / Edwards / Amon-Ra / Maxey → HOLD_CORE
+
+Scoot → SPECULATIVE_FLYER or HOLD (not ACCUMULATE unless truly cheap)
+
+Pickett / Mac / Hayes / Rosen / Wiseman → AVOID
+
+Brady / Manning / Kobe → HOLD
+
+Distribution should be roughly:
+
+HOLD_CORE: ~40–50%
+
+SPECULATIVE_FLYER: ~25–35%
+
+AVOID_NEW_MONEY: ~15–20%
+
+ACCUMULATE: ~5–10%
+
+TRADE_THE_HYPE: ~0% (until live comps improve)
