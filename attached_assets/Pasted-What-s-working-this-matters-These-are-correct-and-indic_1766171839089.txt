@@ -1,0 +1,240 @@
+What’s working (this matters)
+
+These are correct and indicate the guardrails are doing their job:
+
+Tom Brady → HOLD_CORE
+
+Jerry Rice → HOLD_CORE
+You’ve successfully stopped legends from drifting into hype logic. That’s a major win.
+
+Bronny → AVOID_NEW_MONEY
+
+Jayden Daniels → AVOID_NEW_MONEY
+
+Johnny Juzang → AVOID_NEW_MONEY
+
+This means:
+
+comps gating is working
+
+TRADE_THE_HYPE is no longer the default
+
+“don’t chase” is now the dominant action when data is weak
+
+That’s exactly what we wanted.
+
+What’s wrong (and why)
+1. Busts are still too soft
+
+Zach Wilson → SPECULATIVE_FLYER
+Killian Hayes → SPECULATIVE_FLYER
+
+These should be AVOID_NEW_MONEY, not speculative.
+
+Why this is happening:
+
+Your fallback logic (“if no rule matched → SPECULATIVE”) is catching them
+
+Your BUST override is either:
+
+not firing early enough, or
+
+too permissive with “speculative” exceptions
+
+Fix (hard rule):
+Busts should not be speculative by default.
+
+SPECULATIVE_FLYER is for uncertainty, not failure.
+
+Concrete change:
+
+If stage == BUST → AVOID_NEW_MONEY
+
+Only allow SPECULATIVE_FLYER for busts if:
+
+valueScore ≥ 75
+
+liquidityScore ≥ 45
+
+and confidence == LOW
+
+That makes “dead cat bounce lotto” rare and intentional.
+
+2. Proven stars are being treated like hype noise
+
+Amon-Ra St. Brown → AVOID_NEW_MONEY
+Tyrese Maxey → AVOID_NEW_MONEY
+
+This is the biggest remaining issue.
+
+These players should almost never be AVOID by default.
+
+Why this is happening:
+
+Your overheated logic is still too easy to trigger
+
+narrativeHeat is overpowering value for elite, established players
+
+AVOID_NEW_MONEY is acting as a catch-all for “not cheap”
+
+Collectors do not interpret “not cheap” as “avoid.”
+
+This is the key conceptual fix:
+
+AVOID_NEW_MONEY should mean “structurally bad bet,” not “fully priced.”
+
+Fully priced stars = HOLD_CORE, not AVOID.
+
+3. Prospects are being over-penalized
+
+Paul Skenes → AVOID_NEW_MONEY
+
+This should be SPECULATIVE_FLYER, not avoid.
+
+Why:
+
+Prospect markets are inherently speculative
+
+AVOID implies negative expected value
+
+Skenes is high-risk, not structurally broken
+
+Your system is currently:
+
+treating “modeled comps + hype” as “avoid”
+
+when it should be “speculative unless cheap”
+
+The real pattern in your results
+
+Right now, the engine behavior is:
+
+“If I’m not confident enough to buy, I avoid.”
+
+That’s too harsh.
+
+You need a middle state that says:
+“I don’t know enough, but the upside exists.”
+
+That’s what SPECULATIVE_FLYER is for — and it’s currently underused.
+
+The two calibration changes that fix almost everything
+Change #1: Narrow AVOID_NEW_MONEY dramatically
+
+AVOID_NEW_MONEY should only fire when one of these is true:
+
+A) Bust or near-bust with no upside path
+B) Downside risk is extreme (≥ 75) AND value is not compelling
+C) Overheated + compsReliable + clear spike exhaustion (future feature)
+
+Everything else should flow to HOLD or SPECULATIVE.
+
+New rule:
+If downsideRiskScore < 70, AVOID_NEW_MONEY is not allowed unless stage == BUST.
+
+This one line will immediately fix:
+
+Amon-Ra
+
+Maxey
+
+Skenes
+
+Change #2: SPECULATIVE_FLYER should be the default for uncertainty
+
+Right now SPECULATIVE is a weak fallback. It needs to be the primary home for:
+
+prospects
+
+thin markets
+
+modeled comps
+
+narrative-heavy but unproven players
+
+New rule:
+If comps are modeled OR data sufficiency is weak:
+
+SPECULATIVE_FLYER unless:
+
+valueScore is clearly strong → ACCUMULATE
+
+downsideRisk is extreme → AVOID_NEW_MONEY
+
+This restores balance.
+
+Corrected expected outputs (sanity check)
+
+After the fixes above, your test set should land here:
+
+Tom Brady → HOLD_CORE
+
+Jerry Rice → HOLD_CORE
+
+Zach Wilson → AVOID_NEW_MONEY
+
+Killian Hayes → AVOID_NEW_MONEY
+
+Amon-Ra St. Brown → HOLD_CORE
+
+Tyrese Maxey → HOLD_CORE
+
+Bronny James → AVOID_NEW_MONEY
+
+Paul Skenes → SPECULATIVE_FLYER
+
+Jayden Daniels → AVOID_NEW_MONEY (until comps improve)
+
+Johnny Juzang → SPECULATIVE_FLYER or AVOID (depending on downside score)
+
+If you don’t see this distribution, something is still mis-weighted.
+
+Copy-paste adjustment for Replit (final calibration)
+
+Add these rules after bust/retired overrides and before final fallback:
+
+/* Narrow AVOID_NEW_MONEY */
+if (
+  verdictCandidate === "AVOID_NEW_MONEY" &&
+  input.stage !== "BUST" &&
+  scores.downsideRiskScore < 70
+) {
+  verdictCandidate = "HOLD_CORE";
+}
+
+/* Prospect & modeled comps default to SPECULATIVE */
+if (
+  !compsReliable &&
+  verdictCandidate === "AVOID_NEW_MONEY" &&
+  input.stage !== "BUST"
+) {
+  verdictCandidate = "SPECULATIVE_FLYER";
+}
+
+/* Busts are not speculative by default */
+if (
+  input.stage === "BUST" &&
+  verdictCandidate === "SPECULATIVE_FLYER"
+) {
+  verdictCandidate = "AVOID_NEW_MONEY";
+}
+
+
+This is intentionally minimal. You don’t need new scores or APIs.
+
+One final framing shift (important)
+
+Think of the verdicts like this:
+
+ACCUMULATE → positive expected value
+
+HOLD_CORE → neutral expected value
+
+SPECULATIVE_FLYER → unknown expected value
+
+AVOID_NEW_MONEY → negative expected value
+
+TRADE_THE_HYPE → timing-based exit (rare)
+
+Your engine was treating “unknown” as “negative.”
+We’ve now separated them.
