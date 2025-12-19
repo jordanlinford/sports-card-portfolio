@@ -1,0 +1,82 @@
+Tweak 1: Create a “modern active avoid” rule that’s not just extreme downsideRisk
+
+Right now AVOID appears to require downsideRisk ≥ 75 or BUST. That’s too strict for players whose cards are bad buys due to role insecurity, declining trajectory, or thin demand.
+
+Add a mid-tier avoid condition:
+
+If stage is ACTIVE (not RETIRED/HOF) AND comps are not reliable AND:
+
+liquidityScore <= 35
+
+AND (risk is HIGH OR volatility is HIGH OR momentum is DOWN)
+→ AVOID_NEW_MONEY
+
+This will catch Daniel Jones–type profiles.
+
+Tweak 2: Force SPECULATIVE_FLYER for rookies/early-year players unless they are clearly cheap
+
+You want SPECULATIVE_FLYER to show up more for:
+
+ROOKIE
+
+YEAR_2
+
+PROSPECT
+
+Add:
+
+If stage in (ROOKIE, YEAR_2) AND compsReliable is false:
+
+If valueScore >= 65 and liquidity >= 55 and downsideRisk <= 65 → ACCUMULATE
+
+Else → SPECULATIVE_FLYER
+
+This will stop Nabers-style players from falling into HOLD_CORE by default.
+
+Copy/paste instructions for Replit (minimal diff)
+
+Add these two blocks after retired/bust overrides and before HOLD_CORE band selection:
+
+Block A: Early-career default to speculative (unless clearly cheap)
+
+const earlyCareer = input.stage === "ROOKIE" || input.stage === "YEAR_2";
+
+if (!compsReliable && earlyCareer) {
+  if (scores.mispricingScore >= 15 && scores.liquidityScore >= 55 && scores.downsideRiskScore <= 65) {
+    return finalize("ACCUMULATE");
+  }
+  return finalize("SPECULATIVE_FLYER", { forceConfidence: "LOW" });
+}
+
+
+Block B: Active-player avoid for low liquidity + deteriorating setup
+
+const activeNotLegend = input.stage !== "RETIRED" && input.stage !== "RETIRED_HOF" && input.stage !== "BUST";
+
+const deteriorating =
+  input.momentum === "DOWN" ||
+  input.risk === "HIGH" ||
+  input.volatility === "HIGH";
+
+if (activeNotLegend && !compsReliable && scores.liquidityScore <= 35 && deteriorating) {
+  return finalize("AVOID_NEW_MONEY", { forceConfidence: "LOW" });
+}
+
+
+Then keep your widened HOLD_CORE band below those.
+
+What you should see after this change
+
+Daniel Jones flips to AVOID_NEW_MONEY
+
+Malik Nabers flips to SPECULATIVE_FLYER (unless he’s clearly cheap)
+
+Love might stay HOLD_CORE or become SPECULATIVE depending on momentum/risk inputs
+
+Your overall distribution shifts closer to:
+
+HOLD: majority but not everything
+
+SPECULATIVE: visible and meaningful
+
+AVOID: appears for structurally weak situations
