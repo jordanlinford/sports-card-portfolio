@@ -1,0 +1,119 @@
+Correct interpretation given Bryce is Year 3
+
+Under your current mapping:
+
+ROOKIE → year 0
+
+YEAR_2 → year 1
+
+PRIME → year ≥ 2
+
+Bryce Young = PRIME, not early-career.
+
+So this rule:
+
+“Early-career players should not be AVOID”
+
+does not apply to Bryce anymore.
+
+That means the engine is allowed to say AVOID — but only if it’s for the right reason.
+
+When PRIME players should be AVOID (this is the real rule)
+
+For PRIME players, AVOID_NEW_MONEY should mean:
+
+role security is poor
+
+demand is thin or declining
+
+downside surprises outweigh upside rebounds
+
+That can apply to Bryce today.
+
+What matters is why he was AVOID.
+
+The only thing you need to verify
+
+Look at Bryce’s debug object and check one field:
+
+roleTier / roleStabilityScore
+
+If Bryce is tagged as:
+
+UNCERTAIN_STARTER or BACKUP
+then AVOID_NEW_MONEY is correct
+
+If Bryce is tagged as:
+
+STARTER or FRANCHISE_CORE
+then AVOID is too harsh and should downgrade to SPECULATIVE_FLYER
+
+So the correct rule is not “Year 3 can’t be avoid.”
+The correct rule is:
+
+PRIME players can be AVOID only when role stability is low.
+
+Final corrected rule (this replaces the earlier one)
+
+Do not use an early-career blanket guardrail.
+
+Instead use this:
+
+const isPrime = input.stage === "PRIME";
+
+if (
+  isPrime &&
+  verdict === "AVOID_NEW_MONEY" &&
+  roleTier === "STARTER"
+) {
+  verdict = "SPECULATIVE_FLYER";
+}
+
+
+And keep this:
+
+if (
+  isPrime &&
+  roleTier === "BACKUP" || roleTier === "OUT_OF_LEAGUE"
+) {
+  verdict = "AVOID_NEW_MONEY";
+}
+
+
+This yields:
+
+Bryce Young (PRIME + UNCERTAIN_STARTER) → AVOID or SPECULATIVE depending on your roleTier assignment
+
+Josh Rosen (OUT_OF_LEAGUE) → AVOID
+
+Kenny Pickett (BACKUP) → AVOID
+
+Caleb Williams (ROOKIE) → SPECULATIVE
+
+Wembanyama (EMERGING) → SPECULATIVE
+
+Why this is actually better
+
+This aligns perfectly with collector intuition:
+
+“Third-year QB with shaky job security? Probably stay away.”
+
+“Third-year QB still locked in as starter? Risky, but not dead.”
+
+“Rookie or Year-2? Too early to avoid — it’s a bet.”
+
+You didn’t break the system — you clarified it.
+
+One last sanity check (optional but recommended)
+
+Re-run just these three with updated roleTier logic:
+
+Bryce Young → AVOID_NEW_MONEY if roleTier ≠ STARTER
+
+Trevor Lawrence → HOLD_CORE
+
+Jordan Love → HOLD_CORE or SPECULATIVE depending on roleTier
+
+If those make sense to you as a collector, you’re done.
+
+At this point, the engine is no longer “broken” — it’s expressing a point of view. That’s exactly what people want.
