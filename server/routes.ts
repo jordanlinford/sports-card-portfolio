@@ -4723,6 +4723,79 @@ Allow: /
   });
 
   // ============================================================================
+  // Hidden Gems - Data-driven undervalued player picks
+  // ============================================================================
+  
+  const { getActiveHiddenGems, refreshHiddenGems, getHiddenGemsStats } = await import("./hiddenGemsService");
+
+  // GET /api/hidden-gems - Get active hidden gems (public)
+  app.get("/api/hidden-gems", async (req, res) => {
+    try {
+      const gems = await getActiveHiddenGems();
+      const stats = await getHiddenGemsStats();
+      
+      res.json({
+        gems,
+        stats,
+        cached: true,
+      });
+    } catch (error) {
+      console.error("[Hidden Gems] Error fetching:", error);
+      res.status(500).json({ error: "Failed to fetch hidden gems" });
+    }
+  });
+
+  // POST /api/hidden-gems/refresh - Admin-only refresh (generates new gems from AI)
+  app.post("/api/hidden-gems/refresh", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Check if user is admin
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const targetCount = parseInt(req.query.count as string) || 25;
+      
+      console.log(`[Hidden Gems] Admin ${userId} triggered refresh...`);
+      const result = await refreshHiddenGems(targetCount);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          gemsCreated: result.gemsCreated,
+          batchId: result.batchId,
+          message: `Created ${result.gemsCreated} hidden gems`,
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: result.error,
+          batchId: result.batchId,
+        });
+      }
+    } catch (error) {
+      console.error("[Hidden Gems] Error refreshing:", error);
+      res.status(500).json({ error: "Failed to refresh hidden gems" });
+    }
+  });
+
+  // GET /api/hidden-gems/stats - Get hidden gems statistics
+  app.get("/api/hidden-gems/stats", async (req, res) => {
+    try {
+      const stats = await getHiddenGemsStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("[Hidden Gems] Error fetching stats:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  // ============================================================================
   // Shared Snapshots - Public sharing of reports
   // ============================================================================
 
