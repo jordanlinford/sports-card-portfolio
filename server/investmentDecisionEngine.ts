@@ -47,6 +47,15 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
   "luka doncic": "FRANCHISE_CORE",
   "shai gilgeous-alexander": "FRANCHISE_CORE",
   "victor wembanyama": "FRANCHISE_CORE",
+  "nikola jokic": "FRANCHISE_CORE",
+  "giannis antetokounmpo": "FRANCHISE_CORE",
+  "lebron james": "FRANCHISE_CORE",
+  "stephen curry": "FRANCHISE_CORE",
+  "kevin durant": "FRANCHISE_CORE",
+  "joel embiid": "FRANCHISE_CORE",
+  "damian lillard": "FRANCHISE_CORE",
+  "donovan mitchell": "FRANCHISE_CORE",
+  "trae young": "FRANCHISE_CORE",
   "amon-ra st. brown": "FRANCHISE_CORE",
   "justin jefferson": "FRANCHISE_CORE",
   "tyreek hill": "FRANCHISE_CORE",
@@ -151,6 +160,8 @@ export type DecisionInput = {
   playerName?: string;  // Required for role stability lookup
 };
 
+export type MaturityTier = "EMERGING" | "ESTABLISHED" | "TRANSITIONAL";
+
 export type DecisionDebug = {
   stage: PlayerStage;
   temperature: MarketTemperature;
@@ -168,6 +179,7 @@ export type DecisionDebug = {
   downsideRiskScore: number;
   roleTier: RoleTier;
   roleStabilityScore: number;
+  maturityTier: MaturityTier;
   chosenVerdict: InvestmentVerdict;
   cappedConfidence: DataConfidence;
   verdictReason: string;
@@ -393,12 +405,40 @@ function decideVerdict(
   }
 
   // ============================================================
-  // PRECEDENCE 5: FRANCHISE_CORE players → ACCUMULATE
-  // High role stability (>= 75) = franchise cornerstone, always accumulate
-  // Examples: CeeDee Lamb, Amon-Ra St. Brown, Justin Jefferson, Tyrese Maxey
+  // MATURITY GATE: Contextual interpretation of value/uncertainty
+  // - EMERGING (ROOKIE/YEAR_2): "cheap" means speculative, not undervalued
+  // - ESTABLISHED: FRANCHISE_CORE who are NOT rookies/sophomores (proven stars)
   // ============================================================
+  const isEarlyCareerStage = stage === "ROOKIE" || stage === "YEAR_2";
+  const maturityTier = 
+    isEarlyCareerStage 
+      ? "EMERGING"
+      : (roleStabilityScore >= 75 && !isEarlyCareerStage)
+        ? "ESTABLISHED"  // FRANCHISE_CORE + not rookie/year2 = proven star
+        : "TRANSITIONAL";
+
+  // ============================================================
+  // PRECEDENCE 5: ESTABLISHED players (FRANCHISE_CORE + PRIME) → ACCUMULATE
+  // Proven stars with locked roles should never be SPECULATIVE
+  // Examples: Nikola Jokic, Giannis, LeBron, Stephen Curry
+  // ============================================================
+  if (maturityTier === "ESTABLISHED") {
+    return { verdict: "ACCUMULATE", reason: "Proven franchise cornerstone - accumulate on any dip" };
+  }
+  
+  // ============================================================
+  // PRECEDENCE 5b: FRANCHISE_CORE but NOT established (rookies/early career)
+  // High upside ≠ good value. Rookies can be stars but still speculative.
+  // Examples: Victor Wembanyama - talent is clear, but priced for best case
+  // ============================================================
+  if (roleStabilityScore >= 75 && maturityTier === "EMERGING") {
+    // Franchise-caliber rookie/sophomore - SPECULATIVE not ACCUMULATE
+    return { verdict: "SPECULATIVE_FLYER", reason: "Franchise-caliber but early career - high upside lottery" };
+  }
+  
+  // FRANCHISE_CORE in transitional stage (not ROOKIE/YEAR_2, not PRIME)
   if (roleStabilityScore >= 75) {
-    return { verdict: "ACCUMULATE", reason: "Franchise cornerstone - accumulate on any dip" };
+    return { verdict: "HOLD_CORE", reason: "Franchise cornerstone - stable core hold" };
   }
 
   // ============================================================
@@ -802,6 +842,15 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const triggers = generateTriggers(verdict, input);
   const cardTargets = generateCardTargets(verdict, input.exposures);
 
+  // Compute maturityTier for debug output (mirrors logic in decideVerdict)
+  const isEarlyCareerStage = input.stage === "ROOKIE" || input.stage === "YEAR_2";
+  const maturityTier: MaturityTier = 
+    isEarlyCareerStage 
+      ? "EMERGING"
+      : (roleStabilityScore >= 75 && !isEarlyCareerStage)
+        ? "ESTABLISHED"
+        : "TRANSITIONAL";
+
   // Build decisionDebug for QA
   const decisionDebug: DecisionDebug = {
     stage: input.stage,
@@ -820,6 +869,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     downsideRiskScore: scores.downsideRiskScore,
     roleTier,
     roleStabilityScore,
+    maturityTier,
     chosenVerdict: verdict,
     cappedConfidence: confidence,
     verdictReason: reason,

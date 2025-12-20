@@ -1,0 +1,173 @@
+Why Victor should NOT be ACCUMULATE
+
+Victor Wembanyama getting ACCUMULATE means your engine believes:
+
+valueScore is high (cheap)
+
+liquidity is sufficient
+
+downsideRisk is acceptable
+
+That is never the correct interpretation for Wemby right now.
+
+Wemby is:
+
+expensive by default
+
+priced for best-case outcomes
+
+volatile
+
+long-horizon
+
+He is the textbook definition of SPECULATIVE, not undervalued.
+
+What’s missing
+
+You need a rule that says:
+
+“High upside ≠ good value”
+
+Right now, your valuation logic is allowing narrative upside to masquerade as cheapness.
+
+Why Nikola should NOT be SPECULATIVE
+
+Nikola Jokic being SPECULATIVE means your engine believes:
+
+uncertainty is high
+
+timing edge is unclear
+
+role is not locked in
+
+That is objectively false.
+
+Jokic is:
+
+the most stable asset in the NBA card market
+
+proven, liquid, and boring-good
+
+exactly what HOLD_CORE or ACCUMULATE is for
+
+What’s missing
+
+You need a rule that says:
+
+“Proven dominance + role certainty overrides uncertainty penalties”
+
+The core bug (very important)
+
+Your ACCUMULATE gate is too permissive, and your SPECULATIVE fallback is too aggressive.
+
+Right now:
+
+ACCUMULATE is being triggered by “looks cheap in range”
+
+SPECULATIVE is being triggered by “modeled comps / uncertainty”
+
+Those two things must be constrained by player maturity.
+
+The fix (this is the final missing piece)
+
+You need one maturity gate that controls BOTH ACCUMULATE and SPECULATIVE.
+
+Add a maturityTier (derived, not manual)
+
+You already have everything you need to compute it.
+
+Define:
+
+maturityTier =
+  if stage === "ROOKIE" or stage === "YEAR_2" -> EMERGING
+  else if roleTier === "FRANCHISE_CORE" and stage === "PRIME" -> ESTABLISHED
+  else -> TRANSITIONAL
+
+Apply maturity gates to verdicts
+Rule 1: ACCUMULATE is NOT allowed for EMERGING players
+
+This fixes Victor immediately.
+
+if (maturityTier === "EMERGING" && verdict === "ACCUMULATE") {
+  verdict = "SPECULATIVE_FLYER";
+}
+
+
+Meaning:
+
+No rookies or early-career players can be “undervalued”
+
+They can only be speculative or avoid
+
+This is how real collectors think.
+
+Rule 2: ESTABLISHED players should never default to SPECULATIVE
+
+This fixes Jokic immediately.
+
+if (maturityTier === "ESTABLISHED" && verdict === "SPECULATIVE_FLYER") {
+  verdict = "HOLD_CORE";
+}
+
+
+Meaning:
+
+Proven stars don’t become “lottery tickets”
+
+Uncertainty doesn’t apply the same way
+
+Why this works (and nothing else did)
+
+You were trying to solve this with:
+
+thresholds
+
+heat tuning
+
+liquidity tuning
+
+stage fixes
+
+All necessary — but insufficient.
+
+What you were missing was contextual interpretation:
+
+cheap means different things for rookies vs legends
+
+uncertainty means different things for Jokic vs Wemby
+
+This maturity gate gives your engine judgment, not just math.
+
+Replit copy-paste patch (minimal, safe)
+
+Paste this after verdict selection but before returning output:
+
+const maturityTier =
+  (input.stage === "ROOKIE" || input.stage === "YEAR_2")
+    ? "EMERGING"
+    : (input.roleTier === "FRANCHISE_CORE" && input.stage === "PRIME")
+      ? "ESTABLISHED"
+      : "TRANSITIONAL";
+
+// Prevent rookies / early-career from ACCUMULATE
+if (maturityTier === "EMERGING" && verdict === "ACCUMULATE") {
+  verdict = "SPECULATIVE_FLYER";
+}
+
+// Prevent proven stars from being treated as speculative
+if (maturityTier === "ESTABLISHED" && verdict === "SPECULATIVE_FLYER") {
+  verdict = "HOLD_CORE";
+}
+
+
+No new data. No new APIs. No re-architecture.
+
+What should happen after this
+
+Re-run only these two:
+
+Victor Wembanyama → SPECULATIVE_FLYER (LOW)
+
+Nikola Jokic → HOLD_CORE or ACCUMULATE (LOW)
+
+If those pass, then all eight canonical tests should finally pass.
