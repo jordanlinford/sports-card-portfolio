@@ -1535,3 +1535,47 @@ export const sharedSnapshots = pgTable("shared_snapshots", {
 export type SharedSnapshot = typeof sharedSnapshots.$inferSelect;
 export type InsertSharedSnapshot = typeof sharedSnapshots.$inferInsert;
 export const insertSharedSnapshotSchema = createInsertSchema(sharedSnapshots).omit({ id: true, createdAt: true, viewCount: true });
+
+// Hidden Gems - monthly curated undervalued player picks from AI analysis
+export const hiddenGems = pgTable("hidden_gems", {
+  id: serial("id").primaryKey(),
+  playerKey: varchar("player_key", { length: 128 }).notNull(), // normalized: sport:playername
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  sport: varchar("sport", { length: 50 }).notNull(),
+  position: varchar("position", { length: 50 }),
+  team: varchar("team", { length: 100 }),
+  
+  // Investment call data
+  verdict: varchar("verdict", { length: 30 }).notNull(), // BUY, MONITOR
+  modifier: varchar("modifier", { length: 50 }).notNull(), // Value, Momentum, Speculative, Long-Term
+  temperature: varchar("temperature", { length: 20 }).notNull(), // HOT, WARM, NEUTRAL, COOLING
+  tier: varchar("tier", { length: 30 }).notNull(), // PREMIUM, CORE, GROWTH, SPECULATIVE
+  riskLevel: varchar("risk_level", { length: 20 }).notNull(), // LOW, MEDIUM, HIGH
+  
+  // Content
+  thesis: text("thesis").notNull(), // One-line opportunity summary
+  whyDiscounted: jsonb("why_discounted").$type<string[]>().notNull(),
+  repricingCatalysts: jsonb("repricing_catalysts").$type<string[]>().notNull(),
+  trapRisks: jsonb("trap_risks").$type<string[]>().notNull(),
+  
+  // Scores for ranking
+  upsideScore: integer("upside_score"),
+  confidenceScore: integer("confidence_score"),
+  discountScore: integer("discount_score"), // How undervalued (higher = more undervalued)
+  
+  // Batch management
+  batchId: varchar("batch_id", { length: 64 }).notNull(), // Groups gems from same refresh
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"), // When this batch should be replaced
+}, (table) => [
+  index("idx_hidden_gems_active").on(table.isActive),
+  index("idx_hidden_gems_batch").on(table.batchId),
+  index("idx_hidden_gems_sport").on(table.sport),
+]);
+
+export type HiddenGem = typeof hiddenGems.$inferSelect;
+export type InsertHiddenGem = typeof hiddenGems.$inferInsert;
+export const insertHiddenGemSchema = createInsertSchema(hiddenGems).omit({ id: true, createdAt: true });
