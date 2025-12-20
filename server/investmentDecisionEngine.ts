@@ -69,6 +69,8 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
   "amon-ra st. brown": "FRANCHISE_CORE",
   "justin jefferson": "FRANCHISE_CORE",
   "tyreek hill": "FRANCHISE_CORE",
+  "aj brown": "FRANCHISE_CORE",
+  "a.j. brown": "FRANCHISE_CORE",
   "josh allen": "FRANCHISE_CORE",
   "patrick mahomes": "FRANCHISE_CORE",
   "lamar jackson": "FRANCHISE_CORE",
@@ -853,6 +855,35 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     reason = "Role security gone - high risk of further decline";
   }
   
+  // Compute maturityTier for franchise core protection (need it before the rule)
+  const isEarlyCareerStage = input.stage === "ROOKIE" || input.stage === "YEAR_2";
+  const maturityTier: MaturityTier = 
+    isEarlyCareerStage 
+      ? "EMERGING"
+      : (roleStabilityScore >= 75 && !isEarlyCareerStage)
+        ? "ESTABLISHED"
+        : "TRANSITIONAL";
+  
+  // ============================================================
+  // FRANCHISE CORE PROTECTION RULE
+  // Franchise-core players should never be AVOID and should only 
+  // be ACCUMULATE when undervaluation is extreme
+  // ============================================================
+  const franchiseCore = roleTier === "FRANCHISE_CORE" && maturityTier === "ESTABLISHED";
+  
+  // Protect franchise-core from AVOID (AJ Brown fix)
+  if (franchiseCore && verdict === "AVOID_NEW_MONEY") {
+    verdict = "HOLD_CORE";
+    reason = "Franchise core asset - hold through volatility";
+  }
+  
+  // Make ACCUMULATE harder for franchise-core (requires clear undervaluation)
+  // Only ACCUMULATE when valuationScore >= 75 (meaning clearly cheap)
+  if (franchiseCore && verdict === "ACCUMULATE" && scores.valuationScore < 75) {
+    verdict = "HOLD_CORE";
+    reason = "Franchise core - already priced as elite, hold unless clearly cheap";
+  }
+  
   // Compute base confidence
   let confidence = computeConfidence(scores);
   
@@ -886,16 +917,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const triggers = generateTriggers(verdict, input);
   const cardTargets = generateCardTargets(verdict, input.exposures);
 
-  // Compute maturityTier for debug output (mirrors logic in decideVerdict)
-  const isEarlyCareerStage = input.stage === "ROOKIE" || input.stage === "YEAR_2";
-  const maturityTier: MaturityTier = 
-    isEarlyCareerStage 
-      ? "EMERGING"
-      : (roleStabilityScore >= 75 && !isEarlyCareerStage)
-        ? "ESTABLISHED"
-        : "TRANSITIONAL";
-
-  // Build decisionDebug for QA
+  // Build decisionDebug for QA (maturityTier already computed above for franchise core rule)
   const decisionDebug: DecisionDebug = {
     stage: input.stage,
     temperature: input.temperature,
