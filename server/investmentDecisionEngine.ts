@@ -69,7 +69,7 @@ export type RoleTier =
 
 const ROLE_STABILITY_SCORES: Record<RoleTier, number> = {
   FRANCHISE_CORE: 90,
-  STARTER: 75,
+  STARTER: 70,             // Below 75 threshold - won't auto-qualify as ESTABLISHED
   UNCERTAIN_STARTER: 45,
   BACKUP: 25,
   OUT_OF_LEAGUE: 10,
@@ -111,6 +111,28 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
   "mike trout": "FRANCHISE_CORE",
   "ronald acuna jr": "FRANCHISE_CORE",
   "mookie betts": "FRANCHISE_CORE",
+  
+  // FRANCHISE_CORE - Proven elite RBs (established with multi-year dominance)
+  "christian mccaffrey": "FRANCHISE_CORE",
+  "derrick henry": "FRANCHISE_CORE",
+  "saquon barkley": "FRANCHISE_CORE",
+  "jonathan taylor": "FRANCHISE_CORE",
+  
+  // STARTER - Young/emerging RBs (talented but not yet proven franchise-level)
+  // Also includes productive veterans with declining usage
+  "breece hall": "STARTER",         // Year 2, elite talent but injury history
+  "bijan robinson": "STARTER",      // Year 2, need more sample size
+  "jahmyr gibbs": "STARTER",        // Year 2, RBBC limits ceiling confirmation
+  "alvin kamara": "STARTER",        // Still productive but 29, declining usage
+  "josh jacobs": "STARTER",
+  "aaron jones": "STARTER",
+  "travis etienne": "STARTER",
+  "isaiah pacheco": "STARTER",
+  "de'von achane": "STARTER",
+  "kyren williams": "STARTER",
+  "rachaad white": "STARTER",
+  "james cook": "STARTER",
+  "najee harris": "STARTER",
   
   // STARTER - Clear starters
   "mike evans": "STARTER",
@@ -467,12 +489,22 @@ function decideVerdict(
         : "TRANSITIONAL";
 
   // ============================================================
-  // PRECEDENCE 5: ESTABLISHED players (FRANCHISE_CORE + PRIME) → ACCUMULATE
+  // PRECEDENCE 5: ESTABLISHED players (FRANCHISE_CORE + PRIME) → ACCUMULATE or HOLD
   // Proven stars with locked roles should never be SPECULATIVE
+  // BUT high downside risk (injury, position decline) limits ACCUMULATE
   // Examples: Nikola Jokic, Giannis, LeBron, Stephen Curry
   // ============================================================
   if (maturityTier === "ESTABLISHED") {
-    return { verdict: "ACCUMULATE", reason: "Proven franchise cornerstone - accumulate on any dip" };
+    // High downside risk = never aggressively accumulate (catches aging RBs)
+    if (scores.downsideRiskScore >= 65) {
+      return { verdict: "HOLD_CORE", reason: "Franchise asset but elevated risk - hold, don't chase" };
+    }
+    // Low risk AND clearly undervalued = ACCUMULATE
+    if (scores.valuationScore >= 75) {
+      return { verdict: "ACCUMULATE", reason: "Proven franchise cornerstone - accumulate on any dip" };
+    }
+    // Otherwise, hold - priced fairly for the risk level
+    return { verdict: "HOLD_CORE", reason: "Franchise asset at fair value - hold position" };
   }
   
   // ============================================================
@@ -908,7 +940,27 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   
   // Incorporate role stability into downsideRiskScore
   // Low role stability = higher downside risk
-  const adjustedDownsideRisk = Math.max(scores.downsideRiskScore, 100 - roleStabilityScore);
+  let adjustedDownsideRisk = Math.max(scores.downsideRiskScore, 100 - roleStabilityScore);
+  
+  // ============================================================
+  // RB-SPECIFIC AGE/DECLINE RISK MODIFIER
+  // Running backs age faster than other positions:
+  // - RBs typically decline sharply after age 26-27
+  // - Workload/injury risk compounds with age
+  // - Position has shortest career lifespan in NFL
+  // ============================================================
+  const position = input.position?.toLowerCase().trim() ?? "";
+  const isRunningBack = position === "rb" || position === "running back" || position === "hb" || position === "halfback";
+  const isAgingRB = isRunningBack && (input.stage === "PRIME" || input.stage === "VETERAN" || input.stage === "AGING");
+  
+  if (isAgingRB) {
+    // Add 15-25 points to downside risk for aging RBs
+    // PRIME RBs: +15 (still productive but decline imminent)
+    // VETERAN/AGING RBs: +25 (decline likely in progress)
+    const rbAgingPenalty = input.stage === "PRIME" ? 15 : 25;
+    adjustedDownsideRisk = Math.min(95, adjustedDownsideRisk + rbAgingPenalty);
+  }
+  
   scores.downsideRiskScore = adjustedDownsideRisk;
   
   // Compute helper flags for gating logic
