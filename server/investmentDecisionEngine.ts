@@ -382,9 +382,10 @@ function decideVerdict(
       // Fall through to HOLD_CORE (for PRIME) or SPECULATIVE (for others)
       // NOT negative EV, just not a buy
     }
-    // Early-career needs even higher threshold (75) since uncertainty is expected
-    else if (earlyCareer && !hasProvenDemand && downsideRiskScore < 75) {
-      // Don't AVOID rookies at 70-74 downside - that's expected volatility
+    // Early-career/uncertain starters need higher threshold (85) since uncertainty is expected
+    // Rookies and uncertain starters should be SPECULATIVE, not AVOID
+    else if (earlyCareer && !hasProvenDemand && downsideRiskScore < 85) {
+      // Don't AVOID early-career players at 70-84 downside - that's expected volatility
       // Fall through to SPECULATIVE
     } else {
       return { verdict: "AVOID_NEW_MONEY", reason: "High downside risk - structural concern" };
@@ -392,9 +393,17 @@ function decideVerdict(
   }
 
   // ============================================================
-  // PRECEDENCE 5: Players with proven demand → HOLD_CORE
-  // High liquidity (>= 75) indicates established star, regardless of stage classification
-  // This catches misclassified players like Maxey/Amon-Ra who show as UNKNOWN
+  // PRECEDENCE 5: FRANCHISE_CORE players → ACCUMULATE
+  // High role stability (>= 75) = franchise cornerstone, always accumulate
+  // Examples: CeeDee Lamb, Amon-Ra St. Brown, Justin Jefferson, Tyrese Maxey
+  // ============================================================
+  if (roleStabilityScore >= 75) {
+    return { verdict: "ACCUMULATE", reason: "Franchise cornerstone - accumulate on any dip" };
+  }
+
+  // ============================================================
+  // PRECEDENCE 6: Players with proven demand → HOLD_CORE
+  // High liquidity (>= 60) + role stability > 55 indicates established player
   // ============================================================
   if (hasProvenDemand && !isPrime) {
     // Accumulate exception: clearly underpriced
