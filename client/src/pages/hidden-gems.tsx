@@ -32,6 +32,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { PlayerVerdict, StockTier, MarketTemperature, VerdictModifier } from "@shared/schema";
+import { PageShareButton } from "@/components/page-share-button";
 
 interface GemCandidate {
   playerName: string;
@@ -381,9 +382,12 @@ export default function HiddenGemsPage() {
   return (
     <div className="container max-w-6xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <Gem className="h-8 w-8 text-emerald-500" />
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Hidden Gems</h1>
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <div className="flex items-center gap-3">
+            <Gem className="h-8 w-8 text-emerald-500" />
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">Hidden Gems</h1>
+          </div>
+          <PageShareButton pageSlug="hidden-gems" />
         </div>
         <p className="text-muted-foreground max-w-2xl">
           Players who might be underpriced relative to their talent. Each card explains why 

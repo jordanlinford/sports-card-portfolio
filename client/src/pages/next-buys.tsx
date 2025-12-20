@@ -25,6 +25,7 @@ import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { NextBuy, NextBuyPortfolioImpact } from "@shared/schema";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { PageShareButton } from "@/components/page-share-button";
 
 function formatTimestamp(date: Date | string | null | undefined): string {
   if (!date) return "Unknown";
@@ -319,6 +320,7 @@ export default function NextBuysPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <PageShareButton pageSlug="next-buys" />
           <Button 
             variant={showBuyOnly ? "default" : "outline"}
             size="sm"

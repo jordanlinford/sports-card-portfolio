@@ -11,6 +11,7 @@ import { WebhookHandlers } from "./webhookHandlers";
 import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
 import { generateShareImage } from "./shareImageService";
 import { generatePlayerOGImage, getPlayerShareData } from "./playerShareImageService";
+import { generatePageOGImage, getPageShareData } from "./pageShareImageService";
 import { prestigeService } from "./prestigeService";
 import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./cardOutlookService";
 import { sendPaymentConfirmationEmail } from "./email";
@@ -696,6 +697,103 @@ Allow: /
     } catch (error) {
       console.error("Error serving player share page:", error);
       res.status(500).json({ message: "Failed to serve player share page" });
+    }
+  });
+
+  // Page OG image generation endpoint (for Next Buys, Hidden Gems, etc.)
+  app.get("/api/og/page/:pageSlug.png", async (req, res) => {
+    try {
+      const { pageSlug } = req.params;
+      const sanitizedSlug = pageSlug.replace(/[^a-z0-9-]/gi, "").toLowerCase();
+      
+      const imageBuffer = await generatePageOGImage(sanitizedSlug);
+      
+      res.set({
+        "Content-Type": "image/png",
+        "Content-Length": imageBuffer.length,
+        "Cache-Control": "public, max-age=86400", // 24 hours for static pages
+      });
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error("Error generating page OG image:", error);
+      res.status(500).json({ message: "Failed to generate page OG image" });
+    }
+  });
+
+  // Page share routes with OG meta tags for social crawlers
+  app.get("/share/:pageSlug", async (req, res) => {
+    try {
+      const { pageSlug } = req.params;
+      const userAgent = req.headers["user-agent"] || "";
+      
+      // Sanitize pageSlug (only allow alphanumeric and hyphens)
+      const sanitizedSlug = pageSlug.replace(/[^a-z0-9-]/gi, "").toLowerCase();
+      
+      // Skip if it's a player share route (handled separately)
+      if (sanitizedSlug === "player") {
+        return res.status(404).json({ message: "Not found" });
+      }
+      
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
+        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
+        : `https://${req.headers.host}`;
+      
+      const pageData = getPageShareData(sanitizedSlug);
+      
+      const title = escapeHtml(`${pageData.title} | Sports Card Portfolio`);
+      const description = escapeHtml(pageData.description);
+      const imageUrl = `${baseUrl}/api/og/page/${sanitizedSlug}.png`;
+      const pageUrl = `${baseUrl}/share/${sanitizedSlug}`;
+      
+      // Route mapping for SPA redirects
+      const routeMap: Record<string, string> = {
+        "next-buys": "/next-buys",
+        "hidden-gems": "/hidden-gems",
+        "portfolio-analytics": "/analytics",
+        "player-outlook": "/player",
+        "watchlist": "/watchlist",
+      };
+      const spaRoute = routeMap[sanitizedSlug] || `/${sanitizedSlug}`;
+      
+      // For social crawlers, return static HTML with OG tags
+      if (isSocialCrawler(userAgent)) {
+        const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <meta name="description" content="${description}">
+  
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  <meta property="og:image" content="${imageUrl}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="${pageUrl}">
+  <meta property="og:site_name" content="Sports Card Portfolio">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <meta name="twitter:image" content="${imageUrl}">
+</head>
+<body>
+  <p>Redirecting to Sports Card Portfolio...</p>
+</body>
+</html>`;
+        res.set("Content-Type", "text/html");
+        return res.send(html);
+      }
+      
+      // For humans, redirect to the SPA page
+      res.redirect(spaRoute);
+    } catch (error) {
+      console.error("Error serving page share:", error);
+      res.status(500).json({ message: "Failed to serve page share" });
     }
   });
 
