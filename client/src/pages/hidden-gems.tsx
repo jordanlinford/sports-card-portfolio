@@ -6,11 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Link } from "wouter";
 import { 
-  Search,
   TrendingUp,
   Minus,
   Flame,
@@ -29,9 +27,8 @@ import {
   Filter,
   Gem,
   RefreshCw,
-  Loader2,
 } from "lucide-react";
-import type { PlayerVerdict, StockTier, MarketTemperature, VerdictModifier } from "@shared/schema";
+import type { PlayerVerdict, StockTier, MarketTemperature, HiddenGem } from "@shared/schema";
 import { PageShareButton } from "@/components/page-share-button";
 
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
@@ -39,451 +36,18 @@ type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
 interface GemCandidate {
   playerName: string;
   sport: string;
-  position?: string;
-  team?: string;
+  position?: string | null;
+  team?: string | null;
   verdict: PlayerVerdict;
-  modifier: VerdictModifier;
+  modifier: string;
   temperature: MarketTemperature;
-  tier: StockTier;
+  tier: string;
   thesis: string;
   riskLevel: RiskLevel;
   whyDiscounted: string[];
   repricingCatalysts: string[];
   trapRisks: string[];
 }
-
-// Updated for 2024-2025 season
-const FOOTBALL_GEMS: GemCandidate[] = [
-  {
-    playerName: "CJ Stroud",
-    sport: "football",
-    position: "QB",
-    team: "Houston Texans",
-    verdict: "BUY",
-    modifier: "Momentum",
-    temperature: "HOT",
-    tier: "PREMIUM",
-    thesis: "Rookie of the Year with playoff success. Still room to run before peak pricing.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Prices spiked but haven't reached elite QB tier (Mahomes, Allen) yet.",
-      "Small market Houston caps casual collector ceiling compared to NY/LA.",
-    ],
-    repricingCatalysts: [
-      "MVP-caliber sophomore season confirms generational status.",
-      "Deep playoff run or Super Bowl appearance.",
-    ],
-    trapRisks: ["Sophomore slump could stall momentum temporarily."],
-  },
-  {
-    playerName: "Jayden Daniels",
-    sport: "football",
-    position: "QB",
-    team: "Washington Commanders",
-    verdict: "BUY",
-    modifier: "Momentum",
-    temperature: "HOT",
-    tier: "GROWTH",
-    thesis: "Electric dual-threat with top-2 pick pedigree. Heisman winner turning heads.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "Washington dysfunction creates 'will they ruin him?' doubt.",
-      "Dual-threat QBs get longevity discount despite modern success stories.",
-    ],
-    repricingCatalysts: [
-      "Playoff berth in year one would cement franchise QB status.",
-      "Sustained rushing + passing production builds unique profile.",
-    ],
-    trapRisks: ["Injury from running style could derail trajectory."],
-  },
-  {
-    playerName: "Bijan Robinson",
-    sport: "football",
-    position: "RB",
-    team: "Atlanta Falcons",
-    verdict: "MONITOR",
-    modifier: "Value",
-    temperature: "NEUTRAL",
-    tier: "GROWTH",
-    thesis: "Generational RB talent suppressed by position devaluation. Hobby doesn't match ability.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "RB position systematically discounted in modern hobby despite elite talent.",
-      "Atlanta hasn't featured him optimally, limiting highlight reel.",
-    ],
-    repricingCatalysts: [
-      "2000-yard season or receiving breakout expands value.",
-      "Playoff success as featured weapon changes narrative.",
-    ],
-    trapRisks: ["RB shelf life concerns amplify if usage stays low."],
-  },
-  {
-    playerName: "Malik Nabers",
-    sport: "football",
-    position: "WR",
-    team: "New York Giants",
-    verdict: "MONITOR",
-    modifier: "Speculative",
-    temperature: "WARM",
-    tier: "GROWTH",
-    thesis: "Elite talent in massive market. QB situation suppressing true ceiling.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "Giants QB carousel limits stat accumulation and highlight plays.",
-      "Team dysfunction creates 'wasted talent' fear.",
-    ],
-    repricingCatalysts: [
-      "Competent QB play unlocking 1,400+ yard ceiling.",
-      "Pro Bowl or All-Pro selection validates elite status.",
-    ],
-    trapRisks: ["Giants continue dysfunction, capping career production."],
-  },
-  {
-    playerName: "Lamar Jackson",
-    sport: "football",
-    position: "QB",
-    team: "Baltimore Ravens",
-    verdict: "BUY",
-    modifier: "Value",
-    temperature: "WARM",
-    tier: "PREMIUM",
-    thesis: "2x MVP still trading below elite tier. Playoff win away from massive repricing.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Playoff struggles (1-4) create persistent 'regular season only' discount.",
-      "Running QB longevity concerns despite proven durability.",
-    ],
-    repricingCatalysts: [
-      "Playoff run or Super Bowl appearance reprices cards 30-50%.",
-      "Third MVP would cement all-time status.",
-    ],
-    trapRisks: ["Another early playoff exit cements negative narrative."],
-  },
-  {
-    playerName: "Brock Purdy",
-    sport: "football",
-    position: "QB",
-    team: "San Francisco 49ers",
-    verdict: "BUY",
-    modifier: "Value",
-    temperature: "NEUTRAL",
-    tier: "GROWTH",
-    thesis: "Elite production ignored due to draft pedigree. Mr. Irrelevant outperforming perception.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Last pick draft status creates permanent 'system QB' skepticism.",
-      "Market anchoring to pedigree over actual elite performance.",
-    ],
-    repricingCatalysts: [
-      "Super Bowl win silences all doubters permanently.",
-      "Sustained success without elite weapons proves it's him.",
-    ],
-    trapRisks: ["Injury or weapons departure could expose limitations."],
-  },
-  {
-    playerName: "Aaron Rodgers",
-    sport: "football",
-    position: "QB",
-    team: "New York Jets",
-    verdict: "MONITOR",
-    modifier: "Long-Term",
-    temperature: "COOLING",
-    tier: "CORE",
-    thesis: "HOF lock at multi-year lows. Legacy cards will reprice post-retirement.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "Age and injury tanked market sentiment from prior peaks.",
-      "Jets dysfunction creating 'sad ending' narrative.",
-    ],
-    repricingCatalysts: [
-      "Retirement triggers HOF legacy buying cycle.",
-      "Any competitive success reminds market of all-time status.",
-    ],
-    trapRisks: ["Continued decline cements 'what if' rather than 'all-time great'."],
-  },
-];
-
-const BASKETBALL_GEMS: GemCandidate[] = [
-  {
-    playerName: "Victor Wembanyama",
-    sport: "basketball",
-    position: "C",
-    team: "San Antonio Spurs",
-    verdict: "BUY",
-    modifier: "Momentum",
-    temperature: "HOT",
-    tier: "PREMIUM",
-    thesis: "Generational prospect delivering on hype. Still early in long-term appreciation curve.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Prices are high but not yet at Luka/Giannis tier for a comparable prospect.",
-      "Small market San Antonio limits casual collector awareness.",
-    ],
-    repricingCatalysts: [
-      "All-Star starter or All-NBA selection in year 2.",
-      "Playoff appearance accelerates timeline.",
-    ],
-    trapRisks: ["Injury to 7'4\" frame could alter trajectory."],
-  },
-  {
-    playerName: "Anthony Edwards",
-    sport: "basketball",
-    position: "SG",
-    team: "Minnesota Timberwolves",
-    verdict: "BUY",
-    modifier: "Momentum",
-    temperature: "HOT",
-    tier: "PREMIUM",
-    thesis: "Face of next generation. Olympic star power translating to hobby demand.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Small market Minnesota still creates slight discount vs. LA/NY peers.",
-      "No championship yet keeps him below absolute elite tier pricing.",
-    ],
-    repricingCatalysts: [
-      "Championship or Finals MVP would unlock Kobe-level trajectory.",
-      "Sustained 30+ PPG scoring makes him undeniable.",
-    ],
-    trapRisks: ["Team construction issues limit playoff success window."],
-  },
-  {
-    playerName: "Tyrese Haliburton",
-    sport: "basketball",
-    position: "PG",
-    team: "Indiana Pacers",
-    verdict: "BUY",
-    modifier: "Value",
-    temperature: "NEUTRAL",
-    tier: "GROWTH",
-    thesis: "Elite playmaker in smallest market. All-Star production at mid-tier prices.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Indiana market caps national visibility and casual demand.",
-      "Playmaking doesn't create viral highlights like scoring.",
-    ],
-    repricingCatalysts: [
-      "All-NBA selection validates superstar tier.",
-      "Deep playoff run or Conference Finals appearance.",
-    ],
-    trapRisks: ["Back injury history could become recurring issue."],
-  },
-  {
-    playerName: "Chet Holmgren",
-    sport: "basketball",
-    position: "C",
-    team: "Oklahoma City Thunder",
-    verdict: "MONITOR",
-    modifier: "Speculative",
-    temperature: "WARM",
-    tier: "GROWTH",
-    thesis: "Unicorn skillset on elite young team. Injury history creates buying window.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "Missed rookie year to injury creates durability concerns.",
-      "Thin frame raises questions about long-term NBA physicality.",
-    ],
-    repricingCatalysts: [
-      "Full healthy season silences injury narrative.",
-      "Thunder playoff success with him as key contributor.",
-    ],
-    trapRisks: ["Another significant injury could tank long-term value."],
-  },
-  {
-    playerName: "James Harden",
-    sport: "basketball",
-    position: "SG",
-    team: "Los Angeles Clippers",
-    verdict: "MONITOR",
-    modifier: "Long-Term",
-    temperature: "COOLING",
-    tier: "CORE",
-    thesis: "Former MVP at career-low prices. HOF legacy underpriced if he ages gracefully.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "Team-hopping and playoff struggles created 'quitter' narrative.",
-      "Play style (free throw hunting) made him less beloved than peers.",
-    ],
-    repricingCatalysts: [
-      "Championship would dramatically shift legacy narrative.",
-      "Retirement triggers HOF legacy buying - MVP, scoring titles.",
-    ],
-    trapRisks: ["Further decline cements negative legacy perception."],
-  },
-];
-
-const BASEBALL_GEMS: GemCandidate[] = [
-  {
-    playerName: "Elly De La Cruz",
-    sport: "baseball",
-    position: "SS",
-    team: "Cincinnati Reds",
-    verdict: "BUY",
-    modifier: "Momentum",
-    temperature: "HOT",
-    tier: "GROWTH",
-    thesis: "Historic speed + power combo. Most electric player in baseball right now.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "Cincinnati market limits mainstream visibility.",
-      "Strikeout rate creates boom-bust perception.",
-    ],
-    repricingCatalysts: [
-      "All-Star or Silver Slugger validates elite status.",
-      "40-40 season would be historic.",
-    ],
-    trapRisks: ["High strikeout rate limits consistency narratives."],
-  },
-  {
-    playerName: "Gunnar Henderson",
-    sport: "baseball",
-    position: "SS",
-    team: "Baltimore Orioles",
-    verdict: "BUY",
-    modifier: "Long-Term",
-    temperature: "WARM",
-    tier: "PREMIUM",
-    thesis: "Generational talent on rising team. MVP trajectory at mid-tier prices.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Baltimore market smaller than NY/LA, limiting casual ceiling.",
-      "Not flashy power numbers compared to Ohtani creates perception gap.",
-    ],
-    repricingCatalysts: [
-      "MVP season establishes him as face of franchise.",
-      "World Series appearance with star performance.",
-    ],
-    trapRisks: ["Power development stalls below elite tier."],
-  },
-  {
-    playerName: "Paul Skenes",
-    sport: "baseball",
-    position: "SP",
-    team: "Pittsburgh Pirates",
-    verdict: "BUY",
-    modifier: "Momentum",
-    temperature: "HOT",
-    tier: "GROWTH",
-    thesis: "Most dominant pitching prospect in years. All-Star as rookie is just the start.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "Pittsburgh market severely limits mainstream demand.",
-      "Pitcher cards historically capped vs. position players.",
-    ],
-    repricingCatalysts: [
-      "Cy Young contention in year 2 validates elite trajectory.",
-      "Trade to big market team would explode prices.",
-    ],
-    trapRisks: ["Pitcher injury risk (especially high-velo arms) is real."],
-  },
-  {
-    playerName: "Mookie Betts",
-    sport: "baseball",
-    position: "OF",
-    team: "Los Angeles Dodgers",
-    verdict: "BUY",
-    modifier: "Value",
-    temperature: "COOLING",
-    tier: "PREMIUM",
-    thesis: "Multi-tool superstar down from peak. World Series champ with HOF trajectory.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Peak hype was 2018-2020 - market normalized from trade excitement.",
-      "Ohtani arrival shifted LA market attention away.",
-    ],
-    repricingCatalysts: [
-      "Another MVP season reminds market of elite tier.",
-      "HOF trajectory becoming undeniable as stats accumulate.",
-    ],
-    trapRisks: ["Age-related decline could accelerate."],
-  },
-  {
-    playerName: "Shohei Ohtani",
-    sport: "baseball",
-    position: "DH",
-    team: "Los Angeles Dodgers",
-    verdict: "MONITOR",
-    modifier: "Momentum",
-    temperature: "HOT",
-    tier: "PREMIUM",
-    thesis: "Historic talent but prices already reflect uniqueness. Buy dips, not peaks.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Not truly discounted - prices are high, but may not be peak yet.",
-      "Post-surgery (no pitching 2024) creates temporary value opportunity.",
-    ],
-    repricingCatalysts: [
-      "Return to two-way play in 2025 reignites hype.",
-      "World Series championship in LA market.",
-    ],
-    trapRisks: ["Prices may already reflect historical status - ceiling unclear."],
-  },
-];
-
-const HOCKEY_GEMS: GemCandidate[] = [
-  {
-    playerName: "Connor Bedard",
-    sport: "hockey",
-    position: "C",
-    team: "Chicago Blackhawks",
-    verdict: "BUY",
-    modifier: "Momentum",
-    temperature: "HOT",
-    tier: "PREMIUM",
-    thesis: "Generational prospect in historic market. McDavid comparisons are warranted.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Chicago rebuild means team success is years away.",
-      "Hockey cards less mainstream than other sports limits casual demand.",
-    ],
-    repricingCatalysts: [
-      "100-point season as young player validates hype.",
-      "Blackhawks becoming competitive sooner than expected.",
-    ],
-    trapRisks: ["Slow team rebuild could frustrate collectors."],
-  },
-  {
-    playerName: "Macklin Celebrini",
-    sport: "hockey",
-    position: "C",
-    team: "San Jose Sharks",
-    verdict: "MONITOR",
-    modifier: "Speculative",
-    temperature: "WARM",
-    tier: "GROWTH",
-    thesis: "Next generational prospect after Bedard. San Jose tank paid off.",
-    riskLevel: "MEDIUM",
-    whyDiscounted: [
-      "San Jose market and rebuild timeline limit near-term upside.",
-      "Hasn't played NHL games yet - all projection-based.",
-    ],
-    repricingCatalysts: [
-      "Calder Trophy (Rookie of Year) would validate elite status.",
-      "Point-per-game or better rookie season.",
-    ],
-    trapRisks: ["NHL transition proves harder than expected."],
-  },
-  {
-    playerName: "Connor McDavid",
-    sport: "hockey",
-    position: "C",
-    team: "Edmonton Oilers",
-    verdict: "BUY",
-    modifier: "Value",
-    temperature: "WARM",
-    tier: "PREMIUM",
-    thesis: "Best player in hockey, prices don't fully reflect all-time trajectory.",
-    riskLevel: "LOW",
-    whyDiscounted: [
-      "Canadian/small market limits mainstream US collector base.",
-      "No Stanley Cup yet creates 'individual stats' discount.",
-    ],
-    repricingCatalysts: [
-      "Stanley Cup championship unlocks Gretzky-tier legacy pricing.",
-      "Breaking major scoring records.",
-    ],
-    trapRisks: ["Continued playoff frustration could cap ceiling."],
-  },
-];
 
 function getVerdictIcon(verdict: PlayerVerdict) {
   switch (verdict) {
@@ -523,7 +87,7 @@ function getTemperatureColor(temp: MarketTemperature) {
   }
 }
 
-function getTierIcon(tier: StockTier) {
+function getTierIcon(tier: string) {
   switch (tier) {
     case "PREMIUM": return <Crown className="h-3 w-3" />;
     case "CORE": return <Target className="h-3 w-3" />;
@@ -533,7 +97,7 @@ function getTierIcon(tier: StockTier) {
   }
 }
 
-function getTierColor(tier: StockTier) {
+function getTierColor(tier: string) {
   switch (tier) {
     case "PREMIUM": return "text-purple-600 dark:text-purple-400";
     case "CORE": return "text-blue-600 dark:text-blue-400";
@@ -580,18 +144,16 @@ function GemCard({ gem }: { gem: GemCandidate }) {
           </Badge>
         </div>
         
-        <p className="text-sm text-foreground/80 italic mt-2 leading-snug">
-          "{gem.thesis}"
-        </p>
+        <p className="text-sm mt-3 text-foreground">{gem.thesis}</p>
         
-        <div className="flex flex-wrap gap-1 mt-2">
-          <Badge variant="outline" className={`${getTierColor(gem.tier)} flex items-center gap-1 text-xs`}>
-            {getTierIcon(gem.tier)}
-            {gem.tier}
-          </Badge>
+        <div className="flex flex-wrap gap-2 mt-3">
           <Badge variant="outline" className={`${getTemperatureColor(gem.temperature)} flex items-center gap-1 text-xs`}>
             {getTemperatureIcon(gem.temperature)}
             {gem.temperature}
+          </Badge>
+          <Badge variant="outline" className={`${getTierColor(gem.tier)} flex items-center gap-1 text-xs`}>
+            {getTierIcon(gem.tier)}
+            {gem.tier}
           </Badge>
           <Badge variant="outline" className={`${getRiskColor(gem.riskLevel)} flex items-center gap-1 text-xs`}>
             <AlertTriangle className="h-3 w-3" />
@@ -648,13 +210,44 @@ function GemCard({ gem }: { gem: GemCandidate }) {
   );
 }
 
+function mapHiddenGemToCandidate(gem: HiddenGem): GemCandidate {
+  return {
+    playerName: gem.playerName,
+    sport: gem.sport,
+    position: gem.position,
+    team: gem.team,
+    verdict: gem.verdict as PlayerVerdict,
+    modifier: gem.modifier || "Value",
+    temperature: gem.temperature as MarketTemperature,
+    tier: gem.tier,
+    thesis: gem.thesis,
+    riskLevel: gem.riskLevel as RiskLevel,
+    whyDiscounted: gem.whyDiscounted || [],
+    repricingCatalysts: gem.repricingCatalysts || [],
+    trapRisks: gem.trapRisks || [],
+  };
+}
+
 export default function HiddenGemsPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useAuth();
   const [sport, setSport] = useState("all");
   const [temperatureFilter, setTemperatureFilter] = useState("all");
   const [verdictFilter, setVerdictFilter] = useState("buy-watch");
   
-  const allGems = [...FOOTBALL_GEMS, ...BASKETBALL_GEMS, ...BASEBALL_GEMS, ...HOCKEY_GEMS];
+  const { data: gemsData, isLoading: gemsLoading } = useQuery<{
+    gems: HiddenGem[];
+    stats: {
+      totalActive: number;
+      bySport: Record<string, number>;
+      lastRefresh: string | null;
+      batchId: string | null;
+    };
+  }>({
+    queryKey: ["/api/hidden-gems"],
+  });
+  
+  const allGems: GemCandidate[] = gemsData?.gems?.map(mapHiddenGemToCandidate) || [];
+  const lastRefresh = gemsData?.stats?.lastRefresh;
   
   const filteredGems = allGems.filter(gem => {
     if (sport !== "all" && gem.sport !== sport) return false;
@@ -669,7 +262,7 @@ export default function HiddenGemsPage() {
     return true;
   });
   
-  if (authLoading) {
+  if (authLoading || gemsLoading) {
     return (
       <div className="container max-w-6xl mx-auto px-4 py-8">
         <Skeleton className="h-10 w-64 mb-8" />
@@ -693,12 +286,22 @@ export default function HiddenGemsPage() {
           <PageShareButton pageSlug="hidden-gems" />
         </div>
         <p className="text-muted-foreground max-w-2xl">
-          Players who might be underpriced relative to their talent. Each card explains why 
+          AI-identified players who might be underpriced relative to their talent. Each card explains why 
           they're discounted, what would trigger repricing, and what trap risks to watch for.
         </p>
-        <p className="text-xs text-muted-foreground mt-2">
-          Updated for 2024-2025 season. Last refresh: December 2024.
-        </p>
+        {lastRefresh && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Last AI refresh: {new Date(lastRefresh).toLocaleDateString('en-US', { 
+              month: 'long', 
+              year: 'numeric' 
+            })}
+          </p>
+        )}
+        {allGems.length === 0 && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+            No hidden gems available yet. Gems are generated from players that have been analyzed.
+          </p>
+        )}
       </div>
       
       <Card className="mb-8" data-testid="card-filters">
@@ -762,24 +365,31 @@ export default function HiddenGemsPage() {
         <Card>
           <CardContent className="py-12 text-center">
             <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No gems match your filters</h3>
+            <h3 className="text-lg font-medium mb-2">
+              {allGems.length === 0 ? "No gems available yet" : "No gems match your filters"}
+            </h3>
             <p className="text-muted-foreground mb-4">
-              Try adjusting your filter settings to see more candidates.
+              {allGems.length === 0 
+                ? "Hidden gems are generated from players that have been analyzed. Try using the Player Outlook feature first."
+                : "Try adjusting your filter settings to see more candidates."
+              }
             </p>
-            <Button variant="outline" onClick={() => {
-              setSport("all");
-              setTemperatureFilter("all");
-              setVerdictFilter("buy-watch");
-            }} data-testid="button-reset-filters">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reset Filters
-            </Button>
+            {allGems.length > 0 && (
+              <Button variant="outline" onClick={() => {
+                setSport("all");
+                setTemperatureFilter("all");
+                setVerdictFilter("buy-watch");
+              }} data-testid="button-reset-filters">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reset Filters
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
         <>
           <p className="text-sm text-muted-foreground mb-4">
-            Showing {filteredGems.length} potential hidden gem{filteredGems.length !== 1 ? "s" : ""} across {new Set(filteredGems.map(g => g.sport)).size} sport{new Set(filteredGems.map(g => g.sport)).size !== 1 ? "s" : ""}
+            Showing {filteredGems.length} AI-identified hidden gem{filteredGems.length !== 1 ? "s" : ""} across {new Set(filteredGems.map(g => g.sport)).size} sport{new Set(filteredGems.map(g => g.sport)).size !== 1 ? "s" : ""}
           </p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="grid-gems">
             {filteredGems.map((gem) => (
