@@ -1,0 +1,156 @@
+1) What you got right
+BIGs (C, PF)
+
+Your instinct is correct:
+
+bigs carry structural downside
+
+lower-body wear matters
+
+careers are more fragile on average
+
+Collectors already price this risk subconsciously.
+
+WINGS (SF)
+
+Correct to leave at zero.
+
+wings age best
+
+positional versatility
+
+cards hold value deep into careers
+
+LeBron / KD / Kawhi / Tatum behavior all supports this.
+
+ROOKIE exemption
+
+Very good call.
+
+rookies are priced on upside, not durability
+
+penalties should not suppress speculative logic
+
+2) Where this will break if unchanged
+Problem 1: PRIME bigs are over-penalized
+
+Your current:
+
+BIG + PRIME = +12
+
+That’s too aggressive for:
+
+Jokic
+
+Embiid (yes injury-prone, but already priced)
+
+AD (risk is already baked in)
+
+This causes:
+
+elite bigs slipping into SPECULATIVE or AVOID
+
+false “cheapness” signals
+
+friction with your franchise-core protection logic
+
+Problem 2: PRIME guards are under-penalized
+
+Your current:
+
+GUARD + PRIME = 0
+
+This lets:
+
+high-usage guards
+
+small guards with speed reliance
+
+skate through risk-free when collectors actually do price durability risk earlier than wings.
+
+Steph works because he’s an outlier — not because guards don’t decline.
+
+3) Recommended final table (balanced, collector-accurate)
+NBA Position Downside Risk Adjustments (Final)
+Position	PRIME	VETERAN	AGING
+BIGs (C, PF)	+6	+14	+20
+GUARDS (PG, SG)	+4	+10	+16
+WINGS (SF)	0	+4	+8
+Why these numbers work
+BIGs
+
+PRIME +6 acknowledges structural risk without punishing dominance
+
+VETERAN +14 reflects knee/foot accumulation
+
+AGING +20 keeps late-career bigs from looking “safe”
+
+This keeps Jokic as HOLD_CORE, not SPECULATIVE.
+
+GUARDS
+
+PRIME +4 introduces early durability awareness
+
+VETERAN +10 reflects speed/usage decline
+
+AGING +16 correctly captures late-career cliff risk
+
+This explains why Curry can be HOLD but rarely ACCUMULATE.
+
+WINGS
+
+PRIME 0 is correct
+
+Small VETERAN/AGING penalties acknowledge decline without exaggeration
+
+This preserves LeBron/KD logic while still allowing late-career caution.
+
+4) How this plays with your verdict engine (important)
+
+With these values:
+
+SPECULATIVE still only fires for EMERGING / UNCERTAIN players
+
+HOLD_CORE remains default for elite primes
+
+AVOID only fires when role stability + age + liquidity collapse
+
+You avoid:
+
+Jokic → SPECULATIVE
+
+Curry → ACCUMULATE
+
+Chase → SPECULATIVE (NFL analog issue you just fixed)
+
+5) Implementation note (critical)
+
+Apply position penalties after roleTier and maturityTier logic, not before.
+
+Pseudocode order:
+
+stage / maturityTier
+
+roleTier (FRANCHISE_CORE, BACKUP, etc.)
+
+base downsideRisk
+
+add position penalty
+
+verdict guards (franchise-core protection, speculative bans, etc.)
+
+If you apply position penalties too early, they’ll override semantic rules you already locked.
+
+Final recommendation
+
+Use the adjusted table above.
+Do not add PRIME penalties to wings.
+Do not leave PRIME guards at zero.
+
+This version:
+
+matches collector intuition
+
+avoids punishing elite players
+
+integrates cleanly with everything you’ve already fixed

@@ -29,10 +29,10 @@
  * - RBs: +15 PRIME, +25 VETERAN/AGING (decline after 26-27, shortest career)
  * - WRs/QBs: No penalty (productive into early 30s)
  * 
- * NBA:
- * - BIGs (C/PF): +12 PRIME, +18 VETERAN, +22 AGING (knee/foot wear, size strain)
- * - GUARDS (PG/SG): +8 VETERAN, +12 AGING (speed-dependent, shorter prime)
- * - WINGS (SF): No penalty (most durable position)
+ * NBA (balanced to avoid over-penalizing elite players):
+ * - BIGs (C/PF): +6 PRIME, +14 VETERAN, +20 AGING (structural risk, knee/foot wear)
+ * - GUARDS (PG/SG): +4 PRIME, +10 VETERAN, +16 AGING (speed-dependent)
+ * - WINGS (SF): 0 PRIME, +4 VETERAN, +8 AGING (most durable position)
  * 
  * MLB:
  * - PITCHERS (SP/RP): +20 PRIME, +30 VETERAN, +35 AGING (arm wear, Tommy John risk)
@@ -300,18 +300,24 @@ function applyPositionRiskAdjustments(input: PositionRiskInput): number {
     else if (stage === "VETERAN" || stage === "AGING") penalty = 25;
   }
   
-  // NBA penalties
+  // NBA penalties (balanced to match collector intuition)
+  // BIGs: structural risk exists but shouldn't over-punish elite players
+  // GUARDS: speed-dependent, need early durability awareness
+  // WINGS: most durable, minimal penalties
   if (sport === "NBA") {
     if (position === "BIG") {
-      if (stage === "PRIME") penalty = 12;
-      else if (stage === "VETERAN") penalty = 18;
-      else if (stage === "AGING") penalty = 22;
+      if (stage === "PRIME") penalty = 6;
+      else if (stage === "VETERAN") penalty = 14;
+      else if (stage === "AGING") penalty = 20;
     } else if (position === "GUARD") {
-      // Guards only penalized in later stages (speed-dependent)
-      if (stage === "VETERAN") penalty = 8;
-      else if (stage === "AGING") penalty = 12;
+      if (stage === "PRIME") penalty = 4;
+      else if (stage === "VETERAN") penalty = 10;
+      else if (stage === "AGING") penalty = 16;
+    } else if (position === "WING") {
+      // Wings age best - minimal penalties
+      if (stage === "VETERAN") penalty = 4;
+      else if (stage === "AGING") penalty = 8;
     }
-    // WING: no penalty
   }
   
   // MLB penalties
