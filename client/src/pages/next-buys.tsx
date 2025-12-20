@@ -115,14 +115,46 @@ function PortfolioImpactLine({ impact }: { impact: NextBuyPortfolioImpact | null
   );
 }
 
-function NextBuyCard({ buy }: { buy: NextBuy }) {
+function getVerdictLine(buy: NextBuy): string {
+  const price = buy.estPrice ? `$${buy.estPrice.toFixed(0)}` : "this price";
+  
+  if (buy.verdict === "BUY") {
+    return `Good entry point at ${price}. Consider adding.`;
+  }
+  
+  // MONITOR cards get conditional triggers
+  const triggers: string[] = [];
+  if (buy.estPrice) {
+    const buyTarget = Math.round(buy.estPrice * 0.85);
+    triggers.push(`Buy if price drops below $${buyTarget}`);
+  }
+  if (buy.momentumScore && buy.momentumScore < 60) {
+    triggers.push("or if momentum picks up");
+  }
+  
+  if (triggers.length > 0) {
+    return triggers.join(" ");
+  }
+  
+  return "Wait for better entry. Monitor for price dips or news.";
+}
+
+function NextBuyCard({ buy, isBestOpportunity = false }: { buy: NextBuy; isBestOpportunity?: boolean }) {
   const whyBullets = (buy.whyBullets as string[] | null) || [];
   const portfolioImpact = buy.portfolioImpact as NextBuyPortfolioImpact | null;
 
   return (
-    <Card className="overflow-hidden" data-testid={`card-next-buy-${buy.id}`}>
+    <Card className={`overflow-hidden ${isBestOpportunity ? "ring-2 ring-primary" : ""}`} data-testid={`card-next-buy-${buy.id}`}>
       <CardContent className="pt-4">
-        <div className="flex items-start justify-between gap-3 mb-3">
+        {isBestOpportunity && (
+          <div className="flex items-center gap-1 mb-2">
+            <Badge className="bg-primary text-primary-foreground gap-1">
+              <Sparkles className="h-3 w-3" />
+              Best Opportunity
+            </Badge>
+          </div>
+        )}
+        <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge 
@@ -158,11 +190,15 @@ function NextBuyCard({ buy }: { buy: NextBuy }) {
         </div>
 
         {buy.estPrice && (
-          <div className="mb-3 text-sm">
+          <div className="mb-2 text-sm">
             <span className="text-muted-foreground">Est. Price: </span>
             <span className="font-medium">${buy.estPrice.toFixed(0)}</span>
           </div>
         )}
+        
+        <p className="text-xs text-foreground/80 mb-3 italic">
+          {getVerdictLine(buy)}
+        </p>
 
         {whyBullets.length > 0 && (
           <ul className="space-y-1 mb-3">
@@ -352,8 +388,12 @@ export default function NextBuysPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredBuys.map((buy) => (
-          <NextBuyCard key={buy.id} buy={buy} />
+        {filteredBuys.map((buy, index) => (
+          <NextBuyCard 
+            key={buy.id} 
+            buy={buy} 
+            isBestOpportunity={index === 0 && (buy.overallScore ?? 0) >= 60}
+          />
         ))}
       </div>
 
