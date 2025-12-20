@@ -1,0 +1,196 @@
+What you nailed
+1) Pitchers as highest-risk asset class
+
+100% correct.
+
+Collectors already behave as if:
+
+every pitcher is one pitch away from zero
+
+even elite arms are rentals
+
+injuries are not edge cases, they’re expected
+
+Your instinct to be aggressive here is right.
+
+2) Catchers as second-highest risk
+
+Also correct.
+
+knee/back wear
+
+defensive workload
+
+earlier offensive decline
+
+positional shifts signal aging (C → 1B/DH)
+
+Collectors discount catchers earlier than corner bats.
+
+3) Hitters = baseline zero
+
+Correct, with one caveat (below).
+
+Bat skill ages better than any other tool, and:
+
+Judge
+
+Betts
+
+Goldschmidt
+
+Cruz
+
+prove that.
+
+Where it will break if left as-is
+Problem 1: PRIME pitcher penalty is too high
+
+Your current:
+
+PRIME pitcher = +20
+
+This is enough to:
+
+push Gerrit Cole / deGrom / Scherzer-type players out of HOLD_CORE
+
+cause SPECULATIVE or AVOID leakage even when roleTier is FRANCHISE_CORE
+
+That undermines your “elite protection” logic and forces you to rely on overrides.
+
+Collectors do discount pitchers, but they don’t treat prime aces as lottery tickets.
+
+Problem 2: Shohei Ohtani needs explicit handling
+
+You already hinted at this, which is good.
+
+Ohtani is:
+
+a pitcher
+
+a hitter
+
+a brand
+
+If you treat him as a normal pitcher with a +20 penalty, you’ll constantly fight the engine.
+
+He needs either:
+
+a two-way modifier
+
+or a special roleTier dampener
+
+Problem 3: “Hitters = 0” hides positional nuance
+
+This is mostly fine, but:
+
+middle infielders (SS/2B) age slightly worse
+
+DH-only aging hitters should not be treated as zero-risk late
+
+You don’t need to model this now, but be aware of it.
+
+Recommended final MLB table (collector-accurate)
+MLB Position Downside Risk Adjustments (Final)
+Position	PRIME	VETERAN	AGING
+PITCHERS (SP, RP)	+14	+24	+32
+CATCHERS	+8	+14	+20
+HITTERS (all)	0	0	+6
+Why these values work
+Pitchers
+
+PRIME +14 acknowledges fragility without nuking aces
+
+VETERAN +24 reflects innings accumulation and velocity loss
+
+AGING +32 makes late-career arms clearly risky
+
+This keeps:
+
+Gerrit Cole → HOLD_CORE (not SPECULATIVE)
+
+Scherzer late-career → AVOID
+
+deGrom volatile but not lottery-tier
+
+Catchers
+
+PRIME +8 acknowledges wear
+
+VETERAN +14 mirrors positional shifts
+
+AGING +20 captures decline cliff
+
+This matches collector behavior perfectly.
+
+Hitters
+
+PRIME/VETERAN 0 is fine
+
+AGING +6 prevents 38-year-old DHs from looking “safe”
+
+This keeps:
+
+Judge → HOLD_CORE
+
+Betts → HOLD_CORE
+
+40-year-old bat → caution without panic
+
+Mandatory special handling: Shohei Ohtani
+
+Do not rely on “FRANCHISE_CORE protection alone.”
+
+Add one explicit rule:
+
+if (player.isTwoWay && roleTier === "FRANCHISE_CORE") {
+  pitcherPenalty *= 0.5;
+}
+
+
+Or more simply:
+
+if (player.name === "Shohei Ohtani") {
+  applyPitcherPenalty = false;
+}
+
+
+Yes, it’s a special case. That’s fine. He is one.
+
+How this integrates with your engine
+
+Order of operations (critical):
+
+stage / maturityTier
+
+roleTier (FRANCHISE_CORE, etc.)
+
+base downsideRisk
+
+apply MLB position penalty
+
+franchise-core protection
+
+speculative bans / avoid rules
+
+If you apply pitcher penalties before role/maturity, you will keep fighting leaks.
+
+Final recommendation
+
+Keep pitchers as the highest-risk class
+
+Reduce PRIME pitcher penalty to the mid-teens
+
+Keep veteran/aging pitcher penalties aggressive
+
+Add a light aging penalty for hitters
+
+Explicitly protect Ohtani
+
+This version:
+
+matches collector intuition
+
+avoids false “lottery ticket” labels
+
+works cleanly with everything you’ve already built

@@ -34,10 +34,11 @@
  * - GUARDS (PG/SG): +4 PRIME, +10 VETERAN, +16 AGING (speed-dependent)
  * - WINGS (SF): 0 PRIME, +4 VETERAN, +8 AGING (most durable position)
  * 
- * MLB:
- * - PITCHERS (SP/RP): +20 PRIME, +30 VETERAN, +35 AGING (arm wear, Tommy John risk)
- * - CATCHERS: +10 PRIME, +15 VETERAN, +20 AGING (knees, wear from squatting)
- * - HITTERS (1B/2B/SS/3B/OF/DH): No penalty (bat skills age gracefully)
+ * MLB (balanced to avoid over-penalizing elite aces):
+ * - PITCHERS (SP/RP): +14 PRIME, +24 VETERAN, +32 AGING (arm wear, Tommy John risk)
+ * - CATCHERS: +8 PRIME, +14 VETERAN, +20 AGING (knees, wear from squatting)
+ * - HITTERS (1B/2B/SS/3B/OF/DH): 0/0/+6 (bat skills age well, light aging caution)
+ * - TWO-WAY (Ohtani): Pitcher penalty halved due to unique value proposition
  * 
  * ROLE STABILITY THRESHOLDS:
  * - FRANCHISE_CORE: 90 (triggers ESTABLISHED maturity if not early-career)
@@ -288,11 +289,23 @@ interface PositionRiskInput {
   position: NormalizedPosition;
   stage: PlayerStage;
   baseDownsideRisk: number;
+  playerName?: string;
+  roleTier?: RoleTier;
 }
 
+// Two-way players who get reduced pitcher penalties
+const TWO_WAY_PLAYERS = new Set([
+  "shohei ohtani",
+  "ohtani",
+]);
+
 function applyPositionRiskAdjustments(input: PositionRiskInput): number {
-  const { sport, position, stage, baseDownsideRisk } = input;
+  const { sport, position, stage, baseDownsideRisk, playerName, roleTier } = input;
   let penalty = 0;
+  
+  // Check for two-way player special handling (Ohtani)
+  const normalizedName = playerName?.toLowerCase().trim() ?? "";
+  const isTwoWayFranchise = TWO_WAY_PLAYERS.has(normalizedName) && roleTier === "FRANCHISE_CORE";
   
   // NFL penalties
   if (sport === "NFL" && position === "RB") {
@@ -320,18 +333,29 @@ function applyPositionRiskAdjustments(input: PositionRiskInput): number {
     }
   }
   
-  // MLB penalties
+  // MLB penalties (balanced to avoid over-penalizing elite aces)
+  // Pitchers: highest risk but PRIME aces shouldn't become lottery tickets
+  // Catchers: moderate risk from positional wear
+  // Hitters: bat skills age well, light AGING penalty only
+  // Two-way (Ohtani): pitcher penalty halved - unique value proposition
   if (sport === "MLB") {
     if (position === "PITCHER") {
-      if (stage === "PRIME") penalty = 20;
-      else if (stage === "VETERAN") penalty = 30;
-      else if (stage === "AGING") penalty = 35;
+      if (stage === "PRIME") penalty = 14;
+      else if (stage === "VETERAN") penalty = 24;
+      else if (stage === "AGING") penalty = 32;
+      
+      // Two-way franchise players get halved pitcher penalty
+      if (isTwoWayFranchise) {
+        penalty = Math.round(penalty * 0.5);
+      }
     } else if (position === "CATCHER") {
-      if (stage === "PRIME") penalty = 10;
-      else if (stage === "VETERAN") penalty = 15;
+      if (stage === "PRIME") penalty = 8;
+      else if (stage === "VETERAN") penalty = 14;
       else if (stage === "AGING") penalty = 20;
+    } else {
+      // INFIELDER, OUTFIELDER, DH: light aging penalty only
+      if (stage === "AGING") penalty = 6;
     }
-    // INFIELDER, OUTFIELDER, DH: no penalty
   }
   
   return Math.min(95, baseDownsideRisk + penalty);
@@ -1231,6 +1255,8 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     position: normalizedPosition,
     stage: input.stage,
     baseDownsideRisk: adjustedDownsideRisk,
+    playerName: playerName,
+    roleTier: roleTier,
   });
   
   scores.downsideRiskScore = adjustedDownsideRisk;
