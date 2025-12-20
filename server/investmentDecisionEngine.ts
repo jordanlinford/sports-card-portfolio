@@ -23,13 +23,21 @@
  * - ACCUMULATE for ESTABLISHED players requires valuationScore >= 75 AND downsideRiskScore < 65
  * - Confidence stays LOW when comps are modeled/estimated
  * 
- * POSITION-SPECIFIC LOGIC:
- * - RBs (Running Backs): +15/+25 downside risk penalty for PRIME/VETERAN stages
- *   - RBs age faster than other positions (decline after 26-27)
- *   - This pushes aging RBs like McCaffrey/Henry to HOLD_CORE instead of ACCUMULATE
- * - WRs (Wide Receivers): No position-specific penalty
- *   - WRs age more gracefully (productive into early 30s)
- *   - Franchise WRs like Chase/Jefferson get standard FRANCHISE_CORE protection
+ * POSITION-SPECIFIC LOGIC (Multi-Sport):
+ * 
+ * NFL:
+ * - RBs: +15 PRIME, +25 VETERAN/AGING (decline after 26-27, shortest career)
+ * - WRs/QBs: No penalty (productive into early 30s)
+ * 
+ * NBA:
+ * - BIGs (C/PF): +12 PRIME, +18 VETERAN, +22 AGING (knee/foot wear, size strain)
+ * - GUARDS (PG/SG): +8 VETERAN, +12 AGING (speed-dependent, shorter prime)
+ * - WINGS (SF): No penalty (most durable position)
+ * 
+ * MLB:
+ * - PITCHERS (SP/RP): +20 PRIME, +30 VETERAN, +35 AGING (arm wear, Tommy John risk)
+ * - CATCHERS: +10 PRIME, +15 VETERAN, +20 AGING (knees, wear from squatting)
+ * - HITTERS (1B/2B/SS/3B/OF/DH): No penalty (bat skills age gracefully)
  * 
  * ROLE STABILITY THRESHOLDS:
  * - FRANCHISE_CORE: 90 (triggers ESTABLISHED maturity if not early-career)
@@ -84,6 +92,244 @@ export type RoleTier =
   | "BACKUP"              // Not starting (Kenny Pickett, Mac Jones)
   | "OUT_OF_LEAGUE"       // No team or inactive (Trey Lance, James Wiseman)
   | "UNKNOWN";            // Default when we don't have info
+
+// ============================================================
+// SPORT & POSITION NORMALIZATION
+// Unified system for detecting sport and normalizing positions
+// ============================================================
+
+export type Sport = "NFL" | "NBA" | "MLB" | "UNKNOWN";
+
+export type NormalizedPosition = 
+  // NFL
+  | "RB" | "WR" | "QB" | "TE" | "OL" | "DL" | "LB" | "DB"
+  // NBA
+  | "GUARD" | "WING" | "BIG"
+  // MLB
+  | "PITCHER" | "CATCHER" | "INFIELDER" | "OUTFIELDER" | "DH"
+  // Default
+  | "UNKNOWN";
+
+// Position aliases for normalization
+const POSITION_ALIASES: Record<string, { sport: Sport; normalized: NormalizedPosition }> = {
+  // NFL - Running Backs
+  "rb": { sport: "NFL", normalized: "RB" },
+  "running back": { sport: "NFL", normalized: "RB" },
+  "hb": { sport: "NFL", normalized: "RB" },
+  "halfback": { sport: "NFL", normalized: "RB" },
+  "fb": { sport: "NFL", normalized: "RB" },
+  "fullback": { sport: "NFL", normalized: "RB" },
+  // NFL - Wide Receivers
+  "wr": { sport: "NFL", normalized: "WR" },
+  "wide receiver": { sport: "NFL", normalized: "WR" },
+  "receiver": { sport: "NFL", normalized: "WR" },
+  // NFL - Quarterbacks
+  "qb": { sport: "NFL", normalized: "QB" },
+  "quarterback": { sport: "NFL", normalized: "QB" },
+  // NFL - Tight Ends
+  "te": { sport: "NFL", normalized: "TE" },
+  "tight end": { sport: "NFL", normalized: "TE" },
+  // NFL - Other
+  "ol": { sport: "NFL", normalized: "OL" },
+  "dl": { sport: "NFL", normalized: "DL" },
+  "lb": { sport: "NFL", normalized: "LB" },
+  "db": { sport: "NFL", normalized: "DB" },
+  
+  // NBA - Guards
+  "pg": { sport: "NBA", normalized: "GUARD" },
+  "point guard": { sport: "NBA", normalized: "GUARD" },
+  "sg": { sport: "NBA", normalized: "GUARD" },
+  "shooting guard": { sport: "NBA", normalized: "GUARD" },
+  "guard": { sport: "NBA", normalized: "GUARD" },
+  "g": { sport: "NBA", normalized: "GUARD" },
+  // NBA - Wings
+  "sf": { sport: "NBA", normalized: "WING" },
+  "small forward": { sport: "NBA", normalized: "WING" },
+  "wing": { sport: "NBA", normalized: "WING" },
+  "forward": { sport: "NBA", normalized: "WING" },
+  "f": { sport: "NBA", normalized: "WING" },
+  // NBA - Bigs
+  "pf": { sport: "NBA", normalized: "BIG" },
+  "power forward": { sport: "NBA", normalized: "BIG" },
+  "c": { sport: "NBA", normalized: "BIG" },
+  "center": { sport: "NBA", normalized: "BIG" },
+  "big": { sport: "NBA", normalized: "BIG" },
+  
+  // MLB - Pitchers
+  "sp": { sport: "MLB", normalized: "PITCHER" },
+  "starting pitcher": { sport: "MLB", normalized: "PITCHER" },
+  "rp": { sport: "MLB", normalized: "PITCHER" },
+  "relief pitcher": { sport: "MLB", normalized: "PITCHER" },
+  "p": { sport: "MLB", normalized: "PITCHER" },
+  "pitcher": { sport: "MLB", normalized: "PITCHER" },
+  "closer": { sport: "MLB", normalized: "PITCHER" },
+  "cl": { sport: "MLB", normalized: "PITCHER" },
+  // MLB - Catcher
+  "catcher": { sport: "MLB", normalized: "CATCHER" },
+  "ca": { sport: "MLB", normalized: "CATCHER" },
+  // MLB - Infielders
+  "1b": { sport: "MLB", normalized: "INFIELDER" },
+  "first base": { sport: "MLB", normalized: "INFIELDER" },
+  "2b": { sport: "MLB", normalized: "INFIELDER" },
+  "second base": { sport: "MLB", normalized: "INFIELDER" },
+  "ss": { sport: "MLB", normalized: "INFIELDER" },
+  "shortstop": { sport: "MLB", normalized: "INFIELDER" },
+  "3b": { sport: "MLB", normalized: "INFIELDER" },
+  "third base": { sport: "MLB", normalized: "INFIELDER" },
+  "infielder": { sport: "MLB", normalized: "INFIELDER" },
+  "if": { sport: "MLB", normalized: "INFIELDER" },
+  // MLB - Outfielders
+  "lf": { sport: "MLB", normalized: "OUTFIELDER" },
+  "left field": { sport: "MLB", normalized: "OUTFIELDER" },
+  "cf": { sport: "MLB", normalized: "OUTFIELDER" },
+  "center field": { sport: "MLB", normalized: "OUTFIELDER" },
+  "rf": { sport: "MLB", normalized: "OUTFIELDER" },
+  "right field": { sport: "MLB", normalized: "OUTFIELDER" },
+  "of": { sport: "MLB", normalized: "OUTFIELDER" },
+  "outfielder": { sport: "MLB", normalized: "OUTFIELDER" },
+  // MLB - DH
+  "dh": { sport: "MLB", normalized: "DH" },
+  "designated hitter": { sport: "MLB", normalized: "DH" },
+};
+
+// Team-to-sport mapping for sport detection
+const NFL_TEAMS = new Set([
+  "arizona cardinals", "atlanta falcons", "baltimore ravens", "buffalo bills",
+  "carolina panthers", "chicago bears", "cincinnati bengals", "cleveland browns",
+  "dallas cowboys", "denver broncos", "detroit lions", "green bay packers",
+  "houston texans", "indianapolis colts", "jacksonville jaguars", "kansas city chiefs",
+  "las vegas raiders", "los angeles chargers", "los angeles rams", "miami dolphins",
+  "minnesota vikings", "new england patriots", "new orleans saints", "new york giants",
+  "new york jets", "philadelphia eagles", "pittsburgh steelers", "san francisco 49ers",
+  "seattle seahawks", "tampa bay buccaneers", "tennessee titans", "washington commanders",
+  // Short names
+  "cardinals", "falcons", "ravens", "bills", "panthers", "bears", "bengals", "browns",
+  "cowboys", "broncos", "lions", "packers", "texans", "colts", "jaguars", "chiefs",
+  "raiders", "chargers", "rams", "dolphins", "vikings", "patriots", "saints", "giants",
+  "jets", "eagles", "steelers", "49ers", "niners", "seahawks", "buccaneers", "bucs", "titans", "commanders",
+]);
+
+const NBA_TEAMS = new Set([
+  "atlanta hawks", "boston celtics", "brooklyn nets", "charlotte hornets",
+  "chicago bulls", "cleveland cavaliers", "dallas mavericks", "denver nuggets",
+  "detroit pistons", "golden state warriors", "houston rockets", "indiana pacers",
+  "los angeles clippers", "los angeles lakers", "memphis grizzlies", "miami heat",
+  "milwaukee bucks", "minnesota timberwolves", "new orleans pelicans", "new york knicks",
+  "oklahoma city thunder", "orlando magic", "philadelphia 76ers", "phoenix suns",
+  "portland trail blazers", "sacramento kings", "san antonio spurs", "toronto raptors",
+  "utah jazz", "washington wizards",
+  // Short names
+  "hawks", "celtics", "nets", "hornets", "bulls", "cavaliers", "cavs", "mavericks", "mavs",
+  "nuggets", "pistons", "warriors", "dubs", "rockets", "pacers", "clippers", "lakers",
+  "grizzlies", "heat", "bucks", "timberwolves", "wolves", "pelicans", "pels", "knicks",
+  "thunder", "okc", "magic", "76ers", "sixers", "suns", "trail blazers", "blazers",
+  "kings", "spurs", "raptors", "jazz", "wizards",
+]);
+
+const MLB_TEAMS = new Set([
+  "arizona diamondbacks", "atlanta braves", "baltimore orioles", "boston red sox",
+  "chicago cubs", "chicago white sox", "cincinnati reds", "cleveland guardians",
+  "colorado rockies", "detroit tigers", "houston astros", "kansas city royals",
+  "los angeles angels", "los angeles dodgers", "miami marlins", "milwaukee brewers",
+  "minnesota twins", "new york mets", "new york yankees", "oakland athletics",
+  "philadelphia phillies", "pittsburgh pirates", "san diego padres", "san francisco giants",
+  "seattle mariners", "st. louis cardinals", "tampa bay rays", "texas rangers",
+  "toronto blue jays", "washington nationals",
+  // Short names
+  "diamondbacks", "dbacks", "braves", "orioles", "o's", "red sox", "sox", "cubs",
+  "white sox", "reds", "guardians", "rockies", "tigers", "astros", "stros", "royals",
+  "angels", "halos", "dodgers", "marlins", "brewers", "twins", "mets", "yankees", "yanks",
+  "athletics", "a's", "phillies", "phils", "pirates", "bucs", "padres", "pads", "giants", "sf giants",
+  "mariners", "m's", "cardinals", "cards", "rays", "rangers", "blue jays", "jays", "nationals", "nats",
+]);
+
+function detectSport(team: string | undefined, position: string | undefined): Sport {
+  const normalizedTeam = team?.toLowerCase().trim() ?? "";
+  const normalizedPos = position?.toLowerCase().trim() ?? "";
+  
+  // PRIORITY 1: Team detection is most reliable (unambiguous)
+  if (NFL_TEAMS.has(normalizedTeam)) return "NFL";
+  if (NBA_TEAMS.has(normalizedTeam)) return "NBA";
+  if (MLB_TEAMS.has(normalizedTeam)) return "MLB";
+  
+  // PRIORITY 2: Position detection (may be ambiguous for single letters)
+  // Skip ambiguous single-letter positions when team is unknown
+  const ambiguousPositions = new Set(["c", "f", "g"]);
+  if (!ambiguousPositions.has(normalizedPos)) {
+    const posMatch = POSITION_ALIASES[normalizedPos];
+    if (posMatch) return posMatch.sport;
+  }
+  
+  return "UNKNOWN";
+}
+
+function normalizePosition(position: string | undefined, sport?: Sport): NormalizedPosition {
+  const normalized = position?.toLowerCase().trim() ?? "";
+  
+  // Handle ambiguous single-letter positions based on sport context
+  if (normalized === "c") {
+    // "C" means center in NBA, catcher in MLB
+    if (sport === "MLB") return "CATCHER";
+    if (sport === "NBA") return "BIG";
+    // Default to NBA center if sport unknown
+    return "BIG";
+  }
+  
+  return POSITION_ALIASES[normalized]?.normalized ?? "UNKNOWN";
+}
+
+// ============================================================
+// POSITION RISK ADJUSTMENTS
+// Apply sport-specific downside penalties based on position aging curves
+// ============================================================
+
+interface PositionRiskInput {
+  sport: Sport;
+  position: NormalizedPosition;
+  stage: PlayerStage;
+  baseDownsideRisk: number;
+}
+
+function applyPositionRiskAdjustments(input: PositionRiskInput): number {
+  const { sport, position, stage, baseDownsideRisk } = input;
+  let penalty = 0;
+  
+  // NFL penalties
+  if (sport === "NFL" && position === "RB") {
+    if (stage === "PRIME") penalty = 15;
+    else if (stage === "VETERAN" || stage === "AGING") penalty = 25;
+  }
+  
+  // NBA penalties
+  if (sport === "NBA") {
+    if (position === "BIG") {
+      if (stage === "PRIME") penalty = 12;
+      else if (stage === "VETERAN") penalty = 18;
+      else if (stage === "AGING") penalty = 22;
+    } else if (position === "GUARD") {
+      // Guards only penalized in later stages (speed-dependent)
+      if (stage === "VETERAN") penalty = 8;
+      else if (stage === "AGING") penalty = 12;
+    }
+    // WING: no penalty
+  }
+  
+  // MLB penalties
+  if (sport === "MLB") {
+    if (position === "PITCHER") {
+      if (stage === "PRIME") penalty = 20;
+      else if (stage === "VETERAN") penalty = 30;
+      else if (stage === "AGING") penalty = 35;
+    } else if (position === "CATCHER") {
+      if (stage === "PRIME") penalty = 10;
+      else if (stage === "VETERAN") penalty = 15;
+      else if (stage === "AGING") penalty = 20;
+    }
+    // INFIELDER, OUTFIELDER, DH: no penalty
+  }
+  
+  return Math.min(95, baseDownsideRisk + penalty);
+}
 
 const ROLE_STABILITY_SCORES: Record<RoleTier, number> = {
   FRANCHISE_CORE: 90,
@@ -968,23 +1214,18 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   let adjustedDownsideRisk = Math.max(scores.downsideRiskScore, 100 - roleStabilityScore);
   
   // ============================================================
-  // RB-SPECIFIC AGE/DECLINE RISK MODIFIER
-  // Running backs age faster than other positions:
-  // - RBs typically decline sharply after age 26-27
-  // - Workload/injury risk compounds with age
-  // - Position has shortest career lifespan in NFL
+  // SPORT-SPECIFIC POSITION RISK ADJUSTMENTS
+  // Apply penalties based on position aging curves across NFL/NBA/MLB
   // ============================================================
-  const position = input.position?.toLowerCase().trim() ?? "";
-  const isRunningBack = position === "rb" || position === "running back" || position === "hb" || position === "halfback";
-  const isAgingRB = isRunningBack && (input.stage === "PRIME" || input.stage === "VETERAN" || input.stage === "AGING");
+  const detectedSport = detectSport(input.team, input.position);
+  const normalizedPosition = normalizePosition(input.position, detectedSport);
   
-  if (isAgingRB) {
-    // Add 15-25 points to downside risk for aging RBs
-    // PRIME RBs: +15 (still productive but decline imminent)
-    // VETERAN/AGING RBs: +25 (decline likely in progress)
-    const rbAgingPenalty = input.stage === "PRIME" ? 15 : 25;
-    adjustedDownsideRisk = Math.min(95, adjustedDownsideRisk + rbAgingPenalty);
-  }
+  adjustedDownsideRisk = applyPositionRiskAdjustments({
+    sport: detectedSport,
+    position: normalizedPosition,
+    stage: input.stage,
+    baseDownsideRisk: adjustedDownsideRisk,
+  });
   
   scores.downsideRiskScore = adjustedDownsideRisk;
   
