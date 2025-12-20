@@ -12,10 +12,12 @@
  * - Amon-Ra St. Brown: ACCUMULATE (FRANCHISE_CORE + undervalued)
  * - Victor Wembanyama: SPECULATIVE_FLYER (EMERGING despite elite talent)
  * - AJ Brown: HOLD_CORE (FRANCHISE_CORE protection from AVOID)
+ * - Christian McCaffrey: HOLD_CORE or AVOID_NEW_MONEY (FRANCHISE_CORE never SPECULATIVE)
  * 
  * KEY RULES:
  * - Maturity gate: EMERGING players cannot be ACCUMULATE or AVOID
- * - Franchise Core Protection: ESTABLISHED FRANCHISE_CORE never AVOID
+ * - Franchise Core Protection: ESTABLISHED FRANCHISE_CORE never AVOID or SPECULATIVE
+ * - SPECULATIVE_FLYER guardrail: proven veterans never labeled "lottery tickets"
  * - ACCUMULATE for franchise-core requires valuationScore >= 75
  * - Confidence stays LOW when comps are modeled/estimated
  * 
@@ -991,6 +993,27 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   if (franchiseCore && verdict === "ACCUMULATE" && scores.valuationScore < 75) {
     verdict = "HOLD_CORE";
     reason = "Franchise core - already priced as elite, hold unless clearly cheap";
+  }
+  
+  // ============================================================
+  // SPECULATIVE_FLYER GUARDRAIL FOR ESTABLISHED FRANCHISE PLAYERS
+  // Proven veterans should NEVER be labeled as "lottery tickets"
+  // SPECULATIVE is only appropriate for EMERGING or UNKNOWN roles
+  // ============================================================
+  if (franchiseCore && verdict === "SPECULATIVE_FLYER") {
+    // Check for high injury risk + short-term horizon (e.g., aging RBs)
+    const highInjuryRisk = scores.downsideRiskScore >= 65;
+    const isAgingVeteran = input.stage === "PRIME" || input.stage === "VETERAN" || input.stage === "AGING";
+    
+    if (highInjuryRisk && isAgingVeteran && scores.valuationScore < 50) {
+      // Veteran with injury/decline risk and not cheap - avoid new money
+      verdict = "AVOID_NEW_MONEY";
+      reason = "Elite production priced in, but injury/workload risk limits new buying";
+    } else {
+      // Default: upgrade to HOLD_CORE - proven asset, just don't chase
+      verdict = "HOLD_CORE";
+      reason = "Franchise core asset - hold position, don't add aggressively at current prices";
+    }
   }
   
   // Compute base confidence
