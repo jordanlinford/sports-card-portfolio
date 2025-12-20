@@ -18,10 +18,26 @@
  * 
  * KEY RULES:
  * - Maturity gate: EMERGING players cannot be ACCUMULATE or AVOID
- * - Franchise Core Protection: ESTABLISHED FRANCHISE_CORE never AVOID or SPECULATIVE
- * - SPECULATIVE_FLYER guardrail: proven veterans never labeled "lottery tickets"
- * - ACCUMULATE for franchise-core requires valuationScore >= 75
+ * - Franchise Core Protection: ANY FRANCHISE_CORE player never SPECULATIVE
+ * - ESTABLISHED FRANCHISE_CORE also never AVOID
+ * - ACCUMULATE for ESTABLISHED players requires valuationScore >= 75 AND downsideRiskScore < 65
  * - Confidence stays LOW when comps are modeled/estimated
+ * 
+ * POSITION-SPECIFIC LOGIC:
+ * - RBs (Running Backs): +15/+25 downside risk penalty for PRIME/VETERAN stages
+ *   - RBs age faster than other positions (decline after 26-27)
+ *   - This pushes aging RBs like McCaffrey/Henry to HOLD_CORE instead of ACCUMULATE
+ * - WRs (Wide Receivers): No position-specific penalty
+ *   - WRs age more gracefully (productive into early 30s)
+ *   - Franchise WRs like Chase/Jefferson get standard FRANCHISE_CORE protection
+ * 
+ * ROLE STABILITY THRESHOLDS:
+ * - FRANCHISE_CORE: 90 (triggers ESTABLISHED maturity if not early-career)
+ * - STARTER: 70 (below 75 threshold, stays TRANSITIONAL)
+ * - UNCERTAIN_STARTER: 45
+ * - BACKUP: 25
+ * - OUT_OF_LEAGUE: 10
+ * - UNKNOWN: 55 (neutral default)
  * 
  * ⚠️  DO NOT MODIFY VERDICT RULES WITHOUT ADDING A NEW SIGNAL  ⚠️
  * 
@@ -523,7 +539,7 @@ function decideVerdict(
   // ============================================================
   if (roleStabilityScore >= 75 && maturityTier === "EMERGING") {
     // Franchise-caliber rookie/sophomore - SPECULATIVE not ACCUMULATE
-    return { verdict: "SPECULATIVE_FLYER", reason: "Franchise-caliber but early career - high upside lottery" };
+    return { verdict: "SPECULATIVE_FLYER", reason: "Franchise-caliber but early career - high upside, unproven longevity" };
   }
   
   // FRANCHISE_CORE in transitional stage (not ROOKIE/YEAR_2, not PRIME)
@@ -554,7 +570,7 @@ function decideVerdict(
       return { verdict: "ACCUMULATE", reason: "Early-career with compelling value" };
     }
     // Default for early-career: SPECULATIVE (uncertainty, not avoidance)
-    return { verdict: "SPECULATIVE_FLYER", reason: "Early-career - high uncertainty, treat as lottery" };
+    return { verdict: "SPECULATIVE_FLYER", reason: "Early-career - high uncertainty, needs more sample size" };
   }
 
   // ============================================================
@@ -574,7 +590,7 @@ function decideVerdict(
   // PRECEDENCE 8: Fallback - SPECULATIVE_FLYER
   // Edge cases only (should rarely reach here)
   // ============================================================
-  return { verdict: "SPECULATIVE_FLYER", reason: "High uncertainty - treat as lottery ticket" };
+  return { verdict: "SPECULATIVE_FLYER", reason: "High uncertainty - small position with defined thesis only" };
 }
 
 function computeConfidence(scores: InvestmentScores): DataConfidence {
@@ -596,7 +612,7 @@ const POSTURE_LABELS: Record<InvestmentVerdict, string> = {
   HOLD_CORE: "Hold, don't chase",
   TRADE_THE_HYPE: "Sell into spikes",
   AVOID_NEW_MONEY: "Stay away",
-  SPECULATIVE_FLYER: "Small lottery bet",
+  SPECULATIVE_FLYER: "Small, high-upside position",
 };
 
 function getContextAwarePostureLabel(
@@ -650,9 +666,9 @@ function generateActionPlan(verdict: InvestmentVerdict, input: DecisionInput): I
       positionSizing: "Zero allocation. If you hold, consider selling to redeploy capital.",
     },
     SPECULATIVE_FLYER: {
-      whatToDoNow: "Consider a small position only if you can afford to lose it.",
-      entryPlan: "Buy cheap base cards or low-end parallels. Don't overpay for premium.",
-      positionSizing: "Lottery ticket only - max 2-3% of budget. High risk, high reward.",
+      whatToDoNow: "Consider a small position if you believe in the upside catalyst.",
+      entryPlan: "Focus on affordable base cards or low-end parallels. Avoid premium until proven.",
+      positionSizing: "Keep it small - max 2-3% of budget. Asymmetric risk/reward opportunity.",
     },
   };
 
@@ -690,9 +706,9 @@ function generateWhyBullets(verdict: InvestmentVerdict, scores: InvestmentScores
       break;
 
     case "SPECULATIVE_FLYER":
-      bullets.push("Uncertain outlook but potential for a breakout surprise.");
-      if (temperature === "COOLING") bullets.push("Low prices mean limited downside if the bet fails.");
-      bullets.push("Only makes sense as a small, high-risk position.");
+      bullets.push("Uncertain outlook but potential for significant upside if a catalyst hits.");
+      if (temperature === "COOLING") bullets.push("Lower prices create better risk/reward for believers.");
+      bullets.push("Best suited as a small position with defined upside thesis.");
       break;
   }
 
@@ -799,9 +815,9 @@ function generateActionGuidance(
       
     case "SPECULATIVE_FLYER":
       return {
-        header: "How to size this bet",
+        header: "How to size this position",
         bullets: [
-          "Treat as a lottery ticket - only money you can afford to lose",
+          "Keep exposure small - this is a high-upside, high-uncertainty play",
           "Cap at 5-10% of your card budget for this player",
           stage === "ROOKIE" ? "Focus on base/low-end cards - save premium for proven players" : "Buy the dip if conviction is high, but stay disciplined on size",
         ],
@@ -875,7 +891,7 @@ function generateOneLineRationale(verdict: InvestmentVerdict, input: DecisionInp
     HOLD_CORE: `Prices reflect reality for this ${stageLabel} player. Keep what you have but don't chase higher prices right now.`,
     TRADE_THE_HYPE: `Market buzz has pushed prices beyond what the on-field product supports. Take profits before the correction.`,
     AVOID_NEW_MONEY: `Too many red flags for new investment. High risk of price drops with limited upside to justify the gamble.`,
-    SPECULATIVE_FLYER: `Long shot with potential payoff. Small position only - treat it like a lottery ticket, not a core investment.`,
+    SPECULATIVE_FLYER: `Emerging opportunity with asymmetric upside. Small position only - this is a catalyst-driven play, not a core holding.`,
   };
 
   return templates[verdict];
@@ -1004,7 +1020,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     // Can't ACCUMULATE uncertain starters or below
     if (roleStabilityScore <= 35) {
       verdict = "SPECULATIVE_FLYER";
-      reason = "Uncertain role stability - treat as lottery ticket";
+      reason = "Uncertain role stability - small position with clear catalyst only";
     } else {
       verdict = "HOLD_CORE";
       reason = "Role uncertainty limits upside - stable hold only";
