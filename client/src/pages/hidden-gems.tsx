@@ -34,6 +34,8 @@ import {
 import type { PlayerVerdict, StockTier, MarketTemperature, VerdictModifier } from "@shared/schema";
 import { PageShareButton } from "@/components/page-share-button";
 
+type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
+
 interface GemCandidate {
   playerName: string;
   sport: string;
@@ -43,6 +45,8 @@ interface GemCandidate {
   modifier: VerdictModifier;
   temperature: MarketTemperature;
   tier: StockTier;
+  thesis: string; // One-line summary of the opportunity
+  riskLevel: RiskLevel;
   whyDiscounted: string[];
   repricingCatalysts: string[];
   trapRisks: string[];
@@ -58,6 +62,8 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     modifier: "Value",
     temperature: "NEUTRAL",
     tier: "GROWTH",
+    thesis: "Market views him as solid, not special. Outperformance could force repricing.",
+    riskLevel: "MEDIUM",
     whyDiscounted: [
       "Hobby ceiling risk: Market views him as 'solid starter' rather than 'franchise face', capping casual demand.",
       "Narrative gap: Fewer signature moments than peers like Williams or Daniels means slower repricing.",
@@ -77,6 +83,8 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     modifier: "Value",
     temperature: "NEUTRAL",
     tier: "CORE",
+    thesis: "Elite production at suppressed prices. Super Bowl loss hangover is temporary.",
+    riskLevel: "LOW",
     whyDiscounted: [
       "Post-Super Bowl loss hangover suppressed prices despite continued elite play.",
       "Running QB archetype gets discounted vs. traditional pocket passers in long-term value.",
@@ -96,6 +104,8 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     modifier: "Speculative",
     temperature: "WARM",
     tier: "SPECULATIVE",
+    thesis: "Career resurrection play. Cheap for a reason, but asymmetric if real.",
+    riskLevel: "HIGH",
     whyDiscounted: [
       "Career resurrection narrative is fragile - market remembers Jets/Panthers struggles.",
       "Older rookie cards have heavy supply from initial hype cycle that never panned out.",
@@ -115,6 +125,8 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     modifier: "Value",
     temperature: "WARM",
     tier: "PREMIUM",
+    thesis: "2x MVP trading at a discount due to playoff narrative. One win changes everything.",
+    riskLevel: "LOW",
     whyDiscounted: [
       "Playoff narrative (0-4 record) creates persistent discount despite 2x MVP seasons.",
       "Running QB longevity concerns keep some collectors hesitant despite proven durability.",
@@ -134,6 +146,8 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     modifier: "Value",
     temperature: "NEUTRAL",
     tier: "GROWTH",
+    thesis: "Results don't match draft pedigree perception. Market hasn't caught up yet.",
+    riskLevel: "MEDIUM",
     whyDiscounted: [
       "Mr. Irrelevant draft status creates 'system QB' skepticism that persists despite results.",
       "Belief inertia: Market still anchoring to draft pedigree over actual performance.",
@@ -156,6 +170,8 @@ const BASKETBALL_GEMS: GemCandidate[] = [
     modifier: "Value",
     temperature: "NEUTRAL",
     tier: "GROWTH",
+    thesis: "Elite playmaker suppressed by small market. All-Star caliber, value prices.",
+    riskLevel: "LOW",
     whyDiscounted: [
       "Small market (Indiana) caps national visibility and casual collector demand.",
       "Not a highlight-reel scorer - his value is in playmaking which doesn't translate to hobby hype.",
@@ -175,6 +191,8 @@ const BASKETBALL_GEMS: GemCandidate[] = [
     modifier: "Long-Term",
     temperature: "WARM",
     tier: "CORE",
+    thesis: "Second-round pedigree masks first-round talent. NYC market upside is massive.",
+    riskLevel: "LOW",
     whyDiscounted: [
       "Second-round pick pedigree creates persistent 'not elite' perception.",
       "Late bloomer narrative means he missed the rookie hype window.",
@@ -197,6 +215,8 @@ const BASEBALL_GEMS: GemCandidate[] = [
     modifier: "Long-Term",
     temperature: "WARM",
     tier: "PREMIUM",
+    thesis: "Generational talent in a small market. MVP trajectory at mid-tier prices.",
+    riskLevel: "LOW",
     whyDiscounted: [
       "Baltimore market is smaller than NY/LA, limiting casual collector ceiling.",
       "Not flashy power numbers yet compared to peers like Ohtani.",
@@ -269,6 +289,24 @@ function getTemperatureColor(temp: MarketTemperature) {
   }
 }
 
+function getRiskColor(risk: RiskLevel) {
+  switch (risk) {
+    case "LOW": return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20";
+    case "MEDIUM": return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20";
+    case "HIGH": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
+    default: return "bg-muted text-muted-foreground";
+  }
+}
+
+function getRiskLabel(risk: RiskLevel) {
+  switch (risk) {
+    case "LOW": return "Lower Risk";
+    case "MEDIUM": return "Moderate Risk";
+    case "HIGH": return "Higher Risk";
+    default: return risk;
+  }
+}
+
 function GemCard({ gem }: { gem: GemCandidate }) {
   return (
     <Card className="hover-elevate" data-testid={`card-gem-${gem.playerName.toLowerCase().replace(/\s+/g, "-")}`}>
@@ -288,6 +326,12 @@ function GemCard({ gem }: { gem: GemCandidate }) {
             </Badge>
           </div>
         </div>
+        
+        {/* One-line thesis summary */}
+        <p className="text-sm text-foreground/80 italic mt-2 leading-snug">
+          "{gem.thesis}"
+        </p>
+        
         <div className="flex flex-wrap gap-1 mt-2">
           <Badge variant="outline" className={`${getTierColor(gem.tier)} flex items-center gap-1 text-xs`}>
             {getTierIcon(gem.tier)}
@@ -296,6 +340,10 @@ function GemCard({ gem }: { gem: GemCandidate }) {
           <Badge variant="outline" className={`${getTemperatureColor(gem.temperature)} flex items-center gap-1 text-xs`}>
             {getTemperatureIcon(gem.temperature)}
             {gem.temperature}
+          </Badge>
+          <Badge variant="outline" className={`${getRiskColor(gem.riskLevel)} flex items-center gap-1 text-xs`}>
+            <AlertTriangle className="h-3 w-3" />
+            {getRiskLabel(gem.riskLevel)}
           </Badge>
           <Badge variant="outline" className="text-xs">
             {gem.modifier}
