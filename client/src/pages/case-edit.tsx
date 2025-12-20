@@ -144,11 +144,11 @@ function SortableCardTile({ card, onDelete, onClick }: { card: CardType; onDelet
       className="group relative bg-muted rounded-lg overflow-hidden cursor-grab active:cursor-grabbing touch-none"
       data-testid={`card-tile-${card.id}`}
     >
-      <div className="aspect-square relative" onClick={onClick}>
+      <div className="aspect-[5/7] relative" onClick={onClick}>
         <img
           src={card.imagePath || undefined}
           alt={card.title}
-          className="w-full h-full object-cover pointer-events-none"
+          className="w-full h-full object-contain bg-muted pointer-events-none"
         />
         {card.outlookAction && (
           <div className="absolute top-1 left-1 pointer-events-none flex items-center gap-1">
@@ -163,13 +163,19 @@ function SortableCardTile({ card, onDelete, onClick }: { card: CardType; onDelet
             )}
           </div>
         )}
+        {card.year && (
+          <div className="absolute top-1 right-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded pointer-events-none">
+            {card.year}
+          </div>
+        )}
       </div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
         <div className="absolute bottom-0 left-0 right-0 p-3">
           <p className="text-white text-sm font-medium truncate">{card.title}</p>
-          {card.estimatedValue && (
-            <p className="text-white/80 text-xs">Est. ${card.estimatedValue.toFixed(2)}</p>
-          )}
+          <div className="flex items-center gap-2 text-white/80 text-xs">
+            {card.year && <span>{card.year}</span>}
+            {card.estimatedValue && <span>Est. ${card.estimatedValue.toFixed(2)}</span>}
+          </div>
         </div>
       </div>
       <button
