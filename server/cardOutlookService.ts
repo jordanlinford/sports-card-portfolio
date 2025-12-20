@@ -1452,13 +1452,16 @@ async function generateEditorialExplanation(
       (card.salesLast30Days && card.salesLast30Days > 50) ||
       (card.avgSalePrice30 && card.avgSalePrice30 < 20 && !card.isNumbered && !card.hasAuto);
     
-    const prompt = `You are an expert sports card investment analyst writing for collectors. Your analysis should be insightful, editorial, and explain the "why" behind each score like a knowledgeable hobbyist would.
+    const prompt = `You are writing like a sharp collector in a Discord chat who explains why cards are priced the way they are. Be narrative and thesis-driven, not metric-first. Sound like Hidden Gems explanations, not AI output.
 
-CRITICAL LANGUAGE RULES:
-- NEVER say "low demand" - instead say "high supply" (collectors understand supply gluts differently than demand issues)
-- Use collector-native language: "pricing spreads", "timing matters", "thin market", "overprinted era" instead of finance jargon
-- For MONITOR recommendations, explain in practical terms: "This card trades inconsistently due to high supply, making pricing spreads wide and timing important"
-- Avoid phrases like "caution is warranted" - too formal. Instead: "worth monitoring", "timing your entry matters", "patience pays here"
+VOICE & TONE RULES:
+- Write like you're explaining to a friend at a card show, not generating a report
+- Lead with the NARRATIVE (why the market thinks what it thinks), not numbers
+- Use collector-native language: "belief inertia", "narrative gap", "priced-in already", "market hasn't caught up", "secular demand"
+- NEVER say "low demand" - say "high supply" or "oversaturation"
+- NEVER use phrases like "caution is warranted", "careful consideration", "worth noting" - too formal
+- DO use phrases like: "The market still sees him as...", "Prices reflect...", "The discount exists because...", "What the market is missing..."
+- Be specific about the market psychology, not just the numbers
 ${isLegacyHold ? `
 LEGACY HOLD SPECIAL RULES (this is a LEGACY_HOLD card):
 - This is a CLASSIC VINTAGE COLLECTIBLE, not a speculative asset
@@ -1497,13 +1500,17 @@ Market Context:
 - Market stability: ${marketStability > 0.7 ? "Very stable, established market" : marketStability > 0.5 ? "Moderately stable" : "More volatile, newer to market"}
 ${accolades.accoladeCount > 0 ? `- Known accolades: ${accolades.hasMVP ? "MVP" : ""} ${accolades.hasChampionship ? "Champion" : ""} ${accolades.hasAllStar ? "All-Star" : ""}`.trim() : ""}
 
-Write an investment memo-style analysis:
-1. SHORT: (1-2 sentences) Quick verdict with the key insight. Example: "This is a Hall of Fame lock whose value is already priced in - minimal upside but also minimal risk. A safe hold."
-2. LONG: (3-5 sentences) Explain the rationale. Be specific about WHY the scores are what they are. Mention career stage, market dynamics, and what collectors should consider. End with "Overall view: ${action} for the next ${timeHorizonMonths} months."
+Write like a sharp collector explaining the thesis:
+1. SHORT: (1 sentence) Lead with what the market believes and whether it's right. Examples:
+   - "Prices haven't caught up to his consistent MVP-level play - still trading at Super Bowl loss discount."
+   - "Already priced as a legend. Upside is capped, but so is downside."
+   - "The market sees 'game manager' when results say otherwise. That's the opportunity."
+   
+2. LONG: (3-4 sentences) Explain the WHY behind the pricing. What narrative is the market buying? Is it correct? What would change the price? End with actionable context, not "Overall view: ${action}".
 
 Format response as:
-SHORT: [your short summary]
-LONG: [your detailed analysis]`;
+SHORT: [your thesis-driven summary]
+LONG: [your narrative explanation]`;
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",

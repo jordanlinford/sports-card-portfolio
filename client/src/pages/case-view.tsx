@@ -47,6 +47,69 @@ import { OutlookBadge } from "@/components/outlook-badge";
 import { ProFeatureGate, ProBadge } from "@/components/pro-feature-gate";
 import { Crown } from "lucide-react";
 
+function PortfolioInsightLine({ cards }: { cards: Card[] }) {
+  // Analyze the portfolio characteristics
+  const positions: Record<string, number> = {};
+  const sports: Record<string, number> = {};
+  const legacyTiers: Record<string, number> = {};
+  let rookieCount = 0;
+  let autoCount = 0;
+  let numberedCount = 0;
+  
+  cards.forEach(card => {
+    if (card.position) positions[card.position] = (positions[card.position] || 0) + 1;
+    if (card.sport) sports[card.sport] = (sports[card.sport] || 0) + 1;
+    if (card.legacyTier) legacyTiers[card.legacyTier] = (legacyTiers[card.legacyTier] || 0) + 1;
+    if (card.isRookie) rookieCount++;
+    if (card.hasAuto) autoCount++;
+    if (card.isNumbered) numberedCount++;
+  });
+  
+  const totalCards = cards.length;
+  const topPosition = Object.entries(positions).sort((a, b) => b[1] - a[1])[0];
+  const topSport = Object.entries(sports).sort((a, b) => b[1] - a[1])[0];
+  
+  // Determine stability profile
+  const retiredLegendCount = (legacyTiers["HOF"] || 0) + (legacyTiers["RETIRED"] || 0) + (legacyTiers["LEGEND_DECEASED"] || 0);
+  const activeStarCount = (legacyTiers["SUPERSTAR"] || 0) + (legacyTiers["STAR"] || 0);
+  const speculativeCount = (legacyTiers["PROSPECT"] || 0) + (legacyTiers["RISING_STAR"] || 0);
+  
+  // Build insight message
+  let insight = "";
+  
+  if (retiredLegendCount >= totalCards * 0.6) {
+    insight = "Legacy-focused collection with high stability and low volatility.";
+  } else if (speculativeCount >= totalCards * 0.5) {
+    insight = "Growth-oriented portfolio with higher upside potential and volatility.";
+  } else if (rookieCount >= totalCards * 0.7) {
+    insight = "Rookie-heavy collection - high upside but timing-sensitive.";
+  } else if (topPosition && (topPosition[1] / totalCards) >= 0.8) {
+    insight = `Concentrated in ${topPosition[0]}s - strong conviction, less diversification.`;
+  } else if (activeStarCount >= totalCards * 0.5) {
+    insight = "Balanced mix of proven stars - stable with moderate growth potential.";
+  } else if (autoCount >= totalCards * 0.6 || numberedCount >= totalCards * 0.6) {
+    insight = "Premium card focus with strong collector appeal and tighter supply.";
+  } else {
+    const sportCount = Object.keys(sports).length;
+    if (sportCount >= 3) {
+      insight = "Multi-sport diversification reduces single-market risk.";
+    } else if (topSport) {
+      insight = `${topSport[0].charAt(0).toUpperCase() + topSport[0].slice(1)}-focused collection with varied career stages.`;
+    } else {
+      insight = "Diversified collection across multiple player profiles.";
+    }
+  }
+  
+  return (
+    <div className="mt-2 p-2 bg-muted/50 rounded-md" data-testid="portfolio-insight">
+      <p className="text-sm text-muted-foreground italic">
+        <Zap className="h-3.5 w-3.5 inline mr-1.5 text-primary" />
+        {insight}
+      </p>
+    </div>
+  );
+}
+
 function ValueChangeIndicator({ card }: { card: Card }) {
   if (!card.estimatedValue || !card.previousValue || card.previousValue <= 0) return null;
   
@@ -341,6 +404,11 @@ export default function CaseView() {
                   {displayCase.description}
                 </p>
               )}
+              
+              {displayCase.cards && displayCase.cards.length >= 3 && (
+                <PortfolioInsightLine cards={displayCase.cards} />
+              )}
+              
               {(displayCase.showCardCount || displayCase.showTotalValue) && (
                 <div className="flex items-center gap-4 mt-3 flex-wrap">
                   {displayCase.showCardCount && (

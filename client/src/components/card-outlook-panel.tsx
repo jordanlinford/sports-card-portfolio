@@ -194,6 +194,27 @@ function getScoreColor(score: number, inverted = false): string {
   return "text-red-500";
 }
 
+function getUpsideLabel(score: number): string {
+  if (score >= 70) return "High";
+  if (score >= 50) return "Moderate";
+  if (score >= 30) return "Limited";
+  return "Minimal";
+}
+
+function getRiskLabel(score: number): string {
+  if (score >= 60) return "Elevated";
+  if (score >= 40) return "Moderate";
+  if (score >= 20) return "Low-Moderate";
+  return "Low";
+}
+
+function getConfidenceLabel(score: number): string {
+  if (score >= 75) return "High";
+  if (score >= 55) return "Medium";
+  if (score >= 35) return "Low-Medium";
+  return "Low";
+}
+
 function getProgressColor(score: number, inverted = false): string {
   const effectiveScore = inverted ? 100 - score : score;
   if (effectiveScore >= 70) return "bg-green-600";
@@ -344,8 +365,11 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
               <Target className="h-3 w-3" />
               <span>Upside</span>
             </div>
-            <div className={`text-lg font-bold ${getScoreColor(outlook.upsideScore)}`} data-testid="text-upside-score">
-              {outlook.upsideScore}
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-lg font-bold ${getScoreColor(outlook.upsideScore)}`} data-testid="text-upside-score">
+                {outlook.upsideScore}
+              </span>
+              <span className="text-xs text-muted-foreground">{getUpsideLabel(outlook.upsideScore)}</span>
             </div>
             <Progress 
               value={outlook.upsideScore} 
@@ -358,8 +382,11 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
               <Shield className="h-3 w-3" />
               <span>Risk</span>
             </div>
-            <div className={`text-lg font-bold ${getScoreColor(outlook.riskScore, true)}`} data-testid="text-risk-score">
-              {outlook.riskScore}
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-lg font-bold ${getScoreColor(outlook.riskScore, true)}`} data-testid="text-risk-score">
+                {outlook.riskScore}
+              </span>
+              <span className="text-xs text-muted-foreground">{getRiskLabel(outlook.riskScore)}</span>
             </div>
             <Progress 
               value={outlook.riskScore} 
@@ -372,8 +399,11 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
               <Gauge className="h-3 w-3" />
               <span>Confidence</span>
             </div>
-            <div className={`text-lg font-bold ${getScoreColor(outlook.confidenceScore)}`} data-testid="text-confidence-score">
-              {outlook.confidenceScore}
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-lg font-bold ${getScoreColor(outlook.confidenceScore)}`} data-testid="text-confidence-score">
+                {outlook.confidenceScore}
+              </span>
+              <span className="text-xs text-muted-foreground">{getConfidenceLabel(outlook.confidenceScore)}</span>
             </div>
             <Progress 
               value={outlook.confidenceScore} 
