@@ -1,8 +1,37 @@
+/**
+ * ============================================================
+ * INVESTMENT DECISION ENGINE v1.0
+ * ============================================================
+ * 
+ * This engine generates investment verdicts for sports card collectors.
+ * It expresses collector judgment, not just metrics.
+ * 
+ * CANONICAL TEST CASES (regression anchors):
+ * - Nikola Jokic: ACCUMULATE (FRANCHISE_CORE + clearly undervalued)
+ * - Caleb Williams: SPECULATIVE_FLYER (EMERGING maturity gate)
+ * - Amon-Ra St. Brown: ACCUMULATE (FRANCHISE_CORE + undervalued)
+ * - Victor Wembanyama: SPECULATIVE_FLYER (EMERGING despite elite talent)
+ * - AJ Brown: HOLD_CORE (FRANCHISE_CORE protection from AVOID)
+ * 
+ * KEY RULES:
+ * - Maturity gate: EMERGING players cannot be ACCUMULATE or AVOID
+ * - Franchise Core Protection: ESTABLISHED FRANCHISE_CORE never AVOID
+ * - ACCUMULATE for franchise-core requires valuationScore >= 75
+ * - Confidence stays LOW when comps are modeled/estimated
+ * 
+ * ⚠️  DO NOT MODIFY VERDICT RULES WITHOUT ADDING A NEW SIGNAL  ⚠️
+ * 
+ * If you need to change verdict logic, first add the new data source
+ * (better comps, role signals, etc.) then adjust rules accordingly.
+ * ============================================================
+ */
+
 import type {
   InvestmentVerdict,
   InvestmentCall,
   InvestmentScores,
   InvestmentActionPlan,
+  ActionGuidance,
   DataConfidence,
   InvestmentHorizon,
   PlayerStage,
@@ -674,6 +703,86 @@ function generateThesisBreakers(verdict: InvestmentVerdict, input: DecisionInput
   return breakers.slice(0, 3);
 }
 
+// ============================================================
+// ACTION GUIDANCE - Contextual next-step guidance by verdict
+// ============================================================
+function generateActionGuidance(
+  verdict: InvestmentVerdict,
+  input: DecisionInput,
+  scores: InvestmentScores
+): ActionGuidance {
+  const { stage, temperature } = input;
+  
+  switch (verdict) {
+    case "ACCUMULATE":
+      return {
+        header: "How to build your position",
+        bullets: [
+          "Set price alerts for dips - best entries come on bad game nights",
+          "Focus on mid-tier cards first (Prizm Silver, Optic Holo) before premium",
+          temperature === "COOLING" ? "Patience pays - let sellers come to you" : "Act on quality cards that appear below recent averages",
+        ],
+      };
+      
+    case "HOLD_CORE":
+      return {
+        header: "What would make this a buy",
+        bullets: [
+          "Price drops 20-30% without fundamental change (injury, trade)",
+          "Major breakout performance that signals new ceiling",
+          "Market panic creates irrational selling opportunity",
+        ],
+      };
+      
+    case "TRADE_THE_HYPE":
+      return {
+        header: "How to exit smartly",
+        bullets: [
+          "List premium cards first - they have the most profit margin to give",
+          "Price slightly below recent sales for faster execution",
+          "Keep 1-2 favorite cards if you're a collector, but take profits on the rest",
+        ],
+      };
+      
+    case "AVOID_NEW_MONEY":
+      return {
+        header: "What would need to change",
+        bullets: [
+          "Role security restored (starter job locked down)",
+          "Prices drop 40-50%+ making risk/reward attractive again",
+          "Clear return to form with sustained performance over 4+ weeks",
+        ],
+      };
+      
+    case "SPECULATIVE_FLYER":
+      return {
+        header: "How to size this bet",
+        bullets: [
+          "Treat as a lottery ticket - only money you can afford to lose",
+          "Cap at 5-10% of your card budget for this player",
+          stage === "ROOKIE" ? "Focus on base/low-end cards - save premium for proven players" : "Buy the dip if conviction is high, but stay disciplined on size",
+        ],
+      };
+  }
+}
+
+// Generate confidence transparency note
+function generateConfidenceNote(
+  confidence: DataConfidence,
+  compsReliable: boolean,
+  lowMeta: boolean
+): string | undefined {
+  if (confidence === "LOW") {
+    if (!compsReliable) {
+      return "Based on estimated pricing; timing precision is limited.";
+    }
+    if (lowMeta) {
+      return "Limited market data available; verdict directionally correct but timing uncertain.";
+    }
+  }
+  return undefined;
+}
+
 function generateCardTargets(
   verdict: InvestmentVerdict,
   exposures: ExposureRecommendation[]
@@ -946,6 +1055,10 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   console.log(`[InvestmentDecision] Verdict: ${verdict} (${reason}), Scores:`, JSON.stringify(scores));
   console.log(`[InvestmentDecision] Debug: compsReliable=${compsReliable}, lowMeta=${lowMeta}, overheated=${overheated}, roleTier=${roleTier}, roleStability=${roleStabilityScore}`);
 
+  // Generate action guidance and confidence note
+  const actionGuidance = generateActionGuidance(verdict, input, scores);
+  const confidenceNote = generateConfidenceNote(confidence, compsReliable, lowMeta);
+
   return {
     verdict,
     postureLabel,
@@ -954,6 +1067,8 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     oneLineRationale: generateOneLineRationale(verdict, input, scores),
     whyBullets: generateWhyBullets(verdict, scores, input),
     actionPlan: generateActionPlan(verdict, input),
+    actionGuidance,
+    confidenceNote,
     ...cardTargets,
     thesisBreakers: generateThesisBreakers(verdict, input),
     triggersToUpgrade: triggers.upgrade,

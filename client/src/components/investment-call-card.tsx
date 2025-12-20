@@ -18,6 +18,8 @@ import {
   CircleDollarSign,
   ArrowUpCircle,
   ArrowDownCircle,
+  Lightbulb,
+  Info,
 } from "lucide-react";
 import type { InvestmentCall, InvestmentVerdict, DataConfidence, InvestmentHorizon } from "@shared/schema";
 
@@ -133,12 +135,19 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
             <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-rationale">
               {call.oneLineRationale}
             </p>
+            
+            {call.confidenceNote && (
+              <div className="flex items-start gap-2 mt-2 p-2 rounded bg-muted/50 border border-muted" data-testid="text-confidence-note">
+                <Info className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <span className="text-xs text-muted-foreground">{call.confidenceNote}</span>
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
             <h4 className="font-semibold text-sm flex items-center gap-2">
               <Target className="h-4 w-4 text-muted-foreground" />
@@ -189,6 +198,23 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
               ))}
             </ul>
           </div>
+
+          {call.actionGuidance && (
+            <div className="space-y-2" data-testid="section-action-guidance">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <Lightbulb className="h-4 w-4 text-amber-500" />
+                {call.actionGuidance.header}
+              </h4>
+              <ul className="space-y-1.5">
+                {call.actionGuidance.bullets.map((bullet, i) => (
+                  <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
+                    <span className="text-amber-500 mt-1">•</span>
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {(call.whatToBuy?.length || call.whatToSell?.length || call.whatToAvoid?.length) && (

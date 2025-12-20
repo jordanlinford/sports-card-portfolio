@@ -1017,6 +1017,12 @@ export type InvestmentActionPlan = {
   positionSizing: string; // Position size guidance
 };
 
+// Action Guidance - Contextual next-step guidance based on verdict
+export type ActionGuidance = {
+  header: string;           // e.g., "What would make this a buy?"
+  bullets: string[];        // 2-3 actionable conditions or guidance points
+};
+
 // Full Investment Call - The decisive recommendation
 export type InvestmentCall = {
   verdict: InvestmentVerdict;
@@ -1026,6 +1032,8 @@ export type InvestmentCall = {
   oneLineRationale: string;       // 18-24 words, collector language
   whyBullets: string[];           // Max 3, each under 14 words
   actionPlan: InvestmentActionPlan;
+  actionGuidance?: ActionGuidance; // Contextual next-step guidance
+  confidenceNote?: string;        // Transparency note when confidence is limited
   whatToBuy?: string[];           // Card types to accumulate (max 4)
   whatToSell?: string[];          // Card types to sell (max 4)
   whatToAvoid?: string[];         // Card types to avoid (max 4)
