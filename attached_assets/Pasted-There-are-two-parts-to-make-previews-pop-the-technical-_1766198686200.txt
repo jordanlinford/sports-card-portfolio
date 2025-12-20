@@ -1,0 +1,176 @@
+There are two parts to make previews pop:
+
+the technical plumbing so social crawlers actually see the right meta tags
+
+a repeatable OG image design system that looks like a sports product, not a generic screenshot
+
+The non-negotiable technical constraint (SPA reality)
+If your site is a Vite/React SPA, most social crawlers will not execute your JavaScript. That means they will not “see” dynamic meta tags added client-side. You can use react-helmet all day and still get a generic preview.
+
+You need to serve correct Open Graph tags from the server as static HTML per share URL.
+
+The clean pattern
+
+Create a dedicated share route that is server-rendered (or pre-rendered) for crawlers
+Example:
+
+/share/player/<playerSlug>
+
+/share/card/<cardId>
+
+That route returns HTML with:
+
+og:title
+
+og:description
+
+og:image
+
+og:url
+
+twitter:card (summary_large_image)
+
+Then it immediately redirects humans to the SPA page (or uses a small JS redirect after tags are read).
+
+This gives you perfect previews without re-architecting the whole app.
+
+Make the OG image itself slick (this is where “pop” happens)
+Instead of letting Facebook/Twitter pick a random screenshot, you generate a purpose-built 1200×630 image.
+
+OG image layout that wins clicks
+Make every preview look like a “sports graphic”:
+
+Left 40–50%: large player headshot (tight crop, high contrast)
+
+Right side: big decisive verdict badge
+
+HOLD / ACCUMULATE / SPECULATIVE / AVOID
+
+One compelling line (collector language, not analysis)
+Examples:
+
+“Hold. Don’t chase.”
+
+“Speculative: high upside, big swings.”
+
+“Avoid new money: role risk is the story.”
+
+Optional small “why” bullets (max 2)
+
+“Modeled comps”
+
+“Hype ahead of value”
+
+Bottom row: your brand + domain + tiny “confidence” chip
+
+Background: dark gradient + subtle pattern + team color accent bar
+
+Add a tiny sparkline or 3-dot trend indicator if you have it (it signals “data product”)
+
+Specs that matter
+
+1200×630 px, PNG or JPG
+
+Keep key text inside a safe area (roughly 80px inset on all sides)
+
+Make the player face large enough to be recognizable on mobile
+
+Use 1–2 fonts only, heavy weight for verdict
+
+“Compelling” content that increases clicks
+People click on tension. Your preview should imply a stance.
+
+Good preview titles
+
+“Caleb Williams: Speculative Flyer”
+
+“Justin Jefferson: Hold Core”
+
+“Kenny Pickett: Avoid New Money”
+
+Better preview descriptions (one sentence)
+
+“Verdict + one collector reason”
+
+“Speculative: priced on upside, not proof.”
+
+“Hold: market is fair, no chase.”
+
+“Avoid: role stability is the risk.”
+
+How to implement OG images (practical options)
+Pick one path based on your stack and hosting.
+
+Option A: Generate OG images on-demand (recommended)
+
+Create an endpoint like:
+
+GET /api/og/player/<playerSlug>.png
+
+It renders an image server-side using a template
+
+Cache it (critical)
+
+Tech choices that work well
+
+Node canvas libraries (e.g., @napi-rs/canvas) in a simple server
+
+Cloudflare Workers + image generation (fast, cheap, great caching)
+
+Vercel OG image generation is great, but you’re not on Next; still doable with serverless if you deploy the endpoint separately
+
+Option B: Pre-generate images for your “launch players”
+
+Generate OG images nightly for your top 100–500 players
+
+Store them in Cloud Storage/S3 and reference static URLs
+
+This is easiest if your player set is finite and you want zero runtime risk
+
+Given your scraper constraints, pre-generating for top players is very sane.
+
+The exact meta tags you need (minimal set)
+For each share URL, you want:
+
+og:type = website
+
+og:title
+
+og:description
+
+og:image = absolute URL to your generated 1200×630 image
+
+og:url
+
+twitter:card = summary_large_image
+
+twitter:title
+
+twitter:description
+
+twitter:image
+
+Also: ensure your server returns a 200 with these tags. Redirects sometimes break scrapers.
+
+Debugging workflow (so you don’t guess)
+
+Facebook Sharing Debugger (forces re-scrape)
+
+Twitter/X Card Validator
+
+iMessage is picky; test by texting yourself a link
+
+You will iterate 3–10 times. That’s normal.
+
+What to show in the image for “maximum click”
+You mentioned “pic of the person being evaluated.” Yes, do that. Always.
+
+For player outlook share previews, my recommended hierarchy:
+
+player headshot
+
+verdict badge
+
+one-line collector rationale
+
+tiny confidence chip + data note (“modeled comps”)
