@@ -158,6 +158,48 @@ const FOOTBALL_GEMS: GemCandidate[] = [
     ],
     trapRisks: ["Losing supporting cast (Kittle, Deebo, Aiyuk) could expose limitations."],
   },
+  {
+    playerName: "Aaron Rodgers",
+    sport: "football",
+    position: "QB",
+    team: "New York Jets",
+    verdict: "MONITOR",
+    modifier: "Long-Term",
+    temperature: "COOLING",
+    tier: "CORE",
+    thesis: "HOF lock at depressed prices. Legacy cards may reprice once narrative shifts.",
+    riskLevel: "MEDIUM",
+    whyDiscounted: [
+      "Age and recent injury tanked market sentiment from prior peaks.",
+      "Jets dysfunction creates 'career twilight' narrative suppressing demand.",
+    ],
+    repricingCatalysts: [
+      "Competitive Jets season would remind market of his elite tier.",
+      "Retirement would trigger legacy repricing as HOF case crystallizes.",
+    ],
+    trapRisks: ["Further decline could make cards feel like 'what could have been' rather than collectible."],
+  },
+  {
+    playerName: "Russell Wilson",
+    sport: "football",
+    position: "QB",
+    team: "Pittsburgh Steelers",
+    verdict: "MONITOR",
+    modifier: "Long-Term",
+    temperature: "COOLING",
+    tier: "GROWTH",
+    thesis: "Former elite QB at career-low prices. Super Bowl winner with upside if he rediscovers form.",
+    riskLevel: "MEDIUM",
+    whyDiscounted: [
+      "Denver disaster wiped out years of goodwill - market still punishing him.",
+      "Age and declining athleticism raising 'past prime' concerns.",
+    ],
+    repricingCatalysts: [
+      "Playoff run with Steelers proves Denver was the problem, not him.",
+      "Retirement would shift focus to legacy (Super Bowl champ, elite stats).",
+    ],
+    trapRisks: ["Continued mediocrity cements 'overpaid' narrative permanently."],
+  },
 ];
 
 const BASKETBALL_GEMS: GemCandidate[] = [
@@ -203,6 +245,27 @@ const BASKETBALL_GEMS: GemCandidate[] = [
     ],
     trapRisks: ["Small frame raises durability questions as primary scorer."],
   },
+  {
+    playerName: "James Harden",
+    sport: "basketball",
+    position: "SG",
+    team: "Los Angeles Clippers",
+    verdict: "MONITOR",
+    modifier: "Long-Term",
+    temperature: "COOLING",
+    tier: "CORE",
+    thesis: "Former MVP at multi-year lows. Legacy value underpriced if he ages gracefully.",
+    riskLevel: "MEDIUM",
+    whyDiscounted: [
+      "Team-hopping and playoff struggles created 'quitter' narrative.",
+      "Style of play (free throw hunting) made him less beloved than peers.",
+    ],
+    repricingCatalysts: [
+      "Championship ring would dramatically shift legacy narrative.",
+      "Retirement triggers HOF legacy buying - scoring titles, MVP, elite career stats.",
+    ],
+    trapRisks: ["Further decline or messy exit could cement negative legacy perception."],
+  },
 ];
 
 const BASEBALL_GEMS: GemCandidate[] = [
@@ -226,6 +289,48 @@ const BASEBALL_GEMS: GemCandidate[] = [
       "World Series appearance with star performance.",
     ],
     trapRisks: ["Power development stalls below elite tier."],
+  },
+  {
+    playerName: "Mookie Betts",
+    sport: "baseball",
+    position: "OF",
+    team: "Los Angeles Dodgers",
+    verdict: "BUY",
+    modifier: "Value",
+    temperature: "COOLING",
+    tier: "PREMIUM",
+    thesis: "Multi-tool superstar down from peak prices. World Series ring adds to legacy.",
+    riskLevel: "LOW",
+    whyDiscounted: [
+      "Peak hype was 2018-2020 - market has normalized from initial Dodgers trade excitement.",
+      "Ohtani's arrival shifted LA market attention away from Betts.",
+    ],
+    repricingCatalysts: [
+      "Another MVP season would remind market of his elite tier.",
+      "HOF trajectory becoming undeniable as career stats accumulate.",
+    ],
+    trapRisks: ["Age-related decline could accelerate given demanding position."],
+  },
+  {
+    playerName: "Bryce Harper",
+    sport: "baseball",
+    position: "1B",
+    team: "Philadelphia Phillies",
+    verdict: "MONITOR",
+    modifier: "Long-Term",
+    temperature: "COOLING",
+    tier: "CORE",
+    thesis: "Generational hype never fully realized. Still elite, but priced like he's done.",
+    riskLevel: "MEDIUM",
+    whyDiscounted: [
+      "Early career hype set impossible expectations - 'bust' narrative lingers unfairly.",
+      "Injuries have interrupted momentum and cooled consistent demand.",
+    ],
+    repricingCatalysts: [
+      "World Series win would validate the mega-contract and shift narrative.",
+      "Sustained healthy seasons rebuilding 'generational' perception.",
+    ],
+    trapRisks: ["Injury history could define legacy as 'what if' rather than 'all-time great'."],
   },
 ];
 
