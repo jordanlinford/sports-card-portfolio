@@ -86,10 +86,13 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
   "brock purdy": "STARTER",
   "c.j. stroud": "STARTER",
   "cj stroud": "STARTER",
+  "trevor lawrence": "STARTER",  // Locked-in starter for Jacksonville
+  "jordan love": "STARTER",      // Starting QB for Green Bay
   "caleb williams": "UNCERTAIN_STARTER",  // Rookie QB
   "drake maye": "UNCERTAIN_STARTER",
   "bo nix": "UNCERTAIN_STARTER",
   "michael penix jr": "UNCERTAIN_STARTER",
+  "bryce young": "UNCERTAIN_STARTER",  // Year 3, shaky job security
   
   // BACKUP - Not starting
   "kenny pickett": "BACKUP",
@@ -103,6 +106,7 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
   "james wiseman": "OUT_OF_LEAGUE",
   "johnny manziel": "OUT_OF_LEAGUE",
   "jamarcus russell": "OUT_OF_LEAGUE",
+  "josh rosen": "OUT_OF_LEAGUE",
 };
 
 function normalizePlayerName(name: string): string {
@@ -831,6 +835,22 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
       verdict = "HOLD_CORE";
       reason = "Role uncertainty limits upside - stable hold only";
     }
+  }
+  
+  // PRIME player role-based verdict adjustments
+  // Year 3+ players can be AVOID only when role stability is genuinely poor
+  const isPrime = input.stage === "PRIME";
+  
+  // Rule 1: PRIME + AVOID + STARTER → too harsh, downgrade to SPECULATIVE
+  if (isPrime && verdict === "AVOID_NEW_MONEY" && roleTier === "STARTER") {
+    verdict = "SPECULATIVE_FLYER";
+    reason = "Still a starter - risky but not dead money";
+  }
+  
+  // Rule 2: PRIME + BACKUP/OUT_OF_LEAGUE → force AVOID (role is gone)
+  if (isPrime && (roleTier === "BACKUP" || roleTier === "OUT_OF_LEAGUE")) {
+    verdict = "AVOID_NEW_MONEY";
+    reason = "Role security gone - high risk of further decline";
   }
   
   // Compute base confidence
