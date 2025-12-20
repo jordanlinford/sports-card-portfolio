@@ -12,7 +12,9 @@
  * - Amon-Ra St. Brown: ACCUMULATE (FRANCHISE_CORE + undervalued)
  * - Victor Wembanyama: SPECULATIVE_FLYER (EMERGING despite elite talent)
  * - AJ Brown: HOLD_CORE (FRANCHISE_CORE protection from AVOID)
- * - Christian McCaffrey: HOLD_CORE or AVOID_NEW_MONEY (FRANCHISE_CORE never SPECULATIVE)
+ * - Ja'Marr Chase: HOLD_CORE (FRANCHISE_CORE never SPECULATIVE)
+ * - Justin Jefferson: HOLD_CORE or ACCUMULATE (FRANCHISE_CORE WR)
+ * - Christian McCaffrey: HOLD_CORE or AVOID_NEW_MONEY (FRANCHISE_CORE + RB risk)
  * 
  * KEY RULES:
  * - Maturity gate: EMERGING players cannot be ACCUMULATE or AVOID
@@ -102,6 +104,13 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
   "tyreek hill": "FRANCHISE_CORE",
   "aj brown": "FRANCHISE_CORE",
   "a.j. brown": "FRANCHISE_CORE",
+  "ja'marr chase": "FRANCHISE_CORE",
+  "jamarr chase": "FRANCHISE_CORE",
+  "davante adams": "FRANCHISE_CORE",
+  "stefon diggs": "FRANCHISE_CORE",
+  "chris olave": "FRANCHISE_CORE",
+  "garrett wilson": "FRANCHISE_CORE",
+  "drake london": "FRANCHISE_CORE",
   "josh allen": "FRANCHISE_CORE",
   "patrick mahomes": "FRANCHISE_CORE",
   "lamar jackson": "FRANCHISE_CORE",
@@ -1048,12 +1057,15 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   }
   
   // ============================================================
-  // SPECULATIVE_FLYER GUARDRAIL FOR ESTABLISHED FRANCHISE PLAYERS
-  // Proven veterans should NEVER be labeled as "lottery tickets"
-  // SPECULATIVE is only appropriate for EMERGING or UNKNOWN roles
+  // SPECULATIVE_FLYER GUARDRAIL FOR FRANCHISE-CORE PLAYERS
+  // FRANCHISE_CORE players should NEVER be labeled as "lottery tickets"
+  // This guard applies regardless of maturity tier or metadata quality
+  // Examples: Ja'Marr Chase, Justin Jefferson, AJ Brown
   // ============================================================
-  if (franchiseCore && verdict === "SPECULATIVE_FLYER") {
-    // Check for high injury risk + short-term horizon (e.g., aging RBs)
+  const isFranchiseCore = roleTier === "FRANCHISE_CORE";
+  
+  if (isFranchiseCore && verdict === "SPECULATIVE_FLYER") {
+    // Check for high injury risk + aging veteran (e.g., aging RBs)
     const highInjuryRisk = scores.downsideRiskScore >= 65;
     const isAgingVeteran = input.stage === "PRIME" || input.stage === "VETERAN" || input.stage === "AGING";
     

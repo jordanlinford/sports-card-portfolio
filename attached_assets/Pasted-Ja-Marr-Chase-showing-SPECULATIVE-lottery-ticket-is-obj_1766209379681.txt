@@ -1,0 +1,182 @@
+Ja’Marr Chase showing SPECULATIVE / lottery ticket is objectively wrong in the context of your own framework and the “no-brainer” standards you just locked.
+
+Let me be very clear and then give you the exact fix.
+
+Why this is wrong (plain language)
+
+Ja’Marr Chase is:
+
+a franchise-core WR
+
+in his prime
+
+with elite, proven production
+
+on a stable offense
+
+with deep, liquid card demand
+
+“Speculative / lottery ticket” implies:
+
+unproven upside
+
+binary outcomes
+
+thin demand
+
+surprise breakout potential
+
+That describes:
+
+rookies
+
+prospects
+
+fringe starters
+
+It does not describe Ja’Marr Chase under any reasonable collector lens.
+
+Even if:
+
+volatility is high
+
+short-term horizon
+
+some risk exists
+
+Risk ≠ speculation.
+
+What the verdict should be
+
+For Ja’Marr Chase, the only defensible verdicts are:
+
+HOLD_CORE (most of the time)
+
+ACCUMULATE (only when clearly cheap)
+
+He should never be:
+
+SPECULATIVE
+
+AVOID_NEW_MONEY
+
+If a user sees Chase labeled “lottery ticket,” they will immediately distrust the system.
+
+Why your engine landed here
+
+The screenshot tells me exactly what happened:
+
+HIGH volatility
+
+HIGH risk
+
+SHORT term
+
+modeled pricing
+
+metadata showing Unknown for position/stage
+
+Those signals are overpowering franchise-core protection because one of two things is wrong:
+
+Root cause (one of these is true)
+
+roleTier is missing or misclassified
+
+Chase is not being tagged as FRANCHISE_CORE
+
+maturityTier is not being set to ESTABLISHED
+
+Your SPECULATIVE gate is firing before franchise-core protection
+
+“Unknown” metadata (position/stage) is downgrading him into speculative logic
+
+Any one of these will cause this outcome.
+
+The non-negotiable rule you must enforce
+
+SPECULATIVE_FLYER is never allowed for franchise-core, prime players.
+
+You already enforced this for Wembanyama/Jokic logic — Chase needs the same protection.
+
+Exact fix (copy-paste, minimal, final)
+
+Add this after all verdict computation but before return:
+
+const isFranchisePrime =
+  roleTier === "FRANCHISE_CORE" &&
+  maturityTier === "ESTABLISHED";
+
+if (isFranchisePrime && verdict === "SPECULATIVE_FLYER") {
+  verdict = "HOLD_CORE";
+}
+
+
+This is not optional.
+This is a hard semantic guardrail.
+
+Additional safety (recommended)
+
+Because your UI shows Unknown for position/stage, also add:
+
+if (
+  isFranchisePrime &&
+  (playerMeta.position === "Unknown" || playerMeta.stage === "Unknown")
+) {
+  verdict = "HOLD_CORE";
+}
+
+
+Unknown metadata should never downgrade a known elite.
+
+How Ja’Marr Chase should read in your product
+
+A correct Chase output would look like:
+
+Verdict: HOLD_CORE
+Posture: Hold. Don’t chase.
+Confidence: Low–Medium
+Horizon: Short term
+Why:
+“Elite production is already priced in. Volatility creates noise, not opportunity.”
+
+That feels credible.
+“Lottery ticket” does not.
+
+Why fixing this matters more than McCaffrey
+
+McCaffrey is an edge case (RB aging curve).
+Ja’Marr Chase is a category-defining player.
+
+If Chase is wrong:
+
+WR logic is wrong
+
+franchise-core protection is incomplete
+
+users will stop trusting immediately
+
+What I’d do next (very quick)
+
+Apply the guardrail above
+
+Re-run:
+
+Ja’Marr Chase
+
+Justin Jefferson
+
+A.J. Brown
+
+All three must land HOLD_CORE unless valueScore is extreme
+
+If they do, you’re done again.
+
+If you want, next I can:
+
+sanity-check WR vs RB logic differences
+
+help you rename “Speculative” copy so it never appears insulting
+
+help you add a tiny “elite override” badge so users feel the logic
+
+But this one definitely needs to be fixed.
