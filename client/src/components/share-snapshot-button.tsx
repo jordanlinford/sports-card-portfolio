@@ -4,9 +4,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Share2, Link2, Check, Loader2 } from "lucide-react";
+import { Share2, Link2, Check, Loader2, Image } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -20,6 +21,14 @@ interface ShareSnapshotButtonProps {
   variant?: "default" | "ghost" | "outline";
   size?: "default" | "sm" | "icon";
   className?: string;
+}
+
+function getPlayerSlug(playerName: string): string {
+  return playerName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
 }
 
 export function ShareSnapshotButton({
@@ -78,6 +87,36 @@ export function ShareSnapshotButton({
     }
   };
 
+  const copySocialLink = async () => {
+    if (snapshotType !== 'player_outlook' || !snapshotData?.playerName) {
+      toast({
+        title: "Social sharing not available",
+        description: "This feature is only available for player outlooks.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const playerSlug = getPlayerSlug(snapshotData.playerName);
+    const socialUrl = `${window.location.origin}/share/player/${playerSlug}`;
+
+    try {
+      await navigator.clipboard.writeText(socialUrl);
+      setCopied(true);
+      toast({
+        title: "Social link copied",
+        description: "Link with preview image ready for social media.",
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (clipboardError) {
+      toast({
+        title: "Social link created",
+        description: socialUrl,
+        duration: 10000,
+      });
+    }
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -98,6 +137,18 @@ export function ShareSnapshotButton({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {snapshotType === 'player_outlook' && snapshotData?.playerName && (
+          <>
+            <DropdownMenuItem 
+              onClick={copySocialLink}
+              data-testid="menu-item-copy-social-link"
+            >
+              <Image className="mr-2 h-4 w-4" />
+              Copy social link (with preview)
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem 
           onClick={createAndCopyLink}
           disabled={isLoading}

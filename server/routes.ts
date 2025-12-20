@@ -10,6 +10,7 @@ import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
 import { generateShareImage } from "./shareImageService";
+import { generatePlayerOGImage, getPlayerShareData } from "./playerShareImageService";
 import { prestigeService } from "./prestigeService";
 import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./cardOutlookService";
 import { sendPaymentConfirmationEmail } from "./email";
@@ -591,6 +592,110 @@ Allow: /
     } catch (error) {
       console.error("Error generating share image:", error);
       res.status(500).json({ message: "Failed to generate share image" });
+    }
+  });
+
+  // Player OG image generation endpoint
+  app.get("/api/og/player/:playerSlug.png", async (req, res) => {
+    try {
+      const { playerSlug } = req.params;
+      
+      const imageBuffer = await generatePlayerOGImage(playerSlug);
+      
+      res.set({
+        "Content-Type": "image/png",
+        "Content-Length": imageBuffer.length,
+        "Cache-Control": "public, max-age=3600",
+      });
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error("Error generating player OG image:", error);
+      res.status(500).json({ message: "Failed to generate player OG image" });
+    }
+  });
+
+  // HTML escape helper to prevent injection in meta tags
+  function escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  // Player share page with OG meta tags for social crawlers
+  app.get("/share/player/:playerSlug", async (req, res) => {
+    try {
+      const { playerSlug } = req.params;
+      const userAgent = req.headers["user-agent"] || "";
+      
+      // Sanitize playerSlug to prevent injection (only allow alphanumeric and hyphens)
+      const sanitizedSlug = playerSlug.replace(/[^a-z0-9-]/gi, "").toLowerCase();
+      
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
+        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
+        : `https://${req.headers.host}`;
+      
+      const data = await getPlayerShareData(sanitizedSlug);
+      const playerName = data?.playerName || sanitizedSlug.replace(/-/g, " ");
+      const verdict = data?.verdict || "HOLD_CORE";
+      const oneLineRationale = data?.oneLineRationale || "AI-powered investment analysis for sports card collectors";
+      
+      const verdictLabels: Record<string, string> = {
+        ACCUMULATE: "Accumulate",
+        HOLD_CORE: "Hold",
+        TRADE_THE_HYPE: "Trade the Hype",
+        AVOID_NEW_MONEY: "Avoid",
+        SPECULATIVE_FLYER: "Speculative",
+      };
+      const verdictLabel = verdictLabels[verdict] || "Hold";
+      
+      // Escape all dynamic content for HTML safety
+      const title = escapeHtml(`${playerName}: ${verdictLabel}`);
+      const description = escapeHtml(oneLineRationale);
+      const imageUrl = `${baseUrl}/api/og/player/${sanitizedSlug}.png`;
+      const pageUrl = `${baseUrl}/share/player/${sanitizedSlug}`;
+      
+      // For social crawlers, return static HTML with OG tags
+      if (isSocialCrawler(userAgent)) {
+        const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} | Sports Card Portfolio</title>
+  <meta name="description" content="${description}">
+  
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  <meta property="og:image" content="${imageUrl}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:url" content="${pageUrl}">
+  <meta property="og:site_name" content="Sports Card Portfolio">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <meta name="twitter:image" content="${imageUrl}">
+</head>
+<body>
+  <p>Redirecting to Sports Card Portfolio...</p>
+</body>
+</html>`;
+        res.set("Content-Type", "text/html");
+        return res.send(html);
+      }
+      
+      // For humans, redirect to the SPA player outlook page
+      res.redirect(`/player/${encodeURIComponent(playerName)}`);
+    } catch (error) {
+      console.error("Error serving player share page:", error);
+      res.status(500).json({ message: "Failed to serve player share page" });
     }
   });
 
