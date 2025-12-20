@@ -108,6 +108,37 @@ function RiskSignalCard({ signal }: { signal: RiskSignal }) {
   );
 }
 
+function getStanceSummary(stance: string | null, riskCount: number, exposures: PortfolioExposures | null): string {
+  const retiredPct = exposures?.byCareerStage?.["Retired"] || 0;
+  const primeRisingPct = (exposures?.byCareerStage?.["Prime"] || 0) + (exposures?.byCareerStage?.["Rising"] || 0);
+  const hasHighRetired = retiredPct > 0.4;
+  const hasGrowth = primeRisingPct > 0.3;
+  const hasRisks = riskCount > 0;
+  
+  if (stance === "Legacy") {
+    return hasRisks 
+      ? "Stable collection with limited growth potential. Value is floor-protected but upside is capped."
+      : "Well-established legacy collection. Value is stable but growth-limited.";
+  }
+  if (stance === "Speculative Growth" || stance === "Aggressive Speculation") {
+    return hasRisks
+      ? "High volatility portfolio with significant upside potential. Expect larger swings."
+      : "Growth-focused portfolio with higher risk tolerance. Strong upside if bets pay off.";
+  }
+  if (stance === "Value") {
+    return "Value-oriented collection. Solid floor with moderate growth potential.";
+  }
+  if (stance === "Balanced") {
+    if (hasHighRetired && !hasGrowth) {
+      return "Appears balanced but leans legacy. Growth is limited without adding active players.";
+    }
+    return hasRisks
+      ? "Balanced portfolio with some concentration to manage. Solid foundation overall."
+      : "Well-diversified portfolio with balanced risk/reward profile.";
+  }
+  return "Portfolio analysis complete.";
+}
+
 function ActionCard({ action }: { action: RecommendedAction }) {
   const targetRoutes: Record<string, string> = {
     portfolio: "/",
@@ -319,7 +350,10 @@ export default function PortfolioOutlookPage() {
                 )}
               </div>
               <p className="text-lg font-medium mb-2">{snapshot.primaryDriver}</p>
-              <p className="text-muted-foreground">{snapshot.summaryShort}</p>
+              <p className="text-muted-foreground mb-2">{snapshot.summaryShort}</p>
+              <p className="text-sm font-medium text-foreground/80">
+                {getStanceSummary(snapshot.overallStance, riskSignals.length, exposures)}
+              </p>
             </div>
             <div className="text-right shrink-0">
               <div className="text-2xl font-bold">
@@ -373,7 +407,7 @@ export default function PortfolioOutlookPage() {
 
                 {exposures.topPlayersConcentration && exposures.topPlayersConcentration.length > 0 && (
                   <div className="space-y-2">
-                    <h4 className="text-sm font-medium">Top Players</h4>
+                    <h4 className="text-sm font-medium">Top Players <span className="text-xs text-muted-foreground font-normal">(% of portfolio value)</span></h4>
                     {exposures.topPlayersConcentration.slice(0, 3).map((p) => (
                       <ExposureBar key={p.player} label={p.player} value={p.pct} color="primary" />
                     ))}

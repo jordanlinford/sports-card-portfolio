@@ -356,14 +356,15 @@ ${newsSection}
 Required Output JSON schema:
 {
   "overallStance": "Speculative Growth | Balanced | Value | Legacy | Aggressive Speculation",
+  "stanceSummary": "One clear sentence resolving stable vs risky tension, e.g. 'This portfolio is stable but growth-limited.' or 'High volatility with strong upside potential.'",
   "confidenceScore": 1-100,
   "primaryDriver": "short phrase",
   "summaryShort": "1-2 sentences",
-  "summaryLong": "5-8 sentences with specific exposures and tradeoffs",
-  "opportunities": ["3 bullets, specific, not generic"],
-  "watchouts": ["3 bullets, specific, not generic"],
+  "summaryLong": "5-8 sentences with specific exposures and tradeoffs. Structure as: What this portfolio is → Why it looks this way → What that means going forward.",
+  "opportunities": ["3 bullets, specific and numerically personalized, not generic"],
+  "watchouts": ["3 bullets, specific and numerically personalized, not generic"],
   "recommendedNextActions": [
-    {"label":"short", "why":"short", "cta":"string", "target":"portfolio|nextBuys|watchlist|marketOutlook"}
+    {"label":"short action-oriented label", "why":"specific numeric impact, e.g. 'Adding 2-3 prime WRs would reduce retired exposure by ~10%'", "cta":"string", "target":"portfolio|nextBuys|watchlist|marketOutlook"}
   ]
 }
 
@@ -372,11 +373,14 @@ Rules:
 - Use language that encourages planning: diversification, liquidity, cycle timing.
 - If concentration is high, recommend reducing it via next buys that diversify.
 - Keep it punchy and readable. No long paragraphs.
+- recommendedNextActions.why MUST include specific numbers when possible (e.g. "would reduce X exposure by ~Y%").
+- If RECENT PLAYER NEWS mentions injuries or volatility, use time-bound language like "recent injury-related uncertainty" or "short-term news-driven volatility" rather than stating injury facts as permanent conditions.
 - If RECENT PLAYER NEWS is provided, use it to inform your analysis about players in the portfolio. The news is real-time and supersedes outdated training data.`;
 }
 
 type AIOutlookResponse = {
   overallStance: string;
+  stanceSummary?: string;
   confidenceScore: number;
   primaryDriver: string;
   summaryShort: string;
