@@ -87,12 +87,38 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
 };
 
 function normalizePlayerName(name: string): string {
-  return name.toLowerCase().trim();
+  // Normalize to lowercase, trim, and standardize hyphen variations
+  return name.toLowerCase().trim()
+    .replace(/[-–—]/g, "-")  // Normalize all dash types
+    .replace(/\s+/g, " ");    // Normalize whitespace
+}
+
+// Additional lookup with hyphen variations
+function lookupRoleTier(name: string): RoleTier | undefined {
+  const normalized = normalizePlayerName(name);
+  
+  // Direct lookup
+  if (ROLE_TIER_OVERRIDES[normalized]) {
+    return ROLE_TIER_OVERRIDES[normalized];
+  }
+  
+  // Try without hyphens (amon ra st. brown -> amon-ra st. brown)
+  const withHyphens = normalized.replace(/(\w+) (\w+)/g, "$1-$2");
+  if (ROLE_TIER_OVERRIDES[withHyphens]) {
+    return ROLE_TIER_OVERRIDES[withHyphens];
+  }
+  
+  // Try removing hyphens (amon-ra st. brown -> amon ra st. brown)
+  const withoutHyphens = normalized.replace(/-/g, " ");
+  if (ROLE_TIER_OVERRIDES[withoutHyphens]) {
+    return ROLE_TIER_OVERRIDES[withoutHyphens];
+  }
+  
+  return undefined;
 }
 
 export function getRoleTier(playerName: string): RoleTier {
-  const normalized = normalizePlayerName(playerName);
-  return ROLE_TIER_OVERRIDES[normalized] ?? "UNKNOWN";
+  return lookupRoleTier(playerName) ?? "UNKNOWN";
 }
 
 export function getRoleStabilityScore(playerName: string): number {
@@ -344,9 +370,10 @@ function decideVerdict(
   // Proven demand = established star based on market evidence
   // Two ways to qualify:
   // 1. PRIME + liquidity >= 55 (correctly classified prime)
-  // 2. Any stage + good liquidity (>= 60) (market says they're established)
+  // 2. Any stage + good liquidity (>= 60) + role stability > 55 (market says they're established)
   // Examples: Tyrese Maxey, Amon-Ra St. Brown, CeeDee Lamb, Jayson Tatum
-  const hasProvenDemand = (isPrime && liquidityScore >= 55) || (liquidityScore >= 60);
+  // CRITICAL: Low role stability (uncertain starters, backups) cannot have "proven demand"
+  const hasProvenDemand = (isPrime && liquidityScore >= 55) || (liquidityScore >= 60 && roleStabilityScore > 55);
   
   if (downsideRiskScore >= 70) {
     // Players with proven demand: only AVOID at truly extreme downside (>= 85)
