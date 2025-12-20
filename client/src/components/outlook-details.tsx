@@ -113,13 +113,13 @@ export type OutlookDisplayData = {
   isPro?: boolean;
 };
 
-const ACTION_STYLES: Record<string, { bg: string; border: string; icon: typeof TrendingUp; label: string }> = {
-  BUY: { bg: "bg-green-500/20", border: "border-green-500", icon: TrendingUp, label: "Buy Signal" },
-  WATCH: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Activity, label: "Watch" },
-  SELL: { bg: "bg-red-500/20", border: "border-red-500", icon: TrendingDown, label: "Sell Signal" },
-  LONG_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", icon: Clock, label: "Long Hold" },
-  LEGACY_HOLD: { bg: "bg-indigo-500/20", border: "border-indigo-500", icon: Trophy, label: "Legacy Hold" },
-  LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", icon: MinusCircle, label: "Low Value" },
+const ACTION_STYLES: Record<string, { bg: string; border: string; icon: typeof TrendingUp; label: string; takeaway: string }> = {
+  BUY: { bg: "bg-green-500/20", border: "border-green-500", icon: TrendingUp, label: "Buy Signal", takeaway: "Good entry point at current prices. Consider adding to your collection." },
+  WATCH: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Activity, label: "Watch", takeaway: "Do not buy aggressively. Monitor for volume changes or news." },
+  SELL: { bg: "bg-red-500/20", border: "border-red-500", icon: TrendingDown, label: "Sell Signal", takeaway: "Consider reducing position. Risk outweighs potential upside." },
+  LONG_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", icon: Clock, label: "Long Hold", takeaway: "Hold for the long term. Short-term gains unlikely but solid floor." },
+  LEGACY_HOLD: { bg: "bg-indigo-500/20", border: "border-indigo-500", icon: Trophy, label: "Legacy Hold", takeaway: "Collector piece. Value driven by legacy appeal, not performance." },
+  LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", icon: MinusCircle, label: "Low Value", takeaway: "Limited market interest. Unlikely to appreciate significantly." },
 };
 
 const CONFIDENCE_STYLES: Record<string, { color: string; icon: typeof CheckCircle }> = {
@@ -283,6 +283,7 @@ export function OutlookDetails({
             <div className="text-right">
               {data.market?.value != null ? (
                 <>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Est. Fair Value</div>
                   <div className="text-3xl font-bold" data-testid="text-market-value">
                     {formatCurrency(data.market.value)}
                   </div>
@@ -331,6 +332,7 @@ export function OutlookDetails({
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">{actionStyle.label} Recommendation</h3>
+                <p className="text-sm font-medium mb-2">{actionStyle.takeaway}</p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {data.actionReasons.map((reason, i) => (
                     <li key={i} className="flex items-start gap-2">
@@ -339,6 +341,9 @@ export function OutlookDetails({
                     </li>
                   ))}
                 </ul>
+                <p className="text-xs text-muted-foreground mt-3">
+                  Re-evaluate in 30-60 days or after major news.
+                </p>
               </div>
               <div className="flex items-center gap-2">
                 <ConfidenceIcon className={`h-5 w-5 ${confidenceStyle.color}`} />
@@ -414,22 +419,22 @@ export function OutlookDetails({
             <CardContent className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
                 <CompositeScoreCard 
-                  label="U." 
+                  label="Upside" 
                   value={data.signals.upside} 
                   icon={TrendingUp} 
-                  description="Growt..."
+                  description="Growth potential"
                 />
                 <CompositeScoreCard 
-                  label="D." 
+                  label="Downside" 
                   value={data.signals.downsideRisk} 
                   icon={ShieldAlert} 
-                  description="Chan..."
+                  description="Loss exposure"
                 />
                 <CompositeScoreCard 
-                  label="M" 
+                  label="Friction" 
                   value={data.signals.marketFriction} 
-                  icon={ShieldAlert} 
-                  description="Diffic..."
+                  icon={Clock} 
+                  description="Time to sell"
                   helperText={getMarketFrictionHelperText(data.signals.marketFriction, data.action)}
                 />
               </div>
@@ -437,9 +442,9 @@ export function OutlookDetails({
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <SignalBar label="Trend" value={data.signals.trend} />
-                    <SignalBar label="Liquidity" value={data.signals.liquidity} />
-                    <SignalBar label="Volatility" value={data.signals.volatility} />
+                    <SignalBar label="Recent Momentum" value={data.signals.trend} />
+                    <SignalBar label="Market Liquidity" value={data.signals.liquidity} />
+                    <SignalBar label="Price Volatility" value={data.signals.volatility} />
                     <SignalBar label="Card Quality" value={data.signals.cardType} />
                   </div>
                 </>
