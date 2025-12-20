@@ -175,9 +175,9 @@ function getActionLabel(action: OutlookAction): string {
     case "SELL":
       return "SELL";
     case "MONITOR":
-      return "MONITOR";
+      return "WATCH";
     case "LONG_HOLD":
-      return "LONG HOLD";
+      return "HOLD";
     case "LEGACY_HOLD":
       return "LEGACY HOLD";
     case "LITTLE_VALUE":
@@ -185,6 +185,95 @@ function getActionLabel(action: OutlookAction): string {
     default:
       return action;
   }
+}
+
+function getStateDescription(action: OutlookAction): string {
+  switch (action) {
+    case "BUY":
+      return "Market signals suggest this is a good entry point.";
+    case "SELL":
+      return "Recent price action suggests taking profits.";
+    case "MONITOR":
+      return "Mixed signals - watch for clearer direction.";
+    case "LONG_HOLD":
+      return "Stable asset for long-term holding.";
+    case "LEGACY_HOLD":
+      return "Collector piece with established value.";
+    case "LITTLE_VALUE":
+      return "Limited collector interest at current levels.";
+    default:
+      return "";
+  }
+}
+
+function getTimeContext(generatedAt: string | null | undefined, action: OutlookAction): string {
+  if (!generatedAt) return "Reflects recent market behavior.";
+  
+  const generated = new Date(generatedAt);
+  const now = new Date();
+  const daysSince = Math.floor((now.getTime() - generated.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (daysSince <= 7) {
+    return "Reflects current market behavior over the last 30-60 days.";
+  } else if (daysSince <= 30) {
+    return `Analysis from ${daysSince} days ago - consider refreshing.`;
+  } else {
+    return "Analysis may be outdated - refresh recommended.";
+  }
+}
+
+function getConditionalTriggers(action: OutlookAction, sport?: string | null): string[] {
+  const triggers: string[] = [];
+  const isSportWithPlayoffs = sport === "football" || sport === "basketball" || sport === "baseball" || sport === "hockey";
+  
+  switch (action) {
+    case "BUY":
+      triggers.push("Price rises above fair value range");
+      triggers.push("Negative news or injury concerns");
+      if (isSportWithPlayoffs) {
+        triggers.push("Playoff performance (could accelerate or invalidate)");
+      } else {
+        triggers.push("Significant increase in available supply");
+      }
+      break;
+    case "SELL":
+      triggers.push("Price drops back to fair value");
+      if (isSportWithPlayoffs) {
+        triggers.push("Playoff run or championship win");
+      } else {
+        triggers.push("Major award or renewed interest");
+      }
+      triggers.push("Market sentiment shift");
+      break;
+    case "MONITOR":
+      triggers.push("Sustained weekly sales above recent average");
+      if (isSportWithPlayoffs) {
+        triggers.push("Playoff performance or postseason run");
+      } else {
+        triggers.push("Narrative shift (breakout, award)");
+      }
+      triggers.push("Price stabilizes with clear direction");
+      break;
+    case "LONG_HOLD":
+      triggers.push("Career milestone or Hall of Fame election");
+      if (isSportWithPlayoffs) {
+        triggers.push("Championship win or legacy moment");
+      } else {
+        triggers.push("Significant market repricing");
+      }
+      triggers.push("Anniversary or special event");
+      break;
+    case "LEGACY_HOLD":
+      triggers.push("Market repricing event");
+      triggers.push("Documentary or renewed cultural interest");
+      break;
+    case "LITTLE_VALUE":
+      triggers.push("Career breakout or major award");
+      triggers.push("Scarcity discovery");
+      break;
+  }
+  
+  return triggers.slice(0, 3);
 }
 
 function getScoreColor(score: number, inverted = false): string {
@@ -311,120 +400,138 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
 
   return (
     <Card className="bg-muted/30 overflow-visible">
-      <CardHeader className="p-4 pb-2">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <CardTitle className="text-base">Card Outlook AI</CardTitle>
-            {card.cardCategory && card.cardCategory !== "sports" && (
-              <Badge variant="outline" className="text-[10px] uppercase">
-                {card.cardCategory === "tcg" ? "TCG" : "Non-Sport"}
+      <CardContent className="p-4 space-y-4">
+        {/* STATE-BASED HEADLINE: Verdict first */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className={`${getActionColor(outlook.action)} gap-1 text-sm px-3 py-1`} data-testid="badge-outlook-action">
+                {getActionIcon(outlook.action)}
+                {getActionLabel(outlook.action)}
               </Badge>
+              {card.cardCategory && card.cardCategory !== "sports" && (
+                <Badge variant="outline" className="text-[10px] uppercase">
+                  {card.cardCategory === "tcg" ? "TCG" : "Non-Sport"}
+                </Badge>
+              )}
+              <ShareSnapshotButton
+                snapshotType="card_outlook"
+                title={`${card.title} - Card Outlook`}
+                snapshotData={{
+                  cardTitle: card.title,
+                  playerName: outlook.playerName || card.playerName,
+                  sport: outlook.sport || card.sport,
+                  position: outlook.position || card.position,
+                  action: outlook.action,
+                  upsideScore: outlook.upsideScore,
+                  riskScore: outlook.riskScore,
+                  confidenceScore: outlook.confidenceScore,
+                  explanation: outlook.explanation,
+                  priceTargets: outlook.priceTargets,
+                  projectedOutlook: outlook.projectedOutlook,
+                  factors: outlook.factors,
+                  generatedAt: outlook.generatedAt,
+                }}
+                cardId={card.id}
+                size="icon"
+                variant="ghost"
+              />
+            </div>
+            <p className="text-sm font-medium" data-testid="text-state-description">
+              {getStateDescription(outlook.action)}
+            </p>
+            {outlook.explanation?.short && (
+              <p className="text-sm text-muted-foreground" data-testid="text-explanation-short">
+                {outlook.explanation.short}
+              </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <ShareSnapshotButton
-              snapshotType="card_outlook"
-              title={`${card.title} - Card Outlook`}
-              snapshotData={{
-                cardTitle: card.title,
-                playerName: outlook.playerName || card.playerName,
-                sport: outlook.sport || card.sport,
-                position: outlook.position || card.position,
-                action: outlook.action,
-                upsideScore: outlook.upsideScore,
-                riskScore: outlook.riskScore,
-                confidenceScore: outlook.confidenceScore,
-                explanation: outlook.explanation,
-                priceTargets: outlook.priceTargets,
-                projectedOutlook: outlook.projectedOutlook,
-                factors: outlook.factors,
-                generatedAt: outlook.generatedAt,
-              }}
-              cardId={card.id}
-              size="icon"
-              variant="ghost"
-            />
-            <Badge className={`${getActionColor(outlook.action)} gap-1`} data-testid="badge-outlook-action">
-              {getActionIcon(outlook.action)}
-              {getActionLabel(outlook.action)}
-            </Badge>
-          </div>
         </div>
-        {outlook.generatedAt && (
-          <CardDescription className="text-xs">
-            Generated {new Date(outlook.generatedAt).toLocaleDateString()}
-          </CardDescription>
-        )}
-      </CardHeader>
 
-      <CardContent className="p-4 pt-2 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Target className="h-3 w-3" />
-              <span>Upside</span>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-lg font-bold ${getScoreColor(outlook.upsideScore)}`} data-testid="text-upside-score">
-                {outlook.upsideScore}
-              </span>
-              <span className="text-xs text-muted-foreground">{getUpsideLabel(outlook.upsideScore)}</span>
-            </div>
-            <Progress 
-              value={outlook.upsideScore} 
-              className="h-1.5"
-            />
-          </div>
+        {/* TIME CONTEXT LINE */}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 rounded-md px-2 py-1.5">
+          <Clock className="h-3 w-3 flex-shrink-0" />
+          <span data-testid="text-time-context">{getTimeContext(outlook.generatedAt, outlook.action)}</span>
+        </div>
 
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Shield className="h-3 w-3" />
-              <span>Risk</span>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-lg font-bold ${getScoreColor(outlook.riskScore, true)}`} data-testid="text-risk-score">
-                {outlook.riskScore}
-              </span>
-              <span className="text-xs text-muted-foreground">{getRiskLabel(outlook.riskScore)}</span>
-            </div>
-            <Progress 
-              value={outlook.riskScore} 
-              className="h-1.5"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Gauge className="h-3 w-3" />
-              <span>Confidence</span>
-            </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className={`text-lg font-bold ${getScoreColor(outlook.confidenceScore)}`} data-testid="text-confidence-score">
-                {outlook.confidenceScore}
-              </span>
-              <span className="text-xs text-muted-foreground">{getConfidenceLabel(outlook.confidenceScore)}</span>
-            </div>
-            <Progress 
-              value={outlook.confidenceScore} 
-              className="h-1.5"
-            />
-          </div>
-
-          {outlook.factors?.liquidityScore !== undefined && (
-            <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                <span>Market Friction</span>
+        {/* SUPPORTING EVIDENCE: Scores as secondary */}
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="gap-1 p-0 h-auto text-xs text-muted-foreground">
+              <ChevronDown className="h-3 w-3" />
+              View supporting signals
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Target className="h-3 w-3" />
+                  <span>Upside</span>
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-sm font-medium ${getScoreColor(outlook.upsideScore)}`} data-testid="text-upside-score">
+                    {getUpsideLabel(outlook.upsideScore)}
+                  </span>
+                </div>
+                <Progress value={outlook.upsideScore} className="h-1" />
               </div>
-              <div className={`text-lg font-bold ${getScoreColor(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore), true)}`} data-testid="text-friction-score">
-                {getMarketFrictionLabel(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore))}
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Shield className="h-3 w-3" />
+                  <span>Risk</span>
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-sm font-medium ${getScoreColor(outlook.riskScore, true)}`} data-testid="text-risk-score">
+                    {getRiskLabel(outlook.riskScore)}
+                  </span>
+                </div>
+                <Progress value={outlook.riskScore} className="h-1" />
               </div>
-              <p className="text-xs text-muted-foreground/70 leading-tight">
-                {getMarketFrictionHelperText(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore), outlook.action)}
-              </p>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Gauge className="h-3 w-3" />
+                  <span>Confidence</span>
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-sm font-medium ${getScoreColor(outlook.confidenceScore)}`} data-testid="text-confidence-score">
+                    {getConfidenceLabel(outlook.confidenceScore)}
+                  </span>
+                </div>
+                <Progress value={outlook.confidenceScore} className="h-1" />
+              </div>
+
+              {outlook.factors?.liquidityScore !== undefined && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <DollarSign className="h-3 w-3" />
+                    <span>Liquidity</span>
+                  </div>
+                  <div className={`text-sm font-medium ${getScoreColor(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore), true)}`} data-testid="text-friction-score">
+                    {getMarketFrictionLabel(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore))}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/70 leading-tight">
+                    {getMarketFrictionHelperText(getMarketFrictionFromLiquidity(outlook.factors.liquidityScore), outlook.action)}
+                  </p>
+                </div>
+              )}
             </div>
-          )}
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* CONDITIONAL TRIGGERS: What would change this? */}
+        <div className="space-y-2 border-l-2 border-muted pl-3">
+          <div className="text-xs font-medium text-muted-foreground">What Would Change This?</div>
+          <ul className="text-xs text-muted-foreground space-y-1">
+            {getConditionalTriggers(outlook.action, outlook.sport).map((trigger, i) => (
+              <li key={i} className="flex items-start gap-1.5">
+                <span className="text-primary mt-0.5">-</span>
+                <span>{trigger}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
         {outlook.projectedOutlook && (
@@ -575,40 +682,30 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
           </Collapsible>
         )}
 
-        {outlook.explanation?.short && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <p className="text-sm" data-testid="text-explanation-short">
-                {outlook.explanation.short}
+        {/* Extended explanation moved to collapsible if available */}
+        {outlook.explanation?.long && (
+          <Collapsible open={showDetails} onOpenChange={setShowDetails}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1 p-0 h-auto text-muted-foreground">
+                {showDetails ? (
+                  <>
+                    <ChevronUp className="h-3 w-3" />
+                    Less details
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-3 w-3" />
+                    Full analysis
+                  </>
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <p className="text-sm text-muted-foreground" data-testid="text-explanation-long">
+                {outlook.explanation.long}
               </p>
-              
-              {outlook.explanation.long && (
-                <Collapsible open={showDetails} onOpenChange={setShowDetails}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-1 p-0 h-auto text-muted-foreground">
-                      {showDetails ? (
-                        <>
-                          <ChevronUp className="h-3 w-3" />
-                          Less details
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown className="h-3 w-3" />
-                          More details
-                        </>
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-2">
-                    <p className="text-sm text-muted-foreground" data-testid="text-explanation-long">
-                      {outlook.explanation.long}
-                    </p>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </div>
-          </>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {isPro && canEdit && (!card.cardCategory || card.cardCategory === "sports") && (
@@ -663,14 +760,10 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
           </>
         )}
 
-        <Separator />
-        <div className="text-[10px] text-muted-foreground/70 leading-relaxed" data-testid="text-outlook-disclaimer">
-          <Info className="h-3 w-3 inline mr-1 align-text-top" />
-          <strong>Disclaimer:</strong> This analysis is for informational purposes only and is not financial advice. 
-          Scores are based on your entered values, general market patterns, and career lifecycle estimates — not real-time 
-          sales data or professional appraisals. Actual card values can vary significantly. Always do your own research 
-          before buying or selling.
-        </div>
+        {/* Single consolidated disclaimer */}
+        <p className="text-[10px] text-muted-foreground/50 text-center pt-2" data-testid="text-outlook-disclaimer">
+          Not financial advice. Do your own research before acting.
+        </p>
       </CardContent>
     </Card>
   );

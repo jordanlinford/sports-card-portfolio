@@ -36,6 +36,7 @@ import {
   Database,
   Bug,
   Star,
+  Info,
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -881,9 +882,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
         playerKey,
         playerName,
         sport,
-        verdictAtAdd: card.outlookVerdict,
         actionAtAdd: card.outlookAction,
-        temperatureAtAdd: card.outlookTemperature,
         estimatedValueAtAdd: card.estimatedValue,
         source: 'market-outlook',
       });
@@ -1168,18 +1167,35 @@ export default function OutlookOverviewPage() {
         <OutlookSkeleton />
       ) : (
         <>
+          {/* Portfolio Summary with contextual insights */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Total Cards</CardDescription>
                 <CardTitle className="text-2xl" data-testid="text-total-cards">{allCards.length}</CardTitle>
               </CardHeader>
+              <CardContent className="pt-0 pb-3">
+                <p className="text-[10px] text-muted-foreground">
+                  {cardsWithoutOutlook.length > 0 
+                    ? `${cardsWithoutOutlook.length} awaiting analysis`
+                    : "All cards analyzed"
+                  }
+                </p>
+              </CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Analyzed</CardDescription>
                 <CardTitle className="text-2xl text-primary" data-testid="text-analyzed-cards">{cardsWithOutlook.length}</CardTitle>
               </CardHeader>
+              <CardContent className="pt-0 pb-3">
+                <p className="text-[10px] text-muted-foreground">
+                  {allCards.length > 0 
+                    ? `${Math.round((cardsWithOutlook.length / allCards.length) * 100)}% coverage`
+                    : "Add cards to analyze"
+                  }
+                </p>
+              </CardContent>
             </Card>
             <Card className={bigMovers.length > 0 ? "border-purple-500/30 bg-purple-500/5" : ""}>
               <CardHeader className="pb-2">
@@ -1189,6 +1205,14 @@ export default function OutlookOverviewPage() {
                 </CardDescription>
                 <CardTitle className="text-2xl text-purple-600 dark:text-purple-400" data-testid="text-big-movers">{bigMovers.length}</CardTitle>
               </CardHeader>
+              <CardContent className="pt-0 pb-3">
+                <p className="text-[10px] text-muted-foreground">
+                  {bigMovers.length > 0 
+                    ? "High upside, moderate risk"
+                    : "None detected yet"
+                  }
+                </p>
+              </CardContent>
             </Card>
             <Card className={buyCards.length > 0 ? "border-green-500/30 bg-green-500/5" : ""}>
               <CardHeader className="pb-2">
@@ -1198,6 +1222,14 @@ export default function OutlookOverviewPage() {
                 </CardDescription>
                 <CardTitle className="text-2xl text-green-600 dark:text-green-400" data-testid="text-buy-cards">{buyCards.length}</CardTitle>
               </CardHeader>
+              <CardContent className="pt-0 pb-3">
+                <p className="text-[10px] text-muted-foreground">
+                  {buyCards.length > 0 
+                    ? "Good entry points identified"
+                    : "No clear buys right now"
+                  }
+                </p>
+              </CardContent>
             </Card>
             <Card className={sellCards.length > 0 ? "border-red-500/30 bg-red-500/5" : ""}>
               <CardHeader className="pb-2">
@@ -1207,8 +1239,24 @@ export default function OutlookOverviewPage() {
                 </CardDescription>
                 <CardTitle className="text-2xl text-red-600 dark:text-red-400" data-testid="text-sell-cards">{sellCards.length}</CardTitle>
               </CardHeader>
+              <CardContent className="pt-0 pb-3">
+                <p className="text-[10px] text-muted-foreground">
+                  {sellCards.length > 0 
+                    ? "Consider taking profits"
+                    : "Nothing to exit now"
+                  }
+                </p>
+              </CardContent>
             </Card>
           </div>
+          
+          {/* Context line when few cards analyzed */}
+          {cardsWithOutlook.length < 3 && allCards.length > 0 && (
+            <div className="mb-6 p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+              <Info className="h-4 w-4 inline mr-2" />
+              Analyze more cards to see patterns. With only {cardsWithOutlook.length} analyzed, it's too early for portfolio-level insights.
+            </div>
+          )}
 
           {bigMovers.length > 0 && (
             <div className="mb-8">
