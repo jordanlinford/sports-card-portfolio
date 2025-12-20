@@ -1,0 +1,174 @@
+Good — that was the hard part. If you’ve already aligned the Card Outlook copy with the Hidden Gems voice, you’ve fixed 70% of the problem. What’s left is not wording polish; it’s structural and conceptual.
+
+Here’s what still needs to happen for Card Outlook to fully “lock in” as a trusted collector tool.
+
+1. CARD OUTLOOK NEEDS A CLEAR JOB
+
+Right now, Card Outlook is doing too many things at once:
+
+• explaining the card
+• scoring the card
+• giving a recommendation
+• disclaiming responsibility
+
+It needs a single, dominant purpose.
+
+What it should be:
+
+Card Outlook answers one question only:
+“What is the market currently saying about this specific card, and how should I treat it?”
+
+That means:
+
+Not portfolio strategy
+Not discovery (Hidden Gems)
+Not shopping (Next Buys)
+
+Just: interpretation.
+
+If you keep this mental boundary, everything else becomes easier.
+
+2. REMOVE ABSTRACT SCORES AS THE PRIMARY OUTPUT
+
+Even with better language, raw numbers like:
+
+Upside: 45
+Risk: 34
+Confidence: 65
+
+are still doing too much cognitive damage.
+
+Collectors don’t think in numbers at the card level. They think in states.
+
+What needs to happen:
+
+• Scores become supporting evidence, not the headline
+• The headline is a state-based verdict
+
+Example structure:
+
+Card Outlook
+Current Market State: WATCH
+Why: Prices have risen, but demand is uneven and volume is thin.
+
+Then show:
+– Upside (translated: Moderate)
+– Risk (translated: Low–Moderate)
+– Confidence (translated: Medium)
+
+Numbers can stay — but visually secondary.
+
+3. CARD OUTLOOK MUST BE TIME-AWARE
+
+This is the single biggest credibility upgrade you can make.
+
+Right now, Card Outlook feels static.
+Markets are not.
+
+What needs to happen:
+
+Add an explicit “time context” line.
+
+Examples:
+• “This outlook reflects current market behavior over the last 30–60 days.”
+• “Short-term outlook; re-evaluate after playoffs.”
+• “Long-term outlook; near-term volatility expected.”
+
+This does two things:
+
+Protects you when conditions change
+
+Teaches collectors how often to revisit decisions
+
+Without this, even good analysis will eventually feel wrong.
+
+4. CARD OUTLOOK NEEDS CONDITIONAL TRIGGERS
+
+This is where it becomes genuinely powerful.
+
+Every Card Outlook should implicitly answer:
+“What would make this change?”
+
+You already do this in Hidden Gems. Card Outlook needs the lighter version.
+
+Add a small section:
+
+What Would Change This Outlook?
+– Sustained weekly sales above $X
+– Playoff performance
+– Increase in graded volume
+– Narrative shift (injury, role change, awards)
+
+This turns the card from “information” into “monitoring.”
+
+5. ALIGN CARD OUTLOOK WITH ACTION STATES
+
+Right now you have WATCH, BUY, MONITOR concepts spread across the app.
+Card Outlook should be the authoritative source for a card’s state.
+
+That means:
+
+Card Outlook verdict should directly drive:
+• Watchlist inclusion
+• Portfolio flags
+• Next Buys eligibility
+• Hidden Gems exclusion (if fully priced)
+
+If a card is WATCH here, it should not feel like a BUY anywhere else without explanation.
+
+This alignment is what makes the system feel intentional instead of layered.
+
+6. CARD OUTLOOK SHOULD TEACH, NOT JUST REPORT
+
+This is subtle but important.
+
+Each Card Outlook should leave the user knowing something they didn’t before about how the hobby works.
+
+Examples:
+• “PSA 10s with wide price bands usually mean eye appeal is driving outcomes.”
+• “Elite players without a signature moment often trade flat until a narrative breaks.”
+• “Cards tied to playoff outcomes reprice faster than regular-season performance.”
+
+One sentence. Not every time. But often enough that users learn.
+
+That’s how trust compounds.
+
+7. REMOVE REDUNDANT DISCLAIMERS, KEEP ONE STRONG ONE
+
+You don’t need to keep reminding users this isn’t financial advice.
+
+One quiet, consistent disclaimer at the bottom is enough.
+
+Over-disclaiming weakens perceived confidence.
+
+THE END STATE (WHAT “DONE” LOOKS LIKE)
+
+When Card Outlook is done, it should feel like this:
+
+• Fast to read (10–15 seconds)
+• Clear state (Buy / Watch / Avoid / Hold)
+• Clear reason (market behavior, not stats)
+• Clear monitoring logic
+• Consistent with every other feature
+
+At that point, Card Outlook becomes the anchor feature — not Hidden Gems.
+
+Hidden Gems excites.
+Next Buys motivates.
+Portfolio Outlook contextualizes.
+
+Card Outlook explains.
+
+BLUNT SUMMARY
+
+You already fixed the language. Good.
+
+What’s left:
+• Make Card Outlook state-based, not score-based
+• Add time context
+• Add conditional triggers
+• Align it as the single source of truth for card status
+
+Do that, and Card Outlook stops feeling like “AI analysis” and starts feeling like “how a smart collector reads the market.”
+
+That’s the difference between impressive and indispensable.
