@@ -104,14 +104,15 @@ export async function generatePlayerOGImage(playerSlug: string): Promise<Buffer>
   const width = 1200;
   const height = 630;
   
-  const playerName = data?.playerName || playerSlug.replace(/-/g, " ");
+  const playerName = data?.playerName || playerSlug.replace(/-/g, " ").split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   const sport = data?.sport || "football";
   const position = data?.position || "";
   const team = data?.team || "";
   const verdict = data?.verdict || "HOLD_CORE";
   const postureLabel = data?.postureLabel || "";
-  const confidence = data?.confidence || "LOW";
-  const oneLineRationale = data?.oneLineRationale || "Analysis pending";
+  const confidence = data?.confidence || "MEDIUM";
+  const hasRealData = !!data?.oneLineRationale;
+  const oneLineRationale = data?.oneLineRationale || "Get AI-powered investment analysis for this player";
   const whyBullets = data?.whyBullets || [];
 
   const verdictConfig = VERDICT_COLORS[verdict];
@@ -119,10 +120,18 @@ export async function generatePlayerOGImage(playerSlug: string): Promise<Buffer>
   const confidenceLabel = CONFIDENCE_LABELS[confidence];
   const sportLabel = SPORT_ICONS[sport.toLowerCase()] || sport.toUpperCase();
 
+  // Build bullet points (up to 2)
   const bulletText = whyBullets.slice(0, 2).map((b, i) => {
-    const escaped = escapeXml(truncateText(b, 50));
-    const yPos = 380 + i * 32;
-    return `<text x="500" y="${yPos}" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#9CA3AF">• ${escaped}</text>`;
+    const escaped = escapeXml(truncateText(b, 45));
+    const yPos = 420 + i * 36;
+    return `<text x="600" y="${yPos}" font-family="system-ui, -apple-system, sans-serif" font-size="18" fill="#94A3B8" text-anchor="middle">${escaped}</text>`;
+  }).join("\n");
+
+  // Word wrap for rationale - centered layout
+  const rationaleLines = wrapText(oneLineRationale, 50);
+  const rationaleText = rationaleLines.slice(0, 2).map((line, i) => {
+    const yPos = 340 + i * 32;
+    return `<text x="600" y="${yPos}" font-family="system-ui, -apple-system, sans-serif" font-size="22" fill="#E2E8F0" text-anchor="middle">${escapeXml(line)}</text>`;
   }).join("\n");
 
   const svg = `
@@ -130,79 +139,99 @@ export async function generatePlayerOGImage(playerSlug: string): Promise<Buffer>
       <defs>
         <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" style="stop-color:#0F172A;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#1E293B;stop-opacity:1" />
+          <stop offset="50%" style="stop-color:#1E293B;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#0F172A;stop-opacity:1" />
         </linearGradient>
-        <linearGradient id="accent" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" style="stop-color:${verdictConfig.accent};stop-opacity:0.3" />
+        <linearGradient id="verdict-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${verdictConfig.accent};stop-opacity:0.15" />
+          <stop offset="50%" style="stop-color:${verdictConfig.accent};stop-opacity:0.08" />
           <stop offset="100%" style="stop-color:${verdictConfig.accent};stop-opacity:0" />
         </linearGradient>
-        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.3"/>
-        </pattern>
+        <linearGradient id="card-border" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:${verdictConfig.accent};stop-opacity:0.5" />
+          <stop offset="100%" style="stop-color:${verdictConfig.accent};stop-opacity:0.1" />
+        </linearGradient>
       </defs>
       
       <!-- Background -->
       <rect width="${width}" height="${height}" fill="url(#bg)"/>
-      <rect width="${width}" height="${height}" fill="url(#grid)"/>
       
-      <!-- Left accent bar -->
-      <rect x="0" y="0" width="8" height="${height}" fill="${verdictConfig.accent}"/>
+      <!-- Radial glow behind main content -->
+      <ellipse cx="600" cy="280" rx="500" ry="300" fill="url(#verdict-glow)"/>
       
-      <!-- Top gradient accent -->
-      <rect x="0" y="0" width="${width}" height="120" fill="url(#accent)"/>
+      <!-- Accent lines -->
+      <rect x="0" y="0" width="6" height="${height}" fill="${verdictConfig.accent}"/>
+      <rect x="${width - 6}" y="0" width="6" height="${height}" fill="${verdictConfig.accent}" opacity="0.3"/>
       
-      <!-- Player silhouette area (left side) -->
-      <rect x="40" y="100" width="380" height="430" rx="16" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+      <!-- Main card container -->
+      <rect x="80" y="60" width="${width - 160}" height="450" rx="20" fill="#1E293B" fill-opacity="0.6" stroke="url(#card-border)" stroke-width="2"/>
       
-      <!-- Sport badge -->
-      <rect x="60" y="120" width="60" height="28" rx="6" fill="${verdictConfig.bg}"/>
-      <text x="90" y="139" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="bold" fill="white" text-anchor="middle">${sportLabel}</text>
+      <!-- Sport badge (top left of card) -->
+      <rect x="110" y="85" width="70" height="32" rx="8" fill="${verdictConfig.bg}"/>
+      <text x="145" y="107" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">${sportLabel}</text>
       
-      <!-- Player silhouette icon -->
-      <circle cx="230" cy="280" r="100" fill="#334155"/>
-      <circle cx="230" cy="240" r="45" fill="#475569"/>
-      <ellipse cx="230" cy="350" rx="60" ry="50" fill="#475569"/>
+      <!-- Player name - large, centered -->
+      <text x="600" y="150" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="bold" fill="white" text-anchor="middle">${escapeXml(truncateText(playerName, 22))}</text>
       
-      <!-- Position/Team under silhouette -->
-      <text x="230" y="460" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#9CA3AF" text-anchor="middle">${escapeXml(position)}${position && team ? " | " : ""}${escapeXml(team)}</text>
+      <!-- Position and team line -->
+      ${(position || team) ? `<text x="600" y="185" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#94A3B8" text-anchor="middle">${escapeXml(position)}${position && team ? " • " : ""}${escapeXml(team)}</text>` : ""}
       
-      <!-- Player name under silhouette -->
-      <text x="230" y="500" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">${escapeXml(truncateText(playerName, 25))}</text>
+      <!-- Verdict badge - prominent, centered -->
+      <rect x="420" y="210" width="360" height="90" rx="16" fill="${verdictConfig.bg}"/>
+      <rect x="420" y="210" width="360" height="90" rx="16" fill="none" stroke="${verdictConfig.accent}" stroke-width="1" opacity="0.5"/>
+      <text x="600" y="270" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="bold" fill="white" text-anchor="middle">${verdictLabel}</text>
       
-      <!-- Right content area -->
+      <!-- One-line rationale - centered below verdict -->
+      ${rationaleText}
       
-      <!-- Verdict badge -->
-      <rect x="480" y="100" width="280" height="80" rx="12" fill="${verdictConfig.bg}"/>
-      <text x="620" y="150" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="bold" fill="white" text-anchor="middle">${verdictLabel}</text>
-      
-      <!-- Posture label -->
-      ${postureLabel ? `<text x="500" y="220" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="${verdictConfig.accent}">${escapeXml(postureLabel)}</text>` : ""}
-      
-      <!-- One-line rationale -->
-      <text x="500" y="270" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#E2E8F0">${escapeXml(truncateText(oneLineRationale, 55))}</text>
-      ${oneLineRationale.length > 55 ? `<text x="500" y="298" font-family="system-ui, -apple-system, sans-serif" font-size="20" fill="#E2E8F0">${escapeXml(truncateText(oneLineRationale.substring(55), 55))}</text>` : ""}
-      
-      <!-- Why bullets -->
+      <!-- Why bullets if present -->
       ${bulletText}
       
-      <!-- Confidence chip -->
-      <rect x="500" y="460" width="160" height="32" rx="16" fill="#334155"/>
-      <text x="580" y="481" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#9CA3AF" text-anchor="middle">${confidenceLabel}</text>
+      <!-- Confidence chip - bottom of card -->
+      <rect x="520" y="460" width="160" height="36" rx="18" fill="#334155" stroke="#475569" stroke-width="1"/>
+      <text x="600" y="485" font-family="system-ui, -apple-system, sans-serif" font-size="15" fill="#94A3B8" text-anchor="middle">${confidenceLabel}</text>
       
-      <!-- Modeled comps note if LOW confidence -->
-      ${confidence === "LOW" ? `<text x="680" y="481" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#6B7280">Modeled comps</text>` : ""}
+      <!-- Bottom branding bar -->
+      <rect x="0" y="530" width="${width}" height="100" fill="#0F172A"/>
+      <rect x="0" y="530" width="${width}" height="1" fill="${verdictConfig.accent}" opacity="0.3"/>
       
-      <!-- Bottom branding -->
-      <rect x="0" y="570" width="${width}" height="60" fill="#0F172A"/>
-      <text x="60" y="608" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold" fill="white">Sports Card Portfolio</text>
-      <text x="280" y="608" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#64748B">AI-Powered Investment Intelligence</text>
+      <!-- Logo area -->
+      <rect x="60" y="555" width="50" height="50" rx="10" fill="${verdictConfig.bg}"/>
+      <text x="85" y="590" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">SC</text>
       
-      <!-- Domain -->
-      <text x="1140" y="608" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#64748B" text-anchor="end">sportscardportfolio.com</text>
+      <!-- Brand name -->
+      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">Sports Card Portfolio</text>
+      <text x="130" y="600" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#64748B">AI-Powered Investment Intelligence</text>
+      
+      <!-- CTA on right -->
+      ${!hasRealData ? `
+        <rect x="920" y="558" width="220" height="44" rx="22" fill="${verdictConfig.bg}"/>
+        <text x="1030" y="587" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">Get Full Analysis</text>
+      ` : `
+        <text x="1140" y="585" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#64748B" text-anchor="end">sportscardportfolio.io</text>
+      `}
     </svg>
   `;
 
   return await sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+function wrapText(text: string, maxCharsPerLine: number): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    if ((currentLine + " " + word).trim().length <= maxCharsPerLine) {
+      currentLine = (currentLine + " " + word).trim();
+    } else {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+
+  return lines;
 }
 
 export function getPlayerSlug(playerName: string): string {
