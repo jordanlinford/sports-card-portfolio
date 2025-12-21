@@ -1,0 +1,198 @@
+Yes—Market Outlook is inherently limited by how many sold comps you can reliably retrieve, and if you turn “number of sales found” directly into “liquidity,” you can absolutely misclassify liquid cards as illiquid purely because you hit your retrieval ceiling.
+There are two separate things that tend to get conflated:
+
+
+Observed liquidity (what your scraper actually saw)
+
+
+True liquidity (how many sales actually occurred on eBay for that exact query definition)
+
+
+If your current liquidity score is driven primarily by observed count, then the tool is vulnerable to exactly the “huge hole” you described.
+How to treat this correctly
+A. Liquidity should not be a raw count. It should be an inference with ceilings and confidence.
+If you cap at ~50–60 comps per query, then counts above that are not meaningful as “50 sales.” They mean “at least 50 in this window, and likely more.”
+So instead of:
+
+
+liquidity = f(soldCount)
+
+
+Use:
+
+
+liquidity = f(min(soldCount, cap), cappedAtMax, queryQuality, daysCovered)
+
+
+and publish confidence separately
+
+
+B. Separate liquidity from confidence
+You can be highly confident a card is liquid (because you hit cap quickly), even if you don’t know the true volume. That’s still a strong signal.
+Recommended model:
+Inputs
+
+
+soldCountObserved: integer
+
+
+cap: integer (e.g., 60)
+
+
+cappedAtMax: boolean (soldCountObserved >= cap or you hit pagination limit)
+
+
+dateCoverageDays: how many days are actually represented in returned sold items (sometimes eBay returns older solds if the query is thin; you need to measure this)
+
+
+querySpecificityScore: heuristic based on how tight the query is (set/parallel/number/grade). Loose queries inflate counts and distort liquidity.
+
+
+scrapeHealth: did you see timeouts, partial pages, captchas, etc.
+
+
+Outputs
+
+
+liquidityTier: LOW / MED / HIGH / VERY_HIGH (or similar)
+
+
+liquidityConfidence: LOW / MED / HIGH
+
+
+liquidityExplanation: plain language + transparency
+
+
+Liquidity tier logic (practical)
+
+
+If cappedAtMax is true:
+
+
+liquidityTier = HIGH (or VERY_HIGH if your cap is conservative and you consistently hit it on true blue-chip cards)
+
+
+liquidityConfidence = HIGH
+
+
+Add note: “We hit our data limit; market is at least this active.”
+
+
+
+
+Else if soldCountObserved is low and dateCoverageDays is truly 30 (meaning you actually saw a full 30-day window but few sales):
+
+
+liquidityTier = LOW
+
+
+liquidityConfidence = MED/HIGH (depending on scrapeHealth and querySpecificity)
+
+
+
+
+Else if soldCountObserved is low but dateCoverageDays is small (meaning your results cluster in the last few days, implying you might be missing older solds or query is too narrow):
+
+
+liquidityTier = LOW/MED
+
+
+liquidityConfidence = LOW
+
+
+Add note: “Limited sample returned; liquidity estimate is less certain.”
+
+
+
+
+C. Use “cap reached” as a first-class signal
+What you proposed (cappedAtMax flag) is the correct direction. It converts the ceiling from a silent failure into a detectable state.
+A few refinements so it’s robust:
+
+
+cappedAtMax should be true when you either:
+
+
+reached the max items you allow (cap), or
+
+
+detected additional pages exist but you stopped (paginationAvailable = true), or
+
+
+eBay shows “X results” and X > cap (only if you can retrieve that number reliably without violating TOS or triggering bot defenses; often you cannot)
+
+
+
+
+store cap value with the snapshot, so if you later change cap (60 → 100), historical data still makes sense.
+
+
+D. Add a UI transparency line without scaring users
+You do not need to turn this into a disclaimer wall. One line is enough:
+Examples:
+
+
+“Liquidity is estimated from recent sold listings we could retrieve. When we hit our limit, liquidity is at least High.”
+
+
+If capped: “High liquidity (data limit reached; likely higher volume).”
+
+
+If not capped and thin: “Low liquidity (few recent sales found).”
+
+
+E. Avoid false “high liquidity” from overly broad queries
+The opposite failure mode is also real: you broaden the query to get enough comps and accidentally mix variations (raw vs PSA, different parallels, wrong year, etc.). That inflates count and looks liquid.
+So couple liquidity to query quality:
+
+
+If querySpecificityScore is low (broad), you can still say “the player/card family is liquid,” but not “this exact card is liquid.”
+Practical UI pattern:
+
+
+“Liquidity (exact match)” vs “Liquidity (closest comps)”
+Or simpler:
+
+
+“Match quality: Exact / Close / Broad” shown next to liquidity.
+
+
+F. Add a “sample size” concept that does not equal liquidity
+In your narrative, keep these distinct:
+
+
+Sample size: how many comps you analyzed
+
+
+Liquidity: how easily it sells (inferred)
+
+
+Because sample size also affects price reliability and volatility stability. A card can be liquid, but your sample might still be small if you had a bad scrape run.
+The shortest answer to your original question
+
+
+Yes, you are limited by how many sales you can find.
+
+
+If you currently equate “sales found” with “liquidity,” you can incorrectly show low liquidity due to scraping limits.
+
+
+The fix is to treat the cap as a positive signal (cappedAtMax → high liquidity) and to publish confidence/transparency so “low liquidity” is only asserted when you truly have coverage and a tight query.
+
+
+What I would do next (high-impact, low-complexity)
+
+
+Implement cappedAtMax (you described this) and make liquidity tier treat cap-hit as High.
+
+
+Compute dateCoverageDays from the sold items you retrieved and use it to downgrade confidence when coverage is weak.
+
+
+Add match quality (Exact/Close/Broad) and ensure liquidity claims are scoped accordingly.
+
+
+Add one UI line for transparency and prevent “LOW liquidity” from displaying when scrapeHealth is degraded (instead show “Liquidity uncertain”).
+
+
+If you want, paste your current liquidity scoring function (even just the pseudocode), and I’ll rewrite it into a version that explicitly separates observed count, cap detection, match quality, date coverage, and confidence.
