@@ -1153,7 +1153,7 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
     return null;
   }
 
-  let rawResults = relevantResults.slice(0, 12).map((r: any) => ({
+  let rawResults = relevantResults.slice(0, 15).map((r: any) => ({
     title: r.title || "",
     snippet: r.snippet || "",
     link: r.link || "",
@@ -1208,8 +1208,20 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
   console.log("========================================================\n");
 
   // Send comps to GPT for price extraction (strict preferred, loose as fallback)
+  // Pre-process snippets to help GPT find prices in various formats
+  const preprocessSnippet = (snippet: string): string => {
+    if (!snippet) return "";
+    // Add spaces around concatenated prices like "Last Sale$48.45" → "Last Sale $48.45"
+    let cleaned = snippet.replace(/([a-zA-Z])(\$\d)/g, '$1 $2');
+    // Add spaces around date+price patterns like "12/15/2025$48.45" → "12/15/2025 $48.45"
+    cleaned = cleaned.replace(/(\d{1,2}\/\d{1,2}\/\d{4})(\$)/g, '$1 $2');
+    // Highlight multiple prices in sold listings
+    cleaned = cleaned.replace(/\$(\d+(?:\.\d{2})?)/g, 'PRICE:$$$1');
+    return cleaned;
+  };
+  
   const searchContext = resultsForPricing
-    .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet}\nURL: ${r.link}`)
+    .map((r: any) => `Title: ${r.title}\nSnippet: ${preprocessSnippet(r.snippet)}\nURL: ${r.link}`)
     .join("\n\n");
 
   // Adjust prompt based on whether we have strict comps or using loose fallback
@@ -1242,9 +1254,13 @@ RULES:
 - Extract up to 20 individual price points
 - EXTRACT ALL PRICES from each snippet - don't stop at the first one!
 - A single search result may contain multiple sold prices - extract them all
-- Look for price guide formats like "Last Sale$48.45" or "PSA 10 $35.00" - extract these!
-- Look for table data like "PSA 10: $35 | PSA 9: $20" - extract the matching grade price
-- "$35.00" next to a date like "12/15/2025" is a sold price - extract it!
+- PRICE FORMATS TO EXTRACT (all are valid):
+  * "Last Sale$48.45" or "Last Sale PRICE:$48.45" → extract $48.45
+  * "Last 14 Avg$43.33" → extract $43.33 as average price
+  * "PSA 10 $35.00" or "PSA 10: $35" → extract $35
+  * "12/15/2025 $48.45" (date + price) → extract $48.45 with that date
+  * eBay sold: "$39.95 shipping" → extract $39.95 (ignore shipping cost)
+  * Price guide range: "$35-$48" → extract midpoint $41.50
 - Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
 - If no date is visible, use today's date
 - Note in confidenceReason that exact match data was not available`
@@ -1285,9 +1301,14 @@ RULES:
 - Extract up to 20 individual price points
 - EXTRACT ALL PRICES from each snippet - don't stop at the first one!
 - A single search result may contain multiple sold prices (e.g., auction history) - extract them all
-- Look for price guide formats like "Last Sale$48.45" or "PSA 10 $35.00" - extract these!
-- Look for table data like "PSA 10: $35 | PSA 9: $20" - extract the matching grade price
-- "$35.00" next to a date like "12/15/2025" is a sold price - extract it!
+- PRICE FORMATS TO EXTRACT (all are valid):
+  * "Last Sale$48.45" or "Last Sale PRICE:$48.45" → extract $48.45
+  * "Last 14 Avg$43.33" → extract $43.33 as average price
+  * "PSA 10 $35.00" or "PSA 10: $35" → extract $35
+  * "12/15/2025 $48.45" (date + price) → extract $48.45 with that date
+  * Price tables: "PSA 10: $35 | PSA 9: $20" → extract ONLY the matching grade price
+  * eBay sold: "$39.95 shipping" → extract $39.95 (ignore shipping cost)
+  * Price guide range: "$35-$48" → extract midpoint $41.50
 - EXCLUDE different card numbers (e.g., #81 Team Leaders vs #10 Base)
 - EXCLUDE different graders for value calculation (CGC 8 ≠ PSA 8)
 - EXCLUDE qualifier grades like PSA 8 (ST) - these are worth much less
