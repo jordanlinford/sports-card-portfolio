@@ -1100,39 +1100,85 @@ async function scrapeEbaySoldListings(
 
 /**
  * Parse eBay listing HTML to extract comp data
- * This is a simplified regex-based parser - production would use a proper HTML parser
+ * Updated Dec 2024: eBay now uses s-card class structure instead of s-item
  */
 function parseEbayListings(html: string): EbayComp[] {
   const comps: EbayComp[] = [];
   
-  // Match listing items - eBay uses srp-results class
-  // This is a simplified pattern - real implementation would use proper DOM parsing
-  const itemPattern = /<li class="s-item[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+  // Try new eBay structure first (s-card), fall back to old (s-item)
+  // New structure: <li ... class="s-card s-card--horizontal ...">
+  const newItemPattern = /<li[^>]*class="s-card[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+  const oldItemPattern = /<li class="s-item[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+  
+  // Check which pattern exists in the HTML
+  const useNewStructure = html.includes('class="s-card');
+  const itemPattern = useNewStructure ? newItemPattern : oldItemPattern;
+  
   let match;
+  let itemCount = 0;
   
   while ((match = itemPattern.exec(html)) !== null) {
-    const itemHtml = match[1];
+    const itemHtml = match[0]; // Full match including the li tag
+    itemCount++;
     
     // Skip ads/promoted listings
-    if (itemHtml.includes("s-item__ad") || itemHtml.includes("SPONSORED")) {
+    if (itemHtml.includes("SPONSORED") || itemHtml.includes("s-item__ad")) {
       continue;
     }
     
-    // Extract title
-    const titleMatch = itemHtml.match(/class="s-item__title[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)/);
-    const title = titleMatch ? titleMatch[1].trim() : "";
+    let title = "";
+    let soldPrice: number | null = null;
+    let itemUrl: string | undefined;
+    let imageUrl: string | undefined;
     
-    if (!title || title === "Shop on eBay") continue;
-    
-    // Extract sold price
-    const priceMatch = itemHtml.match(/class="s-item__price[^"]*"[^>]*>([^<]+)/);
-    const soldPrice = priceMatch ? parsePrice(priceMatch[1]) : null;
+    if (useNewStructure) {
+      // NEW EBAY STRUCTURE (Dec 2024+)
+      // Title is in the alt attribute of the card image
+      const altMatch = itemHtml.match(/alt="([^"]+)"/);
+      title = altMatch ? altMatch[1].trim() : "";
+      
+      // Skip "Shop on eBay" promo cards
+      if (!title || title === "Shop on eBay") continue;
+      
+      // Price is in s-card__price class
+      const priceMatch = itemHtml.match(/s-card__price[^>]*>([^<]+)/);
+      if (priceMatch) {
+        soldPrice = parsePrice(priceMatch[1]);
+      }
+      
+      // URL pattern: href=https://www.ebay.com/itm/[id]... or href="https://..."
+      const urlMatch = itemHtml.match(/href=['"]?(https:\/\/(?:www\.)?ebay\.com\/itm\/\d+)/);
+      if (urlMatch) {
+        itemUrl = urlMatch[1];
+      }
+      
+      // Image from src or data-defer-load attribute
+      const imgMatch = itemHtml.match(/(?:src|data-defer-load)=['"]?(https:\/\/i\.ebayimg\.com[^'">\s]+)/);
+      if (imgMatch) {
+        imageUrl = imgMatch[1];
+      }
+    } else {
+      // OLD EBAY STRUCTURE (legacy fallback)
+      const titleMatch = itemHtml.match(/class="s-item__title[^"]*"[^>]*>(?:<span[^>]*>)?([^<]+)/);
+      title = titleMatch ? titleMatch[1].trim() : "";
+      
+      if (!title || title === "Shop on eBay") continue;
+      
+      const priceMatch = itemHtml.match(/class="s-item__price[^"]*"[^>]*>([^<]+)/);
+      soldPrice = priceMatch ? parsePrice(priceMatch[1]) : null;
+      
+      const urlMatch = itemHtml.match(/href="(https:\/\/www\.ebay\.com\/itm\/[^"]+)"/);
+      itemUrl = urlMatch ? urlMatch[1].split("?")[0] : undefined;
+      
+      const imgMatch = itemHtml.match(/src="(https:\/\/i\.ebayimg\.com[^"]+)"/);
+      imageUrl = imgMatch ? imgMatch[1] : undefined;
+    }
     
     if (!soldPrice) continue;
     
-    // Extract shipping (if present)
-    const shippingMatch = itemHtml.match(/s-item__shipping[^"]*"[^>]*>([^<]+)/);
+    // Extract shipping (common to both structures)
     let shippingPrice = 0;
+    const shippingMatch = itemHtml.match(/(?:s-item__shipping|shipping)[^"]*"[^>]*>([^<]+)/i);
     if (shippingMatch) {
       const shippingText = shippingMatch[1].toLowerCase();
       if (!shippingText.includes("free")) {
@@ -1140,14 +1186,6 @@ function parseEbayListings(html: string): EbayComp[] {
         if (parsed) shippingPrice = parsed;
       }
     }
-    
-    // Extract URL
-    const urlMatch = itemHtml.match(/href="(https:\/\/www\.ebay\.com\/itm\/[^"]+)"/);
-    const itemUrl = urlMatch ? urlMatch[1].split("?")[0] : undefined;
-    
-    // Extract image
-    const imgMatch = itemHtml.match(/src="(https:\/\/i\.ebayimg\.com[^"]+)"/);
-    const imageUrl = imgMatch ? imgMatch[1] : undefined;
     
     // Check for best offer
     const isBestOffer = itemHtml.toLowerCase().includes("best offer");
@@ -1163,6 +1201,8 @@ function parseEbayListings(html: string): EbayComp[] {
       matchScore: 0 // Will be calculated later
     });
   }
+  
+  console.log(`[eBay Parser] Parsed ${comps.length} valid comps from ${itemCount} items (structure: ${useNewStructure ? 'new s-card' : 'old s-item'})`);
   
   return comps;
 }
