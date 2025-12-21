@@ -6,6 +6,18 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
 });
 
+// Helper to get current date in YYYY-MM-DD format for GPT prompts
+function getTodayDate(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+// Helper to get a recent date (for example purposes in prompts)
+function getRecentDate(daysAgo: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - daysAgo);
+  return date.toISOString().split('T')[0];
+}
+
 interface CardInfo {
   title: string;
   set?: string | null;
@@ -1224,11 +1236,18 @@ async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<En
     .map((r: any) => `Title: ${r.title}\nSnippet: ${preprocessSnippet(r.snippet)}\nURL: ${r.link}`)
     .join("\n\n");
 
+  // Get dynamic dates for GPT examples (so they're always recent)
+  const todayStr = getTodayDate();
+  const recentDate1 = getRecentDate(2); // 2 days ago
+  const recentDate2 = getRecentDate(5); // 5 days ago
+  
   // Adjust prompt based on whether we have strict comps or using loose fallback
   const systemPrompt = usingLooseFallback
     ? `You are a sports card pricing expert. Extract ALL price points from search results.
     
 NOTE: No exact matches found, using approximate comps. Extract all relevant prices but acknowledge this is approximate data.
+
+Today's date is: ${todayStr}
 
 Your task:
 1. Find prices from the best matching listings available
@@ -1239,8 +1258,8 @@ Your task:
 Return ONLY a JSON object with:
 {
   "pricePoints": [
-    { "date": "2024-12-01", "price": 79, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Bijan Robinson RC" },
-    { "date": "2024-11-30", "price": 61, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Rated Rookie Bijan Robinson" }
+    { "date": "${recentDate1}", "price": 79, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Bijan Robinson RC" },
+    { "date": "${recentDate2}", "price": 61, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Rated Rookie Bijan Robinson" }
   ],
   "estimatedValue": number (average of prices found),
   "salesFound": number (total price points extracted),
@@ -1262,9 +1281,12 @@ RULES:
   * eBay sold: "$39.95 shipping" → extract $39.95 (ignore shipping cost)
   * Price guide range: "$35-$48" → extract midpoint $41.50
 - Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
-- If no date is visible, use today's date
+- CRITICAL: If no date is visible in the snippet, use TODAY'S DATE: ${todayStr}
+- Most price guide sites show RECENT prices - assume they are from the last few days unless a specific date is shown
 - Note in confidenceReason that exact match data was not available`
     : `You are a sports card pricing expert. Extract ALL INDIVIDUAL price points from search results.
+
+Today's date is: ${todayStr}
 
 CRITICAL MATCHING RULES (STRICT COMPS ONLY):
 1. GRADE IS CRITICAL - NEVER MIX GRADES:
@@ -1286,8 +1308,8 @@ Your task:
 Return ONLY a JSON object with:
 {
   "pricePoints": [
-    { "date": "2024-12-01", "price": 79, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss #305 Bijan Robinson RC PSA 10" },
-    { "date": "2024-11-15", "price": 61, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Rated Rookie Bijan Robinson PSA 10" }
+    { "date": "${recentDate1}", "price": 79, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss #305 Bijan Robinson RC PSA 10" },
+    { "date": "${recentDate2}", "price": 61, "source": "eBay Sold", "url": "https://...", "listingTitle": "2023 Donruss Rated Rookie Bijan Robinson PSA 10" }
   ],
   "estimatedValue": number (average of STRICT matches only),
   "salesFound": number (total STRICT price points extracted),
@@ -1314,7 +1336,8 @@ RULES:
 - EXCLUDE qualifier grades like PSA 8 (ST) - these are worth much less
 - EXCLUDE parallels/variations when searching for base cards (Prizm, Refractor, Holo, /99, etc.)
 - Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
-- If no date is visible, use today's date
+- CRITICAL: If no date is visible in the snippet, use TODAY'S DATE: ${todayStr}
+- Most price guide sites show RECENT prices - assume they are from the last few days unless a specific date is shown
 - eBay sold listings are most reliable`;
 
   const isBaseCard = !card.variation || card.variation.trim().length === 0;
