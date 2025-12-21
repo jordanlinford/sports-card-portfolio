@@ -1242,6 +1242,9 @@ RULES:
 - Extract up to 20 individual price points
 - EXTRACT ALL PRICES from each snippet - don't stop at the first one!
 - A single search result may contain multiple sold prices - extract them all
+- Look for price guide formats like "Last Sale$48.45" or "PSA 10 $35.00" - extract these!
+- Look for table data like "PSA 10: $35 | PSA 9: $20" - extract the matching grade price
+- "$35.00" next to a date like "12/15/2025" is a sold price - extract it!
 - Price ranges like "$400-$600" count as ONE price point at the midpoint ($500)
 - If no date is visible, use today's date
 - Note in confidenceReason that exact match data was not available`
@@ -1282,6 +1285,9 @@ RULES:
 - Extract up to 20 individual price points
 - EXTRACT ALL PRICES from each snippet - don't stop at the first one!
 - A single search result may contain multiple sold prices (e.g., auction history) - extract them all
+- Look for price guide formats like "Last Sale$48.45" or "PSA 10 $35.00" - extract these!
+- Look for table data like "PSA 10: $35 | PSA 9: $20" - extract the matching grade price
+- "$35.00" next to a date like "12/15/2025" is a sold price - extract it!
 - EXCLUDE different card numbers (e.g., #81 Team Leaders vs #10 Base)
 - EXCLUDE different graders for value calculation (CGC 8 ≠ PSA 8)
 - EXCLUDE qualifier grades like PSA 8 (ST) - these are worth much less
