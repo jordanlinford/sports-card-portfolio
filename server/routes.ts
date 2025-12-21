@@ -3190,6 +3190,35 @@ Allow: /
     }
   });
 
+  // Portfolio Growth Projections (Pro feature)
+  app.get("/api/analytics/growth-projections", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Check Pro subscription
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        return res.status(403).json({ 
+          message: "Growth Projections is a Pro feature. Upgrade to see personalized value forecasts for your collection." 
+        });
+      }
+      
+      const { getPortfolioGrowthProjections, generateAIGrowthSummary } = await import("./growthProjectionsService");
+      const projections = await getPortfolioGrowthProjections(userId);
+      
+      // Generate AI summary if there are cards
+      let aiSummary = "";
+      if (projections.currentValue > 0) {
+        aiSummary = await generateAIGrowthSummary(projections);
+      }
+      
+      res.json({ ...projections, aiSummary });
+    } catch (error) {
+      console.error("Error fetching growth projections:", error);
+      res.status(500).json({ message: "Failed to fetch growth projections" });
+    }
+  });
+
   // Bookmark routes
   app.get("/api/bookmarks", isAuthenticated, async (req: any, res) => {
     try {

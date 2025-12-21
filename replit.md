@@ -28,6 +28,7 @@ The application supports core functionalities including:
 - **Social Features**: Liking, commenting, a prestige system with tiers and badges, and a bookmarking system for cards.
 - **Trading & Communication**: An offers system for cards marked "Open to Offers" and a direct messaging system between collectors.
 - **Analytics & Sharing**: Portfolio analytics page, and viral sharing features allowing export of cases as various image formats for social media.
+- **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts at 3/6/12 month intervals, showing bear/base/bull scenarios based on market temperature, investment verdicts, and upside/risk scores from player outlook data.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM for type-safe schema management and queries.

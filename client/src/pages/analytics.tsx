@@ -12,7 +12,9 @@ import {
   TrendingDown,
   LayoutGrid, 
   ImageIcon,
-  BarChart3
+  BarChart3,
+  LineChart,
+  Sparkles
 } from "lucide-react";
 import type { Card as CardType } from "@shared/schema";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
@@ -157,6 +159,29 @@ export default function AnalyticsPage() {
           Track your collection's value and performance
         </p>
       </div>
+
+      <Link href="/analytics/growth">
+        <Card className="mb-6 hover-elevate cursor-pointer border-primary/20 bg-primary/5">
+          <CardContent className="flex items-center gap-4 py-4">
+            <div className="p-3 rounded-md bg-primary/10">
+              <LineChart className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold">Growth Projections</h3>
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  Pro
+                </Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                AI-powered forecasts for your collection's future value
+              </p>
+            </div>
+            <TrendingUp className="h-5 w-5 text-muted-foreground" />
+          </CardContent>
+        </Card>
+      </Link>
 
       {isLoading ? (
         <AnalyticsSkeleton />

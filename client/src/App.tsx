@@ -36,6 +36,7 @@ import WatchlistPage from "@/pages/watchlist";
 import HiddenGemsPage from "@/pages/hidden-gems";
 import PortfolioOutlookPage from "@/pages/portfolio-outlook";
 import NextBuysPage from "@/pages/next-buys";
+import GrowthProjectionsPage from "@/pages/growth-projections";
 import ShareViewer from "@/pages/share-viewer";
 
 function Router() {
@@ -75,6 +76,7 @@ function Router() {
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/onboarding" component={OnboardingPage} />
           <Route path="/analytics" component={AnalyticsPage} />
+          <Route path="/analytics/growth" component={GrowthProjectionsPage} />
           <Route path="/bookmarks" component={BookmarksPage} />
           <Route path="/offers" component={OffersPage} />
           <Route path="/messages" component={MessagesPage} />

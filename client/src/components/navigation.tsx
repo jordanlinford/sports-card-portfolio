@@ -166,6 +166,13 @@ export function Navigation() {
                       Analytics
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/analytics/growth" className="flex items-center gap-2 cursor-pointer">
+                      <TrendingUp className="h-4 w-4" />
+                      Growth Projections
+                      <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-auto">Pro</Badge>
+                    </Link>
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
 
