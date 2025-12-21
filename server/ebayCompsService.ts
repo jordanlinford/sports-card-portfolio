@@ -438,8 +438,8 @@ export function filterAndScoreComps(
 // AGGREGATIONS
 // ============================================================================
 
-// Max items we can scrape before hitting limits (2 pages x ~60 items, accounting for filtering)
-const MAX_SCRAPE_ITEMS = 50;
+// Max items we can scrape before hitting limits (4 pages x 60 items = 240, targeting 150+ for popular cards)
+const MAX_SCRAPE_ITEMS = 150;
 
 /**
  * Calculate statistical aggregations from a list of comps
@@ -857,26 +857,49 @@ function parsePrice(priceStr: string): number | null {
  * Scrape eBay sold listings for a query
  * Note: This is a simplified implementation - production would need more robust scraping
  */
+// Adaptive scraping: start conservative, only expand if early pages are full
+const ITEMS_PER_PAGE = 60; // eBay returns ~60 items per page
+const FULL_PAGE_THRESHOLD = 50; // Consider page "full" if 50+ items
+
 async function scrapeEbaySoldListings(
   canonicalQuery: string,
-  maxPages: number = 2, // Reduced to 2 pages max to avoid rate limiting
-  maxItems: number = 60
+  maxPages: number = 3, // Conservative default, will expand adaptively
+  maxItems: number = 150
 ): Promise<{ comps: EbayComp[]; pagesScraped: number; error?: string; isBlocked?: boolean }> {
   const comps: EbayComp[] = [];
   let pagesScraped = 0;
+  let consecutiveEmptyPages = 0;
+  let shouldExpandPages = true; // Adaptive: only continue if pages are returning full results
   
-  console.log(`[eBay Scraper] Starting scrape for: "${canonicalQuery}"`);
+  console.log(`[eBay Scraper] Starting scrape for: "${canonicalQuery}" (max ${maxPages} pages)`);
   
   for (let page = 1; page <= maxPages; page++) {
-    if (comps.length >= maxItems) break;
+    if (comps.length >= maxItems) {
+      console.log(`[eBay Scraper] Reached ${maxItems} items limit, stopping`);
+      break;
+    }
+    
+    // Stop if we've had 2 consecutive empty pages (likely no more results)
+    if (consecutiveEmptyPages >= 2) {
+      console.log(`[eBay Scraper] 2 consecutive empty pages, stopping`);
+      break;
+    }
+    
+    // Adaptive: if page 1 wasn't full, don't bother with more pages
+    if (page > 1 && !shouldExpandPages) {
+      console.log(`[eBay Scraper] Previous page not full, stopping early`);
+      break;
+    }
     
     try {
       const url = buildEbaySearchUrl(canonicalQuery, page);
-      console.log(`[eBay Scraper] Fetching page ${page}: ${url}`);
+      console.log(`[eBay Scraper] Fetching page ${page}/${maxPages}: ${url}`);
       
-      // Add jitter delay between requests (7-12 seconds to avoid rate limiting)
+      // Exponential delays: significantly longer for later pages
       if (page > 1) {
-        await randomDelay(7000, 12000);
+        // 10s base, then 15s, 22s (exponential with jitter)
+        const baseDelay = 10000 * Math.pow(1.5, page - 2);
+        await randomDelay(baseDelay, baseDelay + 5000);
       }
       
       const response = await fetch(url, {
@@ -912,15 +935,24 @@ async function scrapeEbaySoldListings(
       console.log(`[eBay Scraper] Found ${pageComps.length} items on page ${page}`);
       
       if (pageComps.length === 0) {
-        // No more results
-        break;
+        consecutiveEmptyPages++;
+        shouldExpandPages = false;
+        console.log(`[eBay Scraper] Empty page ${page}, consecutive empty: ${consecutiveEmptyPages}`);
+      } else {
+        consecutiveEmptyPages = 0; // Reset counter on successful page
+        comps.push(...pageComps);
+        
+        // Adaptive: only continue to next page if this one was reasonably full
+        if (pageComps.length < FULL_PAGE_THRESHOLD) {
+          shouldExpandPages = false;
+          console.log(`[eBay Scraper] Page ${page} not full (${pageComps.length}/${FULL_PAGE_THRESHOLD}), won't expand further`);
+        }
       }
-      
-      comps.push(...pageComps);
       
     } catch (err) {
       console.error(`[eBay Scraper] Error on page ${page}:`, err);
-      // Continue to next page on error
+      consecutiveEmptyPages++; // Count errors as empty pages for safety
+      shouldExpandPages = false; // Don't expand on errors
     }
   }
   
@@ -1039,11 +1071,11 @@ async function runFetchJob(job: FetchJob): Promise<void> {
         await randomDelay(2000, 4000);
       }
       
-      // Scrape eBay with reduced limits to avoid blocking
+      // Scrape eBay with adaptive limits - starts conservative, expands only if pages are full
       const { comps: rawComps, pagesScraped, error: scrapeError, isBlocked } = await scrapeEbaySoldListings(
         currentQuery,
-        2, // max pages
-        60 // max items
+        3, // max pages - adaptive expansion based on page fullness
+        150 // max items target
       );
       
       totalPagesScraped += pagesScraped;
