@@ -438,6 +438,9 @@ export function filterAndScoreComps(
 // AGGREGATIONS
 // ============================================================================
 
+// Max items we can scrape before hitting limits (2 pages x ~60 items, accounting for filtering)
+const MAX_SCRAPE_ITEMS = 50;
+
 /**
  * Calculate statistical aggregations from a list of comps
  */
@@ -452,9 +455,13 @@ export function calculateAggregations(comps: EbayComp[]): CompsSummary {
       volatility: 0,
       liquidity: 0,
       trendSeries: [],
-      trendSlope: 0
+      trendSlope: 0,
+      cappedAtMax: false
     };
   }
+  
+  // Flag if we hit scraping limits - actual market volume likely higher
+  const cappedAtMax = comps.length >= MAX_SCRAPE_ITEMS;
   
   const prices = comps.map(c => c.totalPrice).sort((a, b) => a - b);
   const soldCount = prices.length;
@@ -547,22 +554,33 @@ export function calculateAggregations(comps: EbayComp[]): CompsSummary {
     volatility: Math.round(volatility * 1000) / 1000,
     liquidity: Math.round(liquidity * 10) / 10,
     trendSeries,
-    trendSlope: Math.round(trendSlope * 100) / 100
+    trendSlope: Math.round(trendSlope * 100) / 100,
+    cappedAtMax
   };
 }
 
 /**
  * Determine confidence level based on sold count and match quality
  * LOW if < 5 comps, MED if 5-14, HIGH if 15+ with good match score
+ * 
+ * IMPORTANT: If cappedAtMax is true, we hit our scraping limit (50+ items),
+ * which means the actual market likely has even MORE volume. This should
+ * be treated as HIGH liquidity/confidence for data reliability.
  */
 export function calculateConfidence(
   soldCount: number,
   avgMatchScore: number,
-  isFallback: boolean = false
+  isFallback: boolean = false,
+  cappedAtMax: boolean = false
 ): "HIGH" | "MED" | "LOW" {
   // If fallback/blocked, always LOW confidence
   if (isFallback) {
     return "LOW";
+  }
+  
+  // If we capped out on scraping, this is a high-volume card - trust the data
+  if (cappedAtMax && avgMatchScore >= 0.5) {
+    return "HIGH";
   }
   
   // Less than 5 comps = always LOW
@@ -919,7 +937,8 @@ async function runFetchJob(job: FetchJob): Promise<void> {
     }
     
     // Determine confidence (not fallback since we have real eBay data)
-    const confidence = calculateConfidence(summary.soldCount, avgMatchScore, false);
+    // Pass cappedAtMax to boost confidence for high-volume cards
+    const confidence = calculateConfidence(summary.soldCount, avgMatchScore, false, summary.cappedAtMax);
     
     // Calculate expiry with longer TTLs for reliability:
     // - 7 days (168h) for strong data (>=15 comps)

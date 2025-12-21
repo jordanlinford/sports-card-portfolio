@@ -896,6 +896,7 @@ export type CompsSummary = {
   liquidity: number;
   trendSeries: Array<{ week: string; medianPrice: number; count: number }>;
   trendSlope: number;
+  cappedAtMax?: boolean; // True if we hit scraping limits - actual market volume may be higher
 };
 
 // Query filters type
