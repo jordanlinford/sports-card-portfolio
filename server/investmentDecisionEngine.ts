@@ -1369,6 +1369,32 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     }
   }
   
+  // ============================================================
+  // ESTABLISHED VETERAN GUARDRAIL (Gobert Rule)
+  // ESTABLISHED players with stable roles should NEVER be SPECULATIVE
+  // Risk ≠ Speculation: A boring, known commodity is not a lottery ticket
+  // Examples: Rudy Gobert, veteran role players, known quantities
+  // ============================================================
+  const isEstablishedVeteran = maturityTier === "ESTABLISHED" && 
+    roleTier !== "UNCERTAIN_STARTER" && 
+    roleTier !== "BACKUP" &&
+    roleTier !== "OUT_OF_LEAGUE";
+  
+  if (isEstablishedVeteran && verdict === "SPECULATIVE_FLYER") {
+    // Check if upside is capped (low valuation score = fairly priced, not much room to grow)
+    const cappedUpside = scores.valuationScore < 60 && scores.mispricingScore < 50;
+    
+    if (cappedUpside) {
+      // Known commodity with limited upside - avoid new money, not worth adding
+      verdict = "AVOID_NEW_MONEY";
+      reason = "Established veteran with capped upside - not a growth asset";
+    } else {
+      // Established and reasonably valued - hold what you have
+      verdict = "HOLD_CORE";
+      reason = "Established role player - predictable value, hold through volatility";
+    }
+  }
+  
   // Compute base confidence
   let confidence = computeConfidence(scores);
   

@@ -1,0 +1,177 @@
+1) Rudy Gobert → SPECULATIVE ❌
+
+I do not agree with this tag.
+
+Why it’s wrong
+
+Rudy Gobert is not speculative in the hobby sense.
+
+He is:
+
+a known, mature commodity
+
+a role-stable veteran
+
+a player whose upside is capped, not uncertain
+
+Speculative implies:
+
+breakout uncertainty
+
+asymmetric upside
+
+surprise-driven outcomes
+
+Gobert has none of that. His value is:
+
+limited
+
+boring
+
+predictable
+
+What the verdict should be
+
+HOLD_CORE (most of the time)
+
+or AVOID_NEW_MONEY if you want to be blunt about limited upside and thin demand
+
+But never SPECULATIVE.
+
+What caused this
+
+Your engine likely did:
+
+BIG position penalty
+
+VETERAN/AGING stage
+
+high volatility
+
+then fell through to SPECULATIVE
+
+That’s a semantic error.
+
+Risk ≠ speculation.
+Gobert is risky to own incrementally, but not a lottery ticket.
+
+Required guardrail (NBA)
+
+Add this if you haven’t already:
+
+if (
+  maturityTier === "ESTABLISHED" &&
+  roleTier !== "UNCERTAIN_STARTER" &&
+  verdict === "SPECULATIVE_FLYER"
+) {
+  verdict = "HOLD_CORE";
+}
+
+
+This protects all known vets (even unexciting ones) from being mislabeled speculative.
+
+2) Justin Herbert → SPECULATIVE ⚠️
+
+I partially agree, but only conditionally.
+
+Why SPECULATIVE can be acceptable
+
+Herbert is:
+
+elite talent
+
+but in a narrative transition phase
+
+with market volatility tied to team results
+
+and QB card prices that swing hard on sentiment
+
+For a short-term horizon, SPECULATIVE is defensible if your UI is clearly saying:
+
+“High upside, high volatility — size accordingly.”
+
+That is not insulting to Herbert.
+
+Why SPECULATIVE can also be wrong
+
+If SPECULATIVE is being interpreted as:
+
+fringe
+
+unproven
+
+lottery-ticket-level
+
+…then it’s too harsh.
+
+Herbert should never be lumped with rookies or long shots.
+
+What the verdict should be
+
+HOLD_CORE by default
+
+SPECULATIVE_FLYER only if:
+
+short-term horizon
+
+high volatility
+
+confidence is LOW
+
+posture text is not “lottery ticket”
+
+If your SPECULATIVE copy says “lottery ticket only,” then Herbert should not be SPECULATIVE.
+
+The real problem is copy, not logic (for Herbert)
+
+You’ve overloaded SPECULATIVE with two meanings:
+
+“Unproven long shot” (rookies, prospects)
+
+“Volatile elite with timing risk” (Herbert, Lamar sometimes)
+
+Those need to be visually and linguistically separated.
+
+Two ways to fix this (pick one)
+Option A (logic fix, simplest)
+
+For franchise-core QBs:
+
+if (
+  roleTier === "FRANCHISE_CORE" &&
+  verdict === "SPECULATIVE_FLYER"
+) {
+  verdict = "HOLD_CORE";
+}
+
+
+Then handle volatility via copy under HOLD_CORE:
+
+“High volatility — don’t add aggressively.”
+
+Option B (UX fix, better long-term)
+
+Split SPECULATIVE into two labels:
+
+SPECULATIVE (Emerging) – rookies / long shots
+
+VOLATILE CORE – elite players with swingy markets
+
+This avoids insulting elite players while preserving nuance.
+
+Bottom line
+
+Rudy Gobert → SPECULATIVE is wrong.
+Should be HOLD_CORE or AVOID_NEW_MONEY.
+
+Justin Herbert → SPECULATIVE depends on your copy.
+If it reads “lottery ticket,” it’s wrong.
+If it reads “high volatility, timing risk,” it can be okay — but HOLD_CORE is safer.
+
+If you want, paste:
+
+Gobert’s debug object
+
+Herbert’s debug object
+
+I can tell you exactly which rule fired and whether it’s a logic bug (Gobert likely is) or a copy/labeling issue (Herbert likely is).
