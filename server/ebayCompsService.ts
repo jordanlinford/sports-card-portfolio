@@ -33,12 +33,120 @@ const COMMON_SETS = [
   "contenders", "national treasures", "immaculate", "spectra"
 ];
 
-// Common parallels
-const COMMON_PARALLELS = [
+// Colors that indicate parallels when paired with card types
+const PARALLEL_COLORS = [
   "silver", "gold", "red", "blue", "green", "purple", "orange", "pink", "black",
-  "holo", "refractor", "prizm", "mojo", "hyper", "cosmic", "wave",
-  "/99", "/75", "/50", "/25", "/10", "/5", "/1"
+  "white", "yellow", "teal", "ruby", "sapphire", "emerald", "bronze", "platinum",
+  "ice", "neon", "camo", "hyper", "cosmic", "disco", "mojo", "holo"
 ];
+
+// Card type/finish terms that make colors meaningful as parallels
+const PARALLEL_TYPES = [
+  "prizm", "refractor", "optic", "select", "wave", "shimmer", "parallel"
+];
+
+// Standalone parallel markers that are unambiguous (won't match team names)
+const UNAMBIGUOUS_PARALLELS = [
+  // Pattern/finish parallels (distinct terms - these alone indicate a parallel)
+  "refractor", "xfractor", "superfractor", "atomic",
+  "holographic", "pulsar", "velocity", "scope",
+  "speckle", "laser", "reactive", "fluorescent", "marble",
+  "cracked ice", "tie-dye", "tie dye", "neon green", "neon orange",
+  // Special edition markers
+  "ssp", "short print", "case hit", "hobby exclusive", "retail exclusive",
+  "1st edition", "first edition", "1/1", "one of one",
+  // Specific parallel names
+  "camo", "snakeskin", "tiger stripe", "zebra"
+];
+
+// Combined list for query extraction (used in normalizeEbayQuery)
+const COMMON_PARALLELS = [
+  ...UNAMBIGUOUS_PARALLELS,
+  // Add color+type combos for query matching
+  "silver prizm", "gold prizm", "red prizm", "blue prizm", "green prizm",
+  "purple prizm", "orange prizm", "pink prizm", "black prizm",
+  "silver refractor", "gold refractor", "blue refractor", "green refractor",
+  "hyper prizm", "cosmic prizm", "disco prizm", "mojo prizm",
+  "holo optic", "silver optic", "gold optic"
+];
+
+/**
+ * Check if a title contains any parallel indicators
+ * Uses ADJACENCY-AWARE matching: colors only count when ADJACENT to parallel types
+ * This prevents false positives from player names like "Jalen Green"
+ */
+function titleHasParallel(title: string): boolean {
+  const lowerTitle = title.toLowerCase();
+  
+  // Check unambiguous parallels first (simple substring match is safe)
+  for (const p of UNAMBIGUOUS_PARALLELS) {
+    if (lowerTitle.includes(p.toLowerCase())) {
+      return true;
+    }
+  }
+  
+  // Check for numbered parallels like /99, #5/25, "numbered to 99", etc.
+  if (/\/\d{1,3}\b/.test(lowerTitle) || /\b\d+\s*\/\s*\d+\b/.test(lowerTitle)) {
+    return true;
+  }
+  if (/numbered\s+(to\s+)?\d+/i.test(lowerTitle)) {
+    return true;
+  }
+  
+  // ADJACENCY check: color must be NEXT TO a parallel type word
+  // Uses flexible spacing to handle "Prizm Silver", "Prizm-Silver", "Prizm / Silver"
+  // This prevents "Jalen Green 2023 Prizm" from being flagged as a green parallel
+  for (const color of PARALLEL_COLORS) {
+    for (const ptype of PARALLEL_TYPES) {
+      // Check both orders with flexible separators (space, dash, slash)
+      const pattern1 = new RegExp(`\\b${color}[\\s\\-/]+${ptype}\\b`, "i");
+      const pattern2 = new RegExp(`\\b${ptype}[\\s\\-/]+${color}\\b`, "i");
+      if (pattern1.test(lowerTitle) || pattern2.test(lowerTitle)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Check if a title matches a specific parallel filter
+ * Handles both word orders: "silver prizm" matches "prizm silver"
+ * Uses adjacency-aware matching for color-only queries
+ */
+function titleMatchesParallel(title: string, parallel: string): boolean {
+  const lowerTitle = title.toLowerCase();
+  const lowerParallel = parallel.toLowerCase();
+  
+  // Direct substring match
+  if (lowerTitle.includes(lowerParallel)) {
+    return true;
+  }
+  
+  // Try reversed word order for two-word parallels
+  const words = lowerParallel.split(/\s+/);
+  if (words.length === 2) {
+    const reversed = `${words[1]} ${words[0]}`;
+    if (lowerTitle.includes(reversed)) {
+      return true;
+    }
+  }
+  
+  // For single-color queries, check if color is ADJACENT to any parallel type
+  // Uses flexible separators (space, dash, slash)
+  if (PARALLEL_COLORS.includes(lowerParallel)) {
+    for (const ptype of PARALLEL_TYPES) {
+      const pattern1 = new RegExp(`\\b${lowerParallel}[\\s\\-/]+${ptype}\\b`, "i");
+      const pattern2 = new RegExp(`\\b${ptype}[\\s\\-/]+${lowerParallel}\\b`, "i");
+      if (pattern1.test(lowerTitle) || pattern2.test(lowerTitle)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
 
 export interface NormalizedQuery {
   canonicalQuery: string;
@@ -87,13 +195,34 @@ export function normalizeEbayQuery(input: string): NormalizedQuery {
     }
   }
   
-  // Extract parallel
+  // Extract parallel - check for color+type pairs in ANY order
+  // First try exact multi-word parallels from COMMON_PARALLELS
   for (const parallel of COMMON_PARALLELS) {
     if (normalized.includes(parallel)) {
       filters.parallel = parallel;
       break;
     }
   }
+  
+  // If no exact match, check for color+type pairs in any order with flexible spacing
+  if (!filters.parallel) {
+    for (const color of PARALLEL_COLORS) {
+      for (const ptype of PARALLEL_TYPES) {
+        // Match "silver prizm", "prizm silver", "silver-prizm", etc.
+        const pattern1 = new RegExp(`\\b${color}[\\s\\-/]*${ptype}\\b`, "i");
+        const pattern2 = new RegExp(`\\b${ptype}[\\s\\-/]*${color}\\b`, "i");
+        if (pattern1.test(normalized) || pattern2.test(normalized)) {
+          filters.parallel = `${color} ${ptype}`;
+          break;
+        }
+      }
+      if (filters.parallel) break;
+    }
+  }
+  
+  // NOTE: We do NOT do a Stage 3 fallback for non-adjacent colors
+  // because this would incorrectly flag player names like "Jalen Green"
+  // Users must specify parallels explicitly (e.g., "silver prizm" or "prizm silver")
   
   // Extract card number (e.g., "#123", "card 45")
   const cardNumMatch = normalized.match(/#?\s*(\d{1,4})\b/);
@@ -389,20 +518,29 @@ export function calculateMatchScore(
     }
   }
   
-  // Parallel check (soft match)
+  // Parallel/variation check (STRICT - variation is a critical filter)
+  // Uses context-aware detection to avoid false positives with team names
+  const resultHasParallel = titleHasParallel(title);
+  
   if (filters.parallel) {
-    maxScore += 0.1;
-    if (title.includes(filters.parallel.toLowerCase())) {
-      score += 0.1;
+    // User specified a parallel - MUST match (handles word order variations)
+    maxScore += 0.2;
+    if (titleMatchesParallel(title, filters.parallel)) {
+      score += 0.2;
     } else {
-      // Check for conflicting parallel
-      const otherParallels = COMMON_PARALLELS.filter(p => p !== filters.parallel);
-      for (const p of otherParallels) {
-        if (title.includes(p.toLowerCase())) {
-          score -= 0.05; // Slight penalty for wrong parallel
-          break;
-        }
-      }
+      // Wrong parallel or no parallel when one was specified - hard reject
+      return 0;
+    }
+  } else {
+    // No parallel specified = user wants BASE CARD only
+    // Reject any results with parallel markers (context-aware check)
+    maxScore += 0.15;
+    if (resultHasParallel) {
+      // Result has a parallel but user wants base - hard reject
+      return 0;
+    } else {
+      // Base card as expected
+      score += 0.15;
     }
   }
   
