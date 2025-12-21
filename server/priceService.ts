@@ -350,7 +350,9 @@ function isStrictComp(
   // HARD GATE 2.5: RAW listings don't match GRADED cards
   // If user wants PSA 10/BGS 9.5/etc., reject listings mentioning "raw", "ungraded", or lacking grader
   const cardGrade = parseGradeInfo(card.grade);
-  const effectiveCardGrader = card.grader?.toLowerCase() || cardGrade.grader;
+  // Assume PSA if grade is just a number like "10" (most common grader)
+  const effectiveCardGrader = card.grader?.toLowerCase() || cardGrade.grader || 
+    (card.grade && /^\d+\.?\d*$/.test(card.grade.trim()) ? "psa" : null);
   const cardWantsGraded = effectiveCardGrader || (card.grade && /\d/.test(card.grade));
   
   if (cardWantsGraded) {
@@ -915,6 +917,30 @@ function cleanCardTitle(title: string): string {
   return cleaned;
 }
 
+// Normalize grade to include grader prefix (assume PSA if just a number)
+function normalizeGradeForSearch(grade: string | undefined | null, grader: string | undefined | null): string {
+  if (!grade) return "";
+  
+  const gradeLower = grade.toLowerCase();
+  const hasGrader = ["psa", "bgs", "sgc", "cgc"].some(g => gradeLower.includes(g));
+  
+  if (hasGrader) {
+    return grade; // Already has grader
+  }
+  
+  // If explicit grader provided, use it
+  if (grader) {
+    return `${grader.toUpperCase()} ${grade}`;
+  }
+  
+  // If just a number (like "10", "9"), assume PSA (most common)
+  if (/^\d+\.?\d*$/.test(grade.trim())) {
+    return `PSA ${grade}`;
+  }
+  
+  return grade;
+}
+
 function buildSearchQueries(card: CardInfo): string[] {
   const queries: string[] = [];
   const cleanTitle = cleanCardTitle(card.title);
@@ -923,23 +949,26 @@ function buildSearchQueries(card: CardInfo): string[] {
   // This prevents Downtown ($400) from matching when user wants base Donruss ($25)
   const variationOrBase = card.variation || "base";
   
+  // Normalize grade to include grader (assume PSA if just a number like "10")
+  const normalizedGrade = normalizeGradeForSearch(card.grade, card.grader);
+  
   // Primary query: player name + set + year + variation/base + grade + "value" or "price" for pricing info
   const primaryParts: string[] = [];
   if (cleanTitle) primaryParts.push(cleanTitle);
   if (card.set) primaryParts.push(card.set);
   if (card.year) primaryParts.push(String(card.year));
   primaryParts.push(variationOrBase);
-  if (card.grade) primaryParts.push(card.grade);
+  if (normalizedGrade) primaryParts.push(normalizedGrade);
   queries.push(primaryParts.join(" ") + " value price");
   
-  // Secondary query: search PSA auction prices specifically (include variation/base)
-  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${variationOrBase} ${card.grade || ""} auction price sold`);
+  // Secondary query: search auction prices specifically (include variation/base)
+  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${variationOrBase} ${normalizedGrade} auction price sold`);
   
   // Tertiary query: player name + year + variation/base + grade + "rookie card value"
-  queries.push(`${cleanTitle} ${card.year || ""} ${variationOrBase} ${card.grade || ""} rookie card value`);
+  queries.push(`${cleanTitle} ${card.year || ""} ${variationOrBase} ${normalizedGrade} rookie card value`);
   
   // Fourth query: simpler version targeting price guides (include variation/base)
-  queries.push(`${cleanTitle} ${card.set || ""} ${variationOrBase} ${card.grade || ""} price guide`);
+  queries.push(`${cleanTitle} ${card.set || ""} ${variationOrBase} ${normalizedGrade} price guide`);
   
   return queries;
 }
