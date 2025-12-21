@@ -128,9 +128,9 @@ function getTierColor(tier: StockTier) {
 
 function getLiquidityLabel(liq: LiquidityLevel) {
   switch (liq) {
-    case "HIGH": return "Easy to buy/sell";
+    case "HIGH": return "High volume (likely higher)";
     case "MEDIUM": return "Moderate liquidity";
-    case "LOW": return "Hard to exit";
+    case "LOW": return "Lower activity in sample";
     default: return "";
   }
 }

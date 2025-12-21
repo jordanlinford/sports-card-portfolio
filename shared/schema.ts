@@ -818,6 +818,10 @@ export const marketCompsCache = pgTable("market_comps_cache", {
     liquidity: number;
     trendSeries: Array<{ week: string; medianPrice: number; count: number }>;
     trendSlope: number;
+    cappedAtMax?: boolean;
+    dateCoverageDays?: number;
+    oldestSaleDate?: string;
+    newestSaleDate?: string;
   }>(),
   
   // Confidence based on sold count + match quality
@@ -885,6 +889,25 @@ export type EbayComp = {
   matchScore: number;
 };
 
+// Liquidity tier - inferred market liquidity
+export const LIQUIDITY_TIER = {
+  VERY_HIGH: "VERY_HIGH", // Hit data cap on a tight query - extremely liquid
+  HIGH: "HIGH",           // Hit data cap or 30+ comps
+  MEDIUM: "MEDIUM",       // 10-29 comps with good coverage
+  LOW: "LOW",             // Few sales found with good coverage
+  UNCERTAIN: "UNCERTAIN", // Can't determine due to scrape issues or weak coverage
+} as const;
+export type LiquidityTier = keyof typeof LIQUIDITY_TIER;
+
+// Liquidity assessment - complete picture of market liquidity
+export type LiquidityAssessment = {
+  tier: LiquidityTier;
+  confidence: "HIGH" | "MED" | "LOW";
+  explanation: string;
+  matchQuality: "EXACT" | "CLOSE" | "BROAD"; // How specific was the query
+  dateCoverageDays: number; // How many days of sales data we have
+};
+
 // Summary aggregations type
 export type CompsSummary = {
   soldCount: number;
@@ -897,6 +920,9 @@ export type CompsSummary = {
   trendSeries: Array<{ week: string; medianPrice: number; count: number }>;
   trendSlope: number;
   cappedAtMax?: boolean; // True if we hit scraping limits - actual market volume may be higher
+  dateCoverageDays?: number; // How many days of actual sales data
+  oldestSaleDate?: string; // Date of oldest sale in sample
+  newestSaleDate?: string; // Date of newest sale in sample
 };
 
 // Query filters type

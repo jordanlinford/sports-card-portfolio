@@ -124,10 +124,10 @@ function getMarketFrictionHelperText(friction: number, action?: string): string 
       ? "Thin market—eye appeal drives big spreads." 
       : "Sells slowly—patient pricing works best.";
   }
-  if (friction <= 25) return "Easy to move—buyers are plentiful.";
-  if (friction <= 50) return "Usually sellable, but timing matters.";
-  if (friction <= 75) return "May take a while to sell at a fair price.";
-  return "Trades infrequently—expect wide spreads.";
+  if (friction <= 25) return "High volume—buyers plentiful (may be higher).";
+  if (friction <= 50) return "Moderate activity—usually sellable.";
+  if (friction <= 75) return "Lower activity based on available data.";
+  return "Few recent sales found—may be harder to trade.";
 }
 
 function getActionColor(action: OutlookAction): string {

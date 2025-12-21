@@ -2060,7 +2060,7 @@ Allow: /
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
       // Check for eBay comps data with stale-while-revalidate pattern
-      const { normalizeEbayQuery, getCachedCompsWithSWR, getCacheEntry, enqueueFetchJob } = await import("./ebayCompsService");
+      const { normalizeEbayQuery, getCachedCompsWithSWR, getCacheEntry, enqueueFetchJob, calculateQuerySpecificity, calculateLiquidityAssessment, fetchStatusToScrapeHealth } = await import("./ebayCompsService");
       
       // Build query for comps lookup
       const compsQueryParts = [title];
@@ -2088,6 +2088,20 @@ Allow: /
         if (swrResult.data && (swrResult.data.fetchStatus === "complete" || swrResult.data.compsJson)) {
           ebayCompsStatus = swrResult.isStale ? "stale" : "hit";
           ebayCompsSource = "EBAY_SOLD";
+          
+          // Calculate liquidity assessment
+          const querySpecificity = calculateQuerySpecificity(normalized.filters);
+          const scrapeHealth = fetchStatusToScrapeHealth(swrResult.data.fetchStatus, swrResult.data.failureCount);
+          const summary = swrResult.data.summaryJson;
+          const liquidityAssessment = calculateLiquidityAssessment(
+            swrResult.data.soldCount,
+            summary?.cappedAtMax ?? false,
+            summary?.dateCoverageDays ?? 30,
+            swrResult.data.avgMatchScore ?? 0.5,
+            querySpecificity,
+            scrapeHealth
+          );
+          
           ebayComps = {
             queryHash: swrResult.data.queryHash,
             confidence: swrResult.data.confidence,
@@ -2099,8 +2113,9 @@ Allow: /
             itemsKept: swrResult.data.itemsKept,
             isStale: swrResult.isStale,
             refreshing: swrResult.needsRefresh,
+            liquidityAssessment,
           };
-          console.log(`[Quick Analyze] eBay comps cache ${swrResult.isStale ? "stale" : "fresh"} hit: ${swrResult.data.soldCount} comps`);
+          console.log(`[Quick Analyze] eBay comps cache ${swrResult.isStale ? "stale" : "fresh"} hit: ${swrResult.data.soldCount} comps, liquidity: ${liquidityAssessment.tier}`);
         } else {
           // Check if already fetching or has other status
           const entry = await getCacheEntry(normalized.queryHash);
@@ -4418,6 +4433,21 @@ Allow: /
       
       if (swrResult.data && (swrResult.data.fetchStatus === "complete" || swrResult.data.compsJson)) {
         console.log(`[Comps API] Cache ${swrResult.isStale ? "stale" : "fresh"} hit for ${queryHash}`);
+        
+        // Calculate liquidity assessment if we have filters
+        const summary = swrResult.data.summaryJson;
+        const filters = swrResult.data.filters || {};
+        const querySpecificity = ebayComps.calculateQuerySpecificity(filters);
+        const scrapeHealth = ebayComps.fetchStatusToScrapeHealth(swrResult.data.fetchStatus, swrResult.data.failureCount);
+        const liquidityAssessment = ebayComps.calculateLiquidityAssessment(
+          swrResult.data.soldCount,
+          summary?.cappedAtMax ?? false,
+          summary?.dateCoverageDays ?? 30,
+          swrResult.data.avgMatchScore ?? 0.5,
+          querySpecificity,
+          scrapeHealth
+        );
+        
         return res.json({
           status: swrResult.isStale ? "stale" : "complete",
           data: {
@@ -4430,7 +4460,8 @@ Allow: /
             lastFetchedAt: swrResult.data.lastFetchedAt,
             expiresAt: swrResult.data.expiresAt,
             isStale: swrResult.isStale,
-            refreshing: swrResult.needsRefresh
+            refreshing: swrResult.needsRefresh,
+            liquidityAssessment
           }
         });
       }

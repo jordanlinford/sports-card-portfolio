@@ -1,6 +1,6 @@
 import { createHash } from "crypto";
 import { db } from "./db";
-import { marketCompsCache, type EbayComp, type CompsSummary, type CompsQueryFilters, type MarketCompsCache } from "@shared/schema";
+import { marketCompsCache, type EbayComp, type CompsSummary, type CompsQueryFilters, type MarketCompsCache, type LiquidityAssessment, type LiquidityTier } from "@shared/schema";
 import { eq, and, gt } from "drizzle-orm";
 
 // ============================================================================
@@ -466,6 +466,30 @@ export function calculateAggregations(comps: EbayComp[]): CompsSummary {
   const prices = comps.map(c => c.totalPrice).sort((a, b) => a - b);
   const soldCount = prices.length;
   
+  // Calculate date coverage from sold dates
+  const now = new Date();
+  const soldDates = comps
+    .filter(c => c.soldDate)
+    .map(c => new Date(c.soldDate!))
+    .filter(d => !isNaN(d.getTime()))
+    .sort((a, b) => a.getTime() - b.getTime());
+  
+  let dateCoverageDays = 30; // Default assumption
+  let oldestSaleDate: string | undefined;
+  let newestSaleDate: string | undefined;
+  
+  if (soldDates.length >= 2) {
+    oldestSaleDate = soldDates[0].toISOString().split("T")[0];
+    newestSaleDate = soldDates[soldDates.length - 1].toISOString().split("T")[0];
+    dateCoverageDays = Math.max(1, Math.ceil(
+      (soldDates[soldDates.length - 1].getTime() - soldDates[0].getTime()) / (1000 * 60 * 60 * 24)
+    ));
+  } else if (soldDates.length === 1) {
+    oldestSaleDate = soldDates[0].toISOString().split("T")[0];
+    newestSaleDate = oldestSaleDate;
+    dateCoverageDays = 1;
+  }
+  
   // Basic stats
   const minPrice = prices[0];
   const maxPrice = prices[prices.length - 1];
@@ -481,7 +505,6 @@ export function calculateAggregations(comps: EbayComp[]): CompsSummary {
   
   // Group by week for trend analysis
   const weeklyData = new Map<string, number[]>();
-  const now = new Date();
   
   for (const comp of comps) {
     let weekKey: string;
@@ -555,7 +578,10 @@ export function calculateAggregations(comps: EbayComp[]): CompsSummary {
     liquidity: Math.round(liquidity * 10) / 10,
     trendSeries,
     trendSlope: Math.round(trendSlope * 100) / 100,
-    cappedAtMax
+    cappedAtMax,
+    dateCoverageDays,
+    oldestSaleDate,
+    newestSaleDate
   };
 }
 
@@ -602,6 +628,174 @@ export function calculateConfidence(
   }
   
   return "LOW";
+}
+
+/**
+ * Calculate query specificity score based on how many filter components are present.
+ * Higher score = more specific query = more reliable match quality.
+ * 
+ * Returns: 0.0-1.0 score and a match quality tier
+ */
+export function calculateQuerySpecificity(filters: CompsQueryFilters): {
+  score: number;
+  matchQuality: "EXACT" | "CLOSE" | "BROAD";
+} {
+  let score = 0;
+  const maxScore = 7;
+  
+  // Core identifiers (high value)
+  if (filters.player) score += 2;
+  if (filters.year) score += 1;
+  if (filters.set) score += 1.5;
+  
+  // Card specifics (medium value)
+  if (filters.cardNumber) score += 1;
+  if (filters.parallel) score += 0.5;
+  
+  // Grade (indicates exact condition match)
+  if (filters.grade && filters.grader) score += 1;
+  
+  const normalized = score / maxScore;
+  
+  // Map to match quality tier
+  let matchQuality: "EXACT" | "CLOSE" | "BROAD";
+  if (normalized >= 0.7) {
+    matchQuality = "EXACT"; // Player + year + set + grade
+  } else if (normalized >= 0.4) {
+    matchQuality = "CLOSE"; // Player + some specifics
+  } else {
+    matchQuality = "BROAD"; // Just player name or very generic
+  }
+  
+  return { score: normalized, matchQuality };
+}
+
+/**
+ * Calculate comprehensive liquidity assessment.
+ * Separates tier from confidence and provides user-facing explanation.
+ */
+export function calculateLiquidityAssessment(
+  soldCount: number,
+  cappedAtMax: boolean,
+  dateCoverageDays: number,
+  avgMatchScore: number,
+  querySpecificity: { score: number; matchQuality: "EXACT" | "CLOSE" | "BROAD" },
+  scrapeHealth: "GOOD" | "DEGRADED" | "FAILED"
+): LiquidityAssessment {
+  const { matchQuality } = querySpecificity;
+  
+  // If scrape failed or was blocked, we can't make reliable claims
+  if (scrapeHealth === "FAILED") {
+    return {
+      tier: "UNCERTAIN",
+      confidence: "LOW",
+      explanation: "Unable to retrieve market data. Liquidity unknown.",
+      matchQuality,
+      dateCoverageDays
+    };
+  }
+  
+  // If scrape was degraded (partial data, rate limited)
+  if (scrapeHealth === "DEGRADED" && soldCount < 5) {
+    return {
+      tier: "UNCERTAIN",
+      confidence: "LOW",
+      explanation: "Limited data retrieved. Liquidity estimate is uncertain.",
+      matchQuality,
+      dateCoverageDays
+    };
+  }
+  
+  // Cap hit = at least HIGH liquidity (likely much higher)
+  if (cappedAtMax) {
+    const tier = querySpecificity.score >= 0.6 ? "VERY_HIGH" : "HIGH";
+    return {
+      tier,
+      confidence: avgMatchScore >= 0.6 ? "HIGH" : "MED",
+      explanation: tier === "VERY_HIGH" 
+        ? "Very high liquidity (data limit reached; market is extremely active)."
+        : "High liquidity (data limit reached; likely higher volume).",
+      matchQuality,
+      dateCoverageDays
+    };
+  }
+  
+  // Check if we have good date coverage (at least 14 days for reliable liquidity)
+  const hasGoodCoverage = dateCoverageDays >= 14;
+  const hasMinimalCoverage = dateCoverageDays >= 7;
+  
+  // Calculate effective liquidity based on sales per period
+  const salesPerWeek = soldCount / Math.max(1, dateCoverageDays / 7);
+  
+  // Determine tier based on count and coverage
+  let tier: LiquidityTier;
+  let confidence: "HIGH" | "MED" | "LOW";
+  let explanation: string;
+  
+  if (soldCount >= 30 && hasGoodCoverage) {
+    tier = "HIGH";
+    confidence = avgMatchScore >= 0.6 ? "HIGH" : "MED";
+    explanation = `High liquidity (${soldCount} sales in ${dateCoverageDays} days).`;
+  } else if (soldCount >= 10 && hasMinimalCoverage) {
+    tier = "MEDIUM";
+    confidence = hasGoodCoverage && avgMatchScore >= 0.5 ? "MED" : "LOW";
+    explanation = `Moderate liquidity (${soldCount} sales in ${dateCoverageDays} days).`;
+  } else if (soldCount >= 3 && hasMinimalCoverage) {
+    tier = "LOW";
+    confidence = hasGoodCoverage ? "MED" : "LOW";
+    explanation = `Low liquidity (${soldCount} sales found). May be harder to buy/sell quickly.`;
+  } else if (soldCount > 0) {
+    // Few sales but data may be incomplete
+    if (dateCoverageDays < 7) {
+      tier = "UNCERTAIN";
+      confidence = "LOW";
+      explanation = `Limited sample (${soldCount} sales in ${dateCoverageDays} days). Liquidity uncertain.`;
+    } else {
+      tier = "LOW";
+      confidence = "MED";
+      explanation = `Low liquidity (only ${soldCount} sales found with good coverage).`;
+    }
+  } else {
+    tier = "UNCERTAIN";
+    confidence = "LOW";
+    explanation = "No recent sales found. Liquidity cannot be determined.";
+  }
+  
+  // Adjust explanation for broad queries
+  if (matchQuality === "BROAD" && tier !== "UNCERTAIN") {
+    explanation += " Note: Based on similar cards, not exact match.";
+  }
+  
+  return {
+    tier,
+    confidence,
+    explanation,
+    matchQuality,
+    dateCoverageDays
+  };
+}
+
+/**
+ * Convert fetchStatus to scrapeHealth for liquidity assessment
+ */
+export function fetchStatusToScrapeHealth(
+  fetchStatus: string | null | undefined, 
+  failureCount?: number
+): "GOOD" | "DEGRADED" | "FAILED" {
+  if (!fetchStatus || fetchStatus === "failed") {
+    return "FAILED";
+  }
+  if (fetchStatus === "blocked") {
+    return "FAILED";
+  }
+  if (fetchStatus === "pending") {
+    return "DEGRADED";
+  }
+  // "complete" status but with some failures indicates degraded data
+  if (failureCount && failureCount > 0) {
+    return "DEGRADED";
+  }
+  return "GOOD";
 }
 
 // ============================================================================
