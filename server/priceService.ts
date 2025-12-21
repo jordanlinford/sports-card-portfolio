@@ -347,11 +347,42 @@ function isStrictComp(
     return { isStrict: false, excludeReason: `Has qualifier: ${listingGrade.qualifiers.join(", ")}` };
   }
   
+  // HARD GATE 2.5: RAW listings don't match GRADED cards
+  // If user wants PSA 10/BGS 9.5/etc., reject listings mentioning "raw", "ungraded", or lacking grader
+  const cardGrade = parseGradeInfo(card.grade);
+  const effectiveCardGrader = card.grader?.toLowerCase() || cardGrade.grader;
+  const cardWantsGraded = effectiveCardGrader || (card.grade && /\d/.test(card.grade));
+  
+  if (cardWantsGraded) {
+    // Raw/ungraded detection keywords - ONLY explicit indicators
+    // Avoid "mint condition" which appears in "Gem Mint Condition" for graded cards
+    const rawKeywords = [
+      "raw condition", "raw card", "in raw", " raw ", "ungraded", 
+      "not graded", "no grade"
+    ];
+    // Only trigger if raw keyword found WITHOUT a grader nearby
+    const hasRawKeyword = rawKeywords.some(kw => combined.includes(kw));
+    const hasAnyGraderMention = ["psa", "bgs", "sgc", "cgc"].some(g => combined.includes(g));
+    
+    // If listing explicitly mentions "raw" AND no grader mentioned, reject
+    if (hasRawKeyword && !hasAnyGraderMention) {
+      return { isStrict: false, excludeReason: "RAW listing - user wants graded card" };
+    }
+    
+    // If listing has no detected grader and user wants graded, it's likely raw
+    // Exception: eBay sold listings that have the grader in the title but not parsed from snippet
+    if (!listingGrade.grader && effectiveCardGrader) {
+      // Check if the grader appears anywhere in combined text
+      const graderInText = combined.includes(effectiveCardGrader);
+      if (!graderInText) {
+        return { isStrict: false, excludeReason: `No grader detected - user wants ${effectiveCardGrader.toUpperCase()} graded` };
+      }
+    }
+  }
+  
   // HARD GATE 3: Grader must match for strict comp
   // VINTAGE (pre-2000): ALWAYS require exact grader match - PSA 9 vs PSA 10 can be thousands different
   // MODERN (2000+): Allow grader mismatch as loose comp (less price variance between graders)
-  const cardGrade = parseGradeInfo(card.grade);
-  const effectiveCardGrader = card.grader?.toLowerCase() || cardGrade.grader;
   const isVintage = isVintageCard(card);
   
   if (effectiveCardGrader && listingGrade.grader && effectiveCardGrader !== listingGrade.grader) {
@@ -1261,8 +1292,10 @@ CRITICAL MATCHING RULES:
 - This card is: ${card.grade || "Raw/Ungraded"}
 - ONLY extract prices that match this EXACT grade
 - If snippets show multiple grades like "Raw $27; PSA 9 $46; PSA 10 $108", extract ONLY ${card.grade || "the matching grade"} prices
-- NEVER include "Raw" or "Ungraded" prices when the card is graded
+- NEVER include "Raw", "Ungraded", "Raw condition", "NM-MT", "Near Mint" prices when the card is graded
+- SKIP any listing that mentions "raw condition" or is clearly for an ungraded card
 - ${card.grade} ≠ lower grades (a PSA 10 is worth MORE than PSA 9)
+- Extract price RANGES like "$80-$250" as ONE price point at the midpoint ($165)
 
 2. GRADER MATCHING - DO NOT MIX GRADERS:
 - This card is graded by: ${(card.grader || parseGradeInfo(card.grade).grader || "any grader").toUpperCase()}
