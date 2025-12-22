@@ -121,13 +121,20 @@ export type OutlookDisplayData = {
   isPro?: boolean;
 };
 
-const ACTION_STYLES: Record<string, { bg: string; border: string; icon: typeof TrendingUp; label: string; takeaway: string }> = {
-  BUY: { bg: "bg-green-500/20", border: "border-green-500", icon: TrendingUp, label: "Buy Signal", takeaway: "Good entry point at current prices. Consider adding to your collection." },
-  WATCH: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Activity, label: "Watch", takeaway: "Do not buy aggressively. Monitor for volume changes or news." },
-  SELL: { bg: "bg-red-500/20", border: "border-red-500", icon: TrendingDown, label: "Sell Signal", takeaway: "Consider reducing position. Risk outweighs potential upside." },
-  LONG_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", icon: Clock, label: "Long Hold", takeaway: "Hold for the long term. Short-term gains unlikely but solid floor." },
-  LEGACY_HOLD: { bg: "bg-indigo-500/20", border: "border-indigo-500", icon: Trophy, label: "Legacy Hold", takeaway: "Collector piece. Value driven by legacy appeal, not performance." },
-  LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", icon: MinusCircle, label: "Low Value", takeaway: "Limited market interest. Unlikely to appreciate significantly." },
+const ACTION_STYLES: Record<string, { bg: string; border: string; heroBg: string; icon: typeof TrendingUp; label: string; takeaway: string }> = {
+  BUY: { bg: "bg-green-500/20", border: "border-green-500", heroBg: "bg-green-500", icon: TrendingUp, label: "Buy", takeaway: "Good entry point at current prices. Consider adding to your collection." },
+  ACCUMULATE: { bg: "bg-emerald-500/20", border: "border-emerald-500", heroBg: "bg-emerald-500", icon: TrendingUp, label: "Accumulate", takeaway: "Strong long-term pick. Build position over time." },
+  WATCH: { bg: "bg-yellow-500/20", border: "border-yellow-500", heroBg: "bg-yellow-500", icon: Activity, label: "Watch", takeaway: "Do not buy aggressively. Monitor for volume changes or news." },
+  HOLD: { bg: "bg-slate-500/20", border: "border-slate-500", heroBg: "bg-slate-500", icon: Clock, label: "Hold", takeaway: "Keep current position. Not a good time to buy or sell." },
+  SELL: { bg: "bg-red-500/20", border: "border-red-500", heroBg: "bg-red-500", icon: TrendingDown, label: "Sell", takeaway: "Consider reducing position. Risk outweighs potential upside." },
+  AVOID: { bg: "bg-red-600/20", border: "border-red-600", heroBg: "bg-red-600", icon: ShieldAlert, label: "Avoid", takeaway: "Do not buy. High risk with limited upside potential." },
+  LONG_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", heroBg: "bg-blue-500", icon: Clock, label: "Long Hold", takeaway: "Hold for the long term. Short-term gains unlikely but solid floor." },
+  LEGACY_HOLD: { bg: "bg-violet-500/20", border: "border-violet-500", heroBg: "bg-violet-500", icon: Trophy, label: "Legacy Hold", takeaway: "Collector piece. Value driven by legacy appeal, not performance." },
+  TRADE_THE_HYPE: { bg: "bg-orange-500/20", border: "border-orange-500", heroBg: "bg-orange-500", icon: Zap, label: "Trade the Hype", takeaway: "Short-term momentum play. Sell into strength." },
+  SPECULATIVE_FLYER: { bg: "bg-pink-500/20", border: "border-pink-500", heroBg: "bg-pink-500", icon: Target, label: "Speculative", takeaway: "High risk, high reward. Only with money you can lose." },
+  HOLD_CORE: { bg: "bg-indigo-500/20", border: "border-indigo-500", heroBg: "bg-indigo-500", icon: Trophy, label: "Hold Core", takeaway: "Core holding. Anchor of a strong portfolio." },
+  AVOID_NEW_MONEY: { bg: "bg-red-600/20", border: "border-red-600", heroBg: "bg-red-600", icon: ShieldAlert, label: "Avoid New Money", takeaway: "Don't add more. Current position okay to hold." },
+  LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", heroBg: "bg-muted-foreground", icon: MinusCircle, label: "Low Value", takeaway: "Limited market interest. Unlikely to appreciate significantly." },
 };
 
 const CONFIDENCE_STYLES: Record<string, { color: string; icon: typeof CheckCircle }> = {
@@ -326,6 +333,34 @@ export function OutlookDetails({
 
   return (
     <div className="space-y-6">
+      {/* Hero Verdict Banner */}
+      <div className={`${actionStyle.heroBg} rounded-lg p-4 sm:p-6 ${data.action === 'WATCH' ? 'text-black' : 'text-white'}`}>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 rounded-full p-3">
+              <ActionIcon className="h-8 w-8" />
+            </div>
+            <div>
+              <div className="text-sm font-medium opacity-90 uppercase tracking-wide">Investment Verdict</div>
+              <div className="text-3xl sm:text-4xl font-bold" data-testid="text-verdict-hero">
+                {actionStyle.label}
+              </div>
+            </div>
+          </div>
+          <div className="text-center sm:text-right">
+            {data.market?.value != null && (
+              <>
+                <div className="text-sm opacity-90">Fair Value</div>
+                <div className="text-2xl sm:text-3xl font-bold">{formatCurrency(data.market.value)}</div>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="mt-3 pt-3 border-t border-white/20">
+          <p className="text-sm sm:text-base opacity-95">{actionStyle.takeaway}</p>
+        </div>
+      </div>
+
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-4">
