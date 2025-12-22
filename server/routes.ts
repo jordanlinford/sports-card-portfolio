@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
-import { insertDisplayCaseSchema, insertCardSchema } from "@shared/schema";
+import { insertDisplayCaseSchema, insertCardSchema, insertPlayerRegistrySchema, playerRegistry } from "@shared/schema";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -3190,6 +3190,240 @@ Allow: /
     } catch (error) {
       console.error("Error resetting cache stats:", error);
       res.status(500).json({ message: "Failed to reset cache stats" });
+    }
+  });
+
+  // Admin: Player Registry CRUD endpoints
+  app.get("/api/admin/registry/players", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { sport, search, roleTier, page = "1", limit = "50" } = req.query;
+      const pageNum = parseInt(page as string) || 1;
+      const limitNum = Math.min(parseInt(limit as string) || 50, 100);
+      const offset = (pageNum - 1) * limitNum;
+      
+      const { db } = await import("./db");
+      const { sql, ilike, eq, and } = await import("drizzle-orm");
+      
+      let conditions = [];
+      if (sport && sport !== "all") {
+        conditions.push(eq(playerRegistry.sport, sport as string));
+      }
+      if (roleTier && roleTier !== "all") {
+        conditions.push(eq(playerRegistry.roleTier, roleTier as string));
+      }
+      if (search) {
+        conditions.push(ilike(playerRegistry.playerName, `%${search}%`));
+      }
+      
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      
+      const [players, countResult] = await Promise.all([
+        db.select().from(playerRegistry)
+          .where(whereClause)
+          .orderBy(playerRegistry.sport, playerRegistry.playerName)
+          .limit(limitNum)
+          .offset(offset),
+        db.select({ count: sql<number>`count(*)` }).from(playerRegistry).where(whereClause)
+      ]);
+      
+      const total = Number(countResult[0]?.count || 0);
+      
+      res.json({
+        players,
+        pagination: {
+          page: pageNum,
+          limit: limitNum,
+          total,
+          totalPages: Math.ceil(total / limitNum)
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching player registry:", error);
+      res.status(500).json({ message: "Failed to fetch player registry" });
+    }
+  });
+
+  app.get("/api/admin/registry/players/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const id = parseInt(req.params.id);
+      
+      const [player] = await db.select().from(playerRegistry).where(eq(playerRegistry.id, id));
+      if (!player) {
+        return res.status(404).json({ message: "Player not found" });
+      }
+      res.json(player);
+    } catch (error) {
+      console.error("Error fetching player:", error);
+      res.status(500).json({ message: "Failed to fetch player" });
+    }
+  });
+
+  app.post("/api/admin/registry/players", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const validated = insertPlayerRegistrySchema.parse(req.body);
+      const { db } = await import("./db");
+      
+      const [player] = await db.insert(playerRegistry).values({
+        ...validated,
+        updatedBy: req.user?.claims?.email || "admin"
+      }).returning();
+      
+      res.status(201).json(player);
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "Player already exists for this sport" });
+      }
+      console.error("Error creating player:", error);
+      res.status(500).json({ message: "Failed to create player" });
+    }
+  });
+
+  app.put("/api/admin/registry/players/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validated = insertPlayerRegistrySchema.partial().parse(req.body);
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      const [player] = await db.update(playerRegistry)
+        .set({
+          ...validated,
+          lastUpdated: new Date(),
+          updatedBy: req.user?.claims?.email || "admin"
+        })
+        .where(eq(playerRegistry.id, id))
+        .returning();
+      
+      if (!player) {
+        return res.status(404).json({ message: "Player not found" });
+      }
+      res.json(player);
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ message: "Player already exists for this sport" });
+      }
+      console.error("Error updating player:", error);
+      res.status(500).json({ message: "Failed to update player" });
+    }
+  });
+
+  app.delete("/api/admin/registry/players/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      
+      const [player] = await db.delete(playerRegistry)
+        .where(eq(playerRegistry.id, id))
+        .returning();
+      
+      if (!player) {
+        return res.status(404).json({ message: "Player not found" });
+      }
+      res.json({ success: true, message: "Player deleted" });
+    } catch (error) {
+      console.error("Error deleting player:", error);
+      res.status(500).json({ message: "Failed to delete player" });
+    }
+  });
+
+  // Admin: Bulk import from CSV
+  app.post("/api/admin/registry/import-csv", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const fs = await import("fs");
+      const path = await import("path");
+      
+      const csvPath = path.join(process.cwd(), "data", "player_status_registry.csv");
+      if (!fs.existsSync(csvPath)) {
+        return res.status(404).json({ message: "CSV file not found" });
+      }
+      
+      const content = fs.readFileSync(csvPath, "utf-8");
+      const lines = content.split("\n").slice(1).filter(line => line.trim());
+      
+      let imported = 0;
+      let skipped = 0;
+      let errors: string[] = [];
+      
+      for (const line of lines) {
+        try {
+          const [sport, playerName, aliases, careerStage, roleTier, positionGroup, lastUpdated, notes] = line.split(",").map(s => s.trim());
+          
+          if (!sport || !playerName || !careerStage || !roleTier || !positionGroup) {
+            skipped++;
+            continue;
+          }
+          
+          await db.insert(playerRegistry).values({
+            sport,
+            playerName,
+            aliases: aliases || null,
+            careerStage,
+            roleTier,
+            positionGroup,
+            notes: notes || null,
+            updatedBy: req.user?.claims?.email || "csv-import"
+          }).onConflictDoUpdate({
+            target: [playerRegistry.sport, playerRegistry.playerName],
+            set: {
+              aliases: aliases || null,
+              careerStage,
+              roleTier,
+              positionGroup,
+              notes: notes || null,
+              lastUpdated: new Date(),
+              updatedBy: req.user?.claims?.email || "csv-import"
+            }
+          });
+          imported++;
+        } catch (err: any) {
+          errors.push(`Row error: ${err.message}`);
+          skipped++;
+        }
+      }
+      
+      res.json({
+        success: true,
+        imported,
+        skipped,
+        total: lines.length,
+        errors: errors.slice(0, 10)
+      });
+    } catch (error) {
+      console.error("Error importing CSV:", error);
+      res.status(500).json({ message: "Failed to import CSV" });
+    }
+  });
+
+  // Admin: Registry stats
+  app.get("/api/admin/registry/stats", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { sql } = await import("drizzle-orm");
+      
+      const [bySport, byTier, total] = await Promise.all([
+        db.select({
+          sport: playerRegistry.sport,
+          count: sql<number>`count(*)`
+        }).from(playerRegistry).groupBy(playerRegistry.sport),
+        db.select({
+          tier: playerRegistry.roleTier,
+          count: sql<number>`count(*)`
+        }).from(playerRegistry).groupBy(playerRegistry.roleTier),
+        db.select({ count: sql<number>`count(*)` }).from(playerRegistry)
+      ]);
+      
+      res.json({
+        total: Number(total[0]?.count || 0),
+        bySport: Object.fromEntries(bySport.map(r => [r.sport, Number(r.count)])),
+        byTier: Object.fromEntries(byTier.map(r => [r.tier, Number(r.count)]))
+      });
+    } catch (error) {
+      console.error("Error fetching registry stats:", error);
+      res.status(500).json({ message: "Failed to fetch registry stats" });
     }
   });
 
