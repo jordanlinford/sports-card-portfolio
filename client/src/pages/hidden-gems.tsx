@@ -242,15 +242,17 @@ export default function HiddenGemsPage() {
       lastRefresh: string | null;
       batchId: string | null;
     };
+    isFallback?: boolean;
   }>({
     queryKey: ["/api/hidden-gems"],
   });
   
   const allGems: GemCandidate[] = gemsData?.gems?.map(mapHiddenGemToCandidate) || [];
   const lastRefresh = gemsData?.stats?.lastRefresh;
+  const isFallback = gemsData?.isFallback || false;
   
   const filteredGems = allGems.filter(gem => {
-    if (sport !== "all" && gem.sport !== sport) return false;
+    if (sport !== "all" && gem.sport.toUpperCase() !== sport.toUpperCase()) return false;
     
     if (temperatureFilter === "non-hot" && gem.temperature === "HOT") return false;
     if (temperatureFilter === "cooling-only" && gem.temperature !== "COOLING") return false;
@@ -281,25 +283,24 @@ export default function HiddenGemsPage() {
         <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
           <div className="flex items-center gap-3">
             <Gem className="h-8 w-8 text-emerald-500" />
-            <h1 className="text-3xl font-bold" data-testid="text-page-title">Hidden Gems</h1>
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">
+              {isFallback ? "Featured Players" : "Hidden Gems"}
+            </h1>
           </div>
           <PageShareButton pageSlug="hidden-gems" />
         </div>
         <p className="text-muted-foreground max-w-2xl">
-          AI-identified players who might be underpriced relative to their talent. Each card explains why 
-          they're discounted, what would trigger repricing, and what trap risks to watch for.
+          {isFallback 
+            ? "Curated players across all sports who represent compelling value opportunities. Analyze any player to unlock AI-generated insights."
+            : "AI-identified players who might be underpriced relative to their talent. Each card explains why they're discounted, what would trigger repricing, and what trap risks to watch for."
+          }
         </p>
-        {lastRefresh && (
+        {lastRefresh && !isFallback && (
           <p className="text-xs text-muted-foreground mt-2">
             Last AI refresh: {new Date(lastRefresh).toLocaleDateString('en-US', { 
               month: 'long', 
               year: 'numeric' 
             })}
-          </p>
-        )}
-        {allGems.length === 0 && (
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-            No hidden gems available yet. Gems are generated from players that have been analyzed.
           </p>
         )}
       </div>
@@ -321,10 +322,10 @@ export default function HiddenGemsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Sports</SelectItem>
-                  <SelectItem value="football">Football</SelectItem>
-                  <SelectItem value="basketball">Basketball</SelectItem>
-                  <SelectItem value="baseball">Baseball</SelectItem>
-                  <SelectItem value="hockey">Hockey</SelectItem>
+                  <SelectItem value="NFL">NFL (Football)</SelectItem>
+                  <SelectItem value="NBA">NBA (Basketball)</SelectItem>
+                  <SelectItem value="MLB">MLB (Baseball)</SelectItem>
+                  <SelectItem value="NHL">NHL (Hockey)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -366,30 +367,25 @@ export default function HiddenGemsPage() {
           <CardContent className="py-12 text-center">
             <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">
-              {allGems.length === 0 ? "No gems available yet" : "No gems match your filters"}
+              No players match your filters
             </h3>
             <p className="text-muted-foreground mb-4">
-              {allGems.length === 0 
-                ? "Hidden gems are generated from players that have been analyzed. Try using the Player Outlook feature first."
-                : "Try adjusting your filter settings to see more candidates."
-              }
+              Try adjusting your filter settings to see more candidates.
             </p>
-            {allGems.length > 0 && (
-              <Button variant="outline" onClick={() => {
-                setSport("all");
-                setTemperatureFilter("all");
-                setVerdictFilter("buy-watch");
-              }} data-testid="button-reset-filters">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Reset Filters
-              </Button>
-            )}
+            <Button variant="outline" onClick={() => {
+              setSport("all");
+              setTemperatureFilter("all");
+              setVerdictFilter("buy-watch");
+            }} data-testid="button-reset-filters">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reset Filters
+            </Button>
           </CardContent>
         </Card>
       ) : (
         <>
           <p className="text-sm text-muted-foreground mb-4">
-            Showing {filteredGems.length} AI-identified hidden gem{filteredGems.length !== 1 ? "s" : ""} across {new Set(filteredGems.map(g => g.sport)).size} sport{new Set(filteredGems.map(g => g.sport)).size !== 1 ? "s" : ""}
+            Showing {filteredGems.length} {isFallback ? "featured player" : "AI-identified hidden gem"}{filteredGems.length !== 1 ? "s" : ""} across {new Set(filteredGems.map(g => g.sport)).size} sport{new Set(filteredGems.map(g => g.sport)).size !== 1 ? "s" : ""}
           </p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="grid-gems">
             {filteredGems.map((gem) => (

@@ -5091,18 +5091,30 @@ Allow: /
   // Hidden Gems - Data-driven undervalued player picks
   // ============================================================================
   
-  const { getActiveHiddenGems, refreshHiddenGems, getHiddenGemsStats } = await import("./hiddenGemsService");
+  const { getActiveHiddenGems, refreshHiddenGems, getHiddenGemsStats, getFallbackFeaturedGems } = await import("./hiddenGemsService");
 
   // GET /api/hidden-gems - Get active hidden gems (public)
   app.get("/api/hidden-gems", async (req, res) => {
     try {
-      const gems = await getActiveHiddenGems();
+      let gems = await getActiveHiddenGems();
       const stats = await getHiddenGemsStats();
+      
+      // If no AI-generated gems exist, use curated fallback
+      let isFallback = false;
+      if (gems.length === 0) {
+        gems = getFallbackFeaturedGems();
+        isFallback = true;
+      }
       
       res.json({
         gems,
-        stats,
+        stats: isFallback ? {
+          ...stats,
+          totalActive: gems.length,
+          bySport: { NFL: 3, NBA: 3, MLB: 3, NHL: 3 },
+        } : stats,
         cached: true,
+        isFallback,
       });
     } catch (error) {
       console.error("[Hidden Gems] Error fetching:", error);
