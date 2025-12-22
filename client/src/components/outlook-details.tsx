@@ -443,7 +443,7 @@ export function OutlookDetails({
                   <Separator />
                   <div className="space-y-3">
                     <SignalBar label="Recent Momentum" value={data.signals.trend} />
-                    <SignalBar label="Market Liquidity" value={data.signals.liquidity} />
+                    <SignalBar label="Comp Volume" value={data.signals.liquidity} />
                     <SignalBar label="Price Volatility" value={data.signals.volatility} />
                     <SignalBar label="Card Quality" value={data.signals.cardType} />
                   </div>

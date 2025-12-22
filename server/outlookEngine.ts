@@ -157,8 +157,10 @@ const CAREER_STAGE_BOOST: Record<string, number> = {
   UNKNOWN: 1.0,     // Neutral
 };
 
-// Compute Liquidity Score (1-10) based on sold comp count
-export function computeLiquidityScore(pricePoints: PricePoint[], daysWindow: number = 90): number {
+// Compute Comp Volume Score (1-10) based on sold comp count
+// Note: This is displayed as "Comp Volume" in the UI, not "Market Liquidity"
+// Recalibrated: 10+ comps is solid data for most cards
+export function computeLiquidityScore(pricePoints: PricePoint[], daysWindow: number = 180): number {
   const now = new Date();
   const windowStart = new Date(now.getTime() - daysWindow * 24 * 60 * 60 * 1000);
   
@@ -169,11 +171,14 @@ export function computeLiquidityScore(pricePoints: PricePoint[], daysWindow: num
   
   const count = recentComps.length;
   
+  // Recalibrated thresholds - 10 comps is solid, not sparse
   if (count === 0) return 1;
-  if (count <= 2) return 2;
-  if (count <= 5) return 4;
-  if (count <= 10) return 6;
-  if (count <= 20) return 8;
+  if (count <= 2) return 3;
+  if (count <= 4) return 5;
+  if (count <= 6) return 6;
+  if (count <= 10) return 7;
+  if (count <= 15) return 8;
+  if (count <= 25) return 9;
   return 10;
 }
 
@@ -693,42 +698,44 @@ export function computeBigMover(
 }
 
 // Data Confidence Computation
+// Recalibrated: Comp volume is primary driver, volatility is secondary
+// 10+ comps = HIGH confidence (volatility is a separate metric, not a data quality issue)
 export function computeDataConfidence(
   pricePoints: PricePoint[],
   volatilityScore: number
 ): { confidence: "HIGH" | "MEDIUM" | "LOW"; reason: string } {
   const now = new Date();
-  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
   const oneEightyDaysAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
   
-  const recent90 = pricePoints.filter(pp => new Date(pp.date) >= ninetyDaysAgo).length;
   const recent180 = pricePoints.filter(pp => new Date(pp.date) >= oneEightyDaysAgo).length;
   const total = pricePoints.length;
   
-  // HIGH: 10+ comps in 180 days + low volatility
-  if (recent180 >= 10 && volatilityScore <= 5) {
+  // HIGH: 8+ comps in 180 days - solid data regardless of volatility
+  // (volatility just means prices vary, not that data is unreliable)
+  if (recent180 >= 8) {
+    const volatilityNote = volatilityScore >= 6 ? " (prices vary but data is solid)" : "";
     return {
       confidence: "HIGH",
-      reason: `${recent180} recent sold comps with tight price range`
+      reason: `${recent180} recent sold comps${volatilityNote}`
     };
   }
   
-  // MEDIUM: 4-9 comps or moderate volatility
-  if (recent180 >= 4 || (total >= 6 && volatilityScore <= 7)) {
+  // MEDIUM: 4-7 comps - decent sample size
+  if (recent180 >= 4 || total >= 6) {
     return {
       confidence: "MEDIUM",
-      reason: `${recent180} comps in last 180 days - moderate coverage`
+      reason: `${recent180} comps in last 180 days - decent coverage`
     };
   }
   
-  // LOW: sparse data
+  // LOW: sparse data (under 4 recent comps AND under 6 total)
   if (total === 0) {
     return { confidence: "LOW", reason: "No sold comps found" };
   }
   
   return {
     confidence: "LOW",
-    reason: `Only ${total} price point(s) - sparse data, use cautiously`
+    reason: `Only ${total} price point(s) - limited sample size`
   };
 }
 
