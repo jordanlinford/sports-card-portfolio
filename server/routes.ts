@@ -1184,6 +1184,36 @@ Allow: /
     }
   });
 
+  app.post("/api/display-cases/:displayCaseId/cards/auto-order", isAuthenticated, async (req: any, res) => {
+    try {
+      const displayCaseId = parseInt(req.params.displayCaseId);
+      const userId = req.user.claims.sub;
+      const { orderBy } = req.body;
+
+      if (isNaN(displayCaseId)) {
+        return res.status(400).json({ message: "Invalid display case ID" });
+      }
+
+      const validOrderOptions = ["alpha", "year_newest", "year_oldest", "value_high", "value_low"];
+      if (!validOrderOptions.includes(orderBy)) {
+        return res.status(400).json({ message: "Invalid orderBy option" });
+      }
+
+      const existing = await storage.getDisplayCaseByIdAndUser(displayCaseId, userId);
+      if (!existing) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      await storage.autoOrderCards(displayCaseId, orderBy);
+      
+      const updated = await storage.getDisplayCase(displayCaseId);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error auto-ordering cards:", error);
+      res.status(500).json({ message: "Failed to auto-order cards" });
+    }
+  });
+
   // Price lookup for a single card (Pro feature)
   app.post("/api/cards/:cardId/lookup-price", isAuthenticated, async (req: any, res) => {
     try {

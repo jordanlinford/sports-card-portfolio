@@ -871,6 +871,56 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async autoOrderCards(displayCaseId: number, orderBy: "alpha" | "year_newest" | "year_oldest" | "value_high" | "value_low"): Promise<void> {
+    const caseCards = await db
+      .select()
+      .from(cards)
+      .where(eq(cards.displayCaseId, displayCaseId));
+
+    if (caseCards.length === 0) return;
+
+    let sortedCards: typeof caseCards;
+    
+    switch (orderBy) {
+      case "alpha":
+        sortedCards = [...caseCards].sort((a, b) => {
+          const nameA = (a.playerName || a.title || "").toLowerCase();
+          const nameB = (b.playerName || b.title || "").toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+        break;
+      case "year_newest":
+        sortedCards = [...caseCards].sort((a, b) => (b.year || 0) - (a.year || 0));
+        break;
+      case "year_oldest":
+        sortedCards = [...caseCards].sort((a, b) => (a.year || 0) - (b.year || 0));
+        break;
+      case "value_high":
+        sortedCards = [...caseCards].sort((a, b) => {
+          const valA = a.estimatedValue ?? 0;
+          const valB = b.estimatedValue ?? 0;
+          return valB - valA;
+        });
+        break;
+      case "value_low":
+        sortedCards = [...caseCards].sort((a, b) => {
+          const valA = a.estimatedValue ?? 0;
+          const valB = b.estimatedValue ?? 0;
+          return valA - valB;
+        });
+        break;
+      default:
+        return;
+    }
+
+    for (let i = 0; i < sortedCards.length; i++) {
+      await db
+        .update(cards)
+        .set({ sortOrder: i })
+        .where(eq(cards.id, sortedCards[i].id));
+    }
+  }
+
   async searchCards(
     userId: string,
     filters: { query?: string; set?: string; year?: number; grade?: string }
