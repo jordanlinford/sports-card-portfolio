@@ -5,6 +5,7 @@ import { eq, and, gt, lt } from "drizzle-orm";
 import { classifyPlayer, getExposureRecommendations, type ClassificationInput, type ClassificationOutput } from "./playerClassificationEngine";
 import { calculateValuation } from "./valuationService";
 import { generateInvestmentCall } from "./investmentDecisionEngine";
+import { lookupPlayer } from "./playerRegistry";
 import type {
   PlayerOutlookResponse,
   PlayerOutlookRequest,
@@ -675,8 +676,18 @@ async function generateFreshOutlook(
   
   // Step 3.5: If AI detected a non-active career status (DECEASED, RETIRED_HOF, BUST, RETIRED),
   // re-run classification with the AI's stage to get correct investment verdict
+  // IMPORTANT: Only trust AI career status if the player is NOT in the registry.
+  // Registry is authoritative - AI often misreads "HOF?" or "Future HOF" from eBay titles.
   let finalClassification = classification;
-  if (aiDetectedCareerStatus && aiDetectedCareerStatus !== "ACTIVE") {
+  
+  // Check registry first - registry is ALWAYS authoritative
+  const registryResult = lookupPlayer(playerName);
+  const playerInRegistry = registryResult.found;
+  
+  if (playerInRegistry) {
+    console.log(`[PlayerOutlook] Player "${playerName}" found in registry - ignoring AI career status override`);
+  } else if (aiDetectedCareerStatus && aiDetectedCareerStatus !== "ACTIVE") {
+    // Only apply AI override for players NOT in the registry
     // Map AI career status to our PlayerStage enum
     const stageMap: Record<string, PlayerStage> = {
       "DECEASED": "RETIRED_HOF",    // Deceased legends = RETIRED_HOF for investment purposes
@@ -687,7 +698,7 @@ async function generateFreshOutlook(
     const correctedStage = stageMap[aiDetectedCareerStatus];
     
     if (correctedStage && correctedStage !== classification.stage) {
-      console.log(`[PlayerOutlook] AI override: ${playerName} stage ${classification.stage} → ${correctedStage}`);
+      console.log(`[PlayerOutlook] AI override (no registry entry): ${playerName} stage ${classification.stage} → ${correctedStage}`);
       
       // Re-run classification with corrected stage
       const correctedInput: ClassificationInput = {
