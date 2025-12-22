@@ -1,0 +1,105 @@
+To keep this accurate, maintainable, and actually usable, I’m going to deliver this in structured parts, exactly how you’ll paste it into Replit. Trying to drop 400 names in one blast is how mistakes creep in.
+
+Below is PART 1 of the registry build:
+
+NFL Top-Tier & Core (FRANCHISE_CORE + SOLID_STARTER)
+
+This covers the players that were causing you pain (elite WRs/QBs/RBs incorrectly labeled speculative/avoid)
+
+Once this is in place, your verdict engine becomes stable even before the full 200 is complete
+
+I’ll follow immediately with:
+
+PART 2: NFL UNCERTAIN_ROLE / BACKUP_OR_FRINGE
+
+PART 3: NFL BUST / OUT_OF_LEAGUE / RETIRED_ICON
+
+Then NBA Top 200 in the same structure
+
+You can paste each part into the same CSV file (append).
+
+NFL Player Status Registry — Part 1
+
+FRANCHISE_CORE + SOLID_STARTER
+
+sport,playerName,aliases,careerStage,roleTier,positionGroup,lastUpdated
+NFL,Patrick Mahomes,Pat Mahomes|Mahomes,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,Josh Allen,Allen,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,Joe Burrow,Burrow,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,Justin Herbert,Herbert,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,Lamar Jackson,Lamar,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,C.J. Stroud,Stroud,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,Trevor Lawrence,Lawrence,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,Jalen Hurts,Hurts,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,Brock Purdy,Purdy,PRIME,FRANCHISE_CORE,QB,2025-12-21
+
+NFL,Justin Jefferson,JJettas|Jefferson,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,Ja'Marr Chase,Jamarr Chase|Chase,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,A.J. Brown,AJ Brown|Brown,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,CeeDee Lamb,Lamb,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,Tyreek Hill,Tyreek|Hill,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,Cooper Kupp,Kupp,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,Stefon Diggs,Diggs,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,Puka Nacua,Nacua,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,DeVonta Smith,Smith,PRIME,FRANCHISE_CORE,WR,2025-12-21
+
+NFL,Christian McCaffrey,CMC|McCaffrey,PRIME,FRANCHISE_CORE,RB,2025-12-21
+NFL,Jonathan Taylor,JTaylor|Taylor,PRIME,FRANCHISE_CORE,RB,2025-12-21
+NFL,Bijan Robinson,Bijan,PRIME,FRANCHISE_CORE,RB,2025-12-21
+NFL,Saquon Barkley,Barkley,PRIME,FRANCHISE_CORE,RB,2025-12-21
+NFL,Derrick Henry,Henry,PRIME,FRANCHISE_CORE,RB,2025-12-21
+
+NFL,Travis Kelce,Kelce,PRIME,FRANCHISE_CORE,TE,2025-12-21
+NFL,Mark Andrews,Andrews,PRIME,FRANCHISE_CORE,TE,2025-12-21
+NFL,George Kittle,Kittle,PRIME,FRANCHISE_CORE,TE,2025-12-21
+
+NFL,DK Metcalf,Metcalf,PRIME,SOLID_STARTER,WR,2025-12-21
+NFL,Jaylen Waddle,Waddle,PRIME,SOLID_STARTER,WR,2025-12-21
+NFL,Chris Olave,Olave,PRIME,SOLID_STARTER,WR,2025-12-21
+NFL,Brandon Aiyuk,Aiyuk,PRIME,SOLID_STARTER,WR,2025-12-21
+NFL,Tee Higgins,Higgins,PRIME,SOLID_STARTER,WR,2025-12-21
+NFL,Jordan Love,Love,PRIME,SOLID_STARTER,QB,2025-12-21
+NFL,Tua Tagovailoa,Tua,PRIME,SOLID_STARTER,QB,2025-12-21
+NFL,Matthew Stafford,Stafford,PRIME,SOLID_STARTER,QB,2025-12-21
+
+Why this immediately helps
+
+With just this first slice:
+
+Ja’Marr Chase can never be SPECULATIVE again
+
+CMC can never be a lottery ticket
+
+Herbert / Stroud / Allen stay HOLD or ACCUMULATE only
+
+Franchise-core protection becomes deterministic, not inferred
+
+Missing metadata (“Unknown”) can no longer downgrade elites
+
+Your engine now has authoritative truth for the players people care about most.
+
+What’s next (coming immediately)
+
+Part 2 (NFL):
+
+UNCERTAIN_ROLE starters
+
+Young QBs (Bryce, Caleb, Daniels)
+
+Volatile WRs/RBs
+
+This is where SPECULATIVE_FLYER should live
+
+Part 3 (NFL):
+
+BACKUP_OR_FRINGE
+
+BUST / OUT_OF_LEAGUE
+
+Retired icons (Brady, Manning, Rice, etc.)
+
+Then:
+
+NBA Top 200 in the same format
+
+I’ll continue with NFL Part 2 next.
