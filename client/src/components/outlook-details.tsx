@@ -334,11 +334,6 @@ export function OutlookDetails({
                       Range: {formatCurrency(data.market.min)} - {formatCurrency(data.market.max)}
                     </div>
                   )}
-                  {data.market?.compCount != null && data.market.compCount > 0 && (
-                    <div className="text-sm text-muted-foreground">
-                      Based on {data.market.compCount} comp{data.market.compCount !== 1 ? 's' : ''}
-                    </div>
-                  )}
                 </>
               ) : data.market?.modeledEstimate ? (
                 <>
