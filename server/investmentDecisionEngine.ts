@@ -439,11 +439,13 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
   "mike evans": "STARTER",
   "jaylen brown": "STARTER",
   "devin booker": "STARTER",
+  "rudy gobert": "STARTER",     // Established veteran center, Timberwolves
   "brock purdy": "STARTER",
   "c.j. stroud": "STARTER",
   "cj stroud": "STARTER",
   "trevor lawrence": "STARTER",  // Locked-in starter for Jacksonville
   "jordan love": "STARTER",      // Starting QB for Green Bay
+  "justin herbert": "FRANCHISE_CORE",  // Elite QB, Chargers franchise
   "caleb williams": "UNCERTAIN_STARTER",  // Rookie QB
   "drake maye": "UNCERTAIN_STARTER",
   "bo nix": "UNCERTAIN_STARTER",
@@ -1371,14 +1373,13 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   
   // ============================================================
   // ESTABLISHED VETERAN GUARDRAIL (Gobert Rule)
-  // ESTABLISHED players with stable roles should NEVER be SPECULATIVE
+  // Non-early-career players with stable roles should NEVER be SPECULATIVE
   // Risk ≠ Speculation: A boring, known commodity is not a lottery ticket
   // Examples: Rudy Gobert, veteran role players, known quantities
   // ============================================================
-  const isEstablishedVeteran = maturityTier === "ESTABLISHED" && 
-    roleTier !== "UNCERTAIN_STARTER" && 
-    roleTier !== "BACKUP" &&
-    roleTier !== "OUT_OF_LEAGUE";
+  const isNotEarlyCareer = !isEarlyCareerStage;
+  const hasStableRole = roleTier === "FRANCHISE_CORE" || roleTier === "STARTER";
+  const isEstablishedVeteran = isNotEarlyCareer && hasStableRole;
   
   if (isEstablishedVeteran && verdict === "SPECULATIVE_FLYER") {
     // Check if upside is capped (low valuation score = fairly priced, not much room to grow)
