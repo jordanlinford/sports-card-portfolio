@@ -1,0 +1,67 @@
+Keeping going. Here is NFL Part 3 — this locks down the outcomes that were still leaking (Pickett/Mac/Ridder/Lance-type players incorrectly landing HOLD/ACCUMULATE, and retired icons/busts not being deterministic).
+
+Paste this under Parts 1–2 in the same CSV.
+
+NFL Player Status Registry — Part 3
+
+BACKUP_OR_FRINGE + OUT_OF_LEAGUE (BUST) + RETIRED_ICON
+
+sport,playerName,aliases,careerStage,roleTier,positionGroup,lastUpdated
+NFL,Kenny Pickett,Pickett,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Mac Jones,M Jones|Mac,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Desmond Ridder,Ridder,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Trey Lance,Lance,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Daniel Jones,D Jones|Daniel J,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Sam Darnold,Darnold,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Jimmy Garoppolo,Garoppolo|Jimmy G,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Jameis Winston,Winston,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+
+NFL,Josh Rosen,Rosen,BUST,OUT_OF_LEAGUE,QB,2025-12-21
+NFL,JaMarcus Russell,J Russell|JaMarcus Russell,BUST,OUT_OF_LEAGUE,QB,2025-12-21
+NFL,Ryan Leaf,Leaf,BUST,OUT_OF_LEAGUE,QB,2025-12-21
+NFL,Johnny Manziel,Manziel|J Manziel,BUST,OUT_OF_LEAGUE,QB,2025-12-21
+
+NFL,Tom Brady,Brady|T Brady|Thomas Brady,RETIRED_HOF,RETIRED_ICON,QB,2025-12-21
+NFL,Peyton Manning,Manning|P Manning,RETIRED_HOF,RETIRED_ICON,QB,2025-12-21
+NFL,Joe Montana,Montana,RETIRED_HOF,RETIRED_ICON,QB,2025-12-21
+NFL,Drew Brees,Brees,RETIRED_HOF,RETIRED_ICON,QB,2025-12-21
+NFL,Aaron Rodgers,Rodgers,PRIME,FRANCHISE_CORE,QB,2025-12-21
+NFL,Tomlinson,LaDainian Tomlinson|LT,RETIRED_HOF,RETIRED_ICON,RB,2025-12-21
+NFL,Jerry Rice,Rice,RETIRED_HOF,RETIRED_ICON,WR,2025-12-21
+NFL,Randy Moss,Moss,RETIRED_HOF,RETIRED_ICON,WR,2025-12-21
+NFL,Terrell Owens,TO|Terrell Owens,RETIRED_HOF,RETIRED_ICON,WR,2025-12-21
+NFL,Calvin Johnson,Megatron|Calvin Johnson,RETIRED_HOF,RETIRED_ICON,WR,2025-12-21
+NFL,Travis Kelce,Kelce,PRIME,FRANCHISE_CORE,TE,2025-12-21
+NFL,Tony Gonzalez,Gonzalez,RETIRED_HOF,RETIRED_ICON,TE,2025-12-21
+NFL,Rob Gronkowski,Gronk|Gronkowski,RETIRED_HOF,RETIRED_ICON,TE,2025-12-21
+
+Notes (important for correctness)
+
+This Part 3 is intentionally verdict-shaping, not “perfect roster truth.”
+It’s designed to stop the exact misclassifications you were seeing:
+
+Pickett / Ridder / Lance mistakenly HOLD/ACCUMULATE
+
+Bust QBs not going AVOID
+
+Retired icons drifting into speculative/avoid
+
+A few of these players (e.g., Rodgers/Kelce) are still active/late-career; they belong in FRANCHISE_CORE for purposes of market behavior and collector demand, even if on-field context changes.
+
+If you want the registry to reflect exact 2025 team situations, you can add a separate field later (team, status), but don’t let that complicate the verdict engine yet.
+
+Quick verification tests after Part 3
+
+Run these 5 and confirm outcomes:
+
+Kenny Pickett → AVOID_NEW_MONEY
+
+Desmond Ridder → AVOID_NEW_MONEY
+
+Trey Lance → AVOID_NEW_MONEY
+
+Tom Brady → HOLD_CORE
+
+Randy Moss → HOLD_CORE
+
+If any of those fail, it means registry overrides are not being applied early enough or aliases aren’t matching.
