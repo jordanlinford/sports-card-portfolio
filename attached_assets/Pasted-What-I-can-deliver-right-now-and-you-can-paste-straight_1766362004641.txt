@@ -1,0 +1,147 @@
+What I can deliver right now (and you can paste straight into Replit)
+
+A ready-to-use CSV “player status registry” format
+
+A starter registry file you can drop into your app today (NFL + NBA + MLB + NHL, focusing on the no-brainers and the exact problem names you’ve been debugging)
+
+A lookup/normalization spec so it actually matches user input reliably
+
+Two important constraints
+
+I can’t automatically edit your Replit project files directly from here.
+
+“Player status” is time-sensitive. I’ll make this a high-signal starter set you can expand, and I’ll include a workflow so you can update it easily (Google Sheet → CSV export → deploy).
+
+Starter file: player_status_registry.csv
+Copy/paste this into a CSV file at something like: /data/player_status_registry.csv
+
+It covers:
+
+Legends/icons (always HOLD_CORE)
+
+Famous busts (always AVOID_NEW_MONEY)
+
+Your recurring “wrongly speculative” elite players (Chase, CMC, Herbert)
+
+Common backup/fringe QBs you tested (Pickett, Ridder)
+
+A few high-profile prospects (Flagg, Arch) that should always be SPECULATIVE_FLYER
+
+sport,playerName,aliases,careerStage,roleTier,positionGroup,lastUpdated
+NFL,Tom Brady,Thomas Brady|T Brady|Brady,RETIRED_HOF,RETIRED_ICON,QB,2025-12-21
+NFL,Peyton Manning,P Manning|Manning,RETIRED_HOF,RETIRED_ICON,QB,2025-12-21
+NBA,Michael Jordan,M Jordan|Jordan,RETIRED_HOF,RETIRED_ICON,WING,2025-12-21
+NBA,LeBron James,LeBron|L James,PRIME,FRANCHISE_CORE,WING,2025-12-21
+NBA,Stephen Curry,Steph Curry|S Curry|Curry,PRIME,FRANCHISE_CORE,GUARD,2025-12-21
+NBA,Kobe Bryant,Kobe,RETIRED_HOF,RETIRED_ICON,WING,2025-12-21
+NHL,Wayne Gretzky,Gretzky,RETIRED_HOF,RETIRED_ICON,UNKNOWN,2025-12-21
+MLB,Mickey Mantle,Mantle,RETIRED_HOF,RETIRED_ICON,HITTER,2025-12-21
+MLB,Derek Jeter,Jeter,RETIRED_HOF,RETIRED_ICON,HITTER,2025-12-21
+
+NFL,Ja'Marr Chase,Jamarr Chase|Jamar Chase,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,Justin Jefferson,JJettas|J Jefferson|Justin J,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,A.J. Brown,AJ Brown|A J Brown,PRIME,FRANCHISE_CORE,WR,2025-12-21
+NFL,Christian McCaffrey,CMC|C McCaffrey|McCaffrey,PRIME,FRANCHISE_CORE,RB,2025-12-21
+NFL,Justin Herbert,J Herbert|Herbert,PRIME,FRANCHISE_CORE,QB,2025-12-21
+
+NBA,Nikola Jokic,Jokic,PRIME,FRANCHISE_CORE,BIG,2025-12-21
+NBA,Victor Wembanyama,Wembanyama|Wemby,YEAR_2,UNCERTAIN_ROLE,BIG,2025-12-21
+NBA,Rudy Gobert,Gobert,PRIME,SOLID_STARTER,BIG,2025-12-21
+
+MLB,Shohei Ohtani,Ohtani,PRIME,FRANCHISE_CORE,HITTER,2025-12-21
+MLB,Aaron Judge,Judge,PRIME,FRANCHISE_CORE,HITTER,2025-12-21
+MLB,Mike Trout,Trout,PRIME,FRANCHISE_CORE,HITTER,2025-12-21
+
+NFL,Josh Rosen,Rosen,BUST,OUT_OF_LEAGUE,QB,2025-12-21
+NFL,JaMarcus Russell,J Russell|JaMarcus,Russell,BUST,OUT_OF_LEAGUE,QB,2025-12-21
+NFL,Ryan Leaf,Leaf,BUST,OUT_OF_LEAGUE,QB,2025-12-21
+NFL,Johnny Manziel,Manziel|J Manziel,BUST,OUT_OF_LEAGUE,QB,2025-12-21
+NBA,Anthony Bennett,Bennett,BUST,OUT_OF_LEAGUE,UNKNOWN,2025-12-21
+
+NFL,Kenny Pickett,Pickett,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Desmond Ridder,Ridder,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+NFL,Trey Lance,Lance,PRIME,BACKUP_OR_FRINGE,QB,2025-12-21
+
+NFL,Caleb Williams,Caleb,YEAR_2,UNCERTAIN_ROLE,QB,2025-12-21
+NFL,Jayden Daniels,Daniels,YEAR_2,UNCERTAIN_ROLE,QB,2025-12-21
+NFL,Marvin Harrison Jr.,MHJ|Marvin Harrison Junior,YEAR_2,UNCERTAIN_ROLE,WR,2025-12-21
+NFL,Brock Bowers,Bowers,YEAR_2,UNCERTAIN_ROLE,TE,2025-12-21
+
+NBA,Cooper Flagg,Flagg,SPECULATIVE,UNCERTAIN_ROLE,UNKNOWN,2025-12-21
+NFL,Arch Manning,Arch,SPECULATIVE,UNCERTAIN_ROLE,QB,2025-12-21
+
+
+Notes on a few entries
+
+I set Wembanyama to YEAR_2 (since you’re using season-year logic now and it’s Dec 2025). If your system wants ROOKIE/YEAR_2 only, keep YEAR_2.
+
+Cooper Flagg / Arch Manning are “SPECULATIVE” in careerStage. If you don’t support that enum, set careerStage to UNKNOWN and let UNKNOWN route to SPECULATIVE_FLYER.
+
+Next: the Replit integration instructions (copy/paste)
+Paste this to Replit to wire it up.
+
+Load CSV and build an alias map
+
+On server/app init, load /data/player_status_registry.csv
+
+Create a Map keyed by normalized name and normalized aliases
+
+Normalization function
+
+lowercase
+
+trim
+
+remove punctuation (keep letters/numbers/spaces)
+
+collapse whitespace
+
+Apply registry overrides before inference
+In your analysis pipeline, before you infer stage/role/positionGroup:
+
+look up normalized player input in registry map
+
+if found:
+
+stage = registry.careerStage
+
+roleTier = registry.roleTier
+
+positionGroup = registry.positionGroup
+
+metaSource = "registry"
+
+else:
+
+metaSource = "inferred"
+
+keep existing inference
+
+Make registry overrides sticky
+Ensure nothing later overwrites stage/roleTier/positionGroup when metaSource == "registry".
+
+Add to decisionDebug
+Return:
+
+metaSource
+
+stage
+
+roleTier
+
+positionGroup
+
+registryMatchedName (optional)
+
+This will eliminate almost all of the embarrassing “speculative for elite” outcomes immediately.
+
+If you want me to expand this list
+Tell me what you consider “comprehensive”:
+
+top 200 per sport?
+
+just the top 300 NFL + top 200 NBA?
+
+your “top searched” list?
+
+If you paste your current “launch players” list (or a CSV of player names you’re targeting), I can generate a filled registry for that list in the exact same CSV format so you can drop it into Replit.
