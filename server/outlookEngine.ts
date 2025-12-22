@@ -3,6 +3,7 @@
 
 import OpenAI from "openai";
 import type { Card, CardOutlook, PricePoint } from "@shared/schema";
+import { lookupPlayer, mapRegistryStage } from "./playerRegistry";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
@@ -394,13 +395,24 @@ export function getMarketFrictionLabel(score: number): string {
 }
 
 // Career Stage Auto-Detection
+// Priority: 1) Player Registry (authoritative), 2) Legacy tier, 3) Card year heuristics
 export function detectCareerStage(card: Card): string {
   // TCG cards don't have career stages
   if (card.cardCategory === "tcg" || card.cardCategory === "non_sport") {
     return "UNKNOWN";
   }
   
-  // Check for rookie indicators
+  // PRIORITY 1: Check player registry first (authoritative source)
+  if (card.playerName) {
+    const registryResult = lookupPlayer(card.playerName);
+    if (registryResult.found && registryResult.entry) {
+      const mappedStage = mapRegistryStage(registryResult.entry.careerStage);
+      console.log(`[CareerStage] Registry hit for "${card.playerName}" -> ${mappedStage} (from ${registryResult.entry.careerStage})`);
+      return mappedStage;
+    }
+  }
+  
+  // Check for rookie indicators (used for fallback heuristics)
   const titleLower = (card.title || "").toLowerCase();
   const setLower = (card.set || "").toLowerCase();
   
@@ -411,7 +423,7 @@ export function detectCareerStage(card: Card): string {
     setLower.includes("draft") ||
     setLower.includes("bowman 1st");
   
-  // Check legacy tier if set
+  // PRIORITY 2: Check legacy tier if set
   if (card.legacyTier) {
     const tierMap: Record<string, string> = {
       PROSPECT: "ROOKIE",
@@ -426,7 +438,7 @@ export function detectCareerStage(card: Card): string {
     return tierMap[card.legacyTier] || "UNKNOWN";
   }
   
-  // Use card year to estimate career stage
+  // PRIORITY 3: Use card year to estimate career stage (fallback)
   const currentYear = new Date().getFullYear();
   const cardYear = card.year;
   
