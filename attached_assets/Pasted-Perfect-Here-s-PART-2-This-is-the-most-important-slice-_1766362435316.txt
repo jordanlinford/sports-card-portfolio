@@ -1,0 +1,101 @@
+Perfect. Here’s PART 2.
+
+This is the most important slice for correctness, because this is where SPECULATIVE_FLYER should live. Getting this right prevents:
+
+rookies being treated as core
+
+volatile starters being treated as safe
+
+early-career QBs collapsing into HOLD or AVOID incorrectly
+
+You can paste this directly under Part 1 in the same CSV.
+
+NFL Player Status Registry — Part 2
+
+UNCERTAIN_ROLE (Emerging, volatile, high-variance starters)
+
+sport,playerName,aliases,careerStage,roleTier,positionGroup,lastUpdated
+NFL,Caleb Williams,Caleb,YEAR_2,UNCERTAIN_ROLE,QB,2025-12-21
+NFL,Jayden Daniels,Daniels,YEAR_2,UNCERTAIN_ROLE,QB,2025-12-21
+NFL,Bryce Young,B Young|Young,YEAR_3,UNCERTAIN_ROLE,QB,2025-12-21
+NFL,Anthony Richardson,Richardson,YEAR_3,UNCERTAIN_ROLE,QB,2025-12-21
+NFL,Jordan Addison,Addison,YEAR_2,UNCERTAIN_ROLE,WR,2025-12-21
+NFL,Marvin Harrison Jr.,MHJ|Marvin Harrison Junior,YEAR_2,UNCERTAIN_ROLE,WR,2025-12-21
+NFL,Brock Bowers,Bowers,YEAR_2,UNCERTAIN_ROLE,TE,2025-12-21
+NFL,Michael Penix Jr.,Penix,YEAR_2,UNCERTAIN_ROLE,QB,2025-12-21
+NFL,Bo Nix,Nix,YEAR_2,UNCERTAIN_ROLE,QB,2025-12-21
+NFL,Drake Maye,Maye,YEAR_2,UNCERTAIN_ROLE,QB,2025-12-21
+
+NFL,Kenneth Walker,Walker,YEAR_3,UNCERTAIN_ROLE,RB,2025-12-21
+NFL,Jahmyr Gibbs,Gibbs,YEAR_3,UNCERTAIN_ROLE,RB,2025-12-21
+NFL,Isiah Pacheco,Pacheco,YEAR_3,UNCERTAIN_ROLE,RB,2025-12-21
+NFL,Breece Hall,Hall,YEAR_3,UNCERTAIN_ROLE,RB,2025-12-21
+NFL,Rhamondre Stevenson,Stevenson,YEAR_4,UNCERTAIN_ROLE,RB,2025-12-21
+
+NFL,Zay Flowers,Flowers,YEAR_2,UNCERTAIN_ROLE,WR,2025-12-21
+NFL,Jordan Reed,Reed,PRIME,UNCERTAIN_ROLE,TE,2025-12-21
+NFL,George Pickens,Pickens,PRIME,UNCERTAIN_ROLE,WR,2025-12-21
+NFL,Jameson Williams,J Williams|Jameson,YEAR_3,UNCERTAIN_ROLE,WR,2025-12-21
+NFL,Quentin Johnston,Johnston,YEAR_3,UNCERTAIN_ROLE,WR,2025-12-21
+
+How this affects your engine (important)
+
+With these entries:
+
+SPECULATIVE_FLYER becomes the default for:
+
+rookie / year-2 QBs
+
+volatile RBs
+
+early-career WRs with hype > proof
+
+ACCUMULATE only appears if:
+
+valueScore is extreme
+
+liquidity is solid
+
+downsideRisk is controlled
+
+HOLD_CORE no longer swallows young players by mistake
+
+This directly fixes:
+
+Caleb / Daniels flipping incorrectly
+
+MHJ / Addison being treated as safe
+
+RB volatility being ignored
+
+Sanity check (quick)
+
+After Part 1 + Part 2 are loaded:
+
+Caleb Williams → SPECULATIVE_FLYER
+
+Bryce Young → SPECULATIVE_FLYER or AVOID (depending on role logic)
+
+Breece Hall → HOLD or SPECULATIVE depending on value, but never AVOID by default
+
+Marvin Harrison Jr. → SPECULATIVE_FLYER
+
+If you see different behavior, it means:
+
+registry overrides aren’t being applied early enough, or
+
+aliases aren’t matching correctly
+
+What’s next
+
+PART 3 (NFL):
+
+BACKUP_OR_FRINGE
+
+BUST
+
+RETIRED_ICON
+
+This will lock AVOID_NEW_MONEY so it only fires where it should.
+
+I’ll send PART 3 next unless you want to pause and sanity-check this slice first.
