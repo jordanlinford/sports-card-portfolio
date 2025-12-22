@@ -505,7 +505,7 @@ export function OutlookDetails({
                     <SignalBar 
                       label="Card Quality" 
                       value={data.signals.cardType}
-                      tooltip="Card desirability based on set, grade, and player tier. Premium sets/grades score higher."
+                      tooltip="How desirable the card itself is. Factors: grade (PSA 10 = highest), rookie status, autograph, serial numbering (/10, /25, etc.), and special parallels. Higher = more collectible."
                     />
                   </div>
                 </>
