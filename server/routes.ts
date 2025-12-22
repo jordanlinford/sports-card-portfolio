@@ -9,7 +9,7 @@ import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
 import { lookupCardPrice, lookupMultipleCardPrices } from "./priceService";
-import { generateShareImage } from "./shareImageService";
+import { generateShareImage, generateOutlookShareImage, OutlookShareData } from "./shareImageService";
 import { generatePlayerOGImage, getPlayerShareData } from "./playerShareImageService";
 import { generatePageOGImage, getPageShareData } from "./pageShareImageService";
 import { prestigeService } from "./prestigeService";
@@ -593,6 +593,47 @@ Allow: /
     } catch (error) {
       console.error("Error generating share image:", error);
       res.status(500).json({ message: "Failed to generate share image" });
+    }
+  });
+
+  // Outlook share image generation endpoint (POST with data)
+  app.post("/api/share-image/outlook", async (req, res) => {
+    try {
+      const { playerName, cardTitle, sport, position, action, fairValue, upsideScore, riskScore, confidenceLevel, shortExplanation, imagePath } = req.body;
+      
+      if (!playerName || !cardTitle || !action) {
+        return res.status(400).json({ message: "Missing required fields: playerName, cardTitle, action" });
+      }
+      
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
+        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
+        : `https://${req.headers.host}`;
+      
+      const outlookData: OutlookShareData = {
+        playerName,
+        cardTitle,
+        sport,
+        position,
+        action,
+        fairValue,
+        upsideScore,
+        riskScore,
+        confidenceLevel,
+        shortExplanation,
+        imagePath,
+      };
+      
+      const imageBuffer = await generateOutlookShareImage(outlookData, baseUrl);
+      
+      res.set({
+        "Content-Type": "image/png",
+        "Content-Length": imageBuffer.length,
+        "Cache-Control": "no-cache",
+      });
+      res.send(imageBuffer);
+    } catch (error) {
+      console.error("Error generating outlook share image:", error);
+      res.status(500).json({ message: "Failed to generate outlook share image" });
     }
   });
 

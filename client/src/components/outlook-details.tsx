@@ -21,7 +21,10 @@ import {
   Trophy,
   MinusCircle,
   ExternalLink,
+  Download,
+  Loader2,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   AreaChart,
   Area,
@@ -255,6 +258,58 @@ export function OutlookDetails({
   onShowMatchSamples,
 }: OutlookDetailsProps) {
   const [showFullExplanation, setShowFullExplanation] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { toast } = useToast();
+
+  const handleDownloadImage = async () => {
+    setIsDownloading(true);
+    try {
+      const response = await fetch("/api/share-image/outlook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerName: data.card.playerName || "Unknown Player",
+          cardTitle: data.card.title,
+          sport: data.card.sport,
+          position: data.card.position,
+          action: data.action,
+          fairValue: data.market?.value,
+          upsideScore: data.signals?.upside,
+          riskScore: data.signals?.downsideRisk,
+          confidenceLevel: data.confidence?.level,
+          shortExplanation: data.explanation?.short,
+          imagePath: cardImageUrl || data.card.imagePath,
+        }),
+      });
+      
+      if (!response.ok) throw new Error("Failed to generate image");
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const playerSlug = (data.card.playerName || "card").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      link.download = `${playerSlug}-analysis.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Image downloaded",
+        description: "Share it on social media!",
+      });
+    } catch (error) {
+      console.error("Failed to download image:", error);
+      toast({
+        title: "Download failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const actionStyle = ACTION_STYLES[data.action] || ACTION_STYLES.WATCH;
   const ActionIcon = actionStyle.icon;
@@ -320,6 +375,20 @@ export function OutlookDetails({
                     Big Mover
                   </Badge>
                 )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleDownloadImage}
+                  disabled={isDownloading}
+                  data-testid="button-download-analysis"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
+                  <span className="ml-1 hidden sm:inline">Share</span>
+                </Button>
               </div>
             </div>
             <div className="text-right">
@@ -345,9 +414,6 @@ export function OutlookDetails({
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Mid: ${data.market.modeledEstimate.mid}
-                  </div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    No live comps found
                   </div>
                 </>
               ) : (

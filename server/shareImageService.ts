@@ -600,3 +600,263 @@ async function generateBragImage(
 
   return finalImage;
 }
+
+export interface OutlookShareData {
+  playerName: string;
+  cardTitle: string;
+  sport?: string;
+  position?: string;
+  action: string;
+  fairValue?: number | null;
+  upsideScore?: number;
+  riskScore?: number;
+  confidenceLevel?: string;
+  shortExplanation?: string;
+  imagePath?: string | null;
+}
+
+const ACTION_COLORS: Record<string, { bg: string; text: string }> = {
+  BUY: { bg: "#22c55e", text: "#ffffff" },
+  ACCUMULATE: { bg: "#16a34a", text: "#ffffff" },
+  WATCH: { bg: "#eab308", text: "#1a1a1a" },
+  LONG_HOLD: { bg: "#3b82f6", text: "#ffffff" },
+  HOLD: { bg: "#64748b", text: "#ffffff" },
+  SELL: { bg: "#ef4444", text: "#ffffff" },
+  AVOID: { bg: "#dc2626", text: "#ffffff" },
+  LEGACY_HOLD: { bg: "#8b5cf6", text: "#ffffff" },
+  TRADE_THE_HYPE: { bg: "#f97316", text: "#ffffff" },
+  SPECULATIVE_FLYER: { bg: "#ec4899", text: "#ffffff" },
+  HOLD_CORE: { bg: "#6366f1", text: "#ffffff" },
+  AVOID_NEW_MONEY: { bg: "#dc2626", text: "#ffffff" },
+};
+
+export async function generateOutlookShareImage(
+  data: OutlookShareData,
+  baseUrl: string
+): Promise<Buffer> {
+  const width = 1200;
+  const height = 630;
+  
+  const composites: sharp.OverlayOptions[] = [];
+  
+  const actionColor = ACTION_COLORS[data.action] || ACTION_COLORS.WATCH;
+  
+  const svgBackground = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#0f0f23;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#bg)"/>
+    </svg>
+  `;
+  
+  const backgroundBuffer = await sharp(Buffer.from(svgBackground)).png().toBuffer();
+  
+  const cardImageWidth = 280;
+  const cardImageHeight = 390;
+  const cardImageX = 60;
+  const cardImageY = (height - cardImageHeight) / 2;
+  
+  if (data.imagePath) {
+    const cardImageBuffer = await loadCardImage(data.imagePath, baseUrl, cardImageWidth, cardImageHeight);
+    if (cardImageBuffer) {
+      const roundedImage = await sharp(cardImageBuffer)
+        .composite([
+          {
+            input: Buffer.from(`
+              <svg width="${cardImageWidth}" height="${cardImageHeight}">
+                <rect x="0" y="0" width="${cardImageWidth}" height="${cardImageHeight}" 
+                      rx="12" ry="12" fill="white"/>
+              </svg>
+            `),
+            blend: "dest-in",
+          },
+        ])
+        .png()
+        .toBuffer();
+      
+      composites.push({
+        input: roundedImage,
+        top: Math.round(cardImageY),
+        left: cardImageX,
+      });
+    }
+  }
+  
+  const contentX = data.imagePath ? 380 : 60;
+  const contentWidth = width - contentX - 60;
+  
+  const truncatedPlayer = data.playerName.length > 25 ? data.playerName.substring(0, 22) + "..." : data.playerName;
+  const truncatedCard = data.cardTitle.length > 50 ? data.cardTitle.substring(0, 47) + "..." : data.cardTitle;
+  
+  const headerSvg = `
+    <svg width="${contentWidth}" height="180" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="50" 
+            font-family="system-ui, -apple-system, sans-serif" 
+            font-size="42" font-weight="700" fill="white">
+        ${escapeXml(truncatedPlayer)}
+      </text>
+      <text x="0" y="90" 
+            font-family="system-ui, -apple-system, sans-serif" 
+            font-size="22" fill="rgba(255,255,255,0.7)">
+        ${escapeXml(truncatedCard)}
+      </text>
+      ${data.sport || data.position ? `
+        <text x="0" y="130" 
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="18" fill="rgba(255,255,255,0.5)">
+          ${escapeXml([data.sport, data.position].filter(Boolean).join(" · "))}
+        </text>
+      ` : ""}
+    </svg>
+  `;
+  
+  composites.push({
+    input: await sharp(Buffer.from(headerSvg)).png().toBuffer(),
+    top: 60,
+    left: contentX,
+  });
+  
+  const badgeWidth = 180;
+  const badgeHeight = 50;
+  const verdictSvg = `
+    <svg width="${badgeWidth}" height="${badgeHeight}" xmlns="http://www.w3.org/2000/svg">
+      <rect x="0" y="0" width="${badgeWidth}" height="${badgeHeight}" rx="8" ry="8" fill="${actionColor.bg}"/>
+      <text x="${badgeWidth / 2}" y="33" text-anchor="middle"
+            font-family="system-ui, -apple-system, sans-serif" 
+            font-size="22" font-weight="700" fill="${actionColor.text}">
+        ${escapeXml(data.action.replace("_", " "))}
+      </text>
+    </svg>
+  `;
+  
+  composites.push({
+    input: await sharp(Buffer.from(verdictSvg)).png().toBuffer(),
+    top: 200,
+    left: contentX,
+  });
+  
+  let statsY = 280;
+  
+  if (data.fairValue != null) {
+    const valueSvg = `
+      <svg width="300" height="80" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="25" 
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="16" fill="rgba(255,255,255,0.6)">
+          Est. Fair Value
+        </text>
+        <text x="0" y="65" 
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="36" font-weight="700" fill="white">
+          ${formatCurrency(data.fairValue)}
+        </text>
+      </svg>
+    `;
+    
+    composites.push({
+      input: await sharp(Buffer.from(valueSvg)).png().toBuffer(),
+      top: statsY,
+      left: contentX,
+    });
+    
+    statsY += 100;
+  }
+  
+  const signals: Array<{ label: string; value: number; isInverse?: boolean }> = [];
+  if (data.upsideScore != null) signals.push({ label: "Upside", value: data.upsideScore });
+  if (data.riskScore != null) signals.push({ label: "Risk", value: data.riskScore, isInverse: true });
+  
+  if (signals.length > 0) {
+    const signalWidth = 140;
+    const signalGap = 30;
+    
+    for (let i = 0; i < signals.length; i++) {
+      const signal = signals[i];
+      const signalX = contentX + i * (signalWidth + signalGap);
+      
+      const getScoreColor = (score: number, inverse = false) => {
+        if (inverse) {
+          if (score >= 70) return "#ef4444";
+          if (score >= 40) return "#eab308";
+          return "#22c55e";
+        }
+        if (score >= 70) return "#22c55e";
+        if (score >= 40) return "#eab308";
+        return "#ef4444";
+      };
+      
+      const scoreColor = getScoreColor(signal.value, signal.isInverse);
+      
+      const signalSvg = `
+        <svg width="${signalWidth}" height="60" xmlns="http://www.w3.org/2000/svg">
+          <text x="0" y="20" 
+                font-family="system-ui, -apple-system, sans-serif" 
+                font-size="14" fill="rgba(255,255,255,0.6)">
+            ${signal.label}
+          </text>
+          <text x="0" y="50" 
+                font-family="system-ui, -apple-system, sans-serif" 
+                font-size="28" font-weight="600" fill="${scoreColor}">
+            ${signal.value}%
+          </text>
+        </svg>
+      `;
+      
+      composites.push({
+        input: await sharp(Buffer.from(signalSvg)).png().toBuffer(),
+        top: statsY,
+        left: signalX,
+      });
+    }
+  }
+  
+  if (data.shortExplanation) {
+    const maxChars = 100;
+    const explanation = data.shortExplanation.length > maxChars 
+      ? data.shortExplanation.substring(0, maxChars - 3) + "..."
+      : data.shortExplanation;
+    
+    const explanationSvg = `
+      <svg width="${contentWidth}" height="60" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="35" 
+              font-family="system-ui, -apple-system, sans-serif" 
+              font-size="18" font-style="italic" fill="rgba(255,255,255,0.7)">
+          "${escapeXml(explanation)}"
+        </text>
+      </svg>
+    `;
+    
+    composites.push({
+      input: await sharp(Buffer.from(explanationSvg)).png().toBuffer(),
+      top: height - 130,
+      left: contentX,
+    });
+  }
+  
+  const outlookFooterSvg = `
+    <svg width="${width}" height="50" xmlns="http://www.w3.org/2000/svg">
+      <text x="${width / 2}" y="30" text-anchor="middle"
+            font-family="system-ui, -apple-system, sans-serif" 
+            font-size="18" fill="rgba(255,255,255,0.4)">
+        SportsCardPortfolio.com
+      </text>
+    </svg>
+  `;
+  
+  composites.push({
+    input: await sharp(Buffer.from(outlookFooterSvg)).png().toBuffer(),
+    top: height - 50,
+    left: 0,
+  });
+  
+  const outlookFinalImage = await sharp(backgroundBuffer)
+    .composite(composites)
+    .png({ quality: 90 })
+    .toBuffer();
+  
+  return outlookFinalImage;
+}
