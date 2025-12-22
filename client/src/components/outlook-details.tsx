@@ -28,9 +28,14 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
 } from "recharts";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export type OutlookDisplayData = {
   card: {
@@ -137,19 +142,37 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-function SignalBar({ label, value, max = 10 }: { label: string; value?: number; max?: number }) {
+function SignalBar({ label, value, max = 10, tooltip }: { label: string; value?: number; max?: number; tooltip?: string }) {
   if (value === undefined || value === null) return null;
   const percentage = (value / max) * 100;
   
-  return (
+  const content = (
     <div className="space-y-1">
       <div className="flex justify-between text-sm">
-        <span className="text-muted-foreground">{label}</span>
+        <span className="text-muted-foreground flex items-center gap-1">
+          {label}
+          {tooltip && <Info className="h-3 w-3 text-muted-foreground/50" />}
+        </span>
         <span className="font-medium">{value}/{max}</span>
       </div>
       <Progress value={percentage} className="h-2" />
     </div>
   );
+  
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="cursor-help">{content}</div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <p className="text-sm">{tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  
+  return content;
 }
 
 function CompositeScoreCard({ label, value, icon: Icon, description, helperText }: { 
@@ -374,7 +397,7 @@ export function OutlookDetails({
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {chartData.length > 1 && (
           <Card>
             <CardHeader className="pb-2">
@@ -394,7 +417,7 @@ export function OutlookDetails({
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="date" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
                     <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `$${v}`} />
-                    <Tooltip 
+                    <RechartsTooltip 
                       contentStyle={{ 
                         backgroundColor: 'hsl(var(--card))', 
                         border: '1px solid hsl(var(--border))',
@@ -442,10 +465,26 @@ export function OutlookDetails({
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <SignalBar label="Recent Momentum" value={data.signals.trend} />
-                    <SignalBar label="Comp Volume" value={data.signals.liquidity} />
-                    <SignalBar label="Price Volatility" value={data.signals.volatility} />
-                    <SignalBar label="Card Quality" value={data.signals.cardType} />
+                    <SignalBar 
+                      label="Recent Momentum" 
+                      value={data.signals.trend} 
+                      tooltip="How prices are trending recently. High = prices rising. Low = prices falling or flat."
+                    />
+                    <SignalBar 
+                      label="Comp Volume" 
+                      value={data.signals.liquidity}
+                      tooltip="Number of recent sales found. Higher = more data points for accurate pricing. 7+ is solid."
+                    />
+                    <SignalBar 
+                      label="Price Volatility" 
+                      value={data.signals.volatility}
+                      tooltip="How much prices vary between sales. Low = tight, predictable pricing. High = wide price swings."
+                    />
+                    <SignalBar 
+                      label="Card Quality" 
+                      value={data.signals.cardType}
+                      tooltip="Card desirability based on set, grade, and player tier. Premium sets/grades score higher."
+                    />
                   </div>
                 </>
               )}
