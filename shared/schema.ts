@@ -1606,3 +1606,27 @@ export const hiddenGems = pgTable("hidden_gems", {
 export type HiddenGem = typeof hiddenGems.$inferSelect;
 export type InsertHiddenGem = typeof hiddenGems.$inferInsert;
 export const insertHiddenGemSchema = createInsertSchema(hiddenGems).omit({ id: true, createdAt: true });
+
+// Player Registry - Admin-managed player status database for investment verdicts
+export const playerRegistry = pgTable("player_registry", {
+  id: serial("id").primaryKey(),
+  sport: varchar("sport", { length: 10 }).notNull(), // NFL, NBA, MLB, NHL
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  aliases: text("aliases"), // Pipe-separated: "Brady|T Brady|Thomas Brady"
+  careerStage: varchar("career_stage", { length: 30 }).notNull(), // PROSPECT, YEAR_2, YEAR_3, YEAR_4, PRIME, VETERAN, RETIRED_HOF, BUST
+  roleTier: varchar("role_tier", { length: 30 }).notNull(), // FRANCHISE_CORE, SOLID_STARTER, UNCERTAIN_ROLE, BACKUP_OR_FRINGE, OUT_OF_LEAGUE, RETIRED_ICON
+  positionGroup: varchar("position_group", { length: 30 }).notNull(), // QB, WR, RB, TE, GUARD, WING, BIG, HITTER, PITCHER, UNKNOWN
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedBy: varchar("updated_by", { length: 255 }), // Admin who last updated
+  notes: text("notes"), // Optional admin notes
+}, (table) => [
+  index("idx_player_registry_sport").on(table.sport),
+  index("idx_player_registry_name").on(table.playerName),
+  index("idx_player_registry_tier").on(table.roleTier),
+  unique("unique_sport_player").on(table.sport, table.playerName),
+]);
+
+export type PlayerRegistry = typeof playerRegistry.$inferSelect;
+export type InsertPlayerRegistry = typeof playerRegistry.$inferInsert;
+export const insertPlayerRegistrySchema = createInsertSchema(playerRegistry).omit({ id: true, createdAt: true, lastUpdated: true });
