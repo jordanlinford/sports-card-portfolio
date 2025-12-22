@@ -263,6 +263,23 @@ export function computePositionScore(sport: string | null | undefined, position:
   return sportPositions[normalizedPosition] || 5;
 }
 
+// Premium brand keywords - cards from these sets command higher prices
+const PREMIUM_BRANDS = [
+  "prizm", "national treasures", "flawless", "immaculate", "spectra", "select",
+  "optic", "mosaic", "revolution", "obsidian", "noir", "one and one",
+  "chrome", "bowman chrome", "topps chrome", "stadium club chrome",
+  "contenders", "playoff contenders", "panini contenders",
+  "sp authentic", "exquisite", "upper deck exquisite",
+  "origins", "certified", "elite", "limited", "cornerstones"
+];
+
+const MID_TIER_BRANDS = [
+  "donruss", "score", "absolute", "prestige", "playoff", "crown royale",
+  "chronicles", "illusions", "playbook", "legacy", "classics",
+  "topps", "bowman", "stadium club", "heritage", "archives", "gypsy queen",
+  "clearly authentic", "tier one", "definitive", "tribute", "dynasty"
+];
+
 // Compute Card Type Score (1-10) based on rarity/brand/grade
 export function computeCardTypeScore(card: Card): number {
   let score = 5; // Base score
@@ -291,12 +308,23 @@ export function computeCardTypeScore(card: Card): number {
     else score += 0.5;
   }
   
-  // Variation/parallel bonus
+  // Brand bonus - check card set/brand name
+  const brandCheck = [card.set, card.variation, card.title].filter(Boolean).join(" ").toLowerCase();
+  let brandBonus = 0;
+  if (PREMIUM_BRANDS.some(brand => brandCheck.includes(brand))) {
+    brandBonus = 1.5;
+  } else if (MID_TIER_BRANDS.some(brand => brandCheck.includes(brand))) {
+    brandBonus = 0.5;
+  }
+  score += brandBonus;
+  
+  // Variation/parallel bonus (stacks with brand)
   if (card.variation) {
     const varLower = card.variation.toLowerCase();
     if (varLower.includes("1/1") || varLower.includes("one of one")) score += 3;
-    else if (varLower.includes("gold") || varLower.includes("superfractor")) score += 2;
-    else if (varLower.includes("refractor") || varLower.includes("prizm") || varLower.includes("holo")) score += 1;
+    else if (varLower.includes("gold") || varLower.includes("superfractor") || varLower.includes("black")) score += 2;
+    else if (varLower.includes("silver") || varLower.includes("refractor") || varLower.includes("holo") || varLower.includes("shimmer")) score += 1;
+    else if (varLower.includes("blue") || varLower.includes("red") || varLower.includes("green") || varLower.includes("orange")) score += 0.5;
   }
   
   return Math.min(10, Math.max(1, Math.round(score)));
