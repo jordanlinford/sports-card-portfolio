@@ -63,8 +63,20 @@ import {
   X,
   RefreshCw,
   Loader2,
-  Zap
+  Zap,
+  ArrowUpDown,
+  ArrowDownAZ,
+  CalendarDays,
+  DollarSign
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { DisplayCaseWithCards, Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { Badge } from "@/components/ui/badge";
@@ -459,6 +471,26 @@ export default function CaseEdit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+    },
+  });
+
+  const autoOrderMutation = useMutation({
+    mutationFn: async (orderBy: string) => {
+      return await apiRequest("POST", `/api/display-cases/${id}/cards/auto-order`, { orderBy });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      toast({
+        title: "Cards Reordered",
+        description: "Cards have been automatically sorted.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sort Failed",
+        description: error.message || "Failed to sort cards",
+        variant: "destructive",
+      });
     },
   });
 
@@ -919,6 +951,64 @@ export default function CaseEdit() {
                     )}
                     {refreshAllPricesMutation.isPending ? "Refreshing..." : "Refresh All Values"}
                   </Button>
+                )}
+                {displayCase.cards && displayCase.cards.length > 1 && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="gap-2"
+                        disabled={autoOrderMutation.isPending}
+                        data-testid="button-auto-order"
+                      >
+                        {autoOrderMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ArrowUpDown className="h-4 w-4" />
+                        )}
+                        Sort
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Auto-sort cards by</DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => autoOrderMutation.mutate("alpha")}
+                        data-testid="dropdown-item-sort-alpha"
+                      >
+                        <ArrowDownAZ className="h-4 w-4 mr-2" />
+                        Name (A-Z)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => autoOrderMutation.mutate("year_newest")}
+                        data-testid="dropdown-item-sort-year-newest"
+                      >
+                        <CalendarDays className="h-4 w-4 mr-2" />
+                        Year (Newest first)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => autoOrderMutation.mutate("year_oldest")}
+                        data-testid="dropdown-item-sort-year-oldest"
+                      >
+                        <CalendarDays className="h-4 w-4 mr-2" />
+                        Year (Oldest first)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => autoOrderMutation.mutate("value_high")}
+                        data-testid="dropdown-item-sort-value-high"
+                      >
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        Value (Highest first)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => autoOrderMutation.mutate("value_low")}
+                        data-testid="dropdown-item-sort-value-low"
+                      >
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        Value (Lowest first)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
                 <Dialog open={showAddCard} onOpenChange={(open) => {
                   setShowAddCard(open);
