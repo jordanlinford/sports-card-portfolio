@@ -19,6 +19,8 @@ export interface RegistryLookupResult {
 
 const registryMap = new Map<string, PlayerRegistryEntry>();
 let registryLoaded = false;
+let loadingPromise: Promise<void> | null = null;
+let registrySource: "database" | "csv" | "none" = "none";
 
 function normalizeForLookup(name: string): string {
   return name
@@ -28,15 +30,54 @@ function normalizeForLookup(name: string): string {
     .replace(/\s+/g, " ");
 }
 
-function loadRegistry(): void {
-  if (registryLoaded) return;
-  
+async function loadFromDatabase(): Promise<boolean> {
+  try {
+    const { db } = await import("./db");
+    const { playerRegistry } = await import("@shared/schema");
+    
+    const players = await db.select().from(playerRegistry);
+    
+    if (players.length === 0) {
+      return false;
+    }
+    
+    for (const player of players) {
+      const entry: PlayerRegistryEntry = {
+        sport: player.sport,
+        playerName: player.playerName,
+        aliases: player.aliases ? player.aliases.split("|").map(a => a.trim()).filter(a => a) : [],
+        careerStage: player.careerStage,
+        roleTier: player.roleTier,
+        positionGroup: player.positionGroup,
+        lastUpdated: player.lastUpdated?.toISOString() || "",
+      };
+      
+      const normalizedName = normalizeForLookup(entry.playerName);
+      registryMap.set(normalizedName, entry);
+      
+      for (const alias of entry.aliases) {
+        const normalizedAlias = normalizeForLookup(alias);
+        if (normalizedAlias && !registryMap.has(normalizedAlias)) {
+          registryMap.set(normalizedAlias, entry);
+        }
+      }
+    }
+    
+    console.log(`[PlayerRegistry] Loaded ${registryMap.size} entries from database (including aliases)`);
+    registrySource = "database";
+    return true;
+  } catch (error) {
+    console.log("[PlayerRegistry] Database not available, will fall back to CSV");
+    return false;
+  }
+}
+
+function loadFromCSV(): boolean {
   const csvPath = path.join(process.cwd(), "data", "player_status_registry.csv");
   
   if (!fs.existsSync(csvPath)) {
     console.log("[PlayerRegistry] Registry file not found at:", csvPath);
-    registryLoaded = true;
-    return;
+    return false;
   }
   
   try {
@@ -45,11 +86,8 @@ function loadRegistry(): void {
     
     if (lines.length < 2) {
       console.log("[PlayerRegistry] Registry file is empty or has no data rows");
-      registryLoaded = true;
-      return;
+      return false;
     }
-    
-    const headers = lines[0].split(",").map(h => h.trim());
     
     for (let i = 1; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]);
@@ -76,12 +114,57 @@ function loadRegistry(): void {
       }
     }
     
-    console.log(`[PlayerRegistry] Loaded ${registryMap.size} entries (including aliases)`);
-    registryLoaded = true;
+    console.log(`[PlayerRegistry] Loaded ${registryMap.size} entries from CSV (including aliases)`);
+    registrySource = "csv";
+    return true;
   } catch (error) {
-    console.error("[PlayerRegistry] Error loading registry:", error);
+    console.error("[PlayerRegistry] Error loading CSV registry:", error);
+    return false;
+  }
+}
+
+async function loadRegistryAsync(): Promise<void> {
+  if (registryLoaded) return;
+  
+  // Try database first
+  const dbLoaded = await loadFromDatabase();
+  
+  // Fall back to CSV if database is empty or unavailable
+  if (!dbLoaded) {
+    loadFromCSV();
+  }
+  
+  registryLoaded = true;
+}
+
+function loadRegistry(): void {
+  if (registryLoaded) return;
+  
+  // Start async loading if not already in progress
+  if (!loadingPromise) {
+    loadingPromise = loadRegistryAsync().finally(() => {
+      loadingPromise = null;
+    });
+  }
+  
+  // For synchronous access, try CSV first as fallback
+  // This ensures the function works synchronously on first call
+  if (!registryLoaded && registryMap.size === 0) {
+    loadFromCSV();
     registryLoaded = true;
   }
+}
+
+export async function ensureRegistryLoaded(): Promise<void> {
+  if (loadingPromise) {
+    await loadingPromise;
+  } else if (!registryLoaded) {
+    await loadRegistryAsync();
+  }
+}
+
+export function getRegistrySource(): "database" | "csv" | "none" {
+  return registrySource;
 }
 
 function parseCSVLine(line: string): string[] {
@@ -151,10 +234,11 @@ export function mapRegistryStage(registryStage: string): "ROOKIE" | "YEAR_2" | "
   return mapping[registryStage] || "UNKNOWN";
 }
 
-export function getRegistryStats(): { totalEntries: number; loaded: boolean } {
+export function getRegistryStats(): { totalEntries: number; loaded: boolean; source: "database" | "csv" | "none" } {
   loadRegistry();
   return {
     totalEntries: registryMap.size,
     loaded: registryLoaded,
+    source: registrySource,
   };
 }
