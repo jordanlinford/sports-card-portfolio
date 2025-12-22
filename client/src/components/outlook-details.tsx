@@ -175,12 +175,13 @@ function SignalBar({ label, value, max = 10, tooltip }: { label: string; value?:
   return content;
 }
 
-function CompositeScoreCard({ label, value, icon: Icon, description, helperText }: { 
+function CompositeScoreCard({ label, value, icon: Icon, description, helperText, tooltip }: { 
   label: string; 
   value?: number; 
   icon: typeof Target; 
   description: string;
   helperText?: string;
+  tooltip?: string;
 }) {
   if (value === undefined || value === null) return null;
   
@@ -189,14 +190,17 @@ function CompositeScoreCard({ label, value, icon: Icon, description, helperText 
   else if (value >= 40) colorClass = "text-yellow-500";
   else colorClass = "text-red-500";
   
-  return (
+  const content = (
     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
       <div className={`p-2 rounded-full ${colorClass} bg-background`}>
         <Icon className="h-4 w-4" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium truncate">{label}</span>
+          <span className="text-sm font-medium truncate flex items-center gap-1">
+            {label}
+            {tooltip && <Info className="h-3 w-3 text-muted-foreground/50" />}
+          </span>
           <span className={`text-lg font-bold ${colorClass}`}>{value}</span>
         </div>
         <p className="text-xs text-muted-foreground truncate">{description}</p>
@@ -206,6 +210,21 @@ function CompositeScoreCard({ label, value, icon: Icon, description, helperText 
       </div>
     </div>
   );
+  
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="cursor-help">{content}</div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <p className="text-sm">{tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  
+  return content;
 }
 
 function getMarketFrictionHelperText(value: number, action?: string): string {
@@ -446,12 +465,14 @@ export function OutlookDetails({
                   value={data.signals.upside} 
                   icon={TrendingUp} 
                   description="Growth potential"
+                  tooltip="How much room the card has to grow in value. Based on player career stage, card quality, and current market momentum. Higher = more growth potential."
                 />
                 <CompositeScoreCard 
                   label="Downside" 
                   value={data.signals.downsideRisk} 
                   icon={ShieldAlert} 
                   description="Loss exposure"
+                  tooltip="Risk of the card losing value. Considers price volatility, recent trends, and data confidence. Lower = safer investment. High downside means prices could drop."
                 />
                 <CompositeScoreCard 
                   label="Friction" 
@@ -459,6 +480,7 @@ export function OutlookDetails({
                   icon={Clock} 
                   description="Time to sell"
                   helperText={getMarketFrictionHelperText(data.signals.marketFriction, data.action)}
+                  tooltip="How easy it is to sell this card at fair value. Low friction = quick sales, many buyers. High friction = may sit on the market or require price cuts to move."
                 />
               </div>
               {showDetailedSignals && data.signals.trend != null && (
