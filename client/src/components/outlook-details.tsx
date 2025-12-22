@@ -465,7 +465,7 @@ export function OutlookDetails({
                   value={data.signals.upside} 
                   icon={TrendingUp} 
                   description="Growth potential"
-                  tooltip="How much room the card has to grow in value. Based on player career stage, card quality, and current market momentum. Higher = more growth potential."
+                  tooltip="How much room the card has to grow in value. Based on player career stage, role stability (starters vs backups), card quality, and market momentum. Players with uncertain roles have dampened upside."
                 />
                 <CompositeScoreCard 
                   label="Downside" 

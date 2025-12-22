@@ -151,10 +151,26 @@ const CAREER_STAGE_BOOST: Record<string, number> = {
   ROOKIE: 1.3,      // High upside potential
   RISING: 1.2,      // Growing value
   ELITE: 1.0,       // Peak value, stable
+  PRIME: 0.95,      // Established but not growing
   VETERAN: 0.8,     // Declining potential
-  RETIRED: 0.6,     // Fixed legacy value
+  DECLINING: 0.6,   // Active decline / lost role
+  AGING: 0.7,       // End of career
+  RETIRED: 0.5,     // Fixed legacy value
   LEGEND: 1.1,      // Premium for legends
+  HOF: 1.0,         // Hall of Fame - stable legacy
   UNKNOWN: 1.0,     // Neutral
+};
+
+// Role stability affects upside - unstable roles cap growth potential
+const ROLE_UPSIDE_DAMPENER: Record<string, number> = {
+  FRANCHISE_CORE: 1.0,      // Full upside
+  STARTER: 0.95,            // Slight dampening
+  SOLID_STARTER: 0.95,      // Same as starter
+  UNCERTAIN_STARTER: 0.7,   // Significant dampening - role at risk
+  ROTATIONAL: 0.6,          // Limited upside
+  BACKUP: 0.5,              // Very limited
+  OUT_OF_LEAGUE: 0.3,       // Minimal upside
+  UNKNOWN: 0.85,            // Conservative default
 };
 
 // Compute Comp Volume Score (1-10) based on sold comp count
@@ -351,10 +367,12 @@ export function computeQualityScore(cardTypeScore: number, careerStage: string |
 export function computeUpsideScore(
   qualityScore: number, 
   momentumScore: number, 
-  careerStage: string | null | undefined
+  careerStage: string | null | undefined,
+  roleTier?: string | null
 ): number {
   const stageBoost = CAREER_STAGE_BOOST[careerStage || "UNKNOWN"] || 1.0;
-  const weighted = (qualityScore * 0.4 + momentumScore * 0.6) * stageBoost;
+  const roleDampener = ROLE_UPSIDE_DAMPENER[roleTier || "UNKNOWN"] || 0.85;
+  const weighted = (qualityScore * 0.4 + momentumScore * 0.6) * stageBoost * roleDampener;
   return Math.min(100, Math.max(0, Math.round(weighted)));
 }
 
@@ -425,6 +443,30 @@ export function getMarketFrictionLabel(score: number): string {
   if (score <= 50) return "Medium";
   if (score <= 75) return "High";
   return "Very High";
+}
+
+// Detect both career stage and role tier from registry
+// Returns both values for use in upside calculation
+export function detectPlayerStatus(card: Card): { careerStage: string; roleTier: string } {
+  // TCG cards don't have career stages
+  if (card.cardCategory === "tcg" || card.cardCategory === "non_sport") {
+    return { careerStage: "UNKNOWN", roleTier: "UNKNOWN" };
+  }
+  
+  // Check player registry first (authoritative source)
+  if (card.playerName) {
+    const registryResult = lookupPlayer(card.playerName);
+    if (registryResult.found && registryResult.entry) {
+      const mappedStage = mapRegistryStage(registryResult.entry.careerStage);
+      const roleTier = registryResult.entry.roleTier || "UNKNOWN";
+      console.log(`[PlayerStatus] Registry hit for "${card.playerName}" -> stage=${mappedStage}, role=${roleTier}`);
+      return { careerStage: mappedStage, roleTier };
+    }
+  }
+  
+  // Fallback: use detectCareerStage logic, unknown role
+  const careerStage = detectCareerStage(card);
+  return { careerStage, roleTier: "UNKNOWN" };
 }
 
 // Career Stage Auto-Detection
@@ -986,14 +1028,14 @@ export function computeAllSignals(
   const positionScore = computePositionScore(card.sport, card.position);
   const cardTypeScore = computeCardTypeScore(card);
   
-  // Detect career stage
-  const careerStageAuto = detectCareerStage(card);
+  // Detect career stage and role tier
+  const { careerStage: careerStageAuto, roleTier } = detectPlayerStatus(card);
   
   // Compute composite scores
   const demandScore = computeDemandScore(liquidityScore, sportScore, positionScore);
   const momentumScore = computeMomentumScore(trendScore, volatilityScore);
   const qualityScore = computeQualityScore(cardTypeScore, careerStageAuto);
-  const upsideScore = computeUpsideScore(qualityScore, momentumScore, careerStageAuto);
+  const upsideScore = computeUpsideScore(qualityScore, momentumScore, careerStageAuto, roleTier);
   
   // Compute confidence first (needed for risk calculations)
   const { confidence: dataConfidence, reason: confidenceReason } = computeDataConfidence(pricePoints, volatilityScore);
