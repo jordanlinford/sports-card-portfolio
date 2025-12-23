@@ -687,8 +687,63 @@ async function generateFreshOutlook(
   const registryResult = lookupPlayer(playerName);
   const playerInRegistry = registryResult.found;
   
-  if (playerInRegistry) {
-    console.log(`[PlayerOutlook] Player "${playerName}" found in registry - ignoring AI career status override`);
+  // Apply registry data to playerInfo if available
+  let enrichedPlayerInfo = { ...playerInfo };
+  
+  if (playerInRegistry && registryResult.entry) {
+    console.log(`[PlayerOutlook] Player "${playerName}" found in registry - applying authoritative data`);
+    const entry = registryResult.entry;
+    
+    // Apply registry career stage (authoritative)
+    if (entry.careerStage) {
+      const stageMap: Record<string, PlayerStage> = {
+        "ROOKIE": "ROOKIE",
+        "YEAR_2": "YEAR_2",
+        "PRIME": "PRIME",
+        "VETERAN": "VETERAN",
+        "AGING": "AGING",
+        "RETIRED": "RETIRED",
+        "RETIRED_HOF": "RETIRED_HOF",
+        "BUST": "BUST",
+      };
+      const mappedStage = stageMap[entry.careerStage];
+      if (mappedStage) {
+        enrichedPlayerInfo.stage = mappedStage;
+      }
+    }
+    
+    // Apply registry position group (authoritative)
+    if (entry.positionGroup && entry.positionGroup !== "UNKNOWN") {
+      enrichedPlayerInfo.position = entry.positionGroup;
+      // Remove position from inferred fields since we have authoritative data
+      if (enrichedPlayerInfo.inferredFields) {
+        enrichedPlayerInfo.inferredFields = enrichedPlayerInfo.inferredFields.filter(f => f !== "position");
+      }
+    }
+    
+    // Re-run classification with registry stage for correct investment signals
+    const registryStageMap: Record<string, PlayerStage> = {
+      "ROOKIE": "ROOKIE",
+      "YEAR_2": "YEAR_2", 
+      "PRIME": "PRIME",
+      "VETERAN": "VETERAN",
+      "AGING": "AGING",
+      "RETIRED": "RETIRED",
+      "RETIRED_HOF": "RETIRED_HOF",
+      "BUST": "BUST",
+    };
+    const registryStage = registryStageMap[entry.careerStage];
+    if (registryStage && registryStage !== classification.stage) {
+      console.log(`[PlayerOutlook] Registry override: ${playerName} stage ${classification.stage} → ${registryStage}`);
+      const correctedInput: ClassificationInput = {
+        playerName,
+        sport,
+        recentMomentum: momentum,
+        newsHype,
+        careerStage: registryStage,
+      };
+      finalClassification = classifyPlayer(correctedInput);
+    }
   } else if (aiDetectedCareerStatus && aiDetectedCareerStatus !== "ACTIVE") {
     // Only apply AI override for players NOT in the registry
     // Map AI career status to our PlayerStage enum
@@ -779,14 +834,14 @@ async function generateFreshOutlook(
     newsCount: snippets.length,
     momentum: momentumMap[momentum] || "STABLE",
     newsHype: hypeMap[newsHype] || "LOW",
-    team: playerInfo.team,
-    position: playerInfo.position,
+    team: enrichedPlayerInfo.team,
+    position: enrichedPlayerInfo.position,
     playerName: playerName,
   });
   
   // Step 9: Build response
   const response: PlayerOutlookResponse = {
-    player: playerInfo,
+    player: enrichedPlayerInfo,
     snapshot,
     thesis,
     marketRealityCheck,
