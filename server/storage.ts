@@ -1348,6 +1348,7 @@ export class DatabaseStorage implements IStorage {
 
     // Delete user-related data
     await db.delete(offers).where(or(eq(offers.fromUserId, userId), eq(offers.toUserId, userId)));
+    await db.delete(tradeOffers).where(or(eq(tradeOffers.fromUserId, userId), eq(tradeOffers.toUserId, userId)));
     await db.delete(notifications).where(eq(notifications.userId, userId));
     await db.delete(userBadges).where(eq(userBadges.userId, userId));
     await db.delete(follows).where(or(eq(follows.followerId, userId), eq(follows.followingId, userId)));
@@ -1358,6 +1359,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(userAlertSettings).where(eq(userAlertSettings.userId, userId));
     await db.delete(promoCodeRedemptions).where(eq(promoCodeRedemptions.userId, userId));
     await db.delete(watchlist).where(eq(watchlist.userId, userId));
+    await db.delete(sharedSnapshots).where(eq(sharedSnapshots.userId, userId));
 
     // Finally delete the user
     await db.delete(users).where(eq(users.id, userId));

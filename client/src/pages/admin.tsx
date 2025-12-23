@@ -66,7 +66,7 @@ function StatCard({ title, value, icon: Icon, description }: { title: string; va
   );
 }
 
-function UserRow({ user, onUpdateSubscription }: { user: User; onUpdateSubscription: (userId: string, status: string) => void }) {
+function UserRow({ user, onUpdateSubscription, onDelete }: { user: User; onUpdateSubscription: (userId: string, status: string) => void; onDelete: (userId: string) => void }) {
   const initials = user.handle 
     ? user.handle.slice(0, 2).toUpperCase()
     : [user.firstName, user.lastName]
@@ -117,6 +117,16 @@ function UserRow({ user, onUpdateSubscription }: { user: User; onUpdateSubscript
             Upgrade to Pro
           </Button>
         )}
+        {!user.isAdmin && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => onDelete(user.id)}
+            data-testid={`button-delete-user-${user.id}`}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        )}
       </div>
       {user.createdAt && (
         <span className="text-sm text-muted-foreground hidden md:block">
@@ -127,7 +137,7 @@ function UserRow({ user, onUpdateSubscription }: { user: User; onUpdateSubscript
   );
 }
 
-function DisplayCaseRow({ displayCase }: { displayCase: DisplayCaseWithOwner }) {
+function DisplayCaseRow({ displayCase, onDelete }: { displayCase: DisplayCaseWithOwner; onDelete: (id: number) => void }) {
   return (
     <div className="flex items-center gap-4 p-4 border-b last:border-b-0" data-testid={`row-case-${displayCase.id}`}>
       <div className="w-12 h-12 bg-muted rounded-md flex items-center justify-center">
@@ -152,6 +162,14 @@ function DisplayCaseRow({ displayCase }: { displayCase: DisplayCaseWithOwner }) 
         <Badge variant={displayCase.isPublic ? "default" : "outline"}>
           {displayCase.isPublic ? "Public" : "Private"}
         </Badge>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => onDelete(displayCase.id)}
+          data-testid={`button-delete-case-${displayCase.id}`}
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
       </div>
       {displayCase.createdAt && (
         <span className="text-sm text-muted-foreground hidden md:block">
@@ -584,6 +602,8 @@ function PlayerRegistryTab() {
 
 export default function AdminDashboard() {
   const { toast } = useToast();
+  const [deleteUserConfirm, setDeleteUserConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [deleteCaseConfirm, setDeleteCaseConfirm] = useState<{ id: number; name: string } | null>(null);
   
   const { data: stats, isLoading: statsLoading, error: statsError } = useQuery<PlatformStats>({
     queryKey: ["/api/admin/stats"],
@@ -621,8 +641,50 @@ export default function AdminDashboard() {
     },
   });
 
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("DELETE", `/api/admin/users/${userId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/display-cases"] });
+      setDeleteUserConfirm(null);
+      toast({ title: "User Deleted", description: "User and all their data have been removed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to delete user", variant: "destructive" });
+    },
+  });
+
+  const deleteCaseMutation = useMutation({
+    mutationFn: async (caseId: number) => {
+      return await apiRequest("DELETE", `/api/admin/display-cases/${caseId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      setDeleteCaseConfirm(null);
+      toast({ title: "Display Case Deleted", description: "Display case and all cards have been removed" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message || "Failed to delete display case", variant: "destructive" });
+    },
+  });
+
   const handleUpdateSubscription = (userId: string, status: string) => {
     updateSubscriptionMutation.mutate({ userId, subscriptionStatus: status });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    const user = users?.find(u => u.id === userId);
+    const name = user?.handle ? `@${user.handle}` : user?.email || "Unknown User";
+    setDeleteUserConfirm({ id: userId, name });
+  };
+
+  const handleDeleteCase = (caseId: number) => {
+    const dc = displayCases?.find(c => c.id === caseId);
+    setDeleteCaseConfirm({ id: caseId, name: dc?.name || "Unknown Case" });
   };
 
   if (statsError) {
@@ -721,7 +783,7 @@ export default function AdminDashboard() {
                     </div>
                   ) : users && users.length > 0 ? (
                     users.map((user) => (
-                      <UserRow key={user.id} user={user} onUpdateSubscription={handleUpdateSubscription} />
+                      <UserRow key={user.id} user={user} onUpdateSubscription={handleUpdateSubscription} onDelete={handleDeleteUser} />
                     ))
                   ) : (
                     <div className="p-8 text-center text-muted-foreground">
@@ -749,7 +811,7 @@ export default function AdminDashboard() {
                     </div>
                   ) : displayCases && displayCases.length > 0 ? (
                     displayCases.map((displayCase) => (
-                      <DisplayCaseRow key={displayCase.id} displayCase={displayCase} />
+                      <DisplayCaseRow key={displayCase.id} displayCase={displayCase} onDelete={handleDeleteCase} />
                     ))
                   ) : (
                     <div className="p-8 text-center text-muted-foreground">
@@ -766,6 +828,52 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <Dialog open={deleteUserConfirm !== null} onOpenChange={() => setDeleteUserConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete User?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>{deleteUserConfirm?.name}</strong> and all their data including display cases, cards, and activity. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUserConfirm(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteUserConfirm && deleteUserMutation.mutate(deleteUserConfirm.id)}
+              disabled={deleteUserMutation.isPending}
+              data-testid="button-confirm-delete-user"
+            >
+              {deleteUserMutation.isPending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete User
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteCaseConfirm !== null} onOpenChange={() => setDeleteCaseConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Display Case?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>{deleteCaseConfirm?.name}</strong> and all its cards. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteCaseConfirm(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteCaseConfirm && deleteCaseMutation.mutate(deleteCaseConfirm.id)}
+              disabled={deleteCaseMutation.isPending}
+              data-testid="button-confirm-delete-case"
+            >
+              {deleteCaseMutation.isPending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete Case
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
