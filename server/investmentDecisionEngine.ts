@@ -20,7 +20,8 @@
  * - Maturity gate: EMERGING players cannot be ACCUMULATE or AVOID
  * - Franchise Core Protection: ANY FRANCHISE_CORE player never SPECULATIVE
  * - ESTABLISHED FRANCHISE_CORE also never AVOID
- * - ACCUMULATE for ESTABLISHED players requires valuationScore >= 75 AND downsideRiskScore < 65
+ * - ACCUMULATE for ESTABLISHED players requires valuationScore >= threshold AND downsideRiskScore < 65
+ *   (threshold is 65 with comp data, 52 without - context-aware to avoid impossible thresholds)
  * - Confidence stays LOW when comps are modeled/estimated
  * 
  * POSITION-SPECIFIC LOGIC (Multi-Sport):
@@ -665,8 +666,16 @@ function computeScores(input: DecisionInput): InvestmentScores {
     valuationScore = 100 - (medianPosition * 50) - (tempToScore[temperature] ?? 50) * 0.3;
     valuationScore = Math.max(20, Math.min(80, valuationScore));
   } else {
-    valuationScore = 50 - (tempToScore[temperature] ?? 50) * 0.2;
-    valuationScore = Math.max(30, Math.min(70, valuationScore));
+    // Without comp data, use a neutral baseline that allows ACCUMULATE for proven stars
+    // decideVerdict uses context-aware thresholds (52 for no-comp scenarios)
+    // tempToScore: HOT=85, WARM=65, NEUTRAL=45, COOLING=25
+    // Base 59.5 ensures WARM/NEUTRAL/COOLING can ACCUMULATE, HOT cannot
+    // HOT (85): 59.5 - 8.5 = 51 → rounds to 51 → can't ACCUMULATE (overheated)
+    // WARM (65): 59.5 - 6.5 = 53 → can ACCUMULATE (legitimate demand)
+    // NEUTRAL (45): 59.5 - 4.5 = 55 → can ACCUMULATE (fair value)
+    // COOLING (25): 59.5 - 2.5 = 57 → can ACCUMULATE (underpriced)
+    valuationScore = 59.5 - (tempToScore[temperature] ?? 50) * 0.1;
+    valuationScore = Math.max(40, Math.min(70, valuationScore));
   }
 
   const mispricingScore = valuationScore - narrativeHeatScore;
@@ -814,12 +823,22 @@ function decideVerdict(
     if (scores.downsideRiskScore >= 65) {
       return { verdict: "HOLD_CORE", reason: "Franchise asset but elevated risk - hold, don't chase" };
     }
-    // Low risk AND clearly undervalued = ACCUMULATE
-    if (scores.valuationScore >= 75) {
+    // Low risk AND reasonably valued = ACCUMULATE
+    // Threshold is context-aware:
+    // - With reliable comps: 65 (we have real price data)
+    // - Without reliable comps: 52 (no-comp valuations cap around 55-57, 
+    //   so proven stars at neutral/cool temps can qualify)
+    // ESTABLISHED players have already proven themselves (roleStability >= 75)
+    const accumulateThreshold = compsReliable ? 65 : 52;
+    if (scores.valuationScore >= accumulateThreshold) {
       return { verdict: "ACCUMULATE", reason: "Proven franchise cornerstone - accumulate on any dip" };
     }
-    // Otherwise, hold - priced fairly for the risk level
-    return { verdict: "HOLD_CORE", reason: "Franchise asset at fair value - hold position" };
+    // Fair value but still a core asset
+    if (scores.valuationScore >= 45) {
+      return { verdict: "HOLD_CORE", reason: "Franchise asset at fair value - hold position" };
+    }
+    // Overpriced but still franchise core
+    return { verdict: "HOLD_CORE", reason: "Franchise asset but currently overpriced - hold, don't add" };
   }
   
   // ============================================================
@@ -1352,9 +1371,10 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     reason = "Franchise core asset - hold through volatility";
   }
   
-  // Make ACCUMULATE harder for franchise-core (requires clear undervaluation)
-  // Only ACCUMULATE when valuationScore >= 75 (meaning clearly cheap)
-  if (franchiseCore && verdict === "ACCUMULATE" && scores.valuationScore < 75) {
+  // Make ACCUMULATE harder for franchise-core (requires reasonable undervaluation)
+  // Context-aware threshold: 65 with comps, 52 without (matches decideVerdict logic)
+  const franchiseCoreAccumulateThreshold = compsReliable ? 65 : 52;
+  if (franchiseCore && verdict === "ACCUMULATE" && scores.valuationScore < franchiseCoreAccumulateThreshold) {
     verdict = "HOLD_CORE";
     reason = "Franchise core - already priced as elite, hold unless clearly cheap";
   }
