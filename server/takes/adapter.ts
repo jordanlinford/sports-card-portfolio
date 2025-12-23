@@ -41,9 +41,10 @@ export function marketToTakeInputs(market: any): TakeInputs {
     market?.confidenceScore ?? undefined;
 
   const careerStage = market?.careerStage;
+  const cardTitle = market?.card?.title ?? "";
   const isRookie = careerStage === "ROOKIE" || 
     narrativeTags.includes("rookie") ||
-    market?.card?.title?.toLowerCase().includes("rookie");
+    (cardTitle && cardTitle.toLowerCase().includes("rookie"));
 
   return {
     signalCount,

@@ -40,7 +40,9 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getTakesFromMarket, Take } from "@/lib/takes";
+import { CollectorTake } from "@/components/CollectorTake";
 import {
   Dialog,
   DialogContent,
@@ -258,6 +260,7 @@ export default function CardOutlookPage() {
   const [showAddToCaseModal, setShowAddToCaseModal] = useState(false);
   const [showMatchSamplesModal, setShowMatchSamplesModal] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
+  const [takes, setTakes] = useState<Take[]>([]);
   const { toast } = useToast();
 
   const { data: outlook, isLoading, error } = useQuery<OutlookData>({
@@ -330,6 +333,27 @@ export default function CardOutlookPage() {
       });
     },
   });
+
+  useEffect(() => {
+    if (!outlook || !outlook.action) return;
+    
+    (async () => {
+      try {
+        const fetchedTakes = await getTakesFromMarket({
+          scope: "card",
+          subject: {
+            playerName: outlook.card?.playerName || undefined,
+            cardName: outlook.card?.title,
+            subjectId: String(outlook.cardId),
+          },
+          market: outlook,
+        });
+        setTakes(fetchedTakes);
+      } catch (err) {
+        console.error("Failed to fetch takes:", err);
+      }
+    })();
+  }, [outlook?.cardId, outlook?.action]);
 
   if (authLoading || isLoading) {
     return (
@@ -544,6 +568,14 @@ export default function CardOutlookPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {takes.length > 0 && (
+        <div className="space-y-3 mb-6" data-testid="section-collector-takes">
+          {takes.map((take) => (
+            <CollectorTake key={take.id} take={take} />
+          ))}
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
