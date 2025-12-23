@@ -138,24 +138,27 @@ async function loadRegistryAsync(): Promise<void> {
 function loadRegistry(): void {
   // Start async loading if not already in progress
   if (!loadingPromise) {
-    loadingPromise = loadRegistryAsync().finally(() => {
-      loadingPromise = null;
-    });
+    loadingPromise = loadRegistryAsync();
   }
   
   // For synchronous access on first call, load from CSV as immediate fallback
   // Database loading will override this when it completes
   if (registryMap.size === 0) {
     loadFromCSV();
-    registryLoaded = true;
   }
 }
 
 export async function ensureRegistryLoaded(): Promise<void> {
+  // Always wait for any pending database load - it's authoritative
   if (loadingPromise) {
     await loadingPromise;
-  } else if (!registryLoaded) {
-    await loadRegistryAsync();
+    return;
+  }
+  
+  // If no loading in progress, start fresh database load
+  if (!registryLoaded || registrySource !== "database") {
+    loadingPromise = loadRegistryAsync();
+    await loadingPromise;
   }
 }
 
