@@ -155,18 +155,42 @@ const KNOWN_LEGENDS: Record<string, string[]> = {
   ],
 };
 
+// Normalize sport codes to generic sport names for KNOWN_LEGENDS lookup
+function normalizeSportForLegends(sport: string): string {
+  const sportLower = sport.toLowerCase().trim();
+  const mapping: Record<string, string> = {
+    "nfl": "football",
+    "nba": "basketball", 
+    "mlb": "baseball",
+    "nhl": "hockey",
+    "football": "football",
+    "basketball": "basketball",
+    "baseball": "baseball",
+    "hockey": "hockey",
+    "soccer": "soccer",
+  };
+  return mapping[sportLower] || sportLower;
+}
+
 // Check if player is a known legend
 function isKnownLegend(playerName: string, sport: string): boolean {
   const normalizedName = playerName.toLowerCase().trim();
-  const sportLegends = KNOWN_LEGENDS[sport.toLowerCase()] || [];
+  const normalizedSport = normalizeSportForLegends(sport);
+  const sportLegends = KNOWN_LEGENDS[normalizedSport] || [];
   
   // Check all sports if sport doesn't match
   const allLegends = Object.values(KNOWN_LEGENDS).flat();
   const legendsToCheck = sportLegends.length > 0 ? sportLegends : allLegends;
   
-  return legendsToCheck.some(legend => 
+  const isLegend = legendsToCheck.some(legend => 
     normalizedName.includes(legend) || legend.includes(normalizedName)
   );
+  
+  if (isLegend) {
+    console.log(`[PlayerOutlook] isKnownLegend: "${playerName}" matched as legend (sport: ${sport} → ${normalizedSport})`);
+  }
+  
+  return isLegend;
 }
 
 // Use Serper to get news/hype signals about the player
