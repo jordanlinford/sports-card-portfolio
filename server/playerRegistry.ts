@@ -236,7 +236,7 @@ export function mapRegistryStage(registryStage: string): "ROOKIE" | "YEAR_2" | "
     "AGING": "AGING",
     "RETIRED_HOF": "VETERAN",
     "BUST": "PRIME",
-    "PROSPECT": "ROOKIE",
+    "PROSPECT": "ROOKIE", // Legacy support for old data
   };
   
   return mapping[registryStage] || "UNKNOWN";

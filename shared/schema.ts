@@ -1613,7 +1613,7 @@ export const playerRegistry = pgTable("player_registry", {
   sport: varchar("sport", { length: 10 }).notNull(), // NFL, NBA, MLB, NHL
   playerName: varchar("player_name", { length: 255 }).notNull(),
   aliases: text("aliases"), // Pipe-separated: "Brady|T Brady|Thomas Brady"
-  careerStage: varchar("career_stage", { length: 30 }).notNull(), // PROSPECT, YEAR_2, YEAR_3, YEAR_4, PRIME, VETERAN, RETIRED_HOF, BUST
+  careerStage: varchar("career_stage", { length: 30 }).notNull(), // ROOKIE, YEAR_2, YEAR_3, YEAR_4, PRIME, VETERAN, RETIRED_HOF, BUST
   roleTier: varchar("role_tier", { length: 30 }).notNull(), // FRANCHISE_CORE, SOLID_STARTER, UNCERTAIN_ROLE, BACKUP_OR_FRINGE, OUT_OF_LEAGUE, RETIRED_ICON
   positionGroup: varchar("position_group", { length: 30 }).notNull(), // QB, WR, RB, TE, GUARD, WING, BIG, HITTER, PITCHER, UNKNOWN
   lastUpdated: timestamp("last_updated").defaultNow(),

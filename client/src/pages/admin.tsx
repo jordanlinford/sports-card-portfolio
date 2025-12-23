@@ -48,7 +48,7 @@ interface PlayersResponse {
 
 const SPORTS = ["NFL", "NBA", "MLB", "NHL"] as const;
 const ROLE_TIERS = ["FRANCHISE_CORE", "SOLID_STARTER", "UNCERTAIN_ROLE", "BACKUP_OR_FRINGE", "OUT_OF_LEAGUE", "RETIRED_ICON"] as const;
-const CAREER_STAGES = ["PROSPECT", "YEAR_2", "YEAR_3", "YEAR_4", "PRIME", "VETERAN", "RETIRED_HOF", "BUST"] as const;
+const CAREER_STAGES = ["ROOKIE", "YEAR_2", "YEAR_3", "YEAR_4", "PRIME", "VETERAN", "RETIRED_HOF", "BUST"] as const;
 const POSITION_GROUPS = ["QB", "WR", "RB", "TE", "GUARD", "WING", "BIG", "HITTER", "PITCHER", "GOALIE", "CENTER", "UNKNOWN"] as const;
 
 function StatCard({ title, value, icon: Icon, description }: { title: string; value: number; icon: any; description?: string }) {
