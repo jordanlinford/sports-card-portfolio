@@ -446,13 +446,204 @@ const SPORT_FRAMEWORKS: Record<string, SportExposureFramework> = {
   },
 };
 
+// Era-appropriate card frameworks for retired legends
+// These brands existed during their rookie years (pre-modern Panini era before ~2012)
+const VINTAGE_FRAMEWORKS: Record<string, SportExposureFramework> = {
+  football: {
+    premium: [
+      "Playoff Contenders Championship Ticket Auto",
+      "SP Authentic Sign of the Times Auto",
+      "Bowman Chrome Auto",
+      "Topps Chrome Refractor Auto",
+      "Upper Deck SPx Auto",
+    ],
+    growth: [
+      "Topps Chrome Refractor Rookie",
+      "Bowman Chrome Rookie",
+      "Upper Deck SP Authentic Rookie",
+      "Playoff Contenders Rookie Ticket",
+      "Fleer Ultra Rookie",
+    ],
+    core: [
+      "Topps Base Rookie",
+      "Upper Deck Base Rookie",
+      "Score Rookie",
+      "Fleer Rookie",
+      "Pacific Rookie",
+    ],
+    common: [
+      "Score Base",
+      "Pacific Base",
+      "Fleer Tradition",
+      "Upper Deck MVP",
+    ],
+    speculative: [
+      "Press Pass Rookies",
+      "Sage Hit",
+      "Pacific Prism",
+      "Leaf Rookies & Stars",
+    ],
+  },
+  basketball: {
+    premium: [
+      "Upper Deck SPx Auto",
+      "SP Authentic Sign of the Times Auto",
+      "Topps Chrome Refractor Auto",
+      "Fleer Metal Universe",
+      "Skybox Premium",
+    ],
+    growth: [
+      "Topps Chrome Refractor Rookie",
+      "Bowman Chrome Rookie",
+      "Fleer Ultra Rookie",
+      "Upper Deck SP Authentic Rookie",
+      "Skybox E-X",
+    ],
+    core: [
+      "Topps Base Rookie",
+      "Upper Deck Base Rookie",
+      "Fleer Rookie",
+      "Hoops Rookie",
+    ],
+    common: [
+      "Hoops Base",
+      "Fleer Tradition",
+      "Upper Deck MVP",
+      "Collector's Choice",
+    ],
+    speculative: [
+      "Press Pass Rookies",
+      "Skybox Premium Box Sets",
+      "Fleer Metal Universe inserts",
+    ],
+  },
+  baseball: {
+    premium: [
+      "Topps Chrome Refractor Auto",
+      "Bowman Chrome 1st Auto",
+      "Topps Finest Refractor Auto",
+      "Upper Deck SP Authentic Auto",
+    ],
+    growth: [
+      "Bowman Chrome 1st Refractor",
+      "Topps Chrome Rookie Refractor",
+      "Topps Finest Refractor",
+      "Upper Deck SP Authentic",
+    ],
+    core: [
+      "Topps Base Rookie",
+      "Bowman Base Rookie",
+      "Upper Deck Base Rookie",
+      "Fleer Rookie",
+    ],
+    common: [
+      "Topps Base",
+      "Upper Deck Base",
+      "Fleer Tradition",
+      "Donruss Base",
+    ],
+    speculative: [
+      "Pacific products",
+      "Minor league issues",
+      "Team sets",
+    ],
+  },
+  hockey: {
+    premium: [
+      "Upper Deck Young Guns Auto",
+      "SP Authentic Future Watch Auto",
+      "Topps Chrome Refractor Auto",
+      "Be A Player Signatures",
+    ],
+    growth: [
+      "Upper Deck Young Guns",
+      "SP Authentic Future Watch",
+      "Topps Chrome Refractor",
+      "Bowman Chrome",
+    ],
+    core: [
+      "Upper Deck Series 1/2 Rookie",
+      "O-Pee-Chee Rookie",
+      "Topps Base Rookie",
+    ],
+    common: [
+      "Upper Deck Base",
+      "O-Pee-Chee Base",
+      "Score Base",
+    ],
+    speculative: [
+      "Pacific products",
+      "Be A Player Base",
+      "Team sets",
+    ],
+  },
+  soccer: {
+    premium: [
+      "Topps Chrome UCL Auto",
+      "Upper Deck Authentic Auto",
+      "Panini Stickers Rare",
+    ],
+    growth: [
+      "Topps Chrome UCL Refractor",
+      "Panini World Cup Stickers",
+      "Merlin Premier League",
+    ],
+    core: [
+      "Topps UCL Base",
+      "Panini World Cup Base",
+      "Merlin Base",
+    ],
+    common: [
+      "Panini Stickers Base",
+      "Merlin Base",
+    ],
+    speculative: [
+      "Regional league cards",
+      "Magazine inserts",
+    ],
+  },
+};
+
+// Determine if a player needs vintage/era-appropriate card recommendations
+// The "modern Panini era" for football started ~2012 with Prizm
+// For basketball ~2012, baseball has always had Topps, hockey ~2005 with The Cup
+function needsVintageFramework(sport: string, rookieYear?: number): boolean {
+  if (!rookieYear) return false;
+  
+  const modernEraStart: Record<string, number> = {
+    football: 2012,    // Prizm launched 2012
+    basketball: 2012,  // Prizm launched 2012
+    baseball: 2000,    // Baseball kept Topps/Bowman throughout
+    hockey: 2005,      // The Cup launched ~2005
+    soccer: 2014,      // Panini Prizm World Cup 2014
+  };
+  
+  const sportLower = sport.toLowerCase();
+  const threshold = modernEraStart[sportLower] || 2012;
+  
+  return rookieYear < threshold;
+}
+
 // Get exposure recommendations based on player classification
 export function getExposureRecommendations(
   classification: ClassificationOutput,
   sport: string,
   playerName: string
 ): ExposureRecommendation[] {
-  const framework = SPORT_FRAMEWORKS[sport.toLowerCase()] || SPORT_FRAMEWORKS.football;
+  const sportLower = sport.toLowerCase();
+  const sportNormalized = sportLower === "nfl" ? "football" 
+    : sportLower === "nba" ? "basketball"
+    : sportLower === "mlb" ? "baseball"
+    : sportLower === "nhl" ? "hockey"
+    : sportLower;
+  
+  // Use era-appropriate card recommendations for retired legends from pre-modern era
+  const useVintage = (classification.stage === "RETIRED" || classification.stage === "RETIRED_HOF") 
+    && needsVintageFramework(sportNormalized, classification.rookieYear);
+  
+  const framework = useVintage 
+    ? (VINTAGE_FRAMEWORKS[sportNormalized] || VINTAGE_FRAMEWORKS.football)
+    : (SPORT_FRAMEWORKS[sportNormalized] || SPORT_FRAMEWORKS.football);
   const recommendations: ExposureRecommendation[] = [];
   const positionPremium = getPositionPremium(sport, classification.position);
   
