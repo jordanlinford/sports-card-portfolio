@@ -3205,6 +3205,55 @@ Allow: /
     }
   });
 
+  // Admin: Delete user and all their data
+  app.delete("/api/admin/users/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.params.id;
+
+      // Prevent admin from deleting themselves
+      if (userId === req.user.claims.sub) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Prevent deleting other admins
+      if (user.isAdmin) {
+        return res.status(400).json({ message: "Cannot delete admin accounts" });
+      }
+
+      await storage.adminDeleteUser(userId);
+      res.json({ success: true, message: "User and all associated data deleted" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
+  // Admin: Delete display case
+  app.delete("/api/admin/display-cases/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const displayCaseId = parseInt(req.params.id);
+      if (isNaN(displayCaseId)) {
+        return res.status(400).json({ message: "Invalid display case ID" });
+      }
+
+      const displayCase = await storage.getDisplayCase(displayCaseId);
+      if (!displayCase) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      await storage.adminDeleteDisplayCase(displayCaseId);
+      res.json({ success: true, message: "Display case and all associated data deleted" });
+    } catch (error) {
+      console.error("Error deleting display case:", error);
+      res.status(500).json({ message: "Failed to delete display case" });
+    }
+  });
+
   // Admin: Prewarm job status and trigger
   app.get("/api/admin/prewarm/status", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
