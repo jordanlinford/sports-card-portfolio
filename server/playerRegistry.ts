@@ -149,16 +149,22 @@ function loadRegistry(): void {
 }
 
 export async function ensureRegistryLoaded(): Promise<void> {
+  console.log(`[PlayerRegistry] ensureRegistryLoaded called. loadingPromise=${!!loadingPromise}, registryLoaded=${registryLoaded}, registrySource=${registrySource}, mapSize=${registryMap.size}`);
+  
   // Always wait for any pending database load - it's authoritative
   if (loadingPromise) {
+    console.log("[PlayerRegistry] Waiting for existing loadingPromise...");
     await loadingPromise;
+    console.log(`[PlayerRegistry] loadingPromise resolved. registrySource=${registrySource}, mapSize=${registryMap.size}`);
     return;
   }
   
   // If no loading in progress, start fresh database load
   if (!registryLoaded || registrySource !== "database") {
+    console.log("[PlayerRegistry] Starting fresh database load...");
     loadingPromise = loadRegistryAsync();
     await loadingPromise;
+    console.log(`[PlayerRegistry] Fresh load complete. registrySource=${registrySource}, mapSize=${registryMap.size}`);
   }
 }
 
@@ -194,7 +200,10 @@ export function lookupPlayer(playerName: string): RegistryLookupResult {
   const normalized = normalizeForLookup(playerName);
   const entry = registryMap.get(normalized);
   
+  console.log(`[PlayerRegistry] lookupPlayer("${playerName}") -> normalized="${normalized}", found=${!!entry}, registrySource=${registrySource}, mapSize=${registryMap.size}`);
+  
   if (entry) {
+    console.log(`[PlayerRegistry] Found entry: position=${entry.positionGroup}, stage=${entry.careerStage}, sport=${entry.sport}`);
     return {
       found: true,
       entry,
