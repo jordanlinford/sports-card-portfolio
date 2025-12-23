@@ -1,0 +1,841 @@
+Yes. The right approach is to treat “Collector Takes” as a thin layer on top of the market data object you already compute today, not a new data system.
+
+A Replit-ready build, start-to-finish, looks like this:
+
+Do not introduce new scraping or counting
+You add:
+
+a single adapter that maps your existing market object → TakeInputs
+
+a generator that produces 0–N one-liners
+
+UI component that renders them where your outlook already renders
+
+The architecture you want
+
+Existing pipeline (unchanged): your app already produces a MarketOutlook object for card/player/portfolio.
+
+New adapter (small): normalize that object into a stable shape for the take engine.
+
+Take engine (new): rule + template generator (no eBay dependence required).
+
+Logging (optional in phase 1): impressions only.
+
+Exactly what you need to implement
+
+A. Define a stable “TakeInputs” interface
+Create server/src/takes/types.ts
+
+export type TakeScope = "card" | "player" | "portfolio";
+
+export interface TakeInputs {
+  // This is derived from your existing market data (not new scraping)
+  signalCount: number;               // overall confidence/coverage count from your existing system
+  confidenceScore?: number;          // if you already compute something like this
+  narrativeTags: string[];           // normalized tags derived from your existing narrative/summary fields
+
+  sport?: string;
+  position?: string;
+  age?: number;
+  isRookie?: boolean;
+  seasonPhase?: "IN_SEASON" | "OFFSEASON" | "PRESEASON" | "PLAYOFFS";
+}
+
+export interface TakeSubject {
+  playerName?: string;
+  cardName?: string;
+  subjectId?: string;
+  portfolioId?: string;
+}
+
+export interface GenerateTakesRequest {
+  scope: TakeScope;
+  subject: TakeSubject;
+  inputs: TakeInputs;
+
+  portfolioContext?: {
+    concentrationPctTop1?: number;
+    topExposureLabel?: string;
+    segmentMomentum?: "UP" | "FLAT" | "DOWN";
+  };
+}
+
+export interface Take {
+  id: string;
+  scope: TakeScope;
+  severity: "SOFT" | "STRONG";
+  type: "STRUCTURAL" | "TIMING" | "CAUTION";
+  trigger: string;
+  confidence: number;
+  text: string;
+}
+
+
+B. Build the adapter from “your existing market data”
+This is the key file. You will replace the “market” type with your actual object shape.
+
+Create server/src/takes/adapter.ts
+
+import { TakeInputs } from "./types";
+
+// Replace `any` with your actual MarketOutlook type.
+export function marketToTakeInputs(market: any): TakeInputs {
+  // 1) Choose ONE existing “how much data do we have?” field already in your app.
+  // Examples: market.hitCount, market.sampleSize, market.marketCount, market.totalResults, etc.
+  const signalCount =
+    market?.signalCount ??
+    market?.marketCount ??
+    market?.totalCount ??
+    market?.sampleSize ??
+    market?.hits ??
+    0;
+
+  // 2) Pull narrative from what you already display (plain-language summary, flags, etc.)
+  const narrativeText =
+    (market?.narrativeSummary ??
+      market?.summary ??
+      market?.plainEnglish ??
+      market?.insight ??
+      "") as string;
+
+  // 3) Derive tags using simple keyword rules (Phase 1). This is deterministic and stable.
+  const t = narrativeText.toLowerCase();
+  const narrativeTags: string[] = [];
+
+  if (t.includes("rookie")) narrativeTags.push("rookie");
+  if (t.includes("breakout") || t.includes("camp buzz") || t.includes("trending up")) narrativeTags.push("breakout");
+  if (t.includes("injury") || t.includes("out for season") || t.includes("questionable")) narrativeTags.push("injury");
+  if (t.includes("benched") || t.includes("backup") || t.includes("demoted")) narrativeTags.push("benched");
+  if (t.includes("decline") || t.includes("washed") || t.includes("lost a step")) narrativeTags.push("decline");
+  if (t.includes("hype") || t.includes("viral") || t.includes("highlight")) narrativeTags.push("hype");
+
+  // If you already have explicit flags, use them too:
+  if (Array.isArray(market?.flags)) {
+    for (const f of market.flags) narrativeTags.push(String(f).toLowerCase());
+  }
+
+  // Optional: if you already compute an internal confidence score, reuse it.
+  const confidenceScore = market?.confidenceScore ?? market?.dataConfidence ?? undefined;
+
+  return {
+    signalCount,
+    confidenceScore,
+    narrativeTags: Array.from(new Set(narrativeTags)),
+    sport: market?.sport,
+    position: market?.position,
+    age: market?.age,
+    isRookie: market?.isRookie,
+    seasonPhase: market?.seasonPhase,
+  };
+}
+
+
+This keeps you strictly using market data you already utilize. You’re just extracting and normalizing it.
+
+C. The take generator (rules + templates)
+Create server/src/takes/generator.ts
+
+import { GenerateTakesRequest, Take } from "./types";
+
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function tierFromSignalCount(n: number) {
+  // Tune these to match your app’s current “7 hits is liquid” mindset.
+  // This is not eBay-specific; it’s your existing market coverage count.
+  if (n < 7) return "THIN";
+  if (n < 20) return "MEDIUM";
+  return "STRONG";
+}
+
+function has(tags: string[], key: string) {
+  return tags.map((t) => t.toLowerCase()).includes(key.toLowerCase());
+}
+
+export function generateTakes(req: GenerateTakesRequest): Take[] {
+  const { scope, subject, inputs, portfolioContext } = req;
+
+  const playerName = subject.playerName;
+  const tags = inputs.narrativeTags ?? [];
+  const signalTier = tierFromSignalCount(inputs.signalCount ?? 0);
+
+  const takes: Omit<Take, "id">[] = [];
+
+  // Gate: if signal is THIN, do not do bold marketing lines. Only caution.
+  if (signalTier === "THIN") {
+    takes.push({
+      scope,
+      severity: "SOFT",
+      type: "CAUTION",
+      trigger: "SIGNAL_THIN",
+      confidence: 78,
+      text: "Signal is thin here. Treat this as sentiment, not a conviction play.",
+    });
+    return takes.map((t) => ({ ...t, id: `${t.scope}:${t.trigger}:${t.type}:${t.severity}` }));
+  }
+
+  // STRUCTURAL: hobby moved on (narrative driven; no eBay dependence)
+  if (scope !== "portfolio" && (has(tags, "decline") || has(tags, "benched"))) {
+    const base = signalTier === "STRONG" ? 90 : 84;
+    const severity = base >= 88 ? "STRONG" : "SOFT";
+    takes.push({
+      scope,
+      severity,
+      type: "STRUCTURAL",
+      trigger: "HOBBY_MOVED_ON",
+      confidence: base,
+      text:
+        severity === "STRONG"
+          ? `The hobby already moved on from ${playerName ?? "this player"}. These markets usually don’t circle back.`
+          : "Collectors aren’t waiting for a comeback here. The hobby has mostly moved on.",
+    });
+  }
+
+  // STRUCTURAL: QB age cliff (optional, uses your existing player metadata if you have it)
+  const pos = (inputs.position ?? "").toUpperCase();
+  if (scope !== "portfolio" && pos === "QB" && typeof inputs.age === "number" && inputs.age >= 33 && !inputs.isRookie) {
+    const base = clamp(82 + (inputs.age - 33) * 1.5 + (signalTier === "STRONG" ? 4 : 0), 75, 93);
+    const severity = base >= 88 ? "STRONG" : "SOFT";
+    takes.push({
+      scope,
+      severity,
+      type: "STRUCTURAL",
+      trigger: "QB_UPSIDE_WINDOW",
+      confidence: base,
+      text:
+        severity === "STRONG"
+          ? `${playerName ?? "This player"}’s card market is structurally capped. The ceiling doesn’t come back.`
+          : `${playerName ?? "This player"} is past the hobby’s upside window. Even solid games rarely rebuild conviction.`,
+    });
+  }
+
+  // TIMING: rookie uncertainty (marketing-usable without price-level claims)
+  if (scope !== "portfolio" && inputs.isRookie) {
+    const base = signalTier === "STRONG" ? 88 : 82;
+    const severity = base >= 88 ? "STRONG" : "SOFT";
+    takes.push({
+      scope,
+      severity,
+      type: "TIMING",
+      trigger: "ROOKIE_UNCERTAINTY_WINDOW",
+      confidence: base,
+      text:
+        severity === "STRONG"
+          ? `This is the classic rookie uncertainty window for ${playerName ?? "this player"}. Once clarity hits, the market re-prices fast.`
+          : `${playerName ?? "This rookie"} is priced like uncertainty is permanent. That rarely lasts once games start.`,
+    });
+  }
+
+  // CAUTION: hype without conviction
+  if (scope !== "portfolio" && has(tags, "hype") && signalTier === "MEDIUM") {
+    takes.push({
+      scope,
+      severity: "SOFT",
+      type: "CAUTION",
+      trigger: "HYPE_WITHOUT_CONVICTION",
+      confidence: 78,
+      text: "There’s a lot of attention here, but it reads like curiosity more than conviction.",
+    });
+  }
+
+  // PORTFOLIO: concentration (portfolio-only, derived from portfolio context you already compute)
+  if (scope === "portfolio" && portfolioContext) {
+    const pct = portfolioContext.concentrationPctTop1 ?? 0;
+    if (pct >= 25) {
+      const conf = clamp(82 + (pct - 25) * 0.5, 70, 90);
+      const severity = conf >= 88 ? "STRONG" : "SOFT";
+      const label = portfolioContext.topExposureLabel ?? "one segment";
+      takes.push({
+        scope,
+        severity,
+        type: "CAUTION",
+        trigger: "PORTFOLIO_CONCENTRATION",
+        confidence: conf,
+        text:
+          severity === "STRONG"
+            ? `Your portfolio is concentrated in ${label}. That’s fine when it’s hot, dangerous when it cools.`
+            : `You’re overweight in ${label}. If sentiment turns, it will hit your portfolio fast.`,
+      });
+    }
+  }
+
+  // Rank and cap per scope
+  const max = scope === "card" ? 1 : 2;
+  const ranked = takes.sort((a, b) => b.confidence - a.confidence).slice(0, max);
+
+  return ranked.map((t) => ({ ...t, id: `${t.scope}:${t.trigger}:${t.type}:${t.severity}` }));
+}
+
+
+D. Expose an API route that takes your existing market object
+This is how you ensure you’re using market data already used in the app: the request includes the same market object you already render from.
+
+Create server/src/routes/takes.routes.ts
+
+import { Router } from "express";
+import { generateTakes } from "../takes/generator";
+import { marketToTakeInputs } from "../takes/adapter";
+import { GenerateTakesRequest } from "../takes/types";
+
+export const takesRouter = Router();
+
+takesRouter.post("/from-market", (req, res) => {
+  const { scope, subject, market, portfolioContext } = req.body as any;
+
+  if (!scope || !subject || !market) {
+    return res.status(400).json({ error: "Missing scope, subject, or market" });
+  }
+
+  const inputs = marketToTakeInputs(market);
+
+  const payload: GenerateTakesRequest = {
+    scope,
+    subject,
+    inputs,
+    portfolioContext,
+  };
+
+  const takes = generateTakes(payload);
+  res.json({ takes });
+});
+
+
+Wire it in server/src/app.ts
+
+import express from "express";
+import cors from "cors";
+import { takesRouter } from "./routes/takes.routes";
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: "1mb" }));
+
+app.use("/api/takes", takesRouter);
+
+app.listen(process.env.PORT || 3001, () => console.log("API running"));
+
+
+Frontend integration (minimal, uses your existing market object)
+
+Add src/lib/takes.ts
+
+export interface Take {
+  id: string;
+  scope: "card" | "player" | "portfolio";
+  severity: "SOFT" | "STRONG";
+  type: "STRUCTURAL" | "TIMING" | "CAUTION";
+  trigger: string;
+  confidence: number;
+  text: string;
+}
+
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
+export async function getTakesFromMarket(payload: {
+  scope: "card" | "player" | "portfolio";
+  subject: { playerName?: string; cardName?: string; subjectId?: string; portfolioId?: string };
+  market: any; // this is your existing market data object already being used in the app
+  portfolioContext?: any;
+}): Promise<Take[]> {
+  const res = await fetch(`${API_BASE}/api/takes/from-market`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to fetch takes");
+  const data = await res.json();
+  return data.takes ?? [];
+}
+
+
+Add a component src/components/CollectorTake.tsx
+
+import { Take } from "../lib/takes";
+
+export function CollectorTake({ take }: { take: Take }) {
+  return (
+    <div style={{ border: "1px solid rgba(255,255,255,0.12)", borderRadius: 12, padding: 12, background: "rgba(255,255,255,0.04)" }}>
+      <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 6 }}>Collector Take</div>
+      <div style={{ fontSize: 14, lineHeight: 1.35 }}>{take.text}</div>
+    </div>
+  );
+}
+
+
+Then, in your existing Card/Player/Portfolio pages, you already have something like:
+
+const market = card.marketOutlook (or whatever)
+
+render market outlook UI
+
+You add:
+
+import { useEffect, useState } from "react";
+import { getTakesFromMarket, Take } from "../lib/takes";
+import { CollectorTake } from "../components/CollectorTake";
+
+export function CardOutlookPage({ card }) {
+  const [takes, setTakes] = useState<Take[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const out = await getTakesFromMarket({
+        scope: "card",
+        subject: { playerName: card.playerName, cardName: card.title, subjectId: card.id },
+        market: card.marketOutlook, // your existing market data object
+      });
+      setTakes(out);
+    })().catch(() => setTakes([]));
+  }, [card.id]);
+
+  return (
+    <div>
+      {/* existing market outlook UI */}
+
+      {takes[0] ? (
+        <div style={{ marginTop: 12 }}>
+          <CollectorTake take={takes[0]} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+
+What you must do to make this copy/paste perfect
+Right now, only one thing is unknown: the exact field names inside your existing market object.
+
+To remove that guesswork, you update only adapter.ts:
+
+signalCount mapping
+
+narrative text mapping
+
+optional flags mapping
+
+sport/position/age/isRookie mapping if those live elsewhere
+
+If you paste a real sample of your market object (one card’s marketOutlook JSON) into chat, I will rewrite adapter.ts to match your exact structure so you can paste it directly with no debugging.
+
+This fully respects your constraints
+
+Uses market data you already compute and render
+
+Does not depend on eBay reliability or prices
+
+Uses only existing “coverage/confidence/count” and narrative you already produce
+
+Produces quotable marketing one-liners with strict gating so it doesn’t embarrass you
+
+If you want the feature to feel more “marketing ready” immediately, the next upgrade is to add a “Share Card” UI that renders the take + player/card name into a clean image, but the above is the correct Phase 1 foundation.
+
+yes add the share card UI too
+
+Below is a Replit-ready “Share Card UI” add-on that works with the Collector Take aspect you just approved, using the market data already in your app.
+
+This gives you:
+
+a shareable snapshot card (player/card + take + key headline metrics you choose)
+
+Copy Link button
+
+Download Image button (PNG) that exports the card as an image
+
+This is front-end only (fast to ship). If you later want true public share pages and OG images, that’s Phase 2.
+
+Install one dependency (frontend)
+
+In your Vite/React app:
+
+npm i html2canvas
+
+
+Add a reusable ShareCard component
+
+Create: src/components/ShareCard.tsx
+
+import React, { useMemo, useRef, useState } from "react";
+import html2canvas from "html2canvas";
+
+type ShareMetric = { label: string; value: string };
+
+export function ShareCard({
+  title,
+  subtitle,
+  takeLabel = "Collector Take",
+  takeText,
+  metrics = [],
+  shareUrl,
+  watermark = "sportscardportfolio.io",
+  theme = "dark",
+}: {
+  title: string;                 // e.g., "Drake Maye"
+  subtitle?: string;             // e.g., "2024 Prizm Silver • PSA 10" (optional)
+  takeLabel?: string;            // default "Collector Take"
+  takeText: string;              // the one-liner
+  metrics?: ShareMetric[];       // optional: 2–4 small metrics you already have
+  shareUrl?: string;             // optional deep link you copy
+  watermark?: string;            // small footer text
+  theme?: "dark" | "light";
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const bg = theme === "dark" ? "#0B0F17" : "#FFFFFF";
+  const fg = theme === "dark" ? "#EAF0FF" : "#111827";
+  const subtle = theme === "dark" ? "rgba(234,240,255,0.65)" : "rgba(17,24,39,0.65)";
+  const border = theme === "dark" ? "rgba(234,240,255,0.12)" : "rgba(17,24,39,0.12)";
+  const panel = theme === "dark" ? "rgba(234,240,255,0.06)" : "rgba(17,24,39,0.04)";
+
+  const filename = useMemo(() => {
+    const base = `${title}${subtitle ? " - " + subtitle : ""}`.replace(/[^\w\s-]/g, "").trim();
+    return `${base || "share-card"}`.slice(0, 80);
+  }, [title, subtitle]);
+
+  async function onCopyLink() {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {
+      // fallback
+      const el = document.createElement("textarea");
+      el.value = shareUrl;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    }
+  }
+
+  async function onDownloadImage() {
+    if (!ref.current) return;
+    setIsDownloading(true);
+    try {
+      // scale improves sharpness for sharing
+      const canvas = await html2canvas(ref.current, {
+        backgroundColor: bg,
+        scale: 2,
+        useCORS: true,
+      });
+      const link = document.createElement("a");
+      link.download = `${filename}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  async function onNativeShare() {
+    if (!shareUrl) return;
+    // Web Share API (works on many mobile browsers)
+    // Do not rely on it; keep copy/download as primary.
+    // @ts-ignore
+    if (navigator.share) {
+      try {
+        // @ts-ignore
+        await navigator.share({ title, text: takeText, url: shareUrl });
+      } catch {
+        // ignored
+      }
+    }
+  }
+
+  return (
+    <div>
+      <div
+        ref={ref}
+        style={{
+          width: 640,
+          maxWidth: "100%",
+          borderRadius: 18,
+          border: `1px solid ${border}`,
+          background: bg,
+          color: fg,
+          padding: 18,
+          boxSizing: "border-box",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 18, lineHeight: 1.2, letterSpacing: 0.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {title}
+            </div>
+            {subtitle ? (
+              <div style={{ marginTop: 4, fontSize: 12, color: subtle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {subtitle}
+              </div>
+            ) : null}
+          </div>
+
+          <div style={{ fontSize: 11, color: subtle, alignSelf: "flex-start" }}>
+            {new Date().toLocaleDateString()}
+          </div>
+        </div>
+
+        <div style={{ height: 12 }} />
+
+        <div
+          style={{
+            borderRadius: 14,
+            border: `1px solid ${border}`,
+            background: panel,
+            padding: 14,
+          }}
+        >
+          <div style={{ fontSize: 11, color: subtle, marginBottom: 8 }}>{takeLabel}</div>
+          <div style={{ fontSize: 15, lineHeight: 1.35 }}>{takeText}</div>
+        </div>
+
+        {metrics.length ? (
+          <>
+            <div style={{ height: 12 }} />
+            <div style={{ display: "grid", gridTemplateColumns: metrics.length >= 4 ? "repeat(4, 1fr)" : `repeat(${metrics.length}, 1fr)`, gap: 10 }}>
+              {metrics.slice(0, 4).map((m, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    borderRadius: 12,
+                    border: `1px solid ${border}`,
+                    background: panel,
+                    padding: 10,
+                    minWidth: 0,
+                  }}
+                >
+                  <div style={{ fontSize: 10, color: subtle, marginBottom: 6 }}>{m.label}</div>
+                  <div style={{ fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {m.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : null}
+
+        <div style={{ height: 12 }} />
+
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+          <div style={{ fontSize: 11, color: subtle, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {shareUrl ? shareUrl : watermark}
+          </div>
+          <div style={{ fontSize: 11, color: subtle }}>{watermark}</div>
+        </div>
+      </div>
+
+      <div style={{ height: 12 }} />
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {shareUrl ? (
+          <button
+            onClick={onCopyLink}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(0,0,0,0.15)",
+              background: "transparent",
+              cursor: "pointer",
+            }}
+          >
+            {copied ? "Copied" : "Copy Link"}
+          </button>
+        ) : null}
+
+        <button
+          onClick={onDownloadImage}
+          disabled={isDownloading}
+          style={{
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(0,0,0,0.15)",
+            background: "transparent",
+            cursor: isDownloading ? "not-allowed" : "pointer",
+            opacity: isDownloading ? 0.6 : 1,
+          }}
+        >
+          {isDownloading ? "Downloading..." : "Download Image"}
+        </button>
+
+        {shareUrl ? (
+          <button
+            onClick={onNativeShare}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(0,0,0,0.15)",
+              background: "transparent",
+              cursor: "pointer",
+            }}
+          >
+            Share
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+
+Add a simple modal wrapper (optional but recommended)
+
+Create: src/components/ShareCardModal.tsx
+
+import React from "react";
+import { ShareCard } from "./ShareCard";
+
+export function ShareCardModal({
+  isOpen,
+  onClose,
+  title,
+  subtitle,
+  takeText,
+  metrics,
+  shareUrl,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  subtitle?: string;
+  takeText: string;
+  metrics?: { label: string; value: string }[];
+  shareUrl?: string;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        zIndex: 9999,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(720px, 100%)",
+          borderRadius: 16,
+          background: "#ffffff",
+          padding: 16,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 14 }}>Share</div>
+          <button
+            onClick={onClose}
+            style={{ border: "1px solid rgba(0,0,0,0.15)", borderRadius: 10, padding: "8px 10px", background: "transparent", cursor: "pointer" }}
+          >
+            Close
+          </button>
+        </div>
+
+        <ShareCard
+          title={title}
+          subtitle={subtitle}
+          takeText={takeText}
+          metrics={metrics}
+          shareUrl={shareUrl}
+          watermark="sportscardportfolio.io"
+          theme="dark"
+        />
+      </div>
+    </div>
+  );
+}
+
+
+Wire it into your existing Card/Player/Portfolio pages
+
+Wherever you already render the Collector Take (or after you fetch it), add a “Share” button that opens the modal.
+
+Example for a Card page:
+
+import React, { useMemo, useState } from "react";
+import { ShareCardModal } from "../components/ShareCardModal";
+
+export function CardOutlookPage({ card, takes }: any) {
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
+  const takeText = takes?.[0]?.text || "";
+
+  // Use market data you already show. Keep this to 2–4 items.
+  const metrics = useMemo(() => {
+    const m = card.marketOutlook;
+    return [
+      { label: "Outlook", value: String(m?.recommendation ?? "—") },
+      { label: "Signal Count", value: String(m?.signalCount ?? m?.marketCount ?? "—") },
+      { label: "Trend", value: String(m?.trendLabel ?? "—") },
+      { label: "Liquidity", value: String(m?.liquidityLabel ?? "—") },
+    ].filter(x => x.value !== "undefined");
+  }, [card]);
+
+  // Optional deep link. Use whatever route you already have.
+  const shareUrl = `${window.location.origin}/card/${card.id}`;
+
+  return (
+    <div>
+      {/* existing outlook UI */}
+
+      {takeText ? (
+        <div style={{ marginTop: 10, display: "flex", gap: 10, alignItems: "center" }}>
+          <button
+            onClick={() => setIsShareOpen(true)}
+            style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(0,0,0,0.15)", background: "transparent", cursor: "pointer" }}
+          >
+            Share
+          </button>
+        </div>
+      ) : null}
+
+      <ShareCardModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        title={card.playerName}
+        subtitle={card.title}
+        takeText={takeText}
+        metrics={metrics}
+        shareUrl={shareUrl}
+      />
+    </div>
+  );
+}
+
+
+Notes:
+
+The only required input is takeText.
+
+Everything else is optional and pulled from market data you already show.
+
+One practical constraint you should adopt
+
+To keep these share cards credible with your current data situation:
+
+Do not include exact dollar prices on the share card yet.
+
+Include labels (Outlook, Signal Count, Trend, Liquidity) and the one-liner.
+
+That keeps screenshots useful and defensible without anchoring you to shaky numbers.
+
+QA checklist (5 minutes)
+
+Share modal opens and closes reliably
+
+Download image looks crisp (scale: 2)
+
+Copy Link works on Chrome desktop
+
+Share card fits on mobile width (it will shrink, but stays readable)
+
+No blank “Collector Take” exports (only show Share if takeText exists)
