@@ -42,6 +42,8 @@ import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OutlookDetails, type OutlookDisplayData } from "@/components/outlook-details";
+import { CollectorTake } from "@/components/CollectorTake";
+import { getTakesFromMarket, type Take } from "@/lib/takes";
 
 type CaseWithCards = DisplayCase & { cards: CardType[] };
 type UsageInfo = { used: number; limit: number | null; remaining: number | null; isPro: boolean };
@@ -234,6 +236,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [result, setResult] = useState<QuickAnalyzeResult | null>(null);
+  const [takes, setTakes] = useState<Take[]>([]);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState("");
   const [set, setSet] = useState("");
@@ -274,6 +277,37 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
       setIsPollingComps(false);
     }
   }, [result]);
+
+  // Fetch takes when result changes
+  useEffect(() => {
+    if (!result || !result.action) {
+      setTakes([]);
+      return;
+    }
+    
+    (async () => {
+      try {
+        const playerName = extractPlayerName(result.tempCard.title);
+        const fetchedTakes = await getTakesFromMarket({
+          scope: "card",
+          subject: {
+            playerName,
+            cardName: result.tempCard.title,
+            subjectId: result.tempCard.title,
+          },
+          market: {
+            action: result.action,
+            signals: result.signals,
+            confidence: result.confidence,
+            card: { title: result.tempCard.title },
+          },
+        });
+        setTakes(fetchedTakes);
+      } catch (err) {
+        console.error("Failed to fetch takes:", err);
+      }
+    })();
+  }, [result?.tempCard?.title, result?.action]);
   
   // Poll for comps status when queued/fetching
   const pollCompsStatus = async (queryHash: string): Promise<boolean> => {
@@ -804,6 +838,14 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   cardImageUrl={previewUrl}
                   showDetailedSignals={result.isPro}
                 />
+
+                {takes.length > 0 && (
+                  <div className="space-y-3 mt-4" data-testid="section-collector-takes">
+                    {takes.map((take) => (
+                      <CollectorTake key={take.id} take={take} />
+                    ))}
+                  </div>
+                )}
               </DialogContent>
             </Dialog>
           )}
