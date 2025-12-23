@@ -733,8 +733,8 @@ Allow: /
         return res.send(html);
       }
       
-      // For humans, redirect to the SPA player outlook page
-      res.redirect(`/player/${encodeURIComponent(playerName)}`);
+      // For humans, redirect to the SPA player outlook page with pre-filled search
+      res.redirect(`/player-outlook?player=${encodeURIComponent(playerName)}`);
     } catch (error) {
       console.error("Error serving player share page:", error);
       res.status(500).json({ message: "Failed to serve player share page" });
