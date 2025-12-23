@@ -208,10 +208,15 @@ function PlayerHeader({ player, snapshot }: { player: PlayerOutlookResponse["pla
         <h1 className="text-2xl font-bold" data-testid="text-player-name">{player.name}</h1>
         <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
           <span>{player.sport.toUpperCase()}</span>
-          {player.position && <><span className="text-border">|</span><span>{player.position}</span></>}
-          {player.team && <><span className="text-border">|</span><span>{player.team}</span></>}
-          <span className="text-border">|</span>
-          <span>{player.stage.replace("_", " ")}</span>
+          {player.position && player.position.toUpperCase() !== "UNKNOWN" && (
+            <><span className="text-border">|</span><span>{player.position}</span></>
+          )}
+          {player.team && player.team.toUpperCase() !== "UNKNOWN" && (
+            <><span className="text-border">|</span><span>{player.team}</span></>
+          )}
+          {player.stage && player.stage.toUpperCase() !== "UNKNOWN" && (
+            <><span className="text-border">|</span><span>{player.stage.replace("_", " ")}</span></>
+          )}
           {player.inferred && (
             <Badge variant="outline" className="text-xs">Inferred</Badge>
           )}
