@@ -5349,4 +5349,34 @@ Allow: /
     }
   });
 
+  // ============================================================================
+  // Collector Takes API
+  // ============================================================================
+
+  // POST /api/takes/from-market - Generate takes from existing market data
+  app.post("/api/takes/from-market", async (req, res) => {
+    try {
+      const { marketToTakeInputs } = await import("./takes/adapter");
+      const { generateTakes } = await import("./takes/generator");
+      const { scope, subject, market, portfolioContext } = req.body;
+
+      if (!scope || !subject || !market) {
+        return res.status(400).json({ error: "Missing scope, subject, or market" });
+      }
+
+      const inputs = marketToTakeInputs(market);
+      const takes = generateTakes({
+        scope,
+        subject,
+        inputs,
+        portfolioContext,
+      });
+
+      res.json({ takes });
+    } catch (error) {
+      console.error("[Takes] Error generating takes:", error);
+      res.status(500).json({ error: "Failed to generate takes" });
+    }
+  });
+
 }
