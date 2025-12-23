@@ -124,13 +124,11 @@ function loadFromCSV(): boolean {
 }
 
 async function loadRegistryAsync(): Promise<void> {
-  if (registryLoaded) return;
-  
-  // Try database first
+  // Always try database - it's authoritative and may have newer data than CSV
   const dbLoaded = await loadFromDatabase();
   
   // Fall back to CSV if database is empty or unavailable
-  if (!dbLoaded) {
+  if (!dbLoaded && registryMap.size === 0) {
     loadFromCSV();
   }
   
@@ -138,8 +136,6 @@ async function loadRegistryAsync(): Promise<void> {
 }
 
 function loadRegistry(): void {
-  if (registryLoaded) return;
-  
   // Start async loading if not already in progress
   if (!loadingPromise) {
     loadingPromise = loadRegistryAsync().finally(() => {
@@ -147,9 +143,9 @@ function loadRegistry(): void {
     });
   }
   
-  // For synchronous access, try CSV first as fallback
-  // This ensures the function works synchronously on first call
-  if (!registryLoaded && registryMap.size === 0) {
+  // For synchronous access on first call, load from CSV as immediate fallback
+  // Database loading will override this when it completes
+  if (registryMap.size === 0) {
     loadFromCSV();
     registryLoaded = true;
   }

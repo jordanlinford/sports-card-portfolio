@@ -5,7 +5,7 @@ import { eq, and, gt, lt } from "drizzle-orm";
 import { classifyPlayer, getExposureRecommendations, type ClassificationInput, type ClassificationOutput } from "./playerClassificationEngine";
 import { calculateValuation } from "./valuationService";
 import { generateInvestmentCall } from "./investmentDecisionEngine";
-import { lookupPlayer } from "./playerRegistry";
+import { lookupPlayer, ensureRegistryLoaded } from "./playerRegistry";
 import type {
   PlayerOutlookResponse,
   PlayerOutlookRequest,
@@ -614,6 +614,9 @@ export async function getPlayerOutlook(
 ): Promise<PlayerOutlookResponse> {
   const { playerName, sport = "football", contextCard } = request;
   const playerKey = normalizePlayerKey(sport, playerName);
+  
+  // Ensure registry is fully loaded from database before lookups
+  await ensureRegistryLoaded();
   
   console.log(`[PlayerOutlook] Generating outlook for: ${playerName} (${sport})`);
   
