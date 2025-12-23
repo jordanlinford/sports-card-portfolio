@@ -125,15 +125,7 @@ function CompsConfidencePanel({
     }
   };
   
-  // Simple user-friendly messages only - avoid assumptions about why data is limited
-  const getLowConfidenceReason = () => {
-    if (comps.soldCount < 3) return "Limited sales data found - estimate may be less accurate";
-    if (comps.soldCount < 5) return "Few recent sales found - consider this a rough estimate";
-    return null;
-  };
-  
   const confidenceStyle = getConfidenceStyle(effectiveConfidence);
-  const lowConfidenceReason = effectiveConfidence === "LOW" ? getLowConfidenceReason() : null;
   
   return (
     <div className="rounded-lg border p-4 space-y-3" data-testid="panel-comps-confidence">
@@ -147,19 +139,11 @@ function CompsConfidencePanel({
         </Badge>
       </div>
       
-      <p className="text-sm text-muted-foreground">{confidenceStyle.label}</p>
-      
       {isLoading && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin" />
           <span>Gathering market data...</span>
         </div>
-      )}
-      
-      {lowConfidenceReason && (
-        <p className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-500/10 p-2 rounded" data-testid="text-low-confidence-warning">
-          {lowConfidenceReason}
-        </p>
       )}
       
       {showDebug && comps.debug && (

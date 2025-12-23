@@ -493,11 +493,6 @@ export default function CardOutlookPage() {
                     Range: {formatCurrency(outlook.market.min)} - {formatCurrency(outlook.market.max)}
                   </div>
                 )}
-                {outlook.market?.compCount != null && (
-                  <div className="text-sm text-muted-foreground">
-                    Based on {outlook.market.compCount} comp{outlook.market.compCount !== 1 ? 's' : ''}
-                  </div>
-                )}
               </div>
             </div>
           </CardHeader>
@@ -724,7 +719,7 @@ export default function CardOutlookPage() {
         </Card>
       )}
 
-      {outlook?.confidence?.reason && isPro && (
+      {outlook?.confidence?.level && isPro && (
         <Card>
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
@@ -732,7 +727,6 @@ export default function CardOutlookPage() {
               <div>
                 <span className="text-sm font-medium">Data Confidence: </span>
                 <span className={`text-sm ${confidenceStyle.color}`}>{outlook.confidence.level}</span>
-                <p className="text-sm text-muted-foreground mt-1">{outlook.confidence.reason}</p>
               </div>
             </div>
           </CardContent>
