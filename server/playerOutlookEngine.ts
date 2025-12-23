@@ -715,11 +715,17 @@ async function generateFreshOutlook(
     // Apply registry position group (authoritative)
     if (entry.positionGroup && entry.positionGroup !== "UNKNOWN") {
       enrichedPlayerInfo.position = entry.positionGroup;
-      // Remove position from inferred fields since we have authoritative data
-      if (enrichedPlayerInfo.inferredFields) {
-        enrichedPlayerInfo.inferredFields = enrichedPlayerInfo.inferredFields.filter(f => f !== "position");
-      }
     }
+    
+    // Player is in registry, so we have authoritative data - remove inferred status
+    // Clear inferredFields for data we have from registry
+    if (enrichedPlayerInfo.inferredFields) {
+      enrichedPlayerInfo.inferredFields = enrichedPlayerInfo.inferredFields.filter(
+        f => f !== "position" && f !== "careerStage" && f !== "stage"
+      );
+    }
+    // Recalculate inferred flag - false if no fields remain inferred
+    enrichedPlayerInfo.inferred = (enrichedPlayerInfo.inferredFields?.length ?? 0) > 0;
     
     // Re-run classification with registry stage for correct investment signals
     const registryStageMap: Record<string, PlayerStage> = {
