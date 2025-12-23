@@ -3277,6 +3277,36 @@ Allow: /
     }
   });
 
+  // Admin: Career stage advancement (runs automatically March 1 for MLB, July 1 for NBA/NFL/NHL)
+  app.post("/api/admin/career-stages/advance", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { triggerCareerStageAdvancement } = await import("./careerStageJob");
+      const { sports } = req.body;
+      
+      // Validate sports parameter
+      const validSports = ["MLB", "NBA", "NFL", "NHL"];
+      const sportsToAdvance = sports && Array.isArray(sports) 
+        ? sports.filter((s: string) => validSports.includes(s.toUpperCase())).map((s: string) => s.toUpperCase())
+        : validSports; // Default to all sports if not specified
+      
+      if (sportsToAdvance.length === 0) {
+        return res.status(400).json({ message: "No valid sports specified" });
+      }
+      
+      const results = await triggerCareerStageAdvancement(sportsToAdvance);
+      
+      res.json({ 
+        success: true, 
+        sportsAdvanced: sportsToAdvance,
+        playersAdvanced: results.length,
+        details: results 
+      });
+    } catch (error) {
+      console.error("Error advancing career stages:", error);
+      res.status(500).json({ message: "Failed to advance career stages" });
+    }
+  });
+
   // Admin: Cache observability stats
   app.get("/api/admin/cache/stats", isAuthenticated, isAdmin, async (req: any, res) => {
     try {

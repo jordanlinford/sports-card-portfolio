@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startPrewarmJob } from "./prewarmJob";
+import { startCareerStageJob } from "./careerStageJob";
 
 const app = express();
 const httpServer = createServer(app);
@@ -107,6 +108,9 @@ app.use((req, res, next) => {
         
         // Start the nightly prewarm job for eBay comps cache
         startPrewarmJob();
+        
+        // Start the career stage advancement scheduler
+        startCareerStageJob();
         
         log("All routes registered successfully");
       } catch (err) {
