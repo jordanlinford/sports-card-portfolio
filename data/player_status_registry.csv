@@ -49,9 +49,9 @@ NFL,Rob Gronkowski,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NFL,Amon-Ra St. Brown,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Garrett Wilson,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Drake London,,PRIME,undefined,UNKNOWN,2025-12-23
+NFL,De'Von Achane,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Kyren Williams,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Travis Etienne,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,De'Von Achane,,YEAR_3,undefined,UNKNOWN,2025-12-23
 NHL,Henrik Sedin,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NFL,Aaron Rodgers,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Daniel Sedin,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
@@ -73,22 +73,22 @@ NBA,Michael Jordan,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NBA,Kobe Bryant,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NFL,Breece Hall,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Jahmyr Gibbs,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Anthony Richardson,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NFL,Quentin Johnston,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Isiah Pacheco,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Kenneth Walker,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Rhamondre Stevenson,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Caleb Williams,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NFL,Zay Flowers,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Bo Nix,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Zay Flowers,,PRIME,undefined,UNKNOWN,2025-12-23
+NFL,Marvin Harrison Jr.,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Jordan Addison,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,George Pickens,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Jameson Williams,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Marvin Harrison Jr.,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Brock Bowers,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Aaron Jones,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Michael Penix Jr.,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NFL,Brock Bowers,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NFL,Quentin Johnston,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NFL,Caleb Williams,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Najee Harris,,PRIME,undefined,UNKNOWN,2025-12-23
+NFL,Bryce Young,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Kenny Pickett,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Mac Jones,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Desmond Ridder,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -112,7 +112,7 @@ NHL,Nazem Kadri,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Arch Manning,,PROSPECT,undefined,UNKNOWN,2025-12-23
 NBA,Jimmy Butler,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Damian Lillard,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Bryce Young,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NFL,Anthony Richardson,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Brock Boeser,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Zach Wilson,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Sam Howell,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -261,6 +261,8 @@ NHL,Paul Coffey,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Ray Bourque,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Nicklas Lidstrom,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 MLB,Paul Skenes,,YEAR_2,undefined,UNKNOWN,2025-12-23
+MLB,Evan Carter,,YEAR_2,undefined,UNKNOWN,2025-12-23
+MLB,Jasson Dominguez,,YEAR_2,undefined,UNKNOWN,2025-12-23
 MLB,James Wood,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Carey Price,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Moritz Seider,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -276,8 +278,6 @@ NFL,Dre Greenlaw,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Lavonte David,,VETERAN,undefined,UNKNOWN,2025-12-23
 NFL,Demario Davis,,VETERAN,undefined,UNKNOWN,2025-12-23
 NFL,Tremaine Edmunds,,PRIME,undefined,UNKNOWN,2025-12-23
-MLB,Evan Carter,,YEAR_3,undefined,UNKNOWN,2025-12-23
-MLB,Jasson Dominguez,,YEAR_3,undefined,UNKNOWN,2025-12-23
 MLB,Oneil Cruz,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Jordan Lawlar,,YEAR_3,undefined,UNKNOWN,2025-12-23
 MLB,Colt Keith,,YEAR_3,undefined,UNKNOWN,2025-12-23
@@ -306,7 +306,6 @@ NHL,Miro Heiskanen,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Rasmus Dahlin,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Charlie McAvoy,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Rachaad White,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Jayden Daniels,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Erik Karlsson,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Alex Pietrangelo,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Drew Doughty,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -315,6 +314,7 @@ NFL,Jevon Holland,,RISING,undefined,UNKNOWN,2025-12-23
 NFL,Antoine Winfield Jr.,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Talanoa Hufanga,,RISING,undefined,UNKNOWN,2025-12-23
 NFL,Justin Simmons,,VETERAN,undefined,UNKNOWN,2025-12-23
+NFL,Jayden Daniels,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Anze Kopitar,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Shohei Ohtani,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Wyatt Johnston,,YEAR_4,undefined,UNKNOWN,2025-12-23
@@ -326,8 +326,8 @@ MLB,Michael Harris II,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Elias Pettersson,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Sergei Bobrovsky,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Owen Power,,YEAR_4,undefined,UNKNOWN,2025-12-23
-NHL,Luke Hughes,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NHL,Simon Nemec,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NHL,Simon Nemec,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Drake Maye,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Jesper Bratt,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Jaren Jackson Jr.,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Dylan Cozens,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -353,6 +353,7 @@ NBA,Zach LaVine,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Seiya Suzuki,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Ben Simmons,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Jamal Murray,,PRIME,undefined,UNKNOWN,2025-12-23
+NHL,Luke Hughes,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NBA,Brandon Miller,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Chet Holmgren,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Julius Randle,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -367,13 +368,12 @@ NBA,Jabari Smith Jr.,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Alperen Sengun,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Evan Mobley,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Grant Williams,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Drake Maye,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Clyde Edwards-Helaire,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Robert Thomas,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Pierre-Luc Dubois,,PRIME,undefined,UNKNOWN,2025-12-23
-MLB,Elly De La Cruz,,YEAR_3,undefined,UNKNOWN,2025-12-23
 NHL,Matty Beniers,,YEAR_4,undefined,UNKNOWN,2025-12-23
 MLB,Masyn Winn,,YEAR_3,undefined,UNKNOWN,2025-12-23
+MLB,Elly De La Cruz,,YEAR_3,undefined,UNKNOWN,2025-12-23
 NBA,Jaden Ivey,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Franz Wagner,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Amen Thompson,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -416,9 +416,6 @@ NFL,Terry McLaurin,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Keenan Allen,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Amari Cooper,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Calvin Ridley,,PRIME,undefined,UNKNOWN,2025-12-23
-NBA,Reed Sheppard,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NBA,Jared McCain,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NBA,Dalton Knecht,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NBA,Darius Garland,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Jalen Williams,,RISING,undefined,UNKNOWN,2025-12-23
 NBA,Austin Reaves,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -427,7 +424,10 @@ NBA,Desmond Bane,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Keyonte George,,RISING,undefined,UNKNOWN,2025-12-23
 NBA,Gradey Dick,,RISING,undefined,UNKNOWN,2025-12-23
 NBA,Jalen Green,,RISING,undefined,UNKNOWN,2025-12-23
-NBA,Stephon Castle,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NBA,Reed Sheppard,,ROOKIE,undefined,UNKNOWN,2025-12-23
+NBA,Stephon Castle,,ROOKIE,undefined,UNKNOWN,2025-12-23
+NBA,Jared McCain,,ROOKIE,undefined,UNKNOWN,2025-12-23
+NBA,Dalton Knecht,,ROOKIE,undefined,UNKNOWN,2025-12-23
 NFL,DeAndre Hopkins,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Michael Pittman Jr.,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Nico Collins,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -441,8 +441,13 @@ NFL,Tony Pollard,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,David Montgomery,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Jaylen Warren,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Brian Robinson Jr.,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Rome Odunze,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NFL,Malik Nabers,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NBA,Zaccharie Risacher,,ROOKIE,undefined,UNKNOWN,2025-12-23
+NBA,Alexandre Sarr,,ROOKIE,undefined,UNKNOWN,2025-12-23
+NFL,Rashee Rice,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Zach Charbonnet,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Tyjae Spears,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Roschon Johnson,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Kendre Miller,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Baker Mayfield,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Alexander Mattison,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Allen Lazard,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -464,8 +469,6 @@ NFL,Elijah Moore,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Zach Ertz,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Gerald Everett,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Tyler Higbee,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Rashee Rice,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NFL,Zach Charbonnet,,YEAR_3,undefined,UNKNOWN,2025-12-23
 NBA,Scottie Barnes,,RISING,undefined,UNKNOWN,2025-12-23
 NBA,Jaime Jaquez Jr.,,RISING,undefined,UNKNOWN,2025-12-23
 NBA,Keegan Murray,,RISING,undefined,UNKNOWN,2025-12-23
@@ -473,11 +476,8 @@ NBA,Jalen Duren,,RISING,undefined,UNKNOWN,2025-12-23
 NBA,Jonathan Kuminga,,RISING,undefined,UNKNOWN,2025-12-23
 NBA,Herb Jones,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Tari Eason,,RISING,undefined,UNKNOWN,2025-12-23
-NFL,Tyjae Spears,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NFL,Roschon Johnson,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NFL,Kendre Miller,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NBA,Zaccharie Risacher,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NBA,Alexandre Sarr,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Malik Nabers,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Rome Odunze,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Kareem Hunt,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Ronald Acuña Jr.,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Julio Rodríguez,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -532,13 +532,12 @@ NBA,Keldon Johnson,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Jalen Suggs,,RISING,undefined,UNKNOWN,2025-12-23
 NBA,Dyson Daniels,,RISING,undefined,UNKNOWN,2025-12-23
 MLB,Noelvi Marte,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NBA,Zach Edey,,ROOKIE,undefined,UNKNOWN,2025-12-23
 NHL,Zdeno Chara,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Pavel Datsyuk,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Luc Robitaille,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Joe Thornton,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Cole Sillinger,,PRIME,undefined,UNKNOWN,2025-12-23
-NBA,Donovan Clingan,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NBA,Zach Edey,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Jamie Benn,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Camilo Doval,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Aroldis Chapman,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -574,6 +573,7 @@ MLB,Matt Reynolds,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Jose Alvarado,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,David,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Tyler Seguin,,PRIME,undefined,UNKNOWN,2025-12-23
+NBA,Donovan Clingan,,ROOKIE,undefined,UNKNOWN,2025-12-23
 MLB,Andrew McCutchen,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Edwin Díaz,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Ryan Helsley,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -587,7 +587,7 @@ NHL,Carter Hart,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Kevin Fiala,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Timo Meier,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Jesperi Kotkaniemi,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Jared Verse,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NFL,Jared Verse,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Jesper Kotkaniemi,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Kevin Shattenkirk,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,John Klingberg,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -630,7 +630,7 @@ NFL,Za'Darius Smith,,VETERAN,undefined,UNKNOWN,2025-12-23
 NFL,Von Miller,,VETERAN,undefined,UNKNOWN,2025-12-23
 NFL,Joey Bosa,,PRIME,undefined,UNKNOWN,2025-12-23
 MLB,Jackson Holliday,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NFL,Jaxon Smith-Njigba,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NFL,Chase Brown,,YEAR_2,undefined,UNKNOWN,2025-12-23
 MLB,Roki Sasaki,,YEAR_2,undefined,UNKNOWN,2025-12-23
 MLB,Albert Pujols,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NBA,Donovan Mitchell,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -661,9 +661,9 @@ NBA,Derrick White,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,Marcus Morris,,PRIME,undefined,UNKNOWN,2025-12-23
 NBA,PJ Washington,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Diontae Johnson,,PRIME,undefined,UNKNOWN,2025-12-23
-NFL,Chase Brown,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NFL,Jaleel McLaughlin,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NFL,Tyler Allgeier,,YEAR_4,undefined,UNKNOWN,2025-12-23
+NFL,Jaleel McLaughlin,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Tyler Allgeier,,YEAR_3,undefined,UNKNOWN,2025-12-23
+MLB,Marcelo Mayer,,PROSPECT,undefined,UNKNOWN,2025-12-23
 MLB,Pete Crow-Armstrong,,YEAR_3,undefined,UNKNOWN,2025-12-23
 NFL,Russell Wilson,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Kirk Cousins,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -681,12 +681,12 @@ NFL,Curtis Samuel,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Wan'Dale Robinson,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Adam Thielen,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Leonard Fournette,,PRIME,undefined,UNKNOWN,2025-12-23
-MLB,Marcelo Mayer,,ROOKIE,undefined,UNKNOWN,2025-12-23
 MLB,Lawrence Butler,,YEAR_3,undefined,UNKNOWN,2025-12-23
 MLB,Sal Frelick,,YEAR_3,undefined,UNKNOWN,2025-12-23
 MLB,Heston Kjerstad,,YEAR_3,undefined,UNKNOWN,2025-12-23
 MLB,Ceddanne Rafaela,,YEAR_3,undefined,UNKNOWN,2025-12-23
 MLB,Royce Lewis,,YEAR_4,undefined,UNKNOWN,2025-12-23
+NFL,Jaxon Smith-Njigba,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Sauce Gardner,,RISING,undefined,UNKNOWN,2025-12-23
 NHL,Sidney Crosby,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Kirill Kaprizov,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -699,11 +699,10 @@ NHL,Mark Stone,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Tage Thompson,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Jake Guentzel,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Jason Robertson,,PRIME,undefined,UNKNOWN,2025-12-23
-NHL,Leo Carlsson,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NHL,Matvei Michkov,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NHL,Adam Fantilli,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NHL,Macklin Celebrini,,YEAR_3,undefined,UNKNOWN,2025-12-23
-NHL,Logan Cooley,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NHL,Adam Fantilli,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NHL,Logan Cooley,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NHL,Matvei Michkov,,ROOKIE,undefined,UNKNOWN,2025-12-23
+NHL,Macklin Celebrini,,ROOKIE,undefined,UNKNOWN,2025-12-23
 NHL,Tim Stutzle,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Cole Caufield,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Nick Suzuki,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -717,6 +716,7 @@ NHL,Jaromir Jagr,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Steve Yzerman,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Brett Hull,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
 NHL,Teemu Selanne,,RETIRED_HOF,undefined,UNKNOWN,2025-12-23
+NHL,Connor Bedard,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Patrik Laine,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Shea Weber,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Dougie Hamilton,,PRIME,undefined,UNKNOWN,2025-12-23
@@ -744,7 +744,7 @@ NHL,Frederik Andersen,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Petr Mrazek,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Thomas Chabot,,PRIME,undefined,UNKNOWN,2025-12-23
 NHL,Jake Sanderson,,PRIME,undefined,UNKNOWN,2025-12-23
-NHL,Connor Bedard,,YEAR_3,undefined,UNKNOWN,2025-12-23
+NHL,Leo Carlsson,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NHL,Aleksander Ovechkin,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Pat Surtain II,,RISING,undefined,UNKNOWN,2025-12-23
 NFL,Trent McDuffie,,RISING,undefined,UNKNOWN,2025-12-23
@@ -757,6 +757,6 @@ NFL,Jaylon Johnson,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Marshon Lattimore,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Marlon Humphrey,,PRIME,undefined,UNKNOWN,2025-12-23
 NFL,Christian Gonzalez,,RISING,undefined,UNKNOWN,2025-12-23
-NFL,Cooper DeJean,,YEAR_4,undefined,UNKNOWN,2025-12-23
+NFL,Cooper DeJean,,YEAR_2,undefined,UNKNOWN,2025-12-23
+NFL,Terrion Arnold,,YEAR_2,undefined,UNKNOWN,2025-12-23
 NFL,Quinyon Mitchell,,YEAR_2,undefined,UNKNOWN,2025-12-23
-NFL,Terrion Arnold,,YEAR_3,undefined,UNKNOWN,2025-12-23
