@@ -217,7 +217,7 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
           )}
         </div>
 
-        {(call.whatToBuy?.length || call.whatToSell?.length || call.whatToAvoid?.length) && (
+        {((call.whatToBuy?.length ?? 0) > 0 || (call.whatToSell?.length ?? 0) > 0 || (call.whatToAvoid?.length ?? 0) > 0) && (
           <div className="pt-4 border-t">
             <div className="grid gap-4 md:grid-cols-3">
               {call.whatToBuy && call.whatToBuy.length > 0 && (
@@ -271,7 +271,7 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
           </div>
         )}
 
-        {(call.triggersToUpgrade?.length || call.triggersToDowngrade?.length) && (
+        {((call.triggersToUpgrade?.length ?? 0) > 0 || (call.triggersToDowngrade?.length ?? 0) > 0) && (
           <Collapsible open={showTriggers} onOpenChange={setShowTriggers}>
             <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full justify-center pt-2">
               {showTriggers ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
