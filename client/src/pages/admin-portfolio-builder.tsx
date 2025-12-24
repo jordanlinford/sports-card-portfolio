@@ -34,7 +34,6 @@ import { useToast } from "@/hooks/use-toast";
 import {
   Package,
   Plus,
-  Calendar,
   DollarSign,
   Users,
   Clock,
@@ -93,7 +92,7 @@ export default function AdminPortfolioBuilderPage() {
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [showYoutubeDialog, setShowYoutubeDialog] = useState(false);
 
-  const { data: adminCheck } = useQuery({
+  const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/user/admin"],
     enabled: !!user,
   });
@@ -115,11 +114,7 @@ export default function AdminPortfolioBuilderPage() {
 
   const createEventMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("/api/admin/breaks", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", "/api/admin/breaks", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/breaks"] });
@@ -134,11 +129,7 @@ export default function AdminPortfolioBuilderPage() {
 
   const updateEventMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      return apiRequest(`/api/admin/breaks/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("PATCH", `/api/admin/breaks/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/breaks"] });
@@ -153,7 +144,7 @@ export default function AdminPortfolioBuilderPage() {
 
   const deleteEventMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/admin/breaks/${id}`, { method: "DELETE" });
+      return apiRequest("DELETE", `/api/admin/breaks/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/breaks"] });
@@ -166,11 +157,7 @@ export default function AdminPortfolioBuilderPage() {
 
   const createSplitMutation = useMutation({
     mutationFn: async (data: any) => {
-      return apiRequest("/api/admin/splits", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", `/api/admin/breaks/${data.breakEventId}/splits`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/splits"] });
@@ -185,7 +172,7 @@ export default function AdminPortfolioBuilderPage() {
 
   const triggerPaymentMutation = useMutation({
     mutationFn: async (splitId: number) => {
-      return apiRequest(`/api/admin/splits/${splitId}/trigger-payment`, { method: "POST" });
+      return apiRequest("POST", `/api/admin/splits/${splitId}/open-payment`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/splits"] });
@@ -198,11 +185,7 @@ export default function AdminPortfolioBuilderPage() {
 
   const advanceStatusMutation = useMutation({
     mutationFn: async ({ splitId, status }: { splitId: number; status: SplitStatus }) => {
-      return apiRequest(`/api/admin/splits/${splitId}/status`, {
-        method: "POST",
-        body: JSON.stringify({ status }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", `/api/admin/splits/${splitId}/status`, { status });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/splits"] });
@@ -215,10 +198,9 @@ export default function AdminPortfolioBuilderPage() {
 
   const setYoutubeUrlMutation = useMutation({
     mutationFn: async ({ splitId, url }: { splitId: number; url: string }) => {
-      return apiRequest(`/api/admin/splits/${splitId}/youtube`, {
-        method: "POST",
-        body: JSON.stringify({ youtubeUrl: url }),
-        headers: { "Content-Type": "application/json" },
+      return apiRequest("POST", `/api/admin/splits/${splitId}/status`, { 
+        status: "BROKEN",
+        youtubeUrl: url,
       });
     },
     onSuccess: () => {
@@ -265,9 +247,9 @@ export default function AdminPortfolioBuilderPage() {
     const data = {
       title: formData.get("title") as string,
       description: formData.get("description") as string,
-      productType: formData.get("productType") as string,
-      slots: formData.get("slots") as string,
-      pricePerSlot: parseFloat(formData.get("pricePerSlot") as string),
+      sport: formData.get("sport") as string,
+      brand: formData.get("brand") as string,
+      year: formData.get("year") as string,
       isActive: formData.get("isActive") === "true",
     };
 
@@ -282,10 +264,15 @@ export default function AdminPortfolioBuilderPage() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const paymentWindowHours = parseInt(formData.get("paymentWindowHours") as string) || 24;
+    const participantCount = parseInt(formData.get("participantCount") as string) || 10;
+    const seatPriceCents = parseInt(formData.get("seatPriceCents") as string) || 5000;
 
     createSplitMutation.mutate({
       breakEventId: selectedEventId,
       paymentWindowHours,
+      participantCount,
+      seatPriceCents,
+      formatType: "DIVISIONAL",
     });
   };
 
@@ -339,7 +326,7 @@ export default function AdminPortfolioBuilderPage() {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
                         <CardTitle className="text-lg">{event.title}</CardTitle>
-                        <Badge variant={event.isActive ? "default" : "secondary"} size="sm">
+                        <Badge variant={event.isActive ? "default" : "secondary"}>
                           {event.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </div>
@@ -375,15 +362,7 @@ export default function AdminPortfolioBuilderPage() {
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Package className="h-4 w-4" />
-                        {event.productType}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        {event.slots}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        ${event.pricePerSlot} per slot
+                        {event.year} {event.brand} {event.sport}
                       </div>
                     </div>
                     <div className="mt-4">
@@ -436,12 +415,12 @@ export default function AdminPortfolioBuilderPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <CardTitle className="text-lg">{event?.title || "Unknown Event"}</CardTitle>
-                          <Badge className={STATUS_COLORS[split.status as SplitStatus]} size="sm">
+                          <Badge className={STATUS_COLORS[split.status as SplitStatus]}>
                             {STATUS_LABELS[split.status as SplitStatus]}
                           </Badge>
                         </div>
                         <CardDescription className="mt-1">
-                          Split #{split.id} - {event?.productType}
+                          Split #{split.id} - {event?.brand}
                         </CardDescription>
                       </div>
                     </CardHeader>
@@ -449,12 +428,16 @@ export default function AdminPortfolioBuilderPage() {
                       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
                         <div className="flex items-center gap-1">
                           <Users className="h-4 w-4" />
-                          {split.seatsFilled}/{split.seatsTotal} seats
+                          {split.participantCount} seats
                         </div>
-                        {split.paymentDeadline && (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4" />
+                          ${(split.seatPriceCents / 100).toFixed(2)} per seat
+                        </div>
+                        {split.paymentWindowEndsAt && (
                           <div className="flex items-center gap-1">
                             <Clock className="h-4 w-4" />
-                            Deadline: {new Date(split.paymentDeadline).toLocaleString()}
+                            Deadline: {new Date(split.paymentWindowEndsAt).toLocaleString()}
                           </div>
                         )}
                         {split.youtubeUrl && (
@@ -547,7 +530,7 @@ export default function AdminPortfolioBuilderPage() {
           <DialogHeader>
             <DialogTitle>{editingEvent ? "Edit Break Event" : "Create Break Event"}</DialogTitle>
             <DialogDescription>
-              Define the product, slot count, and pricing for this break event.
+              Define the product for this break event.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleEventSubmit} className="space-y-4">
@@ -570,44 +553,43 @@ export default function AdminPortfolioBuilderPage() {
                 data-testid="input-event-description"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="productType">Product Type</Label>
-              <Input
-                id="productType"
-                name="productType"
-                defaultValue={editingEvent?.productType || ""}
-                placeholder="e.g., 2024 Panini Prizm Football Hobby Box"
-                required
-                data-testid="input-event-product"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="slots">Slots (comma-separated)</Label>
-              <Input
-                id="slots"
-                name="slots"
-                defaultValue={editingEvent?.slots || ""}
-                placeholder="e.g., Team A, Team B, Team C"
-                required
-                data-testid="input-event-slots"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="pricePerSlot">Price Per Slot ($)</Label>
-              <Input
-                id="pricePerSlot"
-                name="pricePerSlot"
-                type="number"
-                step="0.01"
-                min="0"
-                defaultValue={editingEvent?.pricePerSlot || ""}
-                required
-                data-testid="input-event-price"
-              />
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="year">Year</Label>
+                <Input
+                  id="year"
+                  name="year"
+                  defaultValue={editingEvent?.year || new Date().getFullYear().toString()}
+                  required
+                  data-testid="input-event-year"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="brand">Brand</Label>
+                <Input
+                  id="brand"
+                  name="brand"
+                  defaultValue={editingEvent?.brand || ""}
+                  placeholder="e.g., Panini Prizm"
+                  required
+                  data-testid="input-event-brand"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sport">Sport</Label>
+                <Input
+                  id="sport"
+                  name="sport"
+                  defaultValue={editingEvent?.sport || ""}
+                  placeholder="e.g., Football"
+                  required
+                  data-testid="input-event-sport"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="isActive">Status</Label>
-              <Select name="isActive" defaultValue={editingEvent?.isActive ? "true" : "false"}>
+              <Select name="isActive" defaultValue={editingEvent?.isActive !== false ? "true" : "false"}>
                 <SelectTrigger data-testid="select-event-status">
                   <SelectValue />
                 </SelectTrigger>
@@ -638,6 +620,31 @@ export default function AdminPortfolioBuilderPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSplitSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="participantCount">Number of Seats</Label>
+              <Input
+                id="participantCount"
+                name="participantCount"
+                type="number"
+                min="2"
+                defaultValue="10"
+                required
+                data-testid="input-split-participants"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="seatPriceCents">Price Per Seat (cents)</Label>
+              <Input
+                id="seatPriceCents"
+                name="seatPriceCents"
+                type="number"
+                min="100"
+                defaultValue="5000"
+                required
+                data-testid="input-split-price"
+              />
+              <p className="text-xs text-muted-foreground">5000 = $50.00</p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="paymentWindowHours">Payment Window (hours)</Label>
               <Input
@@ -728,9 +735,9 @@ export default function AdminPortfolioBuilderPage() {
                     <div className="flex-1">
                       <div className="font-medium">User: {seat.userId.slice(0, 8)}...</div>
                       <div className="text-sm text-muted-foreground">
-                        {seat.assignedSlot ? (
+                        {seat.assignment ? (
                           <span className="text-green-600 dark:text-green-400">
-                            Assigned: {seat.assignedSlot}
+                            Assigned: {seat.assignment}
                           </span>
                         ) : (
                           <span>Pending assignment</span>
@@ -739,9 +746,9 @@ export default function AdminPortfolioBuilderPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       {seat.paidAt ? (
-                        <Badge variant="default" size="sm">Paid</Badge>
+                        <Badge variant="default">Paid</Badge>
                       ) : (
-                        <Badge variant="secondary" size="sm">Unpaid</Badge>
+                        <Badge variant="secondary">Unpaid</Badge>
                       )}
                     </div>
                   </div>
