@@ -1630,3 +1630,209 @@ export const playerRegistry = pgTable("player_registry", {
 export type PlayerRegistry = typeof playerRegistry.$inferSelect;
 export type InsertPlayerRegistry = typeof playerRegistry.$inferInsert;
 export const insertPlayerRegistrySchema = createInsertSchema(playerRegistry).omit({ id: true, createdAt: true, lastUpdated: true });
+
+// =============================================================================
+// PORTFOLIO BUILDER - Box Break Splitting System
+// =============================================================================
+
+// Split Instance Status - forward-only state machine after LOCKED
+export const SPLIT_STATUSES = [
+  "OPEN_INTEREST",
+  "PAYMENT_OPEN", 
+  "LOCKED",
+  "ORDERED",
+  "SHIPPED",
+  "IN_HAND",
+  "BROKEN",
+  "CANCELED",
+  "REFUNDED"
+] as const;
+export type SplitStatus = typeof SPLIT_STATUSES[number];
+
+// Valid forward transitions for the state machine
+export const SPLIT_STATUS_TRANSITIONS: Record<SplitStatus, SplitStatus[]> = {
+  OPEN_INTEREST: ["PAYMENT_OPEN", "CANCELED"],
+  PAYMENT_OPEN: ["LOCKED", "CANCELED", "REFUNDED"],
+  LOCKED: ["ORDERED"],
+  ORDERED: ["SHIPPED"],
+  SHIPPED: ["IN_HAND"],
+  IN_HAND: ["BROKEN"],
+  BROKEN: [],
+  CANCELED: [],
+  REFUNDED: [],
+};
+
+// Split format types
+export const SPLIT_FORMAT_TYPES = ["DIVISIONAL", "CONFERENCE", "PACK", "TEAM_BUNDLE"] as const;
+export type SplitFormatType = typeof SPLIT_FORMAT_TYPES[number];
+
+// Valid participant counts
+export const VALID_PARTICIPANT_COUNTS = [2, 3, 4, 6, 8] as const;
+export type ParticipantCount = typeof VALID_PARTICIPANT_COUNTS[number];
+
+// Seat status
+export const SEAT_STATUSES = ["INTERESTED", "WAITLIST", "PAID", "REFUNDED", "CANCELED"] as const;
+export type SeatStatus = typeof SEAT_STATUSES[number];
+
+// Break Event - a product listing (e.g., "2024 Panini Prizm Football Hobby Box")
+export const breakEvents = pgTable("break_events", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  sport: varchar("sport", { length: 50 }).notNull(),
+  year: varchar("year", { length: 10 }).notNull(),
+  brand: varchar("brand", { length: 100 }).notNull(),
+  description: text("description"),
+  estimatedBreakWindowStart: timestamp("estimated_break_window_start"),
+  estimatedBreakWindowEnd: timestamp("estimated_break_window_end"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const breakEventsRelations = relations(breakEvents, ({ many }) => ({
+  splitInstances: many(splitInstances),
+}));
+
+// Split Instance - a specific split format under a BreakEvent
+export const splitInstances = pgTable("split_instances", {
+  id: serial("id").primaryKey(),
+  breakEventId: integer("break_event_id").notNull().references(() => breakEvents.id, { onDelete: "cascade" }),
+  formatType: varchar("format_type", { length: 30 }).notNull().$type<SplitFormatType>(),
+  participantCount: integer("participant_count").notNull(),
+  isEnabled: boolean("is_enabled").default(true).notNull(),
+  status: varchar("status", { length: 30 }).default("OPEN_INTEREST").notNull().$type<SplitStatus>(),
+  paymentWindowEndsAt: timestamp("payment_window_ends_at"),
+  seatPriceCents: integer("seat_price_cents").notNull(),
+  priceCapCents: integer("price_cap_cents").notNull(),
+  assignmentPool: jsonb("assignment_pool").$type<string[]>().default([]),
+  youtubeUrl: varchar("youtube_url", { length: 500 }),
+  orderMeta: jsonb("order_meta").$type<{
+    retailer?: string;
+    orderId?: string;
+    purchaseCost?: number;
+    tracking?: string;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_split_instances_break_event").on(table.breakEventId),
+  index("idx_split_instances_status").on(table.status),
+  index("idx_split_instances_payment_window").on(table.status, table.paymentWindowEndsAt),
+]);
+
+export const splitInstancesRelations = relations(splitInstances, ({ one, many }) => ({
+  breakEvent: one(breakEvents, {
+    fields: [splitInstances.breakEventId],
+    references: [breakEvents.id],
+  }),
+  seats: many(seats),
+}));
+
+// Seat - user participation record
+export const seats = pgTable("seats", {
+  id: serial("id").primaryKey(),
+  splitInstanceId: integer("split_instance_id").notNull().references(() => splitInstances.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: varchar("status", { length: 30 }).default("INTERESTED").notNull().$type<SeatStatus>(),
+  preferences: jsonb("preferences").$type<string[]>().default([]),
+  paidAt: timestamp("paid_at"),
+  priorityNumber: integer("priority_number"),
+  assignment: varchar("assignment", { length: 255 }),
+  stripeCheckoutSessionId: varchar("stripe_checkout_session_id", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  unique("unique_split_user_seat").on(table.splitInstanceId, table.userId),
+  index("idx_seats_split_status").on(table.splitInstanceId, table.status),
+  index("idx_seats_user").on(table.userId),
+]);
+
+export const seatsRelations = relations(seats, ({ one }) => ({
+  splitInstance: one(splitInstances, {
+    fields: [seats.splitInstanceId],
+    references: [splitInstances.id],
+  }),
+  user: one(users, {
+    fields: [seats.userId],
+    references: [users.id],
+  }),
+}));
+
+// Webhook Event - for idempotency (prevent double-processing)
+export const splitWebhookEvents = pgTable("split_webhook_events", {
+  id: serial("id").primaryKey(),
+  eventId: varchar("event_id", { length: 255 }).notNull().unique(),
+  eventType: varchar("event_type", { length: 100 }).notNull(),
+  processedAt: timestamp("processed_at").defaultNow(),
+  metadata: jsonb("metadata"),
+});
+
+// Helper function to validate status transitions
+export function isValidStatusTransition(current: SplitStatus, next: SplitStatus): boolean {
+  return SPLIT_STATUS_TRANSITIONS[current].includes(next);
+}
+
+// Helper function to check if status is pre-lock (allows preference edits)
+export function isPreLockStatus(status: SplitStatus): boolean {
+  return status === "OPEN_INTEREST" || status === "PAYMENT_OPEN";
+}
+
+// Helper function to check if status is post-lock (procurement stages)
+export function isPostLockStatus(status: SplitStatus): boolean {
+  return ["LOCKED", "ORDERED", "SHIPPED", "IN_HAND", "BROKEN"].includes(status);
+}
+
+// Helper function to check if a participant count is valid (3 only if explicitly enabled)
+export function isValidParticipantCount(count: number, allow3: boolean = false): boolean {
+  if (count === 3) return allow3;
+  return [2, 4, 6, 8].includes(count);
+}
+
+// Zod Schemas and Types
+export const insertBreakEventSchema = createInsertSchema(breakEvents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertBreakEvent = z.infer<typeof insertBreakEventSchema>;
+export type BreakEvent = typeof breakEvents.$inferSelect;
+
+export const insertSplitInstanceSchema = createInsertSchema(splitInstances).omit({
+  id: true,
+  status: true,
+  paymentWindowEndsAt: true,
+  youtubeUrl: true,
+  orderMeta: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertSplitInstance = z.infer<typeof insertSplitInstanceSchema>;
+export type SplitInstance = typeof splitInstances.$inferSelect;
+
+export const insertSeatSchema = createInsertSchema(seats).omit({
+  id: true,
+  paidAt: true,
+  priorityNumber: true,
+  assignment: true,
+  stripeCheckoutSessionId: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertSeat = z.infer<typeof insertSeatSchema>;
+export type Seat = typeof seats.$inferSelect;
+
+export type SplitWebhookEvent = typeof splitWebhookEvents.$inferSelect;
+
+// Extended types with relations
+export type BreakEventWithSplits = BreakEvent & { splitInstances: SplitInstance[] };
+export type SplitInstanceWithSeats = SplitInstance & { seats: Seat[] };
+export type SplitInstanceWithBreakEvent = SplitInstance & { breakEvent: BreakEvent };
+export type SeatWithUser = Seat & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> };
+
+// Seat counts for display
+export type SeatCounts = {
+  interested: number;
+  waitlist: number;
+  paid: number;
+  total: number;
+};
