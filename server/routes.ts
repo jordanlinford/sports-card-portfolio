@@ -4,7 +4,17 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
-import { insertDisplayCaseSchema, insertCardSchema, insertPlayerRegistrySchema, playerRegistry } from "@shared/schema";
+import { 
+  insertDisplayCaseSchema, 
+  insertCardSchema, 
+  insertPlayerRegistrySchema, 
+  playerRegistry,
+  insertBreakEventSchema,
+  insertSplitInstanceSchema,
+  insertSeatSchema,
+  SPLIT_STATUSES,
+  type SplitStatus,
+} from "@shared/schema";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -5406,6 +5416,752 @@ Allow: /
     } catch (error) {
       console.error("[Takes] Error generating takes:", error);
       res.status(500).json({ error: "Failed to generate takes" });
+    }
+  });
+
+  // ============================================================================
+  // PORTFOLIO BUILDER - Box Break Splitting System
+  // ============================================================================
+
+  // Helper: Check if user is admin
+  async function isAdmin(userId: string): Promise<boolean> {
+    const user = await storage.getUser(userId);
+    return user?.isAdmin === true;
+  }
+
+  // ============================================================================
+  // PUBLIC ENDPOINTS - Break Events & Split Instances
+  // ============================================================================
+
+  // GET /api/breaks - List all active break events with their split instances
+  app.get("/api/breaks", async (req, res) => {
+    try {
+      const events = await storage.getBreakEvents(true);
+      res.json(events);
+    } catch (error) {
+      console.error("[Breaks] Error fetching break events:", error);
+      res.status(500).json({ error: "Failed to fetch break events" });
+    }
+  });
+
+  // GET /api/breaks/:id - Get a single break event with splits
+  app.get("/api/breaks/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid break event ID" });
+      }
+
+      const event = await storage.getBreakEvent(id);
+      if (!event) {
+        return res.status(404).json({ error: "Break event not found" });
+      }
+
+      res.json(event);
+    } catch (error) {
+      console.error("[Breaks] Error fetching break event:", error);
+      res.status(500).json({ error: "Failed to fetch break event" });
+    }
+  });
+
+  // GET /api/splits/:id - Get a split instance with seats and break event info
+  app.get("/api/splits/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const split = await storage.getSplitInstance(id);
+      if (!split) {
+        return res.status(404).json({ error: "Split instance not found" });
+      }
+
+      const breakEvent = await storage.getBreakEvent(split.breakEventId);
+      const seatCounts = await storage.getSeatCounts(id);
+
+      res.json({
+        ...split,
+        breakEvent,
+        seatCounts,
+      });
+    } catch (error) {
+      console.error("[Splits] Error fetching split instance:", error);
+      res.status(500).json({ error: "Failed to fetch split instance" });
+    }
+  });
+
+  // GET /api/splits/:id/seats - Get seats for a split (with user info for paid seats)
+  app.get("/api/splits/:id/seats", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const seatsWithUsers = await storage.getSeatsForSplit(id);
+      res.json(seatsWithUsers);
+    } catch (error) {
+      console.error("[Splits] Error fetching seats:", error);
+      res.status(500).json({ error: "Failed to fetch seats" });
+    }
+  });
+
+  // ============================================================================
+  // AUTHENTICATED USER ENDPOINTS - Joining, Preferences, Checkout
+  // ============================================================================
+
+  // POST /api/splits/:id/join - Join a split (express interest or get on waitlist)
+  app.post("/api/splits/:id/join", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const splitId = parseInt(req.params.id);
+      if (isNaN(splitId)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const split = await storage.getSplitInstance(splitId);
+      if (!split) {
+        return res.status(404).json({ error: "Split instance not found" });
+      }
+
+      // Check if user already has a seat
+      const existingSeat = await storage.getSeatByUserAndSplit(userId, splitId);
+      if (existingSeat) {
+        return res.status(400).json({ 
+          error: "You already have a seat in this split",
+          seat: existingSeat,
+        });
+      }
+
+      // Determine if joining as INTERESTED or WAITLIST based on status and capacity
+      const seatCounts = await storage.getSeatCounts(splitId);
+      const isPaymentOpen = split.status === "PAYMENT_OPEN";
+      const isFull = seatCounts.interested + seatCounts.paid >= split.participantCount;
+
+      let seatStatus: "INTERESTED" | "WAITLIST";
+      if (isPaymentOpen) {
+        // During payment window, new joiners go to waitlist
+        seatStatus = "WAITLIST";
+      } else if (split.status === "OPEN_INTEREST") {
+        if (isFull) {
+          seatStatus = "WAITLIST";
+        } else {
+          seatStatus = "INTERESTED";
+        }
+      } else {
+        return res.status(400).json({ 
+          error: "This split is no longer accepting new participants" 
+        });
+      }
+
+      const seat = await storage.createSeat({
+        splitInstanceId: splitId,
+        userId,
+        status: seatStatus,
+        preferences: [],
+      });
+
+      // Check if we should auto-trigger payment window
+      const newCounts = await storage.getSeatCounts(splitId);
+      if (split.status === "OPEN_INTEREST" && 
+          newCounts.interested >= split.participantCount) {
+        // Auto-open payment window with default 24hr window
+        const paymentWindowEndsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+        await storage.updateSplitStatus(splitId, "PAYMENT_OPEN", { paymentWindowEndsAt });
+        console.log(`[Splits] Auto-opened payment window for split ${splitId}`);
+      }
+
+      res.json({ 
+        success: true, 
+        seat,
+        message: seatStatus === "WAITLIST" 
+          ? "You've been added to the waitlist" 
+          : "You've joined this split. Update your preferences before the payment window opens."
+      });
+    } catch (error) {
+      console.error("[Splits] Error joining split:", error);
+      res.status(500).json({ error: "Failed to join split" });
+    }
+  });
+
+  // POST /api/splits/:id/preferences - Update seat preferences (ranked team/slot choices)
+  app.post("/api/splits/:id/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const splitId = parseInt(req.params.id);
+      if (isNaN(splitId)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const { preferences } = req.body;
+      if (!Array.isArray(preferences)) {
+        return res.status(400).json({ error: "Preferences must be an array" });
+      }
+
+      const split = await storage.getSplitInstance(splitId);
+      if (!split) {
+        return res.status(404).json({ error: "Split instance not found" });
+      }
+
+      // Only allow preference updates before LOCKED status
+      const lockedStatuses: SplitStatus[] = ["LOCKED", "ORDERED", "SHIPPED", "IN_HAND", "BROKEN"];
+      if (lockedStatuses.includes(split.status as SplitStatus)) {
+        return res.status(400).json({ 
+          error: "Preferences cannot be changed after assignments are locked" 
+        });
+      }
+
+      const seat = await storage.getSeatByUserAndSplit(userId, splitId);
+      if (!seat) {
+        return res.status(404).json({ error: "You don't have a seat in this split" });
+      }
+
+      const updatedSeat = await storage.updateSeatPreferences(seat.id, preferences);
+      res.json({ success: true, seat: updatedSeat });
+    } catch (error) {
+      console.error("[Splits] Error updating preferences:", error);
+      res.status(500).json({ error: "Failed to update preferences" });
+    }
+  });
+
+  // GET /api/my-seats - Get all seats for the current user
+  app.get("/api/my-seats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const seats = await storage.getUserSeats(userId);
+      res.json(seats);
+    } catch (error) {
+      console.error("[Seats] Error fetching user seats:", error);
+      res.status(500).json({ error: "Failed to fetch your seats" });
+    }
+  });
+
+  // POST /api/splits/:id/checkout - Create Stripe checkout session for seat payment
+  app.post("/api/splits/:id/checkout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const splitId = parseInt(req.params.id);
+      if (isNaN(splitId)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const split = await storage.getSplitInstanceWithBreakEvent(splitId);
+      if (!split) {
+        return res.status(404).json({ error: "Split instance not found" });
+      }
+
+      // Only allow checkout during PAYMENT_OPEN status
+      if (split.status !== "PAYMENT_OPEN") {
+        return res.status(400).json({ 
+          error: "Payment is not currently open for this split" 
+        });
+      }
+
+      const seat = await storage.getSeatByUserAndSplit(userId, splitId);
+      if (!seat) {
+        return res.status(404).json({ error: "You don't have a seat in this split" });
+      }
+
+      // Already paid?
+      if (seat.status === "PAID") {
+        return res.status(400).json({ error: "You've already paid for this seat" });
+      }
+
+      // Check capacity - only allow if under participant count
+      const seatCounts = await storage.getSeatCounts(splitId);
+      if (seatCounts.paid >= split.participantCount) {
+        return res.status(400).json({ 
+          error: "This split is full. You are on the waitlist." 
+        });
+      }
+
+      // Create Stripe checkout session
+      const stripe = await getUncachableStripeClient();
+      if (!stripe) {
+        return res.status(500).json({ error: "Payment system unavailable" });
+      }
+
+      const breakEvent = split.breakEvent;
+      const productName = `${breakEvent.year} ${breakEvent.brand} ${breakEvent.sport} - ${split.formatType} Split`;
+      
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: productName,
+                description: `Seat in ${split.formatType} split for ${breakEvent.title}`,
+              },
+              unit_amount: split.seatPriceCents,
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://your-domain.com'}/portfolio-builder/splits/${splitId}?payment=success`,
+        cancel_url: `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : 'https://your-domain.com'}/portfolio-builder/splits/${splitId}?payment=cancelled`,
+        metadata: {
+          type: "split_seat_payment",
+          seatId: seat.id.toString(),
+          splitId: splitId.toString(),
+          userId,
+        },
+      });
+
+      // Store the checkout session ID on the seat
+      await storage.updateSeat(seat.id, {
+        stripeCheckoutSessionId: session.id,
+      });
+
+      res.json({ 
+        checkoutUrl: session.url,
+        sessionId: session.id,
+      });
+    } catch (error) {
+      console.error("[Splits] Error creating checkout session:", error);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  // ============================================================================
+  // ADMIN ENDPOINTS - Break Event & Split Management
+  // ============================================================================
+
+  // GET /api/admin/breaks - List all break events (including inactive)
+  app.get("/api/admin/breaks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const events = await storage.getBreakEvents(false);
+      res.json(events);
+    } catch (error) {
+      console.error("[Admin Breaks] Error fetching:", error);
+      res.status(500).json({ error: "Failed to fetch break events" });
+    }
+  });
+
+  // POST /api/admin/breaks - Create a new break event
+  app.post("/api/admin/breaks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const parsed = insertBreakEventSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid break event data", details: parsed.error });
+      }
+
+      const event = await storage.createBreakEvent(parsed.data);
+      res.json(event);
+    } catch (error) {
+      console.error("[Admin Breaks] Error creating:", error);
+      res.status(500).json({ error: "Failed to create break event" });
+    }
+  });
+
+  // PATCH /api/admin/breaks/:id - Update a break event
+  app.patch("/api/admin/breaks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid break event ID" });
+      }
+
+      const event = await storage.updateBreakEvent(id, req.body);
+      if (!event) {
+        return res.status(404).json({ error: "Break event not found" });
+      }
+
+      res.json(event);
+    } catch (error) {
+      console.error("[Admin Breaks] Error updating:", error);
+      res.status(500).json({ error: "Failed to update break event" });
+    }
+  });
+
+  // DELETE /api/admin/breaks/:id - Delete a break event
+  app.delete("/api/admin/breaks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid break event ID" });
+      }
+
+      await storage.deleteBreakEvent(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[Admin Breaks] Error deleting:", error);
+      res.status(500).json({ error: "Failed to delete break event" });
+    }
+  });
+
+  // POST /api/admin/breaks/:id/splits - Create a split instance for a break event
+  app.post("/api/admin/breaks/:id/splits", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const breakEventId = parseInt(req.params.id);
+      if (isNaN(breakEventId)) {
+        return res.status(400).json({ error: "Invalid break event ID" });
+      }
+
+      const breakEvent = await storage.getBreakEvent(breakEventId);
+      if (!breakEvent) {
+        return res.status(404).json({ error: "Break event not found" });
+      }
+
+      const parsed = insertSplitInstanceSchema.safeParse({
+        ...req.body,
+        breakEventId,
+      });
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid split instance data", details: parsed.error });
+      }
+
+      const split = await storage.createSplitInstance(parsed.data);
+      res.json(split);
+    } catch (error) {
+      console.error("[Admin Splits] Error creating:", error);
+      res.status(500).json({ error: "Failed to create split instance" });
+    }
+  });
+
+  // PATCH /api/admin/splits/:id - Update a split instance
+  app.patch("/api/admin/splits/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const split = await storage.updateSplitInstance(id, req.body);
+      if (!split) {
+        return res.status(404).json({ error: "Split instance not found" });
+      }
+
+      res.json(split);
+    } catch (error) {
+      console.error("[Admin Splits] Error updating:", error);
+      res.status(500).json({ error: "Failed to update split instance" });
+    }
+  });
+
+  // POST /api/admin/splits/:id/status - Update split status (with validation)
+  app.post("/api/admin/splits/:id/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const { status, youtubeUrl, orderMeta, paymentWindowHours } = req.body;
+      if (!status || !SPLIT_STATUSES.includes(status)) {
+        return res.status(400).json({ 
+          error: "Invalid status",
+          validStatuses: SPLIT_STATUSES,
+        });
+      }
+
+      const additionalData: { youtubeUrl?: string; orderMeta?: any; paymentWindowEndsAt?: Date } = {};
+      if (youtubeUrl) additionalData.youtubeUrl = youtubeUrl;
+      if (orderMeta) additionalData.orderMeta = orderMeta;
+      if (status === "PAYMENT_OPEN" && paymentWindowHours) {
+        additionalData.paymentWindowEndsAt = new Date(Date.now() + paymentWindowHours * 60 * 60 * 1000);
+      }
+
+      const split = await storage.updateSplitStatus(id, status as SplitStatus, additionalData);
+      res.json(split);
+    } catch (error: any) {
+      console.error("[Admin Splits] Error updating status:", error);
+      if (error.message?.includes("Invalid status transition")) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to update split status" });
+    }
+  });
+
+  // POST /api/admin/splits/:id/open-payment - Manually open payment window
+  app.post("/api/admin/splits/:id/open-payment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const { paymentWindowHours = 24 } = req.body;
+      const paymentWindowEndsAt = new Date(Date.now() + paymentWindowHours * 60 * 60 * 1000);
+
+      const split = await storage.updateSplitStatus(id, "PAYMENT_OPEN", { paymentWindowEndsAt });
+      res.json(split);
+    } catch (error: any) {
+      console.error("[Admin Splits] Error opening payment:", error);
+      if (error.message?.includes("Invalid status transition")) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to open payment window" });
+    }
+  });
+
+  // POST /api/admin/splits/:id/lock-and-assign - Lock split and run assignment algorithm
+  app.post("/api/admin/splits/:id/lock-and-assign", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const split = await storage.getSplitInstance(id);
+      if (!split) {
+        return res.status(404).json({ error: "Split instance not found" });
+      }
+
+      // Get paid seats ordered by payment time
+      const paidSeats = await storage.getPaidSeatsForSplit(id);
+      
+      // Get the assignment pool (e.g., teams for a team break)
+      const assignmentPool = (split.assignmentPool || []) as string[];
+      if (assignmentPool.length === 0) {
+        return res.status(400).json({ 
+          error: "No assignment pool defined. Set teams/slots before locking." 
+        });
+      }
+
+      if (paidSeats.length !== assignmentPool.length) {
+        return res.status(400).json({ 
+          error: `Mismatch: ${paidSeats.length} paid seats but ${assignmentPool.length} assignments available.` 
+        });
+      }
+
+      // Fair assignment algorithm: Earlier payers get higher priority for their preferences
+      const assignments: Map<number, string> = new Map();
+      const remainingPool = new Set(assignmentPool);
+
+      for (const seat of paidSeats) {
+        const preferences = (seat.preferences || []) as string[];
+        let assigned = false;
+
+        // Try to give them one of their preferences
+        for (const pref of preferences) {
+          if (remainingPool.has(pref)) {
+            assignments.set(seat.id, pref);
+            remainingPool.delete(pref);
+            assigned = true;
+            break;
+          }
+        }
+
+        // If no preference available, assign randomly from remaining
+        if (!assigned) {
+          const remaining = Array.from(remainingPool);
+          const randomPick = remaining[Math.floor(Math.random() * remaining.length)];
+          assignments.set(seat.id, randomPick);
+          remainingPool.delete(randomPick);
+        }
+      }
+
+      // Update all seats with their assignments and priority numbers
+      let priorityNumber = 1;
+      for (const seat of paidSeats) {
+        const assignment = assignments.get(seat.id);
+        await storage.updateSeat(seat.id, {
+          assignment,
+          priorityNumber,
+        });
+        priorityNumber++;
+      }
+
+      // Lock the split
+      const updatedSplit = await storage.updateSplitStatus(id, "LOCKED");
+      
+      // Fetch the updated seats
+      const updatedSeats = await storage.getSeatsForSplit(id);
+
+      res.json({ 
+        success: true,
+        split: updatedSplit,
+        assignments: updatedSeats.filter(s => s.status === "PAID").map(s => ({
+          seatId: s.id,
+          userId: s.userId,
+          userName: s.user?.firstName || s.user?.handle || 'Unknown',
+          assignment: s.assignment,
+          priorityNumber: s.priorityNumber,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[Admin Splits] Error locking and assigning:", error);
+      if (error.message?.includes("Invalid status transition")) {
+        return res.status(400).json({ error: error.message });
+      }
+      res.status(500).json({ error: "Failed to lock and assign" });
+    }
+  });
+
+  // GET /api/admin/splits/:id/seats - Get all seats with user details (admin view)
+  app.get("/api/admin/splits/:id/seats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await isAdmin(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid split instance ID" });
+      }
+
+      const seats = await storage.getSeatsForSplit(id);
+      const seatCounts = await storage.getSeatCounts(id);
+
+      res.json({ seats, seatCounts });
+    } catch (error) {
+      console.error("[Admin Splits] Error fetching seats:", error);
+      res.status(500).json({ error: "Failed to fetch seats" });
+    }
+  });
+
+  // ============================================================================
+  // WEBHOOK ENDPOINTS - Stripe Webhooks for Split Payments
+  // ============================================================================
+
+  // POST /api/webhooks/splits - Handle Stripe webhooks for split payments
+  app.post("/api/webhooks/splits", async (req, res) => {
+    try {
+      const stripe = await getUncachableStripeClient();
+      if (!stripe) {
+        console.error("[Splits Webhook] Stripe not configured");
+        return res.status(500).json({ error: "Stripe not configured" });
+      }
+
+      const sig = req.headers["stripe-signature"] as string;
+      const webhookSecret = process.env.STRIPE_SPLITS_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET;
+      
+      if (!webhookSecret) {
+        console.error("[Splits Webhook] Webhook secret not configured");
+        return res.status(500).json({ error: "Webhook secret not configured" });
+      }
+
+      let event;
+      try {
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+      } catch (err: any) {
+        console.error("[Splits Webhook] Signature verification failed:", err.message);
+        return res.status(400).json({ error: `Webhook signature verification failed` });
+      }
+
+      // Idempotency check
+      const alreadyProcessed = await storage.hasProcessedWebhookEvent(event.id);
+      if (alreadyProcessed) {
+        console.log(`[Splits Webhook] Already processed event ${event.id}`);
+        return res.json({ received: true, duplicate: true });
+      }
+
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object as any;
+        const metadata = session.metadata || {};
+
+        // Only handle split seat payments
+        if (metadata.type !== "split_seat_payment") {
+          console.log("[Splits Webhook] Ignoring non-split payment");
+          return res.json({ received: true, ignored: true });
+        }
+
+        const seatId = parseInt(metadata.seatId);
+        const splitId = parseInt(metadata.splitId);
+
+        if (isNaN(seatId) || isNaN(splitId)) {
+          console.error("[Splits Webhook] Invalid metadata:", metadata);
+          return res.status(400).json({ error: "Invalid seat or split ID in metadata" });
+        }
+
+        // Check if split is still accepting payments
+        const split = await storage.getSplitInstance(splitId);
+        if (!split || split.status !== "PAYMENT_OPEN") {
+          console.log(`[Splits Webhook] Split ${splitId} not in PAYMENT_OPEN status`);
+          // TODO: Auto-refund the payment if split is no longer accepting payments
+          return res.json({ received: true, status: "split_closed" });
+        }
+
+        // Check capacity
+        const seatCounts = await storage.getSeatCounts(splitId);
+        if (seatCounts.paid >= split.participantCount) {
+          console.log(`[Splits Webhook] Split ${splitId} is full, payment came too late`);
+          // TODO: Auto-refund the payment
+          return res.json({ received: true, status: "split_full" });
+        }
+
+        // Mark seat as paid
+        await storage.markSeatAsPaid(seatId, session.id);
+        console.log(`[Splits Webhook] Marked seat ${seatId} as paid for split ${splitId}`);
+
+        // Record webhook processed
+        await storage.recordProcessedWebhookEvent(event.id, event.type, {
+          seatId,
+          splitId,
+          sessionId: session.id,
+        });
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error("[Splits Webhook] Error processing webhook:", error);
+      res.status(500).json({ error: "Webhook processing failed" });
     }
   });
 
