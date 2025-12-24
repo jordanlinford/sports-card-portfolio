@@ -478,6 +478,18 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
   "dataQuality": "HIGH|MEDIUM|LOW"
 }
 
+CONFIDENCE & DATA QUALITY RULES:
+- confidence: How certain are you about your analysis/verdict?
+  * HIGH: Well-known player with clear career trajectory, reliable data, obvious investment thesis
+  * MEDIUM: Good player data but some uncertainty in outlook (injury recovery, role changes, etc.)
+  * LOW: Sparse data, unknown player, highly speculative thesis, multiple key unknowns
+- dataQuality: How much real-time data did you have to work with?
+  * HIGH: 3+ recent news items, player is well-covered, clear current situation
+  * MEDIUM: 1-2 news items, some gaps but enough to analyze
+  * LOW: No recent news, relying mostly on historical knowledge
+
+IMPORTANT: For established star players (All-Stars, MVPs, Pro Bowlers) with recent news coverage, confidence should typically be MEDIUM or HIGH, not LOW. Reserve LOW confidence for truly obscure players or situations with major unknowns.
+
 ANTI-FLUFF CHECK (critical):
 Before finalizing, verify: if any thesis bullet could apply to 10+ random players, rewrite it to be more specific to ${playerName} OR mark the missing input as Unknown and use conditional language.
 
