@@ -1,0 +1,137 @@
+Build “Portfolio Builder” as a feature in my web app.
+
+Goal
+Collectors share the cost of a hobby box through structured, low-stress splits. No auctions. No single-team breaks. Users express interest first, then pay only when a split is ready. Users submit ranked preferences. Assignments are executed automatically based on payment order. After assignments lock, the admin buys the product, records the break, uploads to YouTube as an unlisted video, and attaches the link to the break.
+
+Hard rules (must implement)
+1) No bidding/auctions.
+2) No 1-team buyer breaks.
+3) Split sizes supported: 2, 4, 6, 8 as standard. Allow 3 only if admin enables it for that SplitInstance (do not allow 5/7/etc).
+4) No draft UI. No trading window. No real-time coordination.
+5) Assignment is automatic and deterministic: payment timestamp order + ranked preferences.
+6) Payments go through Stripe Checkout. Breakers never receive participant funds directly.
+7) Product purchase happens only after split is LOCKED (fully paid and assigned).
+8) Must store a permanent YouTube unlisted URL after break.
+
+Core objects / database tables
+A) BreakEvent (a product listing)
+- id
+- title (e.g., “2024 Panini Prizm Football Hobby Box”)
+- sport, year, brand (strings)
+- description (string)
+- estimated_break_window_start, estimated_break_window_end (date)
+- is_active (bool)
+- created_at, updated_at
+
+B) SplitInstance (a specific split format under a BreakEvent)
+- id
+- break_event_id (FK)
+- format_type: “DIVISIONAL” | “CONFERENCE” | “PACK” | “TEAM_BUNDLE” (for MVP, DIVISIONAL + CONFERENCE are enough)
+- participant_count (int; one of 2,3,4,6,8)
+- is_enabled (bool)
+- status: “OPEN_INTEREST” | “PAYMENT_OPEN” | “LOCKED” | “ORDERED” | “SHIPPED” | “IN_HAND” | “BROKEN” | “CANCELED” | “REFUNDED”
+- payment_window_ends_at (datetime nullable)
+- seat_price_cents (int; all-in price including fees/shipping)
+- price_cap_cents (int; maximum allowed product cost at purchase time)
+- assignment_pool (json array; the available “choices” users rank; ex: division bundles)
+- youtube_url (string nullable)
+- order_meta (json nullable: retailer, order_id, purchase_cost, tracking)
+- created_at, updated_at
+
+C) Seat (user participation record)
+- id
+- split_instance_id (FK)
+- user_id (FK or string)
+- status: “INTERESTED” | “WAITLIST” | “PAID” | “REFUNDED” | “CANCELED”
+- preferences (json array of ranked choices)
+- paid_at (datetime nullable)
+- priority_number (int nullable)
+- assignment (string nullable)
+- stripe_checkout_session_id (string nullable)
+- created_at, updated_at
+
+Backend state machine and automation
+1) Users join interest:
+- Endpoint: POST /api/splits/:splitId/join
+- Adds Seat as INTERESTED if split.status == OPEN_INTEREST
+- If interest already at/above capacity, add Seat as WAITLIST
+- Save preferences draft if provided
+
+2) Auto-open payment window:
+- When count(PAID) < capacity AND (count(INTERESTED)+count(PAID)) >= capacity, set split.status = PAYMENT_OPEN
+- Set payment_window_ends_at = now + 24 hours
+- Notify all INTERESTED + WAITLIST seats: “Payment open. First-paid secures a seat.”
+(For MVP, notifications can just be stored in DB or console logs.)
+
+3) Stripe Checkout (pay for a seat):
+- Endpoint: POST /api/splits/:splitId/checkout
+- Only allowed if split.status == PAYMENT_OPEN and payment_window_ends_at not expired
+- Creates Stripe Checkout Session for seat_price_cents
+- Put metadata on the session: { splitInstanceId, userId }
+- Return checkout_url
+- Do NOT mark as paid here.
+
+4) Stripe Webhook:
+- Endpoint: POST /api/stripe/webhook
+- Handle checkout.session.completed
+- Verify Stripe signature (raw body required)
+- When payment completes:
+  - If PAID seats < capacity: mark that user’s Seat status = PAID, set paid_at
+  - If capacity already filled: auto-refund this payment and set seat to REFUNDED (keep it simple)
+- Recompute priority_number as paid_at order (or compute at lock time)
+
+5) Close payment window and lock+assign:
+- A scheduled job runs every minute (or similar) to:
+  - For splits in PAYMENT_OPEN:
+    - If now >= payment_window_ends_at OR paid seats == capacity:
+      - If paid seats < capacity: cancel split and refund all PAID seats
+      - If paid seats == capacity:
+        - Lock preferences (no more edits)
+        - Execute assignment:
+          - Sort PAID seats by paid_at asc
+          - For each seat: assign highest available preference from assignment_pool
+          - If none available: assign randomly from remaining pool
+        - Set split.status = LOCKED
+        - Save assignments to each seat.assignment
+
+6) Admin procurement status updates (manual)
+- Admin endpoints (protected):
+  - POST /api/admin/splits/:splitId/status with { status, order_meta }
+- Only allow transitions forward: LOCKED -> ORDERED -> SHIPPED -> IN_HAND -> BROKEN
+- BROKEN requires youtube_url.
+
+7) Public/participant views
+- GET /api/break-events (list)
+- GET /api/break-events/:id (details incl split formats and counts)
+- GET /api/splits/:splitId (details, status, counts)
+- GET /api/splits/:splitId/seats (participant view; shows your seat, priority, assignment once locked)
+
+Editing preferences
+- Endpoint: POST /api/splits/:splitId/preferences
+- Allowed only while split.status == OPEN_INTEREST or PAYMENT_OPEN
+- If PAYMENT_OPEN, only allow if user is PAID (recommended) OR allow until window ends (either is fine, pick one and be consistent)
+- After LOCKED, reject changes.
+
+MVP UI requirements (simple)
+- Portfolio Builder page:
+  - list BreakEvents
+  - each BreakEvent shows split formats with interest count, paid count, waitlist count, and status
+- BreakEvent detail page:
+  - select a split and join interest
+  - set ranked preferences (simple list reorder or multi-select in rank order)
+  - when payment is open, show “Pay now” which calls checkout endpoint
+- Split detail page:
+  - show timeline/status (OPEN_INTEREST, PAYMENT_OPEN, LOCKED, ORDERED, SHIPPED, IN_HAND, BROKEN)
+  - if BROKEN, show “Watch break” button linking to youtube_url
+
+Important constraints
+- No inventory pre-buy logic required.
+- Do not implement trading, drafting, or breaker payouts in MVP.
+- Keep code structured and readable; include basic input validation and idempotency for webhooks (store processed webhook event IDs).
+
+Deliverables
+- Working backend with the endpoints above
+- Stripe Checkout + webhook working in deployed Replit environment
+- A simple scheduled job/cron to close payment windows and run lock+assign/refund logic
+- Minimal frontend pages to exercise the flow
+- README with setup steps, environment variables, and how to test a full flow
