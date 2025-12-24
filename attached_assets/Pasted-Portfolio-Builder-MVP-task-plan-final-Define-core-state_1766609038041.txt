@@ -1,0 +1,251 @@
+Portfolio Builder MVP task plan (final)
+
+Define core states and invariants (foundation)
+What to implement
+
+SplitInstance status enum:
+OPEN_INTEREST, PAYMENT_OPEN, LOCKED, ORDERED, SHIPPED, IN_HAND, BROKEN, CANCELED, REFUNDED
+
+Enforce forward-only transitions after LOCKED.
+
+Enforce: no procurement before LOCKED; no preference edits after LOCKED; no payment creation unless PAYMENT_OPEN.
+
+Definition of done
+
+Backend rejects illegal transitions and invalid actions with clear errors.
+
+Add data storage (DB schema)
+What to implement
+
+Tables/collections:
+BreakEvent
+SplitInstance
+Seat
+WebhookEvent (processed event IDs for idempotency)
+
+Indexes:
+Seat(split_instance_id, user_id) unique
+Seat(split_instance_id, status)
+SplitInstance(status, payment_window_ends_at)
+
+Definition of done
+
+Migration runs cleanly.
+
+You can create a BreakEvent and SplitInstances and query them.
+
+BreakEvent + SplitInstance creation and management (admin)
+What to implement
+
+Admin endpoints/UI to:
+
+Create BreakEvent (title, sport/year/brand, description, date window)
+
+Create SplitInstances for that event (format type, participant_count, seat_price, price_cap, assignment_pool JSON)
+
+Enable/disable SplitInstances
+
+Set SplitInstance status manually only for procurement stages (ORDERED, SHIPPED, IN_HAND, BROKEN) after LOCKED
+
+Attach youtube_url at BROKEN
+
+Definition of done
+
+Admin can create an event with splits visible on the public listing.
+
+Admin can mark ORDERED/SHIPPED/IN_HAND/BROKEN with validation.
+
+Interest and waitlist joining
+What to implement
+
+POST /splits/:id/join
+
+If OPEN_INTEREST: add Seat as INTERESTED until capacity reached; after that add as WAITLIST
+
+Store preferences draft if provided
+
+GET views must show:
+
+interest_count, waitlist_count, paid_count per split
+
+Auto-trigger
+
+When interest_count (or interested+paid) reaches capacity and split is OPEN_INTEREST:
+
+Transition to PAYMENT_OPEN
+
+Set payment_window_ends_at = now + 24h
+
+Definition of done
+
+Joining works; counts update live; payment window opens automatically at capacity.
+
+Preferences API (ranked list)
+What to implement
+
+POST /splits/:id/preferences
+
+Allowed in OPEN_INTEREST
+
+Allowed in PAYMENT_OPEN only if user is PAID (recommended)
+
+Rejected in LOCKED+
+
+Definition of done
+
+Preferences saved and retrieved; blocked after lock.
+
+Stripe Checkout “Pay for seat” endpoint
+What to implement
+
+POST /splits/:id/checkout
+
+Only if PAYMENT_OPEN and window not expired and paid_count < capacity
+
+Create Stripe Checkout Session
+
+Include metadata: splitInstanceId, userId
+
+Store checkout_session_id on Seat
+
+Definition of done
+
+User can generate a checkout URL and pay.
+
+Stripe webhook handling (safe + idempotent)
+What to implement
+
+POST /stripe/webhook
+
+Verify Stripe signature (raw body)
+
+Handle checkout.session.completed:
+
+If split.status != PAYMENT_OPEN: ignore or refund (choose ignore + flag)
+
+If paid_count < capacity: mark Seat PAID, set paid_at
+
+If paid_count already == capacity: auto-refund and mark seat REFUNDED
+
+Store webhook event ID in WebhookEvent table so replays don’t double-process
+
+Definition of done
+
+Webhook processes exactly once even if Stripe retries.
+
+Overpayment triggers refund reliably.
+
+Payment window closer + lock-and-assign job (automation)
+What to implement
+
+A scheduled job runs every 60 seconds:
+
+Finds splits where status == PAYMENT_OPEN
+
+If now >= payment_window_ends_at OR paid_count == capacity:
+
+If paid_count < capacity:
+
+Cancel split and refund all PAID seats
+
+Set split status to CANCELED (and/or REFUNDED)
+
+If paid_count == capacity:
+
+Execute assignment engine
+
+Set split status to LOCKED
+
+Assignment engine (must implement)
+
+Order seats by paid_at ascending
+
+For each seat:
+
+Assign highest-ranked preference still available
+
+If none available, assign randomly among remaining pool
+
+Persist seat.assignment for all seats
+
+Definition of done
+
+Splits lock automatically; assignments persist; window-expired partial fills refund cleanly.
+
+Public UI pages (minimal but complete)
+What to implement
+
+Portfolio Builder listing page:
+
+Show BreakEvents
+
+Under each event show SplitInstances with:
+participant_count, format_type, status, counts (paid/interest/waitlist), seat price, estimated break window
+
+BreakEvent detail page:
+
+Show split options
+
+Join interest
+
+Set preferences
+
+If PAYMENT_OPEN: Pay now
+
+Split detail page:
+
+Timeline/status
+
+If LOCKED+: show your assignment
+
+If BROKEN: show YouTube link button
+
+Definition of done
+
+A user can complete a full happy path without admin console hacks.
+
+Admin UI pages (minimal ops console)
+What to implement
+
+Admin event creator/editor
+
+Admin split manager:
+
+View seats, paid counts, assignments
+
+Update procurement statuses
+
+Attach YouTube URL
+
+Definition of done
+
+You can run a real break end-to-end with only this UI.
+
+Testing and QA (must-have)
+Scenarios to test
+
+Happy path: interest fills → payment open → all paid → lock → admin updates → YouTube link
+
+Overpay: capacity reached then extra payment comes in → auto-refund
+
+Payment window expires with 1 seat unpaid → refund paid seats and cancel
+
+Preference changes blocked after lock
+
+Webhook replay does not double-mark paid
+
+Illegal status transitions rejected
+
+Definition of done
+
+All scenarios pass; no silent failures; logs are readable.
+
+Important clarifications to give Replit (so they don’t drift)
+
+Do not implement auctions, drafts, trading, or 1-team breaks.
+
+Do not implement Stripe Connect/breaker payouts in MVP.
+
+YouTube is just a stored URL, no video hosting.
+
+“3-person” splits are allowed only if admin enables that SplitInstance explicitly.
