@@ -1,0 +1,1718 @@
+-- NBA Guards
+UPDATE player_registry
+SET
+  position_group = 'GUARD'
+WHERE
+  sport = 'NBA'
+  AND player_name IN (
+    'Alex Caruso',
+    'Allen Iverson',
+    'Anfernee Simons',
+    'Bogdan Bogdanovic',
+    'Bradley Beal',
+    'Buddy Hield',
+    'Cade Cunningham',
+    'Cam Thomas',
+    'Chris Paul',
+    'De''Aaron Fox',
+    'DeMar DeRozan',
+    'Dejounte Murray',
+    'Derrick White',
+    'Devin Booker',
+    'Donovan Mitchell',
+    'Dwyane Wade',
+    'Fred VanVleet',
+    'Immanuel Quickley',
+    'Ja Morant',
+    'Jaden Ivey',
+    'Jalen Brunson',
+    'Jamal Murray',
+    'James Harden',
+    'Jordan Poole',
+    'Josh Giddey',
+    'Jrue Holiday',
+    'Kyrie Irving',
+    'LaMelo Ball',
+    'Lonzo Ball',
+    'Luka Doncic',
+    'Magic Johnson',
+    'Malcolm Brogdon',
+    'Malik Monk',
+    'Marcus Morris',
+    'Marcus Smart',
+    'Michael Jordan',
+    'Norman Powell',
+    'Scoot Henderson',
+    'Shai Gilgeous-Alexander',
+    'Spencer Dinwiddie',
+    'Stephen Curry',
+    'Trae Young',
+    'Tyrese Haliburton',
+    'Tyrese Maxey',
+    'Victor Oladipo',
+    'Zach LaVine',
+    'Larry Bird',
+    'Kobe Bryant',
+    'Klay Thompson',
+    'Ben Simmons',
+    'Amen Thompson',
+    'Kentavious Caldwell-Pope',
+    'Damian Lillard'
+  );
+
+-- NBA Forwards
+UPDATE player_registry
+SET
+  position_group = 'FORWARD'
+WHERE
+  sport = 'NBA'
+  AND player_name IN (
+    'Aaron Gordon',
+    'Anthony Davis',
+    'Anthony Edwards',
+    'Bam Adebayo',
+    'Brandon Ingram',
+    'Brandon Miller',
+    'Chet Holmgren',
+    'Evan Mobley',
+    'Franz Wagner',
+    'Giannis Antetokounmpo',
+    'Grant Williams',
+    'Harrison Barnes',
+    'Jabari Smith Jr.',
+    'Jaylen Brown',
+    'Jayson Tatum',
+    'Jerami Grant',
+    'John Collins',
+    'Karl-Anthony Towns',
+    'Kristaps Porzingis',
+    'Kyle Kuzma',
+    'Paolo Banchero',
+    'Pascal Siakam',
+    'Paul George',
+    'RJ Barrett',
+    'Zion Williamson',
+    'OG Anunoby',
+    'PJ Washington',
+    'Mikal Bridges',
+    'Kevin Durant',
+    'Kevin Garnett',
+    'Tim Duncan',
+    'Charles Barkley',
+    'Dirk Nowitzki',
+    'LeBron James',
+    'Kawhi Leonard',
+    'Andrew Wiggins',
+    'Julius Randle',
+    'Jaren Jackson Jr.',
+    'Paul Pierce',
+    'Tobias Harris',
+    'Ausar Thompson',
+    'Cooper Flagg',
+    'Jimmy Butler'
+  );
+
+-- NBA Centers
+UPDATE player_registry
+SET
+  position_group = 'CENTER'
+WHERE
+  sport = 'NBA'
+  AND player_name IN (
+    'Alperen Sengun',
+    'Anthony Bennett',
+    'Brook Lopez',
+    'Deandre Ayton',
+    'Chris Bosh',
+    'Clint Capela',
+    'Darko Milicic',
+    'Greg Oden',
+    'Hakeem Olajuwon',
+    'Hasheem Thabeet',
+    'Jarrett Allen',
+    'Joel Embiid',
+    'Kelly Olynyk',
+    'Shaquille O''Neal',
+    'Steven Adams',
+    'Nikola Jokic',
+    'Nikola Vucevic',
+    'Mitchell Robinson',
+    'Robert Williams',
+    'Rudy Gobert',
+    'Mason Plumlee',
+    'Victor Wembanyama',
+    'Domantas Sabonis',
+    'James Wiseman'
+  );
+
+-- NFL Quarterbacks
+UPDATE player_registry
+SET
+  position_group = 'QB'
+WHERE
+  sport = 'NFL'
+  AND player_name IN (
+    'Aaron Rodgers',
+    'Andy Dalton',
+    'Anthony Richardson',
+    'Baker Mayfield',
+    'Bo Nix',
+    'Bryce Young',
+    'Caleb Williams',
+    'Drake Maye',
+    'Derek Carr',
+    'Gardner Minshew',
+    'Geno Smith',
+    'Justin Fields',
+    'Joe Flacco',
+    'Kirk Cousins',
+    'Matthew Stafford',
+    'Michael Penix Jr.',
+    'Russell Wilson',
+    'Jayden Daniels',
+    'Arch Manning',
+    'Brock Purdy',
+    'C.J. Stroud',
+    'Dak Prescott',
+    'Daniel Jones',
+    'Desmond Ridder',
+    'Drew Brees',
+    'JaMarcus Russell',
+    'Jameis Winston',
+    'Jimmy Garoppolo',
+    'Joe Burrow',
+    'Joe Montana',
+    'Johnny Manziel',
+    'Jordan Love',
+    'Josh Allen',
+    'Josh Rosen',
+    'Justin Herbert',
+    'Kenny Pickett',
+    'Lamar Jackson',
+    'Mac Jones',
+    'Patrick Mahomes',
+    'Peyton Manning',
+    'Ryan Leaf',
+    'Sam Darnold',
+    'Sam Howell',
+    'Tom Brady',
+    'Trevor Lawrence',
+    'Trey Lance',
+    'Tua Tagovailoa'
+  );
+
+-- NFL Running Backs
+UPDATE player_registry
+SET
+  position_group = 'RB'
+WHERE
+  sport = 'NFL'
+  AND player_name IN (
+    'AJ Dillon',
+    'Aaron Jones',
+    'Alvin Kamara',
+    'Brian Robinson Jr.',
+    'Chase Brown',
+    'Clyde Edwards-Helaire',
+    'Dalvin Cook',
+    'Ezekiel Elliott',
+    'James Cook',
+    'Jaylen Warren',
+    'Joe Mixon',
+    'Josh Jacobs',
+    'Kendre Miller',
+    'Latavius Murray',
+    'Leonard Fournette',
+    'Najee Harris',
+    'Roschon Johnson',
+    'Tony Pollard',
+    'Tyjae Spears',
+    'Tyler Allgeier',
+    'Kareem Hunt',
+    'Zach Charbonnet',
+    'Antonio Gibson',
+    'David Montgomery',
+    'Jaleel McLaughlin',
+    'Alexander Mattison',
+    'Rachaad White',
+    'Bijan Robinson',
+    'Breece Hall',
+    'Christian McCaffrey',
+    'De''Von Achane',
+    'Derrick Henry',
+    'Isiah Pacheco',
+    'Jahmyr Gibbs',
+    'Jonathan Taylor',
+    'Kenneth Walker',
+    'Kyren Williams',
+    'LaDainian Tomlinson',
+    'Rhamondre Stevenson',
+    'Saquon Barkley',
+    'Travis Etienne'
+  );
+
+-- NFL Wide Receivers
+UPDATE player_registry
+SET
+  position_group = 'WR'
+WHERE
+  sport = 'NFL'
+  AND player_name IN (
+    'Adam Thielen',
+    'Allen Lazard',
+    'Amari Cooper',
+    'Brandin Cooks',
+    'Brandon Aiyuk',
+    'Calvin Ridley',
+    'Chris Godwin',
+    'Chris Olave',
+    'Courtland Sutton',
+    'Curtis Samuel',
+    'Darnell Mooney',
+    'DeAndre Hopkins',
+    'Deebo Samuel',
+    'Diontae Johnson',
+    'Elijah Moore',
+    'George Pickens',
+    'Jakobi Meyers',
+    'Jaxon Smith-Njigba',
+    'JuJu Smith-Schuster',
+    'Keenan Allen',
+    'Malik Nabers',
+    'Marvin Harrison Jr.',
+    'Michael Pittman Jr.',
+    'Michael Wilson',
+    'Mike Evans',
+    'Mike Williams',
+    'Nico Collins',
+    'Odell Beckham Jr.',
+    'Quentin Johnston',
+    'Rashee Rice',
+    'Rome Odunze',
+    'Tee Higgins',
+    'Terry McLaurin',
+    'Tyler Boyd',
+    'Tyler Lockett',
+    'Wan''Dale Robinson',
+    'Zay Flowers',
+    'Jameson Williams',
+    'Jordan Addison',
+    'Tank Dell',
+    'A.J. Brown',
+    'Amon-Ra St. Brown',
+    'Calvin Johnson',
+    'CeeDee Lamb',
+    'Cooper Kupp',
+    'DK Metcalf',
+    'Davante Adams',
+    'DeVonta Smith',
+    'Drake London',
+    'Garrett Wilson',
+    'Ja''Marr Chase',
+    'Jaylen Waddle',
+    'Jerry Rice',
+    'Justin Jefferson',
+    'Puka Nacua',
+    'Randy Moss',
+    'Stefon Diggs',
+    'Terrell Owens'
+  );
+
+-- NFL Tight Ends
+UPDATE player_registry
+SET
+  position_group = 'TE'
+WHERE
+  sport = 'NFL'
+  AND player_name IN (
+    'Brock Bowers',
+    'Cole Kmet',
+    'Dallas Goedert',
+    'Dalton Kincaid',
+    'Evan Engram',
+    'Gerald Everett',
+    'Hunter Henry',
+    'Isaiah Likely',
+    'Kyle Pitts',
+    'Noah Fant',
+    'Pat Freiermuth',
+    'Tyler Higbee',
+    'Zach Ertz',
+    'George Kittle',
+    'Mark Andrews',
+    'Rob Gronkowski',
+    'Sam LaPorta',
+    'T.J. Hockenson',
+    'Tony Gonzalez',
+    'Travis Kelce'
+  );
+
+-- MLB Pitchers
+UPDATE player_registry
+SET
+  position_group = 'PITCHER'
+WHERE
+  sport = 'MLB'
+  AND player_name IN (
+    'Aaron Nola',
+    'Aroldis Chapman',
+    'Blake Snell',
+    'Blake Treinen',
+    'Bryce Miller',
+    'Camilo Doval',
+    'Carlos Rodón',
+    'Chris Sale',
+    'Clayton Kershaw',
+    'Dylan Cease',
+    'Edwin Diaz',
+    'Edwin Díaz',
+    'Emmanuel Clase',
+    'Framber Valdez',
+    'Gavin Williams',
+    'George Kirby',
+    'Gerrit Cole',
+    'Grayson Rodriguez',
+    'Hunter Greene',
+    'Jack Flaherty',
+    'Jacob deGrom',
+    'Joe Ryan',
+    'Jordan Montgomery',
+    'Jose Alvarado',
+    'Justin Verlander',
+    'Kevin Gausman',
+    'Kodai Senga',
+    'Kyle Bradish',
+    'Kyle Harrison',
+    'Logan Gilbert',
+    'Logan Webb',
+    'Luis Castillo',
+    'Mariano Rivera',
+    'Masahiro Tanaka',
+    'Max Fried',
+    'Max Scherzer',
+    'Nolan Ryan',
+    'Pablo Lopez',
+    'Pablo López',
+    'Paul Skenes',
+    'Reid Detmers',
+    'Roki Sasaki',
+    'Ryan Helsley',
+    'Sandy Alcantara',
+    'Sandy Koufax',
+    'Shane Bieber',
+    'Shota Imanaga',
+    'Sonny Gray',
+    'Spencer Strider',
+    'Tanner Bibee',
+    'Tarik Skubal',
+    'Tyler Glasnow',
+    'Walker Buehler',
+    'Yoshinobu Yamamoto',
+    'Yu Darvish',
+    'Zac Gallen',
+    'Zack Wheeler'
+  );
+
+-- MLB Catchers
+UPDATE player_registry
+SET
+  position_group = 'CATCHER'
+WHERE
+  sport = 'MLB'
+  AND player_name IN ('Gabe Moreno', 'Mike Piazza');
+
+-- MLB Infielders
+UPDATE player_registry
+SET
+  position_group = 'INFIELD'
+WHERE
+  sport = 'MLB'
+  AND player_name IN (
+    'Albert Pujols',
+    'Babe Ruth',
+    'Cal Ripken Jr.',
+    'Colt Keith',
+    'Derek Jeter',
+    'Elly De La Cruz',
+    'Gunnar Henderson',
+    'Jackson Holliday',
+    'Junior Caminero',
+    'Lou Gehrig',
+    'Marcelo Mayer',
+    'Masyn Winn',
+    'Matt McLain',
+    'Noelvi Marte',
+    'Oneil Cruz',
+    'Royce Lewis',
+    'Stan Musial',
+    'Ted Williams',
+    'Ty Cobb'
+  );
+
+-- MLB Outfielders
+UPDATE player_registry
+SET
+  position_group = 'OUTFIELD'
+WHERE
+  sport = 'MLB'
+  AND player_name IN (
+    'Barry Bonds',
+    'Ceddanne Rafaela',
+    'Evan Carter',
+    'Heston Kjerstad',
+    'Ichiro Suzuki',
+    'Jackie Robinson',
+    'Jackson Chourio',
+    'James Wood',
+    'Jasson Dominguez',
+    'Jasson Domínguez',
+    'Jordan Lawlar',
+    'Ken Griffey Jr.',
+    'Lawrence Butler',
+    'Michael Busch',
+    'Mickey Mantle',
+    'Pete Crow-Armstrong',
+    'Roberto Clemente',
+    'Sal Frelick',
+    'Willie Mays',
+    'Wyatt Langford',
+    'Hank Aaron'
+  );
+
+-- NHL Goalies
+UPDATE player_registry
+SET
+  position_group = 'GOALIE'
+WHERE
+  sport = 'NHL'
+  AND player_name IN (
+    'Andrei Vasilevskiy',
+    'Carey Price',
+    'Connor Hellebuyck',
+    'Dominik Hasek',
+    'Henrik Lundqvist',
+    'Igor Shesterkin',
+    'Ilya Sorokin',
+    'Jake Oettinger',
+    'Jeremy Swayman',
+    'Linus Ullmark',
+    'Marc-Andre Fleury',
+    'Martin Brodeur',
+    'Patrick Roy',
+    'Sergei Bobrovsky',
+    'Tuukka Rask',
+    'Cam Talbot',
+    'Carter Hart',
+    'Frederik Andersen',
+    'Jacob Markstrom',
+    'Jordan Binnington',
+    'Petr Mrazek',
+    'Juuse Saros',
+    'Thatcher Demko',
+    'Roberto Luongo'
+  );
+
+-- NHL Defensemen
+UPDATE player_registry
+SET
+  position_group = 'DEFENSE'
+WHERE
+  sport = 'NHL'
+  AND player_name IN (
+    'Adam Fox',
+    'Alex Pietrangelo',
+    'Bobby Orr',
+    'Brent Burns',
+    'Brian Leetch',
+    'Cale Makar',
+    'Charlie McAvoy',
+    'Chris Chelios',
+    'David Jiricek',
+    'Dougie Hamilton',
+    'Drew Doughty',
+    'Duncan Keith',
+    'Erik Johnson',
+    'Erik Karlsson',
+    'Jake Sanderson',
+    'John Carlson',
+    'John Klingberg',
+    'Kevin Shattenkirk',
+    'Kris Letang',
+    'Luke Hughes',
+    'Miro Heiskanen',
+    'Moritz Seider',
+    'Nicklas Lidstrom',
+    'Owen Power',
+    'Paul Coffey',
+    'Quinn Hughes',
+    'Rasmus Dahlin',
+    'Ray Bourque',
+    'Roman Josi',
+    'Ryan Ellis',
+    'Scott Stevens',
+    'Shea Weber',
+    'Simon Nemec',
+    'Thomas Chabot',
+    'Torey Krug',
+    'Tyson Barrie',
+    'Victor Hedman',
+    'Zdeno Chara',
+    'Al MacInnis',
+    'Phil Esposito'
+  );
+
+-- NHL Forwards
+UPDATE player_registry
+SET
+  position_group = 'FORWARD'
+WHERE
+  sport = 'NHL'
+  AND player_name IN (
+    'Adam Fantilli',
+    'Aleksander Barkov',
+    'Aleksander Ovechkin',
+    'Alex DeBrincat',
+    'Alex Ovechkin',
+    'Alexis Lafreniere',
+    'Anze Kopitar',
+    'Artemi Panarin',
+    'Auston Matthews',
+    'Bo Horvat',
+    'Brad Marchand',
+    'Brady Tkachuk',
+    'Brayden Point',
+    'Brett Hull',
+    'Brock Boeser',
+    'Chandler Stephenson',
+    'Chris Kreider',
+    'Claude Giroux',
+    'Cole Caufield',
+    'Cole Sillinger',
+    'Connor Bedard',
+    'Connor Garland',
+    'Connor McDavid',
+    'Corey Perry',
+    'Daniel Sedin',
+    'David',
+    'David Krejci',
+    'David Pastrnak',
+    'David Perron',
+    'Dylan Cozens',
+    'Elias Pettersson',
+    'Evander Kane',
+    'Evgeni Malkin',
+    'Evgeny Kuznetsov',
+    'Filip Forsberg',
+    'Gordie Howe',
+    'Guy Lafleur',
+    'Henrik Sedin',
+    'J.T. Miller',
+    'Jack Eichel',
+    'Jack Hughes',
+    'Jake Guentzel',
+    'Jamie Benn',
+    'Jarome Iginla',
+    'Jaromir Jagr',
+    'Jason Robertson',
+    'Jean Beliveau',
+    'Jesper Bratt',
+    'Jesper Kotkaniemi',
+    'Jesperi Kotkaniemi',
+    'Joe Sakic',
+    'Joe Thornton',
+    'John Tavares',
+    'Johnny Gaudreau',
+    'Jonathan Huberdeau',
+    'Jonathan Toews',
+    'Jordan Kyrou',
+    'Jordan Staal',
+    'Juraj Slafkovsky',
+    'Kaapo Kakko',
+    'Kevin Fiala',
+    'Kirill Kaprizov',
+    'Kyle Connor',
+    'Leo Carlsson',
+    'Leon Draisaitl',
+    'Logan Cooley',
+    'Luc Robitaille',
+    'Lucas Raymond',
+    'Macklin Celebrini',
+    'Mario Lemieux',
+    'Mark Messier',
+    'Mark Scheifele',
+    'Mark Stone',
+    'Matthew Barzal',
+    'Matthew Tkachuk',
+    'Matty Beniers',
+    'Matvei Michkov',
+    'Maurice Richard',
+    'Mika Zibanejad',
+    'Mikko Rantanen',
+    'Mitch Marner',
+    'Nathan MacKinnon',
+    'Nazem Kadri',
+    'Nick Suzuki',
+    'Nikita Kucherov',
+    'Oskar Lindblom',
+    'Patrice Bergeron',
+    'Patrick Kane',
+    'Patrick Laine',
+    'Patrik Laine',
+    'Pavel Datsyuk',
+    'Peter Forsberg',
+    'Phil Kessel',
+    'Pierre-Luc Dubois',
+    'Rick Nash',
+    'Robert Thomas',
+    'Roope Hintz',
+    'Ryan Getzlaf',
+    'Ryan Kesler',
+    'Ryan Nugent-Hopkins',
+    'Ryan Strome',
+    'Sam Reinhart',
+    'Sebastian Aho',
+    'Shane Wright',
+    'Sidney Crosby',
+    'Steven',
+    'Steven Stamkos',
+    'T.J. Oshie',
+    'Tage Thompson',
+    'Teemu Selanne',
+    'Tim Stutzle',
+    'Tim Stützle',
+    'Timo',
+    'Timo Meier',
+    'Tom Wilson',
+    'Trevor Zegras',
+    'Tyler Seguin',
+    'Victor Olofsson',
+    'Vladimir Tarasenko',
+    'Wayne Gretzky',
+    'William Nylander',
+    'Wyatt Johnston'
+  );
+
+-- NBA Guards (12)
+INSERT INTO
+  player_registry (
+    sport,
+    player_name,
+    career_stage,
+    role_tier,
+    position_group
+  )
+VALUES
+  (
+    'NBA',
+    'Stephon Castle',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Reed Sheppard',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Jared McCain',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Dalton Knecht',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Darius Garland',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Jalen Williams',
+    'RISING',
+    'FRANCHISE_CORE',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Austin Reaves',
+    'PRIME',
+    'SOLID_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Coby White',
+    'PRIME',
+    'SOLID_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Desmond Bane',
+    'PRIME',
+    'SOLID_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Keyonte George',
+    'RISING',
+    'EMERGING_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Gradey Dick',
+    'RISING',
+    'EMERGING_STARTER',
+    'GUARD'
+  ),
+  (
+    'NBA',
+    'Jalen Green',
+    'RISING',
+    'SOLID_STARTER',
+    'GUARD'
+  )
+ON CONFLICT (sport, player_name) DO NOTHING;
+
+-- NBA Forwards (12)
+INSERT INTO
+  player_registry (
+    sport,
+    player_name,
+    career_stage,
+    role_tier,
+    position_group
+  )
+VALUES
+  (
+    'NBA',
+    'Zaccharie Risacher',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Alexandre Sarr',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Scottie Barnes',
+    'RISING',
+    'FRANCHISE_CORE',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Jaime Jaquez Jr.',
+    'RISING',
+    'SOLID_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Keegan Murray',
+    'RISING',
+    'SOLID_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Jalen Duren',
+    'RISING',
+    'EMERGING_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Jonathan Kuminga',
+    'RISING',
+    'SOLID_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Herb Jones',
+    'PRIME',
+    'SOLID_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Tari Eason',
+    'RISING',
+    'EMERGING_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Keldon Johnson',
+    'PRIME',
+    'SOLID_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Jalen Suggs',
+    'RISING',
+    'SOLID_STARTER',
+    'FORWARD'
+  ),
+  (
+    'NBA',
+    'Dyson Daniels',
+    'RISING',
+    'EMERGING_STARTER',
+    'FORWARD'
+  )
+ON CONFLICT (sport, player_name) DO NOTHING;
+
+-- NBA Centers (6)
+INSERT INTO
+  player_registry (
+    sport,
+    player_name,
+    career_stage,
+    role_tier,
+    position_group
+  )
+VALUES
+  (
+    'NBA',
+    'Donovan Clingan',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'CENTER'
+  ),
+  (
+    'NBA',
+    'Zach Edey',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'CENTER'
+  ),
+  (
+    'NBA',
+    'Walker Kessler',
+    'RISING',
+    'SOLID_STARTER',
+    'CENTER'
+  ),
+  (
+    'NBA',
+    'Onyeka Okongwu',
+    'RISING',
+    'SOLID_STARTER',
+    'CENTER'
+  ),
+  (
+    'NBA',
+    'Mark Williams',
+    'RISING',
+    'EMERGING_STARTER',
+    'CENTER'
+  ),
+  (
+    'NBA',
+    'Dereck Lively II',
+    'RISING',
+    'EMERGING_STARTER',
+    'CENTER'
+  )
+ON CONFLICT (sport, player_name) DO NOTHING;
+
+-- NFL Edge Rushers (14)
+INSERT INTO
+  player_registry (
+    sport,
+    player_name,
+    career_stage,
+    role_tier,
+    position_group
+  )
+VALUES
+  (
+    'NFL',
+    'Myles Garrett',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'T.J. Watt',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Micah Parsons',
+    'RISING',
+    'FRANCHISE_CORE',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Nick Bosa',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Trey Hendrickson',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Jared Verse',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Will Anderson Jr.',
+    'RISING',
+    'FRANCHISE_CORE',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Aidan Hutchinson',
+    'RISING',
+    'FRANCHISE_CORE',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Khalil Mack',
+    'VETERAN',
+    'SOLID_STARTER',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Maxx Crosby',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Danielle Hunter',
+    'PRIME',
+    'SOLID_STARTER',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Za''Darius Smith',
+    'VETERAN',
+    'SOLID_STARTER',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Von Miller',
+    'VETERAN',
+    'SOLID_STARTER',
+    'EDGE'
+  ),
+  (
+    'NFL',
+    'Joey Bosa',
+    'PRIME',
+    'SOLID_STARTER',
+    'EDGE'
+  )
+ON CONFLICT (sport, player_name) DO NOTHING;
+
+-- NFL Cornerbacks (15)
+INSERT INTO
+  player_registry (
+    sport,
+    player_name,
+    career_stage,
+    role_tier,
+    position_group
+  )
+VALUES
+  (
+    'NFL',
+    'Sauce Gardner',
+    'RISING',
+    'FRANCHISE_CORE',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Pat Surtain II',
+    'RISING',
+    'FRANCHISE_CORE',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Trent McDuffie',
+    'RISING',
+    'FRANCHISE_CORE',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Denzel Ward',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'CB'
+  ),
+  (
+    'NFL',
+    'DaRon Bland',
+    'RISING',
+    'FRANCHISE_CORE',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Devon Witherspoon',
+    'RISING',
+    'FRANCHISE_CORE',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Jalen Ramsey',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Derek Stingley Jr.',
+    'RISING',
+    'FRANCHISE_CORE',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Jaylon Johnson',
+    'PRIME',
+    'SOLID_STARTER',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Cooper DeJean',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Quinyon Mitchell',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Terrion Arnold',
+    'ROOKIE',
+    'EMERGING_STARTER',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Marshon Lattimore',
+    'PRIME',
+    'SOLID_STARTER',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Marlon Humphrey',
+    'PRIME',
+    'SOLID_STARTER',
+    'CB'
+  ),
+  (
+    'NFL',
+    'Christian Gonzalez',
+    'RISING',
+    'FRANCHISE_CORE',
+    'CB'
+  )
+ON CONFLICT (sport, player_name) DO NOTHING;
+
+-- NFL Linebackers (10)
+INSERT INTO
+  player_registry (
+    sport,
+    player_name,
+    career_stage,
+    role_tier,
+    position_group
+  )
+VALUES
+  (
+    'NFL',
+    'Fred Warner',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Roquan Smith',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Bobby Wagner',
+    'VETERAN',
+    'FRANCHISE_CORE',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Zack Baun',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Patrick Queen',
+    'PRIME',
+    'SOLID_STARTER',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Devin White',
+    'PRIME',
+    'SOLID_STARTER',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Dre Greenlaw',
+    'PRIME',
+    'SOLID_STARTER',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Lavonte David',
+    'VETERAN',
+    'SOLID_STARTER',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Demario Davis',
+    'VETERAN',
+    'SOLID_STARTER',
+    'LB'
+  ),
+  (
+    'NFL',
+    'Tremaine Edmunds',
+    'PRIME',
+    'SOLID_STARTER',
+    'LB'
+  )
+ON CONFLICT (sport, player_name) DO NOTHING;
+
+-- NFL Safeties (10)
+INSERT INTO
+  player_registry (
+    sport,
+    player_name,
+    career_stage,
+    role_tier,
+    position_group
+  )
+VALUES
+  (
+    'NFL',
+    'Kyle Hamilton',
+    'RISING',
+    'FRANCHISE_CORE',
+    'S'
+  ),
+  (
+    'NFL',
+    'Derwin James Jr.',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'S'
+  ),
+  (
+    'NFL',
+    'Jessie Bates III',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'S'
+  ),
+  (
+    'NFL',
+    'Minkah Fitzpatrick',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'S'
+  ),
+  (
+    'NFL',
+    'Xavier McKinney',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'S'
+  ),
+  (
+    'NFL',
+    'Kerby Joseph',
+    'RISING',
+    'FRANCHISE_CORE',
+    'S'
+  ),
+  (
+    'NFL',
+    'Jevon Holland',
+    'RISING',
+    'SOLID_STARTER',
+    'S'
+  ),
+  (
+    'NFL',
+    'Antoine Winfield Jr.',
+    'PRIME',
+    'FRANCHISE_CORE',
+    'S'
+  ),
+  (
+    'NFL',
+    'Talanoa Hufanga',
+    'RISING',
+    'SOLID_STARTER',
+    'S'
+  ),
+  (
+    'NFL',
+    'Justin Simmons',
+    'VETERAN',
+    'SOLID_STARTER',
+    'S'
+  )
+ON CONFLICT (sport, player_name) DO NOTHING;
+
+UPDATE player_registry
+SET
+  position_group = 'CATCHER'
+WHERE
+  sport = 'MLB'
+  AND player_name IN (
+    'Adley Rutschman',
+    'J.T. Realmuto',
+    'Cal Raleigh',
+    'Buster Posey',
+    'Joe Mauer',
+    'Francisco Alvarez',
+    'Gabe Moreno',
+    'Johnny Bench',
+    'Salvador Perez',
+    'Will Smith',
+    'Sean Murphy',
+    'Willson Contreras',
+    'Mike Piazza',
+    'Omar Narváez',
+    'William Contreras',
+    'Yadier Molina'
+  );
+
+UPDATE player_registry
+SET
+  position_group = 'INFIELDER'
+WHERE
+  sport = 'MLB'
+  AND player_name IN (
+    'Alex Bregman',
+    'Austin Riley',
+    'Bo Bichette',
+    'Bobby Witt Jr.',
+    'Bryce Turang',
+    'Bryson Stott',
+    'Carlos Correa',
+    'Christian Walker',
+    'Corey Seager',
+    'Dansby Swanson',
+    'Elly De La Cruz',
+    'Francisco Lindor',
+    'Freddie Freeman',
+    'Gunnar Henderson',
+    'Ha-Seong Kim',
+    'Isaac Paredes',
+    'Jonathan India',
+    'Jose Altuve',
+    'Jose Ramirez',
+    'José Ramírez',
+    'Josh Naylor',
+    'Josh Bell',
+    'Eugenio Suárez',
+    'Colt Keith',
+    'Jordan Lawlar',
+    'Jackson Holliday',
+    'Anthony Rizzo',
+    'Brandon Lowe',
+    'Cal Ripken Jr.',
+    'Derek Jeter',
+    'Jackie Robinson',
+    'Albert Pujols',
+    'Joey Votto',
+    'Trea Turner',
+    'Matt Olson',
+    'Pete Alonso',
+    'Manny Machado',
+    'Rafael Devers',
+    'Wander Franco',
+    'Marcus Semien',
+    'Xander Bogaerts',
+    'Ketel Marte',
+    'Lou Gehrig',
+    'Matt Chapman',
+    'Matt McLain',
+    'Max Muncy',
+    'Nico Hoerner',
+    'Noelvi Marte',
+    'Nolan Arenado',
+    'Oneil Cruz',
+    'Ozzie Albies',
+    'Paul DeJong',
+    'Paul Goldschmidt',
+    'Rhys Hoskins',
+    'Royce Lewis',
+    'Spencer Torkelson',
+    'Tim Anderson',
+    'Tommy Edman',
+    'Trevor Story',
+    'Vladimir Guerrero Jr.',
+    'Junior Caminero',
+    'Marcelo Mayer',
+    'Masyn Winn',
+    'Matt Carpenter',
+    'Matt Reynolds',
+    'Michael Busch',
+    'Mickey Mantle',
+    'Stan Musial'
+  );
+
+UPDATE player_registry
+SET
+  position_group = 'OUTFIELDER'
+WHERE
+  sport = 'MLB'
+  AND player_name IN (
+    'Aaron Judge',
+    'Anthony Santander',
+    'Andrew McCutchen',
+    'Alex Verdugo',
+    'Bryce Harper',
+    'Bryan Reynolds',
+    'Byron Buxton',
+    'Cedric Mullins',
+    'Christian Yelich',
+    'Cody Bellinger',
+    'Evan Carter',
+    'Fernando Tatis Jr.',
+    'George Springer',
+    'Giancarlo Stanton',
+    'Ian Happ',
+    'Ichiro Suzuki',
+    'Julio Rodriguez',
+    'Julio Rodríguez',
+    'Juan Soto',
+    'Corbin Carroll',
+    'Brandon Nimmo',
+    'Heston Kjerstad',
+    'James Wood',
+    'Jasson Dominguez',
+    'Jasson Domínguez',
+    'Jordan Walker',
+    'Jorge Soler',
+    'Joey Gallo',
+    'Mike Trout',
+    'Mookie Betts',
+    'Ronald Acuña Jr.',
+    'Kyle Tucker',
+    'Yordan Alvarez',
+    'Luis Robert Jr.',
+    'Jazz Chisholm Jr.',
+    'Ceddanne Rafaela',
+    'Babe Ruth',
+    'Hank Aaron',
+    'Barry Bonds',
+    'Ken Griffey Jr.',
+    'Willie Mays',
+    'Ted Williams',
+    'Kyle Schwarber',
+    'Jackson Chourio',
+    'Lane Thomas',
+    'Lawrence Butler',
+    'Marcell Ozuna',
+    'Masataka Yoshida',
+    'Michael Harris II',
+    'Nick Castellanos',
+    'Riley Greene',
+    'Roberto Clemente',
+    'Ronald Acuna Jr.',
+    'Sal Frelick',
+    'Seiya Suzuki',
+    'Starling Marte',
+    'Teoscar Hernández',
+    'Ty Cobb',
+    'Tyler O''Neill',
+    'Wyatt Langford',
+    'Pete Crow-Armstrong',
+    'Matt Vierling',
+    'Shohei Ohtani',
+    'Ohtani'
+  );
+
+UPDATE player_registry
+SET
+  position_group = 'GOALIE'
+WHERE
+  sport = 'NHL'
+  AND player_name IN (
+    'Andrei Vasilevskiy',
+    'Carey Price',
+    'Connor Hellebuyck',
+    'Dominik Hasek',
+    'Henrik Lundqvist',
+    'Igor Shesterkin',
+    'Ilya Sorokin',
+    'Jake Oettinger',
+    'Jeremy Swayman',
+    'Juuse Saros',
+    'Linus Ullmark',
+    'Marc-Andre Fleury',
+    'Martin Brodeur',
+    'Patrick Roy',
+    'Roberto Luongo',
+    'Sergei Bobrovsky',
+    'Thatcher Demko',
+    'Tuukka Rask',
+    'Carter Hart',
+    'Cam Talbot',
+    'Jacob Markstrom',
+    'Frederik Andersen',
+    'Petr Mrazek',
+    'Jordan Binnington'
+  );
+
+UPDATE player_registry
+SET
+  position_group = 'CENTER'
+WHERE
+  sport = 'NHL'
+  AND player_name IN (
+    'Adam Fantilli',
+    'Aleksander Barkov',
+    'Anze Kopitar',
+    'Auston Matthews',
+    'Bo Horvat',
+    'Connor Bedard',
+    'Connor McDavid',
+    'Dylan Cozens',
+    'Evgeni Malkin',
+    'Jack Eichel',
+    'Jack Hughes',
+    'Jean Beliveau',
+    'Joe Sakic',
+    'Joe Thornton',
+    'John Tavares',
+    'Jonathan Toews',
+    'Juraj Slafkovsky',
+    'Leo Carlsson',
+    'Leon Draisaitl',
+    'Logan Cooley',
+    'Macklin Celebrini',
+    'Mario Lemieux',
+    'Mark Messier',
+    'Mark Scheifele',
+    'Matty Beniers',
+    'Mika Zibanejad',
+    'Nathan MacKinnon',
+    'Nick Suzuki',
+    'Patrice Bergeron',
+    'Peter Forsberg',
+    'Pierre-Luc Dubois',
+    'Robert Thomas',
+    'Ryan Getzlaf',
+    'Sebastian Aho',
+    'Shane Wright',
+    'Sidney Crosby',
+    'Steve Yzerman',
+    'Steven Stamkos',
+    'Tage Thompson',
+    'Tim Stutzle',
+    'Tim Stützle',
+    'Tyler Seguin',
+    'Wayne Gretzky',
+    'Wyatt Johnston',
+    'Elias Pettersson',
+    'Cole Sillinger',
+    'Jesper Kotkaniemi',
+    'Jesperi Kotkaniemi',
+    'Jordan Kyrou',
+    'Nazem Kadri',
+    'Ryan Strome',
+    'Jordan Staal',
+    'David Krejci',
+    'J.T. Miller',
+    'Matthew Barzal'
+  );
+
+UPDATE player_registry
+SET
+  position_group = 'WINGER'
+WHERE
+  sport = 'NHL'
+  AND player_name IN (
+    'Alex Ovechkin',
+    'Aleksander Ovechkin',
+    'Alexis Lafreniere',
+    'Artemi Panarin',
+    'Brad Marchand',
+    'Brady Tkachuk',
+    'Brayden Point',
+    'Brett Hull',
+    'Brock Boeser',
+    'Chris Kreider',
+    'Claude Giroux',
+    'Cole Caufield',
+    'Connor Garland',
+    'Corey Perry',
+    'Daniel Sedin',
+    'David Pastrnak',
+    'Evander Kane',
+    'Filip Forsberg',
+    'Gordie Howe',
+    'Guy Lafleur',
+    'Henrik Sedin',
+    'Jake Guentzel',
+    'Jamie Benn',
+    'Jarome Iginla',
+    'Jaromir Jagr',
+    'Jason Robertson',
+    'Jesper Bratt',
+    'Johnny Gaudreau',
+    'Jonathan Huberdeau',
+    'Kirill Kaprizov',
+    'Kyle Connor',
+    'Lucas Raymond',
+    'Luc Robitaille',
+    'Mark Stone',
+    'Matthew Tkachuk',
+    'Matvei Michkov',
+    'Maurice Richard',
+    'Mikko Rantanen',
+    'Mitch Marner',
+    'Nikita Kucherov',
+    'Oskar Lindblom',
+    'Patrick Kane',
+    'Patrick Laine',
+    'Patrik Laine',
+    'Pavel Datsyuk',
+    'Phil Esposito',
+    'Phil Kessel',
+    'Rick Nash',
+    'Roope Hintz',
+    'Ryan Kesler',
+    'Ryan Nugent-Hopkins',
+    'Sam Reinhart',
+    'Teemu Selanne',
+    'Timo Meier',
+    'Tom Wilson',
+    'Trevor Zegras',
+    'Vladimir Tarasenko',
+    'William Nylander',
+    'T.J. Oshie',
+    'Kevin Fiala',
+    'Alex DeBrincat',
+    'Kaapo Kakko',
+    'Victor Olofsson',
+    'Evgeny Kuznetsov',
+    'Chandler Stephenson',
+    'David Perron'
+  );
+
+UPDATE player_registry
+SET
+  position_group = 'DEFENSEMAN'
+WHERE
+  sport = 'NHL'
+  AND player_name IN (
+    'Adam Fox',
+    'Al MacInnis',
+    'Alex Pietrangelo',
+    'Bobby Orr',
+    'Brent Burns',
+    'Brian Leetch',
+    'Cale Makar',
+    'Charlie McAvoy',
+    'Chris Chelios',
+    'David Jiricek',
+    'Dougie Hamilton',
+    'Drew Doughty',
+    'Duncan Keith',
+    'Erik Johnson',
+    'Erik Karlsson',
+    'John Carlson',
+    'John Klingberg',
+    'Jake Sanderson',
+    'Kevin Shattenkirk',
+    'Kris Letang',
+    'Luke Hughes',
+    'Miro Heiskanen',
+    'Moritz Seider',
+    'Nicklas Lidstrom',
+    'Owen Power',
+    'Paul Coffey',
+    'Quinn Hughes',
+    'Rasmus Dahlin',
+    'Ray Bourque',
+    'Roman Josi',
+    'Ryan Ellis',
+    'Scott Stevens',
+    'Shea Weber',
+    'Simon Nemec',
+    'Thomas Chabot',
+    'Torey Krug',
+    'Tyson Barrie',
+    'Victor Hedman',
+    'Zdeno Chara'
+  );
