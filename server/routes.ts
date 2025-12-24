@@ -6080,8 +6080,8 @@ Allow: /
   // WEBHOOK ENDPOINTS - Stripe Webhooks for Split Payments
   // ============================================================================
 
-  // POST /api/webhooks/splits - Handle Stripe webhooks for split payments
-  app.post("/api/webhooks/splits", async (req, res) => {
+  // POST /api/webhooks/stripe - Handle Stripe webhooks for split payments
+  app.post("/api/webhooks/stripe", async (req: any, res) => {
     try {
       const stripe = await getUncachableStripeClient();
       if (!stripe) {
@@ -6097,9 +6097,16 @@ Allow: /
         return res.status(500).json({ error: "Webhook secret not configured" });
       }
 
+      // Use rawBody for signature verification (set by express.json verify callback)
+      const rawBody = req.rawBody;
+      if (!rawBody) {
+        console.error("[Splits Webhook] Raw body not available");
+        return res.status(400).json({ error: "Raw body not available for signature verification" });
+      }
+
       let event;
       try {
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+        event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
       } catch (err: any) {
         console.error("[Splits Webhook] Signature verification failed:", err.message);
         return res.status(400).json({ error: `Webhook signature verification failed` });
