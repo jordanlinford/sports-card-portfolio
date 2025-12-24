@@ -27,6 +27,10 @@ const openai = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
 });
 
+// Prompt version - increment this when making significant prompt changes
+// to auto-invalidate cached outlooks generated with older prompts
+const PROMPT_VERSION = 2; // v2: Added explicit confidence/dataQuality rules
+
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
   return `${sport.toLowerCase()}:${playerName.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
@@ -61,10 +65,20 @@ async function getCachedOutlook(playerKey: string): Promise<{
   
   const record = cached[0];
   const now = new Date();
-  const isStale = record.expiresAt ? record.expiresAt < now : true;
+  const isExpired = record.expiresAt ? record.expiresAt < now : true;
+  
+  // Check if cached outlook was generated with an older prompt version
+  const cachedOutlook = record.outlookJson as (PlayerOutlookResponse & { _promptVersion?: number }) | null;
+  const isOldPromptVersion = !cachedOutlook?._promptVersion || cachedOutlook._promptVersion < PROMPT_VERSION;
+  
+  const isStale = isExpired || isOldPromptVersion;
+  
+  if (isOldPromptVersion && cachedOutlook) {
+    console.log(`[PlayerOutlook] Cache outdated (v${cachedOutlook._promptVersion || 1} < v${PROMPT_VERSION}) for ${playerKey}`);
+  }
   
   return {
-    outlook: record.outlookJson as PlayerOutlookResponse | null,
+    outlook: cachedOutlook,
     isStale,
     cacheRecord: record,
   };
@@ -81,6 +95,9 @@ async function saveToCache(
   const ttlMs = getTtlMs(classification.baseTemperature);
   const expiresAt = new Date(Date.now() + ttlMs);
   
+  // Add prompt version to cached outlook for version checking on retrieval
+  const outlookWithVersion = { ...outlook, _promptVersion: PROMPT_VERSION };
+  
   await db
     .insert(playerOutlookCache)
     .values({
@@ -88,7 +105,7 @@ async function saveToCache(
       sport,
       playerName,
       classificationJson: classification,
-      outlookJson: outlook,
+      outlookJson: outlookWithVersion,
       temperature: classification.baseTemperature,
       lastFetchedAt: new Date(),
       expiresAt,
@@ -97,7 +114,7 @@ async function saveToCache(
       target: playerOutlookCache.playerKey,
       set: {
         classificationJson: classification,
-        outlookJson: outlook,
+        outlookJson: outlookWithVersion,
         temperature: classification.baseTemperature,
         lastFetchedAt: new Date(),
         expiresAt,
