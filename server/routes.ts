@@ -5423,8 +5423,8 @@ Allow: /
   // PORTFOLIO BUILDER - Box Break Splitting System
   // ============================================================================
 
-  // Helper: Check if user is admin
-  async function isAdmin(userId: string): Promise<boolean> {
+  // Helper: Check if user is admin for splits
+  async function checkSplitsAdminAccess(userId: string): Promise<boolean> {
     const user = await storage.getUser(userId);
     return user?.isAdmin === true;
   }
@@ -5750,7 +5750,7 @@ Allow: /
   app.get("/api/admin/breaks", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -5766,7 +5766,7 @@ Allow: /
   app.post("/api/admin/breaks", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -5787,7 +5787,7 @@ Allow: /
   app.patch("/api/admin/breaks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -5812,7 +5812,7 @@ Allow: /
   app.delete("/api/admin/breaks/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -5833,7 +5833,7 @@ Allow: /
   app.post("/api/admin/breaks/:id/splits", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -5867,7 +5867,7 @@ Allow: /
   app.patch("/api/admin/splits/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -5892,7 +5892,7 @@ Allow: /
   app.post("/api/admin/splits/:id/status", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -5931,7 +5931,7 @@ Allow: /
   app.post("/api/admin/splits/:id/open-payment", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -5958,7 +5958,7 @@ Allow: /
   app.post("/api/admin/splits/:id/lock-and-assign", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 
@@ -6057,7 +6057,7 @@ Allow: /
   app.get("/api/admin/splits/:id/seats", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      if (!userId || !(await isAdmin(userId))) {
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
         return res.status(403).json({ error: "Admin access required" });
       }
 

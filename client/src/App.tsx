@@ -38,6 +38,9 @@ import PortfolioOutlookPage from "@/pages/portfolio-outlook";
 import NextBuysPage from "@/pages/next-buys";
 import GrowthProjectionsPage from "@/pages/growth-projections";
 import ShareViewer from "@/pages/share-viewer";
+import PortfolioBuilderPage from "@/pages/portfolio-builder";
+import PortfolioBuilderSplitPage from "@/pages/portfolio-builder-split";
+import PortfolioBuilderPreferencesPage from "@/pages/portfolio-builder-preferences";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -88,6 +91,9 @@ function Router() {
           <Route path="/hidden-gems" component={HiddenGemsPage} />
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
           <Route path="/portfolio/next-buys" component={NextBuysPage} />
+          <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
+          <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
+          <Route path="/portfolio-builder/splits/:id/preferences" component={PortfolioBuilderPreferencesPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />
