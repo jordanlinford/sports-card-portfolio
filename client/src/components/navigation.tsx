@@ -45,7 +45,8 @@ import {
   HandCoins,
   ChevronDown,
   Target,
-  LineChart
+  LineChart,
+  Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -121,7 +122,7 @@ export function Navigation() {
                     size="sm" 
                     className={cn(
                       "gap-1",
-                      isActiveSection(["/cases", "/analytics", "/search", "/portfolio"]) && "bg-accent"
+                      isActiveSection(["/cases", "/analytics", "/search", "/portfolio", "/portfolio-builder"]) && "bg-accent"
                     )}
                     data-testid="nav-portfolio"
                   >
@@ -171,6 +172,13 @@ export function Navigation() {
                       <TrendingUp className="h-4 w-4" />
                       Growth Projections
                       <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-auto">Pro</Badge>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/portfolio-builder" className="flex items-center gap-2 cursor-pointer">
+                      <Package className="h-4 w-4" />
+                      Box Breaks
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -469,6 +477,11 @@ export function Navigation() {
             <Link href="/explore">
               <Button variant="ghost" size="sm" className={cn(isActive("/explore") && "bg-accent")}>
                 <Compass className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link href="/portfolio-builder">
+              <Button variant="ghost" size="sm" className={cn(isActive("/portfolio-builder") && "bg-accent")}>
+                <Package className="h-4 w-4" />
               </Button>
             </Link>
             <Link href="/messages">
