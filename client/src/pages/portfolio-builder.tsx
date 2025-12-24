@@ -1,12 +1,10 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
-  Calendar, 
   Users, 
   DollarSign, 
   Package,
@@ -18,6 +16,7 @@ import {
   Truck,
   Video,
   CheckCircle,
+  Settings,
 } from "lucide-react";
 import type { BreakEventWithSplits, SplitInstance, SplitStatus } from "@shared/schema";
 
@@ -150,14 +149,28 @@ export default function PortfolioBuilderPage() {
     queryKey: ["/api/my-seats"],
   });
 
+  const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
+    queryKey: ["/api/user/admin"],
+  });
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold" data-testid="text-page-title">Portfolio Builder</h1>
-        <p className="text-muted-foreground mt-2">
-          Join box break splits to build your collection at a fraction of the cost. 
-          Share the excitement and cards with other collectors.
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold" data-testid="text-page-title">Portfolio Builder</h1>
+          <p className="text-muted-foreground mt-2">
+            Join box break splits to build your collection at a fraction of the cost. 
+            Share the excitement and cards with other collectors.
+          </p>
+        </div>
+        {adminCheck?.isAdmin && (
+          <Link href="/admin/portfolio-builder">
+            <Button variant="outline" data-testid="button-admin-link">
+              <Settings className="w-4 h-4 mr-2" />
+              Manage
+            </Button>
+          </Link>
+        )}
       </div>
 
       {mySeats && mySeats.length > 0 && (

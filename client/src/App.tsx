@@ -41,6 +41,7 @@ import ShareViewer from "@/pages/share-viewer";
 import PortfolioBuilderPage from "@/pages/portfolio-builder";
 import PortfolioBuilderSplitPage from "@/pages/portfolio-builder-split";
 import PortfolioBuilderPreferencesPage from "@/pages/portfolio-builder-preferences";
+import AdminPortfolioBuilderPage from "@/pages/admin-portfolio-builder";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -94,6 +95,7 @@ function Router() {
           <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
           <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
           <Route path="/portfolio-builder/splits/:id/preferences" component={PortfolioBuilderPreferencesPage} />
+          <Route path="/admin/portfolio-builder" component={AdminPortfolioBuilderPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />
