@@ -24,6 +24,10 @@ import {
   playerOutlookCache,
   sharedSnapshots,
   watchlist,
+  breakEvents,
+  splitInstances,
+  seats,
+  splitWebhookEvents,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -71,6 +75,20 @@ import {
   type Watchlist,
   type InsertWatchlist,
   type WatchlistItemType,
+  type BreakEvent,
+  type InsertBreakEvent,
+  type BreakEventWithSplits,
+  type SplitInstance,
+  type InsertSplitInstance,
+  type SplitInstanceWithSeats,
+  type SplitInstanceWithBreakEvent,
+  type Seat,
+  type InsertSeat,
+  type SeatWithUser,
+  type SeatCounts,
+  type SplitStatus,
+  type SplitWebhookEvent,
+  isValidStatusTransition,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -296,6 +314,42 @@ export interface IStorage {
   removeFromUnifiedWatchlist(id: number, userId: string): Promise<boolean>;
   updateUnifiedWatchlistNotes(id: number, userId: string, notes: string | null): Promise<Watchlist | undefined>;
   isInUnifiedWatchlist(userId: string, itemType: WatchlistItemType, playerKey?: string, cardId?: number): Promise<boolean>;
+
+  // =============================================================================
+  // PORTFOLIO BUILDER - Box Break Splitting System
+  // =============================================================================
+
+  // Break Event operations
+  getBreakEvents(activeOnly?: boolean): Promise<BreakEventWithSplits[]>;
+  getBreakEvent(id: number): Promise<BreakEventWithSplits | undefined>;
+  createBreakEvent(data: InsertBreakEvent): Promise<BreakEvent>;
+  updateBreakEvent(id: number, data: Partial<InsertBreakEvent>): Promise<BreakEvent | undefined>;
+  deleteBreakEvent(id: number): Promise<void>;
+
+  // Split Instance operations
+  getSplitInstance(id: number): Promise<SplitInstanceWithSeats | undefined>;
+  getSplitInstanceWithBreakEvent(id: number): Promise<SplitInstanceWithBreakEvent | undefined>;
+  createSplitInstance(data: InsertSplitInstance): Promise<SplitInstance>;
+  updateSplitInstance(id: number, data: Partial<SplitInstance>): Promise<SplitInstance | undefined>;
+  updateSplitStatus(id: number, status: SplitStatus, additionalData?: { youtubeUrl?: string; orderMeta?: any; paymentWindowEndsAt?: Date }): Promise<SplitInstance | undefined>;
+  getSplitsReadyForPaymentWindowClose(): Promise<SplitInstance[]>;
+  getSeatCounts(splitId: number): Promise<SeatCounts>;
+
+  // Seat operations
+  getSeat(id: number): Promise<Seat | undefined>;
+  getSeatByUserAndSplit(userId: string, splitId: number): Promise<Seat | undefined>;
+  getSeatsForSplit(splitId: number): Promise<SeatWithUser[]>;
+  getPaidSeatsForSplit(splitId: number): Promise<Seat[]>;
+  createSeat(data: InsertSeat): Promise<Seat>;
+  updateSeat(id: number, data: Partial<Seat>): Promise<Seat | undefined>;
+  updateSeatPreferences(seatId: number, preferences: string[]): Promise<Seat | undefined>;
+  markSeatAsPaid(seatId: number, checkoutSessionId: string): Promise<Seat | undefined>;
+  markSeatAsRefunded(seatId: number): Promise<Seat | undefined>;
+  getUserSeats(userId: string): Promise<(Seat & { splitInstance: SplitInstanceWithBreakEvent })[]>;
+
+  // Webhook idempotency
+  hasProcessedWebhookEvent(eventId: string): Promise<boolean>;
+  recordProcessedWebhookEvent(eventId: string, eventType: string, metadata?: any): Promise<SplitWebhookEvent>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2580,6 +2634,296 @@ export class DatabaseStorage implements IStorage {
   async isInUnifiedWatchlist(userId: string, itemType: WatchlistItemType, playerKey?: string, cardId?: number): Promise<boolean> {
     const item = await this.getUnifiedWatchlistItem(userId, itemType, playerKey, cardId);
     return !!item;
+  }
+
+  // =============================================================================
+  // PORTFOLIO BUILDER - Box Break Splitting System
+  // =============================================================================
+
+  // Break Event operations
+  async getBreakEvents(activeOnly: boolean = true): Promise<BreakEventWithSplits[]> {
+    const query = activeOnly
+      ? db.select().from(breakEvents).where(eq(breakEvents.isActive, true))
+      : db.select().from(breakEvents);
+    
+    const events = await query.orderBy(desc(breakEvents.createdAt));
+    
+    const eventsWithSplits: BreakEventWithSplits[] = [];
+    for (const event of events) {
+      const splits = await db
+        .select()
+        .from(splitInstances)
+        .where(eq(splitInstances.breakEventId, event.id))
+        .orderBy(asc(splitInstances.participantCount));
+      eventsWithSplits.push({ ...event, splitInstances: splits });
+    }
+    return eventsWithSplits;
+  }
+
+  async getBreakEvent(id: number): Promise<BreakEventWithSplits | undefined> {
+    const [event] = await db.select().from(breakEvents).where(eq(breakEvents.id, id));
+    if (!event) return undefined;
+    
+    const splits = await db
+      .select()
+      .from(splitInstances)
+      .where(eq(splitInstances.breakEventId, id))
+      .orderBy(asc(splitInstances.participantCount));
+    
+    return { ...event, splitInstances: splits };
+  }
+
+  async createBreakEvent(data: InsertBreakEvent): Promise<BreakEvent> {
+    const [event] = await db.insert(breakEvents).values(data).returning();
+    return event;
+  }
+
+  async updateBreakEvent(id: number, data: Partial<InsertBreakEvent>): Promise<BreakEvent | undefined> {
+    const [event] = await db
+      .update(breakEvents)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(breakEvents.id, id))
+      .returning();
+    return event;
+  }
+
+  async deleteBreakEvent(id: number): Promise<void> {
+    await db.delete(breakEvents).where(eq(breakEvents.id, id));
+  }
+
+  // Split Instance operations
+  async getSplitInstance(id: number): Promise<SplitInstanceWithSeats | undefined> {
+    const [split] = await db.select().from(splitInstances).where(eq(splitInstances.id, id));
+    if (!split) return undefined;
+    
+    const splitSeats = await db
+      .select()
+      .from(seats)
+      .where(eq(seats.splitInstanceId, id))
+      .orderBy(asc(seats.paidAt), asc(seats.createdAt));
+    
+    return { ...split, seats: splitSeats };
+  }
+
+  async getSplitInstanceWithBreakEvent(id: number): Promise<SplitInstanceWithBreakEvent | undefined> {
+    const [split] = await db.select().from(splitInstances).where(eq(splitInstances.id, id));
+    if (!split) return undefined;
+    
+    const [event] = await db.select().from(breakEvents).where(eq(breakEvents.id, split.breakEventId));
+    if (!event) return undefined;
+    
+    return { ...split, breakEvent: event };
+  }
+
+  async createSplitInstance(data: InsertSplitInstance): Promise<SplitInstance> {
+    const [split] = await db.insert(splitInstances).values(data).returning();
+    return split;
+  }
+
+  async updateSplitInstance(id: number, data: Partial<SplitInstance>): Promise<SplitInstance | undefined> {
+    const [split] = await db
+      .update(splitInstances)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(splitInstances.id, id))
+      .returning();
+    return split;
+  }
+
+  async updateSplitStatus(
+    id: number,
+    status: SplitStatus,
+    additionalData?: { youtubeUrl?: string; orderMeta?: any; paymentWindowEndsAt?: Date }
+  ): Promise<SplitInstance | undefined> {
+    const [currentSplit] = await db.select().from(splitInstances).where(eq(splitInstances.id, id));
+    if (!currentSplit) return undefined;
+    
+    // Validate status transition
+    if (!isValidStatusTransition(currentSplit.status as SplitStatus, status)) {
+      throw new Error(`Invalid status transition from ${currentSplit.status} to ${status}`);
+    }
+    
+    const updateData: Partial<SplitInstance> = {
+      status,
+      updatedAt: new Date(),
+    };
+    
+    if (additionalData?.youtubeUrl) updateData.youtubeUrl = additionalData.youtubeUrl;
+    if (additionalData?.orderMeta) updateData.orderMeta = additionalData.orderMeta;
+    if (additionalData?.paymentWindowEndsAt) updateData.paymentWindowEndsAt = additionalData.paymentWindowEndsAt;
+    
+    const [split] = await db
+      .update(splitInstances)
+      .set(updateData)
+      .where(eq(splitInstances.id, id))
+      .returning();
+    return split;
+  }
+
+  async getSplitsReadyForPaymentWindowClose(): Promise<SplitInstance[]> {
+    const now = new Date();
+    return db
+      .select()
+      .from(splitInstances)
+      .where(
+        and(
+          eq(splitInstances.status, "PAYMENT_OPEN"),
+          sql`${splitInstances.paymentWindowEndsAt} <= ${now}`
+        )
+      );
+  }
+
+  async getSeatCounts(splitId: number): Promise<SeatCounts> {
+    const allSeats = await db
+      .select()
+      .from(seats)
+      .where(eq(seats.splitInstanceId, splitId));
+    
+    const counts = {
+      interested: 0,
+      waitlist: 0,
+      paid: 0,
+      total: allSeats.length,
+    };
+    
+    for (const seat of allSeats) {
+      if (seat.status === "INTERESTED") counts.interested++;
+      else if (seat.status === "WAITLIST") counts.waitlist++;
+      else if (seat.status === "PAID") counts.paid++;
+    }
+    
+    return counts;
+  }
+
+  // Seat operations
+  async getSeat(id: number): Promise<Seat | undefined> {
+    const [seat] = await db.select().from(seats).where(eq(seats.id, id));
+    return seat;
+  }
+
+  async getSeatByUserAndSplit(userId: string, splitId: number): Promise<Seat | undefined> {
+    const [seat] = await db
+      .select()
+      .from(seats)
+      .where(and(eq(seats.userId, userId), eq(seats.splitInstanceId, splitId)));
+    return seat;
+  }
+
+  async getSeatsForSplit(splitId: number): Promise<SeatWithUser[]> {
+    const splitSeats = await db
+      .select()
+      .from(seats)
+      .where(eq(seats.splitInstanceId, splitId))
+      .orderBy(asc(seats.paidAt), asc(seats.createdAt));
+    
+    const seatsWithUsers: SeatWithUser[] = [];
+    for (const seat of splitSeats) {
+      const [user] = await db
+        .select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          handle: users.handle,
+          profileImageUrl: users.profileImageUrl,
+        })
+        .from(users)
+        .where(eq(users.id, seat.userId));
+      
+      if (user) {
+        seatsWithUsers.push({ ...seat, user });
+      }
+    }
+    return seatsWithUsers;
+  }
+
+  async getPaidSeatsForSplit(splitId: number): Promise<Seat[]> {
+    return db
+      .select()
+      .from(seats)
+      .where(and(eq(seats.splitInstanceId, splitId), eq(seats.status, "PAID")))
+      .orderBy(asc(seats.paidAt));
+  }
+
+  async createSeat(data: InsertSeat): Promise<Seat> {
+    const [seat] = await db.insert(seats).values(data).returning();
+    return seat;
+  }
+
+  async updateSeat(id: number, data: Partial<Seat>): Promise<Seat | undefined> {
+    const [seat] = await db
+      .update(seats)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(seats.id, id))
+      .returning();
+    return seat;
+  }
+
+  async updateSeatPreferences(seatId: number, preferences: string[]): Promise<Seat | undefined> {
+    const [seat] = await db
+      .update(seats)
+      .set({ preferences, updatedAt: new Date() })
+      .where(eq(seats.id, seatId))
+      .returning();
+    return seat;
+  }
+
+  async markSeatAsPaid(seatId: number, checkoutSessionId: string): Promise<Seat | undefined> {
+    const [seat] = await db
+      .update(seats)
+      .set({
+        status: "PAID",
+        paidAt: new Date(),
+        stripeCheckoutSessionId: checkoutSessionId,
+        updatedAt: new Date(),
+      })
+      .where(eq(seats.id, seatId))
+      .returning();
+    return seat;
+  }
+
+  async markSeatAsRefunded(seatId: number): Promise<Seat | undefined> {
+    const [seat] = await db
+      .update(seats)
+      .set({
+        status: "REFUNDED",
+        updatedAt: new Date(),
+      })
+      .where(eq(seats.id, seatId))
+      .returning();
+    return seat;
+  }
+
+  async getUserSeats(userId: string): Promise<(Seat & { splitInstance: SplitInstanceWithBreakEvent })[]> {
+    const userSeats = await db
+      .select()
+      .from(seats)
+      .where(eq(seats.userId, userId))
+      .orderBy(desc(seats.createdAt));
+    
+    const seatsWithSplits: (Seat & { splitInstance: SplitInstanceWithBreakEvent })[] = [];
+    for (const seat of userSeats) {
+      const splitWithEvent = await this.getSplitInstanceWithBreakEvent(seat.splitInstanceId);
+      if (splitWithEvent) {
+        seatsWithSplits.push({ ...seat, splitInstance: splitWithEvent });
+      }
+    }
+    return seatsWithSplits;
+  }
+
+  // Webhook idempotency
+  async hasProcessedWebhookEvent(eventId: string): Promise<boolean> {
+    const [event] = await db
+      .select()
+      .from(splitWebhookEvents)
+      .where(eq(splitWebhookEvents.eventId, eventId));
+    return !!event;
+  }
+
+  async recordProcessedWebhookEvent(eventId: string, eventType: string, metadata?: any): Promise<SplitWebhookEvent> {
+    const [event] = await db
+      .insert(splitWebhookEvents)
+      .values({ eventId, eventType, metadata })
+      .returning();
+    return event;
   }
 }
 
