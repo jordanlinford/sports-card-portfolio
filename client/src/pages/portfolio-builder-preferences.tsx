@@ -133,7 +133,7 @@ export default function PortfolioBuilderPreferencesPage() {
   });
 
   const { data: currentUser } = useQuery<any>({
-    queryKey: ["/api/auth/me"],
+    queryKey: ["/api/auth/user"],
   });
 
   const saveMutation = useMutation({
