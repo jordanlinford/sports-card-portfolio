@@ -40,7 +40,9 @@ function formatPrice(cents: number): string {
 
 function SplitCard({ split, breakEvent }: { split: SplitInstance; breakEvent: BreakEventWithSplits }) {
   const statusConfig = STATUS_CONFIG[split.status as SplitStatus] || STATUS_CONFIG.OPEN_INTEREST;
-  // Split the $50 breaker fee equally among all participants, plus $5 shipping per seat
+  // seatPriceCents = just the box cost share (total box price / seats)
+  // breakerFeePerSeatCents = breaker fee split equally among all participants
+  // SHIPPING_FEE_CENTS = flat shipping per seat (not split)
   const breakerFeePerSeatCents = Math.ceil(BREAKER_FEE_CENTS / split.participantCount);
   const totalPriceCents = split.seatPriceCents + breakerFeePerSeatCents + SHIPPING_FEE_CENTS;
 
@@ -139,7 +141,7 @@ function BreakEventCard({ event }: { event: BreakEventWithSplits }) {
             <span className="font-medium">Fees included in all prices</span>
           </div>
           <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-            $50 breaker fee (split among participants) + $5 shipping per seat.
+            {formatPrice(BREAKER_FEE_CENTS)} breaker fee (split among participants) + {formatPrice(SHIPPING_FEE_CENTS)} shipping per seat.
           </p>
         </div>
         

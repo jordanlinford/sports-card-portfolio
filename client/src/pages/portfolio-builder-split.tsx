@@ -71,6 +71,18 @@ const STATUS_CONFIG: Record<SplitStatus, { label: string; description: string; c
     color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200", 
     icon: <Video className="w-4 h-4" /> 
   },
+  CANCELED: { 
+    label: "Canceled", 
+    description: "This split has been canceled",
+    color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", 
+    icon: <AlertCircle className="w-4 h-4" /> 
+  },
+  REFUNDED: { 
+    label: "Refunded", 
+    description: "Payments have been refunded",
+    color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", 
+    icon: <AlertCircle className="w-4 h-4" /> 
+  },
 };
 
 const STATUS_ORDER: SplitStatus[] = ["OPEN_INTEREST", "PAYMENT_OPEN", "LOCKED", "ORDERED", "SHIPPED", "IN_HAND", "BROKEN"];
@@ -135,7 +147,7 @@ function SeatsList({ seats, currentUserId }: { seats: SeatWithUser[]; currentUse
           )}
         </div>
       </div>
-      <Badge size="sm" variant={seat.status === "PAID" ? "default" : "outline"}>
+      <Badge variant={seat.status === "PAID" ? "default" : "outline"}>
         {seat.status === "PAID" && seat.priorityNumber && `#${seat.priorityNumber}`}
         {seat.status !== "PAID" && seat.status}
       </Badge>
@@ -211,10 +223,11 @@ export default function PortfolioBuilderSplitPage() {
   const joinMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/splits/${splitId}/join`),
     onSuccess: (data: any) => {
-      toast({ title: "Success", description: data.message });
+      toast({ title: "Joined!", description: "Now set your team/division preferences" });
       queryClient.invalidateQueries({ queryKey: ["/api/splits", splitId] });
       queryClient.invalidateQueries({ queryKey: ["/api/splits", splitId, "seats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-seats"] });
+      setLocation(`/portfolio-builder/splits/${splitId}/preferences`);
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to join", variant: "destructive" });
@@ -294,7 +307,7 @@ export default function PortfolioBuilderSplitPage() {
             </p>
           </div>
           {statusConfig && (
-            <Badge className={statusConfig.color} size="sm">
+            <Badge className={statusConfig.color}>
               {statusConfig.icon}
               <span className="ml-1">{statusConfig.label}</span>
             </Badge>
@@ -445,7 +458,7 @@ export default function PortfolioBuilderSplitPage() {
                   <div className="p-3 rounded-md bg-muted">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium">Your Seat</span>
-                      <Badge size="sm" variant={mySeat.status === "PAID" ? "default" : "secondary"}>
+                      <Badge variant={mySeat.status === "PAID" ? "default" : "secondary"}>
                         {mySeat.status}
                       </Badge>
                     </div>
@@ -496,20 +509,34 @@ export default function PortfolioBuilderSplitPage() {
           </Card>
 
           {mySeat && !["LOCKED", "ORDERED", "SHIPPED", "IN_HAND", "BROKEN"].includes(split.status) && (
-            <Card>
+            <Card className={!mySeat.preferences || (mySeat.preferences as string[]).length === 0 ? "border-amber-300 dark:border-amber-700" : ""}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <ListOrdered className="w-4 h-4" />
                   Preferences
+                  {(!mySeat.preferences || (mySeat.preferences as string[]).length === 0) && (
+                    <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      Not Set
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Rank your preferred teams/slots. Earlier payers get priority for their preferences.
+                  {split.formatType === "DIVISIONAL" 
+                    ? "Rank your preferred divisions. Earlier payers get priority for their preferences."
+                    : "Rank your preferred teams. Earlier payers get priority for their preferences."}
                 </p>
                 <Link href={`/portfolio-builder/splits/${splitId}/preferences`}>
-                  <Button variant="outline" className="w-full" data-testid="button-set-preferences">
-                    Set Preferences
+                  <Button 
+                    variant={(!mySeat.preferences || (mySeat.preferences as string[]).length === 0) ? "default" : "outline"} 
+                    className="w-full" 
+                    data-testid="button-set-preferences"
+                  >
+                    {(!mySeat.preferences || (mySeat.preferences as string[]).length === 0) 
+                      ? "Set Your Preferences" 
+                      : "Edit Preferences"}
                   </Button>
                 </Link>
               </CardContent>

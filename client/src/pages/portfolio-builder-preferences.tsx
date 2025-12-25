@@ -66,7 +66,7 @@ function SortableItem({ id, index }: { id: string; index: number }) {
       >
         <GripVertical className="w-4 h-4" />
       </button>
-      <Badge variant="outline" size="sm" className="w-6 justify-center">
+      <Badge variant="outline" className="w-6 justify-center text-xs">
         {index + 1}
       </Badge>
       <span className="font-medium">{id}</span>
@@ -213,10 +213,10 @@ export default function PortfolioBuilderPreferencesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Set Your Preferences</CardTitle>
+          <CardTitle>Set Your {splitData.formatType === "DIVISIONAL" ? "Division" : "Team"} Preferences</CardTitle>
           <CardDescription>
-            Drag to reorder your preferred teams/slots. The earlier you pay, the higher priority 
-            you get for your preferences.
+            Drag to reorder your preferred {splitData.formatType === "DIVISIONAL" ? "divisions" : "teams"}. 
+            The earlier you pay, the higher priority you get for your preferences.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
