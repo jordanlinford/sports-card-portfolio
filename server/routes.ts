@@ -31,7 +31,15 @@ import { generatePlayerOGImage, getPlayerShareData } from "./playerShareImageSer
 import { generatePageOGImage, getPageShareData } from "./pageShareImageService";
 import { prestigeService } from "./prestigeService";
 import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./cardOutlookService";
-import { sendPaymentConfirmationEmail } from "./email";
+import { 
+  sendPaymentConfirmationEmail,
+  sendSplitJoinedEmail,
+  sendSplitPaymentOpenEmail,
+  sendSplitAssignmentEmail,
+  sendBreakCompleteEmail,
+  sendSplitShippedEmail,
+  sendNewParticipantJoinedEmail
+} from "./email";
 import { 
   buildPortfolioProfile, 
   generateRiskSignals, 
@@ -5573,14 +5581,83 @@ Allow: /
         preferences: [],
       });
 
-      // Check if we should auto-trigger payment window
+      // Get user info for notifications/emails
+      const user = await storage.getUser(userId);
+      const userName = user?.firstName || user?.handle || "Collector";
+      const userEmail = user?.email;
+      const template = split.template;
+
+      // Create notification for the joiner
+      await storage.createNotification(userId, "split_joined", {
+        splitId,
+        splitTitle: split.title,
+        status: seatStatus,
+      });
+
+      // Send email to joiner
+      if (userEmail && template) {
+        sendSplitJoinedEmail(userEmail, userName, {
+          title: split.title,
+          sport: template.sport,
+          brand: template.brand,
+          year: template.year,
+          formatType: split.formatType,
+          seatPrice: split.seatPrice,
+        });
+      }
+
+      // Notify other participants that someone joined
       const newCounts = await storage.getSeatCounts(splitId);
+      const existingSeats = await storage.getSeatsForSplit(splitId);
+      for (const otherSeat of existingSeats) {
+        if (otherSeat.userId !== userId) {
+          // In-app notification
+          await storage.createNotification(otherSeat.userId, "split_participant_joined", {
+            splitId,
+            splitTitle: split.title,
+            currentCount: newCounts.interested + newCounts.paid,
+            totalCount: split.participantCount,
+          });
+          
+          // Email to other participants
+          const otherUser = await storage.getUser(otherSeat.userId);
+          if (otherUser?.email) {
+            sendNewParticipantJoinedEmail(otherUser.email, otherUser.firstName || otherUser.handle || "Collector", {
+              title: split.title,
+              currentCount: newCounts.interested + newCounts.paid,
+              totalCount: split.participantCount,
+            });
+          }
+        }
+      }
+
+      // Check if we should auto-trigger payment window
       if (split.status === "OPEN_INTEREST" && 
           newCounts.interested >= split.participantCount) {
         // Auto-open payment window with default 24hr window
         const paymentWindowEndsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         await storage.updateSplitStatus(splitId, "PAYMENT_OPEN", { paymentWindowEndsAt });
         console.log(`[Splits] Auto-opened payment window for split ${splitId}`);
+
+        // Notify all participants that payment is open
+        for (const participantSeat of existingSeats) {
+          await storage.createNotification(participantSeat.userId, "split_payment_open", {
+            splitId,
+            splitTitle: split.title,
+            seatPrice: split.seatPrice,
+            deadline: paymentWindowEndsAt.toISOString(),
+          });
+          
+          const participantUser = await storage.getUser(participantSeat.userId);
+          if (participantUser?.email && template) {
+            sendSplitPaymentOpenEmail(participantUser.email, participantUser.firstName || participantUser.handle || "Collector", {
+              title: split.title,
+              sport: template.sport,
+              seatPrice: split.seatPrice,
+              deadline: paymentWindowEndsAt,
+            });
+          }
+        }
       }
 
       res.json({ 
