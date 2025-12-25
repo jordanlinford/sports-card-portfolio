@@ -845,8 +845,23 @@ export default function AdminPortfolioBuilderPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSplitSubmit} className="space-y-4">
+            {/* Show break type from the event */}
+            <div className="p-3 bg-muted/50 border border-border rounded-md">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-muted-foreground">Break Type:</span>
+                <span className="font-medium text-sm">
+                  {isPackBreak ? "By Pack" : 
+                   selectedEventForSplit?.breakType === "DIVISIONAL" ? "By Division" : "By Team"}
+                </span>
+              </div>
+              {isPackBreak && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Number of participants = number of packs in the box
+                </p>
+              )}
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="seatCount">{isPackBreak ? "Number of Packs" : "Number of Seats"}</Label>
+              <Label htmlFor="seatCount">{isPackBreak ? "Packs in Box" : "Number of Seats"}</Label>
               {isPackBreak ? (
                 <Select value={seatCount} onValueChange={(v) => setSeatCount(v)}>
                   <SelectTrigger data-testid="select-pack-count">
