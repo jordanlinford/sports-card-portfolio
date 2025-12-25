@@ -94,7 +94,7 @@ export default function AdminPortfolioBuilderPage() {
   const [showYoutubeDialog, setShowYoutubeDialog] = useState(false);
 
   const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
-    queryKey: ["/api/user/admin"],
+    queryKey: ["/api/admin/check"],
     enabled: !!user,
   });
 
