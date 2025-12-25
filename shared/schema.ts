@@ -1662,6 +1662,10 @@ export const SPLIT_STATUS_TRANSITIONS: Record<SplitStatus, SplitStatus[]> = {
   REFUNDED: [],
 };
 
+// Break types - how the break is organized
+export const BREAK_TYPES = ["TEAM", "DIVISIONAL"] as const;
+export type BreakType = typeof BREAK_TYPES[number];
+
 // Split format types
 export const SPLIT_FORMAT_TYPES = ["DIVISIONAL", "CONFERENCE", "PACK", "TEAM_BUNDLE"] as const;
 export type SplitFormatType = typeof SPLIT_FORMAT_TYPES[number];
@@ -1687,6 +1691,7 @@ export const breakEvents = pgTable("break_events", {
   sport: varchar("sport", { length: 50 }).notNull(),
   year: varchar("year", { length: 10 }).notNull(),
   brand: varchar("brand", { length: 100 }).notNull(),
+  breakType: varchar("break_type", { length: 20 }).default("TEAM").notNull().$type<BreakType>(),
   description: text("description"),
   imageUrl: varchar("image_url", { length: 500 }),
   estimatedBreakWindowStart: timestamp("estimated_break_window_start"),
@@ -1709,6 +1714,7 @@ export const splitInstances = pgTable("split_instances", {
   isEnabled: boolean("is_enabled").default(true).notNull(),
   status: varchar("status", { length: 30 }).default("OPEN_INTEREST").notNull().$type<SplitStatus>(),
   paymentWindowEndsAt: timestamp("payment_window_ends_at"),
+  totalBoxPriceCents: integer("total_box_price_cents").notNull().default(0),
   seatPriceCents: integer("seat_price_cents").notNull(),
   priceCapCents: integer("price_cap_cents").notNull(),
   assignmentPool: jsonb("assignment_pool").$type<string[]>().default([]),
