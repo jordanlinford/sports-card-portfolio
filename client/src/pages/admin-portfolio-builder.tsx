@@ -53,7 +53,7 @@ import {
   Printer,
 } from "lucide-react";
 import type { BreakEvent, SplitInstance, Seat, BreakType, BundleDefinition, SeatWithUser } from "@shared/schema";
-import { BREAKER_FEE_CENTS, SHIPPING_FEE_CENTS, BREAK_TYPES, MAX_SINGLE_TEAM_PARTICIPANTS } from "@shared/schema";
+import { BREAKER_FEE_CENTS, SHIPPING_FEE_CENTS, BREAK_TYPES, MAX_SINGLE_TEAM_PARTICIPANTS, VALID_PACK_COUNTS } from "@shared/schema";
 
 type SplitStatus = "OPEN_INTEREST" | "PAYMENT_OPEN" | "LOCKED" | "ORDERED" | "SHIPPED" | "IN_HAND" | "BROKEN";
 
@@ -105,9 +105,6 @@ export default function AdminPortfolioBuilderPage() {
   const [seatCount, setSeatCount] = useState("4");
   const [bundles, setBundles] = useState<BundleDefinition[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Check if bundle configuration is required (5+ participants)
-  const requiresBundles = parseInt(seatCount) > MAX_SINGLE_TEAM_PARTICIPANTS;
 
   const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -131,6 +128,13 @@ export default function AdminPortfolioBuilderPage() {
 
   // Get break event info for the selected split
   const selectedBreakEvent = events.find(e => e.id === selectedSplit?.breakEventId);
+  
+  // Check if the selected event is a pack break (for split creation dialog)
+  const selectedEventForSplit = selectedEventId ? events.find(e => e.id === selectedEventId) : null;
+  const isPackBreak = selectedEventForSplit?.breakType === "PACK";
+  
+  // Check if bundle configuration is required (5+ participants, but NOT for pack breaks)
+  const requiresBundles = !isPackBreak && parseInt(seatCount) > MAX_SINGLE_TEAM_PARTICIPANTS;
 
   // Generate break sheet text for copying
   const generateBreakSheetText = () => {
@@ -842,23 +846,40 @@ export default function AdminPortfolioBuilderPage() {
           </DialogHeader>
           <form onSubmit={handleSplitSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="seatCount">Number of Seats</Label>
-              <Input
-                id="seatCount"
-                type="number"
-                min="2"
-                max="32"
-                value={seatCount}
-                onChange={(e) => {
-                  const newCount = e.target.value;
-                  setSeatCount(newCount);
-                  initializeBundles(parseInt(newCount) || 0);
-                }}
-                required
-                data-testid="input-split-participants"
-              />
+              <Label htmlFor="seatCount">{isPackBreak ? "Number of Packs" : "Number of Seats"}</Label>
+              {isPackBreak ? (
+                <Select value={seatCount} onValueChange={(v) => setSeatCount(v)}>
+                  <SelectTrigger data-testid="select-pack-count">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VALID_PACK_COUNTS.map((count) => (
+                      <SelectItem key={count} value={count.toString()}>
+                        {count} packs
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  id="seatCount"
+                  type="number"
+                  min="2"
+                  max="32"
+                  value={seatCount}
+                  onChange={(e) => {
+                    const newCount = e.target.value;
+                    setSeatCount(newCount);
+                    initializeBundles(parseInt(newCount) || 0);
+                  }}
+                  required
+                  data-testid="input-split-participants"
+                />
+              )}
               <p className="text-xs text-muted-foreground">
-                How many participants will share this box?
+                {isPackBreak 
+                  ? "Each participant gets 1 random pack from the box" 
+                  : "How many participants will share this box?"}
               </p>
               {requiresBundles && (
                 <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">

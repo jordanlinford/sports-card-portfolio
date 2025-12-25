@@ -1663,18 +1663,20 @@ export const SPLIT_STATUS_TRANSITIONS: Record<SplitStatus, SplitStatus[]> = {
 };
 
 // Break types - how the break is organized
-// PACK is for pack breaks where each participant gets random packs (4 or fewer participants only)
+// PACK is for pack breaks where each participant gets random packs (any number of participants based on pack count)
 export const BREAK_TYPES = ["TEAM", "DIVISIONAL", "PACK"] as const;
 export type BreakType = typeof BREAK_TYPES[number];
 
 // Split format types (selection units)
 // TEAM is only valid for splits with <= 4 participants
 // For 5+ participants, must use DIVISION, CONFERENCE, PACK, or TEAM_BUNDLE
+// PACK format has no participant limit - depends on number of packs in the box
 export const SPLIT_FORMAT_TYPES = ["TEAM", "DIVISIONAL", "CONFERENCE", "PACK", "TEAM_BUNDLE"] as const;
 export type SplitFormatType = typeof SPLIT_FORMAT_TYPES[number];
 
 // Bundle format types - formats that require bundle selection (not individual teams)
-export const BUNDLE_FORMAT_TYPES = ["DIVISIONAL", "CONFERENCE", "PACK", "TEAM_BUNDLE"] as const;
+// Note: PACK is excluded - each participant just gets random packs, no team selection needed
+export const BUNDLE_FORMAT_TYPES = ["DIVISIONAL", "CONFERENCE", "TEAM_BUNDLE"] as const;
 export type BundleFormatType = typeof BUNDLE_FORMAT_TYPES[number];
 
 // Type for bundle definitions - maps bundle name to array of teams
@@ -1686,9 +1688,13 @@ export type BundleDefinition = {
 // Maximum participants allowed for single-team selection
 export const MAX_SINGLE_TEAM_PARTICIPANTS = 4;
 
-// Valid participant counts
+// Valid participant counts for team/divisional breaks
 export const VALID_PARTICIPANT_COUNTS = [2, 3, 4, 6, 8] as const;
 export type ParticipantCount = typeof VALID_PARTICIPANT_COUNTS[number];
+
+// Valid participant counts for pack breaks (based on common pack counts in hobby boxes)
+export const VALID_PACK_COUNTS = [2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 24] as const;
+export type ValidPackCount = typeof VALID_PACK_COUNTS[number];
 
 // Seat status
 export const SEAT_STATUSES = ["INTERESTED", "WAITLIST", "PAID", "REFUNDED", "CANCELED"] as const;
@@ -1839,9 +1845,10 @@ export function validateFormatTypeForParticipants(
   if (formatType === "TEAM" && participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
     return `Single-team selection is not allowed for splits with more than ${MAX_SINGLE_TEAM_PARTICIPANTS} participants. Use DIVISIONAL, CONFERENCE, PACK, or TEAM_BUNDLE instead.`;
   }
-  // PACK format is only allowed for 4 or fewer participants
-  if (formatType === "PACK" && participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
-    return `Pack breaks are only allowed for ${MAX_SINGLE_TEAM_PARTICIPANTS} or fewer participants.`;
+  // PACK format has no participant limit - depends on pack count in the box
+  // Validate that participant count is within valid pack counts
+  if (formatType === "PACK" && !(VALID_PACK_COUNTS as readonly number[]).includes(participantCount)) {
+    return `Pack breaks must have a valid pack count: ${VALID_PACK_COUNTS.join(", ")}.`;
   }
   return null;
 }
