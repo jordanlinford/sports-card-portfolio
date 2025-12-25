@@ -6024,7 +6024,61 @@ Allow: /
         additionalData.paymentWindowEndsAt = new Date(Date.now() + paymentWindowHours * 60 * 60 * 1000);
       }
 
+      // Get split before update for template info
+      const existingSplit = await storage.getSplitInstance(id);
+      
       const split = await storage.updateSplitStatus(id, status as SplitStatus, additionalData);
+      
+      // Send notifications for key status changes
+      if (existingSplit && (status === "BROKEN" || status === "SHIPPED")) {
+        const paidSeats = await storage.getPaidSeatsForSplit(id);
+        const template = existingSplit.template;
+        
+        for (const seat of paidSeats) {
+          const seatUser = await storage.getUser(seat.userId);
+          const assignment = seat.assignment || "Your cards";
+          
+          if (status === "BROKEN" && youtubeUrl) {
+            // Break complete notification
+            await storage.createNotification(seat.userId, "split_break_complete", {
+              splitId: id,
+              splitTitle: existingSplit.title,
+              assignment,
+              youtubeUrl,
+            });
+            
+            if (seatUser?.email && template) {
+              sendBreakCompleteEmail(
+                seatUser.email,
+                seatUser.firstName || seatUser.handle || "Collector",
+                { title: existingSplit.title, sport: template.sport },
+                assignment,
+                youtubeUrl
+              );
+            }
+          } else if (status === "SHIPPED") {
+            // Shipped notification
+            const trackingInfo = orderMeta?.tracking?.[seat.userId] || orderMeta?.tracking || null;
+            await storage.createNotification(seat.userId, "split_shipped", {
+              splitId: id,
+              splitTitle: existingSplit.title,
+              assignment,
+              trackingInfo,
+            });
+            
+            if (seatUser?.email && template) {
+              sendSplitShippedEmail(
+                seatUser.email,
+                seatUser.firstName || seatUser.handle || "Collector",
+                { title: existingSplit.title, sport: template.sport },
+                assignment,
+                trackingInfo
+              );
+            }
+          }
+        }
+      }
+      
       res.json(split);
     } catch (error: any) {
       console.error("[Admin Splits] Error updating status:", error);
@@ -6051,7 +6105,34 @@ Allow: /
       const { paymentWindowHours = 24 } = req.body;
       const paymentWindowEndsAt = new Date(Date.now() + paymentWindowHours * 60 * 60 * 1000);
 
+      const existingSplit = await storage.getSplitInstance(id);
       const split = await storage.updateSplitStatus(id, "PAYMENT_OPEN", { paymentWindowEndsAt });
+      
+      // Notify all participants that payment window is open
+      if (existingSplit) {
+        const allSeats = await storage.getSeatsForSplit(id);
+        const template = existingSplit.template;
+        
+        for (const seat of allSeats.filter(s => s.status === "INTERESTED")) {
+          await storage.createNotification(seat.userId, "split_payment_open", {
+            splitId: id,
+            splitTitle: existingSplit.title,
+            seatPrice: existingSplit.seatPrice,
+            deadline: paymentWindowEndsAt.toISOString(),
+          });
+          
+          const seatUser = await storage.getUser(seat.userId);
+          if (seatUser?.email && template) {
+            sendSplitPaymentOpenEmail(seatUser.email, seatUser.firstName || seatUser.handle || "Collector", {
+              title: existingSplit.title,
+              sport: template.sport,
+              seatPrice: existingSplit.seatPrice,
+              deadline: paymentWindowEndsAt,
+            });
+          }
+        }
+      }
+      
       res.json(split);
     } catch (error: any) {
       console.error("[Admin Splits] Error opening payment:", error);
@@ -6140,6 +6221,30 @@ Allow: /
       
       // Fetch the updated seats
       const updatedSeats = await storage.getSeatsForSplit(id);
+      
+      // Notify all paid participants of their assignment
+      const template = split.template;
+      for (const seat of updatedSeats.filter(s => s.status === "PAID")) {
+        // In-app notification
+        await storage.createNotification(seat.userId, "split_assignment", {
+          splitId: id,
+          splitTitle: split.title,
+          assignment: seat.assignment,
+          priorityNumber: seat.priorityNumber,
+        });
+        
+        // Email
+        const seatUser = await storage.getUser(seat.userId);
+        if (seatUser?.email && template && seat.assignment && seat.priorityNumber) {
+          sendSplitAssignmentEmail(
+            seatUser.email,
+            seatUser.firstName || seatUser.handle || "Collector",
+            { title: split.title, sport: template.sport },
+            seat.assignment,
+            seat.priorityNumber
+          );
+        }
+      }
 
       res.json({ 
         success: true,
