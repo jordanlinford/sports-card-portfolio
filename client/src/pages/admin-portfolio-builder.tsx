@@ -356,12 +356,18 @@ export default function AdminPortfolioBuilderPage() {
     const seatPriceCents = Math.ceil(totalCents / participantCount);
     const selectedEvent = selectedEventId ? getEventById(selectedEventId) : null;
     
+    // Determine formatType based on breakType and participant count
     // For 5+ participants, TEAM format is not allowed - must use bundles
     let formatType: string;
-    if (participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
-      formatType = selectedEvent?.breakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM_BUNDLE";
+    const eventBreakType = selectedEvent?.breakType || "TEAM";
+    
+    if (eventBreakType === "PACK") {
+      // PACK breaks are only valid for 4 or fewer participants
+      formatType = "PACK";
+    } else if (participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
+      formatType = eventBreakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM_BUNDLE";
     } else {
-      formatType = selectedEvent?.breakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM";
+      formatType = eventBreakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM";
     }
 
     createSplitMutation.mutate({
@@ -711,10 +717,13 @@ export default function AdminPortfolioBuilderPage() {
                 <SelectContent>
                   <SelectItem value="TEAM">Team Break</SelectItem>
                   <SelectItem value="DIVISIONAL">Divisional Break</SelectItem>
+                  <SelectItem value="PACK">Pack Break (4 or fewer)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {breakType === "TEAM" ? "Participants pick individual teams" : "Participants pick divisions (groups of teams)"}
+                {breakType === "TEAM" ? "Participants pick individual teams" : 
+                 breakType === "PACK" ? "Each participant gets random packs (4 or fewer participants)" :
+                 "Participants pick divisions (groups of teams)"}
               </p>
             </div>
             <div className="space-y-2">

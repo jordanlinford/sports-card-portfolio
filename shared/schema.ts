@@ -1663,7 +1663,8 @@ export const SPLIT_STATUS_TRANSITIONS: Record<SplitStatus, SplitStatus[]> = {
 };
 
 // Break types - how the break is organized
-export const BREAK_TYPES = ["TEAM", "DIVISIONAL"] as const;
+// PACK is for pack breaks where each participant gets random packs (4 or fewer participants only)
+export const BREAK_TYPES = ["TEAM", "DIVISIONAL", "PACK"] as const;
 export type BreakType = typeof BREAK_TYPES[number];
 
 // Split format types (selection units)
@@ -1837,6 +1838,10 @@ export function validateFormatTypeForParticipants(
   // Single-team selection (TEAM format) is only allowed for 4 or fewer participants
   if (formatType === "TEAM" && participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
     return `Single-team selection is not allowed for splits with more than ${MAX_SINGLE_TEAM_PARTICIPANTS} participants. Use DIVISIONAL, CONFERENCE, PACK, or TEAM_BUNDLE instead.`;
+  }
+  // PACK format is only allowed for 4 or fewer participants
+  if (formatType === "PACK" && participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
+    return `Pack breaks are only allowed for ${MAX_SINGLE_TEAM_PARTICIPANTS} or fewer participants.`;
   }
   return null;
 }
