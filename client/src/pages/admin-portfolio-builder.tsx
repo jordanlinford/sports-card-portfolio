@@ -49,8 +49,8 @@ import {
   Upload,
   Image as ImageIcon,
 } from "lucide-react";
-import type { BreakEvent, SplitInstance, Seat, BreakType } from "@shared/schema";
-import { BREAKER_FEE_CENTS, SHIPPING_FEE_CENTS, BREAK_TYPES } from "@shared/schema";
+import type { BreakEvent, SplitInstance, Seat, BreakType, BundleDefinition } from "@shared/schema";
+import { BREAKER_FEE_CENTS, SHIPPING_FEE_CENTS, BREAK_TYPES, MAX_SINGLE_TEAM_PARTICIPANTS } from "@shared/schema";
 
 type SplitStatus = "OPEN_INTEREST" | "PAYMENT_OPEN" | "LOCKED" | "ORDERED" | "SHIPPED" | "IN_HAND" | "BROKEN";
 
@@ -99,7 +99,11 @@ export default function AdminPortfolioBuilderPage() {
   const [breakType, setBreakType] = useState<BreakType>("TEAM");
   const [totalBoxPrice, setTotalBoxPrice] = useState("");
   const [seatCount, setSeatCount] = useState("4");
+  const [bundles, setBundles] = useState<BundleDefinition[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Check if bundle configuration is required (5+ participants)
+  const requiresBundles = parseInt(seatCount) > MAX_SINGLE_TEAM_PARTICIPANTS;
 
   const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -315,7 +319,14 @@ export default function AdminPortfolioBuilderPage() {
     const totalCents = Math.round(parseFloat(totalBoxPrice || "0") * 100);
     const seatPriceCents = Math.ceil(totalCents / participantCount);
     const selectedEvent = selectedEventId ? getEventById(selectedEventId) : null;
-    const formatType = selectedEvent?.breakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM_BUNDLE";
+    
+    // For 5+ participants, TEAM format is not allowed - must use bundles
+    let formatType: string;
+    if (participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
+      formatType = selectedEvent?.breakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM_BUNDLE";
+    } else {
+      formatType = selectedEvent?.breakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM";
+    }
 
     createSplitMutation.mutate({
       breakEventId: selectedEventId,
@@ -324,6 +335,32 @@ export default function AdminPortfolioBuilderPage() {
       seatPriceCents,
       totalBoxPriceCents: totalCents,
       formatType,
+      bundles: formatType === "TEAM_BUNDLE" ? bundles : [],
+    });
+  };
+  
+  // Initialize default bundles when seat count changes and requires bundles
+  const initializeBundles = (count: number) => {
+    if (count > MAX_SINGLE_TEAM_PARTICIPANTS) {
+      const newBundles: BundleDefinition[] = [];
+      for (let i = 0; i < count; i++) {
+        newBundles.push({
+          name: `Bundle ${String.fromCharCode(65 + i)}`,
+          teams: [],
+        });
+      }
+      setBundles(newBundles);
+    } else {
+      setBundles([]);
+    }
+  };
+  
+  const updateBundleTeams = (index: number, teamsText: string) => {
+    const teams = teamsText.split(",").map(t => t.trim()).filter(t => t);
+    setBundles(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], teams };
+      return updated;
     });
   };
 
@@ -733,6 +770,7 @@ export default function AdminPortfolioBuilderPage() {
           setSelectedEventId(null);
           setTotalBoxPrice("");
           setSeatCount("4");
+          setBundles([]);
         }
       }}>
         <DialogContent>
@@ -751,13 +789,28 @@ export default function AdminPortfolioBuilderPage() {
                 min="2"
                 max="32"
                 value={seatCount}
-                onChange={(e) => setSeatCount(e.target.value)}
+                onChange={(e) => {
+                  const newCount = e.target.value;
+                  setSeatCount(newCount);
+                  initializeBundles(parseInt(newCount) || 0);
+                }}
                 required
                 data-testid="input-split-participants"
               />
               <p className="text-xs text-muted-foreground">
                 How many participants will share this box?
               </p>
+              {requiresBundles && (
+                <div className="mt-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+                  <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="font-medium">Team bundles required</span>
+                  </div>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    Splits with {MAX_SINGLE_TEAM_PARTICIPANTS + 1}+ participants use team bundles instead of single-team selection to ensure fair exposure.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="totalBoxPrice">Total Box Price ($)</Label>
@@ -799,6 +852,36 @@ export default function AdminPortfolioBuilderPage() {
                     <span>Total per seat:</span>
                     <span>${(calculatePerSeatPrice().totalPerSeat / 100).toFixed(2)}</span>
                   </div>
+                </div>
+              </div>
+            )}
+            {requiresBundles && bundles.length > 0 && (
+              <div className="space-y-3">
+                <Label>Bundle Configuration</Label>
+                <p className="text-xs text-muted-foreground">
+                  Define which teams are included in each bundle. Participants will rank bundles, not individual teams.
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {bundles.map((bundle, index) => (
+                    <div key={index} className="p-3 bg-muted/30 border border-border rounded-md space-y-2">
+                      <div className="font-medium text-sm">{bundle.name}</div>
+                      <Input
+                        placeholder="Enter teams separated by commas (e.g., Patriots, Chiefs, Cowboys)"
+                        defaultValue={bundle.teams.join(", ")}
+                        onBlur={(e) => updateBundleTeams(index, e.target.value)}
+                        data-testid={`input-bundle-${index}-teams`}
+                      />
+                      {bundle.teams.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {bundle.teams.map((team, ti) => (
+                            <Badge key={ti} variant="secondary" className="text-xs">
+                              {team}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
