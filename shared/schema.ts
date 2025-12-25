@@ -1674,6 +1674,9 @@ export type ParticipantCount = typeof VALID_PARTICIPANT_COUNTS[number];
 export const SEAT_STATUSES = ["INTERESTED", "WAITLIST", "PAID", "REFUNDED", "CANCELED"] as const;
 export type SeatStatus = typeof SEAT_STATUSES[number];
 
+// Breaker fee constant - $50 per break
+export const BREAKER_FEE_CENTS = 5000;
+
 // Break Event - a product listing (e.g., "2024 Panini Prizm Football Hobby Box")
 export const breakEvents = pgTable("break_events", {
   id: serial("id").primaryKey(),
@@ -1682,6 +1685,7 @@ export const breakEvents = pgTable("break_events", {
   year: varchar("year", { length: 10 }).notNull(),
   brand: varchar("brand", { length: 100 }).notNull(),
   description: text("description"),
+  imageUrl: varchar("image_url", { length: 500 }),
   estimatedBreakWindowStart: timestamp("estimated_break_window_start"),
   estimatedBreakWindowEnd: timestamp("estimated_break_window_end"),
   isActive: boolean("is_active").default(true).notNull(),
