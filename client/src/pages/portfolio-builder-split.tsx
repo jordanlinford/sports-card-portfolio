@@ -217,7 +217,7 @@ export default function PortfolioBuilderSplitPage() {
   });
 
   const { data: currentUser } = useQuery<any>({
-    queryKey: ["/api/auth/me"],
+    queryKey: ["/api/auth/user"],
   });
 
   const joinMutation = useMutation({
@@ -433,7 +433,11 @@ export default function PortfolioBuilderSplitPage() {
               {!currentUserId ? (
                 <div className="text-center py-4">
                   <p className="text-muted-foreground mb-4">Sign in to join this split</p>
-                  <Button className="w-full" data-testid="button-signin-to-join">
+                  <Button 
+                    className="w-full" 
+                    onClick={() => window.location.href = "/api/login"}
+                    data-testid="button-signin-to-join"
+                  >
                     Sign In
                   </Button>
                 </div>
