@@ -191,12 +191,11 @@ export default function PortfolioBuilderPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+      <div className="mb-6 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold" data-testid="text-page-title">Portfolio Builder</h1>
           <p className="text-muted-foreground mt-2">
-            Join box break splits to build your collection at a fraction of the cost. 
-            Share the excitement and cards with other collectors.
+            Split hobby boxes with other collectors. No pressure, no bidding wars.
           </p>
         </div>
         {adminCheck?.isAdmin && (
@@ -208,6 +207,44 @@ export default function PortfolioBuilderPage() {
           </Link>
         )}
       </div>
+
+      <Card className="mb-8">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">How It Works</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">1</div>
+              <div>
+                <p className="font-medium">Browse Boxes</p>
+                <p className="text-muted-foreground">Find a hobby box you want to split with others.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">2</div>
+              <div>
+                <p className="font-medium">Join a Split</p>
+                <p className="text-muted-foreground">Pick your preferred teams or divisions and reserve your spot.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">3</div>
+              <div>
+                <p className="font-medium">Pay When Ready</p>
+                <p className="text-muted-foreground">Only pay when enough collectors join. No risk.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">4</div>
+              <div>
+                <p className="font-medium">Watch & Receive</p>
+                <p className="text-muted-foreground">Watch the break live on YouTube, then get your cards shipped.</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {mySeats && mySeats.length > 0 && (
         <Card className="mb-8 border-primary/20 bg-primary/5">
