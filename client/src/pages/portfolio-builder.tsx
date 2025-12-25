@@ -186,7 +186,7 @@ export default function PortfolioBuilderPage() {
   });
 
   const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
-    queryKey: ["/api/user/admin"],
+    queryKey: ["/api/admin/check"],
   });
 
   return (
