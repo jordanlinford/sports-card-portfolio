@@ -1,0 +1,190 @@
+You make it the rule by encoding it in three places simultaneously: configuration, backend validation, and UI language. If it lives in only one of those, it will eventually get broken. If it lives in all three, it becomes unbreakable.
+
+Below is the clean, final way to lock this in.
+
+1. Configuration-level enforcement (the most important)
+
+This is where the rule actually lives.
+
+SplitInstance must declare its “selection unit”
+
+Every split has an explicit selection_unit, not an implied one.
+
+Allowed values:
+
+DIVISION
+
+CONFERENCE
+
+PACK
+
+TEAM_BUNDLE
+
+Never allow TEAM as a selection unit.
+
+For a 6-person split:
+
+participant_count = 6
+
+selection_unit = TEAM_BUNDLE
+
+assignment_pool = [bundle_1, bundle_2, … bundle_6]
+
+Each bundle is predefined and immutable once the split is created.
+
+Backend invariant:
+
+If participant_count >= 5, selection_unit cannot be TEAM
+
+If participant_count == 6, selection_unit must be DIVISION or TEAM_BUNDLE
+
+If someone tries to create a 6-person split with single teams:
+
+Reject at creation time
+
+No override
+
+This prevents accidental or “just this once” exceptions.
+
+2. Backend validation (enforce at runtime)
+
+You must validate this at two moments.
+
+A) When creating a split
+
+Backend rule:
+
+If participant_count > 4 and selection_unit == TEAM, throw an error
+
+If selection_unit == TEAM_BUNDLE, enforce:
+
+assignment_pool.length == participant_count
+
+Each pool entry represents multiple teams
+
+The backend does not trust the admin UI.
+
+B) During assignment execution
+
+Assignment engine must only operate on the declared unit.
+
+For a 6-person split:
+
+The engine assigns one bundle per seat
+
+It never loops over individual teams
+
+There is no code path that allows “next pick gets another team”
+
+This guarantees:
+
+First payer gets one bundle
+
+Everyone gets exactly one bundle
+
+No one gets extra turns
+
+If the assignment engine only understands bundles, the rule cannot be violated later.
+
+3. UI constraints (prevent user confusion)
+
+The UI should never present illegal options.
+
+What users see in a 6-person split
+
+They rank “Bundle A, Bundle B, Bundle C…”
+
+Each bundle clearly shows:
+
+“Includes: Team X, Team Y, Team Z”
+
+No UI exists to select individual teams
+
+What users never see
+
+Individual team pickers
+
+“Choose your team”
+
+Any language implying single-team ownership
+
+If users never see the option, they won’t expect it.
+
+4. Language and copy (sets expectations)
+
+This is subtle but critical.
+
+Everywhere you describe the split, say:
+
+“Participants receive a bundle of teams rather than a single team to ensure balanced exposure.”
+
+Never say:
+
+“Team selection”
+
+“Pick your team”
+
+“Draft teams”
+
+Words enforce behavior as much as code.
+
+5. Admin tooling guardrails
+
+In the admin UI:
+
+For participant_count >= 5, disable:
+
+single-team selection
+
+Force the admin to:
+
+choose DIVISION or TEAM_BUNDLE
+
+define bundles explicitly
+
+Add a warning label in admin UI:
+
+“Team bundles required for 6+ participants. Single-team ownership is not supported.”
+
+This prevents future-you from accidentally breaking the rule.
+
+6. Documentation-level lock (final layer)
+
+Write this once and never change it:
+
+Portfolio Builder rule
+
+Single-team ownership is not supported in splits larger than four participants. Larger splits use divisions or predefined team bundles to ensure fair exposure.
+
+If a user ever complains, you point to this.
+
+The acid test (if this passes, the rule is locked)
+
+Ask yourself:
+
+Can an admin accidentally create a 6-person single-team split? → No
+
+Can the backend assign more than one bundle to a user? → No
+
+Can a user think they’re getting one team? → No
+
+Can “first paid” ever grab multiple teams? → No
+
+If all four are “No,” the rule is enforced.
+
+Final answer (plain)
+
+You don’t rely on policy or discipline.
+You make the system incapable of breaking the rule.
+
+By:
+
+forbidding TEAM as a selection unit above 4
+
+only assigning bundles at 6
+
+never exposing single-team UI
+
+validating on creation and assignment
+
+Once you do that, the rule becomes permanent.
