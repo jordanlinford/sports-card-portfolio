@@ -274,11 +274,17 @@ export default function PortfolioBuilderSplitPage() {
   const joinMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/splits/${splitId}/join`),
     onSuccess: (data: any) => {
-      toast({ title: "Joined!", description: "Now set your team/division preferences" });
       queryClient.invalidateQueries({ queryKey: ["/api/splits", splitId] });
       queryClient.invalidateQueries({ queryKey: ["/api/splits", splitId, "seats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-seats"] });
-      setLocation(`/portfolio-builder/splits/${splitId}/preferences`);
+      
+      // Pack breaks don't need preferences - packs are assigned randomly
+      if (split?.formatType === "PACK") {
+        toast({ title: "Joined!", description: "You've joined this pack break. Pay to confirm your spot!" });
+      } else {
+        toast({ title: "Joined!", description: "Now set your team/division preferences" });
+        setLocation(`/portfolio-builder/splits/${splitId}/preferences`);
+      }
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to join", variant: "destructive" });
