@@ -5639,8 +5639,8 @@ Allow: /
         await storage.updateSplitStatus(splitId, "PAYMENT_OPEN", { paymentWindowEndsAt });
         console.log(`[Splits] Auto-opened payment window for split ${splitId}`);
 
-        // Notify all participants that payment is open
-        for (const participantSeat of existingSeats) {
+        // Notify INTERESTED participants that payment is open (not waitlist)
+        for (const participantSeat of existingSeats.filter(s => s.status === "INTERESTED")) {
           await storage.createNotification(participantSeat.userId, "split_payment_open", {
             splitId,
             splitTitle: split.title,
@@ -6031,10 +6031,13 @@ Allow: /
       
       // Send notifications for key status changes
       if (existingSplit && (status === "BROKEN" || status === "SHIPPED")) {
-        const paidSeats = await storage.getPaidSeatsForSplit(id);
+        // Use getSeatsForSplit with assignment filter to include all assigned participants
+        // (not getPaidSeatsForSplit since seat status may have already advanced)
+        const allSeats = await storage.getSeatsForSplit(id);
+        const assignedSeats = allSeats.filter(s => s.assignment); // Only notify seats with assignments
         const template = existingSplit.template;
         
-        for (const seat of paidSeats) {
+        for (const seat of assignedSeats) {
           const seatUser = await storage.getUser(seat.userId);
           const assignment = seat.assignment || "Your cards";
           
