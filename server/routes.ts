@@ -5701,7 +5701,9 @@ Allow: /
 
       const breakEvent = split.breakEvent;
       const productName = `${breakEvent.year} ${breakEvent.brand} ${breakEvent.sport} - ${split.formatType} Split`;
-      const totalPriceCents = split.seatPriceCents + BREAKER_FEE_CENTS;
+      // Split the $50 breaker fee equally among all participants
+      const feePerSeatCents = Math.ceil(BREAKER_FEE_CENTS / split.participantCount);
+      const totalPriceCents = split.seatPriceCents + feePerSeatCents;
       
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
@@ -5711,7 +5713,7 @@ Allow: /
               currency: "usd",
               product_data: {
                 name: productName,
-                description: `Seat in ${split.formatType} split for ${breakEvent.title} (includes $${(BREAKER_FEE_CENTS / 100).toFixed(0)} breaker fee)`,
+                description: `Seat in ${split.formatType} split for ${breakEvent.title} (includes $${(feePerSeatCents / 100).toFixed(2)} breaker fee)`,
               },
               unit_amount: totalPriceCents,
             },

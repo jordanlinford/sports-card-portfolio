@@ -40,7 +40,9 @@ function formatPrice(cents: number): string {
 
 function SplitCard({ split, breakEvent }: { split: SplitInstance; breakEvent: BreakEventWithSplits }) {
   const statusConfig = STATUS_CONFIG[split.status as SplitStatus] || STATUS_CONFIG.OPEN_INTEREST;
-  const totalPriceCents = split.seatPriceCents + BREAKER_FEE_CENTS;
+  // Split the $50 breaker fee equally among all participants
+  const feePerSeatCents = Math.ceil(BREAKER_FEE_CENTS / split.participantCount);
+  const totalPriceCents = split.seatPriceCents + feePerSeatCents;
 
   return (
     <Card className="overflow-visible hover-elevate" data-testid={`card-split-${split.id}`}>
@@ -66,7 +68,7 @@ function SplitCard({ split, breakEvent }: { split: SplitInstance; breakEvent: Br
               {formatPrice(totalPriceCents)}
             </div>
             <div className="text-xs text-muted-foreground">
-              {formatPrice(split.seatPriceCents)} + $50 fee
+              {formatPrice(split.seatPriceCents)} + {formatPrice(feePerSeatCents)} fee
             </div>
           </div>
         </div>
@@ -134,10 +136,10 @@ function BreakEventCard({ event }: { event: BreakEventWithSplits }) {
         <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
           <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm">
             <DollarSign className="w-4 h-4" />
-            <span className="font-medium">$50 Breaker Fee included in all prices</span>
+            <span className="font-medium">$50 Breaker Fee split among participants</span>
           </div>
           <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-            Covers break hosting, shipping, and handling for your cards.
+            Fee is divided equally - covers break hosting, shipping, and handling.
           </p>
         </div>
         
