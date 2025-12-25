@@ -13,6 +13,7 @@ import {
   insertSplitInstanceSchema,
   insertSeatSchema,
   SPLIT_STATUSES,
+  BREAKER_FEE_CENTS,
   type SplitStatus,
 } from "@shared/schema";
 import { runMigrations } from "stripe-replit-sync";
@@ -5700,6 +5701,7 @@ Allow: /
 
       const breakEvent = split.breakEvent;
       const productName = `${breakEvent.year} ${breakEvent.brand} ${breakEvent.sport} - ${split.formatType} Split`;
+      const totalPriceCents = split.seatPriceCents + BREAKER_FEE_CENTS;
       
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
@@ -5709,9 +5711,9 @@ Allow: /
               currency: "usd",
               product_data: {
                 name: productName,
-                description: `Seat in ${split.formatType} split for ${breakEvent.title}`,
+                description: `Seat in ${split.formatType} split for ${breakEvent.title} (includes $${(BREAKER_FEE_CENTS / 100).toFixed(0)} breaker fee)`,
               },
-              unit_amount: split.seatPriceCents,
+              unit_amount: totalPriceCents,
             },
             quantity: 1,
           },

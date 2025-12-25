@@ -48,6 +48,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { BreakEvent, SplitInstance, Seat } from "@shared/schema";
+import { BREAKER_FEE_CENTS } from "@shared/schema";
 
 type SplitStatus = "OPEN_INTEREST" | "PAYMENT_OPEN" | "LOCKED" | "ORDERED" | "SHIPPED" | "IN_HAND" | "BROKEN";
 
@@ -250,6 +251,7 @@ export default function AdminPortfolioBuilderPage() {
       sport: formData.get("sport") as string,
       brand: formData.get("brand") as string,
       year: formData.get("year") as string,
+      imageUrl: formData.get("imageUrl") as string || null,
       isActive: formData.get("isActive") === "true",
     };
 
@@ -553,6 +555,19 @@ export default function AdminPortfolioBuilderPage() {
                 data-testid="input-event-description"
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="imageUrl">Box Image URL</Label>
+              <Input
+                id="imageUrl"
+                name="imageUrl"
+                defaultValue={editingEvent?.imageUrl || ""}
+                placeholder="https://example.com/box-image.jpg"
+                data-testid="input-event-image"
+              />
+              <p className="text-xs text-muted-foreground">
+                Paste a URL to an image of the hobby box
+              </p>
+            </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="year">Year</Label>
@@ -633,7 +648,7 @@ export default function AdminPortfolioBuilderPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="seatPriceCents">Price Per Seat (cents)</Label>
+              <Label htmlFor="seatPriceCents">Base Price Per Seat (cents)</Label>
               <Input
                 id="seatPriceCents"
                 name="seatPriceCents"
@@ -643,7 +658,16 @@ export default function AdminPortfolioBuilderPage() {
                 required
                 data-testid="input-split-price"
               />
-              <p className="text-xs text-muted-foreground">5000 = $50.00</p>
+              <p className="text-xs text-muted-foreground">5000 = $50.00 (box cost share)</p>
+            </div>
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                <DollarSign className="h-4 w-4" />
+                <span className="font-medium">+ ${(BREAKER_FEE_CENTS / 100).toFixed(2)} Breaker Fee</span>
+              </div>
+              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                A $50 breaker fee is added to every seat to cover break hosting, shipping, and handling.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="paymentWindowHours">Payment Window (hours)</Label>

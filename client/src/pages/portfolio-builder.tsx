@@ -19,6 +19,8 @@ import {
   Settings,
 } from "lucide-react";
 import type { BreakEventWithSplits, SplitInstance, SplitStatus } from "@shared/schema";
+import { BREAKER_FEE_CENTS } from "@shared/schema";
+import { AlertCircle, XCircle } from "lucide-react";
 
 const STATUS_CONFIG: Record<SplitStatus, { label: string; color: string; icon: React.ReactNode }> = {
   OPEN_INTEREST: { label: "Open", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200", icon: <Users className="w-3 h-3" /> },
@@ -28,6 +30,8 @@ const STATUS_CONFIG: Record<SplitStatus, { label: string; color: string; icon: R
   SHIPPED: { label: "Shipped", color: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", icon: <Truck className="w-3 h-3" /> },
   IN_HAND: { label: "In Hand", color: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200", icon: <CheckCircle className="w-3 h-3" /> },
   BROKEN: { label: "Complete", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200", icon: <Video className="w-3 h-3" /> },
+  CANCELED: { label: "Canceled", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200", icon: <XCircle className="w-3 h-3" /> },
+  REFUNDED: { label: "Refunded", color: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400", icon: <AlertCircle className="w-3 h-3" /> },
 };
 
 function formatPrice(cents: number): string {
@@ -36,16 +40,17 @@ function formatPrice(cents: number): string {
 
 function SplitCard({ split, breakEvent }: { split: SplitInstance; breakEvent: BreakEventWithSplits }) {
   const statusConfig = STATUS_CONFIG[split.status as SplitStatus] || STATUS_CONFIG.OPEN_INTEREST;
+  const totalPriceCents = split.seatPriceCents + BREAKER_FEE_CENTS;
 
   return (
     <Card className="overflow-visible hover-elevate" data-testid={`card-split-${split.id}`}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <Badge size="sm" variant="secondary" className={statusConfig.color}>
+          <Badge variant="secondary" className={statusConfig.color}>
             {statusConfig.icon}
             <span className="ml-1">{statusConfig.label}</span>
           </Badge>
-          <Badge size="sm" variant="outline">
+          <Badge variant="outline">
             {split.formatType}
           </Badge>
         </div>
@@ -56,8 +61,13 @@ function SplitCard({ split, breakEvent }: { split: SplitInstance; breakEvent: Br
             <Users className="w-4 h-4" />
             <span>{split.participantCount} spots</span>
           </div>
-          <div className="font-semibold text-lg">
-            {formatPrice(split.seatPriceCents)}
+          <div className="text-right">
+            <div className="font-semibold text-lg">
+              {formatPrice(totalPriceCents)}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {formatPrice(split.seatPriceCents)} + $50 fee
+            </div>
           </div>
         </div>
         {split.status === "PAYMENT_OPEN" && split.paymentWindowEndsAt && (
@@ -89,23 +99,47 @@ function BreakEventCard({ event }: { event: BreakEventWithSplits }) {
   return (
     <Card className="overflow-visible" data-testid={`card-break-event-${event.id}`}>
       <CardHeader>
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <CardTitle className="text-xl">{event.title}</CardTitle>
-            <CardDescription className="mt-1">
-              {event.year} {event.brand} {event.sport}
-            </CardDescription>
+        <div className="flex items-start gap-4">
+          {event.imageUrl && (
+            <div className="flex-shrink-0">
+              <img 
+                src={event.imageUrl} 
+                alt={event.title}
+                className="w-24 h-24 object-cover rounded-md border border-border"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+          <div className="flex-1 flex items-start justify-between gap-2 flex-wrap">
+            <div>
+              <CardTitle className="text-xl">{event.title}</CardTitle>
+              <CardDescription className="mt-1">
+                {event.year} {event.brand} {event.sport}
+              </CardDescription>
+            </div>
+            <Badge variant="secondary">
+              <Layers className="w-3 h-3 mr-1" />
+              {activeSplits.length} splits
+            </Badge>
           </div>
-          <Badge variant="secondary" size="sm">
-            <Layers className="w-3 h-3 mr-1" />
-            {activeSplits.length} splits
-          </Badge>
         </div>
       </CardHeader>
       <CardContent>
         {event.description && (
           <p className="text-sm text-muted-foreground mb-4">{event.description}</p>
         )}
+
+        <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm">
+            <DollarSign className="w-4 h-4" />
+            <span className="font-medium">$50 Breaker Fee included in all prices</span>
+          </div>
+          <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+            Covers break hosting, shipping, and handling for your cards.
+          </p>
+        </div>
         
         {activeSplits.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
