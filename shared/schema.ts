@@ -1666,9 +1666,24 @@ export const SPLIT_STATUS_TRANSITIONS: Record<SplitStatus, SplitStatus[]> = {
 export const BREAK_TYPES = ["TEAM", "DIVISIONAL"] as const;
 export type BreakType = typeof BREAK_TYPES[number];
 
-// Split format types
-export const SPLIT_FORMAT_TYPES = ["DIVISIONAL", "CONFERENCE", "PACK", "TEAM_BUNDLE"] as const;
+// Split format types (selection units)
+// TEAM is only valid for splits with <= 4 participants
+// For 5+ participants, must use DIVISION, CONFERENCE, PACK, or TEAM_BUNDLE
+export const SPLIT_FORMAT_TYPES = ["TEAM", "DIVISIONAL", "CONFERENCE", "PACK", "TEAM_BUNDLE"] as const;
 export type SplitFormatType = typeof SPLIT_FORMAT_TYPES[number];
+
+// Bundle format types - formats that require bundle selection (not individual teams)
+export const BUNDLE_FORMAT_TYPES = ["DIVISIONAL", "CONFERENCE", "PACK", "TEAM_BUNDLE"] as const;
+export type BundleFormatType = typeof BUNDLE_FORMAT_TYPES[number];
+
+// Type for bundle definitions - maps bundle name to array of teams
+export type BundleDefinition = {
+  name: string;
+  teams: string[];
+};
+
+// Maximum participants allowed for single-team selection
+export const MAX_SINGLE_TEAM_PARTICIPANTS = 4;
 
 // Valid participant counts
 export const VALID_PARTICIPANT_COUNTS = [2, 3, 4, 6, 8] as const;
@@ -1711,6 +1726,8 @@ export const splitInstances = pgTable("split_instances", {
   breakEventId: integer("break_event_id").notNull().references(() => breakEvents.id, { onDelete: "cascade" }),
   formatType: varchar("format_type", { length: 30 }).notNull().$type<SplitFormatType>(),
   participantCount: integer("participant_count").notNull(),
+  // Bundle definitions for TEAM_BUNDLE format - each bundle contains multiple teams
+  bundles: jsonb("bundles").$type<BundleDefinition[]>().default([]),
   isEnabled: boolean("is_enabled").default(true).notNull(),
   status: varchar("status", { length: 30 }).default("OPEN_INTEREST").notNull().$type<SplitStatus>(),
   paymentWindowEndsAt: timestamp("payment_window_ends_at"),
@@ -1799,6 +1816,55 @@ export function isPostLockStatus(status: SplitStatus): boolean {
 export function isValidParticipantCount(count: number, allow3: boolean = false): boolean {
   if (count === 3) return allow3;
   return [2, 4, 6, 8].includes(count);
+}
+
+// Helper function to check if format type requires bundles (not individual team selection)
+export function requiresBundleSelection(formatType: SplitFormatType): boolean {
+  return (BUNDLE_FORMAT_TYPES as readonly string[]).includes(formatType);
+}
+
+// Helper function to check if single-team selection is allowed for participant count
+export function isSingleTeamAllowed(participantCount: number): boolean {
+  return participantCount <= MAX_SINGLE_TEAM_PARTICIPANTS;
+}
+
+// Helper function to validate format type against participant count
+// Returns error message if invalid, null if valid
+export function validateFormatTypeForParticipants(
+  formatType: SplitFormatType,
+  participantCount: number
+): string | null {
+  // Single-team selection (TEAM format) is only allowed for 4 or fewer participants
+  if (formatType === "TEAM" && participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
+    return `Single-team selection is not allowed for splits with more than ${MAX_SINGLE_TEAM_PARTICIPANTS} participants. Use DIVISIONAL, CONFERENCE, PACK, or TEAM_BUNDLE instead.`;
+  }
+  return null;
+}
+
+// Helper function to validate bundle definitions
+export function validateBundles(
+  bundles: BundleDefinition[],
+  participantCount: number,
+  formatType: SplitFormatType
+): string | null {
+  if (formatType !== "TEAM_BUNDLE") {
+    return null; // Bundles only required for TEAM_BUNDLE format
+  }
+  
+  if (bundles.length !== participantCount) {
+    return `Number of bundles (${bundles.length}) must match participant count (${participantCount})`;
+  }
+  
+  for (const bundle of bundles) {
+    if (!bundle.name || bundle.name.trim() === "") {
+      return "Each bundle must have a name";
+    }
+    if (!bundle.teams || bundle.teams.length === 0) {
+      return `Bundle "${bundle.name}" must contain at least one team`;
+    }
+  }
+  
+  return null;
 }
 
 // Zod Schemas and Types

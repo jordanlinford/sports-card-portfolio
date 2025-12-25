@@ -15,7 +15,12 @@ import {
   SPLIT_STATUSES,
   BREAKER_FEE_CENTS,
   SHIPPING_FEE_CENTS,
+  MAX_SINGLE_TEAM_PARTICIPANTS,
+  validateFormatTypeForParticipants,
+  validateBundles,
   type SplitStatus,
+  type SplitFormatType,
+  type BundleDefinition,
 } from "@shared/schema";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
@@ -5858,6 +5863,27 @@ Allow: /
       });
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid split instance data", details: parsed.error });
+      }
+
+      // Validate format type against participant count
+      // Single-team selection (TEAM format) is not allowed for 5+ participants
+      const formatValidation = validateFormatTypeForParticipants(
+        parsed.data.formatType as SplitFormatType,
+        parsed.data.participantCount
+      );
+      if (formatValidation) {
+        return res.status(400).json({ error: formatValidation });
+      }
+
+      // Validate bundle definitions for TEAM_BUNDLE format
+      const bundles = (parsed.data.bundles || []) as BundleDefinition[];
+      const bundleValidation = validateBundles(
+        bundles,
+        parsed.data.participantCount,
+        parsed.data.formatType as SplitFormatType
+      );
+      if (bundleValidation) {
+        return res.status(400).json({ error: bundleValidation });
       }
 
       const split = await storage.createSplitInstance(parsed.data);
