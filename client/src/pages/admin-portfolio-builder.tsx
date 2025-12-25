@@ -374,12 +374,16 @@ export default function AdminPortfolioBuilderPage() {
       formatType = eventBreakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM";
     }
 
+    // Calculate full price per seat including fees
+    const priceBreakdown = calculatePerSeatPrice();
+    
     createSplitMutation.mutate({
       breakEventId: selectedEventId,
       paymentWindowHours,
       participantCount,
       seatPriceCents,
       totalBoxPriceCents: totalCents,
+      priceCapCents: priceBreakdown.totalPerSeat,
       formatType,
       bundles: formatType === "TEAM_BUNDLE" ? bundles : [],
     });
