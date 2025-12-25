@@ -366,7 +366,7 @@ export default function AdminPortfolioBuilderPage() {
     const eventBreakType = selectedEvent?.breakType || "TEAM";
     
     if (eventBreakType === "PACK") {
-      // PACK breaks are only valid for 4 or fewer participants
+      // PACK breaks support flexible participant counts based on box pack count
       formatType = "PACK";
     } else if (participantCount > MAX_SINGLE_TEAM_PARTICIPANTS) {
       formatType = eventBreakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM_BUNDLE";
@@ -721,12 +721,12 @@ export default function AdminPortfolioBuilderPage() {
                 <SelectContent>
                   <SelectItem value="TEAM">Team Break</SelectItem>
                   <SelectItem value="DIVISIONAL">Divisional Break</SelectItem>
-                  <SelectItem value="PACK">Pack Break (4 or fewer)</SelectItem>
+                  <SelectItem value="PACK">Pack Break</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
                 {breakType === "TEAM" ? "Participants pick individual teams" : 
-                 breakType === "PACK" ? "Each participant gets random packs (4 or fewer participants)" :
+                 breakType === "PACK" ? "Each participant gets 1 random pack from the box" :
                  "Participants pick divisions (groups of teams)"}
               </p>
             </div>
