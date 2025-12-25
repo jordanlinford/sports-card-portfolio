@@ -18,7 +18,9 @@ import {
   FolderOpen,
   Sparkles,
   TrendingUp,
-  Tag
+  Tag,
+  Users,
+  ArrowRight
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -370,6 +372,29 @@ export default function Dashboard() {
           </ProFeatureGate>
         </div>
       </div>
+
+      {/* Join a Box Split CTA */}
+      <Card className="mb-8 bg-gradient-to-r from-primary/5 via-primary/10 to-accent/5 border-primary/20">
+        <CardContent className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+              <Users className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold" data-testid="text-box-split-cta-title">Join a Box Split</h3>
+              <p className="text-sm text-muted-foreground">
+                Team up with collectors to split premium hobby boxes
+              </p>
+            </div>
+          </div>
+          <Link href="/portfolio-builder">
+            <Button variant="outline" className="gap-2" data-testid="button-join-box-split">
+              Browse Splits
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       {!displayCases || displayCases.length === 0 ? (
         <EmptyState canCreate={canCreate} />
