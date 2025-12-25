@@ -25,6 +25,9 @@ import {
   AlertCircle,
   RefreshCw,
   ExternalLink,
+  Share2,
+  Copy,
+  Check,
 } from "lucide-react";
 import type { SplitInstanceWithSeats, SeatWithUser, SeatCounts, SplitStatus, BreakEventWithSplits } from "@shared/schema";
 
@@ -116,6 +119,54 @@ function StatusTimeline({ currentStatus }: { currentStatus: SplitStatus }) {
         );
       })}
     </div>
+  );
+}
+
+function ShareButton({ title, description, splitId }: { title: string; description: string; splitId: number }) {
+  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+  
+  const shareUrl = `${window.location.origin}/portfolio-builder/splits/${splitId}`;
+  
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title,
+          text: description,
+          url: shareUrl,
+        });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          copyToClipboard();
+        }
+      }
+    } else {
+      copyToClipboard();
+    }
+  };
+  
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      toast({ title: "Link copied!", description: "Share this link with friends to join the split" });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast({ title: "Failed to copy", variant: "destructive" });
+    }
+  };
+  
+  return (
+    <Button 
+      variant="outline" 
+      size="sm"
+      onClick={handleShare}
+      data-testid="button-share-split"
+    >
+      {copied ? <Check className="w-4 h-4 mr-2" /> : <Share2 className="w-4 h-4 mr-2" />}
+      {copied ? "Copied!" : "Share"}
+    </Button>
   );
 }
 
@@ -306,12 +357,19 @@ export default function PortfolioBuilderSplitPage() {
               {breakEvent.year} {breakEvent.brand} {breakEvent.sport} - {split.formatType}
             </p>
           </div>
-          {statusConfig && (
-            <Badge className={statusConfig.color}>
-              {statusConfig.icon}
-              <span className="ml-1">{statusConfig.label}</span>
-            </Badge>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {statusConfig && (
+              <Badge className={statusConfig.color}>
+                {statusConfig.icon}
+                <span className="ml-1">{statusConfig.label}</span>
+              </Badge>
+            )}
+            <ShareButton 
+              title={breakEvent.title}
+              description={`Join this ${breakEvent.year} ${breakEvent.brand} ${breakEvent.sport} box split - ${formatPrice(split.seatPriceCents)} per seat!`}
+              splitId={splitId}
+            />
+          </div>
         </div>
       </div>
 
