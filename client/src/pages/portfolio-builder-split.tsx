@@ -524,7 +524,9 @@ export default function PortfolioBuilderSplitPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {split.formatType === "DIVISIONAL" 
+                  {split.formatType === "TEAM_BUNDLE" 
+                    ? "Rank your preferred bundles. Each bundle contains multiple teams. Earlier payers get priority."
+                    : split.formatType === "DIVISIONAL" 
                     ? "Rank your preferred divisions. Earlier payers get priority for their preferences."
                     : "Rank your preferred teams. Earlier payers get priority for their preferences."}
                 </p>
