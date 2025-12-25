@@ -333,6 +333,7 @@ export interface IStorage {
   updateSplitInstance(id: number, data: Partial<SplitInstance>): Promise<SplitInstance | undefined>;
   updateSplitStatus(id: number, status: SplitStatus, additionalData?: { youtubeUrl?: string; orderMeta?: any; paymentWindowEndsAt?: Date }): Promise<SplitInstance | undefined>;
   getSplitsReadyForPaymentWindowClose(): Promise<SplitInstance[]>;
+  getAllSplitInstances(): Promise<SplitInstance[]>;
   getSeatCounts(splitId: number): Promise<SeatCounts>;
 
   // Seat operations
@@ -2770,6 +2771,13 @@ export class DatabaseStorage implements IStorage {
           sql`${splitInstances.paymentWindowEndsAt} <= ${now}`
         )
       );
+  }
+
+  async getAllSplitInstances(): Promise<SplitInstance[]> {
+    return db
+      .select()
+      .from(splitInstances)
+      .orderBy(desc(splitInstances.createdAt));
   }
 
   async getSeatCounts(splitId: number): Promise<SeatCounts> {

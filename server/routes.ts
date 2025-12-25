@@ -230,6 +230,72 @@ Allow: /
     res.type('text/plain').send(robotsTxt);
   });
 
+  // Social media crawler detection for OG meta tags
+  const isSocialCrawler = (userAgent: string) => {
+    const crawlers = [
+      'facebookexternalhit',
+      'Twitterbot', 
+      'LinkedInBot',
+      'Slackbot',
+      'Discordbot',
+      'WhatsApp',
+      'TelegramBot',
+      'Applebot'
+    ];
+    return crawlers.some(crawler => userAgent.includes(crawler));
+  };
+
+  // Serve OG meta tags for split pages (social media previews)
+  app.get("/portfolio-builder/splits/:id", async (req: any, res, next) => {
+    const userAgent = req.headers['user-agent'] || '';
+    
+    // Only intercept for social media crawlers
+    if (!isSocialCrawler(userAgent)) {
+      return next();
+    }
+
+    try {
+      const splitId = parseInt(req.params.id);
+      if (isNaN(splitId)) return next();
+
+      const split = await storage.getSplitInstanceWithBreakEvent(splitId);
+      if (!split || !split.breakEvent) return next();
+
+      const event = split.breakEvent;
+      const pricePerSeat = (split.seatPriceCents / 100).toFixed(2);
+      const title = `${event.year} ${event.brand} ${event.sport} - Box Split`;
+      const description = `Join this ${split.formatType} break for $${pricePerSeat}/seat. ${event.title} - ${split.participantCount} spots available.`;
+      const imageUrl = event.imageUrl || '';
+      const url = `https://${req.headers.host}${req.originalUrl}`;
+
+      // Return a minimal HTML page with OG tags that redirects to the SPA
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>${title}</title>
+  <meta property="og:title" content="${title}" />
+  <meta property="og:description" content="${description}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${url}" />
+  ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${title}" />
+  <meta name="twitter:description" content="${description}" />
+  ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
+  <meta http-equiv="refresh" content="0;url=${url}" />
+</head>
+<body>
+  <p>Redirecting to <a href="${url}">${title}</a>...</p>
+</body>
+</html>`;
+
+      res.type('text/html').send(html);
+    } catch (error) {
+      console.error('[OG Tags] Error generating meta tags:', error);
+      next();
+    }
+  });
+
   // Stripe webhook endpoint - uses rawBody captured in index.ts
   app.post("/api/stripe/webhook/:uuid", async (req: any, res) => {
     const signature = req.headers['stripe-signature'];
@@ -5968,6 +6034,22 @@ Allow: /
     } catch (error) {
       console.error("[Admin Splits] Error creating:", error);
       res.status(500).json({ error: "Failed to create split instance" });
+    }
+  });
+
+  // GET /api/admin/splits - Get all split instances (admin view)
+  app.get("/api/admin/splits", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId || !(await checkSplitsAdminAccess(userId))) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const splits = await storage.getAllSplitInstances();
+      res.json(splits);
+    } catch (error) {
+      console.error("[Admin Splits] Error fetching:", error);
+      res.status(500).json({ error: "Failed to fetch split instances" });
     }
   });
 
