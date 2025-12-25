@@ -675,7 +675,7 @@ export default function AdminPortfolioBuilderPage() {
         setShowEventDialog(open);
         if (!open) resetEventForm();
       }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingEvent ? "Edit Break Event" : "Create Break Event"}</DialogTitle>
             <DialogDescription>
