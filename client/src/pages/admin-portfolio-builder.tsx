@@ -841,7 +841,7 @@ export default function AdminPortfolioBuilderPage() {
           setBundles([]);
         }
       }}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Split Instance</DialogTitle>
             <DialogDescription>
