@@ -14,6 +14,7 @@ import {
   insertSeatSchema,
   SPLIT_STATUSES,
   BREAKER_FEE_CENTS,
+  SHIPPING_FEE_CENTS,
   type SplitStatus,
 } from "@shared/schema";
 import { runMigrations } from "stripe-replit-sync";
@@ -5701,9 +5702,9 @@ Allow: /
 
       const breakEvent = split.breakEvent;
       const productName = `${breakEvent.year} ${breakEvent.brand} ${breakEvent.sport} - ${split.formatType} Split`;
-      // Split the $50 breaker fee equally among all participants
-      const feePerSeatCents = Math.ceil(BREAKER_FEE_CENTS / split.participantCount);
-      const totalPriceCents = split.seatPriceCents + feePerSeatCents;
+      // Split the $50 breaker fee equally among all participants, plus $5 shipping per seat
+      const breakerFeePerSeatCents = Math.ceil(BREAKER_FEE_CENTS / split.participantCount);
+      const totalPriceCents = split.seatPriceCents + breakerFeePerSeatCents + SHIPPING_FEE_CENTS;
       
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
@@ -5713,7 +5714,7 @@ Allow: /
               currency: "usd",
               product_data: {
                 name: productName,
-                description: `Seat in ${split.formatType} split for ${breakEvent.title} (includes $${(feePerSeatCents / 100).toFixed(2)} breaker fee)`,
+                description: `Seat in ${split.formatType} split for ${breakEvent.title} (includes $${(breakerFeePerSeatCents / 100).toFixed(2)} breaker fee + $${(SHIPPING_FEE_CENTS / 100).toFixed(2)} shipping)`,
               },
               unit_amount: totalPriceCents,
             },

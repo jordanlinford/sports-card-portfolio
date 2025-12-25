@@ -19,7 +19,7 @@ import {
   Settings,
 } from "lucide-react";
 import type { BreakEventWithSplits, SplitInstance, SplitStatus } from "@shared/schema";
-import { BREAKER_FEE_CENTS } from "@shared/schema";
+import { BREAKER_FEE_CENTS, SHIPPING_FEE_CENTS } from "@shared/schema";
 import { AlertCircle, XCircle } from "lucide-react";
 
 const STATUS_CONFIG: Record<SplitStatus, { label: string; color: string; icon: React.ReactNode }> = {
@@ -40,9 +40,9 @@ function formatPrice(cents: number): string {
 
 function SplitCard({ split, breakEvent }: { split: SplitInstance; breakEvent: BreakEventWithSplits }) {
   const statusConfig = STATUS_CONFIG[split.status as SplitStatus] || STATUS_CONFIG.OPEN_INTEREST;
-  // Split the $50 breaker fee equally among all participants
-  const feePerSeatCents = Math.ceil(BREAKER_FEE_CENTS / split.participantCount);
-  const totalPriceCents = split.seatPriceCents + feePerSeatCents;
+  // Split the $50 breaker fee equally among all participants, plus $5 shipping per seat
+  const breakerFeePerSeatCents = Math.ceil(BREAKER_FEE_CENTS / split.participantCount);
+  const totalPriceCents = split.seatPriceCents + breakerFeePerSeatCents + SHIPPING_FEE_CENTS;
 
   return (
     <Card className="overflow-visible hover-elevate" data-testid={`card-split-${split.id}`}>
@@ -68,7 +68,7 @@ function SplitCard({ split, breakEvent }: { split: SplitInstance; breakEvent: Br
               {formatPrice(totalPriceCents)}
             </div>
             <div className="text-xs text-muted-foreground">
-              {formatPrice(split.seatPriceCents)} + {formatPrice(feePerSeatCents)} fee
+              {formatPrice(split.seatPriceCents)} + {formatPrice(breakerFeePerSeatCents)} fee + {formatPrice(SHIPPING_FEE_CENTS)} ship
             </div>
           </div>
         </div>
@@ -136,10 +136,10 @@ function BreakEventCard({ event }: { event: BreakEventWithSplits }) {
         <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
           <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 text-sm">
             <DollarSign className="w-4 h-4" />
-            <span className="font-medium">$50 Breaker Fee split among participants</span>
+            <span className="font-medium">Fees included in all prices</span>
           </div>
           <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-            Fee is divided equally - covers break hosting, shipping, and handling.
+            $50 breaker fee (split among participants) + $5 shipping per seat.
           </p>
         </div>
         
@@ -238,8 +238,8 @@ export default function PortfolioBuilderPage() {
             <div className="flex gap-3">
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">4</div>
               <div>
-                <p className="font-medium">Watch & Receive</p>
-                <p className="text-muted-foreground">Watch the break live on YouTube, then get your cards shipped.</p>
+                <p className="font-medium">Get Your Cards</p>
+                <p className="text-muted-foreground">Receive a YouTube video of your break, then your cards are shipped.</p>
               </div>
             </div>
           </div>

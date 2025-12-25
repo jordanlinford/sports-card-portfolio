@@ -1674,8 +1674,11 @@ export type ParticipantCount = typeof VALID_PARTICIPANT_COUNTS[number];
 export const SEAT_STATUSES = ["INTERESTED", "WAITLIST", "PAID", "REFUNDED", "CANCELED"] as const;
 export type SeatStatus = typeof SEAT_STATUSES[number];
 
-// Breaker fee constant - $50 per break
+// Breaker fee constant - $50 per break (split among participants)
 export const BREAKER_FEE_CENTS = 5000;
+
+// Shipping fee constant - $5 per seat
+export const SHIPPING_FEE_CENTS = 500;
 
 // Break Event - a product listing (e.g., "2024 Panini Prizm Football Hobby Box")
 export const breakEvents = pgTable("break_events", {
