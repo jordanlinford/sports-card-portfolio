@@ -48,8 +48,11 @@ import {
   AlertCircle,
   Upload,
   Image as ImageIcon,
+  ClipboardList,
+  Copy,
+  Printer,
 } from "lucide-react";
-import type { BreakEvent, SplitInstance, Seat, BreakType, BundleDefinition } from "@shared/schema";
+import type { BreakEvent, SplitInstance, Seat, BreakType, BundleDefinition, SeatWithUser } from "@shared/schema";
 import { BREAKER_FEE_CENTS, SHIPPING_FEE_CENTS, BREAK_TYPES, MAX_SINGLE_TEAM_PARTICIPANTS } from "@shared/schema";
 
 type SplitStatus = "OPEN_INTEREST" | "PAYMENT_OPEN" | "LOCKED" | "ORDERED" | "SHIPPED" | "IN_HAND" | "BROKEN";
@@ -91,6 +94,7 @@ export default function AdminPortfolioBuilderPage() {
   const [editingEvent, setEditingEvent] = useState<BreakEvent | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [showSeatsDialog, setShowSeatsDialog] = useState(false);
+  const [showBreakSheetDialog, setShowBreakSheetDialog] = useState(false);
   const [selectedSplit, setSelectedSplit] = useState<SplitInstance | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [showYoutubeDialog, setShowYoutubeDialog] = useState(false);
@@ -120,10 +124,42 @@ export default function AdminPortfolioBuilderPage() {
     enabled: adminCheck?.isAdmin,
   });
 
-  const { data: seats = [] } = useQuery<Seat[]>({
+  const { data: seats = [] } = useQuery<SeatWithUser[]>({
     queryKey: ["/api/admin/splits", selectedSplit?.id, "seats"],
     enabled: !!selectedSplit?.id,
   });
+
+  // Get break event info for the selected split
+  const selectedBreakEvent = events.find(e => e.id === selectedSplit?.breakEventId);
+
+  // Generate break sheet text for copying
+  const generateBreakSheetText = () => {
+    if (!selectedSplit || !selectedBreakEvent) return "";
+    const paidSeats = seats.filter(s => s.status === "PAID" && s.assignment);
+    const lines = [
+      `BREAK SHEET - ${selectedBreakEvent.title}`,
+      `${selectedBreakEvent.year} ${selectedBreakEvent.brand} ${selectedBreakEvent.sport}`,
+      `Format: ${selectedSplit.formatType}`,
+      `Date: ${new Date().toLocaleDateString()}`,
+      "",
+      "ASSIGNMENTS:",
+      "─".repeat(40),
+      ...paidSeats
+        .sort((a, b) => (a.priorityNumber || 99) - (b.priorityNumber || 99))
+        .map(s => {
+          const name = s.user?.firstName || s.user?.handle || s.userId.slice(0, 8);
+          return `#${s.priorityNumber || "?"} ${s.assignment} → ${name}`;
+        }),
+      "─".repeat(40),
+    ];
+    return lines.join("\n");
+  };
+
+  const copyBreakSheet = async () => {
+    const text = generateBreakSheetText();
+    await navigator.clipboard.writeText(text);
+    toast({ title: "Copied!", description: "Break sheet copied to clipboard" });
+  };
 
   const createEventMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -565,6 +601,21 @@ export default function AdminPortfolioBuilderPage() {
                           View Seats
                         </Button>
 
+                        {["LOCKED", "ORDERED", "SHIPPED", "IN_HAND", "BROKEN"].includes(split.status) && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSplit(split);
+                              setShowBreakSheetDialog(true);
+                            }}
+                            data-testid={`button-break-sheet-${split.id}`}
+                          >
+                            <ClipboardList className="h-4 w-4 mr-2" />
+                            Break Sheet
+                          </Button>
+                        )}
+
                         {split.status === "OPEN_INTEREST" && (
                           <Button
                             variant="secondary"
@@ -996,6 +1047,85 @@ export default function AdminPortfolioBuilderPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBreakSheetDialog} onOpenChange={(open) => {
+        setShowBreakSheetDialog(open);
+        if (!open) setSelectedSplit(null);
+      }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Break Sheet
+            </DialogTitle>
+            <DialogDescription>
+              Assignment list for the breaker. Copy or print this sheet.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedBreakEvent && selectedSplit && (
+            <div className="space-y-4">
+              <div className="p-4 bg-muted rounded-md">
+                <h3 className="font-bold text-lg">{selectedBreakEvent.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {selectedBreakEvent.year} {selectedBreakEvent.brand} {selectedBreakEvent.sport} - {selectedSplit.formatType}
+                </p>
+              </div>
+
+              <div className="border rounded-md overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-sm font-medium">#</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium">Assignment</th>
+                      <th className="px-4 py-2 text-left text-sm font-medium">Collector</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {seats
+                      .filter(s => s.status === "PAID" && s.assignment)
+                      .sort((a, b) => (a.priorityNumber || 99) - (b.priorityNumber || 99))
+                      .map((seat) => (
+                        <tr key={seat.id} className="border-t">
+                          <td className="px-4 py-3 text-sm font-medium">
+                            {seat.priorityNumber || "-"}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-semibold">
+                            {seat.assignment}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {seat.user?.firstName || seat.user?.handle || seat.userId.slice(0, 8)}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={copyBreakSheet}
+                  data-testid="button-copy-break-sheet"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy to Clipboard
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => window.print()}
+                  data-testid="button-print-break-sheet"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
