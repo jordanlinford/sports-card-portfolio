@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,9 +46,11 @@ import {
   Home,
   Video,
   AlertCircle,
+  Upload,
+  Image as ImageIcon,
 } from "lucide-react";
-import type { BreakEvent, SplitInstance, Seat } from "@shared/schema";
-import { BREAKER_FEE_CENTS } from "@shared/schema";
+import type { BreakEvent, SplitInstance, Seat, BreakType } from "@shared/schema";
+import { BREAKER_FEE_CENTS, SHIPPING_FEE_CENTS, BREAK_TYPES } from "@shared/schema";
 
 type SplitStatus = "OPEN_INTEREST" | "PAYMENT_OPEN" | "LOCKED" | "ORDERED" | "SHIPPED" | "IN_HAND" | "BROKEN";
 
@@ -92,6 +94,12 @@ export default function AdminPortfolioBuilderPage() {
   const [selectedSplit, setSelectedSplit] = useState<SplitInstance | null>(null);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [showYoutubeDialog, setShowYoutubeDialog] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [eventImageUrl, setEventImageUrl] = useState<string | null>(null);
+  const [breakType, setBreakType] = useState<BreakType>("TEAM");
+  const [totalBoxPrice, setTotalBoxPrice] = useState("");
+  const [seatCount, setSeatCount] = useState("4");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -242,16 +250,39 @@ export default function AdminPortfolioBuilderPage() {
 
   const getEventById = (id: number) => events.find((e) => e.id === id);
 
+  const handleImageUpload = async (file: File) => {
+    setUploadingImage(true);
+    try {
+      const { uploadURL } = await apiRequest("POST", "/api/objects/upload", {});
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      const objectUrl = uploadURL.split("?")[0];
+      const { objectPath } = await apiRequest("PUT", "/api/card-images", { cardImageURL: objectUrl });
+      setEventImageUrl(objectPath);
+      toast({ title: "Image uploaded successfully" });
+    } catch (error) {
+      console.error("Upload failed:", error);
+      toast({ title: "Upload failed", variant: "destructive" });
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   const handleEventSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const imageUrlInput = formData.get("imageUrl") as string;
     const data = {
       title: formData.get("title") as string,
       description: formData.get("description") as string,
       sport: formData.get("sport") as string,
       brand: formData.get("brand") as string,
       year: formData.get("year") as string,
-      imageUrl: formData.get("imageUrl") as string || null,
+      breakType: breakType,
+      imageUrl: eventImageUrl || imageUrlInput || null,
       isActive: formData.get("isActive") === "true",
     };
 
@@ -262,20 +293,51 @@ export default function AdminPortfolioBuilderPage() {
     }
   };
 
+  const calculatePerSeatPrice = () => {
+    const totalCents = Math.round(parseFloat(totalBoxPrice || "0") * 100);
+    const seats = parseInt(seatCount) || 1;
+    const basePricePerSeat = Math.ceil(totalCents / seats);
+    const breakerFeePerSeat = Math.ceil(BREAKER_FEE_CENTS / seats);
+    const shippingPerSeat = SHIPPING_FEE_CENTS;
+    return {
+      basePricePerSeat,
+      breakerFeePerSeat,
+      shippingPerSeat,
+      totalPerSeat: basePricePerSeat + breakerFeePerSeat + shippingPerSeat,
+    };
+  };
+
   const handleSplitSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const paymentWindowHours = parseInt(formData.get("paymentWindowHours") as string) || 24;
-    const participantCount = parseInt(formData.get("participantCount") as string) || 10;
-    const seatPriceCents = parseInt(formData.get("seatPriceCents") as string) || 5000;
+    const participantCount = parseInt(seatCount) || 4;
+    const totalCents = Math.round(parseFloat(totalBoxPrice || "0") * 100);
+    const seatPriceCents = Math.ceil(totalCents / participantCount);
+    const selectedEvent = selectedEventId ? getEventById(selectedEventId) : null;
+    const formatType = selectedEvent?.breakType === "DIVISIONAL" ? "DIVISIONAL" : "TEAM_BUNDLE";
 
     createSplitMutation.mutate({
       breakEventId: selectedEventId,
       paymentWindowHours,
       participantCount,
       seatPriceCents,
-      formatType: "DIVISIONAL",
+      totalBoxPriceCents: totalCents,
+      formatType,
     });
+  };
+
+  const resetEventForm = () => {
+    setEventImageUrl(null);
+    setBreakType("TEAM");
+    setEditingEvent(null);
+  };
+
+  const openEditEvent = (event: BreakEvent) => {
+    setEditingEvent(event);
+    setEventImageUrl(event.imageUrl || null);
+    setBreakType((event as any).breakType || "TEAM");
+    setShowEventDialog(true);
   };
 
   return (
@@ -338,10 +400,7 @@ export default function AdminPortfolioBuilderPage() {
                       <Button
                         variant="outline"
                         size="icon"
-                        onClick={() => {
-                          setEditingEvent(event);
-                          setShowEventDialog(true);
-                        }}
+                        onClick={() => openEditEvent(event)}
                         data-testid={`button-edit-event-${event.id}`}
                       >
                         <Edit className="h-4 w-4" />
@@ -526,9 +585,9 @@ export default function AdminPortfolioBuilderPage() {
 
       <Dialog open={showEventDialog} onOpenChange={(open) => {
         setShowEventDialog(open);
-        if (!open) setEditingEvent(null);
+        if (!open) resetEventForm();
       }}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingEvent ? "Edit Break Event" : "Create Break Event"}</DialogTitle>
             <DialogDescription>
@@ -556,7 +615,55 @@ export default function AdminPortfolioBuilderPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="imageUrl">Box Image URL</Label>
+              <Label>Break Type</Label>
+              <Select value={breakType} onValueChange={(v) => setBreakType(v as BreakType)}>
+                <SelectTrigger data-testid="select-break-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="TEAM">Team Break</SelectItem>
+                  <SelectItem value="DIVISIONAL">Divisional Break</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {breakType === "TEAM" ? "Participants pick individual teams" : "Participants pick divisions (groups of teams)"}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Box Image</Label>
+              <div className="flex gap-2 items-center">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageUpload(file);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  data-testid="button-upload-image"
+                >
+                  {uploadingImage ? (
+                    <span className="animate-spin mr-2">...</span>
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  Upload Image
+                </Button>
+                {eventImageUrl && (
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4 text-green-600" />
+                    <span className="text-sm text-green-600">Uploaded</span>
+                  </div>
+                )}
+              </div>
+              <div className="text-xs text-muted-foreground">or paste URL:</div>
               <Input
                 id="imageUrl"
                 name="imageUrl"
@@ -564,9 +671,6 @@ export default function AdminPortfolioBuilderPage() {
                 placeholder="https://example.com/box-image.jpg"
                 data-testid="input-event-image"
               />
-              <p className="text-xs text-muted-foreground">
-                Paste a URL to an image of the hobby box
-              </p>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -615,7 +719,7 @@ export default function AdminPortfolioBuilderPage() {
               </Select>
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={createEventMutation.isPending || updateEventMutation.isPending} data-testid="button-submit-event">
+              <Button type="submit" disabled={createEventMutation.isPending || updateEventMutation.isPending || uploadingImage} data-testid="button-submit-event">
                 {editingEvent ? "Update" : "Create"}
               </Button>
             </DialogFooter>
@@ -625,7 +729,11 @@ export default function AdminPortfolioBuilderPage() {
 
       <Dialog open={showSplitDialog} onOpenChange={(open) => {
         setShowSplitDialog(open);
-        if (!open) setSelectedEventId(null);
+        if (!open) {
+          setSelectedEventId(null);
+          setTotalBoxPrice("");
+          setSeatCount("4");
+        }
       }}>
         <DialogContent>
           <DialogHeader>
@@ -636,39 +744,64 @@ export default function AdminPortfolioBuilderPage() {
           </DialogHeader>
           <form onSubmit={handleSplitSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="participantCount">Number of Seats</Label>
+              <Label htmlFor="seatCount">Number of Seats</Label>
               <Input
-                id="participantCount"
-                name="participantCount"
+                id="seatCount"
                 type="number"
                 min="2"
-                defaultValue="10"
+                max="32"
+                value={seatCount}
+                onChange={(e) => setSeatCount(e.target.value)}
                 required
                 data-testid="input-split-participants"
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="seatPriceCents">Base Price Per Seat (cents)</Label>
-              <Input
-                id="seatPriceCents"
-                name="seatPriceCents"
-                type="number"
-                min="100"
-                defaultValue="5000"
-                required
-                data-testid="input-split-price"
-              />
-              <p className="text-xs text-muted-foreground">5000 = $50.00 (box cost share)</p>
-            </div>
-            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
-              <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
-                <DollarSign className="h-4 w-4" />
-                <span className="font-medium">+ ${(BREAKER_FEE_CENTS / 100).toFixed(2)} Breaker Fee</span>
-              </div>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-                A $50 breaker fee is added to every seat to cover break hosting, shipping, and handling.
+              <p className="text-xs text-muted-foreground">
+                How many participants will share this box?
               </p>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="totalBoxPrice">Total Box Price ($)</Label>
+              <Input
+                id="totalBoxPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                value={totalBoxPrice}
+                onChange={(e) => setTotalBoxPrice(e.target.value)}
+                placeholder="e.g., 200.00"
+                required
+                data-testid="input-total-box-price"
+              />
+              <p className="text-xs text-muted-foreground">
+                The full retail price of the hobby box
+              </p>
+            </div>
+            {totalBoxPrice && parseInt(seatCount) > 0 && (
+              <div className="p-4 bg-muted/50 border border-border rounded-md space-y-2">
+                <div className="font-medium text-sm flex items-center gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Price Breakdown Per Seat
+                </div>
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Box share:</span>
+                    <span>${(calculatePerSeatPrice().basePricePerSeat / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Breaker fee (split):</span>
+                    <span>${(calculatePerSeatPrice().breakerFeePerSeat / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Shipping:</span>
+                    <span>${(calculatePerSeatPrice().shippingPerSeat / 100).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold border-t pt-1 mt-1">
+                    <span>Total per seat:</span>
+                    <span>${(calculatePerSeatPrice().totalPerSeat / 100).toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="paymentWindowHours">Payment Window (hours)</Label>
               <Input
@@ -682,7 +815,7 @@ export default function AdminPortfolioBuilderPage() {
               />
             </div>
             <DialogFooter>
-              <Button type="submit" disabled={createSplitMutation.isPending} data-testid="button-submit-split">
+              <Button type="submit" disabled={createSplitMutation.isPending || !totalBoxPrice} data-testid="button-submit-split">
                 Create Split
               </Button>
             </DialogFooter>
