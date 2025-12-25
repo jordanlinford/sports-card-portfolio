@@ -32,9 +32,17 @@ import {
   AlertCircle,
   Info,
 } from "lucide-react";
-import type { SplitInstanceWithSeats, SeatWithUser } from "@shared/schema";
+import type { SplitInstanceWithSeats, SeatWithUser, BundleDefinition } from "@shared/schema";
+import { MAX_SINGLE_TEAM_PARTICIPANTS, requiresBundleSelection } from "@shared/schema";
 
-function SortableItem({ id, index }: { id: string; index: number }) {
+interface SortableItemProps {
+  id: string;
+  index: number;
+  teams?: string[];
+  isBundle?: boolean;
+}
+
+function SortableItem({ id, index, teams, isBundle }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -69,7 +77,18 @@ function SortableItem({ id, index }: { id: string; index: number }) {
       <Badge variant="outline" className="w-6 justify-center text-xs">
         {index + 1}
       </Badge>
-      <span className="font-medium">{id}</span>
+      <div className="flex-1">
+        <span className="font-medium">{id}</span>
+        {isBundle && teams && teams.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {teams.map((team, ti) => (
+              <Badge key={ti} variant="secondary" className="text-xs">
+                {team}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -92,10 +111,21 @@ export default function PortfolioBuilderPreferencesPage() {
   const { data: splitData, isLoading } = useQuery<{
     seats: any[];
     assignmentPool: string[];
+    bundles: BundleDefinition[];
   } & SplitInstanceWithSeats>({
     queryKey: ["/api/splits", splitId],
     enabled: splitId > 0,
   });
+  
+  // Check if this is a bundle-based split
+  const isBundle = splitData?.formatType === "TEAM_BUNDLE";
+  const bundles = (splitData?.bundles || []) as BundleDefinition[];
+  
+  // Get bundle info by name
+  const getBundleTeams = (bundleName: string): string[] => {
+    const bundle = bundles.find(b => b.name === bundleName);
+    return bundle?.teams || [];
+  };
 
   const { data: seatsData } = useQuery<SeatWithUser[]>({
     queryKey: ["/api/splits", splitId, "seats"],
@@ -213,10 +243,21 @@ export default function PortfolioBuilderPreferencesPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Set Your {splitData.formatType === "DIVISIONAL" ? "Division" : "Team"} Preferences</CardTitle>
+          <CardTitle>
+            Set Your {isBundle ? "Bundle" : splitData.formatType === "DIVISIONAL" ? "Division" : "Team"} Preferences
+          </CardTitle>
           <CardDescription>
-            Drag to reorder your preferred {splitData.formatType === "DIVISIONAL" ? "divisions" : "teams"}. 
-            The earlier you pay, the higher priority you get for your preferences.
+            {isBundle ? (
+              <>
+                Drag to reorder your preferred bundles. Each bundle contains multiple teams, 
+                giving you broader exposure. The earlier you pay, the higher priority you get.
+              </>
+            ) : (
+              <>
+                Drag to reorder your preferred {splitData.formatType === "DIVISIONAL" ? "divisions" : "teams"}. 
+                The earlier you pay, the higher priority you get for your preferences.
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -225,9 +266,19 @@ export default function PortfolioBuilderPreferencesPage() {
             <div className="text-sm">
               <p className="font-medium mb-1">How Assignment Works</p>
               <p>
-                When payment closes, we assign teams/slots in order of payment time. 
-                Each person gets their highest-ranked available preference. Pay early 
-                to maximize your chances of getting your top picks!
+                {isBundle ? (
+                  <>
+                    When payment closes, we assign bundles in order of payment time. 
+                    Each person receives one bundle containing multiple teams. Pay early 
+                    to maximize your chances of getting your top picks!
+                  </>
+                ) : (
+                  <>
+                    When payment closes, we assign {splitData.formatType === "DIVISIONAL" ? "divisions" : "teams"} in order of payment time. 
+                    Each person gets their highest-ranked available preference. Pay early 
+                    to maximize your chances of getting your top picks!
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -243,7 +294,13 @@ export default function PortfolioBuilderPreferencesPage() {
             >
               <div className="space-y-2">
                 {preferences.map((item, index) => (
-                  <SortableItem key={item} id={item} index={index} />
+                  <SortableItem 
+                    key={item} 
+                    id={item} 
+                    index={index} 
+                    isBundle={isBundle}
+                    teams={isBundle ? getBundleTeams(item) : undefined}
+                  />
                 ))}
               </div>
             </SortableContext>
