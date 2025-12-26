@@ -105,6 +105,7 @@ export default function AdminPortfolioBuilderPage() {
   const [seatCount, setSeatCount] = useState("4");
   const [bundles, setBundles] = useState<BundleDefinition[]>([]);
   const [divisions, setDivisions] = useState<string[]>([]);
+  const [divisionsInput, setDivisionsInput] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
@@ -854,6 +855,7 @@ export default function AdminPortfolioBuilderPage() {
           setSeatCount("4");
           setBundles([]);
           setDivisions([]);
+          setDivisionsInput("");
         }
       }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
@@ -977,9 +979,10 @@ export default function AdminPortfolioBuilderPage() {
                   Enter division names separated by commas. The number of divisions should match the number of seats.
                 </p>
                 <Input
-                  placeholder="e.g., Atlantic, Central, Southeast, Northwest, Pacific, Southwest"
-                  value={divisions.join(", ")}
-                  onChange={(e) => {
+                  placeholder="e.g., AFC North, AFC South, AFC East, AFC West, NFC North, NFC South, NFC East, NFC West"
+                  value={divisionsInput}
+                  onChange={(e) => setDivisionsInput(e.target.value)}
+                  onBlur={(e) => {
                     const divs = e.target.value.split(",").map(d => d.trim()).filter(d => d);
                     setDivisions(divs);
                   }}
