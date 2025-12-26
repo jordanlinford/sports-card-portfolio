@@ -5640,11 +5640,14 @@ Allow: /
         });
       }
 
+      // Accept preferences from request body (user ranks choices when joining)
+      const preferences = Array.isArray(req.body?.preferences) ? req.body.preferences : [];
+
       const seat = await storage.createSeat({
         splitInstanceId: splitId,
         userId,
         status: seatStatus,
-        preferences: [],
+        preferences,
       });
 
       // Get user info for notifications/emails

@@ -6,8 +6,26 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { 
   ArrowLeft,
   Calendar, 
@@ -28,8 +46,9 @@ import {
   Share2,
   Copy,
   Check,
+  GripVertical,
 } from "lucide-react";
-import type { SplitInstanceWithSeats, SeatWithUser, SeatCounts, SplitStatus, BreakEventWithSplits } from "@shared/schema";
+import type { SplitInstanceWithSeats, SeatWithUser, SeatCounts, SplitStatus, BreakEventWithSplits, BundleDefinition } from "@shared/schema";
 
 const STATUS_CONFIG: Record<SplitStatus, { label: string; description: string; color: string; icon: React.ReactNode }> = {
   OPEN_INTEREST: { 
@@ -118,6 +137,64 @@ function StatusTimeline({ currentStatus }: { currentStatus: SplitStatus }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+interface SortablePreferenceItemProps {
+  id: string;
+  index: number;
+  teams?: string[];
+  isBundle?: boolean;
+}
+
+function SortablePreferenceItem({ id, index, teams, isBundle }: SortablePreferenceItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-3 rounded-md border bg-card ${
+        isDragging ? "shadow-lg" : ""
+      }`}
+      data-testid={`preference-item-${id}`}
+    >
+      <button
+        className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground"
+        {...attributes}
+        {...listeners}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+      <Badge variant="outline" className="w-6 justify-center text-xs">
+        {index + 1}
+      </Badge>
+      <div className="flex-1">
+        <span className="font-medium">{id}</span>
+        {isBundle && teams && teams.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {teams.map((team, ti) => (
+              <Badge key={ti} variant="secondary" className="text-xs">
+                {team}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -252,11 +329,22 @@ export default function PortfolioBuilderSplitPage() {
   const { toast } = useToast();
   
   const splitId = parseInt(id || "0");
+  const [showPreferencesDialog, setShowPreferencesDialog] = useState(false);
+  const [preferences, setPreferences] = useState<string[]>([]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const { data: splitData, isLoading, refetch } = useQuery<{
     seats: any[];
     seatCounts: SeatCounts;
     breakEvent: BreakEventWithSplits;
+    assignmentPool?: string[];
+    bundles?: BundleDefinition[];
   } & SplitInstanceWithSeats>({
     queryKey: ["/api/splits", splitId],
     enabled: splitId > 0,
@@ -272,24 +360,65 @@ export default function PortfolioBuilderSplitPage() {
   });
 
   const joinMutation = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/splits/${splitId}/join`),
+    mutationFn: (prefs?: string[]) => apiRequest("POST", `/api/splits/${splitId}/join`, { preferences: prefs }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/splits", splitId] });
       queryClient.invalidateQueries({ queryKey: ["/api/splits", splitId, "seats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-seats"] });
+      setShowPreferencesDialog(false);
       
       // Pack breaks don't need preferences - packs are assigned randomly
       if (split?.formatType === "PACK") {
         toast({ title: "Joined!", description: "You've joined this pack break. Pay to confirm your spot!" });
       } else {
-        toast({ title: "Joined!", description: "Now set your team/division preferences" });
-        setLocation(`/portfolio-builder/splits/${splitId}/preferences`);
+        toast({ title: "Joined!", description: "Your preferences have been saved. Pay when the window opens to confirm your spot!" });
       }
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to join", variant: "destructive" });
     },
   });
+
+  const handleJoinClick = () => {
+    const assignmentPool = (splitData?.assignmentPool || []) as string[];
+    
+    // Pack breaks skip preferences
+    if (splitData?.formatType === "PACK") {
+      joinMutation.mutate(undefined);
+      return;
+    }
+    
+    // For other formats, show preferences dialog
+    if (assignmentPool.length > 0) {
+      setPreferences([...assignmentPool]);
+      setShowPreferencesDialog(true);
+    } else {
+      // No pool configured, just join without preferences
+      joinMutation.mutate(undefined);
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setPreferences((items) => {
+        const oldIndex = items.indexOf(active.id as string);
+        const newIndex = items.indexOf(over.id as string);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
+  };
+
+  const handleConfirmJoin = () => {
+    joinMutation.mutate(preferences);
+  };
+
+  const bundles = (splitData?.bundles || []) as BundleDefinition[];
+  const isBundle = splitData?.formatType === "TEAM_BUNDLE";
+  const getBundleTeams = (bundleName: string): string[] => {
+    const bundle = bundles.find(b => b.name === bundleName);
+    return bundle?.teams || [];
+  };
 
   const checkoutMutation = useMutation({
     mutationFn: () => apiRequest("POST", `/api/splits/${splitId}/checkout`),
@@ -513,7 +642,7 @@ export default function PortfolioBuilderSplitPage() {
                   {(split.status === "OPEN_INTEREST" || split.status === "PAYMENT_OPEN") && (
                     <Button 
                       className="w-full" 
-                      onClick={() => joinMutation.mutate()}
+                      onClick={handleJoinClick}
                       disabled={joinMutation.isPending}
                       data-testid="button-join-split"
                     >
@@ -624,6 +753,69 @@ export default function PortfolioBuilderSplitPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={showPreferencesDialog} onOpenChange={setShowPreferencesDialog}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListOrdered className="w-5 h-5" />
+              Set Your Preferences
+            </DialogTitle>
+            <DialogDescription>
+              Drag to rank your preferences. When you pay, earlier payers get priority for their top choices.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              {split?.formatType === "TEAM_BUNDLE" 
+                ? "Each bundle contains multiple teams. Rank them from most wanted (#1) to least wanted."
+                : split?.formatType === "DIVISIONAL"
+                ? "Rank the divisions from most wanted (#1) to least wanted."
+                : "Rank the teams from most wanted (#1) to least wanted."}
+            </p>
+
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={preferences} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+                  {preferences.map((pref, index) => (
+                    <SortablePreferenceItem
+                      key={pref}
+                      id={pref}
+                      index={index}
+                      teams={isBundle ? getBundleTeams(pref) : undefined}
+                      isBundle={isBundle}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowPreferencesDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmJoin} disabled={joinMutation.isPending}>
+              {joinMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Joining...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Confirm & Join
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
