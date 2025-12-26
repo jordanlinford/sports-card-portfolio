@@ -104,6 +104,7 @@ export default function AdminPortfolioBuilderPage() {
   const [totalBoxPrice, setTotalBoxPrice] = useState("");
   const [seatCount, setSeatCount] = useState("4");
   const [bundles, setBundles] = useState<BundleDefinition[]>([]);
+  const [divisions, setDivisions] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
@@ -135,6 +136,9 @@ export default function AdminPortfolioBuilderPage() {
   
   // Check if bundle configuration is required (5+ participants, but NOT for pack breaks)
   const requiresBundles = !isPackBreak && parseInt(seatCount) > MAX_SINGLE_TEAM_PARTICIPANTS;
+  
+  // Check if this is a divisional break (needs division names)
+  const isDivisionalBreak = selectedEventForSplit?.breakType === "DIVISIONAL";
 
   // Generate break sheet text for copying
   const generateBreakSheetText = () => {
@@ -377,6 +381,15 @@ export default function AdminPortfolioBuilderPage() {
     // Calculate full price per seat including fees
     const priceBreakdown = calculatePerSeatPrice();
     
+    // For divisional breaks, use divisions as assignmentPool
+    // For TEAM_BUNDLE, assignmentPool is the bundle names
+    let assignmentPool: string[] = [];
+    if (formatType === "DIVISIONAL") {
+      assignmentPool = divisions;
+    } else if (formatType === "TEAM_BUNDLE") {
+      assignmentPool = bundles.map(b => b.name);
+    }
+    
     createSplitMutation.mutate({
       breakEventId: selectedEventId,
       paymentWindowHours,
@@ -386,6 +399,7 @@ export default function AdminPortfolioBuilderPage() {
       priceCapCents: priceBreakdown.totalPerSeat,
       formatType,
       bundles: formatType === "TEAM_BUNDLE" ? bundles : [],
+      assignmentPool,
     });
   };
   
@@ -839,6 +853,7 @@ export default function AdminPortfolioBuilderPage() {
           setTotalBoxPrice("");
           setSeatCount("4");
           setBundles([]);
+          setDivisions([]);
         }
       }}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
@@ -953,6 +968,37 @@ export default function AdminPortfolioBuilderPage() {
                     <span>${(calculatePerSeatPrice().totalPerSeat / 100).toFixed(2)}</span>
                   </div>
                 </div>
+              </div>
+            )}
+            {isDivisionalBreak && (
+              <div className="space-y-3">
+                <Label>Divisions</Label>
+                <p className="text-xs text-muted-foreground">
+                  Enter division names separated by commas. The number of divisions should match the number of seats.
+                </p>
+                <Input
+                  placeholder="e.g., Atlantic, Central, Southeast, Northwest, Pacific, Southwest"
+                  value={divisions.join(", ")}
+                  onChange={(e) => {
+                    const divs = e.target.value.split(",").map(d => d.trim()).filter(d => d);
+                    setDivisions(divs);
+                  }}
+                  data-testid="input-divisions"
+                />
+                {divisions.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {divisions.map((div, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">
+                        {div}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                {divisions.length !== parseInt(seatCount) && divisions.length > 0 && (
+                  <p className="text-xs text-amber-600">
+                    You have {divisions.length} divisions but {seatCount} seats. They should match.
+                  </p>
+                )}
               </div>
             )}
             {requiresBundles && bundles.length > 0 && (
