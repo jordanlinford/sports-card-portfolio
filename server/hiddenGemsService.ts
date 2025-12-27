@@ -2,6 +2,7 @@ import { db } from "./db";
 import { hiddenGems, playerOutlookCache, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
 import { eq, desc, and, isNotNull } from "drizzle-orm";
 import OpenAI from "openai";
+import { fetchPlayerNews as fetchPlayerNewsFromEngine } from "./outlookEngine";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
@@ -81,7 +82,18 @@ async function generateGemContent(
   const thesis = outlook.thesis || [];
   const realityCheck = outlook.marketRealityCheck || [];
   
+  // Fetch current news to ensure AI has up-to-date information
+  const newsResult = await fetchPlayerNewsFromEngine(playerName, sport);
+  const newsContext = newsResult.snippets.length > 0 
+    ? `\n\nCURRENT NEWS (use this for up-to-date context):\n${newsResult.snippets.join("\n")}`
+    : "";
+  
+  const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  
   const prompt = `Generate hidden gem analysis for ${playerName} (${sport}):
+
+IMPORTANT: Today is ${currentDate}. Use ONLY current, verified information. Do NOT reference outdated facts.
+${newsContext}
 
 Current Investment Call: ${call?.verdict || "UNKNOWN"}
 Market Temperature: ${outlook.snapshot?.temperature || "UNKNOWN"}
@@ -96,10 +108,11 @@ ${realityCheck.join("\n")}
 
 Generate a JSON object with:
 1. "thesis": A single sentence (max 100 chars) summarizing why this player is undervalued
-2. "whyDiscounted": 2 specific reasons the market has discounted this player
-3. "repricingCatalysts": 2 specific events that would reprice cards higher
-4. "trapRisks": 1-2 risks that could confirm the discount is justified
+2. "whyDiscounted": 2 specific reasons the market has discounted this player (MUST be current/accurate)
+3. "repricingCatalysts": 2 specific events that would reprice cards higher (based on current situation)
+4. "trapRisks": 1-2 risks that could confirm the discount is justified (current risks only)
 
+CRITICAL: Base analysis on current news and verified facts. Do NOT make assumptions about team rosters, player status, or season stage that aren't confirmed in the news.
 Be specific to ${sport} and ${playerName}. Reference team, position, market dynamics.
 Return ONLY valid JSON, no markdown.`;
 
@@ -315,6 +328,7 @@ export async function getHiddenGemsStats(): Promise<{
 
 // Fallback featured players when no AI gems exist
 // These are curated players from each sport who typically represent good value
+// Last updated: December 2025
 const FALLBACK_FEATURED_PLAYERS: Array<{
   playerName: string;
   sport: string;
@@ -339,10 +353,10 @@ const FALLBACK_FEATURED_PLAYERS: Array<{
     temperature: "WARM",
     tier: "GROWTH",
     riskLevel: "MEDIUM",
-    thesis: "Record-breaking rookie with elite chemistry with Matthew Stafford.",
-    whyDiscounted: ["Sophomore slump concerns after historic debut", "Injury history creating market hesitation"],
-    repricingCatalysts: ["Continued high-volume target share", "Deep playoff run with big performances"],
-    trapRisks: ["Cupp return could reduce target share"],
+    thesis: "Elite WR1 with proven chemistry with Matthew Stafford.",
+    whyDiscounted: ["Injury concerns after missing time", "Rams offensive questions"],
+    repricingCatalysts: ["Healthy full season production", "Pro Bowl/All-Pro selection"],
+    trapRisks: ["Durability remains a question mark"],
   },
   {
     playerName: "CJ Stroud",
@@ -353,10 +367,10 @@ const FALLBACK_FEATURED_PLAYERS: Array<{
     temperature: "WARM",
     tier: "PREMIUM",
     riskLevel: "LOW",
-    thesis: "Elite young QB with franchise trajectory and weapons around him.",
-    whyDiscounted: ["Sophomore regression fears", "Supporting cast questions"],
-    repricingCatalysts: ["MVP-caliber season", "Deep playoff run"],
-    trapRisks: ["Offensive line concerns could limit development"],
+    thesis: "Elite young QB entering prime with proven playoff success.",
+    whyDiscounted: ["Market already priced some upside", "AFC competition concerns"],
+    repricingCatalysts: ["MVP votes", "Deep playoff run or Super Bowl appearance"],
+    trapRisks: ["Offensive line health could limit ceiling"],
   },
   {
     playerName: "Brock Bowers",
@@ -367,10 +381,10 @@ const FALLBACK_FEATURED_PLAYERS: Array<{
     temperature: "WARM",
     tier: "GROWTH",
     riskLevel: "MEDIUM",
-    thesis: "Generational TE talent, market may not fully price upside.",
-    whyDiscounted: ["Raiders QB situation creates uncertainty", "TE position historically slow to develop"],
-    repricingCatalysts: ["Pro Bowl selection", "Trade to contender"],
-    trapRisks: ["Poor QB play could cap statistical ceiling"],
+    thesis: "Record-breaking rookie TE with generational receiving talent.",
+    whyDiscounted: ["Raiders franchise instability", "QB carousel limits ceiling"],
+    repricingCatalysts: ["Trade to contender", "Pro Bowl selection"],
+    trapRisks: ["Team situation could suppress stats long-term"],
   },
   // NBA
   {
