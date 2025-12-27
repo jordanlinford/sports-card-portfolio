@@ -64,6 +64,33 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Hobby Box Splits Banner */}
+      <section className="py-10 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border-y">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="text-center md:text-left">
+              <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
+                <Users className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium text-primary uppercase tracking-wide">New Feature</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-bold mb-2" data-testid="text-splits-title">
+                Split the Box, Share the Hits
+              </h2>
+              <p className="text-muted-foreground max-w-xl" data-testid="text-splits-tagline">
+                Join hobby box breaks with fellow collectors. Pick your division, pay your share, and get your cards shipped directly to you.
+              </p>
+            </div>
+            <Link href="/portfolio-builder">
+              <Button size="lg" className="gap-2 whitespace-nowrap" data-testid="button-join-splits">
+                <LayoutGrid className="h-5 w-5" />
+                Browse Open Splits
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Credibility Strip */}
       <section className="py-6 border-y bg-muted/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
