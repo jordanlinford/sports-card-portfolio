@@ -378,13 +378,13 @@ const FALLBACK_FEATURED_PLAYERS: Array<{
     position: "TE",
     team: "LVR",
     verdict: "MONITOR",
-    temperature: "WARM",
+    temperature: "COOLING",
     tier: "GROWTH",
     riskLevel: "MEDIUM",
-    thesis: "Record-breaking rookie TE with generational receiving talent.",
-    whyDiscounted: ["Raiders franchise instability", "QB carousel limits ceiling"],
-    repricingCatalysts: ["Trade to contender", "Pro Bowl selection"],
-    trapRisks: ["Team situation could suppress stats long-term"],
+    thesis: "Elite second-year TE with historic production, now on IR.",
+    whyDiscounted: ["Season-ending IR placement", "Raiders franchise instability"],
+    repricingCatalysts: ["Healthy return in 2025", "Trade to contender"],
+    trapRisks: ["Injury concerns and team dysfunction could persist"],
   },
   // NBA
   {
