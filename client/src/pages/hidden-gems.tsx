@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -229,10 +231,18 @@ function mapHiddenGemToCandidate(gem: HiddenGem): GemCandidate {
 }
 
 export default function HiddenGemsPage() {
-  const { isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading, user } = useAuth();
+  const { toast } = useToast();
   const [sport, setSport] = useState("all");
   const [temperatureFilter, setTemperatureFilter] = useState("all");
   const [verdictFilter, setVerdictFilter] = useState("buy-watch");
+  
+  const { data: adminCheck } = useQuery<{ isAdmin: boolean }>({
+    queryKey: ["/api/admin/check"],
+    enabled: !!user,
+  });
+  
+  const isAdmin = adminCheck?.isAdmin || false;
   
   const { data: gemsData, isLoading: gemsLoading } = useQuery<{
     gems: HiddenGem[];
@@ -245,6 +255,27 @@ export default function HiddenGemsPage() {
     isFallback?: boolean;
   }>({
     queryKey: ["/api/hidden-gems"],
+  });
+  
+  const refreshMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/hidden-gems/refresh");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Hidden Gems Refreshed",
+        description: `Generated ${data.gemsCreated} new gems with current player data.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/hidden-gems"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Refresh Failed",
+        description: error.message || "Failed to refresh hidden gems",
+        variant: "destructive",
+      });
+    },
   });
   
   const allGems: GemCandidate[] = gemsData?.gems?.map(mapHiddenGemToCandidate) || [];
@@ -287,7 +318,21 @@ export default function HiddenGemsPage() {
               {isFallback ? "Featured Players" : "Hidden Gems"}
             </h1>
           </div>
-          <PageShareButton pageSlug="hidden-gems" />
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refreshMutation.mutate()}
+                disabled={refreshMutation.isPending}
+                data-testid="button-refresh-gems"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
+                {refreshMutation.isPending ? "Refreshing..." : "Refresh Gems"}
+              </Button>
+            )}
+            <PageShareButton pageSlug="hidden-gems" />
+          </div>
         </div>
         <p className="text-muted-foreground max-w-2xl">
           {isFallback 
