@@ -180,11 +180,20 @@ export function normalizeEbayQuery(input: string): NormalizedQuery {
     filters.year = parseInt(yearMatch[1]);
   }
   
+  // Check if user explicitly wants RAW/ungraded cards
+  const wantsRaw = /\b(raw|ungraded)\b/i.test(normalized);
+  if (wantsRaw) {
+    filters.condition = "RAW";
+    // Remove "raw" and "ungraded" from the query to clean up
+    normalized = normalized.replace(/\b(raw|ungraded)\b/gi, "").replace(/\s+/g, " ").trim();
+  }
+  
   // Extract grade (e.g., "PSA 10", "BGS 9.5")
   const gradeMatch = normalized.match(/\b(psa|bgs|sgc|cgc|hga|csg)\s*([\d.]+)\b/i);
   if (gradeMatch) {
     filters.grader = gradeMatch[1].toUpperCase();
     filters.grade = gradeMatch[2];
+    filters.condition = "GRADED"; // Explicitly set condition when graded
   }
   
   // Extract set name
@@ -495,17 +504,31 @@ export function calculateMatchScore(
     }
   }
   
-  // Grade check (important if graded)
-  if (filters.grader && filters.grade) {
+  // Condition check: RAW vs GRADED filtering
+  const titleHasGrader = GRADERS.some(g => title.includes(g));
+  const titleIsRaw = !titleHasGrader || title.includes("raw") || title.includes("ungraded");
+  
+  if (filters.condition === "RAW") {
+    // User wants raw cards - reject anything with a grader
     maxScore += 0.2;
-    const gradePattern = new RegExp(`${filters.grader}\\s*${filters.grade}`, "i");
-    if (gradePattern.test(title)) {
+    if (titleHasGrader && !title.includes("raw") && !title.includes("ungraded")) {
+      // This is a graded card, user wants raw - hard reject
+      return 0;
+    }
+    score += 0.2; // Bonus for being ungraded
+  } else if (filters.condition === "GRADED" || (filters.grader && filters.grade)) {
+    // User wants graded cards
+    maxScore += 0.2;
+    const gradePattern = filters.grader && filters.grade 
+      ? new RegExp(`${filters.grader}\\s*${filters.grade}`, "i")
+      : null;
+    if (gradePattern && gradePattern.test(title)) {
       score += 0.2;
-    } else if (title.includes(filters.grader.toLowerCase())) {
+    } else if (filters.grader && title.includes(filters.grader.toLowerCase())) {
       // Has grader but different grade
       score += 0.05;
-    } else if (filters.grader && !title.includes("raw") && !GRADERS.some(g => title.includes(g))) {
-      // Looking for graded but this is raw
+    } else if (titleIsRaw) {
+      // Looking for graded but this is raw - hard reject
       return 0;
     }
   }

@@ -934,6 +934,7 @@ export type CompsQueryFilters = {
   grade?: string;
   grader?: string;
   cardNumber?: string;
+  condition?: "RAW" | "GRADED"; // Whether user wants raw/ungraded or graded comps
 };
 
 // ==================== PLAYER OUTLOOK V2 TYPES ====================
