@@ -36,14 +36,14 @@ function normalizePlayerKey(sport: string, playerName: string): string {
   return `${sport.toLowerCase()}:${playerName.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
 }
 
-// TTL by temperature: Hot players refresh more often
+// TTL by temperature: Hot players refresh more often, but all have extended TTLs
 function getTtlMs(temperature: MarketTemperature): number {
   switch (temperature) {
-    case "HOT": return 24 * 60 * 60 * 1000; // 1 day
-    case "WARM": return 3 * 24 * 60 * 60 * 1000; // 3 days
-    case "NEUTRAL": return 7 * 24 * 60 * 60 * 1000; // 7 days
-    case "COOLING": return 7 * 24 * 60 * 60 * 1000; // 7 days
-    default: return 3 * 24 * 60 * 60 * 1000;
+    case "HOT": return 7 * 24 * 60 * 60 * 1000; // 7 days (was 1 day)
+    case "WARM": return 14 * 24 * 60 * 60 * 1000; // 14 days (was 3 days)
+    case "NEUTRAL": return 30 * 24 * 60 * 60 * 1000; // 30 days (was 7 days)
+    case "COOLING": return 30 * 24 * 60 * 60 * 1000; // 30 days (was 7 days)
+    default: return 14 * 24 * 60 * 60 * 1000;
   }
 }
 
