@@ -260,8 +260,7 @@ export default function HiddenGemsPage() {
   
   const refreshMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/hidden-gems/refresh");
-      return response.json();
+      return await apiRequest("POST", "/api/hidden-gems/refresh");
     },
     onSuccess: (data) => {
       toast({
@@ -281,8 +280,7 @@ export default function HiddenGemsPage() {
   
   const seedMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/hidden-gems/seed?count=50");
-      return response.json();
+      return await apiRequest("POST", "/api/hidden-gems/seed?count=50");
     },
     onSuccess: (data) => {
       toast({
