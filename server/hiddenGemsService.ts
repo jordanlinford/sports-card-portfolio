@@ -544,3 +544,122 @@ export function getFallbackFeaturedGems(): HiddenGem[] {
     createdAt: new Date(),
   }));
 }
+
+// Popular players to seed the database with outlooks
+// Diverse mix of verdicts expected: ACCUMULATE, HOLD_CORE, AVOID, SPECULATIVE
+const SEED_PLAYERS: Array<{ name: string; sport: string }> = [
+  // NFL - Stars & Established
+  { name: "Patrick Mahomes", sport: "NFL" },
+  { name: "Josh Allen", sport: "NFL" },
+  { name: "Lamar Jackson", sport: "NFL" },
+  { name: "Joe Burrow", sport: "NFL" },
+  { name: "Justin Jefferson", sport: "NFL" },
+  { name: "Ja'Marr Chase", sport: "NFL" },
+  { name: "Tyreek Hill", sport: "NFL" },
+  { name: "CeeDee Lamb", sport: "NFL" },
+  { name: "Travis Kelce", sport: "NFL" },
+  { name: "Derrick Henry", sport: "NFL" },
+  // NFL - Rising/Younger
+  { name: "CJ Stroud", sport: "NFL" },
+  { name: "Caleb Williams", sport: "NFL" },
+  { name: "Jayden Daniels", sport: "NFL" },
+  { name: "Puka Nacua", sport: "NFL" },
+  { name: "Brock Bowers", sport: "NFL" },
+  { name: "Marvin Harrison Jr", sport: "NFL" },
+  { name: "Malik Nabers", sport: "NFL" },
+  // NFL - Potential Avoids/Busts
+  { name: "Trey Lance", sport: "NFL" },
+  { name: "Zach Wilson", sport: "NFL" },
+  { name: "Bryce Young", sport: "NFL" },
+  
+  // NBA - Stars
+  { name: "Victor Wembanyama", sport: "NBA" },
+  { name: "Luka Doncic", sport: "NBA" },
+  { name: "Jayson Tatum", sport: "NBA" },
+  { name: "Anthony Edwards", sport: "NBA" },
+  { name: "Shai Gilgeous-Alexander", sport: "NBA" },
+  { name: "Giannis Antetokounmpo", sport: "NBA" },
+  { name: "Stephen Curry", sport: "NBA" },
+  { name: "LeBron James", sport: "NBA" },
+  // NBA - Rising
+  { name: "Tyrese Maxey", sport: "NBA" },
+  { name: "Chet Holmgren", sport: "NBA" },
+  { name: "Paolo Banchero", sport: "NBA" },
+  { name: "Tyrese Haliburton", sport: "NBA" },
+  // NBA - Potential Avoids
+  { name: "Ben Simmons", sport: "NBA" },
+  { name: "James Wiseman", sport: "NBA" },
+  
+  // MLB - Stars
+  { name: "Shohei Ohtani", sport: "MLB" },
+  { name: "Ronald Acuna Jr", sport: "MLB" },
+  { name: "Mookie Betts", sport: "MLB" },
+  { name: "Mike Trout", sport: "MLB" },
+  { name: "Juan Soto", sport: "MLB" },
+  // MLB - Rising
+  { name: "Gunnar Henderson", sport: "MLB" },
+  { name: "Elly De La Cruz", sport: "MLB" },
+  { name: "Corbin Carroll", sport: "MLB" },
+  { name: "Jackson Holliday", sport: "MLB" },
+  { name: "Paul Skenes", sport: "MLB" },
+  
+  // NHL - Stars
+  { name: "Connor McDavid", sport: "NHL" },
+  { name: "Connor Bedard", sport: "NHL" },
+  { name: "Auston Matthews", sport: "NHL" },
+  { name: "Nathan MacKinnon", sport: "NHL" },
+  // NHL - Rising
+  { name: "Matvei Michkov", sport: "NHL" },
+  { name: "Macklin Celebrini", sport: "NHL" },
+];
+
+export async function seedPlayerOutlooks(
+  getPlayerOutlookFn: (request: { playerName: string; sport: string }) => Promise<any>,
+  maxPlayers: number = 50
+): Promise<{
+  success: boolean;
+  analyzed: number;
+  failed: number;
+  results: Array<{ player: string; sport: string; verdict: string | null; error?: string }>;
+}> {
+  console.log(`[Seed] Starting player outlook seeding, max: ${maxPlayers}`);
+  
+  const results: Array<{ player: string; sport: string; verdict: string | null; error?: string }> = [];
+  let analyzed = 0;
+  let failed = 0;
+  
+  const playersToSeed = SEED_PLAYERS.slice(0, maxPlayers);
+  
+  for (const player of playersToSeed) {
+    try {
+      console.log(`[Seed] Analyzing ${player.name} (${player.sport})...`);
+      
+      const outlook = await getPlayerOutlookFn({
+        playerName: player.name,
+        sport: player.sport.toLowerCase(),
+      });
+      
+      const verdict = outlook?.investmentCall?.verdict || null;
+      results.push({ player: player.name, sport: player.sport, verdict });
+      analyzed++;
+      
+      console.log(`[Seed] ${player.name}: ${verdict || "NO_VERDICT"}`);
+      
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.error(`[Seed] Failed to analyze ${player.name}:`, error);
+      results.push({ 
+        player: player.name, 
+        sport: player.sport, 
+        verdict: null, 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      });
+      failed++;
+    }
+  }
+  
+  console.log(`[Seed] Complete. Analyzed: ${analyzed}, Failed: ${failed}`);
+  
+  return { success: failed < analyzed, analyzed, failed, results };
+}

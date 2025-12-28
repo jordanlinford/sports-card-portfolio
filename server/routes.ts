@@ -5261,7 +5261,8 @@ Allow: /
   // Hidden Gems - Data-driven undervalued player picks
   // ============================================================================
   
-  const { getActiveHiddenGems, refreshHiddenGems, getHiddenGemsStats, getFallbackFeaturedGems } = await import("./hiddenGemsService");
+  const { getActiveHiddenGems, refreshHiddenGems, getHiddenGemsStats, getFallbackFeaturedGems, seedPlayerOutlooks } = await import("./hiddenGemsService");
+  const { getPlayerOutlook } = await import("./playerOutlookEngine");
 
   // GET /api/hidden-gems - Get active hidden gems (public)
   app.get("/api/hidden-gems", async (req, res) => {
@@ -5339,6 +5340,45 @@ Allow: /
     } catch (error) {
       console.error("[Hidden Gems] Error fetching stats:", error);
       res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  // POST /api/hidden-gems/seed - Admin-only: Seed database with popular player outlooks
+  app.post("/api/hidden-gems/seed", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      // Check if user is admin
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const maxPlayers = parseInt(req.query.count as string) || 50;
+      
+      console.log(`[Seed] Admin ${userId} triggered player outlook seeding (max: ${maxPlayers})...`);
+      
+      // Run seeding in background and return immediately
+      res.json({
+        success: true,
+        message: `Seeding started for up to ${maxPlayers} players. Check server logs for progress.`,
+        note: "This runs in the background. Refresh Hidden Gems after completion to see new data.",
+      });
+
+      // Execute seeding after response is sent
+      seedPlayerOutlooks(getPlayerOutlook, maxPlayers)
+        .then((result) => {
+          console.log(`[Seed] Complete:`, result);
+        })
+        .catch((error) => {
+          console.error(`[Seed] Error:`, error);
+        });
+    } catch (error) {
+      console.error("[Seed] Error starting seed:", error);
+      res.status(500).json({ error: "Failed to start seeding" });
     }
   });
 

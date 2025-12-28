@@ -29,6 +29,7 @@ import {
   Filter,
   Gem,
   RefreshCw,
+  Database,
 } from "lucide-react";
 import type { PlayerVerdict, StockTier, MarketTemperature, HiddenGem } from "@shared/schema";
 import { PageShareButton } from "@/components/page-share-button";
@@ -278,6 +279,26 @@ export default function HiddenGemsPage() {
     },
   });
   
+  const seedMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/hidden-gems/seed?count=50");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Seeding Started",
+        description: data.message,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Seeding Failed",
+        description: error.message || "Failed to start seeding",
+        variant: "destructive",
+      });
+    },
+  });
+  
   const allGems: GemCandidate[] = gemsData?.gems?.map(mapHiddenGemToCandidate) || [];
   const lastRefresh = gemsData?.stats?.lastRefresh;
   const isFallback = gemsData?.isFallback || false;
@@ -320,16 +341,28 @@ export default function HiddenGemsPage() {
           </div>
           <div className="flex items-center gap-2">
             {isAdmin && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refreshMutation.mutate()}
-                disabled={refreshMutation.isPending}
-                data-testid="button-refresh-gems"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
-                {refreshMutation.isPending ? "Refreshing..." : "Refresh Gems"}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => seedMutation.mutate()}
+                  disabled={seedMutation.isPending}
+                  data-testid="button-seed-players"
+                >
+                  <Database className={`h-4 w-4 mr-2 ${seedMutation.isPending ? "animate-pulse" : ""}`} />
+                  {seedMutation.isPending ? "Seeding..." : "Seed Players"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refreshMutation.mutate()}
+                  disabled={refreshMutation.isPending}
+                  data-testid="button-refresh-gems"
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
+                  {refreshMutation.isPending ? "Refreshing..." : "Refresh Gems"}
+                </Button>
+              </>
             )}
             <PageShareButton pageSlug="hidden-gems" />
           </div>
