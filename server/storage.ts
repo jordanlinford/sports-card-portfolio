@@ -28,6 +28,7 @@ import {
   splitInstances,
   seats,
   splitWebhookEvents,
+  blogPosts,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -89,6 +90,9 @@ import {
   type SplitStatus,
   type SplitWebhookEvent,
   isValidStatusTransition,
+  type BlogPost,
+  type InsertBlogPost,
+  type BlogPostWithAuthor,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -351,6 +355,15 @@ export interface IStorage {
   // Webhook idempotency
   hasProcessedWebhookEvent(eventId: string): Promise<boolean>;
   recordProcessedWebhookEvent(eventId: string, eventType: string, metadata?: any): Promise<SplitWebhookEvent>;
+
+  // Blog operations
+  getBlogPosts(publishedOnly?: boolean): Promise<BlogPostWithAuthor[]>;
+  getBlogPostBySlug(slug: string): Promise<BlogPostWithAuthor | undefined>;
+  getBlogPostById(id: number): Promise<BlogPost | undefined>;
+  createBlogPost(data: InsertBlogPost): Promise<BlogPost>;
+  updateBlogPost(id: number, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined>;
+  deleteBlogPost(id: number): Promise<void>;
+  toggleBlogPostPublished(id: number): Promise<BlogPost | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2932,6 +2945,88 @@ export class DatabaseStorage implements IStorage {
       .values({ eventId, eventType, metadata })
       .returning();
     return event;
+  }
+
+  // Blog operations
+  async getBlogPosts(publishedOnly?: boolean): Promise<BlogPostWithAuthor[]> {
+    const posts = publishedOnly 
+      ? await db.select().from(blogPosts).where(eq(blogPosts.isPublished, true)).orderBy(desc(blogPosts.publishedAt))
+      : await db.select().from(blogPosts).orderBy(desc(blogPosts.createdAt));
+    
+    const postsWithAuthor: BlogPostWithAuthor[] = [];
+    for (const post of posts) {
+      let author = null;
+      if (post.authorId) {
+        const [user] = await db.select({
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          handle: users.handle,
+          profileImageUrl: users.profileImageUrl,
+        }).from(users).where(eq(users.id, post.authorId));
+        author = user || null;
+      }
+      postsWithAuthor.push({ ...post, author });
+    }
+    return postsWithAuthor;
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<BlogPostWithAuthor | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.slug, slug));
+    if (!post) return undefined;
+    
+    let author = null;
+    if (post.authorId) {
+      const [user] = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        handle: users.handle,
+        profileImageUrl: users.profileImageUrl,
+      }).from(users).where(eq(users.id, post.authorId));
+      author = user || null;
+    }
+    return { ...post, author };
+  }
+
+  async getBlogPostById(id: number): Promise<BlogPost | undefined> {
+    const [post] = await db.select().from(blogPosts).where(eq(blogPosts.id, id));
+    return post;
+  }
+
+  async createBlogPost(data: InsertBlogPost): Promise<BlogPost> {
+    const [post] = await db.insert(blogPosts).values(data).returning();
+    return post;
+  }
+
+  async updateBlogPost(id: number, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined> {
+    const [post] = await db
+      .update(blogPosts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return post;
+  }
+
+  async deleteBlogPost(id: number): Promise<void> {
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
+  }
+
+  async toggleBlogPostPublished(id: number): Promise<BlogPost | undefined> {
+    const post = await this.getBlogPostById(id);
+    if (!post) return undefined;
+    
+    const isPublished = !post.isPublished;
+    const [updated] = await db
+      .update(blogPosts)
+      .set({
+        isPublished,
+        publishedAt: isPublished ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated;
   }
 }
 
