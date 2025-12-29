@@ -277,6 +277,11 @@ export function normalizeEbayQuery(input: string): NormalizedQuery {
   if (filters.parallel) parts.push(filters.parallel);
   if (filters.grader && filters.grade) parts.push(`${filters.grader} ${filters.grade}`);
   
+  // Add negative search terms for RAW cards to exclude graded listings
+  if (filters.condition === "RAW") {
+    parts.push("-PSA -SGC -CGC -BGS -HGA -CSG -graded");
+  }
+  
   const canonicalQuery = parts.join(" ").trim() || normalized;
   const queryHash = createHash("sha256").update(canonicalQuery.toLowerCase()).digest("hex");
   
@@ -300,6 +305,9 @@ const MIN_COMPS_THRESHOLD = 12; // Stop broadening when we have this many good c
 export function generateQueryLadder(filters: CompsQueryFilters): string[] {
   const ladder: string[] = [];
   
+  // Negative terms for RAW condition - must be appended to ALL queries in the ladder
+  const rawExclusions = filters.condition === "RAW" ? " -PSA -SGC -CGC -BGS -HGA -CSG -graded" : "";
+  
   // Level 0: Full query with all filters (most specific)
   const fullParts: string[] = [];
   if (filters.year) fullParts.push(String(filters.year));
@@ -307,7 +315,7 @@ export function generateQueryLadder(filters: CompsQueryFilters): string[] {
   if (filters.player) fullParts.push(filters.player);
   if (filters.parallel) fullParts.push(filters.parallel);
   if (filters.grader && filters.grade) fullParts.push(`${filters.grader} ${filters.grade}`);
-  if (fullParts.length > 0) ladder.push(fullParts.join(" "));
+  if (fullParts.length > 0) ladder.push(fullParts.join(" ") + rawExclusions);
   
   // Level 1: Remove parallel (keep player + year + set + grade)
   if (filters.parallel) {
@@ -316,8 +324,9 @@ export function generateQueryLadder(filters: CompsQueryFilters): string[] {
     if (filters.set) parts.push(filters.set);
     if (filters.player) parts.push(filters.player);
     if (filters.grader && filters.grade) parts.push(`${filters.grader} ${filters.grade}`);
-    if (parts.length > 0 && parts.join(" ") !== ladder[ladder.length - 1]) {
-      ladder.push(parts.join(" "));
+    const query = parts.join(" ") + rawExclusions;
+    if (parts.length > 0 && query !== ladder[ladder.length - 1]) {
+      ladder.push(query);
     }
   }
   
@@ -328,8 +337,9 @@ export function generateQueryLadder(filters: CompsQueryFilters): string[] {
     if (filters.set) parts.push(filters.set);
     if (filters.player) parts.push(filters.player);
     if (filters.grader) parts.push(filters.grader); // Just grader, no specific grade
-    if (parts.length > 0 && parts.join(" ") !== ladder[ladder.length - 1]) {
-      ladder.push(parts.join(" "));
+    const query = parts.join(" ") + rawExclusions;
+    if (parts.length > 0 && query !== ladder[ladder.length - 1]) {
+      ladder.push(query);
     }
   }
   
@@ -339,23 +349,25 @@ export function generateQueryLadder(filters: CompsQueryFilters): string[] {
     if (filters.year) parts.push(String(filters.year));
     if (filters.player) parts.push(filters.player);
     if (filters.grader) parts.push(filters.grader);
-    if (parts.length > 0 && parts.join(" ") !== ladder[ladder.length - 1]) {
-      ladder.push(parts.join(" "));
+    const query = parts.join(" ") + rawExclusions;
+    if (parts.length > 0 && query !== ladder[ladder.length - 1]) {
+      ladder.push(query);
     }
   }
   
   // Level 4: Just player + year (broadest useful query)
   if (filters.player && filters.year) {
-    const parts = [String(filters.year), filters.player];
-    if (parts.join(" ") !== ladder[ladder.length - 1]) {
-      ladder.push(parts.join(" "));
+    const query = `${filters.year} ${filters.player}${rawExclusions}`;
+    if (query !== ladder[ladder.length - 1]) {
+      ladder.push(query);
     }
   }
   
   // Level 5: Just player (very broad, last resort)
   if (filters.player) {
-    if (filters.player !== ladder[ladder.length - 1]) {
-      ladder.push(filters.player);
+    const query = filters.player + rawExclusions;
+    if (query !== ladder[ladder.length - 1]) {
+      ladder.push(query);
     }
   }
   
