@@ -204,8 +204,26 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Ensure default promo codes exist
   await ensureDefaultPromoCodes();
 
+  // Helper to get origin URL (prefer HTTPS and deployment domain)
+  const getOriginUrl = (req: any) => {
+    const host = process.env.REPLIT_DEPLOYMENT_DOMAIN || req.headers.host;
+    // Always use HTTPS in production, fallback to forwarded proto or https
+    const proto = process.env.REPLIT_DEPLOYMENT_DOMAIN 
+      ? 'https' 
+      : (req.headers['x-forwarded-proto'] || 'https');
+    return `${proto}://${host}`;
+  };
+  
+  // Helper to safely encode content for JSON-LD (prevent script breakout)
+  const safeJsonLd = (obj: any) => {
+    return JSON.stringify(obj)
+      .replace(/<\/script/gi, '<\\/script')
+      .replace(/<!--/g, '<\\!--');
+  };
+
   // Robots.txt - allow social media crawlers
   app.get("/robots.txt", (req, res) => {
+    const origin = getOriginUrl(req);
     const robotsTxt = `User-agent: facebookexternalhit
 Allow: /
 
@@ -226,6 +244,8 @@ Allow: /
 
 User-agent: *
 Allow: /
+
+Sitemap: ${origin}/sitemap.xml
 `;
     res.type('text/plain').send(robotsTxt);
   });
@@ -294,6 +314,107 @@ Allow: /
       console.error('[OG Tags] Error generating meta tags:', error);
       next();
     }
+  });
+
+  // Serve OG meta tags for blog post pages (social media previews)
+  app.get("/blog/:slug", async (req: any, res, next) => {
+    const userAgent = req.headers['user-agent'] || '';
+    
+    if (!isSocialCrawler(userAgent)) {
+      return next();
+    }
+
+    try {
+      const { slug } = req.params;
+      const post = await storage.getBlogPostBySlug(slug);
+      
+      if (!post || !post.isPublished) return next();
+
+      const origin = getOriginUrl(req);
+      const url = `${origin}/blog/${slug}`;
+      const title = escapeHtml(post.title || '');
+      const rawDescription = post.excerpt || (post.content ? post.content.substring(0, 160) : '');
+      const description = escapeHtml(rawDescription);
+      const imageUrl = post.heroImageUrl || '';
+      const publishedDate = post.publishedAt ? new Date(post.publishedAt).toISOString() : '';
+
+      const jsonLd = safeJsonLd({
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": post.title || '',
+        "description": rawDescription,
+        "datePublished": post.publishedAt,
+        "dateModified": post.updatedAt,
+        "mainEntityOfPage": { "@type": "WebPage", "@id": url },
+        ...(post.heroImageUrl && { "image": post.heroImageUrl }),
+        "publisher": { "@type": "Organization", "name": "Sports Card Portfolio" }
+      });
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>${title} | Sports Card Portfolio</title>
+  <meta name="description" content="${description}" />
+  <meta property="og:title" content="${title}" />
+  <meta property="og:description" content="${description}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="${url}" />
+  ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
+  ${publishedDate ? `<meta property="article:published_time" content="${publishedDate}" />` : ''}
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${title}" />
+  <meta name="twitter:description" content="${description}" />
+  ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
+  <link rel="canonical" href="${url}" />
+  <script type="application/ld+json">${jsonLd}</script>
+  <meta http-equiv="refresh" content="0;url=${url}" />
+</head>
+<body>
+  <p>Redirecting to <a href="${url}">${title}</a>...</p>
+</body>
+</html>`;
+
+      res.type('text/html').send(html);
+    } catch (error) {
+      console.error('[OG Tags] Error generating blog meta tags:', error);
+      next();
+    }
+  });
+
+  // Serve OG meta tags for blog listing page (social media previews)
+  app.get("/blog", async (req: any, res, next) => {
+    const userAgent = req.headers['user-agent'] || '';
+    
+    if (!isSocialCrawler(userAgent)) {
+      return next();
+    }
+
+    const origin = getOriginUrl(req);
+    const url = `${origin}/blog`;
+    const title = "Blog | Sports Card Portfolio";
+    const description = "News, updates, and insights about sports card collecting and investing. Expert tips on building and growing your card portfolio.";
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <title>${title}</title>
+  <meta name="description" content="${description}" />
+  <meta property="og:title" content="${title}" />
+  <meta property="og:description" content="${description}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="${url}" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="${title}" />
+  <meta name="twitter:description" content="${description}" />
+  <link rel="canonical" href="${url}" />
+  <meta http-equiv="refresh" content="0;url=${url}" />
+</head>
+<body>
+  <p>Redirecting to <a href="${url}">${title}</a>...</p>
+</body>
+</html>`;
+
+    res.type('text/html').send(html);
   });
 
   // Stripe webhook endpoint - uses rawBody captured in index.ts
@@ -3845,7 +3966,7 @@ Allow: /
   app.get("/sitemap.xml", async (req, res) => {
     try {
       const posts = await storage.getBlogPosts(true);
-      const baseUrl = `https://${req.get('host')}`;
+      const baseUrl = getOriginUrl(req);
       
       let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
