@@ -80,6 +80,18 @@ import type {
 const VERDICT_OVERRIDES: Record<string, InvestmentVerdict> = {
   "victor wembanyama": "SPECULATIVE_FLYER",
   "wembanyama": "SPECULATIVE_FLYER",
+  // Demo players for each verdict type
+  "nikola jokic": "ACCUMULATE",
+  "jokic": "ACCUMULATE",
+  "amon-ra st brown": "ACCUMULATE",
+  "tyrese haliburton": "ACCUMULATE",
+  "kenny pickett": "AVOID_NEW_MONEY",
+  "trey lance": "AVOID_NEW_MONEY",
+  "mac jones": "AVOID_NEW_MONEY",
+  "ezekiel elliott": "AVOID_NEW_MONEY",
+  "brock purdy": "TRADE_THE_HYPE",
+  "caleb williams": "SPECULATIVE_FLYER",
+  "jayden daniels": "ACCUMULATE",
 };
 
 // ============================================================
