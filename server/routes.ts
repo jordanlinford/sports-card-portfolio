@@ -335,7 +335,8 @@ Sitemap: ${origin}/sitemap.xml
       const title = escapeHtml(post.title || '');
       const rawDescription = post.excerpt || (post.content ? post.content.substring(0, 160) : '');
       const description = escapeHtml(rawDescription);
-      const imageUrl = post.heroImageUrl || '';
+      const rawImageUrl = post.heroImageUrl || '';
+      const imageUrl = rawImageUrl.startsWith('/') ? `${origin}${rawImageUrl}` : rawImageUrl;
       const publishedDate = post.publishedAt ? new Date(post.publishedAt).toISOString() : '';
 
       const jsonLd = safeJsonLd({
@@ -346,7 +347,7 @@ Sitemap: ${origin}/sitemap.xml
         "datePublished": post.publishedAt,
         "dateModified": post.updatedAt,
         "mainEntityOfPage": { "@type": "WebPage", "@id": url },
-        ...(post.heroImageUrl && { "image": post.heroImageUrl }),
+        ...(imageUrl && { "image": imageUrl }),
         "publisher": { "@type": "Organization", "name": "Sports Card Portfolio" }
       });
 
@@ -359,7 +360,9 @@ Sitemap: ${origin}/sitemap.xml
   <meta property="og:description" content="${description}" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${url}" />
-  ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />` : ''}
+  ${imageUrl ? `<meta property="og:image" content="${imageUrl}" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />` : ''}
   ${publishedDate ? `<meta property="article:published_time" content="${publishedDate}" />` : ''}
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${title}" />

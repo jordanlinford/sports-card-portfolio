@@ -59,8 +59,10 @@ export function HeroImageUploader({ value, onChange }: HeroImageUploaderProps) {
         throw new Error("Failed to upload file");
       }
 
-      const publicUrl = uploadURL.split("?")[0];
-      onChange(publicUrl);
+      const gcsUrl = uploadURL.split("?")[0];
+      const pathMatch = gcsUrl.match(/\/uploads\/([^/]+)$/);
+      const objectPath = pathMatch ? `/objects/uploads/${pathMatch[1]}` : gcsUrl;
+      onChange(objectPath);
 
       toast({
         title: "Image uploaded",
@@ -185,6 +187,9 @@ export function HeroImageUploader({ value, onChange }: HeroImageUploaderProps) {
             <ImageIcon className="h-8 w-8 text-muted-foreground" />
             <p className="text-sm text-muted-foreground">
               Drag and drop an image here, or click to browse
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Recommended: 1200 x 630px for best social media previews
             </p>
             <p className="text-xs text-muted-foreground">
               JPG, PNG, GIF, or WebP up to 10MB
