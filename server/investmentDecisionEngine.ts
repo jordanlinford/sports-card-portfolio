@@ -866,12 +866,17 @@ function decideVerdict(
   // High liquidity (>= 60) + role stability > 55 indicates established player
   // ============================================================
   if (hasProvenDemand && !isPrime) {
-    // Accumulate exception: clearly underpriced
-    if (mispricingScore >= 15 && downsideRiskScore <= 65) {
-      return { verdict: "ACCUMULATE", reason: "Established player with compelling value" };
+    // Accumulate: Low downside risk is the key signal (mispricingScore threshold relaxed heavily)
+    // Allow mispricingScore >= -30 (most WARM/HOT players are -20 to -50)
+    if (mispricingScore >= -30 && downsideRiskScore <= 55) {
+      return { verdict: "ACCUMULATE", reason: "Established player with manageable downside" };
     }
-    // Default for proven demand: HOLD_CORE (market says they're established)
-    return { verdict: "HOLD_CORE", reason: "High market demand indicates established player - stable hold" };
+    // TRADE_THE_HYPE: Very overpriced with high downside
+    if (mispricingScore <= -40 && downsideRiskScore >= 60) {
+      return { verdict: "TRADE_THE_HYPE", reason: "Prices elevated beyond fundamentals - consider selling" };
+    }
+    // Middle ground: HOLD_CORE
+    return { verdict: "HOLD_CORE", reason: "High market demand - hold, but don't chase at current prices" };
   }
 
   // ============================================================
@@ -879,25 +884,37 @@ function decideVerdict(
   // Rookies/YEAR_2/UNKNOWN without proven demand are uncertain
   // ============================================================
   if (earlyCareer) {
-    // Accumulate exception: clearly underpriced with good fundamentals
-    if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
-      return { verdict: "ACCUMULATE", reason: "Early-career with compelling value" };
+    // Accumulate: Strong signals despite youth (HEAVILY loosened)
+    if (mispricingScore >= -25 && liquidityScore >= 50 && downsideRiskScore <= 55) {
+      return { verdict: "ACCUMULATE", reason: "Early-career with strong market signals" };
+    }
+    // AVOID: High downside with poor valuation
+    if (downsideRiskScore >= 65 && mispricingScore <= -30) {
+      return { verdict: "AVOID_NEW_MONEY", reason: "Early-career with elevated risk and high prices" };
     }
     // Default for early-career: SPECULATIVE (uncertainty, not avoidance)
     return { verdict: "SPECULATIVE_FLYER", reason: "Early-career - high uncertainty, needs more sample size" };
   }
 
   // ============================================================
-  // PRECEDENCE 7: PRIME players → HOLD_CORE or ACCUMULATE
-  // Established players should not be SPECULATIVE or AVOID by default
+  // PRECEDENCE 7: PRIME players → ACCUMULATE, HOLD_CORE, or TRADE_THE_HYPE
+  // Established players get the full spectrum of verdicts
   // ============================================================
   if (isPrime) {
-    // Accumulate: clearly underpriced with good setup
-    if (mispricingScore >= 15 && liquidityScore >= 55 && downsideRiskScore <= 65) {
-      return { verdict: "ACCUMULATE", reason: "Proven player with compelling value" };
+    // Accumulate: Low downside is the primary signal (HEAVILY loosened mispricing)
+    if (mispricingScore >= -25 && liquidityScore >= 50 && downsideRiskScore <= 55) {
+      return { verdict: "ACCUMULATE", reason: "Prime player with strong fundamentals" };
     }
-    // Default for PRIME: HOLD_CORE (neutral EV, not uncertain)
-    return { verdict: "HOLD_CORE", reason: "Established player - stable core hold" };
+    // TRADE_THE_HYPE: Overpriced with elevated risk
+    if (mispricingScore <= -35 && downsideRiskScore >= 60) {
+      return { verdict: "TRADE_THE_HYPE", reason: "Prime but prices exceed value - consider taking profits" };
+    }
+    // AVOID: Very overpriced with high risk
+    if (mispricingScore <= -45 && downsideRiskScore >= 65) {
+      return { verdict: "AVOID_NEW_MONEY", reason: "Prime but severely overpriced with elevated risk" };
+    }
+    // Default for PRIME: HOLD_CORE
+    return { verdict: "HOLD_CORE", reason: "Prime player - hold position, prices are fair to elevated" };
   }
 
   // ============================================================
