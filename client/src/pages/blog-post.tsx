@@ -21,6 +21,74 @@ function extractVideoId(url: string, provider: string): string | null {
   return null;
 }
 
+function parseTextWithLinks(text: string): (string | JSX.Element)[] {
+  const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const urlRegex = /(https?:\/\/[^\s<]+[^\s<.,;:!?'"\])>])/g;
+  
+  const parts: (string | JSX.Element)[] = [];
+  let lastIndex = 0;
+  let match;
+  let keyCounter = 0;
+  
+  while ((match = linkRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    const linkText = match[1];
+    const linkUrl = match[2];
+    parts.push(
+      <a
+        key={`link-${keyCounter++}`}
+        href={linkUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-primary underline hover:no-underline"
+      >
+        {linkText}
+      </a>
+    );
+    lastIndex = match.index + match[0].length;
+  }
+  
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  
+  const finalParts: (string | JSX.Element)[] = [];
+  for (const part of parts) {
+    if (typeof part === 'string') {
+      let urlLastIndex = 0;
+      let urlMatch;
+      const tempUrlRegex = new RegExp(urlRegex.source, 'g');
+      while ((urlMatch = tempUrlRegex.exec(part)) !== null) {
+        if (urlMatch.index > urlLastIndex) {
+          finalParts.push(part.slice(urlLastIndex, urlMatch.index));
+        }
+        const url = urlMatch[1];
+        finalParts.push(
+          <a
+            key={`autolink-${keyCounter++}`}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary underline hover:no-underline"
+          >
+            {url}
+          </a>
+        );
+        urlLastIndex = urlMatch.index + urlMatch[0].length;
+      }
+      if (urlLastIndex < part.length) {
+        finalParts.push(part.slice(urlLastIndex));
+      }
+    } else {
+      finalParts.push(part);
+    }
+  }
+  
+  return finalParts;
+}
+
 function VideoEmbed({ provider, url, caption }: { provider: string; url: string; caption?: string }) {
   const videoId = extractVideoId(url, provider);
   
@@ -199,7 +267,7 @@ export default function BlogPostPage() {
         <div className="prose prose-neutral dark:prose-invert max-w-none" data-testid="text-post-content">
           {post.content.split('\n').map((paragraph, index) => (
             paragraph.trim() ? (
-              <p key={index}>{paragraph}</p>
+              <p key={index}>{parseTextWithLinks(paragraph)}</p>
             ) : (
               <br key={index} />
             )
