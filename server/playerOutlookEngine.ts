@@ -752,6 +752,8 @@ async function generateFreshOutlook(
       const stageMap: Record<string, PlayerStage> = {
         "ROOKIE": "ROOKIE",
         "YEAR_2": "YEAR_2",
+        "YEAR_3": "YEAR_3",
+        "YEAR_4": "YEAR_4",
         "PRIME": "PRIME",
         "VETERAN": "VETERAN",
         "AGING": "AGING",
@@ -778,7 +780,9 @@ async function generateFreshOutlook(
     // Re-run classification with registry stage for correct investment signals
     const registryStageMap: Record<string, PlayerStage> = {
       "ROOKIE": "ROOKIE",
-      "YEAR_2": "YEAR_2", 
+      "YEAR_2": "YEAR_2",
+      "YEAR_3": "YEAR_3",
+      "YEAR_4": "YEAR_4",
       "PRIME": "PRIME",
       "VETERAN": "VETERAN",
       "AGING": "AGING",
