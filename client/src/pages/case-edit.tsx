@@ -209,7 +209,7 @@ export default function CaseEdit() {
   const [showAddCard, setShowAddCard] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [duplicateCheckTitle, setDuplicateCheckTitle] = useState("");
 
   useEffect(() => {
@@ -236,6 +236,11 @@ export default function CaseEdit() {
   });
 
   const isPro = user?.subscriptionStatus === "PRO";
+
+  // Derive selected card from the latest query data to ensure updates are reflected
+  const selectedCard = selectedCardId && displayCase?.cards
+    ? displayCase.cards.find(c => c.id === selectedCardId) || null
+    : null;
 
   // Duplicate detection - check when title changes
   const { data: duplicates } = useQuery<CardType[]>({
@@ -1549,7 +1554,7 @@ export default function CaseEdit() {
                         key={card.id}
                         card={card}
                         onDelete={() => deleteCardMutation.mutate(card.id)}
-                        onClick={() => setSelectedCard(card)}
+                        onClick={() => setSelectedCardId(card.id)}
                       />
                     ))}
                   </div>
@@ -1563,7 +1568,7 @@ export default function CaseEdit() {
       <CardDetailModal
         card={selectedCard}
         isOpen={!!selectedCard}
-        onClose={() => setSelectedCard(null)}
+        onClose={() => setSelectedCardId(null)}
         displayCaseId={parseInt(id || "0")}
         canEdit={true}
         isPro={isPro}
