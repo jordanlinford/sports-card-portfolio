@@ -1861,6 +1861,7 @@ export const blogPosts = pgTable("blog_posts", {
   title: varchar("title", { length: 500 }).notNull(),
   excerpt: text("excerpt"),
   content: text("content").notNull(),
+  contentFormat: varchar("content_format", { length: 10 }).default("text").notNull(),
   heroImageUrl: varchar("hero_image_url", { length: 1000 }),
   videoEmbeds: jsonb("video_embeds").$type<Array<{ provider: string; url: string; caption?: string }>>().default([]),
   isPublished: boolean("is_published").default(false).notNull(),

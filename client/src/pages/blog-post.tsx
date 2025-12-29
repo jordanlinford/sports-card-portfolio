@@ -265,13 +265,17 @@ export default function BlogPostPage() {
         </header>
 
         <div className="prose prose-neutral dark:prose-invert max-w-none" data-testid="text-post-content">
-          {post.content.split('\n').map((paragraph, index) => (
-            paragraph.trim() ? (
-              <p key={index}>{parseTextWithLinks(paragraph)}</p>
-            ) : (
-              <br key={index} />
-            )
-          ))}
+          {post.contentFormat === "html" ? (
+            <div dangerouslySetInnerHTML={{ __html: post.content }} />
+          ) : (
+            post.content.split('\n').map((paragraph, index) => (
+              paragraph.trim() ? (
+                <p key={index}>{parseTextWithLinks(paragraph)}</p>
+              ) : (
+                <br key={index} />
+              )
+            ))
+          )}
         </div>
 
         {post.videoEmbeds && post.videoEmbeds.length > 0 && (

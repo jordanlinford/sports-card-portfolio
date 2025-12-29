@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -611,6 +612,7 @@ function BlogTab() {
     slug: "",
     excerpt: "",
     content: "",
+    contentFormat: "text" as "text" | "html",
     heroImageUrl: "",
     videoEmbeds: [] as Array<{ provider: string; url: string; caption?: string }>,
     isPublished: false,
@@ -683,6 +685,7 @@ function BlogTab() {
       slug: "",
       excerpt: "",
       content: "",
+      contentFormat: "text",
       heroImageUrl: "",
       videoEmbeds: [],
       isPublished: false,
@@ -702,6 +705,7 @@ function BlogTab() {
       slug: post.slug,
       excerpt: post.excerpt || "",
       content: post.content,
+      contentFormat: (post.contentFormat as "text" | "html") || "text",
       heroImageUrl: post.heroImageUrl || "",
       videoEmbeds: post.videoEmbeds || [],
       isPublished: post.isPublished,
@@ -872,12 +876,32 @@ function BlogTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Content</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label>Content</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="content-format-toggle" className="text-sm text-muted-foreground">
+                    {formData.contentFormat === "html" ? "HTML Mode" : "Plain Text"}
+                  </Label>
+                  <Switch
+                    id="content-format-toggle"
+                    checked={formData.contentFormat === "html"}
+                    onCheckedChange={(checked) => setFormData(f => ({ ...f, contentFormat: checked ? "html" : "text" }))}
+                    data-testid="switch-content-format"
+                  />
+                </div>
+              </div>
+              {formData.contentFormat === "html" && (
+                <p className="text-xs text-muted-foreground">
+                  Paste HTML content directly. Great for formatted text from ChatGPT.
+                </p>
+              )}
               <Textarea
                 value={formData.content}
                 onChange={(e) => setFormData(f => ({ ...f, content: e.target.value }))}
-                placeholder="Write your blog post content here..."
-                className="min-h-[200px]"
+                placeholder={formData.contentFormat === "html" 
+                  ? "Paste your HTML content here..." 
+                  : "Write your blog post content here... Use [link text](url) for links."}
+                className="min-h-[200px] font-mono"
                 data-testid="input-blog-content"
               />
             </div>
