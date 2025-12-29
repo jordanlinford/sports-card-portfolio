@@ -821,29 +821,26 @@ function decideVerdict(
   // ============================================================
   // PRECEDENCE 5: ESTABLISHED players (FRANCHISE_CORE + PRIME) → ACCUMULATE or HOLD
   // Proven stars with locked roles should never be SPECULATIVE
-  // BUT high downside risk (injury, position decline) limits ACCUMULATE
+  // Key insight: downsideRisk matters more than valuation for proven stars
   // Examples: Nikola Jokic, Giannis, LeBron, Stephen Curry
   // ============================================================
   if (maturityTier === "ESTABLISHED") {
-    // High downside risk = never aggressively accumulate (catches aging RBs)
-    if (scores.downsideRiskScore >= 65) {
-      return { verdict: "HOLD_CORE", reason: "Franchise asset but elevated risk - hold, don't chase" };
+    // ACCUMULATE: Low downside risk is the PRIMARY signal for proven stars
+    // mispricingScore can be moderately negative (WARM/HOT players run -20 to -50)
+    // Accept mispricing >= -25 with low risk <= 55
+    if (downsideRiskScore <= 55 && mispricingScore >= -25) {
+      return { verdict: "ACCUMULATE", reason: "Proven franchise cornerstone - low risk, accumulate on dips" };
     }
-    // Low risk AND reasonably valued = ACCUMULATE
-    // Threshold is context-aware (LOOSENED for better distribution):
-    // - With reliable comps: 55 (was 65 - too strict)
-    // - Without reliable comps: 48 (was 52 - allow more neutral temps)
-    // ESTABLISHED players have already proven themselves (roleStability >= 75)
-    const accumulateThreshold = compsReliable ? 55 : 48;
-    if (scores.valuationScore >= accumulateThreshold) {
-      return { verdict: "ACCUMULATE", reason: "Proven franchise cornerstone - accumulate on any dip" };
+    // HOLD_CORE: Medium risk (55-65) or moderately overpriced
+    if (downsideRiskScore <= 65) {
+      return { verdict: "HOLD_CORE", reason: "Franchise asset - hold position, elevated but manageable risk" };
     }
-    // Fair value but still a core asset
-    if (scores.valuationScore >= 45) {
-      return { verdict: "HOLD_CORE", reason: "Franchise asset at fair value - hold position" };
+    // TRADE_THE_HYPE: Very overpriced with high downside (aging stars)
+    if (mispricingScore <= -35 && downsideRiskScore >= 65) {
+      return { verdict: "TRADE_THE_HYPE", reason: "Franchise asset but declining value - consider taking profits" };
     }
-    // Overpriced but still franchise core
-    return { verdict: "HOLD_CORE", reason: "Franchise asset but currently overpriced - hold, don't add" };
+    // High downside but still franchise core
+    return { verdict: "HOLD_CORE", reason: "Franchise asset but elevated risk - hold, don't chase" };
   }
   
   // ============================================================
@@ -862,10 +859,11 @@ function decideVerdict(
   }
 
   // ============================================================
-  // PRECEDENCE 6: Players with proven demand → HOLD_CORE
+  // PRECEDENCE 6: Players with proven demand → route appropriately
   // High liquidity (>= 60) + role stability > 55 indicates established player
+  // BUT early-career players should go to SPECULATIVE, not HOLD_CORE
   // ============================================================
-  if (hasProvenDemand && !isPrime) {
+  if (hasProvenDemand && !isPrime && !earlyCareer) {
     // Accumulate: Low downside risk is the key signal (mispricingScore threshold relaxed heavily)
     // Allow mispricingScore >= -30 (most WARM/HOT players are -20 to -50)
     if (mispricingScore >= -30 && downsideRiskScore <= 55) {
