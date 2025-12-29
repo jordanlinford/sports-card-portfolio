@@ -502,7 +502,14 @@ function lookupRoleTier(name: string): RoleTier | undefined {
 import { lookupPlayer, mapRegistryRoleTier, mapRegistryStage } from "./playerRegistry";
 
 export function getRoleTier(playerName: string): RoleTier {
-  // Check registry first (CSV-based, easier to maintain)
+  // Check hardcoded overrides FIRST (authoritative for known franchise stars)
+  const hardcodedTier = lookupRoleTier(playerName);
+  if (hardcodedTier) {
+    console.log(`[RoleTier] Hardcoded override for "${playerName}" -> ${hardcodedTier}`);
+    return hardcodedTier;
+  }
+  
+  // Then check registry (CSV-based, easier to maintain for bulk data)
   const registryResult = lookupPlayer(playerName);
   if (registryResult.found && registryResult.entry) {
     const mappedTier = mapRegistryRoleTier(registryResult.entry.roleTier);
@@ -510,8 +517,8 @@ export function getRoleTier(playerName: string): RoleTier {
     return mappedTier;
   }
   
-  // Fall back to hardcoded dictionary
-  return lookupRoleTier(playerName) ?? "UNKNOWN";
+  // Fall back to UNKNOWN
+  return "UNKNOWN";
 }
 
 export function getRoleStabilityScore(playerName: string): number {
