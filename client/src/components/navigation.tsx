@@ -46,7 +46,8 @@ import {
   ChevronDown,
   Target,
   LineChart,
-  Package
+  Package,
+  Newspaper
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -277,6 +278,19 @@ export function Navigation() {
                 </Button>
               </Link>
 
+              {/* Blog */}
+              <Link href="/blog">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={cn("gap-2", isActive("/blog") && "bg-accent")}
+                  data-testid="nav-blog"
+                >
+                  <Newspaper className="h-4 w-4" />
+                  Blog
+                </Button>
+              </Link>
+
               {/* Messages Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -322,14 +336,22 @@ export function Navigation() {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {/* Explore for non-authenticated users */}
+            {/* Explore and Blog for non-authenticated users */}
             {!isAuthenticated && (
-              <Link href="/explore">
-                <Button variant="ghost" size="sm" className="gap-2" data-testid="link-explore">
-                  <Compass className="h-4 w-4" />
-                  <span className="hidden sm:inline">Explore</span>
-                </Button>
-              </Link>
+              <>
+                <Link href="/explore">
+                  <Button variant="ghost" size="sm" className="gap-2" data-testid="link-explore">
+                    <Compass className="h-4 w-4" />
+                    <span className="hidden sm:inline">Explore</span>
+                  </Button>
+                </Link>
+                <Link href="/blog">
+                  <Button variant="ghost" size="sm" className="gap-2" data-testid="link-blog">
+                    <Newspaper className="h-4 w-4" />
+                    <span className="hidden sm:inline">Blog</span>
+                  </Button>
+                </Link>
+              </>
             )}
             
             <ThemeToggle />
@@ -477,6 +499,11 @@ export function Navigation() {
             <Link href="/explore">
               <Button variant="ghost" size="sm" className={cn(isActive("/explore") && "bg-accent")}>
                 <Compass className="h-4 w-4" />
+              </Button>
+            </Link>
+            <Link href="/blog">
+              <Button variant="ghost" size="sm" className={cn(isActive("/blog") && "bg-accent")}>
+                <Newspaper className="h-4 w-4" />
               </Button>
             </Link>
             <Link href="/portfolio-builder">
