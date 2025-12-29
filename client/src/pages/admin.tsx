@@ -18,6 +18,7 @@ import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { User, DisplayCaseWithCards, PlayerRegistry, BlogPostWithAuthor } from "@shared/schema";
+import { HeroImageUploader } from "@/components/hero-image-uploader";
 
 interface PlatformStats {
   totalUsers: number;
@@ -881,12 +882,10 @@ function BlogTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Hero Image URL (optional)</Label>
-              <Input
+              <Label>Hero Image (optional)</Label>
+              <HeroImageUploader
                 value={formData.heroImageUrl}
-                onChange={(e) => setFormData(f => ({ ...f, heroImageUrl: e.target.value }))}
-                placeholder="https://example.com/image.jpg"
-                data-testid="input-blog-hero-image"
+                onChange={(url) => setFormData(f => ({ ...f, heroImageUrl: url }))}
               />
             </div>
             <div className="space-y-2">
