@@ -1854,6 +1854,41 @@ export function validateFormatTypeForParticipants(
   return null;
 }
 
+// Blog Posts table
+export const blogPosts = pgTable("blog_posts", {
+  id: serial("id").primaryKey(),
+  slug: varchar("slug", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 500 }).notNull(),
+  excerpt: text("excerpt"),
+  content: text("content").notNull(),
+  heroImageUrl: varchar("hero_image_url", { length: 1000 }),
+  videoEmbeds: jsonb("video_embeds").$type<Array<{ provider: string; url: string; caption?: string }>>().default([]),
+  isPublished: boolean("is_published").default(false).notNull(),
+  publishedAt: timestamp("published_at"),
+  authorId: varchar("author_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const blogPostsRelations = relations(blogPosts, ({ one }) => ({
+  author: one(users, {
+    fields: [blogPosts.authorId],
+    references: [users.id],
+  }),
+}));
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+export type BlogPost = typeof blogPosts.$inferSelect;
+
+export type BlogPostWithAuthor = BlogPost & {
+  author: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> | null;
+};
+
 // Helper function to validate bundle definitions
 export function validateBundles(
   bundles: BundleDefinition[],
