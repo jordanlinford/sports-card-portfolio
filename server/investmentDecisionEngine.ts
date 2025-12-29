@@ -1465,6 +1465,41 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   }
   
   // ============================================================
+  // ROOKIE GUARDRAIL - Rookies should NEVER be HOLD_CORE
+  // Rookies are all projection, not proven track record
+  // HOLD_CORE implies "prices fairly reflect established value" - wrong for rookies
+  // Examples: Cooper Flagg, any first-year player
+  // ============================================================
+  const isRookie = input.stage === "ROOKIE";
+  
+  if (isRookie) {
+    // Rule 1: Rookies can never be HOLD_CORE - downgrade to appropriate verdict
+    if (verdict === "HOLD_CORE") {
+      // Check if overheated with unreliable comps - that's AVOID territory
+      if (overheated && !compsReliable) {
+        verdict = "AVOID_NEW_MONEY";
+        reason = "Overhyped rookie with unproven production - wait for prices to settle";
+      } else {
+        verdict = "SPECULATIVE_FLYER";
+        reason = "Rookie with upside but unproven - small position only";
+      }
+    }
+    
+    // Rule 2: Overheated rookies with unreliable comps → AVOID_NEW_MONEY
+    // High narrative heat + no real pricing data = pure speculation at inflated prices
+    if (overheated && !compsReliable && verdict === "SPECULATIVE_FLYER") {
+      verdict = "AVOID_NEW_MONEY";
+      reason = "Overhyped rookie priced on hype not production - avoid until proven";
+    }
+    
+    // Rule 3: Rookies can still ACCUMULATE if undervalued (rare for hyped rookies)
+    // Keep ACCUMULATE if the engine found genuine undervaluation
+    // Keep TRADE_THE_HYPE if there are reliable comps showing overpricing
+  }
+  
+  console.log(`[RookieGuardrail] isRookie=${isRookie}, verdict=${verdict}, overheated=${overheated}, compsReliable=${compsReliable}`);
+  
+  // ============================================================
   // ESTABLISHED VETERAN GUARDRAIL (Gobert Rule)
   // Non-early-career players with stable roles should NEVER be SPECULATIVE
   // Risk ≠ Speculation: A boring, known commodity is not a lottery ticket
