@@ -96,6 +96,7 @@ function getTierIcon(tier: string) {
     case "CORE": return <Target className="h-3 w-3" />;
     case "GROWTH": return <TrendingUp className="h-3 w-3" />;
     case "SPECULATIVE": return <Zap className="h-3 w-3" />;
+    case "CAUTION": return <Ban className="h-3 w-3" />;
     default: return <Layers className="h-3 w-3" />;
   }
 }
@@ -106,6 +107,7 @@ function getTierColor(tier: string) {
     case "CORE": return "text-blue-600 dark:text-blue-400";
     case "GROWTH": return "text-emerald-600 dark:text-emerald-400";
     case "SPECULATIVE": return "text-amber-600 dark:text-amber-400";
+    case "CAUTION": return "text-red-600 dark:text-red-400";
     default: return "text-gray-600 dark:text-gray-400";
   }
 }
@@ -172,12 +174,12 @@ function GemCard({ gem }: { gem: GemCandidate }) {
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
             <DollarSign className="h-4 w-4" />
-            Why Discounted
+            {gem.verdict === "AVOID" ? "Why Overpriced" : "Why Discounted"}
           </h4>
           <ul className="space-y-1">
             {gem.whyDiscounted.slice(0, 2).map((reason, i) => (
               <li key={i} className="text-sm text-foreground flex items-start gap-2">
-                <span className="text-emerald-600 dark:text-emerald-400 mt-0.5">-</span>
+                <span className={`${gem.verdict === "AVOID" ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"} mt-0.5`}>-</span>
                 <span>{reason}</span>
               </li>
             ))}
@@ -186,16 +188,16 @@ function GemCard({ gem }: { gem: GemCandidate }) {
         
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-            <TrendingUp className="h-4 w-4" />
-            Repricing Catalyst
+            {gem.verdict === "AVOID" ? <AlertTriangle className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+            {gem.verdict === "AVOID" ? "Downward Catalyst" : "Repricing Catalyst"}
           </h4>
           <p className="text-sm text-foreground">{gem.repricingCatalysts[0]}</p>
         </div>
         
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-            <AlertTriangle className="h-4 w-4" />
-            Trap Risk
+            {gem.verdict === "AVOID" ? <TrendingUp className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+            {gem.verdict === "AVOID" ? "Bull Case (Contrary)" : "Trap Risk"}
           </h4>
           <p className="text-sm text-foreground">{gem.trapRisks[0]}</p>
         </div>
@@ -310,6 +312,7 @@ export default function HiddenGemsPage() {
     
     if (verdictFilter === "buy-only" && gem.verdict !== "BUY") return false;
     if (verdictFilter === "buy-watch" && gem.verdict === "AVOID") return false;
+    if (verdictFilter === "avoid-only" && gem.verdict !== "AVOID") return false;
     
     return true;
   });
@@ -431,6 +434,7 @@ export default function HiddenGemsPage() {
                   <SelectItem value="all">All Verdicts</SelectItem>
                   <SelectItem value="buy-only">BUY Only</SelectItem>
                   <SelectItem value="buy-watch">BUY + MONITOR</SelectItem>
+                  <SelectItem value="avoid-only">AVOID Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>

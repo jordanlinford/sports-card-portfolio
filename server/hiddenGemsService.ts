@@ -61,17 +61,49 @@ function determineTier(outlook: PlayerOutlookResponse): string {
   return "CORE";
 }
 
-function mapVerdictToGemVerdict(verdict?: string): "BUY" | "MONITOR" {
+function mapVerdictToGemVerdict(verdict?: string): "BUY" | "MONITOR" | "AVOID" {
   if (verdict === "ACCUMULATE") return "BUY";
   if (verdict === "HOLD_CORE") return "BUY";
   if (verdict === "SPECULATIVE_FLYER") return "MONITOR";
+  if (verdict === "AVOID_NEW_MONEY") return "AVOID";
+  if (verdict === "TRADE_THE_HYPE") return "AVOID";
   return "MONITOR";
+}
+
+function calculateCautionScore(outlook: PlayerOutlookResponse): number {
+  const scores = outlook.investmentCall?.scores;
+  const riskScore = scores?.downsideRiskScore ?? 50;
+  const valuationScore = scores?.valuationScore ?? 50;
+  const confidence = outlook.snapshot?.confidence;
+  const confidenceScore = confidence === "HIGH" ? 85 : confidence === "MEDIUM" ? 60 : 40;
+  
+  const call = outlook.investmentCall;
+  if (!call) return 0;
+  
+  let avoidBonus = 0;
+  if (call.verdict === "AVOID_NEW_MONEY") avoidBonus = 30;
+  else if (call.verdict === "TRADE_THE_HYPE") avoidBonus = 25;
+  
+  const temp = outlook.snapshot?.temperature;
+  const tempBonus = 
+    temp === "HOT" ? 20 :
+    temp === "WARM" ? 10 :
+    temp === "NEUTRAL" ? 5 : 0;
+  
+  return Math.min(100, Math.max(0, 
+    riskScore * 0.3 + 
+    (100 - valuationScore) * 0.2 + 
+    confidenceScore * 0.2 +
+    avoidBonus + 
+    tempBonus
+  ));
 }
 
 async function generateGemContent(
   playerName: string,
   sport: string,
-  outlook: PlayerOutlookResponse
+  outlook: PlayerOutlookResponse,
+  isAvoid: boolean = false
 ): Promise<{
   thesis: string;
   whyDiscounted: string[];
@@ -79,10 +111,9 @@ async function generateGemContent(
   trapRisks: string[];
 }> {
   const call = outlook.investmentCall;
-  const thesis = outlook.thesis || [];
+  const thesisPoints = outlook.thesis || [];
   const realityCheck = outlook.marketRealityCheck || [];
   
-  // Fetch current news to ensure AI has up-to-date information
   const newsResult = await fetchPlayerNewsFromEngine(playerName, sport);
   const newsContext = newsResult.snippets.length > 0 
     ? `\n\nCURRENT NEWS (use this for up-to-date context):\n${newsResult.snippets.join("\n")}`
@@ -90,7 +121,31 @@ async function generateGemContent(
   
   const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   
-  const prompt = `Generate hidden gem analysis for ${playerName} (${sport}):
+  const prompt = isAvoid 
+    ? `Generate AVOID analysis for ${playerName} (${sport}):
+
+IMPORTANT: Today is ${currentDate}. Use ONLY current, verified information. Do NOT reference outdated facts.
+${newsContext}
+
+Current Investment Call: ${call?.verdict || "UNKNOWN"}
+Market Temperature: ${outlook.snapshot?.temperature || "UNKNOWN"}
+Risk Score: ${call?.scores?.downsideRiskScore || "N/A"}/100
+
+Existing Thesis Points:
+${thesisPoints.join("\n")}
+
+Market Reality Check:
+${realityCheck.join("\n")}
+
+Generate a JSON object with:
+1. "thesis": A single sentence (max 100 chars) summarizing why collectors should AVOID this player right now
+2. "whyOverpriced": 2 specific reasons the market has overpriced this player (MUST be current/accurate)
+3. "downwardCatalysts": 2 specific events that could push card values lower
+4. "contraryBullCase": 1-2 scenarios where avoiding would be wrong (balanced view)
+
+CRITICAL: Base analysis on current news and verified facts. Be specific to ${sport} and ${playerName}.
+Return ONLY valid JSON, no markdown.`
+    : `Generate hidden gem analysis for ${playerName} (${sport}):
 
 IMPORTANT: Today is ${currentDate}. Use ONLY current, verified information. Do NOT reference outdated facts.
 ${newsContext}
@@ -101,7 +156,7 @@ Valuation Score: ${call?.scores?.valuationScore || "N/A"}/100
 Risk Score: ${call?.scores?.downsideRiskScore || "N/A"}/100
 
 Existing Thesis Points:
-${thesis.join("\n")}
+${thesisPoints.join("\n")}
 
 Market Reality Check:
 ${realityCheck.join("\n")}
@@ -133,6 +188,15 @@ Return ONLY valid JSON, no markdown.`;
     
     const parsed = JSON.parse(jsonMatch[0]);
     
+    if (isAvoid) {
+      return {
+        thesis: parsed.thesis || `${playerName} cards appear overpriced relative to current situation.`,
+        whyDiscounted: Array.isArray(parsed.whyOverpriced) ? parsed.whyOverpriced.slice(0, 2) : ["Market hasn't fully priced in recent concerns."],
+        repricingCatalysts: Array.isArray(parsed.downwardCatalysts) ? parsed.downwardCatalysts.slice(0, 2) : ["Continued poor performance could trigger sell-off."],
+        trapRisks: Array.isArray(parsed.contraryBullCase) ? parsed.contraryBullCase.slice(0, 2) : ["Situation could improve unexpectedly."],
+      };
+    }
+    
     return {
       thesis: parsed.thesis || `${playerName} may be undervalued relative to talent level.`,
       whyDiscounted: Array.isArray(parsed.whyDiscounted) ? parsed.whyDiscounted.slice(0, 2) : ["Market hasn't recognized full potential yet."],
@@ -141,6 +205,14 @@ Return ONLY valid JSON, no markdown.`;
     };
   } catch (error) {
     console.error(`[HiddenGems] Failed to generate content for ${playerName}:`, error);
+    if (isAvoid) {
+      return {
+        thesis: `${playerName} cards may be overpriced based on current analysis.`,
+        whyDiscounted: ["Market sentiment overly optimistic.", "Risk factors not fully reflected in pricing."],
+        repricingCatalysts: ["Poor performance could shift perception.", "Negative news could trigger correction."],
+        trapRisks: ["Player could outperform expectations."],
+      };
+    }
     return {
       thesis: `${playerName} may be undervalued based on current market analysis.`,
       whyDiscounted: ["Market sentiment not aligned with talent level.", "External factors creating temporary discount."],
@@ -181,12 +253,22 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
       return { success: false, gemsCreated: 0, batchId, error: "No cached player outlooks found" };
     }
     
-    const candidates: Array<{
+    const buyCandidates: Array<{
       playerKey: string;
       playerName: string;
       sport: string;
       outlook: PlayerOutlookResponse;
       discountScore: number;
+      isAvoid: false;
+    }> = [];
+    
+    const avoidCandidates: Array<{
+      playerKey: string;
+      playerName: string;
+      sport: string;
+      outlook: PlayerOutlookResponse;
+      discountScore: number;
+      isAvoid: true;
     }> = [];
     
     for (const cached of cachedOutlooks) {
@@ -194,35 +276,71 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
       if (!outlook?.investmentCall) continue;
       
       const verdict = outlook.investmentCall.verdict;
-      if (!["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER"].includes(verdict)) continue;
       
-      if (verdict === "TRADE_THE_HYPE" || verdict === "AVOID_NEW_MONEY") continue;
-      
-      const discountScore = calculateDiscountScore(outlook);
-      
-      if (discountScore >= 40) {
-        candidates.push({
-          playerKey: cached.playerKey,
-          playerName: cached.playerName,
-          sport: cached.sport,
-          outlook,
-          discountScore,
-        });
+      if (["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER"].includes(verdict)) {
+        const discountScore = calculateDiscountScore(outlook);
+        if (discountScore >= 40) {
+          buyCandidates.push({
+            playerKey: cached.playerKey,
+            playerName: cached.playerName,
+            sport: cached.sport,
+            outlook,
+            discountScore,
+            isAvoid: false,
+          });
+        }
+      } else if (verdict === "TRADE_THE_HYPE" || verdict === "AVOID_NEW_MONEY") {
+        const cautionScore = calculateCautionScore(outlook);
+        if (cautionScore >= 40) {
+          avoidCandidates.push({
+            playerKey: cached.playerKey,
+            playerName: cached.playerName,
+            sport: cached.sport,
+            outlook,
+            discountScore: cautionScore,
+            isAvoid: true,
+          });
+        }
       }
     }
     
-    console.log(`[HiddenGems] ${candidates.length} candidates meet threshold`);
+    console.log(`[HiddenGems] ${buyCandidates.length} BUY candidates, ${avoidCandidates.length} AVOID candidates`);
     
-    candidates.sort((a, b) => b.discountScore - a.discountScore);
+    buyCandidates.sort((a, b) => b.discountScore - a.discountScore);
+    avoidCandidates.sort((a, b) => b.discountScore - a.discountScore);
+    
+    let buyTargetCount = Math.ceil(targetCount * 0.7);
+    let avoidTargetCount = Math.floor(targetCount * 0.3);
+    
+    if (avoidCandidates.length < avoidTargetCount) {
+      avoidTargetCount = avoidCandidates.length;
+      buyTargetCount = targetCount - avoidTargetCount;
+    }
+    if (buyCandidates.length < buyTargetCount) {
+      buyTargetCount = buyCandidates.length;
+      avoidTargetCount = Math.min(avoidCandidates.length, targetCount - buyTargetCount);
+    }
     
     const sportCounts: Record<string, number> = {};
-    const maxPerSport = Math.ceil(targetCount / 4);
-    const selectedCandidates = candidates.filter(c => {
+    const maxPerSport = Math.ceil(buyTargetCount / 4);
+    const selectedBuyCandidates = buyCandidates.filter(c => {
       const count = sportCounts[c.sport] || 0;
       if (count >= maxPerSport) return false;
       sportCounts[c.sport] = count + 1;
       return true;
-    }).slice(0, targetCount);
+    }).slice(0, buyTargetCount);
+    
+    const avoidSportCounts: Record<string, number> = {};
+    const maxAvoidPerSport = Math.ceil(avoidTargetCount / 4);
+    const selectedAvoidCandidates = avoidCandidates.filter(c => {
+      const count = avoidSportCounts[c.sport] || 0;
+      if (count >= maxAvoidPerSport) return false;
+      avoidSportCounts[c.sport] = count + 1;
+      return true;
+    }).slice(0, avoidTargetCount);
+    
+    type Candidate = typeof buyCandidates[0] | typeof avoidCandidates[0];
+    const selectedCandidates: Candidate[] = [...selectedBuyCandidates, ...selectedAvoidCandidates];
     
     console.log(`[HiddenGems] Selected ${selectedCandidates.length} gems for generation`);
     
@@ -234,13 +352,19 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
     let gemsCreated = 0;
     for (let i = 0; i < selectedCandidates.length; i++) {
       const candidate = selectedCandidates[i];
+      const isAvoid = candidate.isAvoid;
       
       try {
         const content = await generateGemContent(
           candidate.playerName,
           candidate.sport,
-          candidate.outlook
+          candidate.outlook,
+          isAvoid
         );
+        
+        const gemVerdict = mapVerdictToGemVerdict(candidate.outlook.investmentCall?.verdict);
+        const modifier = isAvoid ? "Caution" : "Value";
+        const tier = isAvoid ? "CAUTION" : determineTier(candidate.outlook);
         
         const gemData: InsertHiddenGem = {
           playerKey: candidate.playerKey,
@@ -248,16 +372,16 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
           sport: candidate.sport,
           position: candidate.outlook.player?.position || null,
           team: candidate.outlook.player?.team || null,
-          verdict: mapVerdictToGemVerdict(candidate.outlook.investmentCall?.verdict),
-          modifier: "Value",
+          verdict: gemVerdict,
+          modifier,
           temperature: candidate.outlook.snapshot?.temperature || "NEUTRAL",
-          tier: determineTier(candidate.outlook),
+          tier,
           riskLevel: determineRiskLevel(candidate.outlook),
           thesis: content.thesis,
           whyDiscounted: content.whyDiscounted,
           repricingCatalysts: content.repricingCatalysts,
           trapRisks: content.trapRisks,
-          upsideScore: candidate.outlook.investmentCall?.scores?.valuationScore || null,
+          upsideScore: isAvoid ? null : (candidate.outlook.investmentCall?.scores?.valuationScore || null),
           confidenceScore: candidate.outlook.snapshot?.confidence === "HIGH" ? 85 : candidate.outlook.snapshot?.confidence === "MEDIUM" ? 60 : 40,
           discountScore: Math.round(candidate.discountScore),
           batchId,
@@ -269,7 +393,7 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
         await db.insert(hiddenGems).values(gemData);
         gemsCreated++;
         
-        console.log(`[HiddenGems] Created gem ${gemsCreated}: ${candidate.playerName}`);
+        console.log(`[HiddenGems] Created gem ${gemsCreated}: ${candidate.playerName} (${gemVerdict})`);
       } catch (err) {
         console.error(`[HiddenGems] Failed to create gem for ${candidate.playerName}:`, err);
       }
