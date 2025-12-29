@@ -78,20 +78,7 @@ import type {
 // ============================================================
 
 const VERDICT_OVERRIDES: Record<string, InvestmentVerdict> = {
-  "victor wembanyama": "SPECULATIVE_FLYER",
-  "wembanyama": "SPECULATIVE_FLYER",
-  // Demo players for each verdict type
-  "nikola jokic": "ACCUMULATE",
-  "jokic": "ACCUMULATE",
-  "amon-ra st brown": "ACCUMULATE",
-  "tyrese haliburton": "ACCUMULATE",
-  "kenny pickett": "AVOID_NEW_MONEY",
-  "trey lance": "AVOID_NEW_MONEY",
-  "mac jones": "AVOID_NEW_MONEY",
-  "ezekiel elliott": "AVOID_NEW_MONEY",
-  "brock purdy": "TRADE_THE_HYPE",
-  "caleb williams": "SPECULATIVE_FLYER",
-  "jayden daniels": "ACCUMULATE",
+  // Only override truly special cases - let the engine handle most players
 };
 
 // ============================================================
@@ -744,12 +731,19 @@ function decideVerdict(
   const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
 
   // ============================================================
-  // PRECEDENCE 0: LOW ROLE STABILITY → AVOID_NEW_MONEY
-  // Backups/out-of-league players are structural avoid regardless of other signals
-  // Examples: Kenny Pickett, Mac Jones, Trey Lance, James Wiseman
+  // PRECEDENCE 0: LOW ROLE STABILITY → AVOID_NEW_MONEY (WIDENED threshold)
+  // Backups/out-of-league/uncertain players are structural avoid
+  // Original: <= 35 (too strict - only caught obvious busts)
+  // New: <= 45 (catches uncertain starters, fringe players)
+  // Examples: Kenny Pickett, Mac Jones, Trey Lance, James Wiseman, bench players
   // ============================================================
-  if (roleStabilityScore <= 35 && !compsReliable) {
-    return { verdict: "AVOID_NEW_MONEY", reason: "Low role stability - backup/out-of-league player" };
+  if (roleStabilityScore <= 45 && !compsReliable) {
+    return { verdict: "AVOID_NEW_MONEY", reason: "Low role stability - uncertain or backup player" };
+  }
+  
+  // Even with comps, very low stability (backups) should avoid
+  if (roleStabilityScore <= 35) {
+    return { verdict: "AVOID_NEW_MONEY", reason: "Backup/out-of-league player - structural problem" };
   }
 
   // ============================================================
@@ -836,12 +830,11 @@ function decideVerdict(
       return { verdict: "HOLD_CORE", reason: "Franchise asset but elevated risk - hold, don't chase" };
     }
     // Low risk AND reasonably valued = ACCUMULATE
-    // Threshold is context-aware:
-    // - With reliable comps: 65 (we have real price data)
-    // - Without reliable comps: 52 (no-comp valuations cap around 55-57, 
-    //   so proven stars at neutral/cool temps can qualify)
+    // Threshold is context-aware (LOOSENED for better distribution):
+    // - With reliable comps: 55 (was 65 - too strict)
+    // - Without reliable comps: 48 (was 52 - allow more neutral temps)
     // ESTABLISHED players have already proven themselves (roleStability >= 75)
-    const accumulateThreshold = compsReliable ? 65 : 52;
+    const accumulateThreshold = compsReliable ? 55 : 48;
     if (scores.valuationScore >= accumulateThreshold) {
       return { verdict: "ACCUMULATE", reason: "Proven franchise cornerstone - accumulate on any dip" };
     }
@@ -1324,8 +1317,10 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   };
   const lowMeta = isUnknownValue(input.team) || isUnknownValue(input.position);
   
-  // overheated: high narrative heat with negative mispricing
-  const overheated = (scores.mispricingScore <= -20 && scores.narrativeHeatScore >= 65);
+  // overheated: high narrative heat with negative mispricing (loosened for better TRADE_THE_HYPE detection)
+  // Original: mispricingScore <= -20 && narrativeHeatScore >= 65 (too strict)
+  // New: mispricingScore <= -10 && narrativeHeatScore >= 55 (catches more hype situations)
+  const overheated = (scores.mispricingScore <= -10 && scores.narrativeHeatScore >= 55);
   
   // Get verdict with new precedence-based logic
   const { verdict: rawVerdict, reason: rawReason } = decideVerdict(scores, input.stage, compsReliable, overheated, input, roleStabilityScore);
@@ -1371,25 +1366,22 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
         : "TRANSITIONAL";
   
   // ============================================================
-  // FRANCHISE CORE PROTECTION RULE
-  // Franchise-core players should never be AVOID and should only 
-  // be ACCUMULATE when undervaluation is extreme
+  // FRANCHISE CORE PROTECTION RULE (RELAXED for better distribution)
+  // Only protect from AVOID when downside risk is moderate
+  // High downside (>= 65) should still allow AVOID even for stars
   // ============================================================
   const franchiseCore = roleTier === "FRANCHISE_CORE" && maturityTier === "ESTABLISHED";
   
-  // Protect franchise-core from AVOID (AJ Brown fix)
-  if (franchiseCore && verdict === "AVOID_NEW_MONEY") {
+  // Protect franchise-core from AVOID only if downside risk is moderate
+  // If downside >= 65, allow AVOID to flow through (aging RBs, injury-prone stars, etc.)
+  if (franchiseCore && verdict === "AVOID_NEW_MONEY" && scores.downsideRiskScore < 65) {
     verdict = "HOLD_CORE";
     reason = "Franchise core asset - hold through volatility";
   }
   
-  // Make ACCUMULATE harder for franchise-core (requires reasonable undervaluation)
-  // Context-aware threshold: 65 with comps, 52 without (matches decideVerdict logic)
-  const franchiseCoreAccumulateThreshold = compsReliable ? 65 : 52;
-  if (franchiseCore && verdict === "ACCUMULATE" && scores.valuationScore < franchiseCoreAccumulateThreshold) {
-    verdict = "HOLD_CORE";
-    reason = "Franchise core - already priced as elite, hold unless clearly cheap";
-  }
+  // DON'T make ACCUMULATE harder for franchise-core anymore
+  // The decideVerdict thresholds are now reasonable (55/48)
+  // Let the engine's natural valuation scoring determine ACCUMULATE eligibility
   
   // ============================================================
   // SPECULATIVE_FLYER GUARDRAIL FOR FRANCHISE-CORE PLAYERS
