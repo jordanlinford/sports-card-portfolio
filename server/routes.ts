@@ -3841,6 +3841,52 @@ Allow: /
     }
   });
 
+  // Sitemap for SEO
+  app.get("/sitemap.xml", async (req, res) => {
+    try {
+      const posts = await storage.getBlogPosts(true);
+      const baseUrl = `https://${req.get('host')}`;
+      
+      let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${baseUrl}/</loc>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/blog</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/explore</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>`;
+      
+      for (const post of posts) {
+        const lastmod = post.updatedAt ? new Date(post.updatedAt).toISOString().split('T')[0] : '';
+        sitemap += `
+  <url>
+    <loc>${baseUrl}/blog/${post.slug}</loc>${lastmod ? `
+    <lastmod>${lastmod}</lastmod>` : ''}
+    <changefreq>weekly</changefreq>
+    <priority>0.6</priority>
+  </url>`;
+      }
+      
+      sitemap += `
+</urlset>`;
+      
+      res.set('Content-Type', 'application/xml');
+      res.send(sitemap);
+    } catch (error) {
+      console.error("Error generating sitemap:", error);
+      res.status(500).send('Error generating sitemap');
+    }
+  });
+
   // Portfolio Analytics
   app.get("/api/analytics", isAuthenticated, async (req: any, res) => {
     try {

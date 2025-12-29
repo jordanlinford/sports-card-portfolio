@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "wouter";
+import { useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +61,65 @@ export default function BlogPostPage() {
     queryKey: ["/api/blog", params.slug],
     enabled: !!params.slug,
   });
+
+  useEffect(() => {
+    if (post) {
+      document.title = `${post.title} | Sports Card Portfolio`;
+      
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        metaDescription.setAttribute("content", post.excerpt || post.content.substring(0, 160));
+      }
+      
+      const ogTitle = document.querySelector('meta[property="og:title"]');
+      if (ogTitle) ogTitle.setAttribute("content", post.title);
+      
+      const ogDescription = document.querySelector('meta[property="og:description"]');
+      if (ogDescription) ogDescription.setAttribute("content", post.excerpt || post.content.substring(0, 160));
+      
+      if (post.heroImageUrl) {
+        let ogImage = document.querySelector('meta[property="og:image"]');
+        if (!ogImage) {
+          ogImage = document.createElement('meta');
+          ogImage.setAttribute('property', 'og:image');
+          document.head.appendChild(ogImage);
+        }
+        ogImage.setAttribute("content", post.heroImageUrl);
+      }
+      
+      const existingJsonLd = document.querySelector('script[type="application/ld+json"][data-blog-post]');
+      if (existingJsonLd) existingJsonLd.remove();
+      
+      const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": post.title,
+        "description": post.excerpt || post.content.substring(0, 160),
+        "datePublished": post.publishedAt,
+        "dateModified": post.updatedAt,
+        "mainEntityOfPage": {
+          "@type": "WebPage",
+          "@id": window.location.href
+        },
+        ...(post.heroImageUrl && { "image": post.heroImageUrl }),
+        "publisher": {
+          "@type": "Organization",
+          "name": "Sports Card Portfolio"
+        }
+      };
+      
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.setAttribute('data-blog-post', 'true');
+      script.textContent = JSON.stringify(jsonLd);
+      document.head.appendChild(script);
+      
+      return () => {
+        const scriptToRemove = document.querySelector('script[type="application/ld+json"][data-blog-post]');
+        if (scriptToRemove) scriptToRemove.remove();
+      };
+    }
+  }, [post]);
 
   if (isLoading) {
     return (

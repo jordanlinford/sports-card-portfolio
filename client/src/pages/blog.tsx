@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +12,21 @@ export default function BlogListing() {
   const { data: posts, isLoading } = useQuery<BlogPostWithAuthor[]>({
     queryKey: ["/api/blog"],
   });
+
+  useEffect(() => {
+    document.title = "Blog | Sports Card Portfolio";
+    
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute("content", "News, updates, and insights about sports card collecting and investing. Expert tips on building and growing your card portfolio.");
+    }
+    
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", "Blog | Sports Card Portfolio");
+    
+    const ogDescription = document.querySelector('meta[property="og:description"]');
+    if (ogDescription) ogDescription.setAttribute("content", "News, updates, and insights about sports card collecting and investing.");
+  }, []);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
