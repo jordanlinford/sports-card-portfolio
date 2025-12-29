@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Link, useSearch } from "wouter";
+import { useSearch } from "wouter";
 import { 
   Search,
   TrendingUp,
@@ -819,9 +819,9 @@ export default function PlayerOutlookPage() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <h2 className="text-xl font-semibold mb-2">Sign in Required</h2>
             <p className="text-muted-foreground mb-4">Sign in to access Player Outlook analysis.</p>
-            <Button asChild>
-              <Link href="/api/login">Sign In</Link>
-            </Button>
+            <a href="/api/login">
+              <Button data-testid="button-sign-in">Sign In</Button>
+            </a>
           </CardContent>
         </Card>
       </div>

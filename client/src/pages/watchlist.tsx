@@ -541,9 +541,9 @@ export default function Watchlist() {
             <p className="text-muted-foreground mb-4">
               Track your favorite players and monitor market changes.
             </p>
-            <Link href="/api/login">
+            <a href="/api/login">
               <Button data-testid="button-sign-in">Sign In</Button>
-            </Link>
+            </a>
           </CardContent>
         </Card>
       </div>

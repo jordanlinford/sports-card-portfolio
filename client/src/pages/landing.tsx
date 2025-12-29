@@ -611,10 +611,10 @@ export default function Landing() {
               The long-term home for serious collectors who treat cards like assets.
             </p>
             <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
-              <Link href="/terms-of-service" className="hover:text-foreground transition-colors">
+              <Link href="/terms" className="hover:text-foreground transition-colors">
                 Terms of Service
               </Link>
-              <Link href="/privacy-policy" className="hover:text-foreground transition-colors">
+              <Link href="/privacy" className="hover:text-foreground transition-colors">
                 Privacy Policy
               </Link>
               <Link href="/explore" className="hover:text-foreground transition-colors">

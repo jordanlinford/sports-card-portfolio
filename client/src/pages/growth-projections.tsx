@@ -216,7 +216,7 @@ export default function GrowthProjectionsPage() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Growth Projections uses AI to forecast your collection's future value based on market trends, player performance, and investment signals.
             </p>
-            <Link href="/pricing">
+            <Link href="/upgrade">
               <Button data-testid="button-upgrade">Upgrade to Pro</Button>
             </Link>
           </CardContent>
