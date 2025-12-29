@@ -307,9 +307,12 @@ function applyPositionRiskAdjustments(input: PositionRiskInput): number {
   const normalizedName = playerName?.toLowerCase().trim() ?? "";
   const isTwoWayFranchise = TWO_WAY_PLAYERS.has(normalizedName) && roleTier === "FRANCHISE_CORE";
   
-  // NFL penalties
+  // NFL penalties - RBs have shorter shelf life and higher workload risk
+  // Year 3-4 RBs are often peak value but approaching the "cliff"
   if (sport === "NFL" && position === "RB") {
-    if (stage === "PRIME") penalty = 15;
+    if (stage === "YEAR_3") penalty = 8;       // Starting to accumulate wear
+    else if (stage === "YEAR_4") penalty = 12; // Approaching cliff
+    else if (stage === "PRIME") penalty = 15;
     else if (stage === "VETERAN" || stage === "AGING") penalty = 25;
   }
   
@@ -1433,6 +1436,29 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
       // Default: upgrade to HOLD_CORE - proven asset, just don't chase
       verdict = "HOLD_CORE";
       reason = "Franchise core asset - hold position, don't add aggressively at current prices";
+    }
+  }
+  
+  // ============================================================
+  // PROVEN YOUNG RB GUARDRAIL
+  // Year 3-4 RBs with STARTER+ role and good liquidity are not lottery tickets
+  // They're proven producers at peak value - upgrade to HOLD_CORE or TRADE_THE_HYPE
+  // Examples: Bijan Robinson, Jahmyr Gibbs, Breece Hall
+  // ============================================================
+  const isProvenYoungRB = (input.stage === "YEAR_3" || input.stage === "YEAR_4") && 
+                          detectedSport === "NFL" && 
+                          normalizedPosition === "RB" &&
+                          (roleTier === "FRANCHISE_CORE" || roleTier === "STARTER") &&
+                          scores.liquidityScore >= 50;
+  
+  if (isProvenYoungRB && verdict === "SPECULATIVE_FLYER") {
+    // Proven young RB with market demand - not a lottery ticket
+    if (overheated && compsReliable) {
+      verdict = "TRADE_THE_HYPE";
+      reason = "Peak value young RB - sell into hype, RB shelf life is short";
+    } else {
+      verdict = "HOLD_CORE";
+      reason = "Proven young RB - hold position, approaching peak value window";
     }
   }
   
