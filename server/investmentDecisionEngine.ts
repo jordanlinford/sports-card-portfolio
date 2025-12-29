@@ -610,6 +610,8 @@ function computeScores(input: DecisionInput): InvestmentScores {
     PROSPECT: 70,
     ROOKIE: 75,
     YEAR_2: 70,
+    YEAR_3: 68,         // Year 3 - still developing, slightly lower ceiling than rookie hype
+    YEAR_4: 65,         // Year 4 - approaching prime, more established
     PRIME: 65,
     VETERAN: 45,
     AGING: 30,
@@ -623,6 +625,8 @@ function computeScores(input: DecisionInput): InvestmentScores {
     PROSPECT: 40,
     ROOKIE: 45,
     YEAR_2: 40,
+    YEAR_3: 38,         // Year 3 - still young, low injury risk
+    YEAR_4: 36,         // Year 4 - still young, low injury risk
     PRIME: 35,
     VETERAN: 55,
     AGING: 70,
@@ -733,7 +737,7 @@ function decideVerdict(
   // - ACCUMULATE not allowed for roleStabilityScore <= 55
   // ============================================================
 
-  const earlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "UNKNOWN";
+  const earlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3" || stage === "YEAR_4" || stage === "UNKNOWN";
   const isPrime = stage === "PRIME";
   const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
 
@@ -814,15 +818,15 @@ function decideVerdict(
 
   // ============================================================
   // MATURITY GATE: Contextual interpretation of value/uncertainty
-  // - EMERGING (ROOKIE/YEAR_2): "cheap" means speculative, not undervalued
-  // - ESTABLISHED: FRANCHISE_CORE who are NOT rookies/sophomores (proven stars)
+  // - EMERGING (ROOKIE through YEAR_4): "cheap" means speculative, not undervalued
+  // - ESTABLISHED: FRANCHISE_CORE who are NOT developing players (proven stars)
   // ============================================================
-  const isEarlyCareerStage = stage === "ROOKIE" || stage === "YEAR_2";
+  const isEarlyCareerStage = stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3" || stage === "YEAR_4";
   const maturityTier = 
     isEarlyCareerStage 
       ? "EMERGING"
       : (roleStabilityScore >= 75 && !isEarlyCareerStage)
-        ? "ESTABLISHED"  // FRANCHISE_CORE + not rookie/year2 = proven star
+        ? "ESTABLISHED"  // FRANCHISE_CORE + not developing = proven star
         : "TRANSITIONAL";
 
   // ============================================================
@@ -1382,7 +1386,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   }
   
   // Compute maturityTier for franchise core protection (need it before the rule)
-  const isEarlyCareerStage = input.stage === "ROOKIE" || input.stage === "YEAR_2";
+  const isEarlyCareerStage = input.stage === "ROOKIE" || input.stage === "YEAR_2" || input.stage === "YEAR_3" || input.stage === "YEAR_4";
   const maturityTier: MaturityTier = 
     isEarlyCareerStage 
       ? "EMERGING"

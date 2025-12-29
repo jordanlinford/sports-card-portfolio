@@ -978,6 +978,8 @@ export const PLAYER_STAGE = {
   PROSPECT: "PROSPECT",     // Pre-rookie, draft eligible
   ROOKIE: "ROOKIE",         // First year
   YEAR_2: "YEAR_2",         // Sophomore, often breakout year
+  YEAR_3: "YEAR_3",         // Third year, still developing
+  YEAR_4: "YEAR_4",         // Fourth year, still developing
   PRIME: "PRIME",           // Peak performance years
   VETERAN: "VETERAN",       // Later career, established
   AGING: "AGING",           // Declining performance
