@@ -1445,11 +1445,13 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   // They're proven producers at peak value - upgrade to HOLD_CORE or TRADE_THE_HYPE
   // Examples: Bijan Robinson, Jahmyr Gibbs, Breece Hall
   // ============================================================
+  console.log(`[ProvenYoungRB] Checking: stage=${input.stage}, sport=${detectedSport}, position=${normalizedPosition}, roleTier=${roleTier}, liquidity=${scores.liquidityScore}, verdict=${verdict}`);
   const isProvenYoungRB = (input.stage === "YEAR_3" || input.stage === "YEAR_4") && 
                           detectedSport === "NFL" && 
                           normalizedPosition === "RB" &&
                           (roleTier === "FRANCHISE_CORE" || roleTier === "STARTER") &&
                           scores.liquidityScore >= 50;
+  console.log(`[ProvenYoungRB] isProvenYoungRB=${isProvenYoungRB}`);
   
   if (isProvenYoungRB && verdict === "SPECULATIVE_FLYER") {
     // Proven young RB with market demand - not a lottery ticket
