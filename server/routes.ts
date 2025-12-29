@@ -3668,6 +3668,179 @@ Allow: /
     }
   });
 
+  // Blog Admin routes
+  app.get("/api/admin/blog", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const posts = await storage.getBlogPosts(false);
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching blog posts:", error);
+      res.status(500).json({ message: "Failed to fetch blog posts" });
+    }
+  });
+
+  app.get("/api/admin/blog/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid post ID" });
+      }
+      const post = await storage.getBlogPostById(id);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      res.json(post);
+    } catch (error) {
+      console.error("Error fetching blog post:", error);
+      res.status(500).json({ message: "Failed to fetch blog post" });
+    }
+  });
+
+  app.post("/api/admin/blog", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { title, slug, excerpt, content, heroImageUrl, videoEmbeds, isPublished } = req.body;
+      
+      if (!title || !slug || !content) {
+        return res.status(400).json({ message: "Title, slug, and content are required" });
+      }
+
+      // Check for duplicate slug
+      const existing = await storage.getBlogPostBySlug(slug);
+      if (existing) {
+        return res.status(400).json({ message: "A post with this slug already exists" });
+      }
+
+      const post = await storage.createBlogPost({
+        title,
+        slug,
+        excerpt: excerpt || null,
+        content,
+        heroImageUrl: heroImageUrl || null,
+        videoEmbeds: videoEmbeds || [],
+        isPublished: isPublished || false,
+        publishedAt: isPublished ? new Date() : null,
+        authorId: req.user.claims.sub,
+      });
+      
+      res.status(201).json(post);
+    } catch (error) {
+      console.error("Error creating blog post:", error);
+      res.status(500).json({ message: "Failed to create blog post" });
+    }
+  });
+
+  app.patch("/api/admin/blog/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid post ID" });
+      }
+
+      const { title, slug, excerpt, content, heroImageUrl, videoEmbeds, isPublished } = req.body;
+      
+      // If slug is changing, check for duplicates
+      if (slug) {
+        const existing = await storage.getBlogPostBySlug(slug);
+        if (existing && existing.id !== id) {
+          return res.status(400).json({ message: "A post with this slug already exists" });
+        }
+      }
+
+      const updateData: any = {};
+      if (title !== undefined) updateData.title = title;
+      if (slug !== undefined) updateData.slug = slug;
+      if (excerpt !== undefined) updateData.excerpt = excerpt;
+      if (content !== undefined) updateData.content = content;
+      if (heroImageUrl !== undefined) updateData.heroImageUrl = heroImageUrl;
+      if (videoEmbeds !== undefined) updateData.videoEmbeds = videoEmbeds;
+      if (isPublished !== undefined) {
+        updateData.isPublished = isPublished;
+        if (isPublished) {
+          const existingPost = await storage.getBlogPostById(id);
+          if (existingPost && !existingPost.isPublished) {
+            updateData.publishedAt = new Date();
+          }
+        }
+      }
+
+      const post = await storage.updateBlogPost(id, updateData);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      
+      res.json(post);
+    } catch (error) {
+      console.error("Error updating blog post:", error);
+      res.status(500).json({ message: "Failed to update blog post" });
+    }
+  });
+
+  app.post("/api/admin/blog/:id/toggle-publish", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid post ID" });
+      }
+
+      const post = await storage.toggleBlogPostPublished(id);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      
+      res.json(post);
+    } catch (error) {
+      console.error("Error toggling blog post publish status:", error);
+      res.status(500).json({ message: "Failed to toggle publish status" });
+    }
+  });
+
+  app.delete("/api/admin/blog/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid post ID" });
+      }
+
+      const post = await storage.getBlogPostById(id);
+      if (!post) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+
+      await storage.deleteBlogPost(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting blog post:", error);
+      res.status(500).json({ message: "Failed to delete blog post" });
+    }
+  });
+
+  // Public blog routes
+  app.get("/api/blog", async (req, res) => {
+    try {
+      const posts = await storage.getBlogPosts(true);
+      res.json(posts);
+    } catch (error) {
+      console.error("Error fetching published blog posts:", error);
+      res.status(500).json({ message: "Failed to fetch blog posts" });
+    }
+  });
+
+  app.get("/api/blog/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const post = await storage.getBlogPostBySlug(slug);
+      
+      if (!post || !post.isPublished) {
+        return res.status(404).json({ message: "Post not found" });
+      }
+      
+      res.json(post);
+    } catch (error) {
+      console.error("Error fetching blog post:", error);
+      res.status(500).json({ message: "Failed to fetch blog post" });
+    }
+  });
+
   // Portfolio Analytics
   app.get("/api/analytics", isAuthenticated, async (req: any, res) => {
     try {
