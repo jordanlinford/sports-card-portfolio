@@ -42,6 +42,8 @@ import PortfolioBuilderPage from "@/pages/portfolio-builder";
 import PortfolioBuilderSplitPage from "@/pages/portfolio-builder-split";
 import PortfolioBuilderPreferencesPage from "@/pages/portfolio-builder-preferences";
 import AdminPortfolioBuilderPage from "@/pages/admin-portfolio-builder";
+import BlogListing from "@/pages/blog";
+import BlogPostPage from "@/pages/blog-post";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -68,6 +70,8 @@ function Router() {
       <Route path="/upgrade" component={Upgrade} />
       <Route path="/billing/success" component={BillingSuccess} />
       <Route path="/share/:token" component={ShareViewer} />
+      <Route path="/blog" component={BlogListing} />
+      <Route path="/blog/:slug" component={BlogPostPage} />
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
