@@ -60,8 +60,21 @@ export function HeroImageUploader({ value, onChange }: HeroImageUploaderProps) {
       }
 
       const gcsUrl = uploadURL.split("?")[0];
-      const pathMatch = gcsUrl.match(/\/uploads\/([^/]+)$/);
-      const objectPath = pathMatch ? `/objects/uploads/${pathMatch[1]}` : gcsUrl;
+      
+      const aclResponse = await fetch("/api/blog-images", {
+        method: "PUT",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ imageURL: gcsUrl }),
+      });
+
+      if (!aclResponse.ok) {
+        throw new Error("Failed to set image permissions");
+      }
+
+      const { objectPath } = await aclResponse.json();
       onChange(objectPath);
 
       toast({

@@ -3354,6 +3354,33 @@ Sitemap: ${origin}/sitemap.xml
     next();
   };
 
+  // Blog image upload (admin only)
+  app.put("/api/blog-images", isAuthenticated, isAdmin, async (req: any, res) => {
+    if (!req.body.imageURL) {
+      return res.status(400).json({ error: "imageURL is required" });
+    }
+
+    const userId = req.user?.claims?.sub;
+
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const objectPath = await objectStorageService.trySetObjectEntityAclPolicy(
+        req.body.imageURL,
+        {
+          owner: userId,
+          visibility: "public",
+        },
+      );
+
+      res.status(200).json({
+        objectPath: objectPath,
+      });
+    } catch (error) {
+      console.error("Error setting blog image:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Admin routes
   app.get("/api/admin/stats", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
