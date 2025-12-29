@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { User, DisplayCaseWithCards, PlayerRegistry } from "@shared/schema";
+import type { User, DisplayCaseWithCards, PlayerRegistry, BlogPostWithAuthor } from "@shared/schema";
 
 interface PlatformStats {
   totalUsers: number;
@@ -600,6 +600,380 @@ function PlayerRegistryTab() {
   );
 }
 
+function BlogTab() {
+  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<BlogPostWithAuthor | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    slug: "",
+    excerpt: "",
+    content: "",
+    heroImageUrl: "",
+    videoEmbeds: [] as Array<{ provider: string; url: string; caption?: string }>,
+    isPublished: false,
+  });
+
+  const { data: posts, isLoading } = useQuery<BlogPostWithAuthor[]>({
+    queryKey: ["/api/admin/blog"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: typeof formData) => {
+      return await apiRequest("POST", "/api/admin/blog", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      setDialogOpen(false);
+      resetForm();
+      toast({ title: "Blog post created successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: typeof formData }) => {
+      return await apiRequest("PATCH", `/api/admin/blog/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      setDialogOpen(false);
+      resetForm();
+      toast({ title: "Blog post updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const togglePublishMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("POST", `/api/admin/blog/${id}/toggle-publish`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      toast({ title: "Publish status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/admin/blog/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      setDeleteConfirmId(null);
+      toast({ title: "Blog post deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      slug: "",
+      excerpt: "",
+      content: "",
+      heroImageUrl: "",
+      videoEmbeds: [],
+      isPublished: false,
+    });
+    setEditingPost(null);
+  };
+
+  const openNewDialog = () => {
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (post: BlogPostWithAuthor) => {
+    setEditingPost(post);
+    setFormData({
+      title: post.title,
+      slug: post.slug,
+      excerpt: post.excerpt || "",
+      content: post.content,
+      heroImageUrl: post.heroImageUrl || "",
+      videoEmbeds: post.videoEmbeds || [],
+      isPublished: post.isPublished,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = () => {
+    if (editingPost) {
+      updateMutation.mutate({ id: editingPost.id, data: formData });
+    } else {
+      createMutation.mutate(formData);
+    }
+  };
+
+  const generateSlug = (title: string) => {
+    return title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .trim();
+  };
+
+  const addVideoEmbed = () => {
+    setFormData(f => ({
+      ...f,
+      videoEmbeds: [...f.videoEmbeds, { provider: "youtube", url: "", caption: "" }],
+    }));
+  };
+
+  const updateVideoEmbed = (index: number, field: string, value: string) => {
+    setFormData(f => ({
+      ...f,
+      videoEmbeds: f.videoEmbeds.map((v, i) => i === index ? { ...v, [field]: value } : v),
+    }));
+  };
+
+  const removeVideoEmbed = (index: number) => {
+    setFormData(f => ({
+      ...f,
+      videoEmbeds: f.videoEmbeds.filter((_, i) => i !== index),
+    }));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-lg font-semibold">Blog Posts</h3>
+        <Button onClick={openNewDialog} data-testid="button-new-blog-post">
+          <Plus className="h-4 w-4 mr-2" />
+          New Post
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <ScrollArea className="h-[500px]">
+            {isLoading ? (
+              <div className="p-4 space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <Skeleton key={i} className="h-20" />
+                ))}
+              </div>
+            ) : posts && posts.length > 0 ? (
+              <div className="divide-y">
+                {posts.map((post) => (
+                  <div key={post.id} className="flex items-center gap-4 p-4" data-testid={`row-blog-${post.id}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium truncate">{post.title}</p>
+                        <Badge variant={post.isPublished ? "default" : "secondary"}>
+                          {post.isPublished ? "Published" : "Draft"}
+                        </Badge>
+                        {post.videoEmbeds && post.videoEmbeds.length > 0 && (
+                          <Badge variant="outline">
+                            <Video className="h-3 w-3 mr-1" />
+                            {post.videoEmbeds.length} video{post.videoEmbeds.length > 1 ? "s" : ""}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">/{post.slug}</p>
+                      {post.publishedAt && (
+                        <p className="text-xs text-muted-foreground">
+                          Published {format(new Date(post.publishedAt), "MMM d, yyyy")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => togglePublishMutation.mutate(post.id)}
+                        disabled={togglePublishMutation.isPending}
+                        data-testid={`button-toggle-publish-${post.id}`}
+                      >
+                        {post.isPublished ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openEditDialog(post)}
+                        data-testid={`button-edit-blog-${post.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDeleteConfirmId(post.id)}
+                        data-testid={`button-delete-blog-${post.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-muted-foreground">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No blog posts yet</p>
+                <p className="text-sm">Click "New Post" to create your first blog post</p>
+              </div>
+            )}
+          </ScrollArea>
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) { setDialogOpen(false); resetForm(); } else { setDialogOpen(true); }}}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingPost ? "Edit Blog Post" : "New Blog Post"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={formData.title}
+                onChange={(e) => {
+                  const title = e.target.value;
+                  setFormData(f => ({
+                    ...f,
+                    title,
+                    slug: !editingPost ? generateSlug(title) : f.slug,
+                  }));
+                }}
+                placeholder="My Blog Post Title"
+                data-testid="input-blog-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Slug (URL)</Label>
+              <Input
+                value={formData.slug}
+                onChange={(e) => setFormData(f => ({ ...f, slug: e.target.value }))}
+                placeholder="my-blog-post-title"
+                data-testid="input-blog-slug"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Excerpt (optional)</Label>
+              <Textarea
+                value={formData.excerpt}
+                onChange={(e) => setFormData(f => ({ ...f, excerpt: e.target.value }))}
+                placeholder="A short description of your post..."
+                data-testid="input-blog-excerpt"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Content</Label>
+              <Textarea
+                value={formData.content}
+                onChange={(e) => setFormData(f => ({ ...f, content: e.target.value }))}
+                placeholder="Write your blog post content here..."
+                className="min-h-[200px]"
+                data-testid="input-blog-content"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Hero Image URL (optional)</Label>
+              <Input
+                value={formData.heroImageUrl}
+                onChange={(e) => setFormData(f => ({ ...f, heroImageUrl: e.target.value }))}
+                placeholder="https://example.com/image.jpg"
+                data-testid="input-blog-hero-image"
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Video Embeds</Label>
+                <Button size="sm" variant="outline" onClick={addVideoEmbed} data-testid="button-add-video">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Video
+                </Button>
+              </div>
+              {formData.videoEmbeds.map((video, index) => (
+                <div key={index} className="flex items-start gap-2 p-3 border rounded-md">
+                  <div className="flex-1 space-y-2">
+                    <Select
+                      value={video.provider}
+                      onValueChange={(v) => updateVideoEmbed(index, "provider", v)}
+                    >
+                      <SelectTrigger data-testid={`select-video-provider-${index}`}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="youtube">YouTube</SelectItem>
+                        <SelectItem value="vimeo">Vimeo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={video.url}
+                      onChange={(e) => updateVideoEmbed(index, "url", e.target.value)}
+                      placeholder="Video URL"
+                      data-testid={`input-video-url-${index}`}
+                    />
+                    <Input
+                      value={video.caption || ""}
+                      onChange={(e) => updateVideoEmbed(index, "caption", e.target.value)}
+                      placeholder="Caption (optional)"
+                      data-testid={`input-video-caption-${index}`}
+                    />
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => removeVideoEmbed(index)}
+                    data-testid={`button-remove-video-${index}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }}>Cancel</Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={!formData.title || !formData.slug || !formData.content || createMutation.isPending || updateMutation.isPending}
+              data-testid="button-save-blog-post"
+            >
+              {(createMutation.isPending || updateMutation.isPending) && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+              {editingPost ? "Update" : "Create"} Post
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Blog Post?</DialogTitle>
+            <DialogDescription>This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirmId && deleteMutation.mutate(deleteConfirmId)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-blog"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { toast } = useToast();
   const [deleteUserConfirm, setDeleteUserConfirm] = useState<{ id: string; name: string } | null>(null);
@@ -765,6 +1139,10 @@ export default function AdminDashboard() {
               <Database className="h-4 w-4 mr-1" />
               Player Registry
             </TabsTrigger>
+            <TabsTrigger value="blog" data-testid="tab-blog">
+              <FileText className="h-4 w-4 mr-1" />
+              Blog
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -825,6 +1203,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="registry">
             <PlayerRegistryTab />
+          </TabsContent>
+
+          <TabsContent value="blog">
+            <BlogTab />
           </TabsContent>
         </Tabs>
       </div>
