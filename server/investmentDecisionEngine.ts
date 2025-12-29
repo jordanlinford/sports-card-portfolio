@@ -422,8 +422,8 @@ const ROLE_TIER_OVERRIDES: Record<string, RoleTier> = {
   // STARTER - Young/emerging RBs (talented but not yet proven franchise-level)
   // Also includes productive veterans with declining usage
   "breece hall": "STARTER",         // Year 2, elite talent but injury history
-  "bijan robinson": "STARTER",      // Year 2, need more sample size
-  "jahmyr gibbs": "STARTER",        // Year 2, RBBC limits ceiling confirmation
+  "bijan robinson": "STARTER",      // Year 3, elite RB but need sustained production
+  "jahmyr gibbs": "STARTER",        // Year 3, RBBC limits ceiling confirmation
   "alvin kamara": "STARTER",        // Still productive but 29, declining usage
   "josh jacobs": "STARTER",
   "aaron jones": "STARTER",
@@ -1437,10 +1437,12 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   // Non-early-career players with stable roles should NEVER be SPECULATIVE
   // Risk ≠ Speculation: A boring, known commodity is not a lottery ticket
   // Examples: Rudy Gobert, veteran role players, known quantities
+  // NOTE: Year 3/4 players are still developing - not "established veterans"
   // ============================================================
-  const isNotEarlyCareer = !isEarlyCareerStage;
+  const isDevelopingPlayer = input.stage === "ROOKIE" || input.stage === "YEAR_2" || input.stage === "YEAR_3" || input.stage === "YEAR_4";
+  const isVeteranStage = input.stage === "PRIME" || input.stage === "VETERAN" || input.stage === "AGING";
   const hasStableRole = roleTier === "FRANCHISE_CORE" || roleTier === "STARTER";
-  const isEstablishedVeteran = isNotEarlyCareer && hasStableRole;
+  const isEstablishedVeteran = isVeteranStage && hasStableRole && !isDevelopingPlayer;
   
   if (isEstablishedVeteran && verdict === "SPECULATIVE_FLYER") {
     // Check if upside is capped (low valuation score = fairly priced, not much room to grow)
