@@ -821,22 +821,23 @@ function decideVerdict(
   // ============================================================
   // PRECEDENCE 5: ESTABLISHED players (FRANCHISE_CORE + PRIME) → ACCUMULATE or HOLD
   // Proven stars with locked roles should never be SPECULATIVE
-  // Key insight: downsideRisk matters more than valuation for proven stars
+  // Key insight: downsideRisk is THE deciding factor for proven stars
+  // mispricing is IGNORED - hot players are always "overpriced" by this metric
   // Examples: Nikola Jokic, Giannis, LeBron, Stephen Curry
   // ============================================================
+  console.log(`[decideVerdict] Stage: ${stage}, roleStabilityScore: ${roleStabilityScore}, maturityTier: ${maturityTier}, downsideRiskScore: ${downsideRiskScore}, mispricingScore: ${mispricingScore}`);
   if (maturityTier === "ESTABLISHED") {
-    // ACCUMULATE: Low downside risk is the PRIMARY signal for proven stars
-    // mispricingScore can be moderately negative (WARM/HOT players run -20 to -50)
-    // Accept mispricing >= -25 with low risk <= 55
-    if (downsideRiskScore <= 55 && mispricingScore >= -25) {
+    // ACCUMULATE: Low downside risk is THE signal - ignore mispricing for franchise stars
+    // These are proven assets; "overpriced" just means high demand
+    if (downsideRiskScore <= 55) {
       return { verdict: "ACCUMULATE", reason: "Proven franchise cornerstone - low risk, accumulate on dips" };
     }
-    // HOLD_CORE: Medium risk (55-65) or moderately overpriced
+    // HOLD_CORE: Medium risk (55-65)
     if (downsideRiskScore <= 65) {
       return { verdict: "HOLD_CORE", reason: "Franchise asset - hold position, elevated but manageable risk" };
     }
-    // TRADE_THE_HYPE: Very overpriced with high downside (aging stars)
-    if (mispricingScore <= -35 && downsideRiskScore >= 65) {
+    // TRADE_THE_HYPE: Very high downside (aging stars, injury concerns)
+    if (downsideRiskScore >= 70) {
       return { verdict: "TRADE_THE_HYPE", reason: "Franchise asset but declining value - consider taking profits" };
     }
     // High downside but still franchise core
@@ -1291,6 +1292,8 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const playerName = input.playerName ?? "";
   const roleTier = getRoleTier(playerName);
   const roleStabilityScore = getRoleStabilityScore(playerName);
+  
+  console.log(`[InvestmentDecision] Player: ${playerName}, Stage: ${input.stage}, RoleTier: ${roleTier}, RoleStabilityScore: ${roleStabilityScore}`);
   
   // Incorporate role stability into downsideRiskScore
   // Low role stability = higher downside risk
