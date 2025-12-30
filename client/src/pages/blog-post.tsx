@@ -268,13 +268,9 @@ export default function BlogPostPage() {
           {post.contentFormat === "html" ? (
             <div dangerouslySetInnerHTML={{ __html: post.content }} />
           ) : (
-            post.content.split('\n').map((paragraph, index) => (
-              paragraph.trim() ? (
-                <p key={index}>{parseTextWithLinks(paragraph)}</p>
-              ) : (
-                <br key={index} />
-              )
-            ))
+            <div className="whitespace-pre-line">
+              {parseTextWithLinks(post.content)}
+            </div>
           )}
         </div>
 
