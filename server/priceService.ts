@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { MatchedAttributes, MatchSample, CardMatchConfidence, MatchConfidenceTier } from "@shared/schema";
+import type { MatchedAttributes, MatchSample, CardMatchConfidence, MatchConfidenceTier, VariationType } from "@shared/schema";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
@@ -24,6 +24,7 @@ interface CardInfo {
   year?: number | null;
   cardNumber?: string | null;
   variation?: string | null;
+  variationType?: VariationType | null; // Card category for targeted eBay queries
   grade?: string | null;
   grader?: string | null; // Separate grader field (PSA, BGS, SGC, CGC)
 }
@@ -953,34 +954,85 @@ function normalizeGradeForSearch(grade: string | undefined | null, grader: strin
   return grade;
 }
 
+// Build search term based on variationType for more accurate pricing
+function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms: string[] } {
+  const variationType = card.variationType;
+  const variation = card.variation || "";
+  
+  // Default exclusions for base cards - removes premium variants from results
+  const premiumExclusions = ["-auto", "-autograph", "-patch", "-relic", "-jersey", "-memorabilia", "-/10", "-/25", "-/50", "-ssp", "-case"];
+  
+  switch (variationType) {
+    case "base":
+      // Plain base card - use variation name if present (e.g., "Rated Rookie"), else "base"
+      // Always exclude premium variants
+      return { term: variation ? `${variation} base` : "base", excludeTerms: premiumExclusions };
+    
+    case "base_insert":
+      // Common insert (Rookie Wave, Laser, etc.) - use insert name, exclude premium
+      // These are $2-10 inserts, NOT autos/patches
+      return { term: variation || "insert", excludeTerms: premiumExclusions };
+    
+    case "parallel":
+      // Unnumbered parallel (Silver Prizm, Refractor, etc.)
+      return { term: variation || "parallel", excludeTerms: ["-auto", "-autograph", "-patch", "-relic"] };
+    
+    case "numbered":
+      // Numbered parallel (/99, /199, etc.) - include variation but don't exclude numbered terms
+      return { term: variation || "numbered", excludeTerms: ["-auto", "-autograph", "-patch", "-relic"] };
+    
+    case "auto":
+      // Autograph card - specifically search for autos
+      return { term: variation ? `${variation} auto` : "auto autograph", excludeTerms: [] };
+    
+    case "memorabilia":
+      // Patch/Relic/Jersey card
+      return { term: variation ? `${variation} patch` : "patch relic jersey", excludeTerms: ["-auto"] };
+    
+    case "auto_memorabilia":
+      // Auto + Patch combo (RPA, etc.)
+      return { term: variation ? `${variation} auto patch` : "auto patch rpa", excludeTerms: [] };
+    
+    case "case_hit":
+      // SSP/Case hit inserts (Downtown, Kaboom, etc.)
+      return { term: variation || "case hit ssp", excludeTerms: [] };
+    
+    default:
+      // No variationType specified - fall back to variation field or "base"
+      return { term: variation || "base", excludeTerms: variation ? [] : premiumExclusions };
+  }
+}
+
 function buildSearchQueries(card: CardInfo): string[] {
   const queries: string[] = [];
   const cleanTitle = cleanCardTitle(card.title);
   
-  // IMPORTANT: When no variation is specified, add "base" to filter out expensive inserts
-  // This prevents Downtown ($400) from matching when user wants base Donruss ($25)
-  const variationOrBase = card.variation || "base";
+  // Build variation search term based on variationType
+  const { term: variationTerm, excludeTerms } = buildVariationSearchTerm(card);
   
   // Normalize grade to include grader (assume PSA if just a number like "10")
   const normalizedGrade = normalizeGradeForSearch(card.grade, card.grader);
   
-  // Primary query: player name + set + year + variation/base + grade + "value" or "price" for pricing info
+  // Build exclusion string for queries (e.g., "-auto -patch -/10")
+  const exclusions = excludeTerms.join(" ");
+  
+  // Primary query: player name + set + year + variation + grade + "value" or "price" for pricing info
   const primaryParts: string[] = [];
   if (cleanTitle) primaryParts.push(cleanTitle);
   if (card.set) primaryParts.push(card.set);
   if (card.year) primaryParts.push(String(card.year));
-  primaryParts.push(variationOrBase);
+  primaryParts.push(variationTerm);
   if (normalizedGrade) primaryParts.push(normalizedGrade);
-  queries.push(primaryParts.join(" ") + " value price");
+  queries.push(primaryParts.join(" ") + " value price " + exclusions);
   
-  // Secondary query: search auction prices specifically (include variation/base)
-  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${variationOrBase} ${normalizedGrade} auction price sold`);
+  // Secondary query: search auction prices specifically
+  queries.push(`${cleanTitle} ${card.year || ""} ${card.set || ""} ${variationTerm} ${normalizedGrade} auction price sold ${exclusions}`);
   
-  // Tertiary query: player name + year + variation/base + grade + "rookie card value"
-  queries.push(`${cleanTitle} ${card.year || ""} ${variationOrBase} ${normalizedGrade} rookie card value`);
+  // Tertiary query: player name + year + variation + grade + "rookie card value"
+  queries.push(`${cleanTitle} ${card.year || ""} ${variationTerm} ${normalizedGrade} rookie card value ${exclusions}`);
   
-  // Fourth query: simpler version targeting price guides (include variation/base)
-  queries.push(`${cleanTitle} ${card.set || ""} ${variationOrBase} ${normalizedGrade} price guide`);
+  // Fourth query: simpler version targeting price guides
+  queries.push(`${cleanTitle} ${card.set || ""} ${variationTerm} ${normalizedGrade} price guide ${exclusions}`);
   
   return queries;
 }
