@@ -15,6 +15,33 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// ============================================================================
+// VARIATION TYPE ENUM - Required for accurate price lookups
+// ============================================================================
+export const VARIATION_TYPES = [
+  "base",           // Base rookie/veteran card (no parallel, no insert)
+  "base_insert",    // Insert set card (Rookie Wave, Rated Rookie, etc.)
+  "parallel",       // Unnumbered parallel (Silver Prizm, Blue Refractor, etc.)
+  "numbered",       // Numbered parallel (/199, /99, /50, etc.)
+  "auto",           // Autograph card
+  "memorabilia",    // Patch/relic/jersey card
+  "auto_memorabilia", // Auto + patch combo
+  "case_hit",       // Super short print, 1/1, case hit
+] as const;
+
+export type VariationType = typeof VARIATION_TYPES[number];
+
+export const VARIATION_TYPE_LABELS: Record<VariationType, string> = {
+  base: "Base Card",
+  base_insert: "Base Insert (Rookie Wave, Rated Rookie, etc.)",
+  parallel: "Parallel (Silver, Blue, Holo - unnumbered)",
+  numbered: "Numbered Parallel (/199, /99, /50, etc.)",
+  auto: "Autograph",
+  memorabilia: "Memorabilia (Patch/Relic/Jersey)",
+  auto_memorabilia: "Auto + Memorabilia",
+  case_hit: "Case Hit / SSP / 1-of-1",
+};
+
 // Session storage table for Replit Auth
 export const sessions = pgTable(
   "sessions",
@@ -82,6 +109,7 @@ export const cards = pgTable("cards", {
   year: integer("year"),
   cardNumber: varchar("card_number", { length: 50 }),
   variation: varchar("variation", { length: 255 }),
+  variationType: varchar("variation_type", { length: 50 }), // Required for accurate pricing: base, base_insert, parallel, numbered, auto, etc.
   grade: varchar("grade", { length: 50 }),
   purchasePrice: real("purchase_price"),
   estimatedValue: real("estimated_value"),
