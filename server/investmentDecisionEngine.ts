@@ -552,6 +552,7 @@ export type DecisionInput = {
   team?: string;
   position?: string;
   playerName?: string;  // Required for role stability lookup
+  inferredRoleTier?: RoleTier;  // AI-inferred role tier for players not in registry
 };
 
 export type MaturityTier = "EMERGING" | "ESTABLISHED" | "TRANSITIONAL";
@@ -1302,10 +1303,17 @@ function generateTriggers(verdict: InvestmentVerdict, input: DecisionInput): { u
 export function generateInvestmentCall(input: DecisionInput): InvestmentCall & { decisionDebug?: DecisionDebug } {
   const scores = computeScores(input);
   
-  // Get role stability info
+  // Get role stability info - use registry first, then inferred, then UNKNOWN
   const playerName = input.playerName ?? "";
-  const roleTier = getRoleTier(playerName);
-  const roleStabilityScore = getRoleStabilityScore(playerName);
+  let roleTier = getRoleTier(playerName);
+  
+  // If registry returns UNKNOWN but we have an inferred role tier, use that
+  if (roleTier === "UNKNOWN" && input.inferredRoleTier && input.inferredRoleTier !== "UNKNOWN") {
+    console.log(`[RoleTier] Using AI-inferred role tier for "${playerName}": ${input.inferredRoleTier}`);
+    roleTier = input.inferredRoleTier;
+  }
+  
+  const roleStabilityScore = ROLE_STABILITY_SCORES[roleTier];
   
   console.log(`[InvestmentDecision] Player: ${playerName}, Stage: ${input.stage}, RoleTier: ${roleTier}, RoleStabilityScore: ${roleStabilityScore}`);
   

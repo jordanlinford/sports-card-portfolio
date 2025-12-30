@@ -4,8 +4,79 @@ import { playerOutlookCache } from "@shared/schema";
 import { eq, and, gt, lt } from "drizzle-orm";
 import { classifyPlayer, getExposureRecommendations, type ClassificationInput, type ClassificationOutput } from "./playerClassificationEngine";
 import { calculateValuation } from "./valuationService";
-import { generateInvestmentCall } from "./investmentDecisionEngine";
+import { generateInvestmentCall, type RoleTier } from "./investmentDecisionEngine";
 import { lookupPlayer, ensureRegistryLoaded } from "./playerRegistry";
+
+// ============================================================
+// AI-BASED ROLE TIER INFERENCE
+// For players not in registry, infer role from news context
+// ============================================================
+function inferRoleTierFromContext(newsSnippets: string[], playerName: string): RoleTier {
+  const context = newsSnippets.join(" ").toLowerCase();
+  
+  // FRANCHISE_CORE indicators (clear star status)
+  const franchiseIndicators = [
+    "mvp", "all-pro", "all-star", "pro bowl", "superstar",
+    "franchise player", "face of the franchise", "star quarterback",
+    "best player", "elite", "top-5", "top 5", "top-10", "top 10",
+    "super bowl favorite", "championship", "playoff contender",
+    "leading the", "carries the team", "franchise qb",
+    "all-nba", "all-nfl", "cy young", "triple crown",
+  ];
+  
+  // STARTER indicators (clear starting role)
+  const starterIndicators = [
+    "starting", "starter", "start for", "named starter",
+    "will start", "gets the start", "starting lineup",
+    "first-string", "first string", "starting qb", "starting rb",
+    "starting pitcher", "opening day starter", "starting point guard",
+    "earned the job", "won the job", "takes over as",
+  ];
+  
+  // BACKUP/UNCERTAIN indicators
+  const backupIndicators = [
+    "backup", "second-string", "second string", "bench",
+    "reserve", "depth chart", "behind", "lost the job",
+    "demoted", "third-string", "practice squad",
+  ];
+  
+  // OUT_OF_LEAGUE indicators
+  const outOfLeagueIndicators = [
+    "released", "cut", "waived", "unsigned", "free agent looking",
+    "no team", "without a team", "still looking for",
+    "out of the league", "career in jeopardy",
+  ];
+  
+  // Count matches for each tier
+  const franchiseScore = franchiseIndicators.filter(i => context.includes(i)).length;
+  const starterScore = starterIndicators.filter(i => context.includes(i)).length;
+  const backupScore = backupIndicators.filter(i => context.includes(i)).length;
+  const outOfLeagueScore = outOfLeagueIndicators.filter(i => context.includes(i)).length;
+  
+  console.log(`[RoleTierInference] ${playerName}: franchise=${franchiseScore}, starter=${starterScore}, backup=${backupScore}, out=${outOfLeagueScore}`);
+  
+  // Prioritize by tier (higher tiers need stronger evidence)
+  if (franchiseScore >= 2) {
+    console.log(`[RoleTierInference] Inferred FRANCHISE_CORE for ${playerName}`);
+    return "FRANCHISE_CORE";
+  }
+  if (starterScore >= 1 || franchiseScore >= 1) {
+    console.log(`[RoleTierInference] Inferred STARTER for ${playerName}`);
+    return "STARTER";
+  }
+  if (outOfLeagueScore >= 1) {
+    console.log(`[RoleTierInference] Inferred OUT_OF_LEAGUE for ${playerName}`);
+    return "OUT_OF_LEAGUE";
+  }
+  if (backupScore >= 1) {
+    console.log(`[RoleTierInference] Inferred BACKUP for ${playerName}`);
+    return "BACKUP";
+  }
+  
+  // Default: UNKNOWN (not enough signal)
+  console.log(`[RoleTierInference] No strong signal for ${playerName}, defaulting to UNKNOWN`);
+  return "UNKNOWN";
+}
 import type {
   PlayerOutlookResponse,
   PlayerOutlookRequest,
@@ -878,6 +949,9 @@ async function generateFreshOutlook(
     none: "LOW",
   };
   
+  // Infer role tier from news context for players not in registry
+  const inferredRoleTier = inferRoleTierFromContext(snippets, playerName);
+  
   const investmentCall = generateInvestmentCall({
     stage: finalClassification.stage,
     temperature: finalClassification.baseTemperature,
@@ -895,6 +969,7 @@ async function generateFreshOutlook(
     team: enrichedPlayerInfo.team,
     position: enrichedPlayerInfo.position,
     playerName: playerName,
+    inferredRoleTier: inferredRoleTier,
   });
   
   // Step 9: Build response
