@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import type { MatchedAttributes, MatchSample, CardMatchConfidence, MatchConfidenceTier, VariationType } from "@shared/schema";
+import type { MatchedAttributes, MatchSample, CardMatchConfidence, MatchConfidenceTier } from "@shared/schema";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
@@ -24,7 +24,6 @@ interface CardInfo {
   year?: number | null;
   cardNumber?: string | null;
   variation?: string | null;
-  variationType?: VariationType | null; // Card category for targeted eBay queries
   grade?: string | null;
   grader?: string | null; // Separate grader field (PSA, BGS, SGC, CGC)
 }
@@ -954,53 +953,70 @@ function normalizeGradeForSearch(grade: string | undefined | null, grader: strin
   return grade;
 }
 
-// Build search term based on variationType for more accurate pricing
+// Infer card type from free-form variation text and build appropriate search terms
 function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms: string[] } {
-  const variationType = card.variationType;
-  const variation = card.variation || "";
+  const variation = (card.variation || "").toLowerCase().trim();
   
-  // Default exclusions for base cards - removes premium variants from results
+  // Default exclusions for base/insert cards - removes premium variants from results
   const premiumExclusions = ["-auto", "-autograph", "-patch", "-relic", "-jersey", "-memorabilia", "-/10", "-/25", "-/50", "-ssp", "-case"];
   
-  switch (variationType) {
-    case "base":
-      // Plain base card - use variation name if present (e.g., "Rated Rookie"), else "base"
-      // Always exclude premium variants
-      return { term: variation ? `${variation} base` : "base", excludeTerms: premiumExclusions };
-    
-    case "base_insert":
-      // Common insert (Rookie Wave, Laser, etc.) - use insert name, exclude premium
-      // These are $2-10 inserts, NOT autos/patches
-      return { term: variation || "insert", excludeTerms: premiumExclusions };
-    
-    case "parallel":
-      // Unnumbered parallel (Silver Prizm, Refractor, etc.)
-      return { term: variation || "parallel", excludeTerms: ["-auto", "-autograph", "-patch", "-relic"] };
-    
-    case "numbered":
-      // Numbered parallel (/99, /199, etc.) - include variation but don't exclude numbered terms
-      return { term: variation || "numbered", excludeTerms: ["-auto", "-autograph", "-patch", "-relic"] };
-    
-    case "auto":
-      // Autograph card - specifically search for autos
-      return { term: variation ? `${variation} auto` : "auto autograph", excludeTerms: [] };
-    
-    case "memorabilia":
-      // Patch/Relic/Jersey card
-      return { term: variation ? `${variation} patch` : "patch relic jersey", excludeTerms: ["-auto"] };
-    
-    case "auto_memorabilia":
-      // Auto + Patch combo (RPA, etc.)
-      return { term: variation ? `${variation} auto patch` : "auto patch rpa", excludeTerms: [] };
-    
-    case "case_hit":
-      // SSP/Case hit inserts (Downtown, Kaboom, etc.)
-      return { term: variation || "case hit ssp", excludeTerms: [] };
-    
-    default:
-      // No variationType specified - fall back to variation field or "base"
-      return { term: variation || "base", excludeTerms: variation ? [] : premiumExclusions };
+  // If no variation specified, default to base with exclusions
+  if (!variation) {
+    return { term: "base", excludeTerms: premiumExclusions };
   }
+  
+  // Detect auto/memorabilia cards (highest priority - these are premium)
+  const hasAuto = /\b(auto|autograph|signature|signed)\b/.test(variation);
+  const hasPatch = /\b(patch|relic|jersey|memorabilia|game.?used|player.?worn)\b/.test(variation);
+  const hasRPA = /\brpa\b/.test(variation) || (hasAuto && hasPatch);
+  
+  if (hasRPA) {
+    // RPA / Auto + Patch combo
+    return { term: card.variation || "", excludeTerms: [] };
+  }
+  if (hasAuto) {
+    // Autograph card
+    return { term: card.variation || "", excludeTerms: [] };
+  }
+  if (hasPatch) {
+    // Memorabilia card (no auto)
+    return { term: card.variation || "", excludeTerms: [] };
+  }
+  
+  // Detect case hits (Downtown, Kaboom, etc.)
+  const isCaseHit = /\b(downtown|kaboom|disco|stained.?glass|color.?blast|genesis|case.?hit|ssp)\b/.test(variation);
+  if (isCaseHit) {
+    return { term: card.variation || "", excludeTerms: [] };
+  }
+  
+  // Detect numbered parallels (/99, /199, etc.)
+  const isNumbered = /\/\d+|1\/1|\bone of one\b/.test(variation);
+  if (isNumbered) {
+    return { term: card.variation || "", excludeTerms: ["-auto", "-autograph", "-patch", "-relic"] };
+  }
+  
+  // Detect base cards (user explicitly says "base")
+  const isBase = /\bbase\b/.test(variation);
+  if (isBase) {
+    // Use full variation text (might include "Rated Rookie base") but exclude premium
+    return { term: card.variation || "base", excludeTerms: premiumExclusions };
+  }
+  
+  // Detect base inserts (Rookie Wave, Laser, etc. - common cheap inserts)
+  const isBaseInsert = /\b(insert|rookie wave|laser|my house|velocity|hyper|fast break)\b/.test(variation);
+  if (isBaseInsert) {
+    // Use insert name but exclude premium variants
+    return { term: card.variation || "", excludeTerms: premiumExclusions };
+  }
+  
+  // Detect parallels (Silver Prizm, Refractor, etc.)
+  const isParallel = /\b(prizm|refractor|parallel|silver|gold|blue|red|green|pink|purple|orange|ice|cosmic|atomic|cracked)\b/.test(variation);
+  if (isParallel) {
+    return { term: card.variation || "", excludeTerms: ["-auto", "-autograph", "-patch", "-relic"] };
+  }
+  
+  // Default: use variation text as-is, exclude premium variants to be safe
+  return { term: card.variation || "", excludeTerms: premiumExclusions };
 }
 
 function buildSearchQueries(card: CardInfo): string[] {

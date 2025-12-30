@@ -30,8 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Card, VariationType } from "@shared/schema";
-import { VARIATION_TYPES, VARIATION_TYPE_LABELS } from "@shared/schema";
+import type { Card } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -61,7 +60,6 @@ interface EditFormData {
   set: string;
   year: string;
   variation: string;
-  variationType: VariationType | "";
   grade: string;
   grader: string;
   careerStage: string;
@@ -225,7 +223,6 @@ export function CardDetailModal({
     set: "",
     year: "",
     variation: "",
-    variationType: "",
     grade: "",
     grader: "",
     careerStage: "",
@@ -249,7 +246,6 @@ export function CardDetailModal({
         set: card.set || "",
         year: card.year?.toString() || "",
         variation: card.variation || "",
-        variationType: (card.variationType as VariationType) || "",
         grade: card.grade || "",
         grader: card.grader || "",
         careerStage: card.legacyTier || "",
@@ -310,7 +306,6 @@ export function CardDetailModal({
         set: formData.set.trim() || null,
         year: formData.year ? parseInt(formData.year) : null,
         variation: formData.variation.trim() || null,
-        variationType: formData.variationType || null,
         grade: formData.grade.trim() || null,
         grader: formData.grader.trim() || null,
         careerStage: formData.careerStage.trim() || null,
@@ -356,7 +351,6 @@ export function CardDetailModal({
           set: card.set || "",
           year: card.year?.toString() || "",
           variation: card.variation || "",
-          variationType: (card.variationType as VariationType) || "",
           grade: card.grade || "",
           grader: card.grader || "",
           careerStage: card.legacyTier || "",
@@ -386,7 +380,6 @@ export function CardDetailModal({
         set: card.set || "",
         year: card.year?.toString() || "",
         variation: card.variation || "",
-        variationType: (card.variationType as VariationType) || "",
         grade: card.grade || "",
         grader: card.grader || "",
         careerStage: card.legacyTier || "",
@@ -594,37 +587,18 @@ export function CardDetailModal({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label htmlFor="edit-variation">Variation Name</Label>
-                    <Input
-                      id="edit-variation"
-                      value={formData.variation}
-                      onChange={(e) => setFormData({ ...formData, variation: e.target.value })}
-                      placeholder="e.g., Rookie Wave RW-JDT"
-                      data-testid="input-edit-variation"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="edit-variation-type">Card Type</Label>
-                    <Select
-                      value={formData.variationType}
-                      onValueChange={(value) => setFormData({ ...formData, variationType: value as VariationType })}
-                    >
-                      <SelectTrigger id="edit-variation-type" data-testid="select-variation-type">
-                        <SelectValue placeholder="Select card type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {VARIATION_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {VARIATION_TYPE_LABELS[type]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">Required for accurate pricing</p>
-                  </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-variation">Variation</Label>
+                  <Input
+                    id="edit-variation"
+                    value={formData.variation}
+                    onChange={(e) => setFormData({ ...formData, variation: e.target.value })}
+                    placeholder="e.g., Base, Silver Prizm, Rookie Wave insert, Auto /99"
+                    data-testid="input-edit-variation"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Include "base" for base cards, or describe the parallel/insert type for accurate pricing
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
