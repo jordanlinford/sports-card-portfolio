@@ -281,12 +281,88 @@ function isKnownLegend(playerName: string, sport: string): boolean {
   return isLegend;
 }
 
+// Team context assessment - how is the team performing?
+interface TeamContext {
+  playoffOutlook: "CONTENDER" | "BUBBLE" | "REBUILDING" | "UNKNOWN";
+  teamMomentum: "ASCENDING" | "STABLE" | "DECLINING" | "UNKNOWN";
+  narrativeStrength: "STRONG" | "MODERATE" | "WEAK" | "UNKNOWN";
+}
+
+// Peak timing assessment - has the player's market likely peaked?
+interface PeakTimingAssessment {
+  peakStatus: "PRE_PEAK" | "AT_PEAK" | "POST_PEAK" | "UNKNOWN";
+  peakReason: string;
+  shortTermOutlook: string;
+  longTermOutlook: string;
+}
+
+// Tiered card recommendations
+interface TieredRecommendations {
+  baseCards: {
+    verdict: "SELL" | "HOLD" | "BUY";
+    reasoning: string;
+  };
+  midTierParallels: {
+    verdict: "SELL" | "HOLD" | "BUY";
+    reasoning: string;
+  };
+  premiumGraded: {
+    verdict: "SELL" | "HOLD" | "BUY";
+    reasoning: string;
+  };
+}
+
+// Analyze team context from news snippets
+function analyzeTeamContext(snippets: string[], team: string | undefined): TeamContext {
+  if (!team || team === "Unknown") {
+    return { playoffOutlook: "UNKNOWN", teamMomentum: "UNKNOWN", narrativeStrength: "UNKNOWN" };
+  }
+  
+  const context = snippets.join(" ").toLowerCase();
+  
+  // Playoff outlook indicators
+  const contenderIndicators = ["playoff", "contender", "super bowl", "championship", "finals", "postseason", "clinch", "first place", "division lead"];
+  const rebuildingIndicators = ["rebuilding", "tank", "draft pick", "young team", "development", "miss playoffs", "missed playoffs", "out of contention"];
+  
+  const contenderScore = contenderIndicators.filter(i => context.includes(i)).length;
+  const rebuildingScore = rebuildingIndicators.filter(i => context.includes(i)).length;
+  
+  let playoffOutlook: TeamContext["playoffOutlook"] = "UNKNOWN";
+  if (contenderScore >= 2) playoffOutlook = "CONTENDER";
+  else if (rebuildingScore >= 2) playoffOutlook = "REBUILDING";
+  else if (contenderScore >= 1) playoffOutlook = "BUBBLE";
+  
+  // Team momentum
+  const ascendingIndicators = ["win streak", "hot start", "turning around", "on fire", "best record", "dominating"];
+  const decliningIndicators = ["losing streak", "struggling", "injuries", "regression", "disappointing", "missed expectations"];
+  
+  const ascendingScore = ascendingIndicators.filter(i => context.includes(i)).length;
+  const decliningScore = decliningIndicators.filter(i => context.includes(i)).length;
+  
+  let teamMomentum: TeamContext["teamMomentum"] = "UNKNOWN";
+  if (ascendingScore > decliningScore) teamMomentum = "ASCENDING";
+  else if (decliningScore > ascendingScore) teamMomentum = "DECLINING";
+  else if (ascendingScore >= 1 || decliningScore >= 1) teamMomentum = "STABLE";
+  
+  // Narrative strength
+  const narrativeIndicators = ["pro bowl", "all-pro", "mvp", "record", "historic", "franchise record", "best in"];
+  const narrativeScore = narrativeIndicators.filter(i => context.includes(i)).length;
+  
+  let narrativeStrength: TeamContext["narrativeStrength"] = "UNKNOWN";
+  if (narrativeScore >= 2) narrativeStrength = "STRONG";
+  else if (narrativeScore >= 1) narrativeStrength = "MODERATE";
+  else narrativeStrength = "WEAK";
+  
+  return { playoffOutlook, teamMomentum, narrativeStrength };
+}
+
 // Use Serper to get news/hype signals about the player
 async function getPlayerNewsSignals(playerName: string, sport: string): Promise<{
   momentum: "up" | "flat" | "down";
   newsHype: "high" | "medium" | "low" | "none";
   snippets: string[];
   detectedStage?: "BUST" | "RETIRED" | "RETIRED_HOF";
+  teamContext?: TeamContext;
 }> {
   // First check if this is a known legend - override everything
   if (isKnownLegend(playerName, sport)) {
@@ -434,7 +510,12 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
     
     console.log(`[PlayerOutlook] News analysis: deceased=${deceasedIndicators}, hof=${hofIndicators}, retired=${retiredIndicators}, bust=${bustIndicators} → stage=${detectedStage || "none"}`);
     
-    return { momentum, newsHype, snippets, detectedStage };
+    // Analyze team context from the snippets
+    // We'll get the team from the classification later, but we can still analyze the snippets
+    // for team-related signals even without knowing the exact team
+    const teamContext = analyzeTeamContext(snippets, undefined);
+    
+    return { momentum, newsHype, snippets, detectedStage, teamContext };
   } catch (error) {
     console.error("[PlayerOutlook] News fetch error:", error);
     return { momentum: "flat", newsHype: "none", snippets: [] };
@@ -446,7 +527,8 @@ async function generatePlayerOutlookAI(
   playerName: string,
   sport: string,
   classification: ClassificationOutput,
-  newsSnippets: string[]
+  newsSnippets: string[],
+  teamContext?: TeamContext
 ): Promise<{
   playerInfo: PlayerInfo;
   thesis: string[];
@@ -460,6 +542,8 @@ async function generatePlayerOutlookAI(
     repricingCatalysts: string[];
     trapRisks: string[];
   };
+  peakTiming?: PeakTimingAssessment;
+  tieredRecommendations?: TieredRecommendations;
 }> {
   // Build the system message with strict guardrails
   const systemMessage = `You are MyDisplayCase Player Outlook, a skeptical sports-card market analyst. You help collectors decide whether to invest in a player like a stock, and choose the right card exposure (Premium/Growth/Core/Speculative) based on risk, liquidity, and timing.
@@ -533,7 +617,7 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
   "thesis": [
     "<bullet 1: main momentum/hype factor - SPECIFIC to this player>",
     "<bullet 2: performance or role factor>",
-    "<bullet 3: market behavior observation>",
+    "<bullet 3: team context and how it affects card value>",
     "<bullet 4: key risk or what could change>"
   ],
   "marketRealityCheck": [
@@ -548,6 +632,26 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
       "<condition 1 for thesis to work>",
       "<condition 2>"
     ]
+  },
+  "peakTiming": {
+    "peakStatus": "PRE_PEAK|AT_PEAK|POST_PEAK",
+    "peakReason": "<1-2 sentence explanation of why the player's card market is at this peak stage>",
+    "shortTermOutlook": "<1-2 sentence what happens to card values in next 3-6 months>",
+    "longTermOutlook": "<1-2 sentence what happens to card values over next 1-2 years>"
+  },
+  "tieredRecommendations": {
+    "baseCards": {
+      "verdict": "SELL|HOLD|BUY",
+      "reasoning": "<1 sentence reasoning for base card strategy>"
+    },
+    "midTierParallels": {
+      "verdict": "SELL|HOLD|BUY",
+      "reasoning": "<1 sentence reasoning for mid-tier parallel strategy>"
+    },
+    "premiumGraded": {
+      "verdict": "SELL|HOLD|BUY",
+      "reasoning": "<1 sentence reasoning for premium/graded rookie strategy>"
+    }
   },
   "discountAnalysis": {
     "whyDiscounted": [
@@ -577,6 +681,19 @@ CONFIDENCE & DATA QUALITY RULES:
   * LOW: No recent news, relying mostly on historical knowledge
 
 IMPORTANT: For established star players (All-Stars, MVPs, Pro Bowlers) with recent news coverage, confidence should typically be MEDIUM or HIGH, not LOW. Reserve LOW confidence for truly obscure players or situations with major unknowns.
+
+PEAK TIMING RULES (critical for collectors):
+- PRE_PEAK: Player's narrative is still building. Cards have more upside. Examples: emerging stars, pre-All-Star selection, before breakout playoff run.
+- AT_PEAK: Player is at maximum visibility/hype. Cards may be at ceiling. Examples: just made All-Pro, Super Bowl run, MVP talk, franchise records.
+- POST_PEAK: Peak visibility has passed. Cards may trend down without new catalysts. Examples: team missed playoffs after success, entering RB cliff years (27+), coming off injury, narrative fatigue.
+
+TIERED RECOMMENDATIONS RULES:
+- baseCards: Common base cards ($1-5 range). High supply, low demand ceiling. Often SELL at peak, BUY during dips.
+- midTierParallels: Numbered parallels, premium inserts ($10-100 range). Moderate liquidity. More nuanced timing.
+- premiumGraded: PSA 10/BGS 9.5+ graded rookies, low serial autos ($100+ range). Hold for long-term upside or sell at absolute peak visibility.
+
+For RBs entering Year 4+: Generally recommend SELL on base/mid-tier due to positional depreciation, but HOLD premium graded if elite production continues.
+For players on struggling teams: Base cards suffer first, premium holds better if individual stats remain strong.
 
 ANTI-FLUFF CHECK (critical):
 Before finalizing, verify: if any thesis bullet could apply to 10+ random players, rewrite it to be more specific to ${playerName} OR mark the missing input as Unknown and use conditional language.
@@ -657,6 +774,40 @@ TONE ENFORCEMENT:
       console.log(`[PlayerOutlook] AI detected career status for ${playerName}: ${aiDetectedCareerStatus}`);
     }
     
+    // Parse peak timing
+    const validPeakStatuses = ["PRE_PEAK", "AT_PEAK", "POST_PEAK"];
+    const peakTiming: PeakTimingAssessment | undefined = parsed.peakTiming ? {
+      peakStatus: validPeakStatuses.includes(parsed.peakTiming.peakStatus) 
+        ? parsed.peakTiming.peakStatus 
+        : "UNKNOWN",
+      peakReason: parsed.peakTiming.peakReason || "Unable to assess peak timing",
+      shortTermOutlook: parsed.peakTiming.shortTermOutlook || "Monitor for signals",
+      longTermOutlook: parsed.peakTiming.longTermOutlook || "Depends on continued performance",
+    } : undefined;
+    
+    // Parse tiered recommendations
+    const validTierVerdicts = ["SELL", "HOLD", "BUY"];
+    const tieredRecommendations: TieredRecommendations | undefined = parsed.tieredRecommendations ? {
+      baseCards: {
+        verdict: validTierVerdicts.includes(parsed.tieredRecommendations.baseCards?.verdict) 
+          ? parsed.tieredRecommendations.baseCards.verdict 
+          : "HOLD",
+        reasoning: parsed.tieredRecommendations.baseCards?.reasoning || "Standard base card guidance applies",
+      },
+      midTierParallels: {
+        verdict: validTierVerdicts.includes(parsed.tieredRecommendations.midTierParallels?.verdict) 
+          ? parsed.tieredRecommendations.midTierParallels.verdict 
+          : "HOLD",
+        reasoning: parsed.tieredRecommendations.midTierParallels?.reasoning || "Standard parallel guidance applies",
+      },
+      premiumGraded: {
+        verdict: validTierVerdicts.includes(parsed.tieredRecommendations.premiumGraded?.verdict) 
+          ? parsed.tieredRecommendations.premiumGraded.verdict 
+          : "HOLD",
+        reasoning: parsed.tieredRecommendations.premiumGraded?.reasoning || "Standard graded guidance applies",
+      },
+    } : undefined;
+    
     return {
       playerInfo: {
         name: playerName,
@@ -686,6 +837,8 @@ TONE ENFORCEMENT:
         summary: parsed.verdict?.summary || "Insufficient data to make a confident recommendation. Monitor for more signals.",
         whatMustBeTrue: parsed.verdict?.whatMustBeTrue || ["More data needed"],
       },
+      peakTiming,
+      tieredRecommendations,
       discountAnalysis: parsed.discountAnalysis ? {
         whyDiscounted: parsed.discountAnalysis.whyDiscounted || [],
         repricingCatalysts: parsed.discountAnalysis.repricingCatalysts || [],
@@ -793,12 +946,16 @@ async function generateFreshOutlook(
   const classification = classifyPlayer(classificationInput);
   console.log(`[PlayerOutlook] Classification for ${playerName}: stage=${classification.stage}, temp=${classification.baseTemperature}`);
   
+  // Step 2.5: Re-analyze team context with detected team
+  const teamContextWithTeam = analyzeTeamContext(snippets, classification.team);
+  
   // Step 3: Generate AI narrative
-  const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality, aiDetectedCareerStatus } = await generatePlayerOutlookAI(
+  const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality, aiDetectedCareerStatus, peakTiming, tieredRecommendations } = await generatePlayerOutlookAI(
     playerName,
     sport,
     classification,
-    snippets
+    snippets,
+    teamContextWithTeam
   );
   
   // Step 3.5: If AI detected a non-active career status (DECEASED, RETIRED_HOF, BUST, RETIRED),
@@ -982,6 +1139,9 @@ async function generateFreshOutlook(
     investmentCall,
     exposures,
     evidence,
+    peakTiming,
+    tieredRecommendations,
+    teamContext: teamContextWithTeam,
     generatedAt: new Date().toISOString(),
   };
   

@@ -48,7 +48,7 @@ import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import { InvestmentCallCard } from "@/components/investment-call-card";
 import { CollectorTake } from "@/components/CollectorTake";
 import { getTakesFromMarket, type Take } from "@/lib/takes";
-import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis, InvestmentCall } from "@shared/schema";
+import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
   switch (temp) {
@@ -313,6 +313,159 @@ function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["
             </ul>
           </div>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PeakTimingCard({ peakTiming, teamContext }: { peakTiming?: PeakTimingAssessment; teamContext?: TeamContext }) {
+  if (!peakTiming) return null;
+  
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "PRE_PEAK": return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/30";
+      case "AT_PEAK": return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30";
+      case "POST_PEAK": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+  
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "PRE_PEAK": return <TrendingUp className="h-4 w-4" />;
+      case "AT_PEAK": return <Flame className="h-4 w-4" />;
+      case "POST_PEAK": return <TrendingDown className="h-4 w-4" />;
+      default: return <Minus className="h-4 w-4" />;
+    }
+  };
+  
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case "PRE_PEAK": return "Pre-Peak (Still Rising)";
+      case "AT_PEAK": return "At Peak (Maximum Visibility)";
+      case "POST_PEAK": return "Post-Peak (May Be Declining)";
+      default: return "Unknown";
+    }
+  };
+  
+  return (
+    <Card className="border-2 border-primary/20" data-testid="card-peak-timing">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-primary" />
+            Peak Timing Assessment
+          </CardTitle>
+          <Badge className={getStatusColor(peakTiming.peakStatus)} data-testid="badge-peak-status">
+            {getStatusIcon(peakTiming.peakStatus)}
+            <span className="ml-1">{getStatusLabel(peakTiming.peakStatus)}</span>
+          </Badge>
+        </div>
+        <CardDescription>When is the right time to buy or sell?</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-foreground">{peakTiming.peakReason}</p>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-3 rounded-lg bg-muted/30">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Short-Term (3-6 months)</p>
+            <p className="text-sm text-foreground">{peakTiming.shortTermOutlook}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-muted/30">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Long-Term (1-2 years)</p>
+            <p className="text-sm text-foreground">{peakTiming.longTermOutlook}</p>
+          </div>
+        </div>
+        
+        {teamContext && teamContext.playoffOutlook !== "UNKNOWN" && (
+          <div className="pt-3 border-t">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Team Context</p>
+            <div className="flex flex-wrap gap-2">
+              {teamContext.playoffOutlook !== "UNKNOWN" && (
+                <Badge variant="outline" className="text-xs">
+                  Playoff: {teamContext.playoffOutlook}
+                </Badge>
+              )}
+              {teamContext.teamMomentum !== "UNKNOWN" && (
+                <Badge variant="outline" className="text-xs">
+                  Team: {teamContext.teamMomentum}
+                </Badge>
+              )}
+              {teamContext.narrativeStrength !== "UNKNOWN" && (
+                <Badge variant="outline" className="text-xs">
+                  Narrative: {teamContext.narrativeStrength}
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TieredRecommendationsCard({ recommendations }: { recommendations?: TieredRecommendations }) {
+  if (!recommendations) return null;
+  
+  const getVerdictColor = (verdict: string) => {
+    switch (verdict) {
+      case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
+      case "HOLD": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+      case "SELL": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+  
+  const getVerdictIcon = (verdict: string) => {
+    switch (verdict) {
+      case "BUY": return <ShoppingCart className="h-4 w-4" />;
+      case "HOLD": return <Eye className="h-4 w-4" />;
+      case "SELL": return <ArrowRight className="h-4 w-4" />;
+      default: return null;
+    }
+  };
+  
+  const allTiers = [
+    { key: "baseCards", label: "Base Cards", description: "Common base cards ($1-5)", data: recommendations.baseCards },
+    { key: "midTierParallels", label: "Mid-Tier Parallels", description: "Numbered parallels, inserts ($10-100)", data: recommendations.midTierParallels },
+    { key: "premiumGraded", label: "Premium Graded", description: "PSA 10 rookies, low serial autos ($100+)", data: recommendations.premiumGraded },
+  ];
+  
+  const validTiers = allTiers.filter((tier): tier is { key: string; label: string; description: string; data: { verdict: "SELL" | "HOLD" | "BUY"; reasoning: string } } => 
+    tier.data != null && tier.data.verdict != null
+  );
+  
+  if (validTiers.length === 0) return null;
+  
+  return (
+    <Card data-testid="card-tiered-recommendations">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Layers className="h-5 w-5 text-primary" />
+          Tiered Card Strategy
+        </CardTitle>
+        <CardDescription>Different advice for different card types</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {validTiers.map((tier) => (
+          <div 
+            key={tier.key} 
+            className="p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center gap-3"
+            data-testid={`tier-${tier.key}`}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <Badge className={`${getVerdictColor(tier.data.verdict)} min-w-[60px] justify-center`}>
+                {getVerdictIcon(tier.data.verdict)}
+                <span className="ml-1">{tier.data.verdict}</span>
+              </Badge>
+              <div className="flex-1">
+                <p className="text-sm font-medium">{tier.label}</p>
+                <p className="text-xs text-muted-foreground">{tier.description}</p>
+              </div>
+            </div>
+            <p className="text-sm text-foreground sm:max-w-[50%] sm:text-right">{tier.data.reasoning}</p>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );
@@ -674,7 +827,7 @@ export default function PlayerOutlookPage() {
         playerKey,
         playerName: outlookData.player.name,
         sport: outlookSport,
-        verdictAtAdd: outlookData.verdict?.verdict,
+        verdictAtAdd: outlookData.investmentCall?.verdict || outlookData.verdict?.modifier,
         actionAtAdd: outlookData.verdict?.action,
         temperatureAtAdd: outlookData.snapshot?.temperature,
         source: "player-outlook",
@@ -904,6 +1057,13 @@ export default function PlayerOutlookPage() {
           )}
           
           <ThesisCard thesis={outlookData.thesis} />
+          
+          <PeakTimingCard 
+            peakTiming={outlookData.peakTiming} 
+            teamContext={outlookData.teamContext} 
+          />
+          
+          <TieredRecommendationsCard recommendations={outlookData.tieredRecommendations} />
           
           <MarketRealityCheckCard checks={outlookData.marketRealityCheck} />
           

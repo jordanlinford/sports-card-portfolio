@@ -1200,6 +1200,41 @@ export type DiscountAnalysis = {
   trapRisks: string[]; // What could confirm the discount is justified (stay cheap or drop)
 };
 
+// Peak Timing Assessment - has the player's card market likely peaked?
+export type PeakTimingAssessment = {
+  peakStatus: "PRE_PEAK" | "AT_PEAK" | "POST_PEAK" | "UNKNOWN";
+  peakReason: string;
+  shortTermOutlook: string;
+  longTermOutlook: string;
+};
+
+// Tiered Card Recommendations - different advice for different card types
+export type TieredRecommendations = {
+  baseCards: {
+    verdict: "SELL" | "HOLD" | "BUY";
+    reasoning: string;
+  };
+  midTierParallels: {
+    verdict: "SELL" | "HOLD" | "BUY";
+    reasoning: string;
+  };
+  premiumGraded: {
+    verdict: "SELL" | "HOLD" | "BUY";
+    reasoning: string;
+  };
+};
+
+// Team Context Assessment - how is the team performing?
+export type PlayoffOutlook = "CONTENDER" | "BUBBLE" | "REBUILDING" | "UNKNOWN";
+export type TeamMomentum = "ASCENDING" | "STABLE" | "DECLINING" | "UNKNOWN";
+export type NarrativeStrength = "STRONG" | "MODERATE" | "WEAK" | "UNKNOWN";
+
+export type TeamContext = {
+  playoffOutlook: PlayoffOutlook;
+  teamMomentum: TeamMomentum;
+  narrativeStrength: NarrativeStrength;
+};
+
 // Full Player Outlook Response
 export type PlayerOutlookResponse = {
   player: PlayerInfo;
@@ -1209,6 +1244,9 @@ export type PlayerOutlookResponse = {
   verdict: PlayerVerdictResult; // Legacy verdict (deprecated)
   investmentCall?: InvestmentCall; // New 5-state forced-decision call
   discountAnalysis?: DiscountAnalysis; // Only populated for BUY/MONITOR verdicts
+  peakTiming?: PeakTimingAssessment; // Peak timing assessment
+  tieredRecommendations?: TieredRecommendations; // Different advice by card tier
+  teamContext?: TeamContext; // Team performance context
   exposures: ExposureRecommendation[];
   evidence: EvidenceData;
   generatedAt: string;
