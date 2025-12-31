@@ -1300,6 +1300,44 @@ function generateTriggers(verdict: InvestmentVerdict, input: DecisionInput): { u
   return triggers;
 }
 
+// ============================================================
+// ADVISOR VOICE GENERATORS
+// Pattern-based language that sounds like a trusted financial advisor
+// ============================================================
+
+function generateAdvisorTake(verdict: InvestmentVerdict, input: DecisionInput, scores: InvestmentScores): string {
+  const name = input.playerName || "This player";
+  const positionLabel = input.position || "player";
+  
+  // Pattern-based templates that sound like judgment, not data dumping
+  const templates: Record<InvestmentVerdict, string> = {
+    ACCUMULATE: `${name} is a buy because the market still isn't fully pricing the ceiling. The combination of ${positionLabel} role certainty and upside runway creates a profile that continues to absorb capital rather than leak it. This view only changes if performance meaningfully regresses or the team situation deteriorates.`,
+    
+    HOLD_CORE: `${name} is a hold, not a bet. The market already knows who this player is, and prices reflect current production fairly. If you own, sit tight and be ready to sell into any short-term narrative spike. This view only changes if a clear catalyst emerges that reshapes the outlook.`,
+    
+    TRADE_THE_HYPE: `${name} is a sell because the market has already rewarded every plausible upside scenario. Current prices reflect maximum optimism, and history shows that these moments rarely persist. Take profits now before the narrative resets. This only changes if a career-defining moment extends the runway.`,
+    
+    AVOID_NEW_MONEY: `${name} is a pass at current prices. The risk-reward doesn't justify new capital when better opportunities exist. Too many red flags outweigh the potential upside. Wait for a meaningful pullback or clearer situation before considering entry.`,
+    
+    SPECULATIVE_FLYER: `${name} is a small speculative bet only. The upside is real but so is the risk of total loss. Keep position sizing small—lottery ticket territory. This view only changes if role certainty emerges and performance confirms the projection.`,
+  };
+  
+  return templates[verdict];
+}
+
+function generatePackHitReaction(verdict: InvestmentVerdict, scores: InvestmentScores): string {
+  // One-line emotional guidance for pack openers
+  const templates: Record<InvestmentVerdict, string> = {
+    ACCUMULATE: "Strong hit — consider holding or grading.",
+    HOLD_CORE: "Neutral outcome — sell into any spike.",
+    TRADE_THE_HYPE: "Good name, inflated price — sell now while demand is hot.",
+    AVOID_NEW_MONEY: "Move quickly — don't get attached.",
+    SPECULATIVE_FLYER: "Lottery ticket — hold if you believe, otherwise flip fast.",
+  };
+  
+  return templates[verdict];
+}
+
 export function generateInvestmentCall(input: DecisionInput): InvestmentCall & { decisionDebug?: DecisionDebug } {
   const scores = computeScores(input);
   
@@ -1616,6 +1654,9 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     triggersToDowngrade: triggers.downgrade,
     scores,
     decisionDebug,
+    // Advisor voice fields
+    advisorTake: generateAdvisorTake(verdict, input, scores),
+    packHitReaction: generatePackHitReaction(verdict, scores),
   };
 }
 

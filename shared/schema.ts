@@ -1099,6 +1099,9 @@ export type InvestmentCall = {
   triggersToUpgrade?: string[];   // What would flip to stronger buy (max 3)
   triggersToDowngrade?: string[]; // What would flip to avoid/sell (max 3)
   scores?: InvestmentScores;      // Optional: expose scoring for transparency
+  // === NEW ADVISOR VOICE FIELDS ===
+  advisorTake?: string;           // 3-4 sentences: the call, pattern-level why, what changes it. No hedging.
+  packHitReaction?: string;       // One line: how to feel/act if you pull this player in a pack
 };
 
 // Stock Tier - Card exposure type
