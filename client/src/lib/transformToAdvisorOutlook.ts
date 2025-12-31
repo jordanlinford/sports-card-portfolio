@@ -304,12 +304,15 @@ export function applyVerdictGuardrails(advisor: AdvisorOutlook): AdvisorOutlook 
     }
   }
   
-  if (result.verdict === "HOLD" && result.verdictLabel.includes("Speculative")) {
+  const isSpeculative = result.verdictLabel.toLowerCase().includes("speculative") ||
+    result.verdict === "HOLD" && result.verdictLabel.toLowerCase().includes("small");
+  
+  if (isSpeculative) {
     result = {
       ...result,
       actionPlan: {
         ...result.actionPlan,
-        sizingRule: result.actionPlan.sizingRule || "Small position only - lottery ticket sizing (1-2% of budget).",
+        sizingRule: "Small position only - lottery ticket sizing (1-2% of budget).",
       }
     };
     
