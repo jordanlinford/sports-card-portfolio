@@ -183,29 +183,41 @@ function extractCards(outlook: PlayerOutlookResponse): { buy: string[]; avoid: s
   const buy: string[] = [];
   const avoid: string[] = [];
   
-  for (const exposure of outlook.exposures || []) {
-    if (exposure.tier === "GROWTH" || exposure.tier === "CORE") {
-      buy.push(...(exposure.cardTargets || []).slice(0, 2));
-    } else if (exposure.tier === "SPECULATIVE") {
-      avoid.push(...(exposure.cardTargets || []).slice(0, 2));
+  const call = outlook.investmentCall;
+  
+  if (call?.whatToBuy && call.whatToBuy.length > 0) {
+    buy.push(...call.whatToBuy.slice(0, 4));
+  }
+  if (call?.whatToSell && call.whatToSell.length > 0) {
+    avoid.push(...call.whatToSell.map(c => `${c} (sell)`).slice(0, 2));
+  }
+  if (call?.whatToAvoid && call.whatToAvoid.length > 0) {
+    avoid.push(...call.whatToAvoid.slice(0, 2));
+  }
+  
+  if (buy.length === 0) {
+    for (const exposure of outlook.exposures || []) {
+      if (exposure.tier === "GROWTH" || exposure.tier === "CORE" || exposure.tier === "PREMIUM") {
+        buy.push(...(exposure.cardTargets || []).slice(0, 2));
+      }
     }
   }
   
   const tiered = outlook.tieredRecommendations;
   if (tiered) {
-    if (tiered.baseCards?.verdict === "BUY") {
+    if (tiered.baseCards?.verdict === "BUY" && !buy.some(b => b.toLowerCase().includes("base"))) {
       buy.push("Base rookies");
-    } else if (tiered.baseCards?.verdict === "SELL") {
-      avoid.push("Base rookies (consider selling)");
+    } else if (tiered.baseCards?.verdict === "SELL" && !avoid.some(a => a.toLowerCase().includes("base"))) {
+      avoid.push("Base cards (consider selling)");
     }
     
-    if (tiered.midTierParallels?.verdict === "BUY") {
+    if (tiered.midTierParallels?.verdict === "BUY" && !buy.some(b => b.toLowerCase().includes("parallel"))) {
       buy.push("Mid-tier parallels");
-    } else if (tiered.midTierParallels?.verdict === "SELL") {
+    } else if (tiered.midTierParallels?.verdict === "SELL" && !avoid.some(a => a.toLowerCase().includes("parallel"))) {
       avoid.push("Mid-tier parallels (sell into demand)");
     }
     
-    if (tiered.premiumGraded?.verdict === "SELL") {
+    if (tiered.premiumGraded?.verdict === "SELL" && !avoid.some(a => a.toLowerCase().includes("graded"))) {
       avoid.push("Premium graded (take profits)");
     }
   }
@@ -261,33 +273,56 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
 }
 
 export function applyVerdictGuardrails(advisor: AdvisorOutlook): AdvisorOutlook {
-  if (advisor.verdict === "SELL") {
-    const hasEvidence = advisor.evidenceNote.length > 20;
-    const hasBreakers = advisor.whatChangesMyMind.length >= 2;
-    const isLowConfidence = advisor.confidence === "LOW";
+  let result = { ...advisor };
+  
+  if (result.verdict === "SELL") {
+    const hasEvidence = result.evidenceNote.length > 20;
+    const hasBreakers = result.whatChangesMyMind.length >= 2;
+    const isLowConfidence = result.confidence === "LOW";
     
     if (isLowConfidence && (!hasEvidence || !hasBreakers)) {
-      return { ...advisor, verdict: "HOLD", verdictLabel: "Hold (insufficient data for sell)" };
+      result = { ...result, verdict: "HOLD", verdictLabel: "Hold (insufficient data for sell)" };
     }
   }
   
-  if (advisor.verdict === "BUY") {
-    const hasEntryRule = advisor.actionPlan.entryRule.length > 10 && 
-      (advisor.actionPlan.entryRule.toLowerCase().includes("pullback") ||
-       advisor.actionPlan.entryRule.toLowerCase().includes("dip") ||
-       advisor.actionPlan.entryRule.toLowerCase().includes("if") ||
-       advisor.actionPlan.entryRule.toLowerCase().includes("wait"));
+  if (result.verdict === "BUY") {
+    const hasEntryRule = result.actionPlan.entryRule.length > 10 && 
+      (result.actionPlan.entryRule.toLowerCase().includes("pullback") ||
+       result.actionPlan.entryRule.toLowerCase().includes("dip") ||
+       result.actionPlan.entryRule.toLowerCase().includes("if") ||
+       result.actionPlan.entryRule.toLowerCase().includes("wait") ||
+       result.actionPlan.entryRule.toLowerCase().includes("entry"));
     
     if (!hasEntryRule) {
-      return { 
-        ...advisor, 
+      result = { 
+        ...result, 
         actionPlan: {
-          ...advisor.actionPlan,
+          ...result.actionPlan,
           entryRule: "Only buy on meaningful pullbacks of 20%+ from recent highs."
         }
       };
     }
   }
   
-  return advisor;
+  if (result.verdict === "HOLD" && result.verdictLabel.includes("Speculative")) {
+    result = {
+      ...result,
+      actionPlan: {
+        ...result.actionPlan,
+        sizingRule: result.actionPlan.sizingRule || "Small position only - lottery ticket sizing (1-2% of budget).",
+      }
+    };
+    
+    if (result.cards.buy.length > 2) {
+      result = {
+        ...result,
+        cards: {
+          ...result.cards,
+          buy: result.cards.buy.slice(0, 2),
+        }
+      };
+    }
+  }
+  
+  return result;
 }

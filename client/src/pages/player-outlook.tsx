@@ -48,7 +48,10 @@ import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import { InvestmentCallCard } from "@/components/investment-call-card";
 import { CollectorTake } from "@/components/CollectorTake";
 import { getTakesFromMarket, type Take } from "@/lib/takes";
-import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext } from "@shared/schema";
+import { AdvisorSnapshot } from "@/components/outlook/AdvisorSnapshot";
+import { OutlookAccordions } from "@/components/outlook/OutlookAccordions";
+import { transformToAdvisorOutlook, applyVerdictGuardrails } from "@/lib/transformToAdvisorOutlook";
+import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext, AdvisorOutlook } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
   switch (temp) {
@@ -1037,16 +1040,16 @@ export default function PlayerOutlookPage() {
 
       {outlookMutation.isPending && <PlayerOutlookSkeleton />}
 
-      {outlookData && !outlookMutation.isPending && (
+      {outlookData && !outlookMutation.isPending && (() => {
+        const advisorOutlook = applyVerdictGuardrails(transformToAdvisorOutlook(outlookData));
+        return (
         <div className="space-y-6 animate-in fade-in duration-500">
           <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} />
           
-          {outlookData.investmentCall && (
-            <InvestmentCallCard 
-              call={outlookData.investmentCall} 
-              playerName={outlookData.player.name} 
-            />
-          )}
+          <AdvisorSnapshot 
+            advisor={advisorOutlook} 
+            playerName={outlookData.player.name} 
+          />
 
           {takes.length > 0 && (
             <div className="space-y-3" data-testid="section-collector-takes">
@@ -1056,26 +1059,10 @@ export default function PlayerOutlookPage() {
             </div>
           )}
           
-          <ThesisCard thesis={outlookData.thesis} />
-          
-          <PeakTimingCard 
-            peakTiming={outlookData.peakTiming} 
-            teamContext={outlookData.teamContext} 
+          <OutlookAccordions 
+            advisor={advisorOutlook} 
+            outlook={outlookData} 
           />
-          
-          <TieredRecommendationsCard recommendations={outlookData.tieredRecommendations} />
-          
-          <MarketRealityCheckCard checks={outlookData.marketRealityCheck} />
-          
-          {!outlookData.investmentCall && (
-            <VerdictCard verdict={outlookData.verdict} confidence={outlookData.snapshot.confidence} />
-          )}
-          
-          <DiscountAnalysisCard analysis={outlookData.discountAnalysis} />
-          
-          <ExposureRecommendations exposures={outlookData.exposures} />
-          
-          <EvidencePanel evidence={outlookData.evidence} cacheStatus={outlookData.cacheStatus} />
           
           <Card>
             <CardContent className="pt-6">
@@ -1149,7 +1136,8 @@ export default function PlayerOutlookPage() {
             {outlookData.cacheStatus === "stale" && " (updating in background)"}
           </p>
         </div>
-      )}
+        );
+      })()}
 
       {!outlookData && !outlookMutation.isPending && (
         <Card className="border-dashed">

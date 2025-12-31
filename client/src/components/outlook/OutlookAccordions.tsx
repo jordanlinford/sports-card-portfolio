@@ -12,7 +12,13 @@ import {
   Zap,
   FileText,
   TrendingUp,
+  TrendingDown,
   BarChart3,
+  Layers,
+  Target,
+  DollarSign,
+  Crown,
+  Eye,
 } from "lucide-react";
 import type { AdvisorOutlook, PlayerOutlookResponse } from "@shared/schema";
 
@@ -199,6 +205,125 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
                 <p className="text-sm text-foreground">{outlook.peakTiming.longTermOutlook}</p>
               </div>
             </div>
+          </div>
+        </AccordionSection>
+      )}
+      
+      {outlook.tieredRecommendations && (
+        <AccordionSection
+          title="Tiered Card Strategy"
+          description="Different advice for different card types"
+          icon={<Layers className="h-4 w-4 text-primary" />}
+          testId="accordion-tiered"
+        >
+          <div className="space-y-3">
+            {[
+              { key: "baseCards", label: "Base Cards", desc: "Common base cards ($1-5)", data: outlook.tieredRecommendations.baseCards },
+              { key: "midTierParallels", label: "Mid-Tier Parallels", desc: "Numbered parallels, inserts ($10-100)", data: outlook.tieredRecommendations.midTierParallels },
+              { key: "premiumGraded", label: "Premium Graded", desc: "PSA 10 rookies, autos ($100+)", data: outlook.tieredRecommendations.premiumGraded },
+            ].filter(t => t.data?.verdict).map((tier) => (
+              <div key={tier.key} className="p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-3 flex-1">
+                  <Badge className={`min-w-[60px] justify-center ${
+                    tier.data!.verdict === "BUY" ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30" :
+                    tier.data!.verdict === "SELL" ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30" :
+                    "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+                  }`}>
+                    {tier.data!.verdict === "BUY" ? <ShoppingCart className="h-3 w-3 mr-1" /> :
+                     tier.data!.verdict === "SELL" ? <TrendingDown className="h-3 w-3 mr-1" /> :
+                     <Eye className="h-3 w-3 mr-1" />}
+                    {tier.data!.verdict}
+                  </Badge>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{tier.label}</p>
+                    <p className="text-xs text-muted-foreground">{tier.desc}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-foreground sm:max-w-[50%] sm:text-right">{tier.data!.reasoning}</p>
+              </div>
+            ))}
+          </div>
+        </AccordionSection>
+      )}
+      
+      {outlook.discountAnalysis && (outlook.discountAnalysis.whyDiscounted?.length || outlook.discountAnalysis.repricingCatalysts?.length) && (
+        <AccordionSection
+          title="Hidden Gem Analysis"
+          description="Why this player might be underpriced"
+          icon={<Target className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
+          testId="accordion-discount"
+        >
+          <div className="space-y-4">
+            {outlook.discountAnalysis.whyDiscounted && outlook.discountAnalysis.whyDiscounted.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Why Discounted</h4>
+                <ul className="space-y-2">
+                  {outlook.discountAnalysis.whyDiscounted.map((reason, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
+                      <span className="text-foreground">{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {outlook.discountAnalysis.repricingCatalysts && outlook.discountAnalysis.repricingCatalysts.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Repricing Catalysts</h4>
+                <ul className="space-y-2">
+                  {outlook.discountAnalysis.repricingCatalysts.map((catalyst, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <span className="text-foreground">{catalyst}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {outlook.discountAnalysis.trapRisks && outlook.discountAnalysis.trapRisks.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-2">Value Trap Risks</h4>
+                <ul className="space-y-2">
+                  {outlook.discountAnalysis.trapRisks.map((risk, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                      <span className="text-foreground">{risk}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </AccordionSection>
+      )}
+      
+      {outlook.exposures && outlook.exposures.length > 0 && (
+        <AccordionSection
+          title="Card Exposure Tiers"
+          description="Stock tiers ranked by fit for this player"
+          icon={<Crown className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
+          testId="accordion-exposures"
+        >
+          <div className="space-y-3">
+            {outlook.exposures.map((exp, i) => (
+              <div key={i} className="p-3 rounded-lg border">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="text-xs">
+                    {exp.tier}
+                  </Badge>
+                  <span className="text-sm font-medium flex-1">{exp.why}</span>
+                </div>
+                {exp.cardTargets && exp.cardTargets.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {exp.cardTargets.map((card, j) => (
+                      <Badge key={j} variant="secondary" className="text-xs">
+                        {card}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </AccordionSection>
       )}
