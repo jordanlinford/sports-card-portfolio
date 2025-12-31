@@ -1037,36 +1037,45 @@ function generateWhyBullets(verdict: InvestmentVerdict, scores: InvestmentScores
   switch (verdict) {
     case "ACCUMULATE":
       if (mispricingScore >= 15) bullets.push("Market pricing trails production—classic buy window.");
-      if (stage === "ROOKIE" || stage === "YEAR_2") bullets.push(`${stageLabel} ${positionLabel}s with proven roles historically appreciate.`);
-      else if (stage === "YEAR_3" || stage === "YEAR_4") bullets.push(`${stageLabel} players entering prime production years see sustained demand.`);
-      if (liquidityScore >= 60) bullets.push("Strong liquidity means easy entry and exit at fair prices.");
+      if (stage === "ROOKIE" || stage === "YEAR_2") bullets.push(`${stageLabel} ${positionLabel}s with proven roles historically appreciate 20-40%.`);
+      else if (stage === "YEAR_3" || stage === "YEAR_4") bullets.push(`${stageLabel} ${positionLabel}s entering prime typically see sustained demand.`);
+      else bullets.push(`${stageLabel} ${positionLabel}s with elite production command premium multiples.`);
+      if (liquidityScore >= 60) bullets.push("Strong liquidity means easy entry and exit at fair spreads.");
+      else bullets.push("Position sizing allows for gradual accumulation at favorable prices.");
       break;
 
     case "HOLD_CORE":
-      bullets.push("Market already knows the story—prices reflect current production.");
+      bullets.push(`${stageLabel} ${positionLabel}s at this tier typically see flat-to-modest appreciation.`);
       if (downsideRiskScore <= 50) bullets.push("Stable role and production protect existing positions.");
+      else bullets.push("Current pricing reflects known story—no margin of safety for buyers.");
       bullets.push("Capital better deployed chasing undervalued opportunities elsewhere.");
       break;
 
     case "TRADE_THE_HYPE":
       if (narrativeHeatScore >= 70) bullets.push("Narrative outpacing production—classic sell signal.");
-      if (mispricingScore <= -20) bullets.push("Premium pricing leaves no margin of safety for buyers.");
-      bullets.push("History shows hype peaks rarely sustain—lock in gains now.");
+      else bullets.push("Peak pricing typically retraces 30-50% within 6 months.");
+      if (mispricingScore <= -20) bullets.push("Premium pricing leaves no margin of safety for new buyers.");
+      else bullets.push(`${positionLabel}s at this hype level historically mean-revert.`);
+      bullets.push("Lock in gains before the correction hits.");
       break;
 
     case "AVOID_NEW_MONEY":
-      if (downsideRiskScore >= 70) bullets.push("Position/age profile suggests elevated downside risk.");
+      if (downsideRiskScore >= 70) bullets.push(`${positionLabel}s in this profile historically see 40-60% value compression.`);
+      else bullets.push("Position/age profile suggests elevated downside risk ahead.");
       if (liquidityScore <= 40) bullets.push("Thin liquidity traps capital when you need to exit.");
-      bullets.push("Risk/reward doesn't justify new capital at current prices.");
+      else bullets.push("Better risk/reward opportunities exist elsewhere in this tier.");
+      bullets.push("Wait for 40%+ pullback before reconsidering entry.");
       break;
 
     case "SPECULATIVE_FLYER":
-      bullets.push("High variance play—small position with defined catalyst thesis.");
-      if (temperature === "COOLING") bullets.push("Depressed pricing creates asymmetric upside if thesis hits.");
-      bullets.push("Treat as lottery ticket—size for total loss scenario.");
+      bullets.push("High variance play—size for total loss scenario.");
+      if (temperature === "COOLING") bullets.push("Depressed pricing creates asymmetric upside if catalyst hits.");
+      else bullets.push(`${stageLabel} ${positionLabel}s with breakout potential offer convex payoff.`);
+      bullets.push("Treat as lottery ticket with defined thesis and exit plan.");
       break;
   }
 
+  // Ensure exactly 3 bullets
   return bullets.slice(0, 3);
 }
 
@@ -1323,11 +1332,11 @@ function generateAdvisorTake(verdict: InvestmentVerdict, input: DecisionInput, s
   const templates: Record<InvestmentVerdict, string> = {
     ACCUMULATE: `${name} is a buy because the market still isn't fully pricing the ceiling. The combination of ${positionLabel} role certainty and upside runway creates a profile that continues to absorb capital rather than leak it. This view only changes if performance meaningfully regresses or the team situation deteriorates.`,
     
-    HOLD_CORE: `${name} is a hold, not a bet. The market already knows who this player is, and prices reflect current production fairly. If you own, sit tight and be ready to sell into any short-term narrative spike. This view only changes if a clear catalyst emerges that reshapes the outlook.`,
+    HOLD_CORE: `${name} is a hold, not a buy. Prime-age ${positionLabel}s with established production typically see flat-to-modest appreciation—the market has priced in the known story. Sit tight and sell into any short-term narrative spike. This view only changes if a clear breakout catalyst emerges.`,
     
-    TRADE_THE_HYPE: `${name} is a sell because the market has already rewarded every plausible upside scenario. Current prices reflect maximum optimism, and history shows that these moments rarely persist. Take profits now before the narrative resets. This only changes if a career-defining moment extends the runway.`,
+    TRADE_THE_HYPE: `${name} is a sell at current prices. Market pricing has outrun realistic production outcomes—history shows these peaks rarely sustain. Late-stage hype cycles for ${positionLabel}s often retrace 30-50% within 6 months. Lock in gains before the correction. Only reconsider if a career-defining moment extends the runway.`,
     
-    AVOID_NEW_MONEY: `${name} is a pass at current prices. The risk-reward doesn't justify new capital when better opportunities exist. Too many red flags outweigh the potential upside. Wait for a meaningful pullback or clearer situation before considering entry.`,
+    AVOID_NEW_MONEY: `${name} is a pass at current prices. The position/age profile suggests elevated downside risk—${positionLabel}s in similar situations historically see value compression. Better capital deployment opportunities exist elsewhere. Wait for a 40%+ pullback or fundamental change before reconsidering.`,
     
     SPECULATIVE_FLYER: `${name} is a small speculative bet only. The upside is real but so is the risk of total loss. Keep position sizing small—lottery ticket territory. This view only changes if role certainty emerges and performance confirms the projection.`,
   };

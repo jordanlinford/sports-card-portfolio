@@ -143,7 +143,7 @@ function extractTopReasons(outlook: PlayerOutlookResponse): [string, string, str
   }
   
   while (reasons.length < 3) {
-    reasons.push("Analysis based on available market data.");
+    reasons.push("Risk/reward profile favors patience at current levels.");
   }
   
   return [
