@@ -890,9 +890,9 @@ Sitemap: ${origin}/sitemap.xml
       // Sanitize playerSlug to prevent injection (only allow alphanumeric and hyphens)
       const sanitizedSlug = playerSlug.replace(/[^a-z0-9-]/gi, "").toLowerCase();
       
-      const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
-        ? `https://${process.env.REPLIT_DEPLOYMENT_DOMAIN}`
-        : `https://${req.headers.host}`;
+      // Use custom domain for OG URLs to ensure social previews work correctly
+      const customDomain = process.env.CUSTOM_DOMAIN || "sportscardportfolio.io";
+      const baseUrl = `https://${customDomain}`;
       
       const data = await getPlayerShareData(sanitizedSlug);
       const playerName = data?.playerName || sanitizedSlug.replace(/-/g, " ");
