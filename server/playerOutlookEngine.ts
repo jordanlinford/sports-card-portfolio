@@ -100,7 +100,7 @@ const openai = new OpenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 3; // v3: Added peakTiming, tieredRecommendations, teamContext
+const PROMPT_VERSION = 4; // v4: Added fallback generation for peakTiming/tieredRecommendations when AI omits them
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -774,39 +774,118 @@ TONE ENFORCEMENT:
       console.log(`[PlayerOutlook] AI detected career status for ${playerName}: ${aiDetectedCareerStatus}`);
     }
     
-    // Parse peak timing
+    // Parse peak timing - with fallback generation based on classification
     const validPeakStatuses = ["PRE_PEAK", "AT_PEAK", "POST_PEAK"];
-    const peakTiming: PeakTimingAssessment | undefined = parsed.peakTiming ? {
-      peakStatus: validPeakStatuses.includes(parsed.peakTiming.peakStatus) 
-        ? parsed.peakTiming.peakStatus 
-        : "UNKNOWN",
-      peakReason: parsed.peakTiming.peakReason || "Unable to assess peak timing",
-      shortTermOutlook: parsed.peakTiming.shortTermOutlook || "Monitor for signals",
-      longTermOutlook: parsed.peakTiming.longTermOutlook || "Depends on continued performance",
-    } : undefined;
+    let peakTiming: PeakTimingAssessment;
     
-    // Parse tiered recommendations
+    if (parsed.peakTiming) {
+      peakTiming = {
+        peakStatus: validPeakStatuses.includes(parsed.peakTiming.peakStatus) 
+          ? parsed.peakTiming.peakStatus 
+          : "UNKNOWN",
+        peakReason: parsed.peakTiming.peakReason || "Unable to assess peak timing",
+        shortTermOutlook: parsed.peakTiming.shortTermOutlook || "Monitor for signals",
+        longTermOutlook: parsed.peakTiming.longTermOutlook || "Depends on continued performance",
+      };
+    } else {
+      // Generate fallback peak timing based on stage and classification
+      const stage = classification.stage;
+      const isRB = classification.position?.toUpperCase() === "RB";
+      
+      if (stage === "ROOKIE" || stage === "YEAR_2") {
+        peakTiming = {
+          peakStatus: "PRE_PEAK",
+          peakReason: `${playerName} is in early career years with significant upside potential.`,
+          shortTermOutlook: "Card values likely to appreciate with continued strong performance.",
+          longTermOutlook: "Long-term value depends on establishing consistent production and avoiding injuries.",
+        };
+      } else if (stage === "YEAR_3" || stage === "YEAR_4") {
+        peakTiming = {
+          peakStatus: isRB ? "AT_PEAK" : "PRE_PEAK",
+          peakReason: isRB 
+            ? `RBs typically peak in Years 3-4. ${playerName} may be near maximum card value.`
+            : `${playerName} is entering prime production years with room for growth.`,
+          shortTermOutlook: isRB ? "Consider taking profits on base cards if performance dips." : "Strong performance could drive further appreciation.",
+          longTermOutlook: isRB ? "RB positional depreciation is a factor after Year 4." : "Premium cards hold value if elite production continues.",
+        };
+      } else if (stage === "PRIME") {
+        peakTiming = {
+          peakStatus: "AT_PEAK",
+          peakReason: `${playerName} is in prime years with established market position.`,
+          shortTermOutlook: "Prices reflect current production. Monitor for any decline signals.",
+          longTermOutlook: "Long-term value depends on sustained elite performance and narrative moments.",
+        };
+      } else {
+        peakTiming = {
+          peakStatus: "POST_PEAK",
+          peakReason: `${playerName} is past prime years. Cards may trend down without new catalysts.`,
+          shortTermOutlook: "Consider reducing exposure on base and mid-tier cards.",
+          longTermOutlook: "Premium graded cards may retain value better for career/HOF trajectory.",
+        };
+      }
+    }
+    
+    // Parse tiered recommendations - with fallback generation
     const validTierVerdicts = ["SELL", "HOLD", "BUY"];
-    const tieredRecommendations: TieredRecommendations | undefined = parsed.tieredRecommendations ? {
-      baseCards: {
-        verdict: validTierVerdicts.includes(parsed.tieredRecommendations.baseCards?.verdict) 
-          ? parsed.tieredRecommendations.baseCards.verdict 
-          : "HOLD",
-        reasoning: parsed.tieredRecommendations.baseCards?.reasoning || "Standard base card guidance applies",
-      },
-      midTierParallels: {
-        verdict: validTierVerdicts.includes(parsed.tieredRecommendations.midTierParallels?.verdict) 
-          ? parsed.tieredRecommendations.midTierParallels.verdict 
-          : "HOLD",
-        reasoning: parsed.tieredRecommendations.midTierParallels?.reasoning || "Standard parallel guidance applies",
-      },
-      premiumGraded: {
-        verdict: validTierVerdicts.includes(parsed.tieredRecommendations.premiumGraded?.verdict) 
-          ? parsed.tieredRecommendations.premiumGraded.verdict 
-          : "HOLD",
-        reasoning: parsed.tieredRecommendations.premiumGraded?.reasoning || "Standard graded guidance applies",
-      },
-    } : undefined;
+    let tieredRecommendations: TieredRecommendations;
+    
+    if (parsed.tieredRecommendations) {
+      tieredRecommendations = {
+        baseCards: {
+          verdict: validTierVerdicts.includes(parsed.tieredRecommendations.baseCards?.verdict) 
+            ? parsed.tieredRecommendations.baseCards.verdict 
+            : "HOLD",
+          reasoning: parsed.tieredRecommendations.baseCards?.reasoning || "Standard base card guidance applies",
+        },
+        midTierParallels: {
+          verdict: validTierVerdicts.includes(parsed.tieredRecommendations.midTierParallels?.verdict) 
+            ? parsed.tieredRecommendations.midTierParallels.verdict 
+            : "HOLD",
+          reasoning: parsed.tieredRecommendations.midTierParallels?.reasoning || "Standard parallel guidance applies",
+        },
+        premiumGraded: {
+          verdict: validTierVerdicts.includes(parsed.tieredRecommendations.premiumGraded?.verdict) 
+            ? parsed.tieredRecommendations.premiumGraded.verdict 
+            : "HOLD",
+          reasoning: parsed.tieredRecommendations.premiumGraded?.reasoning || "Standard graded guidance applies",
+        },
+      };
+    } else {
+      // Generate fallback tiered recommendations based on verdict and stage
+      const verdictAction = parsed.verdict?.action || "MONITOR";
+      const stage = classification.stage;
+      const isRB = classification.position?.toUpperCase() === "RB";
+      const isYear4PlusRB = isRB && (stage === "YEAR_4" || stage === "PRIME" || stage === "VETERAN" || stage === "AGING");
+      
+      if (verdictAction === "BUY") {
+        tieredRecommendations = {
+          baseCards: { verdict: "BUY", reasoning: "Low cost entry point with upside." },
+          midTierParallels: { verdict: "BUY", reasoning: "Good risk/reward at current prices." },
+          premiumGraded: { verdict: "HOLD", reasoning: "Wait for a dip before adding premium exposure." },
+        };
+      } else if (verdictAction === "AVOID") {
+        tieredRecommendations = {
+          baseCards: { verdict: "SELL", reasoning: "Reduce exposure on high-supply cards." },
+          midTierParallels: { verdict: "SELL", reasoning: "Take profits while demand exists." },
+          premiumGraded: { verdict: "HOLD", reasoning: "Premium may hold value better - sell only if needed." },
+        };
+      } else {
+        // MONITOR/HOLD logic
+        if (isYear4PlusRB) {
+          tieredRecommendations = {
+            baseCards: { verdict: "SELL", reasoning: "RB positional depreciation affects base cards first." },
+            midTierParallels: { verdict: "HOLD", reasoning: "Hold if production remains elite." },
+            premiumGraded: { verdict: "HOLD", reasoning: "Premium graded holds value for career totals." },
+          };
+        } else {
+          tieredRecommendations = {
+            baseCards: { verdict: "HOLD", reasoning: "Maintain current position." },
+            midTierParallels: { verdict: "HOLD", reasoning: "Wait for clearer signals." },
+            premiumGraded: { verdict: "HOLD", reasoning: "No urgency to buy or sell at current levels." },
+          };
+        }
+      }
+    }
     
     return {
       playerInfo: {
