@@ -1264,6 +1264,36 @@ export type PlayerOutlookRequest = {
   };
 };
 
+// ============ ADVISOR OUTLOOK - Trusted Advisor Format ============
+// Compact, opinionated summary for the above-the-fold view
+
+export type AdvisorVerdict = "BUY" | "HOLD_CORE" | "HOLD" | "SELL" | "AVOID";
+export type AdvisorConfidence = "LOW" | "MED" | "HIGH";
+export type AdvisorHorizon = "1-3m" | "3-12m" | "12m+";
+
+export type AdvisorActionPlan = {
+  now: string; // 1 sentence: what to do right now
+  entryRule: string; // 1 sentence: when/how to enter
+  sizingRule: string; // 1 sentence: position sizing guidance
+};
+
+export type AdvisorOutlook = {
+  verdict: AdvisorVerdict;
+  verdictLabel: string; // Human-readable label like "Hold, don't chase"
+  confidence: AdvisorConfidence;
+  horizon: AdvisorHorizon;
+  advisorTake: string; // 3-4 sentences max: the advisor's voice
+  topReasons: [string, string, string]; // Exactly 3 short reasons
+  actionPlan: AdvisorActionPlan;
+  whatChangesMyMind: string[]; // 2-4 bullets: conditions that break the thesis
+  buyTriggers: string[]; // 2-4 bullets: what would make this a buy
+  cards: {
+    buy: string[]; // 0-6 specific cards to buy
+    avoid: string[]; // 0-6 specific cards to avoid
+  };
+  evidenceNote: string; // 1 sentence: data sources and limitations
+};
+
 // Player Outlook Cache table
 export const playerOutlookCache = pgTable("player_outlook_cache", {
   id: serial("id").primaryKey(),
