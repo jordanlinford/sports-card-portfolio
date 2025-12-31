@@ -1336,13 +1336,13 @@ function generateAdvisorTake(verdict: InvestmentVerdict, input: DecisionInput, s
 }
 
 function generatePackHitReaction(verdict: InvestmentVerdict, scores: InvestmentScores): string {
-  // One-line emotional guidance for pack openers
+  // One-line emotional guidance for pack openers - distinct per verdict
   const templates: Record<InvestmentVerdict, string> = {
-    ACCUMULATE: "Strong hit — consider holding or grading.",
-    HOLD_CORE: "Neutral outcome — sell into any spike.",
-    TRADE_THE_HYPE: "Good name, inflated price — sell now while demand is hot.",
-    AVOID_NEW_MONEY: "Move quickly — don't get attached.",
-    SPECULATIVE_FLYER: "Lottery ticket — hold if you believe, otherwise flip fast.",
+    ACCUMULATE: "Nice pull! Hold this one—it's got room to run.",
+    HOLD_CORE: "Solid hit. Flip it quick or grade it—no rush either way.",
+    TRADE_THE_HYPE: "Lucky! List it tonight—prices won't stay this high.",
+    AVOID_NEW_MONEY: "Don't overthink it—move it fast before you get attached.",
+    SPECULATIVE_FLYER: "Swing for the fences or cash out now—your call on this one.",
   };
   
   return templates[verdict];

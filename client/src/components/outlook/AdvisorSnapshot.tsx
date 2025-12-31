@@ -1,15 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { 
-  TrendingUp, 
   TrendingDown, 
   Minus, 
   ShoppingCart, 
   Ban,
-  Clock,
   Shield,
   Zap,
-  AlertCircle,
   Target,
   Scale,
 } from "lucide-react";
@@ -62,21 +59,6 @@ function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
   }
 }
 
-function getConfidenceStyles(confidence: AdvisorOutlook["confidence"]) {
-  switch (confidence) {
-    case "HIGH":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20";
-    case "MED":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20";
-    case "LOW":
-      return "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
-  }
-}
-
-function getHorizonStyles(_horizon: AdvisorOutlook["horizon"]) {
-  return "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20";
-}
-
 interface AdvisorSnapshotProps {
   advisor: AdvisorOutlook;
   playerName: string;
@@ -101,16 +83,7 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
             </div>
           </div>
           
-          <div className="flex flex-wrap gap-2">
-            <Badge className={getConfidenceStyles(advisor.confidence)} data-testid="badge-confidence">
-              <Zap className="h-3 w-3 mr-1" />
-              {advisor.confidence} Confidence
-            </Badge>
-            <Badge className={getHorizonStyles(advisor.horizon)} data-testid="badge-horizon">
-              <Clock className="h-3 w-3 mr-1" />
-              {advisor.horizon}
-            </Badge>
-          </div>
+          {/* Removed confidence/horizon badges - advisor voice doesn't expose system mechanics */}
         </div>
       </CardHeader>
       

@@ -110,19 +110,19 @@ function extractPackHitReaction(outlook: PlayerOutlookResponse): string | undefi
     return call.packHitReaction;
   }
   
-  // Fallback based on verdict
+  // Fallback based on verdict - distinct emotional guidance per verdict
   if (call?.verdict) {
     switch (call.verdict) {
       case "ACCUMULATE":
-        return "Strong hit — consider holding or grading.";
+        return "Nice pull! Hold this one—it's got room to run.";
       case "HOLD_CORE":
-        return "Neutral outcome — sell into any spike.";
+        return "Solid hit. Flip it quick or grade it—no rush either way.";
       case "TRADE_THE_HYPE":
-        return "Good name, inflated price — sell now while demand is hot.";
+        return "Lucky! List it tonight—prices won't stay this high.";
       case "AVOID_NEW_MONEY":
-        return "Move quickly — don't get attached.";
+        return "Don't overthink it—move it fast before you get attached.";
       case "SPECULATIVE_FLYER":
-        return "Lottery ticket — hold if you believe, otherwise flip fast.";
+        return "Swing for the fences or cash out now—your call on this one.";
     }
   }
   
