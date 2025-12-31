@@ -72,6 +72,7 @@ function Router() {
       <Route path="/share/:token" component={ShareViewer} />
       <Route path="/blog" component={BlogListing} />
       <Route path="/blog/:slug" component={BlogPostPage} />
+      <Route path="/player-outlook" component={PlayerOutlookPage} />
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
@@ -91,7 +92,6 @@ function Router() {
           <Route path="/messages/:conversationId" component={MessagesPage} />
           <Route path="/settings" component={SettingsPage} />
           <Route path="/outlook" component={OutlookOverviewPage} />
-          <Route path="/player-outlook" component={PlayerOutlookPage} />
           <Route path="/watchlist" component={WatchlistPage} />
           <Route path="/hidden-gems" component={HiddenGemsPage} />
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
