@@ -46,8 +46,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import { InvestmentCallCard } from "@/components/investment-call-card";
-import { CollectorTake } from "@/components/CollectorTake";
-import { getTakesFromMarket, type Take } from "@/lib/takes";
 import { AdvisorSnapshot } from "@/components/outlook/AdvisorSnapshot";
 import { OutlookAccordions } from "@/components/outlook/OutlookAccordions";
 import { transformToAdvisorOutlook, applyVerdictGuardrails } from "@/lib/transformToAdvisorOutlook";
@@ -755,7 +753,6 @@ export default function PlayerOutlookPage() {
   const [sport, setSport] = useState("football");
   const [outlookData, setOutlookData] = useState<PlayerOutlookResponse | null>(null);
   const [outlookSport, setOutlookSport] = useState<string>("football");
-  const [takes, setTakes] = useState<Take[]>([]);
   const initialSearchDone = useRef(false);
 
   const playerKey = outlookData?.player?.name 
@@ -785,42 +782,6 @@ export default function PlayerOutlookPage() {
       setCachedWatchlistItemId(null);
     }
   }, [watchlistStatus]);
-
-  // Fetch takes when outlook data changes
-  useEffect(() => {
-    if (!outlookData || !outlookData.investmentCall) {
-      setTakes([]);
-      return;
-    }
-    
-    const scores = outlookData.investmentCall.scores;
-    const riskVal = outlookData.snapshot?.risk === "HIGH" ? 80 : outlookData.snapshot?.risk === "LOW" ? 20 : 50;
-    
-    (async () => {
-      try {
-        const fetchedTakes = await getTakesFromMarket({
-          scope: "player",
-          subject: {
-            playerName: outlookData.player?.name,
-            subjectId: playerKey || outlookData.player?.name,
-          },
-          market: {
-            action: outlookData.investmentCall?.verdict,
-            signals: {
-              upside: scores?.valuationScore ?? 50,
-              risk: scores?.downsideRiskScore ?? riskVal,
-            },
-            confidence: { level: outlookData.snapshot?.confidence || "MED" },
-            careerStage: outlookData.player?.stage,
-            narrativeTags: [],
-          },
-        });
-        setTakes(fetchedTakes);
-      } catch (err) {
-        console.error("Failed to fetch takes:", err);
-      }
-    })();
-  }, [outlookData?.player?.name, outlookData?.investmentCall?.verdict]);
 
   const addToWatchlistMutation = useMutation({
     mutationFn: async () => {
@@ -1051,14 +1012,6 @@ export default function PlayerOutlookPage() {
             playerName={outlookData.player.name} 
           />
 
-          {takes.length > 0 && (
-            <div className="space-y-3" data-testid="section-collector-takes">
-              {takes.map((take) => (
-                <CollectorTake key={take.id} take={take} />
-              ))}
-            </div>
-          )}
-          
           <OutlookAccordions 
             advisor={advisorOutlook} 
             outlook={outlookData} 
