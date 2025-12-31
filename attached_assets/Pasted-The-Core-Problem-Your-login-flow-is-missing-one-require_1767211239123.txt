@@ -1,0 +1,112 @@
+The Core Problem
+
+Your login flow is missing one required OAuth parameter:
+
+prompt=select_account
+
+
+Without it:
+
+Replit will always auto-login the currently authenticated user
+
+You cannot test new users
+
+It will feel “locked” to your account
+
+The Fix (This Is the Important Part)
+Step 1: Update your Replit OAuth URL
+
+Wherever you build your Replit auth URL (server or client), update it to include:
+
+&prompt=select_account
+
+Example (generic)
+
+Before:
+
+https://replit.com/auth/oauth/authorize?
+client_id=YOUR_CLIENT_ID
+&redirect_uri=YOUR_REDIRECT
+&response_type=code
+&scope=identity email profile
+
+
+After:
+
+https://replit.com/auth/oauth/authorize?
+client_id=YOUR_CLIENT_ID
+&redirect_uri=YOUR_REDIRECT
+&response_type=code
+&scope=identity email profile
+&prompt=select_account
+
+
+This forces the account chooser every time, even if you’re logged in.
+
+Step 2: Clear Existing Session (Important)
+
+After making the change, do one of the following:
+
+Option A (fastest):
+
+Open an incognito window
+
+Visit your app
+
+Try login
+
+Option B (clean):
+
+Log out of Replit entirely
+
+Clear cookies for replit.com
+
+Restart browser
+
+Step 3: Confirm You Are NOT Hardcoding Owner Logic
+
+Double-check you are not doing any of these:
+
+Auto-creating user records with a fixed email
+
+Overwriting user.email with env values
+
+Treating the first user as “admin” and blocking others
+
+Your screenshot suggests this is OAuth-level, not app logic — but it’s worth confirming.
+
+How You Know It’s Fixed
+
+When working correctly:
+
+Clicking “Login” always shows a Replit account selector
+
+You can choose:
+
+a different Replit account
+
+a brand new Replit user
+
+New users get unique emails + IDs in your database
+
+Important Production Note (Future You Will Thank You)
+
+Replit Auth is great for dev/testing, but not ideal for public SaaS.
+
+Before public launch, you should strongly consider:
+
+Clerk
+
+Firebase Auth
+
+Auth0
+
+Replit Auth is best for:
+
+internal tools
+
+early previews
+
+demos
+
+You’re fine for now — just don’t ship this publicly long-term.
