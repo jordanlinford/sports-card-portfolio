@@ -88,10 +88,6 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
       </CardHeader>
       
       <CardContent className="space-y-4">
-        <p className="text-sm text-foreground leading-relaxed" data-testid="text-advisor-take">
-          {advisor.advisorTake}
-        </p>
-        
         {advisor.packHitReaction && (
           <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
             <Zap className="h-4 w-4 text-amber-500 shrink-0" />
