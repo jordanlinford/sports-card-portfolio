@@ -1,0 +1,142 @@
+PROJECT: SportsCardPortfolio – PlayerOutlook overhaul to “Trusted Advisor” format
+
+CONTEXT
+Current PlayerOutlook UI is too busy and reads like a research memo. We want it to read like a trusted financial advisor: decisive call up front, short rationale, clear conditions that change the call, optional deep-dive behind accordions. Keep all existing analysis and data, but re-stage it.
+
+NON-GOALS
+- Do NOT change scraping, scoring, projections, or any backend analysis logic.
+- Do NOT remove data; just restructure presentation and add a summary layer.
+- Do NOT add new APIs unless necessary; prefer transforming existing analysis output.
+
+HIGH-LEVEL APPROACH
+1) Introduce a strict “AdvisorOutlook” output schema (compact, opinionated).
+2) Add a transformation step that takes existing long-form analysis and converts it into AdvisorOutlook (via LLM or deterministic summarizer).
+3) Rebuild PlayerOutlook UI to use AdvisorOutlook for the above-the-fold “Snapshot.”
+4) Move all detail content into collapsed accordions by default.
+
+STEP 1 — CREATE ADVISOROUTLOOK TYPE/SCHEMA
+Add a new type file: /src/types/advisor-outlook.ts (or equivalent)
+
+Type:
+- verdict: "BUY" | "HOLD_CORE" | "HOLD" | "SELL" | "AVOID"
+- confidence: "LOW" | "MED" | "HIGH"
+- horizon: "1-3m" | "3-12m" | "12m+"
+- advisorTake: string (max 3–4 sentences)
+- topReasons: string[] (exactly 3, short)
+- actionPlan:
+  - now: string (1 sentence)
+  - entryRule: string (1 sentence)
+  - sizingRule: string (1 sentence)
+- whatChangesMyMind: string[] (2–4 bullets)
+- buyTriggers: string[] (2–4 bullets)
+- cards:
+  - buy: string[] (0–6)
+  - avoid: string[] (0–6)
+- evidenceNote: string (1 sentence: what data was used + limitation)
+
+Add a Zod validator if the project uses Zod. If not, add a small runtime guard.
+
+STEP 2 — ADD “ADVISOR SUMMARY” TRANSFORMER
+Create: /src/lib/outlook/transformToAdvisorOutlook.ts
+
+This function should accept the existing analysis payload (whatever PlayerOutlook currently renders) and return AdvisorOutlook.
+
+Implementation options:
+A) Preferred: use the existing LLM call (same request) but ask it to output JSON strictly matching AdvisorOutlook.
+B) If you cannot change the LLM response yet: implement a temporary summarizer that extracts key fields and compresses text until you add the strict JSON response.
+
+Rules for advisorTake:
+- Sentence 1: the call (verdict) + direction (e.g., “Hold, don’t chase”)
+- Sentence 2: 1–2 strongest reasons only
+- Sentence 3: what would invalidate the call
+- Optional sentence 4: a practical instruction (entry/pullback or trimming)
+
+Enforce:
+- topReasons must be exactly 3
+- no repeated ideas between advisorTake and topReasons
+- max lengths (truncate safely if needed)
+
+STEP 3 — UPDATE THE LLM PROMPT (IF LLM IS USED HERE)
+Wherever PlayerOutlook analysis is generated, modify the prompt so the model returns:
+1) advisorOutlook (strict JSON matching schema)
+2) fullAnalysis (existing verbose sections), unchanged
+
+If you can’t return two payloads, return advisorOutlook only and keep fullAnalysis from existing stored sections; do not break current features.
+
+Hard constraints for the model:
+- Output MUST be valid JSON.
+- No markdown.
+- advisorTake max 4 sentences.
+- topReasons exactly 3 items.
+- whatChangesMyMind 2–4.
+- buyTriggers 2–4.
+- cards.buy/avoid max 6 each.
+- evidenceNote 1 sentence.
+
+STEP 4 — REBUILD UI WITH A “SNAPSHOT FIRST” LAYOUT
+Refactor the PlayerOutlook page component to render:
+
+A) Advisor Snapshot (always visible, above the fold)
+Create component: /src/components/outlook/AdvisorSnapshot.tsx
+
+Snapshot must include:
+- Large Verdict pill (dominant)
+- Confidence + Horizon chips (small)
+- advisorTake paragraph (the advisor voice)
+- “Top reasons” list (exactly 3 bullets)
+- Mini Action Plan row with 3 items:
+  - Now
+  - Entry Rule
+  - Sizing Rule
+
+Everything above must fit in a compact card with reduced padding and minimal vertical scroll.
+
+B) Accordions below (collapsed by default)
+Create component: /src/components/outlook/OutlookAccordions.tsx
+
+Accordion sections, in this order:
+1) What Changes My Mind (bullets)
+2) Buy Triggers (bullets)
+3) Cards (Buy vs Avoid lists side-by-side; stacked on mobile)
+4) Full Thesis / Why This Call (existing content; keep but collapse)
+5) Market Reality Check (existing content; keep but collapse)
+6) Supporting Evidence / Sources (existing; keep collapsed)
+
+Accordion behavior:
+- All collapsed by default
+- Hide an accordion if its data is missing/empty
+
+STEP 5 — COPY + DENSITY RULES (ENFORCE IN UI)
+- No multi-paragraph blocks in Snapshot besides advisorTake.
+- Bullet lists should be short; if longer than allowed, show “Show more” within that accordion section only.
+- Remove redundant headings and repeated explanations from the visible layer.
+
+STEP 6 — VERDICT GUARDRAILS (LIGHTWEIGHT, OPTIONAL BUT RECOMMENDED)
+Add a small validator to prevent “random” SELL/BUY:
+- If verdict is SELL, require confidence != LOW OR include at least 2 whatChangesMyMind items and evidenceNote.
+- If verdict is BUY, require entryRule includes a condition (pullback, price level, catalyst, etc.).
+
+If guardrails fail, downgrade verdict:
+- SELL -> HOLD
+- BUY -> HOLD (or HOLD_CORE depending on current logic)
+
+STEP 7 — ACCEPTANCE CRITERIA
+- Above the fold shows: verdict, confidence, horizon, advisorTake, 3 reasons, mini action plan. Nothing else.
+- Accordions are collapsed by default.
+- Total visible text reduced by at least 50% without losing access to details.
+- Mobile layout is readable; cards stack; chips wrap.
+- No backend logic changes; only response formatting + UI.
+
+TASK EXECUTION ORDER (DO THIS IN THIS SEQUENCE)
+1) Add AdvisorOutlook type/schema
+2) Add transformToAdvisorOutlook
+3) Add AdvisorSnapshot component and render it using AdvisorOutlook
+4) Add accordions and move existing content under them
+5) Tighten spacing + remove redundant visible sections
+6) Add guardrails and empty-state handling
+7) QA: desktop + mobile
+
+DELIVERABLE
+Commit the refactor with these components and ensure PlayerOutlook page renders successfully with both:
+- fully populated analysis
+- partial/missing sections without crashing
