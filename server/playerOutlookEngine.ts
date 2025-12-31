@@ -615,10 +615,10 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
     "inferredFields": ["<list any fields you guessed: 'position', 'team', 'rookieYear', 'careerStatus'>"]
   },
   "thesis": [
-    "<bullet 1: main momentum/hype factor - SPECIFIC to this player>",
-    "<bullet 2: performance or role factor>",
-    "<bullet 3: team context and how it affects card value>",
-    "<bullet 4: key risk or what could change>"
+    "<bullet 1: PATTERN-BASED market rule applied to this player (e.g., 'Year 3 WRs with Pro Bowl selection historically appreciate 30-50%')>",
+    "<bullet 2: Role/production pattern (e.g., 'Franchise QBs on playoff teams maintain demand floors')>",
+    "<bullet 3: Team/situation pattern (e.g., 'Players in small markets often trade at discounts to production')>",
+    "<bullet 4: Key pattern-based risk (e.g., 'RBs after age 27 see 40-60% value compression')>"
   ],
   "marketRealityCheck": [
     "<uncomfortable truth 1: honest skeptical observation>",
@@ -627,7 +627,7 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
   "verdict": {
     "action": "BUY|MONITOR|AVOID",
     "modifier": "Momentum|Speculative|Value|Long-Term|Late Cycle",
-    "summary": "<2-4 sentence plain language summary>",
+    "summary": "<2-4 sentence ADVISOR VOICE summary: State the call, the pattern-level why, and what changes it. Sound like a trusted financial advisor, not a data explainer. Example: 'This is a buy. Year 3 receivers with All-Pro selection historically see 30-40% appreciation. This changes if injury or production decline breaks the pattern.'>",
     "whatMustBeTrue": [
       "<condition 1 for thesis to work>",
       "<condition 2>"
@@ -696,7 +696,15 @@ For RBs entering Year 4+: Generally recommend SELL on base/mid-tier due to posit
 For players on struggling teams: Base cards suffer first, premium holds better if individual stats remain strong.
 
 ANTI-FLUFF CHECK (critical):
-Before finalizing, verify: if any thesis bullet could apply to 10+ random players, rewrite it to be more specific to ${playerName} OR mark the missing input as Unknown and use conditional language.
+Before finalizing, verify: if any thesis bullet could apply to 10+ random players, rewrite it using a PATTERN-BASED market rule that specifically applies to ${playerName}'s situation (career stage, position, team context). 
+
+PATTERN-BASED LANGUAGE EXAMPLES:
+GOOD: "Year 3 WRs with back-to-back 1,000 yard seasons historically appreciate 20-40%"
+GOOD: "QBs in contract years on contending teams see demand spikes"
+GOOD: "RBs entering Year 4 with high workload historically decline 30-50% in value"
+BAD: "This player is exciting and has upside"
+BAD: "Cards could appreciate if performance continues"
+BAD: "Elite talent with room to grow"
 
 MODIFIER SELECTION:
 - "Speculative": High upside, high downside, projection-driven (rookies, unproven talent)

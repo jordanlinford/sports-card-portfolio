@@ -1022,38 +1022,48 @@ function generateActionPlan(verdict: InvestmentVerdict, input: DecisionInput): I
 
 function generateWhyBullets(verdict: InvestmentVerdict, scores: InvestmentScores, input: DecisionInput): string[] {
   const bullets: string[] = [];
-  const { stage, temperature } = input;
+  const { stage, temperature, position } = input;
   const { mispricingScore, downsideRiskScore, narrativeHeatScore, liquidityScore } = scores;
+  
+  // Position-aware stage labels for pattern language
+  const stageLabel = stage === "ROOKIE" ? "Rookie" : 
+    stage === "YEAR_2" ? "Year 2" : 
+    stage === "YEAR_3" ? "Year 3" :
+    stage === "YEAR_4" ? "Year 4" :
+    stage === "PRIME" ? "Prime" :
+    stage === "VETERAN" ? "Veteran" : "Late-career";
+  const positionLabel = position || "player";
 
   switch (verdict) {
     case "ACCUMULATE":
-      if (mispricingScore >= 15) bullets.push("Cards are underpriced relative to current buzz and attention.");
-      if (stage === "ROOKIE" || stage === "YEAR_2") bullets.push("Young player with significant upside runway ahead.");
-      if (liquidityScore >= 60) bullets.push("Strong market demand makes buying and selling easy.");
+      if (mispricingScore >= 15) bullets.push("Market pricing trails production—classic buy window.");
+      if (stage === "ROOKIE" || stage === "YEAR_2") bullets.push(`${stageLabel} ${positionLabel}s with proven roles historically appreciate.`);
+      else if (stage === "YEAR_3" || stage === "YEAR_4") bullets.push(`${stageLabel} players entering prime production years see sustained demand.`);
+      if (liquidityScore >= 60) bullets.push("Strong liquidity means easy entry and exit at fair prices.");
       break;
 
     case "HOLD_CORE":
-      bullets.push("Current prices fairly reflect the player's market position.");
-      if (downsideRiskScore <= 50) bullets.push("Limited downside risk protects your existing position.");
-      bullets.push("Better opportunities exist elsewhere for new money right now.");
+      bullets.push("Market already knows the story—prices reflect current production.");
+      if (downsideRiskScore <= 50) bullets.push("Stable role and production protect existing positions.");
+      bullets.push("Capital better deployed chasing undervalued opportunities elsewhere.");
       break;
 
     case "TRADE_THE_HYPE":
-      if (narrativeHeatScore >= 70) bullets.push("Hype is running ahead of actual on-field production.");
-      if (mispricingScore <= -20) bullets.push("Cards are expensive relative to realistic expectations.");
-      bullets.push("Selling now locks in gains before the market corrects.");
+      if (narrativeHeatScore >= 70) bullets.push("Narrative outpacing production—classic sell signal.");
+      if (mispricingScore <= -20) bullets.push("Premium pricing leaves no margin of safety for buyers.");
+      bullets.push("History shows hype peaks rarely sustain—lock in gains now.");
       break;
 
     case "AVOID_NEW_MONEY":
-      if (downsideRiskScore >= 70) bullets.push("High risk of injury, role change, or performance decline.");
-      if (liquidityScore <= 40) bullets.push("Thin market makes it hard to exit if things go wrong.");
-      bullets.push("Better ways to deploy your card budget right now.");
+      if (downsideRiskScore >= 70) bullets.push("Position/age profile suggests elevated downside risk.");
+      if (liquidityScore <= 40) bullets.push("Thin liquidity traps capital when you need to exit.");
+      bullets.push("Risk/reward doesn't justify new capital at current prices.");
       break;
 
     case "SPECULATIVE_FLYER":
-      bullets.push("Uncertain outlook but potential for significant upside if a catalyst hits.");
-      if (temperature === "COOLING") bullets.push("Lower prices create better risk/reward for believers.");
-      bullets.push("Best suited as a small position with defined upside thesis.");
+      bullets.push("High variance play—small position with defined catalyst thesis.");
+      if (temperature === "COOLING") bullets.push("Depressed pricing creates asymmetric upside if thesis hits.");
+      bullets.push("Treat as lottery ticket—size for total loss scenario.");
       break;
   }
 
