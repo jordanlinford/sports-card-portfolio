@@ -949,7 +949,8 @@ Sitemap: ${origin}/sitemap.xml
       }
       
       // For humans, redirect to the SPA player outlook page with pre-filled search
-      res.redirect(`/player-outlook?player=${encodeURIComponent(playerName)}`);
+      // Include shared=true so the frontend knows to fetch cached data without auth
+      res.redirect(`/player-outlook?player=${encodeURIComponent(playerName)}&shared=true`);
     } catch (error) {
       console.error("Error serving player share page:", error);
       res.status(500).json({ message: "Failed to serve player share page" });
@@ -2708,6 +2709,60 @@ Sitemap: ${origin}/sitemap.xml
       });
     } catch (error) {
       console.error("Error getting player outlook:", error);
+      res.status(500).json({ message: "Failed to get player outlook" });
+    }
+  });
+
+  // Get cached player outlook (PUBLIC - no auth required)
+  // Used for shared links so visitors can see analysis results without signing up
+  app.get("/api/player-outlook/shared/:playerSlug", async (req, res) => {
+    try {
+      const { playerSlug } = req.params;
+      const sport = (req.query.sport as string) || "football";
+      
+      // Convert slug back to player name (lamar-jackson -> Lamar Jackson)
+      const playerName = playerSlug
+        .split("-")
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ");
+      
+      // Build the player key for cache lookup
+      const playerKey = `${sport.toLowerCase()}:${playerName.toLowerCase().trim().replace(/\s+/g, "_")}`;
+      
+      // Look up cached outlook
+      const cachedOutlook = await storage.getCachedPlayerOutlook(playerKey);
+      
+      if (!cachedOutlook || !cachedOutlook.outlookData) {
+        return res.status(404).json({ 
+          message: "No cached analysis found for this player. Sign up to generate a new analysis.",
+          notFound: true
+        });
+      }
+      
+      // Check if cache is too old (more than 30 days)
+      const cacheAge = Date.now() - new Date(cachedOutlook.generatedAt).getTime();
+      const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
+      
+      if (cacheAge > maxAge) {
+        return res.status(404).json({ 
+          message: "This analysis is outdated. Sign up to get fresh insights.",
+          outdated: true
+        });
+      }
+      
+      // Return the cached data (parsed from JSON)
+      const outlookData = typeof cachedOutlook.outlookData === 'string' 
+        ? JSON.parse(cachedOutlook.outlookData)
+        : cachedOutlook.outlookData;
+      
+      res.json({
+        ...outlookData,
+        cacheStatus: "cached",
+        generatedAt: cachedOutlook.generatedAt,
+        isSharedView: true, // Flag to indicate this is a public shared view
+      });
+    } catch (error) {
+      console.error("Error getting shared player outlook:", error);
       res.status(500).json({ message: "Failed to get player outlook" });
     }
   });

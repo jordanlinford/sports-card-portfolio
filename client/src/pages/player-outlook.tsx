@@ -42,6 +42,7 @@ import {
   ExternalLink,
   Star,
   StarOff,
+  Sparkles,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -755,6 +756,9 @@ export default function PlayerOutlookPage() {
   const [outlookData, setOutlookData] = useState<PlayerOutlookResponse | null>(null);
   const [outlookSport, setOutlookSport] = useState<string>("football");
   const [showSignupDialog, setShowSignupDialog] = useState(false);
+  const [isSharedView, setIsSharedView] = useState(false);
+  const [sharedPlayerName, setSharedPlayerName] = useState<string | null>(null);
+  const [isLoadingShared, setIsLoadingShared] = useState(false);
   const initialSearchDone = useRef(false);
 
   const playerKey = outlookData?.player?.name 
@@ -895,6 +899,7 @@ export default function PlayerOutlookPage() {
     const params = new URLSearchParams(search);
     const urlPlayer = params.get("player");
     const urlSport = params.get("sport");
+    const isShared = params.get("shared") === "true";
     
     if (urlPlayer) {
       setPlayerName(urlPlayer);
@@ -902,14 +907,47 @@ export default function PlayerOutlookPage() {
         setSport(urlSport);
       }
       initialSearchDone.current = true;
-      setTimeout(() => {
-        outlookMutation.mutate({ 
-          playerName: urlPlayer, 
-          sport: urlSport || sport 
-        });
-      }, 100);
+      
+      // If this is a shared link AND user is not logged in, fetch from public cache endpoint
+      if (isShared && !user) {
+        setIsSharedView(true);
+        setSharedPlayerName(urlPlayer);
+        setIsLoadingShared(true);
+        
+        // Convert player name to slug for API call
+        const playerSlug = urlPlayer.toLowerCase().replace(/\s+/g, "-");
+        const sportParam = urlSport || sport;
+        
+        fetch(`/api/player-outlook/shared/${playerSlug}?sport=${sportParam}`)
+          .then(res => {
+            if (!res.ok) {
+              throw new Error("No cached analysis available");
+            }
+            return res.json();
+          })
+          .then(data => {
+            setOutlookData(data);
+            setOutlookSport(sportParam);
+          })
+          .catch(err => {
+            console.log("No cached data for shared player, prompting signup");
+            // No cached data - show signup prompt
+            setShowSignupDialog(true);
+          })
+          .finally(() => {
+            setIsLoadingShared(false);
+          });
+      } else {
+        // User is logged in or not a shared link - use normal mutation
+        setTimeout(() => {
+          outlookMutation.mutate({ 
+            playerName: urlPlayer, 
+            sport: urlSport || sport 
+          });
+        }, 100);
+      }
     }
-  }, [search]);
+  }, [search, user]);
 
   const handleSearch = () => {
     if (!playerName.trim()) {
@@ -925,10 +963,13 @@ export default function PlayerOutlookPage() {
       setShowSignupDialog(true);
       return;
     }
+    // Reset shared view state when user searches
+    setIsSharedView(false);
+    setSharedPlayerName(null);
     outlookMutation.mutate({ playerName: playerName.trim(), sport });
   };
 
-  if (authLoading) {
+  if (authLoading || isLoadingShared) {
     return (
       <div className="container max-w-6xl py-8 px-4">
         <PlayerOutlookSkeleton />
@@ -944,10 +985,13 @@ export default function PlayerOutlookPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Target className="h-5 w-5 text-primary" />
-              Unlock Player Analysis
+              {isSharedView && outlookData ? "Want to Analyze More Players?" : "Unlock Player Analysis"}
             </DialogTitle>
             <DialogDescription>
-              Create a free account to get AI-powered investment verdicts for any player. See who to buy, hold, or avoid.
+              {isSharedView && outlookData 
+                ? "Create a free account to analyze any player and get personalized investment verdicts."
+                : "Create a free account to get AI-powered investment verdicts for any player. See who to buy, hold, or avoid."
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1053,6 +1097,30 @@ export default function PlayerOutlookPage() {
         const advisorOutlook = applyVerdictGuardrails(transformToAdvisorOutlook(outlookData));
         return (
         <div className="space-y-6 animate-in fade-in duration-500">
+          {/* Shared view banner for unauthenticated users */}
+          {isSharedView && !user && (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="py-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-medium">You're viewing a shared analysis</p>
+                      <p className="text-sm text-muted-foreground">Sign up free to analyze any player and track your collection</p>
+                    </div>
+                  </div>
+                  <a href="/api/login">
+                    <Button size="sm" data-testid="button-signup-banner">
+                      Create Free Account
+                    </Button>
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} />
           
           <AdvisorSnapshot 
@@ -1068,48 +1136,62 @@ export default function PlayerOutlookPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex flex-wrap gap-3">
-                <Button 
-                  variant={isWatching ? "secondary" : "default"}
-                  onClick={handleToggleWatchlist}
-                  disabled={isWatchlistLoading}
-                  data-testid="button-toggle-watchlist"
-                >
-                  {isWatchlistLoading ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : isWatching ? (
-                    <StarOff className="h-4 w-4 mr-2" />
-                  ) : (
-                    <Star className="h-4 w-4 mr-2" />
-                  )}
-                  {isWatching ? "Remove from Watchlist" : "Add to Watchlist"}
-                </Button>
-                <ShareSnapshotButton
-                  snapshotType="player_outlook"
-                  title={`${outlookData.player.name} Outlook`}
-                  snapshotData={{
-                    playerName: outlookData.player.name,
-                    sport: outlookData.player.sport,
-                    position: outlookData.player.position,
-                    team: outlookData.player.team,
-                    stage: outlookData.player.stage,
-                    outlook: outlookData.investmentCall?.verdict || outlookData.verdict.action,
-                    modifier: outlookData.verdict.modifier,
-                    summary: outlookData.investmentCall?.oneLineRationale || outlookData.verdict.summary,
-                    thesis: outlookData.thesis,
-                    marketRealityCheck: outlookData.marketRealityCheck,
-                    temperature: outlookData.snapshot.temperature,
-                    volatility: outlookData.snapshot.volatility,
-                    risk: outlookData.snapshot.risk,
-                    confidence: outlookData.snapshot.confidence,
-                    exposures: outlookData.exposures.map(exp => ({
-                      tier: exp.tier,
-                      cardTargets: exp.cardTargets,
-                      why: exp.why,
-                    })),
-                    investmentCall: outlookData.investmentCall,
-                    generatedAt: outlookData.generatedAt,
-                  }}
-                />
+                {/* Show full actions for authenticated users */}
+                {user && (
+                  <>
+                    <Button 
+                      variant={isWatching ? "secondary" : "default"}
+                      onClick={handleToggleWatchlist}
+                      disabled={isWatchlistLoading}
+                      data-testid="button-toggle-watchlist"
+                    >
+                      {isWatchlistLoading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : isWatching ? (
+                        <StarOff className="h-4 w-4 mr-2" />
+                      ) : (
+                        <Star className="h-4 w-4 mr-2" />
+                      )}
+                      {isWatching ? "Remove from Watchlist" : "Add to Watchlist"}
+                    </Button>
+                    <ShareSnapshotButton
+                      snapshotType="player_outlook"
+                      title={`${outlookData.player.name} Outlook`}
+                      snapshotData={{
+                        playerName: outlookData.player.name,
+                        sport: outlookData.player.sport,
+                        position: outlookData.player.position,
+                        team: outlookData.player.team,
+                        stage: outlookData.player.stage,
+                        outlook: outlookData.investmentCall?.verdict || outlookData.verdict.action,
+                        modifier: outlookData.verdict.modifier,
+                        summary: outlookData.investmentCall?.oneLineRationale || outlookData.verdict.summary,
+                        thesis: outlookData.thesis,
+                        marketRealityCheck: outlookData.marketRealityCheck,
+                        temperature: outlookData.snapshot.temperature,
+                        volatility: outlookData.snapshot.volatility,
+                        risk: outlookData.snapshot.risk,
+                        confidence: outlookData.snapshot.confidence,
+                        exposures: outlookData.exposures.map(exp => ({
+                          tier: exp.tier,
+                          cardTargets: exp.cardTargets,
+                          why: exp.why,
+                        })),
+                        investmentCall: outlookData.investmentCall,
+                        generatedAt: outlookData.generatedAt,
+                      }}
+                    />
+                    <Button variant="outline" onClick={() => {
+                      setOutlookData(null);
+                      outlookMutation.mutate({ playerName: outlookData.player.name, sport });
+                    }} data-testid="button-refresh">
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Analysis
+                    </Button>
+                  </>
+                )}
+                
+                {/* Always show eBay link */}
                 <Button variant="outline" asChild>
                   <a 
                     href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(outlookData.player.name + " card")}&_sacat=0&LH_Sold=1`}
@@ -1121,13 +1203,16 @@ export default function PlayerOutlookPage() {
                     Search eBay Sold
                   </a>
                 </Button>
-                <Button variant="outline" onClick={() => {
-                  setOutlookData(null);
-                  outlookMutation.mutate({ playerName: outlookData.player.name, sport });
-                }} data-testid="button-refresh">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Refresh Analysis
-                </Button>
+                
+                {/* Show signup CTA for unauthenticated users */}
+                {!user && (
+                  <a href="/api/login">
+                    <Button data-testid="button-signup-actions">
+                      <Star className="h-4 w-4 mr-2" />
+                      Sign Up to Save & Track
+                    </Button>
+                  </a>
+                )}
               </div>
             </CardContent>
           </Card>
