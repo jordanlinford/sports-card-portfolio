@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useSearch } from "wouter";
 import { 
   Search,
@@ -753,6 +754,7 @@ export default function PlayerOutlookPage() {
   const [sport, setSport] = useState("football");
   const [outlookData, setOutlookData] = useState<PlayerOutlookResponse | null>(null);
   const [outlookSport, setOutlookSport] = useState<string>("football");
+  const [showSignupDialog, setShowSignupDialog] = useState(false);
   const initialSearchDone = useRef(false);
 
   const playerKey = outlookData?.player?.name 
@@ -918,6 +920,11 @@ export default function PlayerOutlookPage() {
       });
       return;
     }
+    // If user is not logged in, show signup dialog instead of running analysis
+    if (!user) {
+      setShowSignupDialog(true);
+      return;
+    }
     outlookMutation.mutate({ playerName: playerName.trim(), sport });
   };
 
@@ -929,23 +936,64 @@ export default function PlayerOutlookPage() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="container max-w-6xl py-8 px-4">
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <h2 className="text-xl font-semibold mb-2">Sign in Required</h2>
-            <p className="text-muted-foreground mb-4">Sign in to access Player Outlook analysis.</p>
-            <a href="/api/login">
-              <Button data-testid="button-sign-in">Sign In</Button>
-            </a>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
+    <>
+      {/* Signup prompt dialog for unauthenticated users */}
+      <Dialog open={showSignupDialog} onOpenChange={setShowSignupDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              Unlock Player Analysis
+            </DialogTitle>
+            <DialogDescription>
+              Create a free account to get AI-powered investment verdicts for any player. See who to buy, hold, or avoid.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Investment Verdicts</p>
+                  <p className="text-xs text-muted-foreground">Get buy/hold/avoid recommendations</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                  <BarChart3 className="h-4 w-4 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">Market Intelligence</p>
+                  <p className="text-xs text-muted-foreground">See market temperature and risk levels</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Star className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-sm">3 Free Analyses/Month</p>
+                  <p className="text-xs text-muted-foreground">Analyze players before you buy cards</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="outline" onClick={() => setShowSignupDialog(false)} data-testid="button-cancel-signup">
+              Maybe Later
+            </Button>
+            <a href="/api/login" className="w-full sm:w-auto">
+              <Button className="w-full" data-testid="button-signup-free">
+                Create Free Account
+              </Button>
+            </a>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
     <div className="container max-w-6xl py-8 px-4 space-y-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold" data-testid="text-page-title">Player Outlook</h1>
@@ -1130,5 +1178,6 @@ export default function PlayerOutlookPage() {
         </Card>
       )}
     </div>
+    </>
   );
 }
