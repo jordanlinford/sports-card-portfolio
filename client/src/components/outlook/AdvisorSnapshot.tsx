@@ -119,10 +119,14 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
           {advisor.advisorTake}
         </p>
         
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <AlertCircle className="h-3 w-3" />
-          {advisor.evidenceNote}
-        </p>
+        {advisor.packHitReaction && (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
+            <Zap className="h-4 w-4 text-amber-500 shrink-0" />
+            <span className="text-sm font-medium" data-testid="text-pack-hit-reaction">
+              Pack Hit: {advisor.packHitReaction}
+            </span>
+          </div>
+        )}
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
           <div>

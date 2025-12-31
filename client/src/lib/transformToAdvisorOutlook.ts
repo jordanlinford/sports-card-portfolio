@@ -56,8 +56,8 @@ function mapHorizon(
   snapshot?: PlayerOutlookResponse["snapshot"]
 ): AdvisorHorizon {
   const horizon = investmentCall?.timeHorizon || snapshot?.horizon;
-  if (horizon === "SHORT" || horizon === "1-3 months") return "1-3m";
-  if (horizon === "LONG" || horizon === "12+ months") return "12m+";
+  if (horizon === "SHORT") return "1-3m";
+  if (horizon === "LONG") return "12m+";
   return "3-12m";
 }
 
@@ -65,8 +65,15 @@ function buildAdvisorTake(
   outlook: PlayerOutlookResponse,
   verdictLabel: string
 ): string {
-  const playerName = outlook.player?.name || "This player";
   const call = outlook.investmentCall;
+  
+  // Prefer the new pre-generated advisorTake from investmentDecisionEngine
+  if (call?.advisorTake && call.advisorTake.length > 50) {
+    return call.advisorTake;
+  }
+  
+  // Legacy fallback: build from pieces
+  const playerName = outlook.player?.name || "This player";
   const thesis = outlook.thesis || [];
   
   let sentence1 = `${verdictLabel}.`;
@@ -94,6 +101,32 @@ function buildAdvisorTake(
     .filter(s => s.length > 0)
     .join(" ")
     .slice(0, 500);
+}
+
+function extractPackHitReaction(outlook: PlayerOutlookResponse): string | undefined {
+  const call = outlook.investmentCall;
+  
+  if (call?.packHitReaction) {
+    return call.packHitReaction;
+  }
+  
+  // Fallback based on verdict
+  if (call?.verdict) {
+    switch (call.verdict) {
+      case "ACCUMULATE":
+        return "Strong hit — consider holding or grading.";
+      case "HOLD_CORE":
+        return "Neutral outcome — sell into any spike.";
+      case "TRADE_THE_HYPE":
+        return "Good name, inflated price — sell now while demand is hot.";
+      case "AVOID_NEW_MONEY":
+        return "Move quickly — don't get attached.";
+      case "SPECULATIVE_FLYER":
+        return "Lottery ticket — hold if you believe, otherwise flip fast.";
+    }
+  }
+  
+  return undefined;
 }
 
 function extractTopReasons(outlook: PlayerOutlookResponse): [string, string, string] {
@@ -263,6 +296,7 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     confidence: mapConfidence(outlook.investmentCall, outlook.snapshot),
     horizon: mapHorizon(outlook.investmentCall, outlook.snapshot),
     advisorTake: buildAdvisorTake(outlook, label),
+    packHitReaction: extractPackHitReaction(outlook),
     topReasons: extractTopReasons(outlook),
     actionPlan: extractActionPlan(outlook),
     whatChangesMyMind: extractWhatChangesMyMind(outlook),
