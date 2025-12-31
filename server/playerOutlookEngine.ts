@@ -1092,6 +1092,19 @@ async function generateFreshOutlook(
     enrichedPlayerInfo.inferred = false;
     enrichedPlayerInfo.inferredFields = [];
     
+    // If registry position is UNKNOWN but AI provided a valid position, use AI's value
+    if ((!entry.positionGroup || entry.positionGroup === "UNKNOWN") && 
+        playerInfo.position && playerInfo.position.toLowerCase() !== "unknown") {
+      console.log(`[PlayerOutlook] Registry position is UNKNOWN, using AI-inferred: ${playerInfo.position}`);
+      enrichedPlayerInfo.position = playerInfo.position;
+      enrichedPlayerInfo.inferredFields = ["position"];
+    }
+    
+    // Team is not in registry, always use AI-inferred team if available
+    if (playerInfo.team && playerInfo.team.toLowerCase() !== "unknown") {
+      enrichedPlayerInfo.team = playerInfo.team;
+    }
+    
     // Re-run classification with registry stage for correct investment signals
     const registryStageMap: Record<string, PlayerStage> = {
       "ROOKIE": "ROOKIE",
