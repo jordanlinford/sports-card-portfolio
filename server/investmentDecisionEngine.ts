@@ -1032,7 +1032,8 @@ function generateWhyBullets(verdict: InvestmentVerdict, scores: InvestmentScores
     stage === "YEAR_4" ? "Year 4" :
     stage === "PRIME" ? "Prime" :
     stage === "VETERAN" ? "Veteran" : "Late-career";
-  const positionLabel = position || "player";
+  // Treat "Unknown" position as missing - use "player" instead
+  const positionLabel = (position && position.toLowerCase() !== "unknown") ? position : "player";
 
   switch (verdict) {
     case "ACCUMULATE":
@@ -1326,7 +1327,8 @@ function generateTriggers(verdict: InvestmentVerdict, input: DecisionInput): { u
 
 function generateAdvisorTake(verdict: InvestmentVerdict, input: DecisionInput, scores: InvestmentScores): string {
   const name = input.playerName || "This player";
-  const positionLabel = input.position || "player";
+  // Treat "Unknown" position as missing - use "player" instead
+  const positionLabel = (input.position && input.position.toLowerCase() !== "unknown") ? input.position : "player";
   
   // Pattern-based templates that sound like judgment, not data dumping
   const templates: Record<InvestmentVerdict, string> = {
