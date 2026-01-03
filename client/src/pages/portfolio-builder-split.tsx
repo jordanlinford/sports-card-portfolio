@@ -357,10 +357,13 @@ export default function PortfolioBuilderSplitPage() {
     staleTime: 30000,
   });
 
-  const { data: currentUser } = useQuery<any>({
+  const { data: currentUser, isLoading: isUserLoading } = useQuery<any>({
     queryKey: ["/api/auth/user"],
     retry: false,
     staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
   });
 
   const isLoading = isSplitLoading || isSeatsLoading;

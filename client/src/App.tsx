@@ -50,20 +50,9 @@ function Router() {
   
   useAnalytics();
 
-  // Show loading state during auth check
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <Switch>
+      {/* Public routes - render immediately without auth check */}
       <Route path="/terms" component={TermsOfService} />
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/explore" component={Explore} />
@@ -74,7 +63,20 @@ function Router() {
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/player-outlook" component={PlayerOutlookPage} />
       <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
-      {!isAuthenticated ? (
+      <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
+      {/* Show loading only for auth-dependent routes */}
+      {isLoading ? (
+        <Route>
+          {() => (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="flex flex-col items-center gap-4">
+                <div className="h-8 w-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                <p className="text-muted-foreground">Loading...</p>
+              </div>
+            </div>
+          )}
+        </Route>
+      ) : !isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
           <Route path="/case/:id" component={CaseView} />
@@ -109,7 +111,6 @@ function Router() {
           <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
         </>
       )}
-      <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
       <Route component={NotFound} />
     </Switch>
   );
