@@ -339,7 +339,7 @@ export default function PortfolioBuilderSplitPage() {
     })
   );
 
-  const { data: splitData, isLoading, refetch } = useQuery<{
+  const { data: splitData, isLoading: isSplitLoading, refetch } = useQuery<{
     seats: any[];
     seatCounts: SeatCounts;
     breakEvent: BreakEventWithSplits;
@@ -348,16 +348,22 @@ export default function PortfolioBuilderSplitPage() {
   } & SplitInstanceWithSeats>({
     queryKey: ["/api/splits", splitId],
     enabled: splitId > 0,
+    staleTime: 30000,
   });
 
-  const { data: seatsData } = useQuery<SeatWithUser[]>({
+  const { data: seatsData, isLoading: isSeatsLoading } = useQuery<SeatWithUser[]>({
     queryKey: ["/api/splits", splitId, "seats"],
     enabled: splitId > 0,
+    staleTime: 30000,
   });
 
   const { data: currentUser } = useQuery<any>({
     queryKey: ["/api/auth/user"],
+    retry: false,
+    staleTime: Infinity,
   });
+
+  const isLoading = isSplitLoading || isSeatsLoading;
 
   const joinMutation = useMutation({
     mutationFn: (prefs?: string[]) => apiRequest("POST", `/api/splits/${splitId}/join`, { preferences: prefs }),
