@@ -73,6 +73,7 @@ function Router() {
       <Route path="/blog" component={BlogListing} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/player-outlook" component={PlayerOutlookPage} />
+      <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
       {!isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
@@ -97,7 +98,6 @@ function Router() {
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
           <Route path="/portfolio/next-buys" component={NextBuysPage} />
           <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
-          <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
           <Route path="/portfolio-builder/splits/:id/preferences" component={PortfolioBuilderPreferencesPage} />
           <Route path="/admin/portfolio-builder" component={AdminPortfolioBuilderPage} />
           <Route path="/search" component={SearchPage} />
