@@ -3845,6 +3845,153 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // Admin: Export player registry as CSV
+  app.get("/api/admin/registry/export-csv", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      
+      const players = await db.select().from(playerRegistry).orderBy(playerRegistry.sport, playerRegistry.playerName);
+      
+      const escapeCSV = (val: string) => {
+        if (val.includes(",") || val.includes('"') || val.includes("\n")) {
+          return `"${val.replace(/"/g, '""')}"`;
+        }
+        return val;
+      };
+      
+      const headers = ["Sport", "PlayerName", "Aliases", "CareerStage", "RoleTier", "PositionGroup", "Notes"];
+      const rows = players.map(p => [
+        escapeCSV(p.sport),
+        escapeCSV(p.playerName),
+        escapeCSV(p.aliases || ""),
+        escapeCSV(p.careerStage),
+        escapeCSV(p.roleTier),
+        escapeCSV(p.positionGroup),
+        escapeCSV(p.notes || "")
+      ].join(","));
+      
+      const csv = [headers.join(","), ...rows].join("\n");
+      
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename=player_registry_${new Date().toISOString().split("T")[0]}.csv`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      res.status(500).json({ message: "Failed to export CSV" });
+    }
+  });
+
+  // Admin: Upload and upsert player registry from CSV content
+  app.post("/api/admin/registry/upload-csv", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { csvContent } = req.body;
+      
+      if (!csvContent || typeof csvContent !== "string") {
+        return res.status(400).json({ message: "CSV content is required" });
+      }
+      
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let current = "";
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          const nextChar = line[i + 1];
+          
+          if (char === '"' && !inQuotes) {
+            inQuotes = true;
+          } else if (char === '"' && inQuotes) {
+            if (nextChar === '"') {
+              current += '"';
+              i++;
+            } else {
+              inQuotes = false;
+            }
+          } else if (char === "," && !inQuotes) {
+            result.push(current.trim());
+            current = "";
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+      
+      const lines = csvContent.split("\n").slice(1).filter(line => line.trim());
+      
+      let updated = 0;
+      let added = 0;
+      let skipped = 0;
+      let errors: string[] = [];
+      
+      for (const line of lines) {
+        try {
+          const parts = parseCSVLine(line);
+          const [sport, playerName, aliases, careerStage, roleTier, positionGroup, notes] = parts;
+          
+          if (!sport || !playerName) {
+            skipped++;
+            continue;
+          }
+          
+          const validCareerStage = careerStage && ["ROOKIE", "YEAR_2", "YEAR_3", "YEAR_4", "PRIME", "VETERAN", "RETIRED_HOF", "BUST"].includes(careerStage) ? careerStage : "PRIME";
+          const validRoleTier = roleTier && ["FRANCHISE_CORE", "SOLID_STARTER", "UNCERTAIN_ROLE", "BACKUP_OR_FRINGE", "OUT_OF_LEAGUE", "RETIRED_ICON"].includes(roleTier) ? roleTier : "SOLID_STARTER";
+          const validPositionGroup = positionGroup && ["QB", "WR", "RB", "TE", "EDGE", "DL", "LB", "CB", "S", "GUARD", "WING", "BIG", "PITCHER", "CATCHER", "INFIELDER", "OUTFIELDER", "GOALIE", "CENTER", "WINGER", "DEFENSEMAN", "UNKNOWN"].includes(positionGroup) ? positionGroup : "UNKNOWN";
+          
+          const { eq, and } = await import("drizzle-orm");
+          const existing = await db.select().from(playerRegistry)
+            .where(and(eq(playerRegistry.sport, sport), eq(playerRegistry.playerName, playerName)))
+            .limit(1);
+          
+          if (existing.length > 0) {
+            await db.update(playerRegistry)
+              .set({
+                aliases: aliases || null,
+                careerStage: validCareerStage,
+                roleTier: validRoleTier,
+                positionGroup: validPositionGroup,
+                notes: notes || null,
+                lastUpdated: new Date(),
+                updatedBy: req.user?.claims?.email || "csv-upload"
+              })
+              .where(and(eq(playerRegistry.sport, sport), eq(playerRegistry.playerName, playerName)));
+            updated++;
+          } else {
+            await db.insert(playerRegistry).values({
+              sport,
+              playerName,
+              aliases: aliases || null,
+              careerStage: validCareerStage,
+              roleTier: validRoleTier,
+              positionGroup: validPositionGroup,
+              notes: notes || null,
+              updatedBy: req.user?.claims?.email || "csv-upload"
+            });
+            added++;
+          }
+        } catch (err: any) {
+          errors.push(`Row error: ${err.message}`);
+          skipped++;
+        }
+      }
+      
+      res.json({
+        success: true,
+        updated,
+        added,
+        skipped,
+        total: lines.length,
+        errors: errors.slice(0, 10)
+      });
+    } catch (error) {
+      console.error("Error uploading CSV:", error);
+      res.status(500).json({ message: "Failed to upload CSV" });
+    }
+  });
+
   // Admin: Registry stats
   app.get("/api/admin/registry/stats", isAuthenticated, isAdmin, async (req: any, res) => {
     try {

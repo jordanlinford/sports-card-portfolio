@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video } from "lucide-react";
+import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -188,9 +188,12 @@ function PlayerRegistryTab() {
   const [sportFilter, setSportFilter] = useState("all");
   const [tierFilter, setTierFilter] = useState("all");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState<PlayerRegistry | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
     sport: "NFL",
@@ -204,14 +207,14 @@ function PlayerRegistryTab() {
 
   const queryParams = new URLSearchParams({
     page: String(page),
-    limit: "25",
+    limit: String(pageSize),
     ...(sportFilter !== "all" && { sport: sportFilter }),
     ...(tierFilter !== "all" && { roleTier: tierFilter }),
     ...(searchQuery && { search: searchQuery })
   });
 
   const { data, isLoading, refetch } = useQuery<PlayersResponse>({
-    queryKey: ["/api/admin/registry/players", page, sportFilter, tierFilter, searchQuery],
+    queryKey: ["/api/admin/registry/players", page, pageSize, sportFilter, tierFilter, searchQuery],
     queryFn: async () => {
       const res = await fetch(`/api/admin/registry/players?${queryParams}`);
       if (!res.ok) throw new Error("Failed to fetch");
@@ -239,6 +242,50 @@ function PlayerRegistryTab() {
       toast({ title: "Import Failed", description: error.message, variant: "destructive" });
     }
   });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (csvContent: string) => {
+      return await apiRequest("POST", "/api/admin/registry/upload-csv", { csvContent });
+    },
+    onSuccess: (data: any) => {
+      refetch();
+      refetchStats();
+      setUploadDialogOpen(false);
+      setCsvFile(null);
+      toast({
+        title: "Upload Complete",
+        description: `Updated ${data.updated} players, added ${data.added} new players, skipped ${data.skipped}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const handleExportCSV = async () => {
+    try {
+      const res = await fetch("/api/admin/registry/export-csv");
+      if (!res.ok) throw new Error("Failed to export");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `player_registry_${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast({ title: "Export Complete", description: "CSV downloaded successfully" });
+    } catch (error: any) {
+      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleUploadCSV = async () => {
+    if (!csvFile) return;
+    const content = await csvFile.text();
+    uploadMutation.mutate(content);
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
@@ -367,12 +414,19 @@ function PlayerRegistryTab() {
             <div className="flex gap-2 flex-wrap">
               <Button
                 variant="outline"
-                onClick={() => importMutation.mutate()}
-                disabled={importMutation.isPending}
-                data-testid="button-import-csv"
+                onClick={handleExportCSV}
+                data-testid="button-export-csv"
               >
-                {importMutation.isPending ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                Import CSV
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setUploadDialogOpen(true)}
+                data-testid="button-upload-csv"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload CSV
               </Button>
               <Button
                 onClick={() => {
@@ -418,6 +472,16 @@ function PlayerRegistryTab() {
                 {ROLE_TIERS.map(t => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
               </SelectContent>
             </Select>
+            <Select value={String(pageSize)} onValueChange={(v) => { setPageSize(Number(v)); setPage(1); }}>
+              <SelectTrigger className="w-[100px]" data-testid="select-page-size">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <ScrollArea className="h-[400px]">
@@ -460,7 +524,7 @@ function PlayerRegistryTab() {
           {data?.pagination && data.pagination.totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-muted-foreground">
-                Showing {((page - 1) * 25) + 1}-{Math.min(page * 25, data.pagination.total)} of {data.pagination.total}
+                Showing {((page - 1) * pageSize) + 1}-{Math.min(page * pageSize, data.pagination.total)} of {data.pagination.total}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -594,6 +658,59 @@ function PlayerRegistryTab() {
               data-testid="button-confirm-delete"
             >
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={uploadDialogOpen} onOpenChange={(open) => { setUploadDialogOpen(open); if (!open) setCsvFile(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Upload CSV</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to update players. The CSV should have columns: Sport, PlayerName, Aliases, CareerStage, RoleTier, PositionGroup, Notes.
+              Players will be matched by Sport + PlayerName and updated. New players will be added.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="outline"
+                onClick={handleExportCSV}
+                className="flex-1"
+                data-testid="button-download-template"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Current Registry
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Download the current registry, make your changes in a spreadsheet, then upload the modified CSV below.
+            </p>
+            <div className="space-y-2">
+              <Label>Select CSV File</Label>
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                data-testid="input-csv-file"
+              />
+            </div>
+            {csvFile && (
+              <p className="text-sm text-muted-foreground">
+                Selected: {csvFile.name} ({(csvFile.size / 1024).toFixed(1)} KB)
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setCsvFile(null); }}>Cancel</Button>
+            <Button
+              onClick={handleUploadCSV}
+              disabled={!csvFile || uploadMutation.isPending}
+              data-testid="button-upload-confirm"
+            >
+              {uploadMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+              Upload and Update
             </Button>
           </DialogFooter>
         </DialogContent>
