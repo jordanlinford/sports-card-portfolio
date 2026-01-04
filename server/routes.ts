@@ -3885,10 +3885,16 @@ Sitemap: ${origin}/sitemap.xml
   app.post("/api/admin/registry/upload-csv", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const { db } = await import("./db");
-      const { csvContent } = req.body;
+      const { csvContent, clearAll } = req.body;
       
       if (!csvContent || typeof csvContent !== "string") {
         return res.status(400).json({ message: "CSV content is required" });
+      }
+      
+      let cleared = false;
+      if (clearAll === true) {
+        await db.delete(playerRegistry);
+        cleared = true;
       }
       
       const parseCSVLine = (line: string): string[] => {
@@ -4014,6 +4020,7 @@ Sitemap: ${origin}/sitemap.xml
         updated,
         added,
         skipped,
+        cleared,
         total: lines.length,
         errors: errors.slice(0, 10),
         debug: {

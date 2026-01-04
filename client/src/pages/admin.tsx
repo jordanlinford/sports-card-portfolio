@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -194,6 +195,7 @@ function PlayerRegistryTab() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [clearAllBeforeImport, setClearAllBeforeImport] = useState(false);
 
   const [formData, setFormData] = useState({
     sport: "NFL",
@@ -244,17 +246,20 @@ function PlayerRegistryTab() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (csvContent: string) => {
-      return await apiRequest("POST", "/api/admin/registry/upload-csv", { csvContent });
+    mutationFn: async ({ csvContent, clearAll }: { csvContent: string; clearAll: boolean }) => {
+      return await apiRequest("POST", "/api/admin/registry/upload-csv", { csvContent, clearAll });
     },
     onSuccess: (data: any) => {
       refetch();
       refetchStats();
       setUploadDialogOpen(false);
       setCsvFile(null);
+      setClearAllBeforeImport(false);
       toast({
         title: "Upload Complete",
-        description: `Updated ${data.updated} players, added ${data.added} new players, skipped ${data.skipped}`,
+        description: data.cleared 
+          ? `Cleared registry and imported ${data.added} players`
+          : `Updated ${data.updated} players, added ${data.added} new players, skipped ${data.skipped}`,
       });
     },
     onError: (error: Error) => {
@@ -284,7 +289,7 @@ function PlayerRegistryTab() {
   const handleUploadCSV = async () => {
     if (!csvFile) return;
     const content = await csvFile.text();
-    uploadMutation.mutate(content);
+    uploadMutation.mutate({ csvContent: content, clearAll: clearAllBeforeImport });
   };
 
   const createMutation = useMutation({
@@ -663,7 +668,7 @@ function PlayerRegistryTab() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={uploadDialogOpen} onOpenChange={(open) => { setUploadDialogOpen(open); if (!open) setCsvFile(null); }}>
+      <Dialog open={uploadDialogOpen} onOpenChange={(open) => { setUploadDialogOpen(open); if (!open) { setCsvFile(null); setClearAllBeforeImport(false); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Upload CSV</DialogTitle>
@@ -701,9 +706,20 @@ function PlayerRegistryTab() {
                 Selected: {csvFile.name} ({(csvFile.size / 1024).toFixed(1)} KB)
               </p>
             )}
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="clearAll" 
+                checked={clearAllBeforeImport} 
+                onCheckedChange={(checked) => setClearAllBeforeImport(checked === true)}
+                data-testid="checkbox-clear-all"
+              />
+              <Label htmlFor="clearAll" className="text-sm font-normal cursor-pointer">
+                Clear all existing entries before import (recommended for fresh start)
+              </Label>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setCsvFile(null); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setUploadDialogOpen(false); setCsvFile(null); setClearAllBeforeImport(false); }}>Cancel</Button>
             <Button
               onClick={handleUploadCSV}
               disabled={!csvFile || uploadMutation.isPending}
