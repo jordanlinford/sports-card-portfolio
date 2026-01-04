@@ -17,7 +17,7 @@ export function serveStatic(app: Express) {
   app.use("*", (req, res, next) => {
     const url = req.originalUrl;
     // Share routes need server-side handling for social media crawlers
-    if (url.startsWith("/share/player/") || url.startsWith("/api/")) {
+    if (url.startsWith("/share/") || url.startsWith("/api/")) {
       return next();
     }
     res.sendFile(path.resolve(distPath, "index.html"));
