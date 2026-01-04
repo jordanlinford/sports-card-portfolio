@@ -977,8 +977,11 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // Known page slugs that should be handled by this route
+  const knownPageSlugs = new Set(["next-buys", "hidden-gems", "portfolio-analytics", "player-outlook", "watchlist"]);
+  
   // Page share routes with OG meta tags for social crawlers
-  app.get("/share/:pageSlug", async (req, res) => {
+  app.get("/share/:pageSlug", async (req, res, next) => {
     try {
       const { pageSlug } = req.params;
       const userAgent = req.headers["user-agent"] || "";
@@ -989,6 +992,12 @@ Sitemap: ${origin}/sitemap.xml
       // Skip if it's a player share route (handled separately)
       if (sanitizedSlug === "player") {
         return res.status(404).json({ message: "Not found" });
+      }
+      
+      // If this is NOT a known page slug, it's likely a snapshot token
+      // Pass it through to the SPA to handle
+      if (!knownPageSlugs.has(sanitizedSlug)) {
+        return next();
       }
       
       const baseUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN 
