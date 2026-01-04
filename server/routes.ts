@@ -3930,10 +3930,6 @@ Sitemap: ${origin}/sitemap.xml
       const headerMap: Record<string, number> = {};
       headerRow.forEach((h, i) => { headerMap[normalizeHeader(h)] = i; });
       
-      console.log("[CSV Upload] Headers found:", headerRow);
-      console.log("[CSV Upload] Header map:", headerMap);
-      console.log("[CSV Upload] Total data rows:", allLines.length - 1);
-      
       const getCol = (row: string[], ...names: string[]): string => {
         for (const name of names) {
           const idx = headerMap[normalizeHeader(name)];
@@ -3961,11 +3957,6 @@ Sitemap: ${origin}/sitemap.xml
           const roleTier = getCol(parts, "roletier", "role_tier", "tier", "role");
           const positionGroup = getCol(parts, "positiongroup", "position_group", "position");
           const notes = getCol(parts, "notes", "note");
-          
-          if (i < 3) {
-            console.log(`[CSV Upload] Row ${i}: parts=`, parts);
-            console.log(`[CSV Upload] Row ${i}: sport=${sport}, player=${playerName}, pos=${positionGroup}, stage=${careerStage}, tier=${roleTier}`);
-          }
           
           if (!sport || !playerName) {
             skipped++;
