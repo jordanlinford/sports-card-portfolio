@@ -3920,7 +3920,25 @@ Sitemap: ${origin}/sitemap.xml
         return result;
       };
       
-      const lines = csvContent.split("\n").slice(1).filter(line => line.trim());
+      const allLines = csvContent.split("\n").filter(line => line.trim());
+      if (allLines.length < 2) {
+        return res.status(400).json({ message: "CSV must have a header row and at least one data row" });
+      }
+      
+      const headerRow = parseCSVLine(allLines[0]);
+      const normalizeHeader = (h: string) => h.toLowerCase().replace(/[_\s-]/g, "");
+      const headerMap: Record<string, number> = {};
+      headerRow.forEach((h, i) => { headerMap[normalizeHeader(h)] = i; });
+      
+      const getCol = (row: string[], ...names: string[]): string => {
+        for (const name of names) {
+          const idx = headerMap[normalizeHeader(name)];
+          if (idx !== undefined && row[idx]) return row[idx];
+        }
+        return "";
+      };
+      
+      const lines = allLines.slice(1);
       
       let updated = 0;
       let added = 0;
@@ -3930,7 +3948,14 @@ Sitemap: ${origin}/sitemap.xml
       for (const line of lines) {
         try {
           const parts = parseCSVLine(line);
-          const [sport, playerName, aliases, careerStage, roleTier, positionGroup, notes] = parts;
+          
+          const sport = getCol(parts, "sport", "league");
+          const playerName = getCol(parts, "playername", "player_name", "name");
+          const aliases = getCol(parts, "aliases", "alias");
+          const careerStage = getCol(parts, "careerstage", "career_stage", "stage");
+          const roleTier = getCol(parts, "roletier", "role_tier", "tier", "role");
+          const positionGroup = getCol(parts, "positiongroup", "position_group", "position");
+          const notes = getCol(parts, "notes", "note");
           
           if (!sport || !playerName) {
             skipped++;
@@ -3949,11 +3974,11 @@ Sitemap: ${origin}/sitemap.xml
           if (existing.length > 0) {
             await db.update(playerRegistry)
               .set({
-                aliases: aliases || null,
+                aliases: aliases || existing[0].aliases || null,
                 careerStage: validCareerStage,
                 roleTier: validRoleTier,
                 positionGroup: validPositionGroup,
-                notes: notes || null,
+                notes: notes || existing[0].notes || null,
                 lastUpdated: new Date(),
                 updatedBy: req.user?.claims?.email || "csv-upload"
               })
