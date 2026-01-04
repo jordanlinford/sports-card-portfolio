@@ -3944,6 +3944,7 @@ Sitemap: ${origin}/sitemap.xml
       let added = 0;
       let skipped = 0;
       let errors: string[] = [];
+      let sampleParsed: any[] = [];
       
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -3957,6 +3958,10 @@ Sitemap: ${origin}/sitemap.xml
           const roleTier = getCol(parts, "roletier", "role_tier", "tier", "role");
           const positionGroup = getCol(parts, "positiongroup", "position_group", "position");
           const notes = getCol(parts, "notes", "note");
+          
+          if (i < 3) {
+            sampleParsed.push({ sport, playerName, positionGroup, careerStage, roleTier, rawParts: parts });
+          }
           
           if (!sport || !playerName) {
             skipped++;
@@ -4010,7 +4015,12 @@ Sitemap: ${origin}/sitemap.xml
         added,
         skipped,
         total: lines.length,
-        errors: errors.slice(0, 10)
+        errors: errors.slice(0, 10),
+        debug: {
+          headers: headerRow,
+          sampleParsed,
+          hadCarriageReturns: csvContent.includes('\r')
+        }
       });
     } catch (error) {
       console.error("Error uploading CSV:", error);
