@@ -1018,13 +1018,18 @@ export const PLAYER_STAGE = {
 } as const;
 export type PlayerStage = keyof typeof PLAYER_STAGE;
 
-// Investment Verdict - The main action recommendation (5-state forced-decision system)
+// Investment Verdict - The main action recommendation (expanded with role-risk nuance)
 export const INVESTMENT_VERDICT = {
   ACCUMULATE: "ACCUMULATE",           // Buy on dips, build position
   HOLD_CORE: "HOLD_CORE",             // Hold what you have, don't chase
   TRADE_THE_HYPE: "TRADE_THE_HYPE",   // Sell into spikes, take profits
   AVOID_NEW_MONEY: "AVOID_NEW_MONEY", // Stay away, don't add new money
   SPECULATIVE_FLYER: "SPECULATIVE_FLYER", // Small lottery ticket position
+  // Nuanced role-risk verdicts (backup/fringe players)
+  HOLD_ROLE_RISK: "HOLD_ROLE_RISK",   // Backup with role uncertainty, hold but monitor
+  HOLD_INJURY_CONTINGENT: "HOLD_INJURY_CONTINGENT", // Value depends on injury opportunity
+  SPECULATIVE_SUPPRESSED: "SPECULATIVE_SUPPRESSED", // Talent there, situation bad - buy low
+  AVOID_STRUCTURAL: "AVOID_STRUCTURAL", // True structural decline, no path back
 } as const;
 export type InvestmentVerdict = keyof typeof INVESTMENT_VERDICT;
 
@@ -1043,6 +1048,10 @@ export const VERDICT_POSTURE: Record<InvestmentVerdict, string> = {
   TRADE_THE_HYPE: "Sell into spikes",
   AVOID_NEW_MONEY: "Stay away",
   SPECULATIVE_FLYER: "Small lottery bet",
+  HOLD_ROLE_RISK: "Hold, monitor role",
+  HOLD_INJURY_CONTINGENT: "Hold for injury upside",
+  SPECULATIVE_SUPPRESSED: "Buy suppressed value",
+  AVOID_STRUCTURAL: "Avoid, structural decline",
 } as const;
 
 // Verdict Modifier - Adds nuance to the verdict (legacy, kept for compatibility)

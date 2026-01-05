@@ -504,6 +504,156 @@ function lookupRoleTier(name: string): RoleTier | undefined {
 // Import registry lookup
 import { lookupPlayer, mapRegistryRoleTier, mapRegistryStage } from "./playerRegistry";
 
+// ============================================================
+// BACKUP/FRINGE DECISION TREE (Nuanced Role-Risk Evaluation)
+// ============================================================
+// Backup status is a signal, not an automatic verdict.
+// Only AVOID_STRUCTURAL when multiple negatives stack.
+// Otherwise, use nuanced verdicts: HOLD_ROLE_RISK, HOLD_INJURY_CONTINGENT,
+// SPECULATIVE_SUPPRESSED, or standard verdicts.
+// ============================================================
+
+interface BackupEvaluationContext {
+  stage: PlayerStage | undefined;
+  sport: string;
+  position: string;
+  roleStabilityScore: number;
+  downsideRiskScore: number;
+  liquidityScore: number;
+  valuationScore: number;
+  compsReliable: boolean;
+}
+
+interface BackupVerdictResult {
+  verdict: InvestmentVerdict | null;  // null = continue to normal logic
+  reason: string;
+}
+
+function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdictResult {
+  const { stage, sport, position, roleStabilityScore, downsideRiskScore, liquidityScore, valuationScore, compsReliable } = ctx;
+  
+  // Only applies to backup/fringe players (stability <= 45)
+  if (roleStabilityScore > 45) {
+    return { verdict: null, reason: "" };
+  }
+  
+  // ============================================================
+  // Evaluate negative factors (stack towards AVOID_STRUCTURAL)
+  // ============================================================
+  let negativeFactors = 0;
+  const negativeReasons: string[] = [];
+  
+  // 1. Age curve negative (position-specific thresholds)
+  const isAgingNegative = stage === "VETERAN" || stage === "AGING";
+  const isRBOver26 = sport === "NFL" && position === "RB" && (stage === "PRIME" || stage === "VETERAN" || stage === "AGING");
+  const isWROver30 = sport === "NFL" && position === "WR" && (stage === "VETERAN" || stage === "AGING");
+  const isQBOver33 = sport === "NFL" && position === "QB" && stage === "AGING";
+  
+  if (isAgingNegative || isRBOver26 || isWROver30 || isQBOver33) {
+    negativeFactors++;
+    negativeReasons.push("Age curve declining");
+  }
+  
+  // 2. Market liquidity collapsing (few sales, widening spreads)
+  if (liquidityScore < 30) {
+    negativeFactors++;
+    negativeReasons.push("Market liquidity collapsed");
+  }
+  
+  // 3. High downside risk (already elevated concerns)
+  if (downsideRiskScore >= 70) {
+    negativeFactors++;
+    negativeReasons.push("High structural downside risk");
+  }
+  
+  // 4. Very low role stability (OUT_OF_LEAGUE tier, not just BACKUP)
+  if (roleStabilityScore <= 15) {
+    negativeFactors++;
+    negativeReasons.push("No realistic path to starter reps");
+  }
+  
+  // 5. Bust career stage
+  if (stage === "BUST") {
+    negativeFactors++;
+    negativeReasons.push("Career stalled/failed");
+  }
+  
+  // ============================================================
+  // Evaluate positive factors (mitigate towards HOLD or SPECULATIVE)
+  // ============================================================
+  let positiveFactors = 0;
+  const positiveReasons: string[] = [];
+  
+  // 1. Young and still in development window (ROOKIE through YEAR_4)
+  const isYoungDevelopment = stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3" || stage === "YEAR_4";
+  if (isYoungDevelopment) {
+    positiveFactors++;
+    positiveReasons.push("Still in development window");
+  }
+  
+  // 2. Injury fill-in upside (RB2, QB2 on any offense)
+  // RBs and QBs have highest injury-opportunity value
+  if ((position === "RB" || position === "QB") && roleStabilityScore >= 20) {
+    positiveFactors++;
+    positiveReasons.push("Injury fill-in upside");
+  }
+  
+  // 3. Market has overcorrected (cheap valuation despite having some liquidity)
+  if (valuationScore >= 60 && liquidityScore >= 35) {
+    positiveFactors++;
+    positiveReasons.push("Market overcorrected downward");
+  }
+  
+  // 4. Still has some market liquidity (tradeable)
+  if (liquidityScore >= 50) {
+    positiveFactors++;
+    positiveReasons.push("Still liquid and tradeable");
+  }
+  
+  // ============================================================
+  // Decision tree based on factor balance
+  // ============================================================
+  
+  // AVOID_STRUCTURAL: 3+ negative factors AND fewer positive factors
+  if (negativeFactors >= 3 && positiveFactors < negativeFactors) {
+    return { 
+      verdict: "AVOID_STRUCTURAL", 
+      reason: `Structural decline: ${negativeReasons.join(", ")}` 
+    };
+  }
+  
+  // OUT_OF_LEAGUE with no positives = AVOID_STRUCTURAL
+  if (roleStabilityScore <= 15 && positiveFactors === 0) {
+    return { 
+      verdict: "AVOID_STRUCTURAL", 
+      reason: "Out of league with no path back" 
+    };
+  }
+  
+  // Young + injury upside = SPECULATIVE_SUPPRESSED (buy low opportunity)
+  if (isYoungDevelopment && positiveFactors >= 2 && valuationScore >= 50) {
+    return { 
+      verdict: "SPECULATIVE_SUPPRESSED", 
+      reason: `Suppressed value: ${positiveReasons.join(", ")}` 
+    };
+  }
+  
+  // Has injury fill-in upside with decent market = HOLD_INJURY_CONTINGENT
+  if ((position === "RB" || position === "QB") && liquidityScore >= 40 && negativeFactors < 3) {
+    return { 
+      verdict: "HOLD_INJURY_CONTINGENT", 
+      reason: "Backup with injury-opportunity upside" 
+    };
+  }
+  
+  // Default for backup/fringe: HOLD_ROLE_RISK
+  // Not an avoid, but needs monitoring
+  return { 
+    verdict: "HOLD_ROLE_RISK", 
+    reason: `Role uncertainty: ${roleStabilityScore <= 25 ? "backup player" : "uncertain starter"} - monitor for path back` 
+  };
+}
+
 export function getRoleTier(playerName: string): RoleTier {
   // Check hardcoded overrides FIRST (authoritative for known franchise stars)
   const hardcodedTier = lookupRoleTier(playerName);
@@ -551,6 +701,7 @@ export type DecisionInput = {
   newsHype?: "HIGH" | "MEDIUM" | "LOW";
   team?: string;
   position?: string;
+  sport?: string;  // Sport for position-specific evaluation (NFL, NBA, MLB, NHL)
   playerName?: string;  // Required for role stability lookup
   inferredRoleTier?: RoleTier;  // AI-inferred role tier for players not in registry
 };
@@ -746,27 +897,35 @@ function decideVerdict(
   const isRetiredOrHOF = stage === "RETIRED" || stage === "RETIRED_HOF";
 
   // ============================================================
-  // PRECEDENCE 0: LOW ROLE STABILITY → AVOID_NEW_MONEY (WIDENED threshold)
-  // Backups/out-of-league/uncertain players are structural avoid
-  // Original: <= 35 (too strict - only caught obvious busts)
-  // New: <= 45 (catches uncertain starters, fringe players)
-  // Examples: Kenny Pickett, Mac Jones, Trey Lance, James Wiseman, bench players
+  // PRECEDENCE 0: BACKUP/FRINGE EVALUATION (Nuanced Decision Tree)
+  // Backup status is a signal, not an automatic verdict.
+  // Evaluates: age curve, liquidity, development window, injury upside
+  // Only AVOID_STRUCTURAL when multiple negatives stack.
   // ============================================================
-  if (roleStabilityScore <= 45 && !compsReliable) {
-    return { verdict: "AVOID_NEW_MONEY", reason: "Low role stability - uncertain or backup player" };
-  }
-  
-  // Even with comps, very low stability (backups) should avoid
-  if (roleStabilityScore <= 35) {
-    return { verdict: "AVOID_NEW_MONEY", reason: "Backup/out-of-league player - structural problem" };
+  if (roleStabilityScore <= 45) {
+    const backupResult = evaluateBackupFringePlayer({
+      stage,
+      sport: input.sport || "NFL",
+      position: input.position || "UNKNOWN",
+      roleStabilityScore,
+      downsideRiskScore,
+      liquidityScore,
+      valuationScore,
+      compsReliable,
+    });
+    
+    if (backupResult.verdict) {
+      console.log(`[decideVerdict] Backup/fringe evaluation: ${backupResult.verdict} - ${backupResult.reason}`);
+      return { verdict: backupResult.verdict, reason: backupResult.reason };
+    }
   }
 
   // ============================================================
-  // PRECEDENCE 1: BUST → AVOID_NEW_MONEY (always allowed)
+  // PRECEDENCE 1: BUST → AVOID_STRUCTURAL (always allowed)
   // Busts have structural career problems = negative EV
   // ============================================================
   if (stage === "BUST") {
-    return { verdict: "AVOID_NEW_MONEY", reason: "BUST - career stalled, structural problem" };
+    return { verdict: "AVOID_STRUCTURAL", reason: "BUST - career stalled, structural problem" };
   }
 
   // ============================================================
@@ -958,6 +1117,10 @@ const POSTURE_LABELS: Record<InvestmentVerdict, string> = {
   TRADE_THE_HYPE: "Sell into spikes",
   AVOID_NEW_MONEY: "Stay away",
   SPECULATIVE_FLYER: "Small, high-upside position",
+  HOLD_ROLE_RISK: "Hold, monitor role situation",
+  HOLD_INJURY_CONTINGENT: "Hold for injury opportunity",
+  SPECULATIVE_SUPPRESSED: "Buy suppressed value",
+  AVOID_STRUCTURAL: "Avoid, structural decline",
 };
 
 function getContextAwarePostureLabel(
@@ -1014,6 +1177,26 @@ function generateActionPlan(verdict: InvestmentVerdict, input: DecisionInput): I
       whatToDoNow: "Consider a small position if you believe in the upside catalyst.",
       entryPlan: "Focus on affordable base cards or low-end parallels. Avoid premium until proven.",
       positionSizing: "Keep it small - max 2-3% of budget. Asymmetric risk/reward opportunity.",
+    },
+    HOLD_ROLE_RISK: {
+      whatToDoNow: "Hold what you have but monitor the role situation closely.",
+      entryPlan: "Only add if you see a clear path back to starter reps or role improvement.",
+      positionSizing: "Small position only. The risk is elevated due to role uncertainty.",
+    },
+    HOLD_INJURY_CONTINGENT: {
+      whatToDoNow: "Hold as a hedge - value depends on injury opportunities.",
+      entryPlan: "Consider adding cheaply as insurance for your collection.",
+      positionSizing: "Small allocation. This is an asymmetric bet on injury/opportunity.",
+    },
+    SPECULATIVE_SUPPRESSED: {
+      whatToDoNow: "Consider buying now while prices are suppressed.",
+      entryPlan: "The market has overcorrected. Build a position at these discounted prices.",
+      positionSizing: "Moderate position - 3-5% allocation on the value dislocation.",
+    },
+    AVOID_STRUCTURAL: {
+      whatToDoNow: "Do not buy. This is a structural decline with no path back.",
+      entryPlan: "There is no good entry point. Multiple negatives have stacked.",
+      positionSizing: "Zero allocation. Sell any holdings to redeploy capital elsewhere.",
     },
   };
 
@@ -1187,6 +1370,46 @@ function generateActionGuidance(
           stage === "ROOKIE" ? "Focus on base/low-end cards - save premium for proven players" : "Buy the dip if conviction is high, but stay disciplined on size",
         ],
       };
+      
+    case "HOLD_ROLE_RISK":
+      return {
+        header: "How to manage role uncertainty",
+        bullets: [
+          "Hold existing position but don't add until role clarity emerges",
+          "Monitor depth chart changes and coaching decisions weekly",
+          "Set alerts for role-changing news (trades, injuries to starters)",
+        ],
+      };
+      
+    case "HOLD_INJURY_CONTINGENT":
+      return {
+        header: "Managing your injury hedge",
+        bullets: [
+          "Keep position small - this is insurance, not a core holding",
+          "Watch starter health closely - your upside depends on opportunity",
+          "Be ready to sell into any spike when starter gets hurt",
+        ],
+      };
+      
+    case "SPECULATIVE_SUPPRESSED":
+      return {
+        header: "Building a suppressed-value position",
+        bullets: [
+          "Buy now while prices are overcorrected",
+          "Focus on base cards - don't overpay for parallels at these levels",
+          "Be patient - value dislocation can take months to correct",
+        ],
+      };
+      
+    case "AVOID_STRUCTURAL":
+      return {
+        header: "Why to stay away",
+        bullets: [
+          "Structural decline with no realistic path back",
+          "Deploy capital elsewhere - better opportunities exist",
+          "If you hold, consider selling now to avoid further losses",
+        ],
+      };
   }
 }
 
@@ -1244,6 +1467,28 @@ function generateCardTargets(
         whatToBuy: [...specCards.slice(0, 2), ...coreCards.slice(0, 2)].slice(0, 4),
         whatToAvoid: premiumCards.slice(0, 2),
       };
+      
+    case "HOLD_ROLE_RISK":
+      return {
+        whatToAvoid: premiumCards.slice(0, 2),
+      };
+      
+    case "HOLD_INJURY_CONTINGENT":
+      return {
+        whatToBuy: coreCards.slice(0, 2),
+        whatToAvoid: premiumCards.slice(0, 2),
+      };
+      
+    case "SPECULATIVE_SUPPRESSED":
+      return {
+        whatToBuy: [...coreCards.slice(0, 2), ...specCards.slice(0, 2)].slice(0, 4),
+      };
+      
+    case "AVOID_STRUCTURAL":
+      return {
+        whatToAvoid: [...premiumCards.slice(0, 2), ...growthCards.slice(0, 2)].slice(0, 4),
+        whatToSell: [...premiumCards.slice(0, 2), ...coreCards.slice(0, 2)].slice(0, 4),
+      };
   }
 }
 
@@ -1257,6 +1502,10 @@ function generateOneLineRationale(verdict: InvestmentVerdict, input: DecisionInp
     TRADE_THE_HYPE: `Market buzz has pushed prices beyond what the on-field product supports. Take profits before the correction.`,
     AVOID_NEW_MONEY: `Too many red flags for new investment. High risk of price drops with limited upside to justify the gamble.`,
     SPECULATIVE_FLYER: `Emerging opportunity with asymmetric upside. Small position only - this is a catalyst-driven play, not a core holding.`,
+    HOLD_ROLE_RISK: `Role uncertainty creates risk. Hold but monitor closely - path back to relevance could unlock value.`,
+    HOLD_INJURY_CONTINGENT: `Backup with injury-opportunity upside. Hold as a hedge - one injury away from relevance.`,
+    SPECULATIVE_SUPPRESSED: `Market has overcorrected. Talent is there but situation is suppressed. Buy low opportunity.`,
+    AVOID_STRUCTURAL: `Structural decline with no realistic path back. Multiple negatives have stacked against this player.`,
   };
 
   return templates[verdict];
@@ -1315,6 +1564,53 @@ function generateTriggers(verdict: InvestmentVerdict, input: DecisionInput): { u
         "Prices rise before breakout (eliminating value)",
       ];
       break;
+      
+    case "HOLD_ROLE_RISK":
+      triggers.upgrade = [
+        "Role clarity emerges (starter job locked down)",
+        "Trade to team with clearer path to playing time",
+        "Depth chart competition resolves in their favor",
+      ];
+      triggers.downgrade = [
+        "Confirmed demotion or roster move",
+        "Team drafts/signs replacement",
+        "Age curve turns negative with no role improvement",
+      ];
+      break;
+      
+    case "HOLD_INJURY_CONTINGENT":
+      triggers.upgrade = [
+        "Starter injury creates opportunity",
+        "Trade to team where they'd be the starter",
+        "Breakout performance when given opportunity",
+      ];
+      triggers.downgrade = [
+        "Starter signs extension (blocking path)",
+        "Team drafts/signs new backup",
+        "Own injury derails value proposition",
+      ];
+      break;
+      
+    case "SPECULATIVE_SUPPRESSED":
+      triggers.upgrade = [
+        "Role situation improves",
+        "Performance confirms underlying talent",
+        "Market recognizes the value dislocation",
+      ];
+      triggers.downgrade = [
+        "Situation worsens (trade to worse team)",
+        "Performance declines further",
+        "Better suppressed-value plays emerge",
+      ];
+      break;
+      
+    case "AVOID_STRUCTURAL":
+      triggers.upgrade = [
+        "Dramatic role reversal (unlikely)",
+        "Prices collapse 60%+ making it a lottery ticket",
+        "Career renaissance via trade or scheme change",
+      ];
+      break;
   }
 
   return triggers;
@@ -1341,6 +1637,14 @@ function generateAdvisorTake(verdict: InvestmentVerdict, input: DecisionInput, s
     AVOID_NEW_MONEY: `${name} is a pass at current prices. The position/age profile suggests elevated downside risk—${positionLabel}s in similar situations historically see value compression. Better capital deployment opportunities exist elsewhere. Wait for a 40%+ pullback or fundamental change before reconsidering.`,
     
     SPECULATIVE_FLYER: `${name} is a small speculative bet only. The upside is real but so is the risk of total loss. Keep position sizing small—lottery ticket territory. This view only changes if role certainty emerges and performance confirms the projection.`,
+    
+    HOLD_ROLE_RISK: `${name} is a hold with elevated role risk. The talent profile may be strong but the current role situation creates uncertainty. Monitor for path back to relevance—one opportunity away from repricing. Don't add until role clarity emerges.`,
+    
+    HOLD_INJURY_CONTINGENT: `${name} is a hold as an injury hedge. Backup ${positionLabel}s can spike dramatically with starter injuries. The current suppressed price creates asymmetric upside if opportunity knocks. Keep position small but don't sell into weakness.`,
+    
+    SPECULATIVE_SUPPRESSED: `${name} is a speculative buy at suppressed prices. The market has overcorrected on role concerns. Talent is there—situation isn't. This is a value dislocation play. Build a position while prices are cheap and wait for role improvement.`,
+    
+    AVOID_STRUCTURAL: `${name} is a hard pass. This isn't a temporary dip—it's structural decline. Age curve, role trajectory, and market dynamics all point down. No realistic path back to relevance exists. Deploy capital elsewhere.`,
   };
   
   return templates[verdict];
@@ -1354,6 +1658,10 @@ function generatePackHitReaction(verdict: InvestmentVerdict, scores: InvestmentS
     TRADE_THE_HYPE: "Lucky! List it tonight—prices won't stay this high.",
     AVOID_NEW_MONEY: "Don't overthink it—move it fast before you get attached.",
     SPECULATIVE_FLYER: "Swing for the fences or cash out now—your call on this one.",
+    HOLD_ROLE_RISK: "Role is uncertain. Hold for now but watch the depth chart.",
+    HOLD_INJURY_CONTINGENT: "Backup upside! One injury away from spiking.",
+    SPECULATIVE_SUPPRESSED: "Buy low opportunity! Market is sleeping on this one.",
+    AVOID_STRUCTURAL: "Move it quick—this one's heading down.",
   };
   
   return templates[verdict];
