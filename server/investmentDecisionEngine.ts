@@ -1727,8 +1727,8 @@ function generateCollectorTip(scores: InvestmentScores, momentum: "UP" | "DOWN" 
     return "For collectors: Prices are stable but cards are scarce. If you find one at a fair price, grab it before it's gone.";
   }
   
-  // Default stable tip
-  return "For collectors: Prices are stable with no strong trend. Good time to shop for the right card at the right price.";
+  // Default stable tip - speak to PC collectors directly
+  return "For collectors: Prices aren't moving much on this player. If you PC them, now is as good a time as any to add to your collection.";
 }
 
 export function generateInvestmentCall(input: DecisionInput): InvestmentCall & { decisionDebug?: DecisionDebug } {
