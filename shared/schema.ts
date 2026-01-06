@@ -1111,6 +1111,8 @@ export type InvestmentCall = {
   // === NEW ADVISOR VOICE FIELDS ===
   advisorTake?: string;           // 3-4 sentences: the call, pattern-level why, what changes it. No hedging.
   packHitReaction?: string;       // One line: how to feel/act if you pull this player in a pack
+  // === COLLECTOR TIP ===
+  collectorTip?: string;          // Timing tip for fans/collectors based on price momentum (independent of investment verdict)
 };
 
 // Stock Tier - Card exposure type

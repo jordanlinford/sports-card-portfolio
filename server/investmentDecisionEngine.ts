@@ -1692,6 +1692,34 @@ function generatePackHitReaction(verdict: InvestmentVerdict, scores: InvestmentS
   return templates[verdict];
 }
 
+// Generate collector tip based on price momentum - helps fans/collectors time their purchases
+// This is INDEPENDENT of the investment verdict - speaks to collectors who want the card regardless
+function generateCollectorTip(scores: InvestmentScores, momentum: "UP" | "DOWN" | "STABLE" | undefined): string | undefined {
+  const { trendScore, volatilityScore } = scores;
+  
+  // Determine price direction based on trendScore and momentum
+  const isPriceDropping = trendScore <= 35 || momentum === "DOWN";
+  const isPriceRising = trendScore >= 65 || momentum === "UP";
+  const isVolatile = volatilityScore >= 60;
+  
+  if (isPriceDropping) {
+    if (isVolatile) {
+      return "For collectors: Prices are dropping with high volatility. Could be a good entry point, but expect continued swings.";
+    }
+    return "For collectors: Prices are trending down. If you want this player for your collection, this could be a good time to buy.";
+  }
+  
+  if (isPriceRising) {
+    if (isVolatile) {
+      return "For collectors: Prices are rising fast. Buy soon if you want this player, or wait for a pullback if you're patient.";
+    }
+    return "For collectors: Prices are on the upswing. Move soon if you want to add this to your collection, or wait for the market to cool.";
+  }
+  
+  // Stable prices - no strong tip needed
+  return undefined;
+}
+
 export function generateInvestmentCall(input: DecisionInput): InvestmentCall & { decisionDebug?: DecisionDebug } {
   const scores = computeScores(input);
   
@@ -2011,6 +2039,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     // Advisor voice fields
     advisorTake: generateAdvisorTake(verdict, input, scores),
     packHitReaction: generatePackHitReaction(verdict, scores),
+    collectorTip: generateCollectorTip(scores, input.momentum),
   };
 }
 

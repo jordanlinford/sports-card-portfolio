@@ -20,6 +20,7 @@ import {
   ArrowDownCircle,
   Lightbulb,
   Info,
+  Heart,
 } from "lucide-react";
 import type { InvestmentCall, InvestmentVerdict, DataConfidence, InvestmentHorizon } from "@shared/schema";
 
@@ -172,6 +173,13 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
               <div className="flex items-start gap-2 mt-2 p-2 rounded bg-muted/50 border border-muted" data-testid="text-confidence-note">
                 <Info className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <span className="text-xs text-muted-foreground">{call.confidenceNote}</span>
+              </div>
+            )}
+            
+            {call.collectorTip && (
+              <div className="flex items-start gap-2 mt-2 p-2 rounded bg-pink-500/10 dark:bg-pink-500/20 border border-pink-500/30" data-testid="text-collector-tip">
+                <Heart className="h-4 w-4 text-pink-600 dark:text-pink-400 flex-shrink-0 mt-0.5" />
+                <span className="text-xs text-pink-700 dark:text-pink-300">{call.collectorTip}</span>
               </div>
             )}
           </div>
