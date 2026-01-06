@@ -521,6 +521,7 @@ interface BackupEvaluationContext {
   downsideRiskScore: number;
   liquidityScore: number;
   valuationScore: number;
+  mispricingScore: number;  // Positive = underpriced, Negative = overpriced
   compsReliable: boolean;
 }
 
@@ -530,7 +531,7 @@ interface BackupVerdictResult {
 }
 
 function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdictResult {
-  const { stage, sport, position, roleStabilityScore, downsideRiskScore, liquidityScore, valuationScore, compsReliable } = ctx;
+  const { stage, sport, position, roleStabilityScore, downsideRiskScore, liquidityScore, valuationScore, mispricingScore, compsReliable } = ctx;
   
   // Only applies to backup/fringe players (stability <= 45)
   if (roleStabilityScore > 45) {
@@ -576,6 +577,12 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
   if (stage === "BUST") {
     negativeFactors++;
     negativeReasons.push("Career stalled/failed");
+  }
+  
+  // 6. Overpriced relative to fundamentals (negative mispricing = overpriced)
+  if (mispricingScore < -15) {
+    negativeFactors++;
+    negativeReasons.push("Overpriced relative to fundamentals");
   }
   
   // ============================================================
@@ -631,7 +638,10 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
   }
   
   // Young + injury upside = SPECULATIVE_SUPPRESSED (buy low opportunity)
-  if (isYoungDevelopment && positiveFactors >= 2 && valuationScore >= 50) {
+  // CRITICAL GUARDRAIL: Only fires when actually underpriced (mispricingScore >= 0) 
+  // AND negatives don't outweigh positives
+  if (isYoungDevelopment && positiveFactors >= 2 && valuationScore >= 50 && 
+      mispricingScore >= 0 && negativeFactors < 2) {
     return { 
       verdict: "SPECULATIVE_SUPPRESSED", 
       reason: `Suppressed value: ${positiveReasons.join(", ")}` 
@@ -639,10 +649,24 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
   }
   
   // Has injury fill-in upside with decent market = HOLD_INJURY_CONTINGENT
-  if ((position === "RB" || position === "QB") && liquidityScore >= 40 && negativeFactors < 3) {
+  // Only if not overpriced and downside isn't extreme
+  if ((position === "RB" || position === "QB") && liquidityScore >= 40 && 
+      negativeFactors < 2 && mispricingScore >= -15) {
     return { 
       verdict: "HOLD_INJURY_CONTINGENT", 
       reason: "Backup with injury-opportunity upside" 
+    };
+  }
+  
+  // SEVERE NEGATIVE COMBO: High downside + significantly overpriced = AVOID_STRUCTURAL
+  // Only when positives don't clearly dominate (positives must be 2+ more than negatives to override)
+  const hasHighDownside = downsideRiskScore >= 70;
+  const isSignificantlyOverpriced = mispricingScore < -15;
+  const positivesOverwhelm = positiveFactors >= negativeFactors + 2;
+  if (hasHighDownside && isSignificantlyOverpriced && !positivesOverwhelm) {
+    return { 
+      verdict: "AVOID_STRUCTURAL", 
+      reason: "High downside risk + significantly overpriced - negative expected value" 
     };
   }
   
@@ -911,6 +935,7 @@ function decideVerdict(
       downsideRiskScore,
       liquidityScore,
       valuationScore,
+      mispricingScore,
       compsReliable,
     });
     
