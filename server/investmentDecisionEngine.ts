@@ -1694,13 +1694,15 @@ function generatePackHitReaction(verdict: InvestmentVerdict, scores: InvestmentS
 
 // Generate collector tip based on price momentum - helps fans/collectors time their purchases
 // This is INDEPENDENT of the investment verdict - speaks to collectors who want the card regardless
-function generateCollectorTip(scores: InvestmentScores, momentum: "UP" | "DOWN" | "STABLE" | undefined): string | undefined {
-  const { trendScore, volatilityScore } = scores;
+// ALWAYS returns a tip - collectors deserve timing guidance for any player
+function generateCollectorTip(scores: InvestmentScores, momentum: "UP" | "DOWN" | "STABLE" | undefined): string {
+  const { trendScore, volatilityScore, liquidityScore } = scores;
   
   // Determine price direction based on trendScore and momentum
   const isPriceDropping = trendScore <= 35 || momentum === "DOWN";
   const isPriceRising = trendScore >= 65 || momentum === "UP";
   const isVolatile = volatilityScore >= 60;
+  const isLowLiquidity = liquidityScore < 40;
   
   if (isPriceDropping) {
     if (isVolatile) {
@@ -1716,8 +1718,17 @@ function generateCollectorTip(scores: InvestmentScores, momentum: "UP" | "DOWN" 
     return "For collectors: Prices are on the upswing. Move soon if you want to add this to your collection, or wait for the market to cool.";
   }
   
-  // Stable prices - no strong tip needed
-  return undefined;
+  // Stable prices - still provide guidance
+  if (isVolatile) {
+    return "For collectors: Prices are choppy but trendless. If you want this card, wait for a dip or buy now if you see one you like.";
+  }
+  
+  if (isLowLiquidity) {
+    return "For collectors: Prices are stable but cards are scarce. If you find one at a fair price, grab it before it's gone.";
+  }
+  
+  // Default stable tip
+  return "For collectors: Prices are stable with no strong trend. Good time to shop for the right card at the right price.";
 }
 
 export function generateInvestmentCall(input: DecisionInput): InvestmentCall & { decisionDebug?: DecisionDebug } {
