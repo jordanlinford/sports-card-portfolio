@@ -135,6 +135,10 @@ const ACTION_STYLES: Record<string, { bg: string; border: string; heroBg: string
   HOLD_CORE: { bg: "bg-indigo-500/20", border: "border-indigo-500", heroBg: "bg-indigo-500", icon: Trophy, label: "Hold Core", takeaway: "Core holding. Anchor of a strong portfolio." },
   AVOID_NEW_MONEY: { bg: "bg-red-600/20", border: "border-red-600", heroBg: "bg-red-600", icon: ShieldAlert, label: "Avoid New Money", takeaway: "Don't add more. Current position okay to hold." },
   LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", heroBg: "bg-muted-foreground", icon: MinusCircle, label: "Low Value", takeaway: "Limited market interest. Unlikely to appreciate significantly." },
+  HOLD_ROLE_RISK: { bg: "bg-amber-500/20", border: "border-amber-500", heroBg: "bg-amber-500", icon: Clock, label: "Hold (Role Risk)", takeaway: "Role uncertainty. Hold but monitor closely." },
+  HOLD_INJURY_CONTINGENT: { bg: "bg-cyan-500/20", border: "border-cyan-500", heroBg: "bg-cyan-500", icon: Clock, label: "Hold (Injury Hedge)", takeaway: "Backup upside. One injury away from spiking." },
+  SPECULATIVE_SUPPRESSED: { bg: "bg-emerald-500/20", border: "border-emerald-500", heroBg: "bg-emerald-500", icon: Target, label: "Speculative Buy", takeaway: "Suppressed value opportunity. Market overcorrected." },
+  AVOID_STRUCTURAL: { bg: "bg-red-700/20", border: "border-red-700", heroBg: "bg-red-700", icon: ShieldAlert, label: "Avoid", takeaway: "Structural decline. No path back to relevance." },
 };
 
 const CONFIDENCE_STYLES: Record<string, { color: string; icon: typeof CheckCircle }> = {

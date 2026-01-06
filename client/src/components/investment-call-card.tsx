@@ -70,6 +70,38 @@ function getVerdictConfig(verdict: InvestmentVerdict) {
       borderColor: "border-purple-500/30",
       description: "Lottery ticket only",
     },
+    HOLD_ROLE_RISK: {
+      label: "Hold (Role Risk)",
+      icon: Eye,
+      bgColor: "bg-amber-500/10 dark:bg-amber-500/20",
+      textColor: "text-amber-700 dark:text-amber-400",
+      borderColor: "border-amber-500/30",
+      description: "Monitor role situation",
+    },
+    HOLD_INJURY_CONTINGENT: {
+      label: "Hold (Injury Hedge)",
+      icon: Eye,
+      bgColor: "bg-cyan-500/10 dark:bg-cyan-500/20",
+      textColor: "text-cyan-700 dark:text-cyan-400",
+      borderColor: "border-cyan-500/30",
+      description: "Value depends on opportunity",
+    },
+    SPECULATIVE_SUPPRESSED: {
+      label: "Speculative Buy",
+      icon: Zap,
+      bgColor: "bg-emerald-500/10 dark:bg-emerald-500/20",
+      textColor: "text-emerald-700 dark:text-emerald-400",
+      borderColor: "border-emerald-500/30",
+      description: "Suppressed value opportunity",
+    },
+    AVOID_STRUCTURAL: {
+      label: "Avoid",
+      icon: Ban,
+      bgColor: "bg-red-600/10 dark:bg-red-600/20",
+      textColor: "text-red-800 dark:text-red-400",
+      borderColor: "border-red-600/30",
+      description: "Structural decline",
+    },
   };
   return configs[verdict];
 }

@@ -22,6 +22,14 @@ function mapVerdictToAdvisor(
         return { verdict: "AVOID", label: "Avoid new positions" };
       case "SPECULATIVE_FLYER":
         return { verdict: "HOLD", label: "Small speculative bet only" };
+      case "HOLD_ROLE_RISK":
+        return { verdict: "HOLD", label: "Hold, monitor role" };
+      case "HOLD_INJURY_CONTINGENT":
+        return { verdict: "HOLD", label: "Hold as injury hedge" };
+      case "SPECULATIVE_SUPPRESSED":
+        return { verdict: "BUY", label: "Speculative buy" };
+      case "AVOID_STRUCTURAL":
+        return { verdict: "AVOID", label: "Avoid, structural decline" };
       default:
         return { verdict: "HOLD", label: "Hold current position" };
     }
