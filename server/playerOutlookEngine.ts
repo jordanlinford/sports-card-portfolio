@@ -100,7 +100,7 @@ const openai = new OpenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 5; // v5: Pattern-based advisor voice, packHitReaction, advisorTake generation
+const PROMPT_VERSION = 6; // v6: Role stability scoring, backup/fringe player nuanced verdicts (HOLD_ROLE_RISK, AVOID_STRUCTURAL, etc.)
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
