@@ -9,6 +9,7 @@ import {
   Zap,
   Target,
   Scale,
+  Heart,
 } from "lucide-react";
 import type { AdvisorOutlook } from "@shared/schema";
 
@@ -100,6 +101,15 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
             <Zap className="h-4 w-4 text-amber-500 shrink-0" />
             <span className="text-sm font-medium" data-testid="text-pack-hit-reaction">
               Pack Hit: {advisor.packHitReaction}
+            </span>
+          </div>
+        )}
+        
+        {advisor.collectorTip && (
+          <div className="flex items-center gap-2 p-2 rounded-md bg-pink-500/10 dark:bg-pink-500/20 border border-pink-500/30">
+            <Heart className="h-4 w-4 text-pink-600 dark:text-pink-400 shrink-0" />
+            <span className="text-sm text-pink-700 dark:text-pink-300" data-testid="text-collector-tip">
+              {advisor.collectorTip}
             </span>
           </div>
         )}

@@ -1298,6 +1298,7 @@ export type AdvisorOutlook = {
   horizon: AdvisorHorizon;
   advisorTake: string; // 3-4 sentences max: the advisor's voice
   packHitReaction?: string; // One line: how to feel/act if you pull this player in a pack
+  collectorTip?: string; // Timing tip for fans/collectors based on price momentum
   topReasons: [string, string, string]; // Exactly 3 short reasons
   actionPlan: AdvisorActionPlan;
   whatChangesMyMind: string[]; // 2-4 bullets: conditions that break the thesis

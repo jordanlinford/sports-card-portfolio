@@ -305,6 +305,7 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     horizon: mapHorizon(outlook.investmentCall, outlook.snapshot),
     advisorTake: buildAdvisorTake(outlook, label),
     packHitReaction: extractPackHitReaction(outlook),
+    collectorTip: outlook.investmentCall?.collectorTip,
     topReasons: extractTopReasons(outlook),
     actionPlan: extractActionPlan(outlook),
     whatChangesMyMind: extractWhatChangesMyMind(outlook),
