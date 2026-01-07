@@ -833,7 +833,32 @@ function computeScores(input: DecisionInput): InvestmentScores {
   if (momentum) {
     baseTrendScore = (baseTrendScore + momentumToScore[momentum]) / 2;
   }
-  const trendScore = baseTrendScore;
+  
+  // Override with actual eBay price trend when available
+  // trendSlope is typically in range -2 to +2 (weekly % change as decimal)
+  // Positive = prices rising, Negative = prices falling
+  let trendScore = baseTrendScore;
+  if (compData?.trendSlope !== undefined && compData?.soldCount !== undefined) {
+    // Only trust eBay trends with sufficient data (5+ sales)
+    const hasReliableTrend = compData.soldCount >= 5;
+    
+    if (hasReliableTrend) {
+      // Convert trendSlope to 0-100 scale
+      // trendSlope of +0.10 (10% weekly rise) → strong uptrend → ~75-80
+      // trendSlope of 0 → stable → ~50
+      // trendSlope of -0.10 → downtrend → ~25-30
+      const ebayTrendScore = 50 + (compData.trendSlope * 250); // Scale factor converts decimal to points
+      const clampedEbayScore = Math.max(10, Math.min(90, ebayTrendScore));
+      
+      // Blend eBay actual data (70%) with stage-based estimate (30%)
+      // eBay data is more reliable for current market direction
+      trendScore = (clampedEbayScore * 0.7) + (baseTrendScore * 0.3);
+      
+      console.log(`[TrendScore] eBay override: slope=${compData.trendSlope.toFixed(3)}, soldCount=${compData.soldCount}, ebayScore=${clampedEbayScore.toFixed(1)}, final=${trendScore.toFixed(1)} (was ${baseTrendScore.toFixed(1)})`);
+    } else {
+      console.log(`[TrendScore] Insufficient eBay data (${compData.soldCount} sales), using stage-based: ${baseTrendScore.toFixed(1)}`);
+    }
+  }
 
   const liquidityScore = tempToScore[temperature] ?? 50;
   const volatilityScore = volToScore[volatility] ?? 50;
