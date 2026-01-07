@@ -719,6 +719,8 @@ export type DecisionInput = {
     high?: number;
     available: boolean;
     source?: "live" | "modeled";
+    trendSlope?: number;  // Actual eBay price trend: positive = rising, negative = falling
+    soldCount?: number;   // Number of recent sales for confidence
   };
   newsCount?: number;
   momentum?: "UP" | "DOWN" | "STABLE";
