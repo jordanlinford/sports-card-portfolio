@@ -1197,6 +1197,7 @@ export type EvidenceData = {
     low?: number;
     high?: number;
     soldCount?: number;
+    trendSlope?: number;  // eBay price trend: positive = rising, negative = falling
     source?: "live" | "modeled"; // Whether data is live market or modeled estimate
     recentSales?: Array<{ price: number; date: string; source: string }>;
   };

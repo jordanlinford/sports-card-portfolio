@@ -100,7 +100,7 @@ const openai = new OpenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 7; // v7: Stricter SPECULATIVE_SUPPRESSED gating (requires mispricingScore >= 0, negativeFactors < 2)
+const PROMPT_VERSION = 8; // v8: Incorporate actual eBay price trends into trendScore for accurate collector tips
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
