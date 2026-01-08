@@ -61,12 +61,10 @@ function determineTier(outlook: PlayerOutlookResponse): string {
   return "CORE";
 }
 
-function mapVerdictToGemVerdict(verdict?: string): "BUY" | "MONITOR" | "AVOID" {
-  if (verdict === "ACCUMULATE") return "BUY";
-  if (verdict === "HOLD_CORE") return "BUY";
-  if (verdict === "SPECULATIVE_FLYER") return "MONITOR";
-  if (verdict === "AVOID_NEW_MONEY") return "AVOID";
-  if (verdict === "TRADE_THE_HYPE") return "AVOID";
+// Return the actual verdict for display consistency with the analysis page
+function getDisplayVerdict(verdict?: string): string {
+  // Return the actual verdict so hidden gems matches full analysis page
+  if (verdict) return verdict;
   return "MONITOR";
 }
 
@@ -362,7 +360,7 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
           isAvoid
         );
         
-        const gemVerdict = mapVerdictToGemVerdict(candidate.outlook.investmentCall?.verdict);
+        const gemVerdict = getDisplayVerdict(candidate.outlook.investmentCall?.verdict);
         const modifier = isAvoid ? "Caution" : "Value";
         const tier = isAvoid ? "CAUTION" : determineTier(candidate.outlook);
         

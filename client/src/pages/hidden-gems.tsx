@@ -41,7 +41,7 @@ interface GemCandidate {
   sport: string;
   position?: string | null;
   team?: string | null;
-  verdict: PlayerVerdict;
+  verdict: string; // Now stores actual verdict: ACCUMULATE, HOLD_CORE, etc.
   modifier: string;
   temperature: MarketTemperature;
   tier: string;
@@ -52,21 +52,63 @@ interface GemCandidate {
   trapRisks: string[];
 }
 
-function getVerdictIcon(verdict: PlayerVerdict) {
+function getVerdictIcon(verdict: string) {
   switch (verdict) {
+    // Positive verdicts
+    case "ACCUMULATE": return <TrendingUp className="h-4 w-4" />;
+    case "HOLD_CORE": return <Target className="h-4 w-4" />;
+    case "SPECULATIVE_FLYER": return <Zap className="h-4 w-4" />;
+    case "SPECULATIVE_SUPPRESSED": return <Zap className="h-4 w-4" />;
+    // Hold verdicts (neutral)
+    case "HOLD_ROLE_RISK": return <EyeIcon className="h-4 w-4" />;
+    case "HOLD_INJURY_CONTINGENT": return <EyeIcon className="h-4 w-4" />;
+    // Avoid verdicts
+    case "TRADE_THE_HYPE": 
+    case "AVOID_NEW_MONEY": 
+    case "AVOID_STRUCTURAL":
+    case "AVOID": return <Ban className="h-4 w-4" />;
+    // Legacy verdicts
     case "BUY": return <ShoppingCart className="h-4 w-4" />;
     case "MONITOR": return <EyeIcon className="h-4 w-4" />;
-    case "AVOID": return <Ban className="h-4 w-4" />;
-    default: return null;
+    default: return <EyeIcon className="h-4 w-4" />;
   }
 }
 
-function getVerdictColor(verdict: PlayerVerdict) {
+function getVerdictColor(verdict: string) {
   switch (verdict) {
+    // Positive verdicts - green
+    case "ACCUMULATE": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+    case "SPECULATIVE_SUPPRESSED": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+    // Hold verdicts - blue
+    case "HOLD_CORE": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    case "HOLD_ROLE_RISK": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    case "HOLD_INJURY_CONTINGENT": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    // Speculative - amber
+    case "SPECULATIVE_FLYER": return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+    // Avoid verdicts - red
+    case "TRADE_THE_HYPE": 
+    case "AVOID_NEW_MONEY":
+    case "AVOID_STRUCTURAL":
+    case "AVOID": return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+    // Legacy verdicts
     case "BUY": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
     case "MONITOR": return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
-    case "AVOID": return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-    default: return "";
+    default: return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+  }
+}
+
+function getVerdictLabel(verdict: string): string {
+  switch (verdict) {
+    case "ACCUMULATE": return "ACCUMULATE";
+    case "HOLD_CORE": return "HOLD CORE";
+    case "SPECULATIVE_FLYER": return "SPECULATIVE";
+    case "TRADE_THE_HYPE": return "TRADE HYPE";
+    case "AVOID_NEW_MONEY": return "AVOID";
+    case "HOLD_ROLE_RISK": return "HOLD (ROLE)";
+    case "HOLD_INJURY_CONTINGENT": return "HOLD (INJURY)";
+    case "SPECULATIVE_SUPPRESSED": return "BUY LOW";
+    case "AVOID_STRUCTURAL": return "AVOID";
+    default: return verdict;
   }
 }
 
@@ -145,7 +187,7 @@ function GemCard({ gem }: { gem: GemCandidate }) {
           </div>
           <Badge className={`${getVerdictColor(gem.verdict)} flex items-center gap-1`}>
             {getVerdictIcon(gem.verdict)}
-            {gem.verdict}
+            {getVerdictLabel(gem.verdict)}
           </Badge>
         </div>
         
@@ -174,12 +216,12 @@ function GemCard({ gem }: { gem: GemCandidate }) {
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
             <DollarSign className="h-4 w-4" />
-            {gem.verdict === "AVOID" ? "Why Overpriced" : "Why Discounted"}
+            {isAvoidVerdict(gem.verdict) ? "Why Overpriced" : "Why Discounted"}
           </h4>
           <ul className="space-y-1">
             {gem.whyDiscounted.slice(0, 2).map((reason, i) => (
               <li key={i} className="text-sm text-foreground flex items-start gap-2">
-                <span className={`${gem.verdict === "AVOID" ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"} mt-0.5`}>-</span>
+                <span className={`${isAvoidVerdict(gem.verdict) ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"} mt-0.5`}>-</span>
                 <span>{reason}</span>
               </li>
             ))}
@@ -188,16 +230,16 @@ function GemCard({ gem }: { gem: GemCandidate }) {
         
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-            {gem.verdict === "AVOID" ? <AlertTriangle className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-            {gem.verdict === "AVOID" ? "Downward Catalyst" : "Repricing Catalyst"}
+            {isAvoidVerdict(gem.verdict) ? <AlertTriangle className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+            {isAvoidVerdict(gem.verdict) ? "Downward Catalyst" : "Repricing Catalyst"}
           </h4>
           <p className="text-sm text-foreground">{gem.repricingCatalysts[0]}</p>
         </div>
         
         <div>
           <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-            {gem.verdict === "AVOID" ? <TrendingUp className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-            {gem.verdict === "AVOID" ? "Bull Case (Contrary)" : "Trap Risk"}
+            {isAvoidVerdict(gem.verdict) ? <TrendingUp className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+            {isAvoidVerdict(gem.verdict) ? "Bull Case (Contrary)" : "Trap Risk"}
           </h4>
           <p className="text-sm text-foreground">{gem.trapRisks[0]}</p>
         </div>
@@ -221,7 +263,7 @@ function mapHiddenGemToCandidate(gem: HiddenGem): GemCandidate {
     sport: gem.sport,
     position: gem.position,
     team: gem.team,
-    verdict: gem.verdict as PlayerVerdict,
+    verdict: gem.verdict, // Now stores actual verdict
     modifier: gem.modifier || "Value",
     temperature: gem.temperature as MarketTemperature,
     tier: gem.tier,
@@ -231,6 +273,19 @@ function mapHiddenGemToCandidate(gem: HiddenGem): GemCandidate {
     repricingCatalysts: gem.repricingCatalysts || [],
     trapRisks: gem.trapRisks || [],
   };
+}
+
+// Helper to categorize verdicts for filtering
+function isPositiveVerdict(verdict: string): boolean {
+  return ["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_SUPPRESSED", "BUY"].includes(verdict);
+}
+
+function isHoldVerdict(verdict: string): boolean {
+  return ["HOLD_ROLE_RISK", "HOLD_INJURY_CONTINGENT", "SPECULATIVE_FLYER", "MONITOR"].includes(verdict);
+}
+
+function isAvoidVerdict(verdict: string): boolean {
+  return ["AVOID_NEW_MONEY", "TRADE_THE_HYPE", "AVOID_STRUCTURAL", "AVOID"].includes(verdict);
 }
 
 export default function HiddenGemsPage() {
@@ -310,9 +365,10 @@ export default function HiddenGemsPage() {
     if (temperatureFilter === "cooling-only" && gem.temperature !== "COOLING") return false;
     if (temperatureFilter === "hot-only" && gem.temperature !== "HOT") return false;
     
-    if (verdictFilter === "buy-only" && gem.verdict !== "BUY") return false;
-    if (verdictFilter === "buy-watch" && gem.verdict === "AVOID") return false;
-    if (verdictFilter === "avoid-only" && gem.verdict !== "AVOID") return false;
+    // Filter by verdict category (positive verdicts = ACCUMULATE, HOLD_CORE, etc.)
+    if (verdictFilter === "buy-only" && !isPositiveVerdict(gem.verdict)) return false;
+    if (verdictFilter === "buy-watch" && isAvoidVerdict(gem.verdict)) return false;
+    if (verdictFilter === "avoid-only" && !isAvoidVerdict(gem.verdict)) return false;
     
     return true;
   });
@@ -428,13 +484,13 @@ export default function HiddenGemsPage() {
               <Label htmlFor="verdict-filter">Verdict</Label>
               <Select value={verdictFilter} onValueChange={setVerdictFilter}>
                 <SelectTrigger id="verdict-filter" data-testid="select-verdict">
-                  <SelectValue placeholder="BUY + WATCH" />
+                  <SelectValue placeholder="Positive Only" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Verdicts</SelectItem>
-                  <SelectItem value="buy-only">BUY Only</SelectItem>
-                  <SelectItem value="buy-watch">BUY + MONITOR</SelectItem>
-                  <SelectItem value="avoid-only">AVOID Only</SelectItem>
+                  <SelectItem value="buy-only">Positive Only (Accumulate, Hold Core)</SelectItem>
+                  <SelectItem value="buy-watch">Positive + Speculative</SelectItem>
+                  <SelectItem value="avoid-only">Avoid Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
