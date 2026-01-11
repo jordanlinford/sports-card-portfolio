@@ -6774,8 +6774,8 @@ Sitemap: ${origin}/sitemap.xml
         additionalData.paymentWindowEndsAt = new Date(Date.now() + paymentWindowHours * 60 * 60 * 1000);
       }
 
-      // Get split before update for template info
-      const existingSplit = await storage.getSplitInstance(id);
+      // Get split before update for break event info
+      const existingSplit = await storage.getSplitInstanceWithBreakEvent(id);
       
       const split = await storage.updateSplitStatus(id, status as SplitStatus, additionalData);
       
@@ -6785,7 +6785,8 @@ Sitemap: ${origin}/sitemap.xml
         // (not getPaidSeatsForSplit since seat status may have already advanced)
         const allSeats = await storage.getSeatsForSplit(id);
         const assignedSeats = allSeats.filter(s => s.assignment); // Only notify seats with assignments
-        const template = existingSplit.template;
+        const breakEvent = existingSplit.breakEvent;
+        const splitTitle = breakEvent.title;
         
         for (const seat of assignedSeats) {
           const seatUser = await storage.getUser(seat.userId);
@@ -6795,16 +6796,16 @@ Sitemap: ${origin}/sitemap.xml
             // Break complete notification
             await storage.createNotification(seat.userId, "split_break_complete", {
               splitId: id,
-              splitTitle: existingSplit.title,
+              splitTitle,
               assignment,
               youtubeUrl,
             });
             
-            if (seatUser?.email && template) {
+            if (seatUser?.email && breakEvent) {
               sendBreakCompleteEmail(
                 seatUser.email,
                 seatUser.firstName || seatUser.handle || "Collector",
-                { title: existingSplit.title, sport: template.sport },
+                { title: splitTitle, sport: breakEvent.sport },
                 assignment,
                 youtubeUrl
               );
@@ -6814,16 +6815,16 @@ Sitemap: ${origin}/sitemap.xml
             const trackingInfo = orderMeta?.tracking?.[seat.userId] || orderMeta?.tracking || null;
             await storage.createNotification(seat.userId, "split_shipped", {
               splitId: id,
-              splitTitle: existingSplit.title,
+              splitTitle,
               assignment,
               trackingInfo,
             });
             
-            if (seatUser?.email && template) {
+            if (seatUser?.email && breakEvent) {
               sendSplitShippedEmail(
                 seatUser.email,
                 seatUser.firstName || seatUser.handle || "Collector",
-                { title: existingSplit.title, sport: template.sport },
+                { title: splitTitle, sport: breakEvent.sport },
                 assignment,
                 trackingInfo
               );
@@ -6858,28 +6859,30 @@ Sitemap: ${origin}/sitemap.xml
       const { paymentWindowHours = 24 } = req.body;
       const paymentWindowEndsAt = new Date(Date.now() + paymentWindowHours * 60 * 60 * 1000);
 
-      const existingSplit = await storage.getSplitInstance(id);
+      const existingSplit = await storage.getSplitInstanceWithBreakEvent(id);
       const split = await storage.updateSplitStatus(id, "PAYMENT_OPEN", { paymentWindowEndsAt });
       
       // Notify all participants that payment window is open
       if (existingSplit) {
         const allSeats = await storage.getSeatsForSplit(id);
-        const template = existingSplit.template;
+        const breakEvent = existingSplit.breakEvent;
+        const splitTitle = breakEvent.title;
+        const seatPrice = existingSplit.seatPriceCents / 100;
         
         for (const seat of allSeats.filter(s => s.status === "INTERESTED")) {
           await storage.createNotification(seat.userId, "split_payment_open", {
             splitId: id,
-            splitTitle: existingSplit.title,
-            seatPrice: existingSplit.seatPrice,
+            splitTitle,
+            seatPrice,
             deadline: paymentWindowEndsAt.toISOString(),
           });
           
           const seatUser = await storage.getUser(seat.userId);
-          if (seatUser?.email && template) {
+          if (seatUser?.email && breakEvent) {
             sendSplitPaymentOpenEmail(seatUser.email, seatUser.firstName || seatUser.handle || "Collector", {
-              title: existingSplit.title,
-              sport: template.sport,
-              seatPrice: existingSplit.seatPrice,
+              title: splitTitle,
+              sport: breakEvent.sport,
+              seatPrice,
               deadline: paymentWindowEndsAt,
             });
           }
@@ -6909,10 +6912,13 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(400).json({ error: "Invalid split instance ID" });
       }
 
-      const split = await storage.getSplitInstance(id);
+      const split = await storage.getSplitInstanceWithBreakEvent(id);
       if (!split) {
         return res.status(404).json({ error: "Split instance not found" });
       }
+
+      const breakEvent = split.breakEvent;
+      const splitTitle = breakEvent.title;
 
       // Get paid seats ordered by payment time
       const paidSeats = await storage.getPaidSeatsForSplit(id);
@@ -6976,23 +6982,22 @@ Sitemap: ${origin}/sitemap.xml
       const updatedSeats = await storage.getSeatsForSplit(id);
       
       // Notify all paid participants of their assignment
-      const template = split.template;
       for (const seat of updatedSeats.filter(s => s.status === "PAID")) {
         // In-app notification
         await storage.createNotification(seat.userId, "split_assignment", {
           splitId: id,
-          splitTitle: split.title,
+          splitTitle,
           assignment: seat.assignment,
           priorityNumber: seat.priorityNumber,
         });
         
         // Email
         const seatUser = await storage.getUser(seat.userId);
-        if (seatUser?.email && template && seat.assignment && seat.priorityNumber) {
+        if (seatUser?.email && breakEvent && seat.assignment && seat.priorityNumber) {
           sendSplitAssignmentEmail(
             seatUser.email,
             seatUser.firstName || seatUser.handle || "Collector",
-            { title: split.title, sport: template.sport },
+            { title: splitTitle, sport: breakEvent.sport },
             seat.assignment,
             seat.priorityNumber
           );
