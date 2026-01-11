@@ -901,24 +901,31 @@ async function searchCardPrices(query: string): Promise<any> {
     throw new Error("SERPER_API_KEY not configured");
   }
 
-  // Search for prices from multiple sources - eBay, PSA, price guides, etc.
-  const response = await fetch("https://google.serper.dev/search", {
-    method: "POST",
-    headers: {
-      "X-API-KEY": serperApiKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      q: query,
-      num: 15, // Get more results for better price coverage
-    }),
-  });
+  try {
+    // Search for prices from multiple sources - eBay, PSA, price guides, etc.
+    const response = await fetch("https://google.serper.dev/search", {
+      method: "POST",
+      headers: {
+        "X-API-KEY": serperApiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        q: query,
+        num: 15, // Get more results for better price coverage
+      }),
+    });
 
-  if (!response.ok) {
-    throw new Error(`Serper API error: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      console.error(`Serper API error ${response.status}: ${errorText}`);
+      throw new Error(`Serper API error: ${response.status}`);
+    }
+
+    return response.json();
+  } catch (error: any) {
+    console.error("Serper API request failed:", error.message);
+    throw error;
   }
-
-  return response.json();
 }
 
 function cleanCardTitle(title: string): string {
@@ -1059,9 +1066,15 @@ function buildSearchQuery(card: CardInfo): string {
 }
 
 async function trySearchQuery(query: string, card: CardInfo): Promise<PriceLookupResult | null> {
-  const searchResults = await searchCardPrices(query);
+  let searchResults;
+  try {
+    searchResults = await searchCardPrices(query);
+  } catch (error: any) {
+    // Let Serper errors bubble up with proper context
+    throw error;
+  }
   
-  const organicResults = searchResults.organic || [];
+  const organicResults = searchResults?.organic || [];
   // Filter for pricing-relevant results from eBay, PSA, price guides, etc.
   const relevantResults = organicResults.filter((result: any) => {
     const title = (result.title || "").toLowerCase();
@@ -1085,12 +1098,14 @@ async function trySearchQuery(query: string, card: CardInfo): Promise<PriceLooku
     .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet || "N/A"}\nSource: ${r.link}`)
     .join("\n\n");
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      {
-        role: "system",
-        content: `You are a sports card pricing expert. Analyze search results from various sources (eBay, PSA, price guides) and extract the market value for a specific card.
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a sports card pricing expert. Analyze search results from various sources (eBay, PSA, price guides) and extract the market value for a specific card.
 
 Your task:
 1. Look at all the search results carefully - they may include eBay listings, PSA auction prices, price guides, etc.
@@ -1111,10 +1126,10 @@ IMPORTANT:
 - eBay "Buy It Now" prices are less reliable than sold prices, but still useful as reference
 - Be AGGRESSIVE about finding prices - even a single price reference is valuable
 - If you see multiple prices, use the average`,
-      },
-      {
-        role: "user",
-        content: `Find the current market value for this card:
+        },
+        {
+          role: "user",
+          content: `Find the current market value for this card:
 Card: ${card.title}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
@@ -1125,11 +1140,15 @@ Search results from eBay sold listings:
 ${searchContext}
 
 Return a JSON object with estimatedValue, salesFound, confidence, and details.`,
-      },
-    ],
-    temperature: 0.3,
-    max_tokens: 500,
-  });
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 500,
+    });
+  } catch (error: any) {
+    console.error("OpenAI API error in price lookup:", error.message);
+    throw new Error(`AI price analysis failed: ${error.message}`);
+  }
 
   const responseText = completion.choices[0]?.message?.content || "";
   

@@ -1527,9 +1527,20 @@ Sitemap: ${origin}/sitemap.xml
         cardId,
         updated: result.estimatedValue !== null,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error looking up card price:", error);
-      res.status(500).json({ message: "Failed to lookup card price" });
+      // Provide more specific error messages based on error type
+      if (error.message?.includes("SERPER_API_KEY")) {
+        res.status(500).json({ message: "Price lookup service not configured" });
+      } else if (error.message?.includes("Serper API error")) {
+        res.status(502).json({ message: "Price lookup service temporarily unavailable. Please try again in a moment." });
+      } else if (error.message?.includes("AI price analysis failed")) {
+        res.status(502).json({ message: "Price analysis temporarily unavailable. Please try again in a moment." });
+      } else if (error.status === 429 || error.message?.includes("rate limit")) {
+        res.status(429).json({ message: "Too many requests. Please wait a moment before trying again." });
+      } else {
+        res.status(500).json({ message: "Failed to lookup card price. Please try again." });
+      }
     }
   });
 
