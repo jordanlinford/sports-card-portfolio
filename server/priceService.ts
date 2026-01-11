@@ -1,9 +1,19 @@
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import type { MatchedAttributes, MatchSample, CardMatchConfidence, MatchConfidenceTier } from "@shared/schema";
 
 const openai = new OpenAI({
   baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+});
+
+// Gemini for price lookups (more reliable)
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
 });
 
 // Helper to get current date in YYYY-MM-DD format for GPT prompts
@@ -1126,19 +1136,12 @@ async function trySearchQuery(query: string, card: CardInfo): Promise<PriceLooku
     .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet || "N/A"}\nSource: ${r.link}`)
     .join("\n\n");
 
-  // Retry logic for OpenAI API
-  let completion;
+  // Use Gemini for price analysis (more reliable than OpenAI)
+  let responseText = "";
   let lastAIError: Error | null = null;
   const maxAIRetries = 3;
   
-  for (let attempt = 1; attempt <= maxAIRetries; attempt++) {
-    try {
-      completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a sports card pricing expert. Analyze search results from various sources (eBay, PSA, price guides) and extract the market value for a specific card.
+  const prompt = `You are a sports card pricing expert. Analyze search results from various sources (eBay, PSA, price guides) and extract the market value for a specific card.
 
 Your task:
 1. Look at all the search results carefully - they may include eBay listings, PSA auction prices, price guides, etc.
@@ -1158,11 +1161,9 @@ IMPORTANT:
 - PSA auction prices and price guide values are valid sources
 - eBay "Buy It Now" prices are less reliable than sold prices, but still useful as reference
 - Be AGGRESSIVE about finding prices - even a single price reference is valuable
-- If you see multiple prices, use the average`,
-          },
-          {
-            role: "user",
-            content: `Find the current market value for this card:
+- If you see multiple prices, use the average
+
+Find the current market value for this card:
 Card: ${card.title}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
@@ -1172,30 +1173,31 @@ Grade: ${card.grade || "Raw/Ungraded"}
 Search results from eBay sold listings:
 ${searchContext}
 
-Return a JSON object with estimatedValue, salesFound, confidence, and details.`,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 500,
+Return a JSON object with estimatedValue, salesFound, confidence, and details.`;
+
+  for (let attempt = 1; attempt <= maxAIRetries; attempt++) {
+    try {
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
       });
+      responseText = response.text || "";
       break; // Success, exit retry loop
     } catch (error: any) {
       lastAIError = error;
-      console.error(`OpenAI API error (attempt ${attempt}):`, error.message);
+      console.error(`Gemini API error (attempt ${attempt}):`, error.message);
       
       if (attempt < maxAIRetries) {
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.log(`Retrying OpenAI API in ${delay}ms...`);
+        console.log(`Retrying Gemini API in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   
-  if (!completion) {
+  if (!responseText) {
     throw new Error(`AI price analysis failed after ${maxAIRetries} attempts: ${lastAIError?.message}`);
   }
-
-  const responseText = completion.choices[0]?.message?.content || "";
   
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
   if (jsonMatch) {
@@ -1212,7 +1214,7 @@ Return a JSON object with estimatedValue, salesFound, confidence, and details.`,
         };
       }
     } catch {
-      console.error("Failed to parse GPT response as JSON:", responseText);
+      console.error("Failed to parse Gemini response as JSON:", responseText);
     }
   }
 
