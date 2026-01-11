@@ -1761,14 +1761,36 @@ function generateCollectorTip(scores: InvestmentScores, momentum: "UP" | "DOWN" 
 export function generateInvestmentCall(input: DecisionInput): InvestmentCall & { decisionDebug?: DecisionDebug } {
   const scores = computeScores(input);
   
-  // Get role stability info - use registry first, then inferred, then UNKNOWN
+  // Get role stability info - use the WORSE of registry and inferred tiers
+  // This prevents out-of-league players from getting good verdicts based on stale registry data
   const playerName = input.playerName ?? "";
   let roleTier = getRoleTier(playerName);
+  const registryRoleTier = roleTier;
   
-  // If registry returns UNKNOWN but we have an inferred role tier, use that
-  if (roleTier === "UNKNOWN" && input.inferredRoleTier && input.inferredRoleTier !== "UNKNOWN") {
-    console.log(`[RoleTier] Using AI-inferred role tier for "${playerName}": ${input.inferredRoleTier}`);
-    roleTier = input.inferredRoleTier;
+  // Use inferredRoleTier if:
+  // 1. Registry returns UNKNOWN, OR
+  // 2. Inferred tier is WORSE (lower stability score) than registry tier
+  // 3. Team is "Free Agent" or similar - force OUT_OF_LEAGUE
+  
+  // First, check if team indicates free agent status
+  const teamLower = (input.team ?? "").toLowerCase().trim();
+  const isFreeAgentTeam = teamLower === "free agent" || teamLower === "fa" || 
+                          teamLower === "unsigned" || teamLower === "none" ||
+                          teamLower.includes("free agent");
+  
+  if (isFreeAgentTeam) {
+    console.log(`[RoleTier] Free agent team detected for "${playerName}": forcing OUT_OF_LEAGUE`);
+    roleTier = "OUT_OF_LEAGUE";
+  } else if (input.inferredRoleTier && input.inferredRoleTier !== "UNKNOWN") {
+    const registryScore = ROLE_STABILITY_SCORES[roleTier] ?? 50;
+    const inferredScore = ROLE_STABILITY_SCORES[input.inferredRoleTier] ?? 50;
+    
+    if (roleTier === "UNKNOWN" || inferredScore < registryScore) {
+      console.log(`[RoleTier] Overriding registry tier for "${playerName}": ${roleTier} (${registryScore}) → ${input.inferredRoleTier} (${inferredScore}) [news-based]`);
+      roleTier = input.inferredRoleTier;
+    } else {
+      console.log(`[RoleTier] Keeping registry tier for "${playerName}": ${roleTier} (${registryScore}) vs inferred ${input.inferredRoleTier} (${inferredScore})`);
+    }
   }
   
   const roleStabilityScore = ROLE_STABILITY_SCORES[roleTier];

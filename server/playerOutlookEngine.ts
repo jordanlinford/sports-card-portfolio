@@ -21,7 +21,7 @@ function inferRoleTierFromContext(newsSnippets: string[], playerName: string, ro
       console.log(`[RoleTierInference] ${playerName}: AI detected INJURED_RESERVE → BACKUP`);
       return "BACKUP";
     }
-    if (status === "BUST" || status === "OUT_OF_LEAGUE") {
+    if (status === "BUST" || status === "OUT_OF_LEAGUE" || status === "FREE_AGENT") {
       console.log(`[RoleTierInference] ${playerName}: AI detected ${status} → OUT_OF_LEAGUE`);
       return "OUT_OF_LEAGUE";
     }
@@ -70,11 +70,16 @@ function inferRoleTierFromContext(newsSnippets: string[], playerName: string, ro
     "injured reserve", "ir", "season-ending", "surgery", "missed season",
   ];
   
-  // OUT_OF_LEAGUE indicators
+  // OUT_OF_LEAGUE indicators - expanded to catch free agents
   const outOfLeagueIndicators = [
     "released", "cut", "waived", "unsigned", "free agent looking",
     "no team", "without a team", "still looking for",
     "out of the league", "career in jeopardy",
+    "free agent", "currently unsigned", "not on a roster",
+    "remains unsigned", "hasn't signed", "has not signed",
+    "cut by", "released by", "waived by", "let go by",
+    "failed physical", "didn't make the roster", "training camp cut",
+    "off the team", "not currently on", "former starter",
   ];
   
   // Count matches for each tier
@@ -429,7 +434,7 @@ Return ONLY a JSON object with these exact fields:
   "snippets": ["<news snippet 1>", "<news snippet 2>", ...],
   "newsCount": <number of news articles found>,
   "momentum": "up" | "flat" | "down",
-  "roleStatus": "<STARTER | BACKUP | INJURED_RESERVE | ROTATIONAL | UNCERTAIN | UNKNOWN>",
+  "roleStatus": "<STARTER | BACKUP | INJURED_RESERVE | ROTATIONAL | UNCERTAIN | OUT_OF_LEAGUE | UNKNOWN>",
   "injuryStatus": "<HEALTHY | INJURED | RECOVERING | UNKNOWN>",
   "careerStatus": "<ACTIVE | RETIRED | RETIRED_HOF | DECEASED | BUST | UNKNOWN>",
   "details": "<brief summary of current situation>"
@@ -440,7 +445,8 @@ Role status rules:
 - BACKUP: Lost starting job, second-string, depth chart QB2+, behind another player
 - INJURED_RESERVE: On IR, season-ending injury, had surgery, missed season
 - ROTATIONAL: Part-time role, platoon, time-share
-- BUST: Released, cut, waived, out of league, practice squad
+- OUT_OF_LEAGUE: Released, cut, waived, unsigned free agent, not on any roster
+- BUST: Practice squad, failed starter, career struggling
 
 Career status rules:
 - ACTIVE: Currently playing
