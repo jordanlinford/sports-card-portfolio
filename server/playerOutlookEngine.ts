@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { db } from "./db";
 import { playerOutlookCache } from "@shared/schema";
 import { eq, and, gt, lt } from "drizzle-orm";
@@ -93,9 +93,8 @@ import type {
 } from "@shared/schema";
 import { VERDICT_MODIFIER } from "@shared/schema";
 
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
 });
 
 // Prompt version - increment this when making significant prompt changes
@@ -733,17 +732,12 @@ TONE ENFORCEMENT:
 - Reference team context, position premium, historical patterns for ${sport}`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 1600,
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${systemMessage}\n\n${prompt}`,
     });
     
-    const content = response.choices[0]?.message?.content || "{}";
+    const content = response.text || "{}";
     
     // Extract JSON from response
     const jsonMatch = content.match(/\{[\s\S]*\}/);

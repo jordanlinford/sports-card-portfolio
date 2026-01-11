@@ -1,12 +1,15 @@
 import { db } from "./db";
 import { hiddenGems, playerOutlookCache, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
 import { eq, desc, and, isNotNull } from "drizzle-orm";
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { fetchPlayerNews as fetchPlayerNewsFromEngine } from "./outlookEngine";
 
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
 });
 
 function generateBatchId(): string {
@@ -170,17 +173,14 @@ Be specific to ${sport} and ${playerName}. Reference team, position, market dyna
 Return ONLY valid JSON, no markdown.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You are a sports card market analyst. Generate concise, specific analysis. Return only valid JSON." },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 600,
+    const systemPrompt = "You are a sports card market analyst. Generate concise, specific analysis. Return only valid JSON.";
+    
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${systemPrompt}\n\n${prompt}`,
     });
 
-    const content = response.choices[0]?.message?.content || "{}";
+    const content = response.text || "{}";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON found");
     

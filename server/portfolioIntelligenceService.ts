@@ -9,25 +9,16 @@ import type {
   RecommendedAction
 } from "@shared/schema";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { fetchPlayerNews } from "./outlookEngine";
 
-let openaiClient: OpenAI | null = null;
-
-function getOpenAI(): OpenAI {
-  if (!openaiClient) {
-    // Prefer OPENAI_API_KEY first, fall back to AI_INTEGRATIONS only if it's not a placeholder
-    let apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      const aiIntegrationsKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
-      if (aiIntegrationsKey && !aiIntegrationsKey.includes('DUMMY')) {
-        apiKey = aiIntegrationsKey;
-      }
-    }
-    openaiClient = new OpenAI({ apiKey });
-  }
-  return openaiClient;
-}
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
+});
 
 type CareerStage = "Rookie" | "Rising" | "Prime" | "Decline" | "Retired" | "Unknown";
 
@@ -450,18 +441,15 @@ export async function generatePortfolioOutlook(userId: string): Promise<Portfoli
   let aiResponse: AIOutlookResponse;
   
   try {
-    const completion = await getOpenAI().chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: PORTFOLIO_OUTLOOK_SYSTEM_PROMPT },
-        { role: "user", content: buildPortfolioOutlookPrompt(profile, riskSignals, playerNews) },
-      ],
-      temperature: 0.7,
-      max_tokens: 1500,
-      response_format: { type: "json_object" },
+    const systemPrompt = PORTFOLIO_OUTLOOK_SYSTEM_PROMPT;
+    const userPrompt = buildPortfolioOutlookPrompt(profile, riskSignals, playerNews);
+    
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${systemPrompt}\n\n${userPrompt}`,
     });
 
-    const content = completion.choices[0].message.content;
+    const content = response.text || "";
     if (!content) throw new Error("No AI response");
     
     aiResponse = JSON.parse(content);

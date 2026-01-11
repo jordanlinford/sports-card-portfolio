@@ -1,13 +1,7 @@
-import OpenAI from "openai";
 import { GoogleGenAI } from "@google/genai";
 import type { MatchedAttributes, MatchSample, CardMatchConfidence, MatchConfidenceTier } from "@shared/schema";
 
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-});
-
-// Gemini for price lookups (more reliable)
+// Gemini for all AI features
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
   httpOptions: {
@@ -1455,17 +1449,12 @@ ${searchContext}
 
 Return JSON with pricePoints array (all prices found), estimatedValue, salesFound, confidence, and confidenceReason.`;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    temperature: 0.2,
-    max_tokens: 1500,
+  const response = await gemini.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: `${systemPrompt}\n\n${userPrompt}`,
   });
 
-  const responseText = completion.choices[0]?.message?.content || "";
+  const responseText = response.text || "";
   
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
   if (jsonMatch) {

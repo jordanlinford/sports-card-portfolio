@@ -1,17 +1,13 @@
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import type { Card } from "@shared/schema";
 
-let openaiClient: OpenAI | null = null;
-
-function getOpenAI(): OpenAI | null {
-  if (!process.env.OPENAI_API_KEY) {
-    return null;
-  }
-  if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  }
-  return openaiClient;
-}
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
+});
 
 export type OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE";
 
@@ -1313,27 +1309,18 @@ async function generateExplanation(
   action: OutlookAction,
   timeHorizonMonths: number
 ): Promise<{ short: string; long: string }> {
-  const openai = getOpenAI();
-  
-  if (!openai) {
-    return {
-      short: generateFallbackShort(action, upsideScore, riskScore),
-      long: generateFallbackLong(card, action, factors, upsideScore, riskScore),
-    };
-  }
-  
   try {
     const trendPct = card.avgSalePrice30 && card.avgSalePrice90 && card.avgSalePrice90 > 0
       ? ((card.avgSalePrice30 - card.avgSalePrice90) / card.avgSalePrice90 * 100).toFixed(1)
       : "unknown";
     
-    const prompt = `You are an assistant helping sports card collectors decide whether to invest in specific cards. You will receive structured data about a card, the player, and a set of pre-calculated scores.
+    const systemPrompt = `You are an assistant helping sports card collectors decide whether to invest in specific cards. You will receive structured data about a card, the player, and a set of pre-calculated scores.
 
 Return:
 1. A 1-2 sentence summary for beginners (labeled "SHORT:").
-2. A 3-6 sentence detailed explanation using hobby language, no promises or guarantees (labeled "LONG:").
+2. A 3-6 sentence detailed explanation using hobby language, no promises or guarantees (labeled "LONG:").`;
 
-Data:
+    const userPrompt = `Data:
 - Player: ${card.playerName || card.title}, ${card.sport || "unknown sport"}, ${card.position || "unknown position"}, legacy tier: ${card.legacyTier || "unknown"}.
 - Card: rookie=${card.isRookie || false}, numbered=${card.isNumbered || false} (/${card.serialNumber || "N/A"}), auto=${card.hasAuto || false}, graded=${card.grade || "raw"}.
 - Scores: upside=${upsideScore}, risk=${riskScore}, confidence=${confidenceScore}.
@@ -1342,14 +1329,12 @@ Data:
 Explain the reasoning behind the scores and end with a plain-language tag like:
 "Overall view: ${action} for the next ${timeHorizonMonths} months."`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 400,
-      temperature: 0.7,
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${systemPrompt}\n\n${userPrompt}`,
     });
 
-    const content = response.choices[0]?.message?.content || "";
+    const content = response.text || "";
     
     const shortMatch = content.match(/SHORT:\s*([\s\S]+?)(?=LONG:|$)/);
     const longMatch = content.match(/LONG:\s*([\s\S]+)/);
@@ -1422,20 +1407,12 @@ async function generateEditorialExplanation(
   accolades: DetectedAccolades,
   sportConfig: SportConfig | null
 ): Promise<{ short: string; long: string }> {
-  const openai = getOpenAI();
   const legacyTier = (card.legacyTier as LegacyTier) || "STAR";
   
   // Build context for narrative
   const lifecycleContext = getLifecycleNarrative(legacyTier, card);
   const cardContext = getCardNarrative(card);
   const stabilityContext = getStabilityNarrative(marketStability, legacyTier);
-  
-  if (!openai) {
-    return {
-      short: generateEditorialFallbackShort(action, upsideScore, riskScore, legacyTier, card),
-      long: generateEditorialFallbackLong(card, action, upsideScore, riskScore, confidenceScore, legacyTier, lifecycleContext, cardContext, stabilityContext),
-    };
-  }
   
   try {
     const trendPct = card.avgSalePrice30 && card.avgSalePrice90 && card.avgSalePrice90 > 0
@@ -1512,14 +1489,12 @@ Format response as:
 SHORT: [your thesis-driven summary]
 LONG: [your narrative explanation]`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
-      temperature: 0.7,
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
     });
 
-    const content = response.choices[0]?.message?.content || "";
+    const content = response.text || "";
     
     const shortMatch = content.match(/SHORT:\s*([\s\S]+?)(?=LONG:|$)/);
     const longMatch = content.match(/LONG:\s*([\s\S]+)/);
@@ -1853,12 +1828,6 @@ export async function inferCardMetadata(
     return result;
   }
   
-  const openai = getOpenAI();
-  if (!openai) {
-    result.legacyTier = result.legacyTier || inferLegacyTierFromYear(card.year, card.title);
-    return result;
-  }
-  
   try {
     const prompt = `Analyze this trading card and extract metadata. Return ONLY valid JSON.
 
@@ -1885,14 +1854,12 @@ Rules for legacyTier:
 
 Return only JSON: {"playerName":"...","sport":"...","position":"...","legacyTier":"..."}`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 150,
-      temperature: 0.3,
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
     });
 
-    const content = response.choices[0]?.message?.content || "";
+    const content = response.text || "";
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     
     if (jsonMatch) {

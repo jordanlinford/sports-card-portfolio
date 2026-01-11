@@ -11,10 +11,14 @@ import { db } from "./db";
 import { cards, displayCases, playerOutlookCache } from "@shared/schema";
 import type { Card, MarketTemperature, PlayerVerdict } from "@shared/schema";
 import { eq, and, isNotNull, sql, desc } from "drizzle-orm";
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
-const openai = new OpenAI({ 
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY 
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
 });
 
 export interface GrowthProjection {
@@ -501,29 +505,21 @@ export async function generateAIGrowthSummary(projections: PortfolioGrowthRespon
   }
   
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a sports card investment analyst. Provide a concise 2-3 sentence summary of the portfolio growth outlook. Be specific about opportunities and risks. Do not use emojis."
-        },
-        {
-          role: "user",
-          content: `Analyze this portfolio:
+    const systemPrompt = "You are a sports card investment analyst. Provide a concise 2-3 sentence summary of the portfolio growth outlook. Be specific about opportunities and risks. Do not use emojis.";
+    const userPrompt = `Analyze this portfolio:
 Current Value: $${projections.currentValue}
 12-Month Base Case Growth: ${projections.projections.find(p => p.timeframe === "12m")?.baseCase.valuePct || 0}%
 Top Growth Drivers: ${projections.topGrowers.slice(0, 3).map(c => c.playerName).join(", ")}
 Risk Cards: ${projections.riskCards.slice(0, 2).map(c => c.playerName).join(", ")}
 Sport Mix: ${projections.sportBreakdown.map(s => `${s.sport} (${s.cardCount} cards)`).join(", ")}
-Market Temperature: ${projections.temperatureBreakdown.map(t => `${t.temperature} (${t.cardCount})`).join(", ")}`
-        }
-      ],
-      max_tokens: 150,
-      temperature: 0.7,
+Market Temperature: ${projections.temperatureBreakdown.map(t => `${t.temperature} (${t.cardCount})`).join(", ")}`;
+
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${systemPrompt}\n\n${userPrompt}`,
     });
     
-    return response.choices[0]?.message?.content || "Unable to generate summary.";
+    return response.text || "Unable to generate summary.";
   } catch (error) {
     console.error("[GrowthProjections] AI summary error:", error);
     return `Your $${projections.currentValue.toLocaleString()} portfolio is projected to grow ${projections.projections.find(p => p.timeframe === "12m")?.baseCase.valuePct || 0}% over the next 12 months in the base case scenario.`;

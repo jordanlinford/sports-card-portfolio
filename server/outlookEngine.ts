@@ -1,13 +1,16 @@
 // Card Outlook AI 2.0 - Deterministic Signal Computation Engine
 // "AI should explain, not decide" - all action logic is transparent and rule-based
 
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import type { Card, CardOutlook, PricePoint } from "@shared/schema";
 import { lookupPlayer, mapRegistryStage } from "./playerRegistry";
 
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || "https://ai.replit.dev/v1beta",
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+const gemini = new GoogleGenAI({
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
 });
 
 // Fetch real-time news about a player using Serper API
@@ -870,7 +873,9 @@ export async function generateOutlookExplanation(
     ? `\nRECENT NEWS (use this for current player status - YOUR TRAINING DATA MAY BE OUTDATED):\n${newsSnippets.map(s => `- ${s}`).join("\n")}\n\nIMPORTANT: The news above is REAL-TIME from today. Use it to understand the player's CURRENT situation. Do NOT contradict this news with outdated information from your training data.`
     : "";
 
-  const prompt = `You are a sports card market analyst. Explain WHY the following action was computed for this card.
+  const systemPrompt = "You explain card market recommendations based on computed signals. Be concise and data-driven.";
+
+  const userPrompt = `You are a sports card market analyst. Explain WHY the following action was computed for this card.
 
 CARD: ${card.title}
 Set: ${card.set || "Unknown"} | Year: ${card.year || "Unknown"} | Grade: ${card.grade || "Ungraded"}
@@ -911,19 +916,13 @@ IMPORTANT RULES:
 5. The explanation must never contradict the displayed confidence indicators.
 6. If RECENT NEWS is provided, USE IT to inform your explanation about the player's current status. The news is real-time and supersedes your training data.`;
 
-
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: "You explain card market recommendations based on computed signals. Be concise and data-driven." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 800,
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${systemPrompt}\n\n${userPrompt}`,
     });
 
-    const responseText = completion.choices[0]?.message?.content || "";
+    const responseText = response.text || "";
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     
     if (jsonMatch) {
