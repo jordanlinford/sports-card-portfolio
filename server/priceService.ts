@@ -905,65 +905,86 @@ function extractSourceFromUrl(url: string): string {
   }
 }
 
-async function searchCardPricesWithRetry(query: string, maxRetries: number = 3): Promise<any> {
-  const serperApiKey = process.env.SERPER_API_KEY;
-  if (!serperApiKey) {
-    throw new Error("SERPER_API_KEY not configured");
-  }
-
+// Use Gemini with Google Search grounding for price lookups (replaces Serper)
+async function searchAndAnalyzeCardPrice(card: CardInfo): Promise<PriceLookupResult | null> {
+  const maxRetries = 3;
   let lastError: Error | null = null;
   
+  // Build a comprehensive search prompt
+  const searchPrompt = `Search for recent eBay sold listings and price data for this sports card:
+
+Card: ${card.title}
+Set: ${card.set || "Unknown"}
+Year: ${card.year || "Unknown"}
+Variation: ${card.variation || "Base"}
+Grade: ${card.grade || "Raw/Ungraded"}
+
+Search eBay sold listings, PSA price guides, and sports card pricing websites to find:
+1. Recent sold prices (last 30-90 days preferred)
+2. Current market value range
+3. Any notable price trends
+
+Return ONLY a JSON object with these exact fields:
+{
+  "estimatedValue": <number or null>,
+  "salesFound": <number of price references found>,
+  "confidence": "high" | "medium" | "low",
+  "details": "<brief explanation of sources and prices found>"
+}
+
+Be aggressive about finding prices - even a single price reference is valuable. If you find a price range like $400-$600, average it to $500.`;
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const response = await fetch("https://google.serper.dev/search", {
-        method: "POST",
-        headers: {
-          "X-API-KEY": serperApiKey,
-          "Content-Type": "application/json",
+      console.log(`[Price Lookup] Attempt ${attempt} for: ${card.title}`);
+      
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: searchPrompt,
+        config: {
+          tools: [{ googleSearch: {} }],
         },
-        body: JSON.stringify({
-          q: query,
-          num: 15,
-        }),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => "");
-        console.error(`Serper API error ${response.status} (attempt ${attempt}): ${errorText}`);
-        
-        // Don't retry on 4xx errors (client errors) except rate limits
-        if (response.status >= 400 && response.status < 500 && response.status !== 429) {
-          throw new Error(`Serper API error: ${response.status}`);
+      
+      const responseText = response.text || "";
+      console.log(`[Price Lookup] Gemini response length: ${responseText.length}`);
+      
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (parsed.estimatedValue && parsed.estimatedValue > 0) {
+            return {
+              estimatedValue: parsed.estimatedValue,
+              source: "Market Data (AI + Google Search)",
+              searchQuery: `${card.title} ${card.set || ""} ${card.grade || ""}`,
+              salesFound: parsed.salesFound || 0,
+              confidence: parsed.confidence || "medium",
+              details: parsed.details || "",
+            };
+          }
+        } catch (parseError) {
+          console.error(`[Price Lookup] Failed to parse JSON:`, responseText.substring(0, 200));
         }
-        
-        lastError = new Error(`Serper API error: ${response.status}`);
-        if (attempt < maxRetries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-          console.log(`Retrying Serper API in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-        throw lastError;
       }
-
-      return response.json();
+      
+      // If no valid price found, return null to try next approach
+      return null;
+      
     } catch (error: any) {
       lastError = error;
-      console.error(`Serper API request failed (attempt ${attempt}):`, error.message);
+      console.error(`[Price Lookup] Gemini error (attempt ${attempt}):`, error.message);
       
       if (attempt < maxRetries) {
         const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.log(`Retrying Serper API in ${delay}ms...`);
+        console.log(`[Price Lookup] Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }
   
-  throw lastError || new Error("Serper API failed after retries");
-}
-
-async function searchCardPrices(query: string): Promise<any> {
-  return searchCardPricesWithRetry(query, 3);
+  throw lastError || new Error("Price lookup failed after retries");
 }
 
 function cleanCardTitle(title: string): string {
@@ -1103,147 +1124,25 @@ function buildSearchQuery(card: CardInfo): string {
   return queries[0]; // Return primary query for backward compatibility
 }
 
-async function trySearchQuery(query: string, card: CardInfo): Promise<PriceLookupResult | null> {
-  let searchResults;
-  try {
-    searchResults = await searchCardPrices(query);
-  } catch (error: any) {
-    // Let Serper errors bubble up with proper context
-    throw error;
-  }
-  
-  const organicResults = searchResults?.organic || [];
-  // Filter for pricing-relevant results from eBay, PSA, price guides, etc.
-  const relevantResults = organicResults.filter((result: any) => {
-    const title = (result.title || "").toLowerCase();
-    const snippet = (result.snippet || "").toLowerCase();
-    const link = (result.link || "").toLowerCase();
-    // Include results that mention prices, sales, auctions, or are from relevant sites
-    return title.includes("price") || title.includes("sold") || title.includes("value") ||
-           title.includes("auction") || 
-           snippet.includes("$") || snippet.includes("price") || snippet.includes("sold") ||
-           link.includes("ebay.com") || link.includes("psacard.com") || 
-           link.includes("sportscardspro.com") || link.includes("130point.com") ||
-           link.includes("pricecharting.com");
-  });
-
-  if (relevantResults.length === 0) {
-    return null;
-  }
-
-  const searchContext = relevantResults
-    .slice(0, 8) // Use more results for better coverage
-    .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet || "N/A"}\nSource: ${r.link}`)
-    .join("\n\n");
-
-  // Use Gemini for price analysis (more reliable than OpenAI)
-  let responseText = "";
-  let lastAIError: Error | null = null;
-  const maxAIRetries = 3;
-  
-  const prompt = `You are a sports card pricing expert. Analyze search results from various sources (eBay, PSA, price guides) and extract the market value for a specific card.
-
-Your task:
-1. Look at all the search results carefully - they may include eBay listings, PSA auction prices, price guides, etc.
-2. Extract ANY visible prices from the titles or snippets (look for $ amounts like "$299.00", "$400-600", etc.)
-3. Look for price ranges mentioned (e.g., "sells for $350-600")
-4. Calculate an average market value based on what you find
-5. Return ONLY a JSON object with these fields:
-   - estimatedValue: number (the average/typical price in dollars, or null if truly unable to determine)
-   - salesFound: number (how many price references you found)
-   - confidence: "high" | "medium" | "low"
-   - details: string (brief explanation of where the prices came from)
-
-IMPORTANT:
-- Look carefully for ANY dollar amounts in the snippets
-- Price ranges like "$400-$600" should be averaged to get $500
-- The grade (PSA 10, PSA 9, etc.) significantly affects value - only match same grade
-- PSA auction prices and price guide values are valid sources
-- eBay "Buy It Now" prices are less reliable than sold prices, but still useful as reference
-- Be AGGRESSIVE about finding prices - even a single price reference is valuable
-- If you see multiple prices, use the average
-
-Find the current market value for this card:
-Card: ${card.title}
-Set: ${card.set || "Unknown"}
-Year: ${card.year || "Unknown"}
-Variation: ${card.variation || "None"}
-Grade: ${card.grade || "Raw/Ungraded"}
-
-Search results from eBay sold listings:
-${searchContext}
-
-Return a JSON object with estimatedValue, salesFound, confidence, and details.`;
-
-  for (let attempt = 1; attempt <= maxAIRetries; attempt++) {
-    try {
-      const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-      });
-      responseText = response.text || "";
-      break; // Success, exit retry loop
-    } catch (error: any) {
-      lastAIError = error;
-      console.error(`Gemini API error (attempt ${attempt}):`, error.message);
-      
-      if (attempt < maxAIRetries) {
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.log(`Retrying Gemini API in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-  }
-  
-  if (!responseText) {
-    throw new Error(`AI price analysis failed after ${maxAIRetries} attempts: ${lastAIError?.message}`);
-  }
-  
-  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    try {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (parsed.estimatedValue && parsed.estimatedValue > 0) {
-        return {
-          estimatedValue: parsed.estimatedValue,
-          source: "Market Data (AI analyzed)",
-          searchQuery: query,
-          salesFound: parsed.salesFound || 0,
-          confidence: parsed.confidence || "medium",
-          details: parsed.details || "",
-        };
-      }
-    } catch {
-      console.error("Failed to parse Gemini response as JSON:", responseText);
-    }
-  }
-
-  return null;
-}
+// Note: trySearchQuery removed - now using searchAndAnalyzeCardPrice with Gemini + Google Search
 
 export async function lookupCardPrice(card: CardInfo): Promise<PriceLookupResult> {
-  const queries = buildSearchQueries(card);
-  
   try {
-    // Try each query until we get a result with a valid price
-    for (const query of queries) {
-      console.log(`Trying search query: ${query}`);
-      const result = await trySearchQuery(query, card);
-      if (result && result.estimatedValue) {
-        return result;
-      }
-      // Small delay between queries to avoid rate limiting
-      await new Promise((resolve) => setTimeout(resolve, 500));
+    // Use Gemini with Google Search grounding (no Serper needed)
+    const result = await searchAndAnalyzeCardPrice(card);
+    
+    if (result && result.estimatedValue) {
+      return result;
     }
 
-    // If no queries returned a price, return a failure result
+    // If no price found, return a failure result
     return {
       estimatedValue: null,
       source: "eBay (no sales found)",
-      searchQuery: queries[0],
+      searchQuery: `${card.title} ${card.set || ""} ${card.grade || ""}`,
       salesFound: 0,
       confidence: "low",
-      details: `No recent sold listings found after trying ${queries.length} search variations.`,
+      details: "No recent sold listings found. Try adding more card details.",
     };
   } catch (error) {
     console.error("Price lookup error:", error);
@@ -1279,8 +1178,31 @@ export async function lookupMultipleCardPrices(
 
 // Enhanced price lookup for Card Outlook AI 2.0
 // Extracts 8-20 individual price points with dates, sources, and URLs
+// Note: Using Gemini + Google Search grounding (Serper removed)
 async function tryEnhancedSearchQuery(query: string, card: CardInfo): Promise<EnhancedPriceLookupResult | null> {
-  const searchResults = await searchCardPrices(query);
+  // Use the basic lookup - enhanced search will be reimplemented later
+  const basicResult = await searchAndAnalyzeCardPrice(card);
+  if (!basicResult || !basicResult.estimatedValue) {
+    return null;
+  }
+  
+  // Convert basic result to enhanced format with a single price point
+  return {
+    estimatedValue: basicResult.estimatedValue,
+    pricePoints: [{
+      date: new Date().toISOString().split('T')[0],
+      price: basicResult.estimatedValue,
+      source: basicResult.source,
+    }],
+    salesFound: basicResult.salesFound,
+    confidence: basicResult.confidence,
+    confidenceReason: basicResult.details || "Based on market data analysis",
+    details: basicResult.details,
+    rawSearchResults: [],
+  };
+  
+  // Original Serper-based code below is deprecated
+  const searchResults = { organic: [] } as any; // Placeholder
   
   const organicResults = searchResults.organic || [];
   const relevantResults = organicResults.filter((result: any) => {
