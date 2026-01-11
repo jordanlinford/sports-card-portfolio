@@ -138,7 +138,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 8; // v8: Incorporate actual eBay price trends into trendScore for accurate collector tips
+const PROMPT_VERSION = 9; // v9: Free agent detection forces OUT_OF_LEAGUE role tier for accurate verdicts
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
