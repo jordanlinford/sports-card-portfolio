@@ -2741,7 +2741,7 @@ Sitemap: ${origin}/sitemap.xml
       // Look up cached outlook
       const cachedOutlook = await storage.getCachedPlayerOutlook(playerKey);
       
-      if (!cachedOutlook || !cachedOutlook.outlookData) {
+      if (!cachedOutlook || !cachedOutlook.outlookJson) {
         return res.status(404).json({ 
           message: "No cached analysis found for this player. Sign up to generate a new analysis.",
           notFound: true
@@ -2749,7 +2749,7 @@ Sitemap: ${origin}/sitemap.xml
       }
       
       // Check if cache is too old (more than 30 days)
-      const cacheAge = Date.now() - new Date(cachedOutlook.generatedAt).getTime();
+      const cacheAge = Date.now() - new Date(cachedOutlook.lastFetchedAt || cachedOutlook.createdAt || Date.now()).getTime();
       const maxAge = 30 * 24 * 60 * 60 * 1000; // 30 days
       
       if (cacheAge > maxAge) {
@@ -2759,15 +2759,13 @@ Sitemap: ${origin}/sitemap.xml
         });
       }
       
-      // Return the cached data (parsed from JSON)
-      const outlookData = typeof cachedOutlook.outlookData === 'string' 
-        ? JSON.parse(cachedOutlook.outlookData)
-        : cachedOutlook.outlookData;
+      // Return the cached data
+      const outlookData = cachedOutlook.outlookJson;
       
       res.json({
         ...outlookData,
         cacheStatus: "cached",
-        generatedAt: cachedOutlook.generatedAt,
+        generatedAt: cachedOutlook.lastFetchedAt || cachedOutlook.createdAt,
         isSharedView: true, // Flag to indicate this is a public shared view
       });
     } catch (error) {
@@ -6269,10 +6267,14 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(400).json({ error: "Invalid split instance ID" });
       }
 
-      const split = await storage.getSplitInstance(splitId);
+      const split = await storage.getSplitInstanceWithBreakEvent(splitId);
       if (!split) {
         return res.status(404).json({ error: "Split instance not found" });
       }
+
+      const breakEvent = split.breakEvent;
+      const splitTitle = breakEvent.title;
+      const seatPrice = split.seatPriceCents / 100;
 
       // Check if user already has a seat
       const existingSeat = await storage.getSeatByUserAndSplit(userId, splitId);
@@ -6318,24 +6320,23 @@ Sitemap: ${origin}/sitemap.xml
       const user = await storage.getUser(userId);
       const userName = user?.firstName || user?.handle || "Collector";
       const userEmail = user?.email;
-      const template = split.template;
 
       // Create notification for the joiner
       await storage.createNotification(userId, "split_joined", {
         splitId,
-        splitTitle: split.title,
+        splitTitle,
         status: seatStatus,
       });
 
       // Send email to joiner
-      if (userEmail && template) {
+      if (userEmail && breakEvent) {
         sendSplitJoinedEmail(userEmail, userName, {
-          title: split.title,
-          sport: template.sport,
-          brand: template.brand,
-          year: template.year,
+          title: splitTitle,
+          sport: breakEvent.sport,
+          brand: breakEvent.brand,
+          year: breakEvent.year,
           formatType: split.formatType,
-          seatPrice: split.seatPrice,
+          seatPrice,
         });
       }
 
@@ -6347,7 +6348,7 @@ Sitemap: ${origin}/sitemap.xml
           // In-app notification
           await storage.createNotification(otherSeat.userId, "split_participant_joined", {
             splitId,
-            splitTitle: split.title,
+            splitTitle,
             currentCount: newCounts.interested + newCounts.paid,
             totalCount: split.participantCount,
           });
@@ -6356,7 +6357,7 @@ Sitemap: ${origin}/sitemap.xml
           const otherUser = await storage.getUser(otherSeat.userId);
           if (otherUser?.email) {
             sendNewParticipantJoinedEmail(otherUser.email, otherUser.firstName || otherUser.handle || "Collector", {
-              title: split.title,
+              title: splitTitle,
               currentCount: newCounts.interested + newCounts.paid,
               totalCount: split.participantCount,
             });
@@ -6376,17 +6377,17 @@ Sitemap: ${origin}/sitemap.xml
         for (const participantSeat of existingSeats.filter(s => s.status === "INTERESTED")) {
           await storage.createNotification(participantSeat.userId, "split_payment_open", {
             splitId,
-            splitTitle: split.title,
-            seatPrice: split.seatPrice,
+            splitTitle,
+            seatPrice,
             deadline: paymentWindowEndsAt.toISOString(),
           });
           
           const participantUser = await storage.getUser(participantSeat.userId);
-          if (participantUser?.email && template) {
+          if (participantUser?.email && breakEvent) {
             sendSplitPaymentOpenEmail(participantUser.email, participantUser.firstName || participantUser.handle || "Collector", {
-              title: split.title,
-              sport: template.sport,
-              seatPrice: split.seatPrice,
+              title: splitTitle,
+              sport: breakEvent.sport,
+              seatPrice,
               deadline: paymentWindowEndsAt,
             });
           }
