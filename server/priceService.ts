@@ -895,37 +895,65 @@ function extractSourceFromUrl(url: string): string {
   }
 }
 
-async function searchCardPrices(query: string): Promise<any> {
+async function searchCardPricesWithRetry(query: string, maxRetries: number = 3): Promise<any> {
   const serperApiKey = process.env.SERPER_API_KEY;
   if (!serperApiKey) {
     throw new Error("SERPER_API_KEY not configured");
   }
 
-  try {
-    // Search for prices from multiple sources - eBay, PSA, price guides, etc.
-    const response = await fetch("https://google.serper.dev/search", {
-      method: "POST",
-      headers: {
-        "X-API-KEY": serperApiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        q: query,
-        num: 15, // Get more results for better price coverage
-      }),
-    });
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch("https://google.serper.dev/search", {
+        method: "POST",
+        headers: {
+          "X-API-KEY": serperApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          q: query,
+          num: 15,
+        }),
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "");
-      console.error(`Serper API error ${response.status}: ${errorText}`);
-      throw new Error(`Serper API error: ${response.status}`);
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        console.error(`Serper API error ${response.status} (attempt ${attempt}): ${errorText}`);
+        
+        // Don't retry on 4xx errors (client errors) except rate limits
+        if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+          throw new Error(`Serper API error: ${response.status}`);
+        }
+        
+        lastError = new Error(`Serper API error: ${response.status}`);
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+          console.log(`Retrying Serper API in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        throw lastError;
+      }
+
+      return response.json();
+    } catch (error: any) {
+      lastError = error;
+      console.error(`Serper API request failed (attempt ${attempt}):`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`Retrying Serper API in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
-
-    return response.json();
-  } catch (error: any) {
-    console.error("Serper API request failed:", error.message);
-    throw error;
   }
+  
+  throw lastError || new Error("Serper API failed after retries");
+}
+
+async function searchCardPrices(query: string): Promise<any> {
+  return searchCardPricesWithRetry(query, 3);
 }
 
 function cleanCardTitle(title: string): string {
@@ -1098,14 +1126,19 @@ async function trySearchQuery(query: string, card: CardInfo): Promise<PriceLooku
     .map((r: any) => `Title: ${r.title}\nSnippet: ${r.snippet || "N/A"}\nSource: ${r.link}`)
     .join("\n\n");
 
+  // Retry logic for OpenAI API
   let completion;
-  try {
-    completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: `You are a sports card pricing expert. Analyze search results from various sources (eBay, PSA, price guides) and extract the market value for a specific card.
+  let lastAIError: Error | null = null;
+  const maxAIRetries = 3;
+  
+  for (let attempt = 1; attempt <= maxAIRetries; attempt++) {
+    try {
+      completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a sports card pricing expert. Analyze search results from various sources (eBay, PSA, price guides) and extract the market value for a specific card.
 
 Your task:
 1. Look at all the search results carefully - they may include eBay listings, PSA auction prices, price guides, etc.
@@ -1126,10 +1159,10 @@ IMPORTANT:
 - eBay "Buy It Now" prices are less reliable than sold prices, but still useful as reference
 - Be AGGRESSIVE about finding prices - even a single price reference is valuable
 - If you see multiple prices, use the average`,
-        },
-        {
-          role: "user",
-          content: `Find the current market value for this card:
+          },
+          {
+            role: "user",
+            content: `Find the current market value for this card:
 Card: ${card.title}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
@@ -1140,14 +1173,26 @@ Search results from eBay sold listings:
 ${searchContext}
 
 Return a JSON object with estimatedValue, salesFound, confidence, and details.`,
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 500,
-    });
-  } catch (error: any) {
-    console.error("OpenAI API error in price lookup:", error.message);
-    throw new Error(`AI price analysis failed: ${error.message}`);
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 500,
+      });
+      break; // Success, exit retry loop
+    } catch (error: any) {
+      lastAIError = error;
+      console.error(`OpenAI API error (attempt ${attempt}):`, error.message);
+      
+      if (attempt < maxAIRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`Retrying OpenAI API in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  if (!completion) {
+    throw new Error(`AI price analysis failed after ${maxAIRetries} attempts: ${lastAIError?.message}`);
   }
 
   const responseText = completion.choices[0]?.message?.content || "";
