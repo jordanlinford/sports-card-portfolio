@@ -10,8 +10,37 @@ import { lookupPlayer, ensureRegistryLoaded } from "./playerRegistry";
 // ============================================================
 // AI-BASED ROLE TIER INFERENCE
 // For players not in registry, infer role from news context
+// Now also accepts roleStatus from Gemini search for more accurate inference
 // ============================================================
-function inferRoleTierFromContext(newsSnippets: string[], playerName: string): RoleTier {
+function inferRoleTierFromContext(newsSnippets: string[], playerName: string, roleStatus?: string, injuryStatus?: string): RoleTier {
+  // If we have a direct roleStatus from Gemini search, use it first (most accurate)
+  if (roleStatus) {
+    const status = roleStatus.toUpperCase();
+    if (status === "INJURED_RESERVE") {
+      // IR players are essentially out - treat as BACKUP with injury flag
+      console.log(`[RoleTierInference] ${playerName}: AI detected INJURED_RESERVE → BACKUP`);
+      return "BACKUP";
+    }
+    if (status === "BUST" || status === "OUT_OF_LEAGUE") {
+      console.log(`[RoleTierInference] ${playerName}: AI detected ${status} → OUT_OF_LEAGUE`);
+      return "OUT_OF_LEAGUE";
+    }
+    if (status === "BACKUP" || status === "ROTATIONAL") {
+      console.log(`[RoleTierInference] ${playerName}: AI detected ${status} → BACKUP`);
+      return "BACKUP";
+    }
+    if (status === "STARTER") {
+      console.log(`[RoleTierInference] ${playerName}: AI detected STARTER`);
+      return "STARTER";
+    }
+    if (status === "UNCERTAIN") {
+      console.log(`[RoleTierInference] ${playerName}: AI detected UNCERTAIN → UNCERTAIN_STARTER`);
+      return "UNCERTAIN_STARTER";
+    }
+    // For UNKNOWN, fall through to keyword analysis
+  }
+  
+  // Fallback: keyword-based inference from news snippets
   const context = newsSnippets.join(" ").toLowerCase();
   
   // FRANCHISE_CORE indicators (clear star status)
@@ -38,6 +67,7 @@ function inferRoleTierFromContext(newsSnippets: string[], playerName: string): R
     "backup", "second-string", "second string", "bench",
     "reserve", "depth chart", "behind", "lost the job",
     "demoted", "third-string", "practice squad",
+    "injured reserve", "ir", "season-ending", "surgery", "missed season",
   ];
   
   // OUT_OF_LEAGUE indicators
@@ -95,6 +125,10 @@ import { VERDICT_MODIFIER } from "@shared/schema";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+  httpOptions: {
+    apiVersion: "",
+    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+  },
 });
 
 // Prompt version - increment this when making significant prompt changes
@@ -355,13 +389,15 @@ function analyzeTeamContext(snippets: string[], team: string | undefined): TeamC
   return { playoffOutlook, teamMomentum, narrativeStrength };
 }
 
-// Use Serper to get news/hype signals about the player
+// Get news/hype signals about the player using Gemini with Google Search grounding
 async function getPlayerNewsSignals(playerName: string, sport: string): Promise<{
   momentum: "up" | "flat" | "down";
   newsHype: "high" | "medium" | "low" | "none";
   snippets: string[];
   detectedStage?: "BUST" | "RETIRED" | "RETIRED_HOF";
   teamContext?: TeamContext;
+  roleStatus?: string;
+  injuryStatus?: string;
 }> {
   // First check if this is a known legend - override everything
   if (isKnownLegend(playerName, sport)) {
@@ -374,151 +410,130 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
     };
   }
 
-  const SERPER_API_KEY = process.env.SERPER_API_KEY;
-  if (!SERPER_API_KEY) {
-    return { momentum: "flat", newsHype: "none", snippets: [] };
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+  const currentYear = new Date().getFullYear();
+  
+  // Use Gemini with Google Search grounding for accurate, current news
+  const searchPrompt = `Search for the latest news about ${playerName} ${sport} player in ${currentYear}.
+
+Focus on finding:
+1. Current team and roster status (starter, backup, injured reserve, depth chart position)
+2. Recent performance news (games played, stats, injuries)
+3. Role changes (lost starting job, promoted to starter, traded, released)
+4. Any injuries, surgeries, or health concerns
+5. Career status (active, retired, hall of fame, deceased)
+
+Return ONLY a JSON object with these exact fields:
+{
+  "snippets": ["<news snippet 1>", "<news snippet 2>", ...],
+  "newsCount": <number of news articles found>,
+  "momentum": "up" | "flat" | "down",
+  "roleStatus": "<STARTER | BACKUP | INJURED_RESERVE | ROTATIONAL | UNCERTAIN | UNKNOWN>",
+  "injuryStatus": "<HEALTHY | INJURED | RECOVERING | UNKNOWN>",
+  "careerStatus": "<ACTIVE | RETIRED | RETIRED_HOF | DECEASED | BUST | UNKNOWN>",
+  "details": "<brief summary of current situation>"
+}
+
+Role status rules:
+- STARTER: Named starter, starting lineup, first-string
+- BACKUP: Lost starting job, second-string, depth chart QB2+, behind another player
+- INJURED_RESERVE: On IR, season-ending injury, had surgery, missed season
+- ROTATIONAL: Part-time role, platoon, time-share
+- BUST: Released, cut, waived, out of league, practice squad
+
+Career status rules:
+- ACTIVE: Currently playing
+- RETIRED: No longer playing but not HOF
+- RETIRED_HOF: Hall of fame, legend, all-time great
+- DECEASED: Passed away
+- BUST: Career failed, out of league`;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[PlayerOutlook] News fetch attempt ${attempt} for: ${playerName}`);
+      
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: searchPrompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      });
+      
+      let responseText = response.text || "";
+      console.log(`[PlayerOutlook] Gemini news response length: ${responseText.length}`);
+      
+      // Strip markdown code fences if present (common in Gemini responses)
+      responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+      
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          const snippets = Array.isArray(parsed.snippets) ? parsed.snippets : [];
+          
+          // Determine momentum - override based on role/injury status
+          let momentum: "up" | "flat" | "down" = parsed.momentum || "flat";
+          if (parsed.roleStatus === "INJURED_RESERVE" || parsed.injuryStatus === "INJURED") {
+            momentum = "down";
+          } else if (parsed.roleStatus === "BACKUP" || parsed.roleStatus === "BUST") {
+            momentum = "down";
+          }
+          
+          // Determine news hype level
+          const newsCount = parsed.newsCount || snippets.length;
+          const newsHype = newsCount >= 5 ? "high" : newsCount >= 3 ? "medium" : newsCount >= 1 ? "low" : "none";
+          
+          // Map career status to detected stage
+          let detectedStage: "BUST" | "RETIRED" | "RETIRED_HOF" | undefined = undefined;
+          const careerStatus = parsed.careerStatus?.toUpperCase();
+          if (careerStatus === "RETIRED_HOF" || careerStatus === "DECEASED") {
+            detectedStage = "RETIRED_HOF";
+          } else if (careerStatus === "RETIRED") {
+            detectedStage = "RETIRED";
+          } else if (careerStatus === "BUST" || parsed.roleStatus === "BUST") {
+            detectedStage = "BUST";
+          }
+          
+          // Analyze team context from snippets
+          const teamContext = analyzeTeamContext(snippets, undefined);
+          
+          console.log(`[PlayerOutlook] News for ${playerName}: ${newsCount} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}, career: ${careerStatus} → stage=${detectedStage || "none"}`);
+          
+          return { 
+            momentum, 
+            newsHype, 
+            snippets, 
+            detectedStage, 
+            teamContext,
+            roleStatus: parsed.roleStatus,
+            injuryStatus: parsed.injuryStatus,
+          };
+        } catch (parseError) {
+          console.error(`[PlayerOutlook] Failed to parse news JSON (attempt ${attempt}):`, responseText.substring(0, 200));
+          // Continue to next retry attempt on parse failure
+        }
+      } else {
+        console.log(`[PlayerOutlook] No JSON found in response (attempt ${attempt})`);
+        // Continue to next retry attempt
+      }
+      
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[PlayerOutlook] Gemini news error (attempt ${attempt}):`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`[PlayerOutlook] Retrying news fetch in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
   }
   
-  try {
-    // Use current year to get the latest news
-    const currentYear = new Date().getFullYear();
-    
-    // Run two parallel queries for better coverage
-    const [generalResponse, performanceResponse] = await Promise.all([
-      // Query 1: General news about the player
-      fetch("https://google.serper.dev/news", {
-        method: "POST",
-        headers: {
-          "X-API-KEY": SERPER_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          q: `${playerName} ${sport} ${currentYear}`,
-          num: 6,
-        }),
-      }),
-      // Query 2: Specific game performance and stats
-      fetch("https://google.serper.dev/news", {
-        method: "POST",
-        headers: {
-          "X-API-KEY": SERPER_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          q: `${playerName} points game stats NBA`,
-          num: 4,
-        }),
-      }),
-    ]);
-    
-    let allNews: any[] = [];
-    
-    if (generalResponse.ok) {
-      const data = await generalResponse.json();
-      allNews = [...(data.news || [])];
-    }
-    
-    if (performanceResponse.ok) {
-      const data = await performanceResponse.json();
-      allNews = [...allNews, ...(data.news || [])];
-    }
-    
-    if (allNews.length === 0) {
-      return { momentum: "flat", newsHype: "none", snippets: [] };
-    }
-    
-    // Deduplicate and prioritize news that mentions specific stats or team
-    const seen = new Set<string>();
-    const uniqueNews = allNews.filter((n: any) => {
-      const key = (n.title || "").toLowerCase().slice(0, 50);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    
-    // Prioritize snippets that mention points, drafted, or team names
-    const priorityKeywords = ["points", "drafted", "mavericks", "dallas", "scored", "game", "debut", "rookie"];
-    const sortedNews = uniqueNews.sort((a: any, b: any) => {
-      const aText = ((a.snippet || "") + " " + (a.title || "")).toLowerCase();
-      const bText = ((b.snippet || "") + " " + (b.title || "")).toLowerCase();
-      const aScore = priorityKeywords.filter(kw => aText.includes(kw)).length;
-      const bScore = priorityKeywords.filter(kw => bText.includes(kw)).length;
-      return bScore - aScore;
-    });
-    
-    const snippets = sortedNews.slice(0, 5).map((n: any) => n.snippet || n.title);
-    
-    // Analyze sentiment from snippets
-    const positiveKeywords = ["surge", "rising", "hot", "breakout", "mvp", "record", "star", "elite", "best"];
-    const negativeKeywords = ["decline", "falling", "injury", "benched", "struggling", "bust", "down", "trade"];
-    // Keywords that indicate a player is a bust / career has stalled
-    const bustKeywords = ["3rd string", "third string", "backup", "released", "cut", "waived", "demoted", "benched", "practice squad", "bust", "failed", "out of league", "unsigned", "free agent"];
-    // Keywords that indicate player is deceased
-    const deceasedKeywords = ["passed away", "died", "death of", "rip ", "r.i.p.", "in memoriam", "funeral", "obituary", "late great", "remembered", "tribute to", "legacy of", "1934-", "1940-", "1950-", "1960-", "1970-"];
-    // Keywords that indicate player is retired/HOF
-    const retiredHofKeywords = ["hall of fame", "hof", "inducted", "enshrinement", "canton", "cooperstown", "springfield", "retired jersey", "jersey retirement", "ring of honor", "former nfl", "former nba", "former mlb", "former nhl", "legendary", "all-time great", "greatest of all time", "goat"];
-    // Keywords that indicate player is simply retired (not HOF)
-    const retiredKeywords = ["retired", "retirement", "hung up", "called it a career", "final season", "last game", "farewell tour"];
-    
-    let positiveCount = 0;
-    let negativeCount = 0;
-    let bustIndicators = 0;
-    let deceasedIndicators = 0;
-    let hofIndicators = 0;
-    let retiredIndicators = 0;
-    const combined = snippets.join(" ").toLowerCase();
-    
-    positiveKeywords.forEach(kw => {
-      if (combined.includes(kw)) positiveCount++;
-    });
-    negativeKeywords.forEach(kw => {
-      if (combined.includes(kw)) negativeCount++;
-    });
-    bustKeywords.forEach(kw => {
-      if (combined.includes(kw)) bustIndicators++;
-    });
-    deceasedKeywords.forEach(kw => {
-      if (combined.includes(kw)) deceasedIndicators++;
-    });
-    retiredHofKeywords.forEach(kw => {
-      if (combined.includes(kw)) hofIndicators++;
-    });
-    retiredKeywords.forEach(kw => {
-      if (combined.includes(kw)) retiredIndicators++;
-    });
-    
-    const momentum = positiveCount > negativeCount + 1 ? "up" : 
-                     negativeCount > positiveCount + 1 ? "down" : "flat";
-    const newsHype = allNews.length >= 5 ? "high" : allNews.length >= 3 ? "medium" : allNews.length >= 1 ? "low" : "none";
-    
-    // Determine detected career stage from news
-    let detectedStage: "BUST" | "RETIRED" | "RETIRED_HOF" | undefined = undefined;
-    if (deceasedIndicators >= 1 || hofIndicators >= 2) {
-      // Deceased or strong HOF indicators = RETIRED_HOF (legacy player)
-      detectedStage = "RETIRED_HOF";
-    } else if (hofIndicators >= 1) {
-      // Single HOF mention = likely RETIRED_HOF
-      detectedStage = "RETIRED_HOF";
-    } else if (retiredIndicators >= 1) {
-      // Retired but not HOF
-      detectedStage = "RETIRED";
-    } else if (bustIndicators >= 2 || (bustIndicators >= 1 && negativeCount > positiveCount)) {
-      // Multiple bust indicators = BUST
-      detectedStage = "BUST";
-    }
-    
-    console.log(`[PlayerOutlook] News analysis: deceased=${deceasedIndicators}, hof=${hofIndicators}, retired=${retiredIndicators}, bust=${bustIndicators} → stage=${detectedStage || "none"}`);
-    
-    // Analyze team context from the snippets
-    // We'll get the team from the classification later, but we can still analyze the snippets
-    // for team-related signals even without knowing the exact team
-    const teamContext = analyzeTeamContext(snippets, undefined);
-    
-    return { momentum, newsHype, snippets, detectedStage, teamContext };
-  } catch (error) {
-    console.error("[PlayerOutlook] News fetch error:", error);
-    return { momentum: "flat", newsHype: "none", snippets: [] };
-  }
+  console.error("[PlayerOutlook] News fetch failed after retries:", lastError?.message);
+  return { momentum: "flat", newsHype: "none", snippets: [] };
 }
 
 // Use AI to infer player info and generate thesis
@@ -1011,8 +1026,8 @@ async function generateFreshOutlook(
   sport: string,
   playerKey: string
 ): Promise<PlayerOutlookResponse> {
-  // Step 1: Get news signals
-  const { momentum, newsHype, snippets, detectedStage } = await getPlayerNewsSignals(playerName, sport);
+  // Step 1: Get news signals (now includes roleStatus and injuryStatus from Gemini search)
+  const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus } = await getPlayerNewsSignals(playerName, sport);
   
   // Step 2: Run classification engine
   // If news detected a special stage (BUST, RETIRED, RETIRED_HOF), use it
@@ -1200,8 +1215,8 @@ async function generateFreshOutlook(
     none: "LOW",
   };
   
-  // Infer role tier from news context for players not in registry
-  const inferredRoleTier = inferRoleTierFromContext(snippets, playerName);
+  // Infer role tier from news context - use AI-detected roleStatus if available
+  const inferredRoleTier = inferRoleTierFromContext(snippets, playerName, roleStatus, injuryStatus);
   
   const investmentCall = generateInvestmentCall({
     stage: finalClassification.stage,

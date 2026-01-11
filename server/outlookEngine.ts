@@ -13,117 +13,116 @@ const gemini = new GoogleGenAI({
   },
 });
 
-// Fetch real-time news about a player using Serper API
+// Fetch real-time news about a player using Gemini with Google Search grounding
 // This ensures AI explanations use current information, not outdated training data
 export async function fetchPlayerNews(playerName: string | null | undefined, sport: string | null | undefined): Promise<{
   snippets: string[];
   momentum: "up" | "flat" | "down";
   newsCount: number;
+  roleStatus?: string;
+  injuryStatus?: string;
 }> {
   if (!playerName) {
     return { snippets: [], momentum: "flat", newsCount: 0 };
   }
 
-  const SERPER_API_KEY = process.env.SERPER_API_KEY;
-  if (!SERPER_API_KEY) {
-    console.log("[OutlookEngine] No SERPER_API_KEY - skipping news fetch");
-    return { snippets: [], momentum: "flat", newsCount: 0 };
-  }
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+  
+  const currentYear = new Date().getFullYear();
+  const sportQuery = sport ? ` ${sport}` : "";
+  
+  const searchPrompt = `Search for the latest news about ${playerName}${sportQuery} in ${currentYear}.
 
-  try {
-    const sportQuery = sport ? ` ${sport}` : "";
-    // Use current year to ensure we get the most recent news
-    const currentYear = new Date().getFullYear();
-    
-    // Run two parallel queries for better coverage
-    const [generalResponse, performanceResponse] = await Promise.all([
-      // Query 1: General news about the player
-      fetch("https://google.serper.dev/news", {
-        method: "POST",
-        headers: {
-          "X-API-KEY": SERPER_API_KEY,
-          "Content-Type": "application/json",
+Focus on finding:
+1. Current team and roster status (starter, backup, injured reserve, etc.)
+2. Recent performance news (games played, stats, injuries)
+3. Depth chart position and role changes
+4. Any injuries, surgeries, or health concerns
+5. Trade rumors or roster transactions
+
+Return ONLY a JSON object with these exact fields:
+{
+  "snippets": ["<news snippet 1>", "<news snippet 2>", ...],
+  "newsCount": <number of news articles found>,
+  "momentum": "up" | "flat" | "down",
+  "roleStatus": "<STARTER | BACKUP | INJURED_RESERVE | UNCERTAIN | UNKNOWN>",
+  "injuryStatus": "<HEALTHY | INJURED | RECOVERING | UNKNOWN>",
+  "details": "<brief summary of current situation>"
+}
+
+Be specific about role and injury status. If the player:
+- Lost their starting job, set roleStatus to "BACKUP"
+- Is on injured reserve or had surgery, set roleStatus to "INJURED_RESERVE" and injuryStatus to "INJURED"
+- Was traded or released, note this in details`;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[OutlookEngine] News fetch attempt ${attempt} for: ${playerName}`);
+      
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: searchPrompt,
+        config: {
+          tools: [{ googleSearch: {} }],
         },
-        body: JSON.stringify({
-          q: `${playerName}${sportQuery} ${currentYear}`,
-          num: 6,
-        }),
-      }),
-      // Query 2: Specific game performance and stats
-      fetch("https://google.serper.dev/news", {
-        method: "POST",
-        headers: {
-          "X-API-KEY": SERPER_API_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          q: `${playerName} points game stats`,
-          num: 4,
-        }),
-      }),
-    ]);
-
-    let allNews: any[] = [];
-    
-    if (generalResponse.ok) {
-      const data = await generalResponse.json();
-      allNews = [...(data.news || [])];
+      });
+      
+      let responseText = response.text || "";
+      console.log(`[OutlookEngine] Gemini news response length: ${responseText.length}`);
+      
+      // Strip markdown code fences if present (common in Gemini responses)
+      responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+      
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          const snippets = Array.isArray(parsed.snippets) ? parsed.snippets : [];
+          
+          // Analyze momentum from snippets if not provided
+          let momentum: "up" | "flat" | "down" = parsed.momentum || "flat";
+          
+          // Override momentum based on role/injury status for accuracy
+          if (parsed.roleStatus === "INJURED_RESERVE" || parsed.injuryStatus === "INJURED") {
+            momentum = "down";
+          } else if (parsed.roleStatus === "BACKUP") {
+            momentum = momentum === "up" ? "flat" : "down";
+          }
+          
+          console.log(`[OutlookEngine] News for ${playerName}: ${parsed.newsCount || snippets.length} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}`);
+          
+          return {
+            snippets,
+            momentum,
+            newsCount: parsed.newsCount || snippets.length,
+            roleStatus: parsed.roleStatus,
+            injuryStatus: parsed.injuryStatus,
+          };
+        } catch (parseError) {
+          console.error(`[OutlookEngine] Failed to parse news JSON (attempt ${attempt}):`, responseText.substring(0, 200));
+          // Continue to next retry attempt on parse failure
+        }
+      } else {
+        console.log(`[OutlookEngine] No JSON found in response (attempt ${attempt})`);
+        // Continue to next retry attempt
+      }
+      
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[OutlookEngine] Gemini news error (attempt ${attempt}):`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        console.log(`[OutlookEngine] Retrying news fetch in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
-    
-    if (performanceResponse.ok) {
-      const data = await performanceResponse.json();
-      allNews = [...allNews, ...(data.news || [])];
-    }
-
-    if (allNews.length === 0) {
-      return { snippets: [], momentum: "flat", newsCount: 0 };
-    }
-
-    // Deduplicate and prioritize news that mentions specific stats or team
-    const seen = new Set<string>();
-    const uniqueNews = allNews.filter((n: any) => {
-      const key = (n.title || "").toLowerCase().slice(0, 50);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    
-    // Prioritize snippets that mention points, drafted, or team names
-    const priorityKeywords = ["points", "drafted", "scored", "game", "debut", "rookie", "nba", "nfl", "mlb"];
-    const sortedNews = uniqueNews.sort((a: any, b: any) => {
-      const aText = ((a.snippet || "") + " " + (a.title || "")).toLowerCase();
-      const bText = ((b.snippet || "") + " " + (b.title || "")).toLowerCase();
-      const aScore = priorityKeywords.filter(kw => aText.includes(kw)).length;
-      const bScore = priorityKeywords.filter(kw => bText.includes(kw)).length;
-      return bScore - aScore;
-    });
-
-    const snippets = sortedNews.slice(0, 5).map((n: any) => n.snippet || n.title);
-
-    // Analyze sentiment from snippets
-    const positiveKeywords = ["surge", "rising", "hot", "breakout", "mvp", "record", "star", "elite", "best", "youngest", "historic", "amazing", "dominant"];
-    const negativeKeywords = ["decline", "falling", "injury", "benched", "struggling", "bust", "down", "trade", "concern", "slump"];
-
-    let positiveCount = 0;
-    let negativeCount = 0;
-    const combined = snippets.join(" ").toLowerCase();
-
-    positiveKeywords.forEach(kw => {
-      if (combined.includes(kw)) positiveCount++;
-    });
-    negativeKeywords.forEach(kw => {
-      if (combined.includes(kw)) negativeCount++;
-    });
-
-    const momentum = positiveCount > negativeCount + 1 ? "up" :
-                     negativeCount > positiveCount + 1 ? "down" : "flat";
-
-    console.log(`[OutlookEngine] News for ${playerName}: ${allNews.length} articles, momentum: ${momentum}`);
-    return { snippets, momentum, newsCount: allNews.length };
-  } catch (error) {
-    console.error("[OutlookEngine] News fetch error:", error);
-    return { snippets: [], momentum: "flat", newsCount: 0 };
   }
+  
+  console.error("[OutlookEngine] News fetch failed after retries:", lastError?.message);
+  return { snippets: [], momentum: "flat", newsCount: 0 };
 }
 
 // Static score mappings
