@@ -357,10 +357,37 @@ Sitemap: ${origin}/sitemap.xml
       const imageUrl = rawImageUrl.startsWith('/') ? `${origin}${rawImageUrl}` : rawImageUrl;
       const publishedDate = post.publishedAt ? new Date(post.publishedAt).toISOString() : '';
       
-      // Convert markdown-like content to readable HTML
-      const contentHtml = escapeHtml(post.content || '')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br/>');
+      // Convert content to readable HTML (simple markdown-like conversion)
+      // First handle markdown headings, then paragraphs
+      const rawContent = post.content || '';
+      const contentHtml = rawContent
+        .split('\n\n')
+        .map(paragraph => {
+          const trimmed = paragraph.trim();
+          if (!trimmed) return '';
+          // Handle markdown headings
+          if (trimmed.startsWith('### ')) {
+            return `<h3>${escapeHtml(trimmed.slice(4))}</h3>`;
+          }
+          if (trimmed.startsWith('## ')) {
+            return `<h2>${escapeHtml(trimmed.slice(3))}</h2>`;
+          }
+          if (trimmed.startsWith('# ')) {
+            return `<h2>${escapeHtml(trimmed.slice(2))}</h2>`;
+          }
+          // Handle bullet lists
+          if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            const items = trimmed.split('\n')
+              .filter(line => line.trim().startsWith('- ') || line.trim().startsWith('* '))
+              .map(line => `<li>${escapeHtml(line.trim().slice(2))}</li>`)
+              .join('');
+            return `<ul>${items}</ul>`;
+          }
+          // Regular paragraph
+          return `<p>${escapeHtml(trimmed).replace(/\n/g, '<br/>')}</p>`;
+        })
+        .filter(Boolean)
+        .join('\n');
 
       const jsonLd = safeJsonLd({
         "@context": "https://schema.org",
@@ -414,7 +441,7 @@ Sitemap: ${origin}/sitemap.xml
       ${imageUrl ? `<img src="${imageUrl}" alt="${title}" />` : ''}
     </header>
     <div class="content">
-      <p>${contentHtml}</p>
+      ${contentHtml}
     </div>
     <footer>
       <p><a href="${origin}/blog">Back to Blog</a> | <a href="${origin}">Sports Card Portfolio</a></p>
@@ -447,14 +474,17 @@ Sitemap: ${origin}/sitemap.xml
       // Get all published blog posts for the listing
       const posts = await storage.getBlogPosts(true);
       
-      // Generate list of blog posts as HTML
+      // Generate list of blog posts as HTML with hero images
       const postsHtml = posts.map(post => {
         const postUrl = `${origin}/blog/${post.slug}`;
         const postTitle = escapeHtml(post.title || '');
         const postExcerpt = escapeHtml(post.excerpt || '');
         const postDate = post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+        const heroImage = post.heroImageUrl ? 
+          (post.heroImageUrl.startsWith('/') ? `${origin}${post.heroImageUrl}` : post.heroImageUrl) : '';
         return `
           <article>
+            ${heroImage ? `<img src="${heroImage}" alt="${postTitle}" style="max-width:100%;height:auto;margin-bottom:1rem;border-radius:8px;" />` : ''}
             <h2><a href="${postUrl}">${postTitle}</a></h2>
             ${postDate ? `<p class="meta">Published: ${postDate}</p>` : ''}
             <p>${postExcerpt}</p>
