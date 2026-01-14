@@ -264,6 +264,23 @@ Sitemap: ${origin}/sitemap.xml
     ];
     return crawlers.some(crawler => userAgent.includes(crawler));
   };
+  
+  // Detect ALL crawlers including search engines and LLM bots for SSR
+  const isSearchCrawler = (userAgent: string) => {
+    const crawlers = [
+      // Search engines
+      'Googlebot', 'Bingbot', 'Slurp', 'DuckDuckBot', 'Baiduspider', 'YandexBot',
+      // Social crawlers
+      'facebookexternalhit', 'Twitterbot', 'LinkedInBot', 'Slackbot', 'Discordbot',
+      'WhatsApp', 'TelegramBot', 'Applebot',
+      // LLM/AI crawlers
+      'GPTBot', 'ChatGPT-User', 'Claude-Web', 'Anthropic', 'CCBot', 'PerplexityBot',
+      'YouBot', 'Cohere-ai', 'AI2Bot', 'Bytespider', 'ClaudeBot',
+      // Other bots
+      'AhrefsBot', 'SemrushBot', 'MJ12bot', 'ia_archiver', 'archive.org_bot'
+    ];
+    return crawlers.some(crawler => userAgent.toLowerCase().includes(crawler.toLowerCase()));
+  };
 
   // Serve OG meta tags for split pages (social media previews)
   app.get("/portfolio-builder/splits/:id", async (req: any, res, next) => {
@@ -316,11 +333,12 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
-  // Serve OG meta tags for blog post pages (social media previews)
+  // Serve full HTML content for blog post pages (SSR for search engines and LLM crawlers)
   app.get("/blog/:slug", async (req: any, res, next) => {
     const userAgent = req.headers['user-agent'] || '';
     
-    if (!isSocialCrawler(userAgent)) {
+    // Serve SSR for all crawlers (search engines, social bots, LLM crawlers)
+    if (!isSearchCrawler(userAgent)) {
       return next();
     }
 
@@ -338,6 +356,11 @@ Sitemap: ${origin}/sitemap.xml
       const rawImageUrl = post.heroImageUrl || '';
       const imageUrl = rawImageUrl.startsWith('/') ? `${origin}${rawImageUrl}` : rawImageUrl;
       const publishedDate = post.publishedAt ? new Date(post.publishedAt).toISOString() : '';
+      
+      // Convert markdown-like content to readable HTML
+      const contentHtml = escapeHtml(post.content || '')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br/>');
 
       const jsonLd = safeJsonLd({
         "@context": "https://schema.org",
@@ -351,11 +374,15 @@ Sitemap: ${origin}/sitemap.xml
         "publisher": { "@type": "Organization", "name": "Sports Card Portfolio" }
       });
 
+      // Serve full HTML with actual content (no redirect) for crawlers
       const html = `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title} | Sports Card Portfolio</title>
   <meta name="description" content="${description}" />
+  <meta name="robots" content="index, follow" />
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${description}" />
   <meta property="og:type" content="article" />
@@ -370,38 +397,80 @@ Sitemap: ${origin}/sitemap.xml
   ${imageUrl ? `<meta name="twitter:image" content="${imageUrl}" />` : ''}
   <link rel="canonical" href="${url}" />
   <script type="application/ld+json">${jsonLd}</script>
-  <meta http-equiv="refresh" content="0;url=${url}" />
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    .meta { color: #666; margin-bottom: 1.5rem; }
+    .content { margin-top: 1.5rem; }
+    img { max-width: 100%; height: auto; }
+    a { color: #F59E0B; }
+  </style>
 </head>
 <body>
-  <p>Redirecting to <a href="${url}">${title}</a>...</p>
+  <article>
+    <header>
+      <h1>${title}</h1>
+      ${publishedDate ? `<p class="meta">Published: ${new Date(post.publishedAt!).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>` : ''}
+      ${imageUrl ? `<img src="${imageUrl}" alt="${title}" />` : ''}
+    </header>
+    <div class="content">
+      <p>${contentHtml}</p>
+    </div>
+    <footer>
+      <p><a href="${origin}/blog">Back to Blog</a> | <a href="${origin}">Sports Card Portfolio</a></p>
+    </footer>
+  </article>
 </body>
 </html>`;
 
       res.type('text/html').send(html);
     } catch (error) {
-      console.error('[OG Tags] Error generating blog meta tags:', error);
+      console.error('[SSR] Error generating blog post HTML:', error);
       next();
     }
   });
 
-  // Serve OG meta tags for blog listing page (social media previews)
+  // Serve full HTML content for blog listing page (SSR for search engines and LLM crawlers)
   app.get("/blog", async (req: any, res, next) => {
     const userAgent = req.headers['user-agent'] || '';
     
-    if (!isSocialCrawler(userAgent)) {
+    if (!isSearchCrawler(userAgent)) {
       return next();
     }
 
-    const origin = getOriginUrl(req);
-    const url = `${origin}/blog`;
-    const title = "Blog | Sports Card Portfolio";
-    const description = "News, updates, and insights about sports card collecting and investing. Expert tips on building and growing your card portfolio.";
+    try {
+      const origin = getOriginUrl(req);
+      const url = `${origin}/blog`;
+      const title = "Blog | Sports Card Portfolio";
+      const description = "News, updates, and insights about sports card collecting and investing. Expert tips on building and growing your card portfolio.";
+      
+      // Get all published blog posts for the listing
+      const posts = await storage.getBlogPosts(true);
+      
+      // Generate list of blog posts as HTML
+      const postsHtml = posts.map(post => {
+        const postUrl = `${origin}/blog/${post.slug}`;
+        const postTitle = escapeHtml(post.title || '');
+        const postExcerpt = escapeHtml(post.excerpt || '');
+        const postDate = post.publishedAt ? new Date(post.publishedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+        return `
+          <article>
+            <h2><a href="${postUrl}">${postTitle}</a></h2>
+            ${postDate ? `<p class="meta">Published: ${postDate}</p>` : ''}
+            <p>${postExcerpt}</p>
+            <p><a href="${postUrl}">Read more</a></p>
+          </article>
+        `;
+      }).join('\n');
 
-    const html = `<!DOCTYPE html>
-<html>
+      const html = `<!DOCTYPE html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
   <meta name="description" content="${description}" />
+  <meta name="robots" content="index, follow" />
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${description}" />
   <meta property="og:type" content="website" />
@@ -410,14 +479,34 @@ Sitemap: ${origin}/sitemap.xml
   <meta name="twitter:title" content="${title}" />
   <meta name="twitter:description" content="${description}" />
   <link rel="canonical" href="${url}" />
-  <meta http-equiv="refresh" content="0;url=${url}" />
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    h1 { font-size: 2rem; margin-bottom: 1rem; }
+    h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .meta { color: #666; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    article { margin-bottom: 2rem; padding-bottom: 2rem; border-bottom: 1px solid #eee; }
+    a { color: #F59E0B; }
+  </style>
 </head>
 <body>
-  <p>Redirecting to <a href="${url}">${title}</a>...</p>
+  <header>
+    <h1>Sports Card Portfolio Blog</h1>
+    <p>${description}</p>
+  </header>
+  <main>
+    ${posts.length > 0 ? postsHtml : '<p>No blog posts yet. Check back soon!</p>'}
+  </main>
+  <footer>
+    <p><a href="${origin}">Sports Card Portfolio</a> - AI-powered portfolio management for sports card collectors.</p>
+  </footer>
 </body>
 </html>`;
 
-    res.type('text/html').send(html);
+      res.type('text/html').send(html);
+    } catch (error) {
+      console.error('[SSR] Error generating blog listing HTML:', error);
+      next();
+    }
   });
 
   // Stripe webhook endpoint - uses rawBody captured in index.ts
