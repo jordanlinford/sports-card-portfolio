@@ -225,7 +225,7 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
         <div className="relative rounded overflow-hidden shadow-inner bg-black/20">
           <div style={{ paddingBottom: '140%' }} className="relative">
             <img
-              src={card.imagePath}
+              src={card.imagePath || undefined}
               alt={card.title}
               className="absolute inset-0 w-full h-full object-contain"
             />
@@ -290,8 +290,14 @@ export default function CaseView() {
     queryKey: [`/api/display-cases/${id}/public`],
   });
 
-  const { data: user } = useQuery<User>({
+  const { data: user } = useQuery<User | null>({
     queryKey: ["/api/auth/user"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/user", { credentials: "include" });
+      if (res.status === 401) return null;
+      if (!res.ok) throw new Error("Failed to fetch user");
+      return res.json();
+    },
   });
 
   const isOwner = user?.id === displayCase?.userId;
