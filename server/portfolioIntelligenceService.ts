@@ -876,35 +876,83 @@ function scoreValue(candidate: NextBuyCandidate): number {
 function scoreFit(candidate: NextBuyCandidate, profile: PortfolioProfile): number {
   let score = 50;
   
-  // TEAM THEME BONUS - Strongly favor candidates matching user's team preferences
+  // TEAM THEME BONUS - Moderate boost (not dominant)
   if (candidate.source === "TeamTheme") {
-    score += 25; // Big boost for matching team themes
+    score += 12; // Meaningful but not dominant
   }
   
+  // WATCHLIST BONUS - User explicitly interested
+  if (candidate.source === "Watchlist") {
+    score += 18; // High priority - user actively tracking
+  }
+  
+  // BREAKOUT BONUS - High upside potential
+  if (candidate.source === "Breakout") {
+    score += 15; // Strong investment signal
+  }
+  
+  // DIVERSIFICATION BONUSES - Fill portfolio gaps
+  
+  // Position diversification
   const qbExposure = profile.positions["QB"] || 0;
   if (qbExposure > 0.50 && candidate.position !== "QB") {
-    score += 15;
+    score += 15; // Reduce QB concentration
   }
   if (qbExposure < 0.20 && candidate.position === "QB") {
-    score += 10;
-  }
-  
-  const rookieExposure = (profile.careerStage["Rookie"] || 0) + (profile.careerStage["Rising"] || 0);
-  if (rookieExposure > 0.50 && (candidate.stage === "Prime" || candidate.stage === "Decline")) {
-    score += 15;
-  }
-  if (rookieExposure < 0.30 && candidate.stage === "Rookie") {
-    score += 10;
-  }
-  
-  const topPlayer = profile.concentration.topPlayers[0];
-  if (topPlayer && topPlayer.pct > 0.15 && candidate.playerName !== topPlayer.player) {
-    score += 10;
+    score += 10; // Add QB exposure
   }
   
   const wrExposure = profile.positions["WR"] || 0;
   if (wrExposure < 0.15 && candidate.position === "WR") {
-    score += 20;
+    score += 18; // WR underweight - high bonus
+  }
+  
+  // New position exposure (adds diversity)
+  if (candidate.position && !(candidate.position in profile.positions)) {
+    score += 12; // Adding new position type
+  }
+  
+  // Career stage balance
+  const rookieExposure = (profile.careerStage["Rookie"] || 0) + (profile.careerStage["Rising"] || 0);
+  const primeExposure = profile.careerStage["Prime"] || 0;
+  
+  if (rookieExposure > 0.50 && (candidate.stage === "Prime")) {
+    score += 15; // Balance with proven players
+  }
+  if (rookieExposure < 0.30 && candidate.stage === "Rookie") {
+    score += 10; // Add growth potential
+  }
+  if (primeExposure < 0.20 && candidate.stage === "Prime") {
+    score += 12; // Need more proven performers
+  }
+  
+  // Concentration risk - favor non-top-player cards
+  const topPlayer = profile.concentration.topPlayers[0];
+  if (topPlayer && topPlayer.pct > 0.15 && candidate.playerName !== topPlayer.player) {
+    score += 10; // Diversify away from concentration
+  }
+  
+  // VALUE RANGE ALIGNMENT - Match user's typical investment level
+  // Use actual card count for accurate per-card average
+  const avgCardValue = profile.cardCount > 0 
+    ? profile.portfolioValueEstimate / profile.cardCount 
+    : 50; // Default $50 for new collectors
+  
+  if (candidate.estPrice && avgCardValue > 0) {
+    const priceRatio = candidate.estPrice / avgCardValue;
+    if (priceRatio >= 0.3 && priceRatio <= 3.0) {
+      score += 6; // Within reasonable range
+    } else if (priceRatio > 5.0) {
+      score -= 8; // Much more expensive than typical
+    }
+    // Don't penalize cheaper cards - they could be good value picks
+  }
+  
+  // MOMENTUM BONUS - Upward trends are attractive
+  if (candidate.momentumTrend === "up") {
+    score += 8;
+  } else if (candidate.momentumTrend === "down") {
+    score -= 5;
   }
   
   return Math.max(0, Math.min(100, Math.round(score)));
@@ -926,15 +974,19 @@ function generateWhyBullets(
 ): string[] {
   const bullets: string[] = [];
   
-  // Team theme explanation - PRIORITY
-  if (candidate.source === "TeamTheme") {
+  // SOURCE-BASED EXPLANATIONS (pick the most relevant one)
+  if (candidate.source === "Watchlist") {
+    bullets.push("From your watchlist - you've been tracking this player");
+  } else if (candidate.source === "Breakout") {
+    bullets.push("Breakout potential: showing strong upward momentum");
+  } else if (candidate.source === "HiddenGems") {
+    bullets.push("Identified as undervalued by market analysis");
+  } else if (candidate.source === "TeamTheme") {
     // Find which specific team the candidate matches from user's collection
     const userTeams = profile.concentration.topTeams
       .filter(t => t.pct > 0.05)
       .map(t => t.team);
     
-    // First use candidate.team directly if available (from Hidden Gems or other sources)
-    // Then fall back to player-to-team mapping, then title extraction
     let candidateTeam: string | null = null;
     if (candidate.team) {
       candidateTeam = normalizeTeamName(candidate.team) || candidate.team;
@@ -943,55 +995,72 @@ function generateWhyBullets(
       candidateTeam = mappedTeam || normalizeTeamName(extractTeamFromText(candidate.title));
     }
     
-    // Find which of the user's team themes this candidate matches
     const matchingTheme = candidateTeam 
       ? userTeams.find(ut => teamsMatch(ut, candidateTeam))
       : userTeams[0];
     
     if (matchingTheme) {
-      bullets.push(`Matches your ${matchingTheme} collection theme`);
-    } else if (userTeams.length > 0) {
-      bullets.push(`Matches your ${userTeams[0]} collection theme`);
-    } else {
-      bullets.push("Matches your team collection theme");
+      bullets.push(`Fits your ${matchingTheme} collection theme`);
     }
   }
   
-  if (scores.fit >= 70) {
-    const qbExposure = profile.positions["QB"] || 0;
-    if (qbExposure > 0.50 && candidate.position !== "QB") {
-      bullets.push(`Reduces QB concentration (adds ${candidate.position} exposure)`);
-    }
-    const wrExposure = profile.positions["WR"] || 0;
-    if (wrExposure < 0.15 && candidate.position === "WR") {
-      bullets.push("Fills WR gap in your portfolio");
-    }
-  }
-  
+  // INVESTMENT SIGNAL BULLETS
   if (scores.value >= 70 && candidate.priceDiscount && candidate.priceDiscount > 10) {
     bullets.push(`Priced ${Math.round(candidate.priceDiscount)}% below recent comps`);
   }
   
-  if (scores.momentum >= 70) {
-    bullets.push("Momentum improving: trending upward");
+  if (scores.momentum >= 70 && candidate.source !== "Breakout") {
+    bullets.push("Price momentum trending upward");
   }
   
+  // PORTFOLIO FIT BULLETS
+  const qbExposure = profile.positions["QB"] || 0;
+  if (qbExposure > 0.50 && candidate.position !== "QB") {
+    bullets.push(`Diversifies beyond your QB-heavy portfolio`);
+  } else if (qbExposure < 0.20 && candidate.position === "QB") {
+    bullets.push("Adds QB exposure to your collection");
+  }
+  
+  const wrExposure = profile.positions["WR"] || 0;
+  if (wrExposure < 0.15 && candidate.position === "WR") {
+    bullets.push("Fills WR gap in your portfolio");
+  }
+  
+  // Career stage balance
+  const rookieExposure = (profile.careerStage["Rookie"] || 0) + (profile.careerStage["Rising"] || 0);
+  const primeExposure = profile.careerStage["Prime"] || 0;
+  
+  if (rookieExposure > 0.50 && candidate.stage === "Prime") {
+    bullets.push("Adds proven performer to balance young prospects");
+  } else if (primeExposure < 0.20 && candidate.stage === "Prime") {
+    bullets.push("Brings established value to your collection");
+  } else if (rookieExposure < 0.30 && candidate.stage === "Rookie") {
+    bullets.push("Adds upside potential with young talent");
+  }
+  
+  // New position type
+  if (candidate.position && !(candidate.position in profile.positions)) {
+    bullets.push(`Adds ${candidate.position} - new position for your collection`);
+  }
+  
+  // Concentration diversification
   const topPlayer = profile.concentration.topPlayers[0];
-  if (topPlayer && topPlayer.pct > 0.15 && candidate.playerName !== topPlayer.player) {
-    bullets.push(`Diversifies away from ${topPlayer.player} concentration`);
+  if (topPlayer && topPlayer.pct > 0.20 && candidate.playerName !== topPlayer.player) {
+    bullets.push(`Reduces concentration in ${topPlayer.player}`);
   }
   
-  if (candidate.source === "Watchlist") {
-    bullets.push("From your watchlist - you've been tracking this player");
-  } else if (candidate.source === "HiddenGems") {
-    bullets.push("Identified as undervalued by market analysis");
-  }
-  
+  // Default if no specific reasons found
   if (bullets.length === 0) {
-    bullets.push("Solid addition to diversify your collection");
+    if (candidate.stage === "Rookie" || candidate.stage === "Rising") {
+      bullets.push("Growth potential with upside");
+    } else if (candidate.stage === "Prime") {
+      bullets.push("Stable investment with proven performance");
+    } else {
+      bullets.push("Solid addition to diversify your collection");
+    }
   }
   
-  return bullets.slice(0, 5);
+  return bullets.slice(0, 4); // Limit to 4 most relevant bullets
 }
 
 function computePortfolioImpact(
@@ -1060,17 +1129,46 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
     });
   }
   
-  // Source 2: Hidden Gems matching user's team preferences (PRIORITY)
-  if (topTeams.length > 0) {
-    try {
-      const activeGems = await db
-        .select()
-        .from(hiddenGems)
-        .where(eq(hiddenGems.isActive, true))
-        .limit(30);
-      
-      // Filter gems matching user's team themes using robust matching
-      for (const gem of activeGems) {
+  // Source 2: Hidden Gems with CAPPED sources to prevent any single type from dominating
+  try {
+    const activeGems = await db
+      .select()
+      .from(hiddenGems)
+      .where(eq(hiddenGems.isActive, true))
+      .limit(50);
+    
+    // Sort by confidence score to get best candidates from each source
+    const sortedGems = [...activeGems].sort((a, b) => 
+      (b.confidenceScore || 0) - (a.confidenceScore || 0)
+    );
+    
+    // Source 2a: BREAKOUT players (HOT temperature) - CAP at 3
+    let breakoutCount = 0;
+    for (const gem of sortedGems) {
+      if (breakoutCount >= 3) break;
+      if (gem.temperature === "HOT" && !candidates.some(c => c.playerName === gem.playerName)) {
+        candidates.push({
+          title: `${gem.playerName} - ${gem.team || gem.sport}`,
+          playerName: gem.playerName,
+          sport: gem.sport,
+          team: gem.team || undefined,
+          source: "Breakout",
+          position: gem.position || "Unknown",
+          stage: "Unknown",
+          estPrice: 25 + Math.random() * 50,
+          compsConfidence: gem.confidenceScore || 70,
+          momentumTrend: "up",
+        });
+        breakoutCount++;
+        console.log(`[NextBuys] Added ${gem.playerName} as BREAKOUT candidate (${breakoutCount}/3)`);
+      }
+    }
+    
+    // Source 2b: Team theme matches - CAP at 3
+    let teamThemeCount = 0;
+    if (topTeams.length > 0) {
+      for (const gem of sortedGems) {
+        if (teamThemeCount >= 3) break;
         const matchesTeam = gem.team && topTeams.some(userTeam => 
           teamsMatch(gem.team, userTeam)
         );
@@ -1080,6 +1178,7 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
             title: `${gem.playerName} - ${gem.team || gem.sport}`,
             playerName: gem.playerName,
             sport: gem.sport,
+            team: gem.team || undefined,
             source: "TeamTheme",
             position: gem.position || "Unknown",
             stage: "Unknown",
@@ -1087,31 +1186,36 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
             compsConfidence: gem.confidenceScore || 70,
             momentumTrend: gem.temperature === "HOT" ? "up" : gem.temperature === "COOLING" ? "down" : "flat",
           });
-          console.log(`[NextBuys] Added ${gem.playerName} (${gem.team}) matching team theme`);
+          teamThemeCount++;
+          console.log(`[NextBuys] Added ${gem.playerName} (${gem.team}) matching team theme (${teamThemeCount}/3)`);
         }
       }
-      
-      // Also add gems matching user's sport preferences
-      for (const gem of activeGems) {
-        const matchesSport = dominantSports.includes(gem.sport.toLowerCase());
-        
-        if (matchesSport && !candidates.some(c => c.playerName === gem.playerName)) {
-          candidates.push({
-            title: `${gem.playerName} - ${gem.team || gem.sport}`,
-            playerName: gem.playerName,
-            sport: gem.sport,
-            source: "HiddenGems",
-            position: gem.position || "Unknown",
-            stage: "Unknown",
-            estPrice: 25 + Math.random() * 50,
-            compsConfidence: gem.confidenceScore || 70,
-            momentumTrend: gem.temperature === "HOT" ? "up" : gem.temperature === "COOLING" ? "down" : "flat",
-          });
-        }
-      }
-    } catch (error) {
-      console.log("[NextBuys] Error fetching hidden gems:", error);
     }
+    
+    // Source 2c: Sport preference matches - CAP at 4
+    let sportMatchCount = 0;
+    for (const gem of sortedGems) {
+      if (sportMatchCount >= 4) break;
+      const matchesSport = dominantSports.includes(gem.sport.toLowerCase());
+      
+      if (matchesSport && !candidates.some(c => c.playerName === gem.playerName)) {
+        candidates.push({
+          title: `${gem.playerName} - ${gem.team || gem.sport}`,
+          playerName: gem.playerName,
+          sport: gem.sport,
+          team: gem.team || undefined,
+          source: "HiddenGems",
+          position: gem.position || "Unknown",
+          stage: "Unknown",
+          estPrice: 25 + Math.random() * 50,
+          compsConfidence: gem.confidenceScore || 70,
+          momentumTrend: gem.temperature === "HOT" ? "up" : gem.temperature === "COOLING" ? "down" : "flat",
+        });
+        sportMatchCount++;
+      }
+    }
+  } catch (error) {
+    console.log("[NextBuys] Error fetching hidden gems:", error);
   }
   
   // Source 3: Sport-specific trending players if not enough candidates
@@ -1202,10 +1306,87 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
     };
   });
 
-  const validCandidates = scoredCandidates
-    .filter(c => c.verdict !== "SKIP")
-    .sort((a, b) => b.overallScore - a.overallScore)
-    .slice(0, 7);
+  // RESERVED SLOT SYSTEM: Ensure diverse recommendations from multiple sources
+  // Instead of pure score sorting (which lets one source dominate), reserve slots
+  const validBySource = new Map<string, typeof scoredCandidates>();
+  
+  for (const c of scoredCandidates.filter(c => c.verdict !== "SKIP")) {
+    const source = c.candidate.source;
+    if (!validBySource.has(source)) {
+      validBySource.set(source, []);
+    }
+    validBySource.get(source)!.push(c);
+  }
+  
+  // Sort each source by score
+  for (const [, list] of validBySource) {
+    list.sort((a, b) => b.overallScore - a.overallScore);
+  }
+  
+  // Build final list with HARD CAPS per source (ensures true diversity)
+  const validCandidates: typeof scoredCandidates = [];
+  
+  // Hard caps per source - no source can exceed these limits
+  const sourceMaxCaps: Record<string, number> = {
+    "Watchlist": 2,      // User's explicit interests - max 2
+    "Breakout": 2,       // Hot momentum players - max 2
+    "TeamTheme": 2,      // Collection fit - max 2
+    "HiddenGems": 2,     // General undervalued picks - max 2
+    "MarketOutlook": 2,  // Trending fallback - max 2
+  };
+  
+  // Track how many we've added from each source
+  const sourceCount: Record<string, number> = {};
+  
+  // Round-robin selection: take best from each source in rotation until we have 7
+  let addedThisRound = true;
+  const sourceOrder = ["Watchlist", "Breakout", "TeamTheme", "HiddenGems", "MarketOutlook"];
+  
+  while (validCandidates.length < 7 && addedThisRound) {
+    addedThisRound = false;
+    
+    for (const source of sourceOrder) {
+      if (validCandidates.length >= 7) break;
+      
+      const currentCount = sourceCount[source] || 0;
+      const maxAllowed = sourceMaxCaps[source] || 2;
+      
+      if (currentCount >= maxAllowed) continue;
+      
+      const sourceList = validBySource.get(source) || [];
+      if (sourceList.length > 0) {
+        const best = sourceList.shift()!; // Take the best (pre-sorted)
+        validCandidates.push(best);
+        sourceCount[source] = currentCount + 1;
+        addedThisRound = true;
+      }
+    }
+  }
+  
+  // If still need more, take any remaining BUT still enforce source caps
+  if (validCandidates.length < 5) {
+    const allRemaining = Array.from(validBySource.values())
+      .flat()
+      .sort((a, b) => b.overallScore - a.overallScore);
+    
+    while (validCandidates.length < 5 && allRemaining.length > 0) {
+      const next = allRemaining.shift()!;
+      if (!validCandidates.includes(next)) {
+        // Still enforce caps even in fallback
+        const source = next.candidate.source;
+        const currentCount = sourceCount[source] || 0;
+        const maxAllowed = sourceMaxCaps[source] || 2;
+        
+        if (currentCount < maxAllowed) {
+          validCandidates.push(next);
+          sourceCount[source] = currentCount + 1;
+        }
+      }
+    }
+  }
+  
+  // Final sort by score for display order
+  validCandidates.sort((a, b) => b.overallScore - a.overallScore);
 
   await db.delete(nextBuys).where(eq(nextBuys.userId, userId));
 
