@@ -1138,8 +1138,9 @@ function decideVerdict(
     if (mispricingScore >= -25 && liquidityScore >= 50 && downsideRiskScore <= 55) {
       return { verdict: "ACCUMULATE", reason: "Early-career with strong market signals" };
     }
-    // AVOID: High downside with poor valuation
-    if (downsideRiskScore >= 65 && mispricingScore <= -30) {
+    // AVOID: High downside with poor valuation (relaxed thresholds)
+    // Downside >= 60 OR severely overpriced triggers this
+    if ((downsideRiskScore >= 60 && mispricingScore <= -25) || (mispricingScore <= -40 && downsideRiskScore >= 50)) {
       return { verdict: "AVOID_NEW_MONEY", reason: "Early-career with elevated risk and high prices" };
     }
     // Default for early-career: SPECULATIVE (uncertainty, not avoidance)
@@ -1155,13 +1156,14 @@ function decideVerdict(
     if (mispricingScore >= -25 && liquidityScore >= 50 && downsideRiskScore <= 55) {
       return { verdict: "ACCUMULATE", reason: "Prime player with strong fundamentals" };
     }
-    // TRADE_THE_HYPE: Overpriced with elevated risk
-    if (mispricingScore <= -35 && downsideRiskScore >= 60) {
-      return { verdict: "TRADE_THE_HYPE", reason: "Prime but prices exceed value - consider taking profits" };
+    // AVOID: Severely overpriced with high risk - don't buy
+    // AVOID_NEW_MONEY comes FIRST because it's more severe (higher thresholds)
+    if (mispricingScore <= -40 && downsideRiskScore >= 65) {
+      return { verdict: "AVOID_NEW_MONEY", reason: "Prime but severely overpriced with elevated risk - not worth chasing" };
     }
-    // AVOID: Very overpriced with high risk
-    if (mispricingScore <= -45 && downsideRiskScore >= 65) {
-      return { verdict: "AVOID_NEW_MONEY", reason: "Prime but severely overpriced with elevated risk" };
+    // TRADE_THE_HYPE: Moderately overpriced with elevated risk - sell if holding
+    if (mispricingScore <= -30 && downsideRiskScore >= 55) {
+      return { verdict: "TRADE_THE_HYPE", reason: "Prime but prices exceed value - consider taking profits" };
     }
     // Default for PRIME: HOLD_CORE
     return { verdict: "HOLD_CORE", reason: "Prime player - hold position, prices are fair to elevated" };
@@ -1889,8 +1891,11 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   // Year 3+ players can be AVOID only when role stability is genuinely poor
   const isPrime = input.stage === "PRIME";
   
-  // Rule 1: PRIME + AVOID + STARTER → too harsh, downgrade to SPECULATIVE
-  if (isPrime && verdict === "AVOID_NEW_MONEY" && roleTier === "STARTER") {
+  // Rule 1: PRIME + AVOID + STARTER → downgrade to SPECULATIVE ONLY if downside is moderate
+  // If downsideRiskScore >= 75 OR severely overpriced (mispricing <= -25), keep AVOID_NEW_MONEY
+  const severelyOverpriced = scores.mispricingScore <= -25;
+  const extremeDownside = scores.downsideRiskScore >= 75;
+  if (isPrime && verdict === "AVOID_NEW_MONEY" && roleTier === "STARTER" && !extremeDownside && !severelyOverpriced) {
     verdict = "SPECULATIVE_FLYER";
     reason = "Still a starter - risky but not dead money";
   }
