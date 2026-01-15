@@ -4549,6 +4549,191 @@ Sitemap: ${origin}/sitemap.xml
   });
 
   // =========================================================================
+  // SUPPORT TICKET ROUTES
+  // =========================================================================
+
+  // Get user's own support tickets
+  app.get("/api/support/tickets", isAuthenticated, async (req: any, res) => {
+    try {
+      const tickets = await storage.getSupportTicketsForUser(req.user.id);
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching user support tickets:", error);
+      res.status(500).json({ message: "Failed to fetch support tickets" });
+    }
+  });
+
+  // Get a specific ticket (must be owner or admin)
+  app.get("/api/support/tickets/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      if (isNaN(ticketId)) {
+        return res.status(400).json({ message: "Invalid ticket ID" });
+      }
+
+      const ticket = await storage.getSupportTicketById(ticketId);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Check access: must be owner or admin
+      const isAdmin = await storage.isUserAdmin(req.user.id);
+      if (ticket.requesterId !== req.user.id && !isAdmin) {
+        return res.status(403).json({ message: "Not authorized to view this ticket" });
+      }
+
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error fetching support ticket:", error);
+      res.status(500).json({ message: "Failed to fetch ticket" });
+    }
+  });
+
+  // Create a new support ticket
+  app.post("/api/support/tickets", isAuthenticated, async (req: any, res) => {
+    try {
+      const { subject, body } = req.body;
+      
+      if (!subject || !body) {
+        return res.status(400).json({ message: "Subject and body are required" });
+      }
+
+      if (subject.length > 200) {
+        return res.status(400).json({ message: "Subject must be 200 characters or less" });
+      }
+
+      const ticket = await storage.createSupportTicket({
+        requesterId: req.user.id,
+        subject,
+        body,
+      });
+
+      // Notify all admins about the new ticket
+      const adminUsers = await storage.getAdminUsers();
+      const user = await storage.getUser(req.user.id);
+      for (const admin of adminUsers) {
+        await storage.createNotification(admin.id, 'support_ticket_created', {
+          ticketId: ticket.id,
+          subject: ticket.subject,
+          requesterName: user?.firstName && user?.lastName 
+            ? `${user.firstName} ${user.lastName}` 
+            : user?.handle || 'A user',
+          requesterEmail: user?.email,
+        });
+      }
+
+      res.status(201).json(ticket);
+    } catch (error) {
+      console.error("Error creating support ticket:", error);
+      res.status(500).json({ message: "Failed to create support ticket" });
+    }
+  });
+
+  // Add a message to a ticket
+  app.post("/api/support/tickets/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      if (isNaN(ticketId)) {
+        return res.status(400).json({ message: "Invalid ticket ID" });
+      }
+
+      const { body } = req.body;
+      if (!body) {
+        return res.status(400).json({ message: "Message body is required" });
+      }
+
+      const ticket = await storage.getSupportTicketById(ticketId);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Check access: must be owner or admin
+      const isAdmin = await storage.isUserAdmin(req.user.id);
+      if (ticket.requesterId !== req.user.id && !isAdmin) {
+        return res.status(403).json({ message: "Not authorized to reply to this ticket" });
+      }
+
+      const message = await storage.addSupportTicketMessage({
+        ticketId,
+        senderId: req.user.id,
+        body,
+        isAdminReply: isAdmin,
+      });
+
+      // Notify the other party
+      if (isAdmin) {
+        // Admin replied - notify the requester
+        await storage.createNotification(ticket.requesterId, 'support_ticket_reply', {
+          ticketId: ticket.id,
+          subject: ticket.subject,
+        });
+      } else {
+        // User replied - notify all admins
+        const adminUsers = await storage.getAdminUsers();
+        const user = await storage.getUser(req.user.id);
+        for (const admin of adminUsers) {
+          await storage.createNotification(admin.id, 'support_ticket_user_reply', {
+            ticketId: ticket.id,
+            subject: ticket.subject,
+            requesterName: user?.firstName && user?.lastName 
+              ? `${user.firstName} ${user.lastName}` 
+              : user?.handle || 'A user',
+          });
+        }
+      }
+
+      res.status(201).json(message);
+    } catch (error) {
+      console.error("Error adding ticket message:", error);
+      res.status(500).json({ message: "Failed to add message" });
+    }
+  });
+
+  // Admin: Get all open support tickets
+  app.get("/api/admin/support/tickets", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const tickets = await storage.getAllOpenSupportTickets();
+      res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching admin support tickets:", error);
+      res.status(500).json({ message: "Failed to fetch support tickets" });
+    }
+  });
+
+  // Admin: Update ticket status
+  app.patch("/api/admin/support/tickets/:id/status", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      if (isNaN(ticketId)) {
+        return res.status(400).json({ message: "Invalid ticket ID" });
+      }
+
+      const { status } = req.body;
+      const validStatuses = ['OPEN', 'IN_PROGRESS', 'WAITING_ON_USER', 'RESOLVED', 'CLOSED'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const ticket = await storage.updateSupportTicketStatus(ticketId, status, req.user.id);
+      if (!ticket) {
+        return res.status(404).json({ message: "Ticket not found" });
+      }
+
+      // Notify requester of status change
+      await storage.createNotification(ticket.requesterId, 'support_ticket_status_changed', {
+        ticketId: ticket.id,
+        subject: ticket.subject,
+        newStatus: status,
+      });
+
+      res.json(ticket);
+    } catch (error) {
+      console.error("Error updating ticket status:", error);
+      res.status(500).json({ message: "Failed to update ticket status" });
+    }
+  });
+
+  // =========================================================================
   // PUBLIC PLAYER OUTLOOK ROUTES (SEO-optimized pages)
   // =========================================================================
 
