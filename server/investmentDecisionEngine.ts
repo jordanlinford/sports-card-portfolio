@@ -621,8 +621,14 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
   // Decision tree based on factor balance
   // ============================================================
   
+  // CRITICAL GUARDRAIL: Young players (ROOKIE through YEAR_3) can NEVER get AVOID_STRUCTURAL
+  // "Structural decline" implies a deteriorating baseline - rookies haven't established one yet
+  // Even struggling rookies should be SPECULATIVE or HOLD, not decline warnings
+  const isEarlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3";
+  
   // AVOID_STRUCTURAL: 3+ negative factors AND fewer positive factors
-  if (negativeFactors >= 3 && positiveFactors < negativeFactors) {
+  // But block for early-career players (they haven't had enough time to "decline")
+  if (negativeFactors >= 3 && positiveFactors < negativeFactors && !isEarlyCareer) {
     return { 
       verdict: "AVOID_STRUCTURAL", 
       reason: `Structural decline: ${negativeReasons.join(", ")}` 
@@ -630,10 +636,19 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
   }
   
   // OUT_OF_LEAGUE with no positives = AVOID_STRUCTURAL
-  if (roleStabilityScore <= 15 && positiveFactors === 0) {
+  // But block for early-career players - they may just need more development time
+  if (roleStabilityScore <= 15 && positiveFactors === 0 && !isEarlyCareer) {
     return { 
       verdict: "AVOID_STRUCTURAL", 
       reason: "Out of league with no path back" 
+    };
+  }
+  
+  // Early-career players with low stability → SPECULATIVE (uncertainty, not avoidance)
+  if (isEarlyCareer && roleStabilityScore <= 15) {
+    return {
+      verdict: "SPECULATIVE_FLYER",
+      reason: "Early-career player still developing - high uncertainty but not structural decline"
     };
   }
   
@@ -660,13 +675,23 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
   
   // SEVERE NEGATIVE COMBO: High downside + significantly overpriced = AVOID_STRUCTURAL
   // Only when positives don't clearly dominate (positives must be 2+ more than negatives to override)
+  // Block for early-career players - they should get SPECULATIVE/HOLD, not structural warnings
   const hasHighDownside = downsideRiskScore >= 70;
   const isSignificantlyOverpriced = mispricingScore < -15;
   const positivesOverwhelm = positiveFactors >= negativeFactors + 2;
-  if (hasHighDownside && isSignificantlyOverpriced && !positivesOverwhelm) {
+  if (hasHighDownside && isSignificantlyOverpriced && !positivesOverwhelm && !isEarlyCareer) {
     return { 
       verdict: "AVOID_STRUCTURAL", 
       reason: "High downside risk + significantly overpriced - negative expected value" 
+    };
+  }
+  
+  // Early-career with high downside and overpriced → still not AVOID_STRUCTURAL 
+  // Use AVOID_NEW_MONEY instead (less severe - suggests waiting for better price, not "declining")
+  if (hasHighDownside && isSignificantlyOverpriced && isEarlyCareer) {
+    return {
+      verdict: "AVOID_NEW_MONEY",
+      reason: "Early-career player overpriced given uncertainty - wait for better entry"
     };
   }
   
