@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download, Globe, Zap, ExternalLink } from "lucide-react";
+import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download, Globe, Zap, ExternalLink, MessageCircle, Send, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { User, DisplayCaseWithCards, PlayerRegistry, BlogPostWithAuthor } from "@shared/schema";
+import type { User, DisplayCaseWithCards, PlayerRegistry, BlogPostWithAuthor, SupportTicketWithRequester, SupportTicketWithMessages, SupportTicketStatus } from "@shared/schema";
 import { HeroImageUploader } from "@/components/hero-image-uploader";
 
 interface PlatformStats {
@@ -934,6 +934,256 @@ function OutlookSEOTab() {
   );
 }
 
+const TICKET_STATUS_CONFIG: Record<SupportTicketStatus, { label: string; variant: "default" | "secondary" | "outline" | "destructive"; icon: typeof Clock }> = {
+  OPEN: { label: "Open", variant: "destructive", icon: AlertCircle },
+  IN_PROGRESS: { label: "In Progress", variant: "secondary", icon: Clock },
+  WAITING_ON_USER: { label: "Awaiting User", variant: "outline", icon: MessageCircle },
+  RESOLVED: { label: "Resolved", variant: "default", icon: CheckCircle },
+  CLOSED: { label: "Closed", variant: "outline", icon: CheckCircle },
+};
+
+function SupportTicketsTab() {
+  const { toast } = useToast();
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  const [replyBody, setReplyBody] = useState("");
+
+  const { data: tickets, isLoading } = useQuery<SupportTicketWithRequester[]>({
+    queryKey: ["/api/admin/support/tickets"],
+  });
+
+  const { data: selectedTicket, isLoading: ticketLoading } = useQuery<SupportTicketWithMessages>({
+    queryKey: ["/api/support/tickets", selectedTicketId],
+    enabled: !!selectedTicketId,
+  });
+
+  const replyMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/support/tickets/${selectedTicketId}/messages`, { body: replyBody });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets", selectedTicketId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/support/tickets"] });
+      setReplyBody("");
+      toast({ title: "Reply sent" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      return apiRequest("PATCH", `/api/admin/support/tickets/${id}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/support/tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/support/tickets", selectedTicketId] });
+      toast({ title: "Status updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openCount = tickets?.filter(t => t.status === "OPEN").length || 0;
+
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      <div className="md:col-span-1">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageCircle className="h-5 w-5" />
+              Support Tickets
+              {openCount > 0 && (
+                <Badge variant="destructive" className="ml-2">{openCount} open</Badge>
+              )}
+            </CardTitle>
+            <CardDescription>User questions and problems</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[500px]">
+              {isLoading ? (
+                <div className="p-4 space-y-2">
+                  {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16" />)}
+                </div>
+              ) : tickets && tickets.length > 0 ? (
+                <div className="divide-y">
+                  {tickets.map(ticket => {
+                    const statusConfig = TICKET_STATUS_CONFIG[ticket.status as SupportTicketStatus] || TICKET_STATUS_CONFIG.OPEN;
+                    const StatusIcon = statusConfig.icon;
+                    return (
+                      <div
+                        key={ticket.id}
+                        className={`p-3 cursor-pointer hover-elevate ${selectedTicketId === ticket.id ? 'bg-primary/10' : ''}`}
+                        onClick={() => setSelectedTicketId(ticket.id)}
+                        data-testid={`row-ticket-${ticket.id}`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant={statusConfig.variant} className="text-xs">
+                            <StatusIcon className="h-3 w-3 mr-1" />
+                            {statusConfig.label}
+                          </Badge>
+                        </div>
+                        <p className="font-medium text-sm truncate">{ticket.subject}</p>
+                        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                          <span>{ticket.requester.firstName || ticket.requester.handle || "User"}</span>
+                          <span>·</span>
+                          <span>{ticket.createdAt ? format(new Date(ticket.createdAt), "MMM d") : ""}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-8 text-center text-muted-foreground">
+                  <CheckCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No open tickets</p>
+                </div>
+              )}
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="md:col-span-2">
+        <Card className="h-[580px] flex flex-col">
+          {selectedTicketId && selectedTicket ? (
+            <>
+              <CardHeader className="border-b">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <CardTitle className="text-lg" data-testid="text-ticket-subject">{selectedTicket.subject}</CardTitle>
+                    <CardDescription className="flex items-center gap-2 flex-wrap">
+                      <span>From: {selectedTicket.requester.email || selectedTicket.requester.handle}</span>
+                      <span>·</span>
+                      <span>{selectedTicket.createdAt ? format(new Date(selectedTicket.createdAt), "MMM d, yyyy 'at' h:mm a") : ""}</span>
+                    </CardDescription>
+                  </div>
+                  <Select
+                    value={selectedTicket.status}
+                    onValueChange={(status) => statusMutation.mutate({ id: selectedTicket.id, status })}
+                  >
+                    <SelectTrigger className="w-[160px]" data-testid="select-ticket-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="OPEN">Open</SelectItem>
+                      <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                      <SelectItem value="WAITING_ON_USER">Awaiting User</SelectItem>
+                      <SelectItem value="RESOLVED">Resolved</SelectItem>
+                      <SelectItem value="CLOSED">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+
+              <ScrollArea className="flex-1">
+                <div className="p-4 space-y-4">
+                  <Card className="bg-muted/50">
+                    <CardContent className="pt-4">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={selectedTicket.requester.profileImageUrl || undefined} />
+                          <AvatarFallback>
+                            {selectedTicket.requester.firstName?.[0] || selectedTicket.requester.handle?.[0] || "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm">
+                              {selectedTicket.requester.firstName && selectedTicket.requester.lastName
+                                ? `${selectedTicket.requester.firstName} ${selectedTicket.requester.lastName}`
+                                : selectedTicket.requester.handle || "User"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {selectedTicket.createdAt && format(new Date(selectedTicket.createdAt), "MMM d 'at' h:mm a")}
+                            </span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap" data-testid="text-ticket-body">{selectedTicket.body}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {selectedTicket.messages.map((message) => (
+                    <Card 
+                      key={message.id} 
+                      className={message.isAdminReply ? "border-primary/30 bg-primary/5" : "bg-muted/50"}
+                    >
+                      <CardContent className="pt-4">
+                        <div className="flex items-start gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={message.sender.profileImageUrl || undefined} />
+                            <AvatarFallback>
+                              {message.sender.firstName?.[0] || message.sender.handle?.[0] || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-sm">
+                                {message.sender.firstName && message.sender.lastName
+                                  ? `${message.sender.firstName} ${message.sender.lastName}`
+                                  : message.sender.handle || "Unknown"}
+                              </span>
+                              {message.isAdminReply && (
+                                <Badge variant="secondary" className="text-xs">Admin</Badge>
+                              )}
+                              <span className="text-xs text-muted-foreground">
+                                {message.createdAt && format(new Date(message.createdAt), "MMM d 'at' h:mm a")}
+                              </span>
+                            </div>
+                            <p className="text-sm whitespace-pre-wrap">{message.body}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </ScrollArea>
+
+              {selectedTicket.status !== "CLOSED" && (
+                <div className="p-4 border-t flex gap-2">
+                  <Textarea
+                    placeholder="Type your reply..."
+                    value={replyBody}
+                    onChange={(e) => setReplyBody(e.target.value)}
+                    rows={2}
+                    className="flex-1"
+                    data-testid="input-admin-reply"
+                  />
+                  <Button 
+                    onClick={() => replyMutation.mutate()}
+                    disabled={!replyBody.trim() || replyMutation.isPending}
+                    data-testid="button-send-admin-reply"
+                  >
+                    {replyMutation.isPending ? (
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : ticketLoading ? (
+            <CardContent className="flex-1 flex items-center justify-center">
+              <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+            </CardContent>
+          ) : (
+            <CardContent className="flex-1 flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <MessageCircle className="h-12 w-12 mx-auto mb-2 opacity-30" />
+                <p>Select a ticket to view details</p>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function BlogTab() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1502,6 +1752,10 @@ export default function AdminDashboard() {
               <Globe className="h-4 w-4 mr-1" />
               Outlook SEO
             </TabsTrigger>
+            <TabsTrigger value="support" data-testid="tab-support">
+              <MessageCircle className="h-4 w-4 mr-1" />
+              Support
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -1570,6 +1824,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="outlook">
             <OutlookSEOTab />
+          </TabsContent>
+
+          <TabsContent value="support">
+            <SupportTicketsTab />
           </TabsContent>
         </Tabs>
       </div>
