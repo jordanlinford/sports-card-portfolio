@@ -1,14 +1,15 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import { 
   Upload, 
   ImageIcon, 
@@ -17,19 +18,225 @@ import {
   Clock,
   ArrowRight,
   Plus,
-  ExternalLink
+  ExternalLink,
+  Sparkles,
+  TrendingUp,
+  Brain,
+  Eye,
+  ChevronRight,
+  LayoutGrid
 } from "lucide-react";
 import { DISPLAY_CASE_THEMES } from "@/lib/themes";
 import { trackEvent } from "@/lib/analytics";
-import type { DisplayCaseWithCards } from "@shared/schema";
+import type { DisplayCaseWithCards, Card as CardType } from "@shared/schema";
 import { ProFeatureGate } from "@/components/pro-feature-gate";
-import { useQuery } from "@tanstack/react-query";
+import { OutlookBadge } from "@/components/outlook-badge";
 
 const ONBOARDING_THEMES = DISPLAY_CASE_THEMES.filter(t => 
   ["classic", "velvet", "wood"].includes(t.id)
 );
 
-export default function OnboardingPage() {
+type DemoCase = DisplayCaseWithCards & { ownerName: string; likeCount: number };
+
+function DemoPortfolioCard({ card, onClick }: { card: CardType; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="group relative text-left cursor-pointer transition-transform duration-200 hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg"
+      data-testid={`card-demo-${card.id}`}
+    >
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-lg p-2 shadow-lg">
+        <div className="relative rounded overflow-hidden shadow-inner bg-black/20">
+          <div style={{ paddingBottom: '140%' }} className="relative">
+            <img
+              src={card.imagePath || undefined}
+              alt={card.title}
+              className="absolute inset-0 w-full h-full object-contain"
+            />
+          </div>
+          {card.outlookAction && (
+            <div className="absolute top-1 left-1">
+              <OutlookBadge action={card.outlookAction} size="sm" />
+            </div>
+          )}
+        </div>
+        <div className="mt-2 px-1">
+          <p className="font-medium text-sm truncate text-white">{card.title}</p>
+          {card.estimatedValue && (
+            <p className="text-xs text-slate-400">${card.estimatedValue.toLocaleString()}</p>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function DemoExploreStep({ onContinue }: { onContinue: () => void }) {
+  const [, setLocation] = useLocation();
+  
+  const { data: trendingCases, isLoading } = useQuery<DemoCase[]>({
+    queryKey: ["/api/explore/trending"],
+  });
+
+  const demoCase = trendingCases?.find(c => c.cards && c.cards.length >= 4);
+  const previewCards = demoCase?.cards?.slice(0, 6) || [];
+
+  const handleCardClick = (card: CardType) => {
+    if (demoCase) {
+      setLocation(`/case/${demoCase.id}`);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-background py-12">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="text-center mb-8">
+            <Skeleton className="h-10 w-64 mx-auto mb-4" />
+            <Skeleton className="h-5 w-96 mx-auto" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <Skeleton key={i} className="aspect-[3/4] rounded-lg" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!demoCase) {
+    onContinue();
+    return null;
+  }
+
+  const cardsWithOutlooks = demoCase.cards?.filter(c => c.outlookAction) || [];
+
+  return (
+    <div className="min-h-[calc(100vh-64px)] bg-background py-8">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-medium mb-4">
+            <Sparkles className="h-4 w-4" />
+            Welcome to Sports Card Portfolio
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold mb-3" data-testid="text-demo-title">
+            See what your collection could look like
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Explore this sample portfolio to see AI-powered insights, investment verdicts, and more. 
+            Then create your own in just one minute.
+          </p>
+        </div>
+
+        <Card className="mb-8 overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-800 via-slate-900 to-slate-800 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-white" data-testid="text-demo-case-name">
+                  {demoCase.name}
+                </h2>
+                <p className="text-slate-400 text-sm">by {demoCase.ownerName}</p>
+              </div>
+              <div className="flex items-center gap-3 text-slate-400 text-sm">
+                <span className="flex items-center gap-1">
+                  <LayoutGrid className="h-4 w-4" />
+                  {demoCase.cards?.length || 0} cards
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-3 mb-4">
+              {previewCards.map((card) => (
+                <DemoPortfolioCard 
+                  key={card.id} 
+                  card={card} 
+                  onClick={() => handleCardClick(card)}
+                />
+              ))}
+            </div>
+
+            {(demoCase.cards?.length || 0) > 6 && (
+              <div className="text-center">
+                <Link href={`/case/${demoCase.id}`}>
+                  <Button variant="secondary" className="gap-2" data-testid="button-view-full-demo">
+                    View all {demoCase.cards?.length} cards
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {cardsWithOutlooks.length > 0 && (
+          <Card className="mb-8">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                <CardTitle>AI-Powered Investment Insights</CardTitle>
+              </div>
+              <CardDescription>
+                Every card gets an AI analysis with buy/hold/sell recommendations based on real market data
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3">
+                {cardsWithOutlooks.slice(0, 3).map((card) => (
+                  <div 
+                    key={card.id}
+                    className="flex items-center gap-4 p-3 rounded-lg bg-muted/50"
+                  >
+                    <div className="w-12 h-16 rounded overflow-hidden flex-shrink-0 bg-muted">
+                      {card.imagePath && (
+                        <img 
+                          src={card.imagePath} 
+                          alt={card.title}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{card.title}</p>
+                      {card.outlookExplanationShort && (
+                        <p className="text-sm text-muted-foreground line-clamp-1">
+                          {card.outlookExplanationShort}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex-shrink-0">
+                      <OutlookBadge action={card.outlookAction!} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="flex flex-col gap-4">
+          <Button 
+            size="lg" 
+            className="w-full gap-2 text-lg py-6"
+            onClick={onContinue}
+            data-testid="button-start-collection"
+          >
+            <Plus className="h-5 w-5" />
+            Start My Own Collection
+          </Button>
+          <Link href={`/case/${demoCase.id}`}>
+            <Button variant="outline" size="lg" className="w-full gap-2" data-testid="button-explore-more">
+              <Eye className="h-5 w-5" />
+              Explore this portfolio first
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CreateCaseStep() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -40,7 +247,6 @@ export default function OnboardingPage() {
   });
   const isPro = user?.subscriptionStatus === "PRO";
 
-  const [step, setStep] = useState<"setup" | "success">("setup");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -50,6 +256,7 @@ export default function OnboardingPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [createdCase, setCreatedCase] = useState<DisplayCaseWithCards | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [step, setStep] = useState<"setup" | "success">("setup");
 
   const isValidName = caseName.length >= 2 && caseName.length <= 40;
   const canCreate = uploadedImagePath && isValidName && !uploading;
@@ -315,10 +522,10 @@ export default function OnboardingPage() {
 
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2" data-testid="text-onboarding-title">
-            Create your first display case
+            Now add your first card
           </h1>
           <p className="text-muted-foreground">
-            Upload a card to get started with your collection
+            Upload a card to start getting AI-powered insights
           </p>
         </div>
 
@@ -512,4 +719,28 @@ export default function OnboardingPage() {
       </div>
     </div>
   );
+}
+
+export default function OnboardingPage() {
+  const [currentStep, setCurrentStep] = useState<"demo" | "create">("demo");
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Skeleton className="h-8 w-32" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/api/login";
+    return null;
+  }
+
+  if (currentStep === "demo") {
+    return <DemoExploreStep onContinue={() => setCurrentStep("create")} />;
+  }
+
+  return <CreateCaseStep />;
 }
