@@ -200,47 +200,51 @@ export default function SearchPage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {results.map((card) => (
-              <button
-                key={card.id}
-                onClick={() => setSelectedCard(card)}
-                className="group relative bg-card rounded-lg overflow-hidden border hover-elevate text-left cursor-pointer w-full"
-                data-testid={`card-search-result-${card.id}`}
-              >
-                <div className="aspect-square relative">
-                  <img
-                    src={card.imagePath}
-                    alt={card.title}
-                    className="w-full h-full object-cover"
-                  />
-                  {card.outlookAction && (
-                    <div className="absolute top-1 left-1">
-                      <OutlookBadge action={card.outlookAction} size="sm" />
-                    </div>
-                  )}
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
-                    <p className="font-medium text-sm truncate">{card.title}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-white/80">
-                      {card.year && <span>{card.year}</span>}
-                      {card.grade && (
-                        <Badge variant="secondary" className="text-xs">
-                          {card.grade}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1 mt-1 text-xs text-white/70">
-                      <span className="truncate">{card.displayCaseName}</span>
-                      <Link
-                        href={`/cases/${card.displayCaseId}/edit`}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
+              <div key={card.id} className="flex flex-col">
+                <button
+                  onClick={() => setSelectedCard(card)}
+                  className="group relative bg-card rounded-lg overflow-hidden border hover-elevate text-left cursor-pointer w-full"
+                  data-testid={`card-search-result-${card.id}`}
+                >
+                  <div className="aspect-square relative">
+                    <img
+                      src={card.imagePath}
+                      alt={card.title}
+                      className="w-full h-full object-cover"
+                    />
+                    {card.outlookAction && (
+                      <div className="absolute top-1 left-1">
+                        <OutlookBadge action={card.outlookAction} size="sm" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                      <p className="font-medium text-sm truncate">{card.title}</p>
+                      <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-white/80">
+                        {card.year && <span>{card.year}</span>}
+                        {card.grade && (
+                          <Badge variant="secondary" className="text-xs">
+                            {card.grade}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
+                </button>
+                <div className="px-1 pt-2 pb-1">
+                  <p className="text-sm font-medium truncate">{card.title}</p>
+                  <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground">
+                    <span className="truncate">In: {card.displayCaseName}</span>
+                    <Link
+                      href={`/cases/${card.displayCaseId}/edit`}
+                      className="text-primary hover:text-primary/80"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
