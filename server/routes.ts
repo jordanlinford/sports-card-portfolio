@@ -6649,6 +6649,32 @@ Sitemap: ${origin}/sitemap.xml
     return user?.isAdmin === true;
   }
 
+  // Helper: Notify all admins about split activity
+  async function notifyAdminsAboutSplitAction(
+    action: string,
+    splitTitle: string,
+    splitId: number,
+    details: Record<string, any>
+  ): Promise<void> {
+    try {
+      // Get all admin users through storage
+      const adminUsers = await storage.getAdminUsers();
+      
+      for (const admin of adminUsers) {
+        await storage.createNotification(admin.id, "split_admin_activity", {
+          action,
+          splitTitle,
+          splitId,
+          ...details,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      console.log(`[Splits] Notified ${adminUsers.length} admin(s) about: ${action} on "${splitTitle}"`);
+    } catch (error) {
+      console.error("[Splits] Error notifying admins:", error);
+    }
+  }
+
   // ============================================================================
   // PUBLIC ENDPOINTS - Break Events & Split Instances
   // ============================================================================
@@ -6816,6 +6842,20 @@ Sitemap: ${origin}/sitemap.xml
           seatPrice,
         });
       }
+
+      // Notify admins about the join action
+      await notifyAdminsAboutSplitAction(
+        "User Joined",
+        splitTitle,
+        splitId,
+        {
+          userName,
+          userEmail,
+          seatStatus,
+          currentInterested: seatCounts.interested + 1,
+          totalSeats: split.participantCount,
+        }
+      );
 
       // Notify other participants that someone joined
       const newCounts = await storage.getSeatCounts(splitId);
@@ -7604,6 +7644,29 @@ Sitemap: ${origin}/sitemap.xml
         // Mark seat as paid
         await storage.markSeatAsPaid(seatId, session.id);
         console.log(`[Splits Webhook] Marked seat ${seatId} as paid for split ${splitId}`);
+
+        // Get seat and split info for admin notification
+        const paidSeat = await storage.getSeat(seatId);
+        const splitWithEvent = await storage.getSplitInstanceWithBreakEvent(splitId);
+        if (paidSeat && splitWithEvent) {
+          const paidUser = await storage.getUser(paidSeat.userId);
+          const splitTitle = splitWithEvent.breakEvent.title;
+          const newSeatCounts = await storage.getSeatCounts(splitId);
+          
+          // Notify admins about the payment
+          await notifyAdminsAboutSplitAction(
+            "Payment Received",
+            splitTitle,
+            splitId,
+            {
+              userName: paidUser?.firstName || paidUser?.handle || "Collector",
+              userEmail: paidUser?.email,
+              amountPaid: (split.seatPriceCents / 100).toFixed(2),
+              paidCount: newSeatCounts.paid,
+              totalSeats: split.participantCount,
+            }
+          );
+        }
 
         // Record webhook processed
         await storage.recordProcessedWebhookEvent(event.id, event.type, {

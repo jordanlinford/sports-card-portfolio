@@ -120,6 +120,7 @@ function generateRandomHandle(): string {
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getAdminUsers(): Promise<User[]>;
   upsertUser(user: UpsertUser): Promise<{ user: User; isNewUser: boolean }>;
   updateUserHandle(userId: string, handle: string): Promise<User | undefined>;
   isHandleAvailable(handle: string, excludeUserId?: string): Promise<boolean>;
@@ -375,6 +376,10 @@ export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
+  }
+
+  async getAdminUsers(): Promise<User[]> {
+    return db.select().from(users).where(eq(users.isAdmin, true));
   }
 
   async upsertUser(userData: UpsertUser): Promise<{ user: User; isNewUser: boolean }> {
