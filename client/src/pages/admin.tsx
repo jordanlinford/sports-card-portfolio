@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download } from "lucide-react";
+import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download, Globe, Zap, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -735,6 +735,205 @@ function PlayerRegistryTab() {
   );
 }
 
+interface OutlookCacheEntry {
+  playerKey: string;
+  playerName: string;
+  sport: string;
+  slug: string | null;
+  isPublic: boolean;
+  seoTitle: string | null;
+  updatedAt: string;
+}
+
+interface SeedResult {
+  playerName: string;
+  sport: string;
+  success: boolean;
+  url?: string;
+  error?: string;
+}
+
+function OutlookSEOTab() {
+  const { toast } = useToast();
+  const [seeding, setSeeding] = useState(false);
+  const [seedResults, setSeedResults] = useState<SeedResult[] | null>(null);
+
+  const { data: cacheEntries, isLoading, refetch } = useQuery<OutlookCacheEntry[]>({
+    queryKey: ["/api/admin/outlook/cache"],
+  });
+
+  const togglePublicMutation = useMutation({
+    mutationFn: async ({ playerKey, isPublic }: { playerKey: string; isPublic: boolean }) => {
+      return await apiRequest("PATCH", `/api/admin/outlook/cache/${encodeURIComponent(playerKey)}/public`, { isPublic });
+    },
+    onSuccess: () => {
+      refetch();
+      toast({ title: "Visibility updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSeedTopAthletes = async () => {
+    setSeeding(true);
+    setSeedResults(null);
+    try {
+      const res = await apiRequest("POST", "/api/admin/outlook/seed", {});
+      const data = res as { results: SeedResult[] };
+      setSeedResults(data.results);
+      refetch();
+      const successCount = data.results.filter((r: SeedResult) => r.success).length;
+      toast({ 
+        title: "Seeding Complete", 
+        description: `${successCount}/${data.results.length} athletes seeded successfully` 
+      });
+    } catch (error: any) {
+      toast({ title: "Seeding Failed", description: error.message, variant: "destructive" });
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const publicCount = cacheEntries?.filter(e => e.isPublic).length || 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-2xl font-bold">{cacheEntries?.length || 0}</div>
+            <p className="text-xs text-muted-foreground">Cached Outlooks</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="text-2xl font-bold">{publicCount}</div>
+            <p className="text-xs text-muted-foreground">Public Pages</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <Button 
+              onClick={handleSeedTopAthletes} 
+              disabled={seeding}
+              className="w-full"
+              data-testid="button-seed-athletes"
+            >
+              {seeding ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Zap className="h-4 w-4 mr-2" />
+              )}
+              Seed Top Athletes
+            </Button>
+            <p className="text-xs text-muted-foreground mt-2">
+              Generates outlooks for popular players
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {seedResults && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Seed Results</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {seedResults.map((result, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <Badge variant={result.success ? "default" : "destructive"}>
+                    {result.sport}
+                  </Badge>
+                  <span>{result.playerName}</span>
+                  {result.success ? (
+                    <a 
+                      href={result.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline flex items-center gap-1"
+                    >
+                      View <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-destructive">{result.error}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Public Outlook Pages</CardTitle>
+          <CardDescription>
+            Manage which player outlooks are publicly accessible for SEO
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ScrollArea className="h-[400px]">
+            {isLoading ? (
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12" />)}
+              </div>
+            ) : cacheEntries && cacheEntries.length > 0 ? (
+              <div className="space-y-1">
+                {cacheEntries.map(entry => (
+                  <div 
+                    key={entry.playerKey} 
+                    className="flex items-center gap-4 p-3 border-b last:border-b-0"
+                    data-testid={`row-outlook-${entry.playerKey}`}
+                  >
+                    <Badge variant="outline" className="w-12 justify-center">{entry.sport}</Badge>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{entry.playerName}</p>
+                      {entry.slug && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          /outlook/{entry.sport.toLowerCase()}/{entry.slug}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={entry.isPublic}
+                        onCheckedChange={(checked) => 
+                          togglePublicMutation.mutate({ playerKey: entry.playerKey, isPublic: checked })
+                        }
+                        data-testid={`switch-public-${entry.playerKey}`}
+                      />
+                      <span className="text-sm text-muted-foreground w-16">
+                        {entry.isPublic ? "Public" : "Private"}
+                      </span>
+                      {entry.isPublic && entry.slug && (
+                        <a
+                          href={`/outlook/${entry.sport.toLowerCase()}/${entry.slug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button size="icon" variant="ghost">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No cached outlooks. Use "Seed Top Athletes" or analyze players in the app.
+              </div>
+            )}
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function BlogTab() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -1299,6 +1498,10 @@ export default function AdminDashboard() {
               <FileText className="h-4 w-4 mr-1" />
               Blog
             </TabsTrigger>
+            <TabsTrigger value="outlook" data-testid="tab-outlook">
+              <Globe className="h-4 w-4 mr-1" />
+              Outlook SEO
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -1363,6 +1566,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="blog">
             <BlogTab />
+          </TabsContent>
+
+          <TabsContent value="outlook">
+            <OutlookSEOTab />
           </TabsContent>
         </Tabs>
       </div>
