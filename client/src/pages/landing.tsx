@@ -39,7 +39,7 @@ export default function Landing() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-title">
-              Make smarter sports card decisions — without guessing.
+              The first sports card tracker that tells you Why to buy, not just what it's worth.
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-subtitle">
               Sports Card Portfolio helps collectors reduce regret by understanding when to buy, hold, sell, or wait across their entire collection.
