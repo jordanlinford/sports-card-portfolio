@@ -759,12 +759,12 @@ function OutlookSEOTab() {
   const [seedResults, setSeedResults] = useState<SeedResult[] | null>(null);
 
   const { data: cacheEntries, isLoading, refetch } = useQuery<OutlookCacheEntry[]>({
-    queryKey: ["/api/admin/outlook/cache"],
+    queryKey: ["/api/admin/outlook"],
   });
 
   const togglePublicMutation = useMutation({
     mutationFn: async ({ playerKey, isPublic }: { playerKey: string; isPublic: boolean }) => {
-      return await apiRequest("PATCH", `/api/admin/outlook/cache/${encodeURIComponent(playerKey)}/public`, { isPublic });
+      return await apiRequest("PATCH", `/api/admin/outlook/${encodeURIComponent(playerKey)}/public`, { isPublic });
     },
     onSuccess: () => {
       refetch();

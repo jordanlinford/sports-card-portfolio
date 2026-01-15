@@ -305,6 +305,7 @@ export interface IStorage {
   getCachedPlayerOutlook(playerKey: string): Promise<PlayerOutlookCache | undefined>;
   getPublicPlayerOutlookBySlug(sport: string, slug: string): Promise<PlayerOutlookCache | undefined>;
   getAllPublicPlayerOutlooks(): Promise<PlayerOutlookCache[]>;
+  getAllPlayerOutlookCache(): Promise<PlayerOutlookCache[]>;
   updatePlayerOutlookPublicFields(playerKey: string, data: { slug?: string; isPublic?: boolean; seoTitle?: string; seoDescription?: string }): Promise<PlayerOutlookCache | undefined>;
 
   // Shared Snapshot operations
@@ -2541,6 +2542,13 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(playerOutlookCache)
       .where(eq(playerOutlookCache.isPublic, true))
+      .orderBy(playerOutlookCache.playerName);
+  }
+
+  async getAllPlayerOutlookCache(): Promise<PlayerOutlookCache[]> {
+    return db
+      .select()
+      .from(playerOutlookCache)
       .orderBy(playerOutlookCache.playerName);
   }
 
