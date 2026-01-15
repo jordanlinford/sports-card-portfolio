@@ -29,6 +29,8 @@ import {
   seats,
   splitWebhookEvents,
   blogPosts,
+  supportTickets,
+  supportTicketMessages,
   type User,
   type UpsertUser,
   type DisplayCase,
@@ -93,6 +95,13 @@ import {
   type BlogPost,
   type InsertBlogPost,
   type BlogPostWithAuthor,
+  type SupportTicket,
+  type InsertSupportTicket,
+  type SupportTicketWithRequester,
+  type SupportTicketWithMessages,
+  type SupportTicketMessage,
+  type InsertSupportTicketMessage,
+  type SupportTicketStatus,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -369,6 +378,14 @@ export interface IStorage {
   updateBlogPost(id: number, data: Partial<InsertBlogPost>): Promise<BlogPost | undefined>;
   deleteBlogPost(id: number): Promise<void>;
   toggleBlogPostPublished(id: number): Promise<BlogPost | undefined>;
+
+  // Support ticket operations
+  getSupportTicketsForUser(userId: string): Promise<SupportTicketWithRequester[]>;
+  getAllOpenSupportTickets(): Promise<SupportTicketWithRequester[]>;
+  getSupportTicketById(id: number): Promise<SupportTicketWithMessages | undefined>;
+  createSupportTicket(data: InsertSupportTicket): Promise<SupportTicket>;
+  updateSupportTicketStatus(id: number, status: SupportTicketStatus, adminId?: string): Promise<SupportTicket | undefined>;
+  addSupportTicketMessage(data: InsertSupportTicketMessage & { isAdminReply: boolean }): Promise<SupportTicketMessage>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3072,6 +3089,154 @@ export class DatabaseStorage implements IStorage {
       .where(eq(blogPosts.id, id))
       .returning();
     return updated;
+  }
+
+  // Support ticket operations
+  async getSupportTicketsForUser(userId: string): Promise<SupportTicketWithRequester[]> {
+    const tickets = await db
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.requesterId, userId))
+      .orderBy(desc(supportTickets.createdAt));
+    
+    const result: SupportTicketWithRequester[] = [];
+    for (const ticket of tickets) {
+      const [requester] = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        handle: users.handle,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      }).from(users).where(eq(users.id, ticket.requesterId));
+      
+      if (requester) {
+        result.push({ ...ticket, requester });
+      }
+    }
+    return result;
+  }
+
+  async getAllOpenSupportTickets(): Promise<SupportTicketWithRequester[]> {
+    const tickets = await db
+      .select()
+      .from(supportTickets)
+      .where(
+        or(
+          eq(supportTickets.status, 'OPEN'),
+          eq(supportTickets.status, 'IN_PROGRESS'),
+          eq(supportTickets.status, 'WAITING_ON_USER')
+        )
+      )
+      .orderBy(desc(supportTickets.createdAt));
+    
+    const result: SupportTicketWithRequester[] = [];
+    for (const ticket of tickets) {
+      const [requester] = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        handle: users.handle,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      }).from(users).where(eq(users.id, ticket.requesterId));
+      
+      if (requester) {
+        result.push({ ...ticket, requester });
+      }
+    }
+    return result;
+  }
+
+  async getSupportTicketById(id: number): Promise<SupportTicketWithMessages | undefined> {
+    const [ticket] = await db
+      .select()
+      .from(supportTickets)
+      .where(eq(supportTickets.id, id));
+    
+    if (!ticket) return undefined;
+    
+    const [requester] = await db.select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      handle: users.handle,
+      email: users.email,
+      profileImageUrl: users.profileImageUrl,
+    }).from(users).where(eq(users.id, ticket.requesterId));
+    
+    if (!requester) return undefined;
+    
+    const messageRows = await db
+      .select()
+      .from(supportTicketMessages)
+      .where(eq(supportTicketMessages.ticketId, id))
+      .orderBy(asc(supportTicketMessages.createdAt));
+    
+    const messagesWithSenders = [];
+    for (const msg of messageRows) {
+      const [sender] = await db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        handle: users.handle,
+        profileImageUrl: users.profileImageUrl,
+      }).from(users).where(eq(users.id, msg.senderId));
+      
+      if (sender) {
+        messagesWithSenders.push({ ...msg, sender });
+      }
+    }
+    
+    return { ...ticket, requester, messages: messagesWithSenders };
+  }
+
+  async createSupportTicket(data: InsertSupportTicket): Promise<SupportTicket> {
+    const [ticket] = await db
+      .insert(supportTickets)
+      .values(data)
+      .returning();
+    return ticket;
+  }
+
+  async updateSupportTicketStatus(id: number, status: SupportTicketStatus, adminId?: string): Promise<SupportTicket | undefined> {
+    const updateData: any = { status, updatedAt: new Date() };
+    if (adminId) {
+      updateData.assignedAdminId = adminId;
+    }
+    
+    const [ticket] = await db
+      .update(supportTickets)
+      .set(updateData)
+      .where(eq(supportTickets.id, id))
+      .returning();
+    return ticket;
+  }
+
+  async addSupportTicketMessage(data: InsertSupportTicketMessage & { isAdminReply: boolean }): Promise<SupportTicketMessage> {
+    const [message] = await db
+      .insert(supportTicketMessages)
+      .values(data)
+      .returning();
+    
+    // Update the ticket's lastReplyAt and adminReplyCount if admin
+    const updateData: any = { lastReplyAt: new Date(), updatedAt: new Date() };
+    if (data.isAdminReply) {
+      await db
+        .update(supportTickets)
+        .set({
+          ...updateData,
+          adminReplyCount: sql`${supportTickets.adminReplyCount} + 1`,
+        })
+        .where(eq(supportTickets.id, data.ticketId));
+    } else {
+      await db
+        .update(supportTickets)
+        .set(updateData)
+        .where(eq(supportTickets.id, data.ticketId));
+    }
+    
+    return message;
   }
 }
 
