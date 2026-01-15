@@ -441,9 +441,27 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
     .sort((a, b) => b.projectedGrowth["12m"] - a.projectedGrowth["12m"])
     .slice(0, 5);
   
+  // More comprehensive risk detection - every collection has some risk profile
   const riskCards = [...cardProjections]
-    .filter(c => c.riskLevel === "high" || c.projectedGrowth["12m"] < 0)
-    .sort((a, b) => a.projectedGrowth["12m"] - b.projectedGrowth["12m"])
+    .filter(c => {
+      // Explicit high risk
+      if (c.riskLevel === "high") return true;
+      // Negative projected growth
+      if (c.projectedGrowth["12m"] < 0) return true;
+      // Near-flat growth indicates stagnant value (retired/aging players)
+      if (c.projectedGrowth["12m"] <= 1 && c.currentValue >= 20) return true;
+      // Negative verdicts
+      if (c.verdict === "AVOID") return true;
+      // Cooling markets with meaningful value
+      if (c.temperature === "COOLING" && c.currentValue >= 30) return true;
+      return false;
+    })
+    .sort((a, b) => {
+      // Sort by risk priority: negative growth first, then flat growth, then by value at risk
+      const aScore = a.projectedGrowth["12m"] - (a.riskLevel === "high" ? 10 : 0);
+      const bScore = b.projectedGrowth["12m"] - (b.riskLevel === "high" ? 10 : 0);
+      return aScore - bScore;
+    })
     .slice(0, 5);
   
   const insights = generateInsights(cardProjections, sportStats, tempStats, currentValue);
@@ -521,6 +539,22 @@ function generateInsights(
       description: `${highRiskCards.length} cards have elevated risk profiles. Diversification may reduce volatility.`,
       impactLevel: highRiskCards.length > 5 ? "high" : "medium",
       affectedCards: highRiskCards.length,
+    });
+  }
+  
+  // Stagnant value cards (retired/aging players with near-flat growth)
+  const stagnantCards = cardProjections.filter(c => 
+    c.projectedGrowth["12m"] <= 1 && c.currentValue >= 20
+  );
+  if (stagnantCards.length > 0) {
+    const stagnantValue = stagnantCards.reduce((sum, c) => sum + c.currentValue, 0);
+    const stagnantPct = Math.round(stagnantValue / totalValue * 100);
+    insights.push({
+      type: "risk",
+      title: "Stagnant Value Holdings",
+      description: `${stagnantCards.length} cards ($${Math.round(stagnantValue)}, ${stagnantPct}% of portfolio) have minimal growth potential. Consider reallocating to active players.`,
+      impactLevel: stagnantPct > 30 ? "high" : stagnantPct > 15 ? "medium" : "low",
+      affectedCards: stagnantCards.length,
     });
   }
   
