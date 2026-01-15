@@ -271,6 +271,107 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
+// ============================================================================
+// SUPPORT TICKETS - User questions and problems
+// ============================================================================
+export const SUPPORT_TICKET_STATUSES = [
+  "OPEN",
+  "IN_PROGRESS", 
+  "WAITING_ON_USER",
+  "RESOLVED",
+  "CLOSED",
+] as const;
+
+export type SupportTicketStatus = typeof SUPPORT_TICKET_STATUSES[number];
+
+export const SUPPORT_TICKET_PRIORITIES = [
+  "LOW",
+  "NORMAL",
+  "HIGH",
+  "URGENT",
+] as const;
+
+export type SupportTicketPriority = typeof SUPPORT_TICKET_PRIORITIES[number];
+
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  requesterId: varchar("requester_id").notNull().references(() => users.id),
+  assignedAdminId: varchar("assigned_admin_id").references(() => users.id, { onDelete: "set null" }),
+  subject: varchar("subject", { length: 200 }).notNull(),
+  body: text("body").notNull(),
+  status: varchar("status", { length: 30 }).default("OPEN").notNull(),
+  priority: varchar("priority", { length: 20 }).default("NORMAL").notNull(),
+  adminReplyCount: integer("admin_reply_count").default(0).notNull(),
+  lastReplyAt: timestamp("last_reply_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const supportTicketMessages = pgTable("support_ticket_messages", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").notNull().references(() => supportTickets.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  isAdminReply: boolean("is_admin_reply").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const supportTicketsRelations = relations(supportTickets, ({ one, many }) => ({
+  requester: one(users, {
+    fields: [supportTickets.requesterId],
+    references: [users.id],
+    relationName: "ticketRequester",
+  }),
+  assignedAdmin: one(users, {
+    fields: [supportTickets.assignedAdminId],
+    references: [users.id],
+    relationName: "ticketAdmin",
+  }),
+  messages: many(supportTicketMessages),
+}));
+
+export const supportTicketMessagesRelations = relations(supportTicketMessages, ({ one }) => ({
+  ticket: one(supportTickets, {
+    fields: [supportTicketMessages.ticketId],
+    references: [supportTickets.id],
+  }),
+  sender: one(users, {
+    fields: [supportTicketMessages.senderId],
+    references: [users.id],
+  }),
+}));
+
+export const insertSupportTicketSchema = createInsertSchema(supportTickets).omit({
+  id: true,
+  status: true,
+  priority: true,
+  adminReplyCount: true,
+  lastReplyAt: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertSupportTicket = z.infer<typeof insertSupportTicketSchema>;
+export type SupportTicket = typeof supportTickets.$inferSelect;
+
+export const insertSupportTicketMessageSchema = createInsertSchema(supportTicketMessages).omit({
+  id: true,
+  isAdminReply: true,
+  createdAt: true,
+});
+export type InsertSupportTicketMessage = z.infer<typeof insertSupportTicketMessageSchema>;
+export type SupportTicketMessage = typeof supportTicketMessages.$inferSelect;
+
+export type SupportTicketWithRequester = SupportTicket & {
+  requester: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'email' | 'profileImageUrl'>;
+};
+
+export type SupportTicketWithMessages = SupportTicket & {
+  requester: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'email' | 'profileImageUrl'>;
+  messages: (SupportTicketMessage & { 
+    sender: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>;
+  })[];
+};
+
 // Badges table - definitions of available badges
 export const badges = pgTable("badges", {
   id: varchar("id", { length: 50 }).primaryKey(),
