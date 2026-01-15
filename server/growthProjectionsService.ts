@@ -111,6 +111,26 @@ const RISK_LEVEL_MAP: Record<string, "low" | "medium" | "high"> = {
   HIGH: "high",
 };
 
+// Career stage modifiers - retired and aging players have limited/no growth potential
+const CAREER_STAGE_MODIFIERS: Record<string, { multiplier: number; maxGrowth: number; minGrowth: number }> = {
+  // Retired players: stable market, minimal movement
+  RETIRED: { multiplier: 0.0, maxGrowth: 1, minGrowth: -2 },
+  RETIRED_HOF: { multiplier: 0.1, maxGrowth: 3, minGrowth: -1 },
+  // Aging vets: declining value trajectory
+  AGING_VET: { multiplier: 0.2, maxGrowth: 2, minGrowth: -5 },
+  // Prime players: solid but not explosive
+  PRIME: { multiplier: 0.9, maxGrowth: 25, minGrowth: -15 },
+  SUPERSTAR: { multiplier: 1.1, maxGrowth: 35, minGrowth: -12 },
+  // Rising stars: highest upside potential
+  RISING_STAR: { multiplier: 1.2, maxGrowth: 50, minGrowth: -20 },
+  RISING: { multiplier: 1.2, maxGrowth: 50, minGrowth: -20 },
+  BREAKOUT: { multiplier: 1.3, maxGrowth: 60, minGrowth: -25 },
+  // Franchise core (established stars)
+  FRANCHISE_CORE: { multiplier: 1.0, maxGrowth: 30, minGrowth: -10 },
+};
+
+const DEFAULT_CAREER_STAGE = { multiplier: 0.8, maxGrowth: 15, minGrowth: -10 };
+
 function calculateCardGrowth(
   card: Card,
   temperature: MarketTemperature | null,
@@ -122,22 +142,28 @@ function calculateCardGrowth(
   const temp = temperature || "NEUTRAL";
   const baseFactor = TEMPERATURE_GROWTH_FACTORS[temp];
   
+  // Get career stage modifier
+  const legacyTier = card.legacyTier?.toUpperCase() || "";
+  const careerMod = CAREER_STAGE_MODIFIERS[legacyTier] || DEFAULT_CAREER_STAGE;
+  
   const upsideMod = upsideScore ? (upsideScore - 50) / 100 : 0;
   const riskMod = riskScore ? (riskScore - 50) / 100 : 0;
   const verdictMod = verdict ? (VERDICT_GROWTH_MODIFIERS[verdict] || 1.0) : 1.0;
   
   const timeScale = monthsAhead / 12;
   
+  // Apply career stage multiplier to dampen growth for retired/aging players
   const baseGrowth = {
-    bear: (baseFactor.bear - riskMod * 10) * timeScale * verdictMod,
-    base: (baseFactor.base + upsideMod * 5) * timeScale * verdictMod,
-    bull: (baseFactor.bull + upsideMod * 15) * timeScale * verdictMod,
+    bear: (baseFactor.bear - riskMod * 10) * timeScale * verdictMod * careerMod.multiplier,
+    base: (baseFactor.base + upsideMod * 5) * timeScale * verdictMod * careerMod.multiplier,
+    bull: (baseFactor.bull + upsideMod * 15) * timeScale * verdictMod * careerMod.multiplier,
   };
   
+  // Clamp growth to career stage limits
   return {
-    bear: Math.round(baseGrowth.bear * 10) / 10,
-    base: Math.round(baseGrowth.base * 10) / 10,
-    bull: Math.round(baseGrowth.bull * 10) / 10,
+    bear: Math.round(Math.max(careerMod.minGrowth, Math.min(careerMod.maxGrowth, baseGrowth.bear)) * 10) / 10,
+    base: Math.round(Math.max(careerMod.minGrowth, Math.min(careerMod.maxGrowth, baseGrowth.base)) * 10) / 10,
+    bull: Math.round(Math.max(careerMod.minGrowth, Math.min(careerMod.maxGrowth, baseGrowth.bull)) * 10) / 10,
   };
 }
 
@@ -145,8 +171,22 @@ function determineGrowthDriver(
   temperature: MarketTemperature | null,
   verdict: string | null,
   upsideScore: number | null,
-  sport: string | null
+  sport: string | null,
+  legacyTier: string | null
 ): string {
+  const tier = legacyTier?.toUpperCase() || "";
+  
+  // Career stage takes priority for retired/aging players
+  if (tier === "RETIRED") {
+    return "Retired - stable pricing";
+  }
+  if (tier === "RETIRED_HOF") {
+    return "Hall of Famer - legacy value";
+  }
+  if (tier === "AGING_VET") {
+    return "Aging veteran - limited upside";
+  }
+  
   if (!temperature && !verdict) {
     return "Limited data available";
   }
@@ -168,6 +208,17 @@ function determineGrowthDriver(
   }
   if (temperature === "COOLING") {
     return "Market correction phase";
+  }
+  
+  // Career stage messaging for active players
+  if (tier === "RISING_STAR" || tier === "RISING" || tier === "BREAKOUT") {
+    return "Rising star potential";
+  }
+  if (tier === "SUPERSTAR" || tier === "FRANCHISE_CORE") {
+    return "Elite player status";
+  }
+  if (tier === "PRIME") {
+    return "Prime years value";
   }
   
   return "Stable market conditions";
@@ -318,7 +369,7 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
         "6m": growth6m.base,
         "12m": growth12m.base,
       },
-      growthDriver: determineGrowthDriver(temperature, verdict, upsideScore || null, card.sport),
+      growthDriver: determineGrowthDriver(temperature, verdict, upsideScore || null, card.sport, card.legacyTier),
       riskLevel: riskScore ? (riskScore > 65 ? "high" : riskScore > 40 ? "medium" : "low") : "medium",
       temperature,
       verdict,
