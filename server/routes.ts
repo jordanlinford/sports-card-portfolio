@@ -3311,6 +3311,23 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       const comment = await storage.createComment(id, userId, content.trim());
+      
+      // Notify the display case owner about the new comment (if not self-commenting)
+      if (displayCase.userId !== userId) {
+        const commenter = await storage.getUser(userId);
+        const commenterName = commenter?.handle 
+          ? `@${commenter.handle}` 
+          : commenter ? `${commenter.firstName || ''} ${commenter.lastName || ''}`.trim() || 'Someone' : 'Someone';
+        
+        await storage.createNotification(displayCase.userId, "comment_received", {
+          displayCaseId: id,
+          caseName: displayCase.name,
+          commenterId: userId,
+          commenterName,
+          commentPreview: content.trim().substring(0, 100),
+        });
+      }
+      
       res.status(201).json(comment);
     } catch (error) {
       console.error("Error creating comment:", error);
@@ -3390,6 +3407,21 @@ Sitemap: ${origin}/sitemap.xml
         prestigeService.checkAndAwardLikeBadge(userId).catch(err => {
           console.error("Error awarding like badge:", err);
         });
+        
+        // Notify the display case owner about the like (if not self-liking)
+        if (displayCase.userId !== userId) {
+          const liker = await storage.getUser(userId);
+          const likerName = liker?.handle 
+            ? `@${liker.handle}` 
+            : liker ? `${liker.firstName || ''} ${liker.lastName || ''}`.trim() || 'Someone' : 'Someone';
+          
+          await storage.createNotification(displayCase.userId, "like_received", {
+            displayCaseId: id,
+            caseName: displayCase.name,
+            likerId: userId,
+            likerName,
+          });
+        }
       }
 
       res.json({ hasLiked, count });
