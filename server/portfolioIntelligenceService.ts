@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { cards, displayCases, playerWatchlist, portfolioSnapshots, nextBuys, cardOutlooks } from "@shared/schema";
+import { cards, displayCases, playerWatchlist, portfolioSnapshots, nextBuys, cardOutlooks, hiddenGems } from "@shared/schema";
 import type { 
   PortfolioProfile, 
   PortfolioExposures, 
@@ -78,6 +78,268 @@ function inferTeamMarketSize(teamMarket: string | null): "Large" | "Mid" | "Smal
   return "Unknown";
 }
 
+// NBA Teams
+const NBA_TEAMS = [
+  "Hawks", "Celtics", "Nets", "Hornets", "Bulls", "Cavaliers", "Mavericks", "Nuggets",
+  "Pistons", "Warriors", "Rockets", "Pacers", "Clippers", "Lakers", "Grizzlies", "Heat",
+  "Bucks", "Timberwolves", "Pelicans", "Knicks", "Thunder", "Magic", "76ers", "Suns",
+  "Trail Blazers", "Blazers", "Kings", "Spurs", "Raptors", "Jazz", "Wizards",
+  // Full names for better matching
+  "Atlanta Hawks", "Boston Celtics", "Brooklyn Nets", "Charlotte Hornets", "Chicago Bulls",
+  "Cleveland Cavaliers", "Dallas Mavericks", "Denver Nuggets", "Detroit Pistons",
+  "Golden State Warriors", "Houston Rockets", "Indiana Pacers", "LA Clippers", "Los Angeles Clippers",
+  "LA Lakers", "Los Angeles Lakers", "Memphis Grizzlies", "Miami Heat", "Milwaukee Bucks",
+  "Minnesota Timberwolves", "New Orleans Pelicans", "New York Knicks", "Oklahoma City Thunder",
+  "Orlando Magic", "Philadelphia 76ers", "Phoenix Suns", "Portland Trail Blazers",
+  "Sacramento Kings", "San Antonio Spurs", "Toronto Raptors", "Utah Jazz", "Washington Wizards"
+];
+
+// NFL Teams
+const NFL_TEAMS = [
+  "Cardinals", "Falcons", "Ravens", "Bills", "Panthers", "Bears", "Bengals", "Browns",
+  "Cowboys", "Broncos", "Lions", "Packers", "Texans", "Colts", "Jaguars", "Chiefs",
+  "Raiders", "Chargers", "Rams", "Dolphins", "Vikings", "Patriots", "Saints", "Giants",
+  "Jets", "Eagles", "Steelers", "49ers", "Seahawks", "Buccaneers", "Titans", "Commanders",
+  // Full names
+  "Arizona Cardinals", "Atlanta Falcons", "Baltimore Ravens", "Buffalo Bills",
+  "Carolina Panthers", "Chicago Bears", "Cincinnati Bengals", "Cleveland Browns",
+  "Dallas Cowboys", "Denver Broncos", "Detroit Lions", "Green Bay Packers",
+  "Houston Texans", "Indianapolis Colts", "Jacksonville Jaguars", "Kansas City Chiefs",
+  "Las Vegas Raiders", "Los Angeles Chargers", "Los Angeles Rams", "Miami Dolphins",
+  "Minnesota Vikings", "New England Patriots", "New Orleans Saints", "New York Giants",
+  "New York Jets", "Philadelphia Eagles", "Pittsburgh Steelers", "San Francisco 49ers",
+  "Seattle Seahawks", "Tampa Bay Buccaneers", "Tennessee Titans", "Washington Commanders"
+];
+
+// MLB Teams
+const MLB_TEAMS = [
+  "Diamondbacks", "Braves", "Orioles", "Red Sox", "Cubs", "White Sox", "Reds", "Guardians",
+  "Rockies", "Tigers", "Astros", "Royals", "Angels", "Dodgers", "Marlins", "Brewers",
+  "Twins", "Mets", "Yankees", "Athletics", "Phillies", "Pirates", "Padres", "Giants",
+  "Mariners", "Cardinals", "Rays", "Rangers", "Blue Jays", "Nationals"
+];
+
+// NHL Teams
+const NHL_TEAMS = [
+  "Ducks", "Coyotes", "Bruins", "Sabres", "Flames", "Hurricanes", "Blackhawks", "Avalanche",
+  "Blue Jackets", "Stars", "Red Wings", "Oilers", "Panthers", "Kings", "Wild", "Canadiens",
+  "Predators", "Devils", "Islanders", "Rangers", "Senators", "Flyers", "Penguins", "Sharks",
+  "Kraken", "Blues", "Lightning", "Maple Leafs", "Canucks", "Golden Knights", "Capitals", "Jets"
+];
+
+const ALL_TEAMS = [...NBA_TEAMS, ...NFL_TEAMS, ...MLB_TEAMS, ...NHL_TEAMS];
+
+// Maps team nicknames to their full canonical names for reliable matching
+const TEAM_CANONICAL_NAMES: Record<string, string> = {
+  // NBA
+  "Hawks": "Atlanta Hawks", "Celtics": "Boston Celtics", "Nets": "Brooklyn Nets",
+  "Hornets": "Charlotte Hornets", "Bulls": "Chicago Bulls", "Cavaliers": "Cleveland Cavaliers",
+  "Mavericks": "Dallas Mavericks", "Nuggets": "Denver Nuggets", "Pistons": "Detroit Pistons",
+  "Warriors": "Golden State Warriors", "Rockets": "Houston Rockets", "Pacers": "Indiana Pacers",
+  "Clippers": "LA Clippers", "Lakers": "LA Lakers", "Grizzlies": "Memphis Grizzlies",
+  "Heat": "Miami Heat", "Bucks": "Milwaukee Bucks", "Timberwolves": "Minnesota Timberwolves",
+  "Pelicans": "New Orleans Pelicans", "Knicks": "New York Knicks", "Thunder": "Oklahoma City Thunder",
+  "Magic": "Orlando Magic", "76ers": "Philadelphia 76ers", "Suns": "Phoenix Suns",
+  "Trail Blazers": "Portland Trail Blazers", "Blazers": "Portland Trail Blazers",
+  "Kings": "Sacramento Kings", "Spurs": "San Antonio Spurs", "Raptors": "Toronto Raptors",
+  "Jazz": "Utah Jazz", "Wizards": "Washington Wizards",
+  // NFL
+  "Cardinals": "Arizona Cardinals", "Falcons": "Atlanta Falcons", "Ravens": "Baltimore Ravens",
+  "Bills": "Buffalo Bills", "Panthers": "Carolina Panthers", "Bears": "Chicago Bears",
+  "Bengals": "Cincinnati Bengals", "Browns": "Cleveland Browns", "Cowboys": "Dallas Cowboys",
+  "Broncos": "Denver Broncos", "Lions": "Detroit Lions", "Packers": "Green Bay Packers",
+  "Texans": "Houston Texans", "Colts": "Indianapolis Colts", "Jaguars": "Jacksonville Jaguars",
+  "Chiefs": "Kansas City Chiefs", "Raiders": "Las Vegas Raiders", "Chargers": "LA Chargers",
+  "Rams": "LA Rams", "Dolphins": "Miami Dolphins", "Vikings": "Minnesota Vikings",
+  "Patriots": "New England Patriots", "Saints": "New Orleans Saints", "Giants": "New York Giants",
+  "Jets": "New York Jets", "Eagles": "Philadelphia Eagles", "Steelers": "Pittsburgh Steelers",
+  "49ers": "San Francisco 49ers", "Seahawks": "Seattle Seahawks", "Buccaneers": "Tampa Bay Buccaneers",
+  "Titans": "Tennessee Titans", "Commanders": "Washington Commanders",
+};
+
+function extractTeamFromText(text: string | null): string | null {
+  if (!text) return null;
+  const textUpper = text.toUpperCase();
+  
+  // Check full team names first (more specific) - return full canonical name
+  for (const team of ALL_TEAMS) {
+    if (textUpper.includes(team.toUpperCase())) {
+      // If it's already a full name (has space), return it
+      if (team.includes(" ")) {
+        return team;
+      }
+      // Otherwise, convert nickname to canonical name
+      return TEAM_CANONICAL_NAMES[team] || team;
+    }
+  }
+  return null;
+}
+
+// Normalize any team string (nickname or full name) to canonical form
+function normalizeTeamName(teamStr: string | null): string | null {
+  if (!teamStr) return null;
+  
+  // Check if it's already a canonical name
+  if (Object.values(TEAM_CANONICAL_NAMES).includes(teamStr)) {
+    return teamStr;
+  }
+  
+  // Try to find it as a nickname
+  const normalized = TEAM_CANONICAL_NAMES[teamStr];
+  if (normalized) return normalized;
+  
+  // Try case-insensitive match
+  const teamUpper = teamStr.toUpperCase();
+  for (const [nickname, canonical] of Object.entries(TEAM_CANONICAL_NAMES)) {
+    if (nickname.toUpperCase() === teamUpper || canonical.toUpperCase() === teamUpper) {
+      return canonical;
+    }
+  }
+  
+  return teamStr;
+}
+
+// Check if two team strings match (handles nicknames vs canonical names)
+function teamsMatch(team1: string | null, team2: string | null): boolean {
+  if (!team1 || !team2) return false;
+  
+  const canonical1 = normalizeTeamName(team1);
+  const canonical2 = normalizeTeamName(team2);
+  
+  if (canonical1 && canonical2 && canonical1 === canonical2) return true;
+  
+  // Fallback to substring matching for edge cases
+  const t1Lower = team1.toLowerCase();
+  const t2Lower = team2.toLowerCase();
+  return t1Lower.includes(t2Lower) || t2Lower.includes(t1Lower);
+}
+
+// Comprehensive player-to-team mapping for reliable team detection
+// This is more reliable than parsing titles which often don't contain team names
+const PLAYER_TEAM_MAP: Record<string, string> = {
+  // Utah Jazz
+  "lauri markkanen": "Utah Jazz",
+  "walker kessler": "Utah Jazz",
+  "keyonte george": "Utah Jazz",
+  "collin sexton": "Utah Jazz",
+  "jordan clarkson": "Utah Jazz",
+  "john collins": "Utah Jazz",
+  "john stockton": "Utah Jazz",
+  "karl malone": "Utah Jazz",
+  "donovan mitchell": "Utah Jazz", // Former Jazz
+  "rudy gobert": "Utah Jazz", // Former Jazz (still counts for collection theme)
+  
+  // Boston Celtics
+  "jayson tatum": "Boston Celtics",
+  "jaylen brown": "Boston Celtics",
+  "derrick white": "Boston Celtics",
+  "jrue holiday": "Boston Celtics",
+  "kristaps porzingis": "Boston Celtics",
+  
+  // LA Lakers
+  "lebron james": "LA Lakers",
+  "anthony davis": "LA Lakers",
+  "austin reaves": "LA Lakers",
+  "d'angelo russell": "LA Lakers",
+  "kobe bryant": "LA Lakers",
+  "magic johnson": "LA Lakers",
+  
+  // Golden State Warriors
+  "stephen curry": "Golden State Warriors",
+  "klay thompson": "Golden State Warriors",
+  "draymond green": "Golden State Warriors",
+  
+  // San Antonio Spurs
+  "victor wembanyama": "San Antonio Spurs",
+  "devin vassell": "San Antonio Spurs",
+  "tim duncan": "San Antonio Spurs",
+  
+  // Oklahoma City Thunder
+  "shai gilgeous-alexander": "Oklahoma City Thunder",
+  "chet holmgren": "Oklahoma City Thunder",
+  "jalen williams": "Oklahoma City Thunder",
+  
+  // Minnesota Timberwolves
+  "anthony edwards": "Minnesota Timberwolves",
+  "karl-anthony towns": "Minnesota Timberwolves",
+  
+  // Indiana Pacers
+  "tyrese haliburton": "Indiana Pacers",
+  "pascal siakam": "Indiana Pacers",
+  
+  // Phoenix Suns
+  "kevin durant": "Phoenix Suns",
+  "devin booker": "Phoenix Suns",
+  "bradley beal": "Phoenix Suns",
+  
+  // Dallas Mavericks
+  "luka doncic": "Dallas Mavericks",
+  "kyrie irving": "Dallas Mavericks",
+  
+  // Denver Nuggets
+  "nikola jokic": "Denver Nuggets",
+  "jamal murray": "Denver Nuggets",
+  
+  // Milwaukee Bucks
+  "giannis antetokounmpo": "Milwaukee Bucks",
+  "damian lillard": "Milwaukee Bucks",
+  
+  // Philadelphia 76ers
+  "joel embiid": "Philadelphia 76ers",
+  "tyrese maxey": "Philadelphia 76ers",
+  
+  // Miami Heat
+  "jimmy butler": "Miami Heat",
+  "bam adebayo": "Miami Heat",
+  
+  // Chicago Bulls
+  "michael jordan": "Chicago Bulls",
+  "zach lavine": "Chicago Bulls",
+  "demar derozan": "Chicago Bulls",
+  
+  // Cleveland Cavaliers
+  "evan mobley": "Cleveland Cavaliers",
+  "darius garland": "Cleveland Cavaliers",
+};
+
+// Player to team lookup cache (populated from hidden gems and other sources)
+const playerTeamCache: Record<string, string> = {};
+
+async function lookupPlayerTeam(playerName: string): Promise<string | null> {
+  if (!playerName) return null;
+  
+  const normalizedName = playerName.toLowerCase().trim();
+  
+  // Check hardcoded mapping first (most reliable)
+  if (PLAYER_TEAM_MAP[normalizedName]) {
+    return PLAYER_TEAM_MAP[normalizedName];
+  }
+  
+  // Check cache
+  const cachedTeam = playerTeamCache[normalizedName];
+  if (cachedTeam) return cachedTeam;
+  
+  try {
+    // Try to find team from hidden gems and normalize to canonical name
+    const [gem] = await db
+      .select({ team: hiddenGems.team })
+      .from(hiddenGems)
+      .where(sql`LOWER(${hiddenGems.playerName}) = LOWER(${playerName})`)
+      .limit(1);
+    
+    if (gem?.team) {
+      // Normalize team to canonical name
+      const canonicalTeam = TEAM_CANONICAL_NAMES[gem.team] || gem.team;
+      playerTeamCache[normalizedName] = canonicalTeam;
+      return canonicalTeam;
+    }
+  } catch (error) {
+    // Ignore lookup errors
+  }
+  
+  return null;
+}
+
 function normalizeGrader(grader: string | null, grade: string | null = null): string {
   // First check the grader field
   if (grader) {
@@ -141,6 +403,7 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
   const grades: Record<string, number> = {};
   const playerValues: Record<string, number> = {};
   const teamValues: Record<string, number> = {};
+  const playersNeedingTeamLookup: Array<{ playerName: string; value: number }> = [];
   
   let highLiquidityCount = 0;
   let lowLiquidityCount = 0;
@@ -169,6 +432,17 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
     const playerName = card.playerName || "Unknown";
     playerValues[playerName] = (playerValues[playerName] || 0) + value;
 
+    // Extract team from card title and add to team values
+    const detectedTeam = extractTeamFromText(card.title);
+    if (detectedTeam) {
+      teamValues[detectedTeam] = (teamValues[detectedTeam] || 0) + value;
+    }
+    
+    // Track players for later team lookup if title didn't contain team
+    if (!detectedTeam && playerName !== "Unknown") {
+      playersNeedingTeamLookup.push({ playerName, value });
+    }
+
     if (card.salesLast30Days !== null) {
       if (card.salesLast30Days >= 10) highLiquidityCount++;
       else if (card.salesLast30Days <= 2) lowLiquidityCount++;
@@ -183,6 +457,24 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
         position: card.position || "Unknown",
         stage: stage,
       });
+    }
+  }
+
+  // Aggregate team lookups by unique player (not card) to capture full collection value
+  const playerValueTotals: Record<string, number> = {};
+  for (const { playerName, value } of playersNeedingTeamLookup) {
+    playerValueTotals[playerName] = (playerValueTotals[playerName] || 0) + value;
+  }
+  
+  // Look up teams for all unique players to ensure accurate team theme detection
+  // Sort by combined value so most valuable players get looked up first (for cache efficiency)
+  const uniquePlayersToLookup = Object.entries(playerValueTotals)
+    .sort(([, a], [, b]) => b - a);
+  
+  for (const [playerName, totalValue] of uniquePlayersToLookup) {
+    const team = await lookupPlayerTeam(playerName);
+    if (team) {
+      teamValues[team] = (teamValues[team] || 0) + totalValue;
     }
   }
 
@@ -584,6 +876,11 @@ function scoreValue(candidate: NextBuyCandidate): number {
 function scoreFit(candidate: NextBuyCandidate, profile: PortfolioProfile): number {
   let score = 50;
   
+  // TEAM THEME BONUS - Strongly favor candidates matching user's team preferences
+  if (candidate.source === "TeamTheme") {
+    score += 25; // Big boost for matching team themes
+  }
+  
   const qbExposure = profile.positions["QB"] || 0;
   if (qbExposure > 0.50 && candidate.position !== "QB") {
     score += 15;
@@ -628,6 +925,37 @@ function generateWhyBullets(
   scores: { value: number; fit: number; momentum: number }
 ): string[] {
   const bullets: string[] = [];
+  
+  // Team theme explanation - PRIORITY
+  if (candidate.source === "TeamTheme") {
+    // Find which specific team the candidate matches from user's collection
+    const userTeams = profile.concentration.topTeams
+      .filter(t => t.pct > 0.05)
+      .map(t => t.team);
+    
+    // First use candidate.team directly if available (from Hidden Gems or other sources)
+    // Then fall back to player-to-team mapping, then title extraction
+    let candidateTeam: string | null = null;
+    if (candidate.team) {
+      candidateTeam = normalizeTeamName(candidate.team) || candidate.team;
+    } else {
+      const mappedTeam = PLAYER_TEAM_MAP[candidate.playerName.toLowerCase().trim()];
+      candidateTeam = mappedTeam || normalizeTeamName(extractTeamFromText(candidate.title));
+    }
+    
+    // Find which of the user's team themes this candidate matches
+    const matchingTheme = candidateTeam 
+      ? userTeams.find(ut => teamsMatch(ut, candidateTeam))
+      : userTeams[0];
+    
+    if (matchingTheme) {
+      bullets.push(`Matches your ${matchingTheme} collection theme`);
+    } else if (userTeams.length > 0) {
+      bullets.push(`Matches your ${userTeams[0]} collection theme`);
+    } else {
+      bullets.push("Matches your team collection theme");
+    }
+  }
   
   if (scores.fit >= 70) {
     const qbExposure = profile.positions["QB"] || 0;
@@ -696,6 +1024,19 @@ function computePortfolioImpact(
 export async function generateNextBuys(userId: string): Promise<import("@shared/schema").NextBuy[]> {
   const profile = await buildPortfolioProfile(userId);
   
+  // Detect user's team preferences from their portfolio
+  const topTeams = profile.concentration.topTeams
+    .filter(t => t.pct > 0.05) // Teams with at least 5% of portfolio
+    .map(t => t.team);
+  
+  // Detect user's sport preferences  
+  const dominantSports = Object.entries(profile.sports)
+    .filter(([, pct]) => pct > 0.1) // Sports with at least 10% exposure
+    .map(([sport]) => sport.toLowerCase());
+  
+  console.log(`[NextBuys] Detected team themes: ${topTeams.join(", ") || "none"}`);
+  console.log(`[NextBuys] Detected sport preferences: ${dominantSports.join(", ") || "none"}`);
+  
   const watchlistPlayers = await db
     .select()
     .from(playerWatchlist)
@@ -704,6 +1045,7 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
 
   const candidates: NextBuyCandidate[] = [];
   
+  // Source 1: User's watchlist
   for (const watched of watchlistPlayers) {
     candidates.push({
       title: `${watched.playerName} Base Rookie`,
@@ -718,30 +1060,128 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
     });
   }
   
+  // Source 2: Hidden Gems matching user's team preferences (PRIORITY)
+  if (topTeams.length > 0) {
+    try {
+      const activeGems = await db
+        .select()
+        .from(hiddenGems)
+        .where(eq(hiddenGems.isActive, true))
+        .limit(30);
+      
+      // Filter gems matching user's team themes using robust matching
+      for (const gem of activeGems) {
+        const matchesTeam = gem.team && topTeams.some(userTeam => 
+          teamsMatch(gem.team, userTeam)
+        );
+        
+        if (matchesTeam && !candidates.some(c => c.playerName === gem.playerName)) {
+          candidates.push({
+            title: `${gem.playerName} - ${gem.team || gem.sport}`,
+            playerName: gem.playerName,
+            sport: gem.sport,
+            source: "TeamTheme",
+            position: gem.position || "Unknown",
+            stage: "Unknown",
+            estPrice: 25 + Math.random() * 50,
+            compsConfidence: gem.confidenceScore || 70,
+            momentumTrend: gem.temperature === "HOT" ? "up" : gem.temperature === "COOLING" ? "down" : "flat",
+          });
+          console.log(`[NextBuys] Added ${gem.playerName} (${gem.team}) matching team theme`);
+        }
+      }
+      
+      // Also add gems matching user's sport preferences
+      for (const gem of activeGems) {
+        const matchesSport = dominantSports.includes(gem.sport.toLowerCase());
+        
+        if (matchesSport && !candidates.some(c => c.playerName === gem.playerName)) {
+          candidates.push({
+            title: `${gem.playerName} - ${gem.team || gem.sport}`,
+            playerName: gem.playerName,
+            sport: gem.sport,
+            source: "HiddenGems",
+            position: gem.position || "Unknown",
+            stage: "Unknown",
+            estPrice: 25 + Math.random() * 50,
+            compsConfidence: gem.confidenceScore || 70,
+            momentumTrend: gem.temperature === "HOT" ? "up" : gem.temperature === "COOLING" ? "down" : "flat",
+          });
+        }
+      }
+    } catch (error) {
+      console.log("[NextBuys] Error fetching hidden gems:", error);
+    }
+  }
+  
+  // Source 3: Sport-specific trending players if not enough candidates
   if (candidates.length < 5) {
-    const popularPlayers = [
-      { name: "Jayden Daniels", position: "QB", stage: "Rookie", sport: "football" },
-      { name: "Caleb Williams", position: "QB", stage: "Rookie", sport: "football" },
-      { name: "Marvin Harrison Jr", position: "WR", stage: "Rookie", sport: "football" },
-      { name: "Malik Nabers", position: "WR", stage: "Rookie", sport: "football" },
-      { name: "Brock Bowers", position: "TE", stage: "Rookie", sport: "football" },
-    ];
+    // Add players based on user's sport preferences
+    const sportSpecificPlayers: Record<string, Array<{ name: string; position: string; stage: string; team?: string }>> = {
+      basketball: [
+        { name: "Victor Wembanyama", position: "C", stage: "Rookie", team: "Spurs" },
+        { name: "Chet Holmgren", position: "C", stage: "Rising", team: "Thunder" },
+        { name: "Anthony Edwards", position: "SG", stage: "Prime", team: "Timberwolves" },
+        { name: "Tyrese Haliburton", position: "PG", stage: "Rising", team: "Pacers" },
+        { name: "Jayson Tatum", position: "SF", stage: "Prime", team: "Celtics" },
+        { name: "Lauri Markkanen", position: "PF", stage: "Prime", team: "Jazz" },
+        { name: "Walker Kessler", position: "C", stage: "Rising", team: "Jazz" },
+        { name: "Keyonte George", position: "PG", stage: "Rookie", team: "Jazz" },
+      ],
+      football: [
+        { name: "Jayden Daniels", position: "QB", stage: "Rookie" },
+        { name: "Caleb Williams", position: "QB", stage: "Rookie" },
+        { name: "Marvin Harrison Jr", position: "WR", stage: "Rookie" },
+        { name: "Malik Nabers", position: "WR", stage: "Rookie" },
+        { name: "Brock Bowers", position: "TE", stage: "Rookie" },
+      ],
+      baseball: [
+        { name: "Gunnar Henderson", position: "SS", stage: "Rising" },
+        { name: "Corbin Carroll", position: "OF", stage: "Rising" },
+        { name: "Elly De La Cruz", position: "SS", stage: "Rookie" },
+        { name: "Jackson Chourio", position: "OF", stage: "Rookie" },
+      ],
+      hockey: [
+        { name: "Connor Bedard", position: "C", stage: "Rookie" },
+        { name: "Macklin Celebrini", position: "C", stage: "Rookie" },
+      ],
+    };
     
-    for (const player of popularPlayers) {
-      if (!candidates.some(c => c.playerName === player.name)) {
-        candidates.push({
-          title: `${player.name} 2024 Donruss Rated Rookie`,
-          playerName: player.name,
-          sport: player.sport,
-          year: 2024,
-          setName: "Donruss",
-          source: "MarketOutlook",
-          position: player.position,
-          stage: player.stage,
-          estPrice: 15 + Math.random() * 30,
-          compsConfidence: 70,
-          momentumTrend: "up",
-        });
+    // Prioritize user's preferred sports
+    const sportsToCheck = dominantSports.length > 0 
+      ? dominantSports 
+      : ["football", "basketball"];
+    
+    for (const sport of sportsToCheck) {
+      const players = sportSpecificPlayers[sport] || [];
+      
+      // If user has team themes, prioritize players from those teams
+      const prioritizedPlayers = [...players].sort((a, b) => {
+        const aMatchesTeam = a.team && topTeams.some(t => teamsMatch(a.team!, t));
+        const bMatchesTeam = b.team && topTeams.some(t => teamsMatch(b.team!, t));
+        if (aMatchesTeam && !bMatchesTeam) return -1;
+        if (!aMatchesTeam && bMatchesTeam) return 1;
+        return 0;
+      });
+      
+      for (const player of prioritizedPlayers) {
+        if (!candidates.some(c => c.playerName === player.name) && candidates.length < 10) {
+          const matchesTeam = player.team && topTeams.some(t => teamsMatch(player.team!, t));
+          
+          candidates.push({
+            title: `${player.name} 2024 ${sport === "basketball" ? "Prizm" : "Donruss"} Base`,
+            playerName: player.name,
+            sport: sport,
+            year: 2024,
+            setName: sport === "basketball" ? "Prizm" : "Donruss",
+            source: matchesTeam ? "TeamTheme" : "MarketOutlook",
+            position: player.position,
+            stage: player.stage,
+            estPrice: 15 + Math.random() * 30,
+            compsConfidence: 70,
+            momentumTrend: "up",
+          });
+        }
       }
     }
   }

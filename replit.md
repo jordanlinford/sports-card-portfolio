@@ -29,6 +29,7 @@ The application supports core functionalities including:
 - **Trading & Communication**: An offers system for cards marked "Open to Offers" and a direct messaging system between collectors.
 - **Analytics & Sharing**: Portfolio analytics page, and viral sharing features allowing export of cases as various image formats for social media.
 - **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts at 3/6/12 month intervals, showing bear/base/bull scenarios based on market temperature, investment verdicts, and upside/risk scores from player outlook data.
+- **Next Buys Team Theme Detection**: Enhanced recommendation engine that detects collection themes (teams, sports) from user portfolios. Uses PLAYER_TEAM_MAP with 50+ popular player-to-team mappings for reliable detection even when card titles don't include team names. Recommendations matching user's team themes get +25 fit bonus and accurate "Matches your [Team] collection theme" explanations.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM for type-safe schema management and queries.
