@@ -10,7 +10,7 @@
 import { db } from "./db";
 import { cards, displayCases, playerOutlookCache } from "@shared/schema";
 import type { Card, MarketTemperature, PlayerVerdict } from "@shared/schema";
-import { eq, and, isNotNull, sql, desc } from "drizzle-orm";
+import { eq, and, isNotNull, sql, desc, inArray } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 
 const gemini = new GoogleGenAI({
@@ -198,7 +198,7 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
   const userCards = await db
     .select()
     .from(cards)
-    .where(sql`${cards.displayCaseId} = ANY(${caseIds})`);
+    .where(inArray(cards.displayCaseId, caseIds));
   
   if (userCards.length === 0) {
     return {
