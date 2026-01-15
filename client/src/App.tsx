@@ -44,6 +44,7 @@ import PortfolioBuilderPreferencesPage from "@/pages/portfolio-builder-preferenc
 import AdminPortfolioBuilderPage from "@/pages/admin-portfolio-builder";
 import BlogListing from "@/pages/blog";
 import BlogPostPage from "@/pages/blog-post";
+import PublicPlayerOutlookPage from "@/pages/public-player-outlook";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -62,6 +63,7 @@ function Router() {
       <Route path="/blog" component={BlogListing} />
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/player-outlook" component={PlayerOutlookPage} />
+      <Route path="/outlook/:sport/:slug" component={PublicPlayerOutlookPage} />
       <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
       <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
       {/* Show loading only for auth-dependent routes */}

@@ -303,6 +303,9 @@ export interface IStorage {
 
   // Player Outlook Cache operations
   getCachedPlayerOutlook(playerKey: string): Promise<PlayerOutlookCache | undefined>;
+  getPublicPlayerOutlookBySlug(sport: string, slug: string): Promise<PlayerOutlookCache | undefined>;
+  getAllPublicPlayerOutlooks(): Promise<PlayerOutlookCache[]>;
+  updatePlayerOutlookPublicFields(playerKey: string, data: { slug?: string; isPublic?: boolean; seoTitle?: string; seoDescription?: string }): Promise<PlayerOutlookCache | undefined>;
 
   // Shared Snapshot operations
   createSharedSnapshot(userId: string, data: Omit<InsertSharedSnapshot, 'userId'>): Promise<SharedSnapshot>;
@@ -2519,6 +2522,35 @@ export class DatabaseStorage implements IStorage {
       .from(playerOutlookCache)
       .where(eq(playerOutlookCache.playerKey, playerKey));
     return cached;
+  }
+
+  async getPublicPlayerOutlookBySlug(sport: string, slug: string): Promise<PlayerOutlookCache | undefined> {
+    const [cached] = await db
+      .select()
+      .from(playerOutlookCache)
+      .where(and(
+        eq(playerOutlookCache.sport, sport),
+        eq(playerOutlookCache.slug, slug),
+        eq(playerOutlookCache.isPublic, true)
+      ));
+    return cached;
+  }
+
+  async getAllPublicPlayerOutlooks(): Promise<PlayerOutlookCache[]> {
+    return db
+      .select()
+      .from(playerOutlookCache)
+      .where(eq(playerOutlookCache.isPublic, true))
+      .orderBy(playerOutlookCache.playerName);
+  }
+
+  async updatePlayerOutlookPublicFields(playerKey: string, data: { slug?: string; isPublic?: boolean; seoTitle?: string; seoDescription?: string }): Promise<PlayerOutlookCache | undefined> {
+    const [updated] = await db
+      .update(playerOutlookCache)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(playerOutlookCache.playerKey, playerKey))
+      .returning();
+    return updated;
   }
 
   // Shared Snapshot operations

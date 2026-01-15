@@ -4347,6 +4347,180 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // =========================================================================
+  // PUBLIC PLAYER OUTLOOK ADMIN ROUTES
+  // =========================================================================
+
+  function generatePlayerSlug(playerName: string): string {
+    return playerName
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .trim();
+  }
+
+  function generateSeoTitle(playerName: string): string {
+    return `${playerName} Sports Card Investment Outlook - Should You Buy or Sell?`;
+  }
+
+  function generateSeoDescription(playerName: string, sport: string): string {
+    const sportLabel = sport === 'football' ? 'NFL' : sport === 'basketball' ? 'NBA' : sport === 'baseball' ? 'MLB' : sport === 'hockey' ? 'NHL' : sport;
+    return `Get AI-powered analysis on ${playerName} (${sportLabel}) cards. Find out whether to buy, sell, or hold based on real market data, player performance, and investment timing.`;
+  }
+
+  // Admin: List all player outlook cache entries (for management)
+  app.get("/api/admin/outlook", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { playerOutlookCache } = await import("@shared/schema");
+      const { desc } = await import("drizzle-orm");
+      
+      const outlooks = await db
+        .select()
+        .from(playerOutlookCache)
+        .orderBy(desc(playerOutlookCache.updatedAt))
+        .limit(100);
+      
+      res.json(outlooks.map(o => ({
+        id: o.id,
+        playerKey: o.playerKey,
+        playerName: o.playerName,
+        sport: o.sport,
+        slug: o.slug,
+        isPublic: o.isPublic,
+        seoTitle: o.seoTitle,
+        hasOutlook: !!o.outlookJson,
+        lastFetchedAt: o.lastFetchedAt,
+        updatedAt: o.updatedAt,
+      })));
+    } catch (error) {
+      console.error("Error fetching outlook cache:", error);
+      res.status(500).json({ message: "Failed to fetch outlook cache" });
+    }
+  });
+
+  // Admin: Toggle public status for a player outlook
+  app.patch("/api/admin/outlook/:playerKey/public", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { playerKey } = req.params;
+      const { isPublic } = req.body;
+      
+      const cached = await storage.getCachedPlayerOutlook(playerKey);
+      if (!cached) {
+        return res.status(404).json({ message: "Player outlook not found in cache" });
+      }
+      
+      const slug = cached.slug || generatePlayerSlug(cached.playerName);
+      const seoTitle = cached.seoTitle || generateSeoTitle(cached.playerName);
+      const seoDescription = cached.seoDescription || generateSeoDescription(cached.playerName, cached.sport);
+      
+      const updated = await storage.updatePlayerOutlookPublicFields(playerKey, {
+        slug,
+        isPublic: isPublic === true,
+        seoTitle,
+        seoDescription,
+      });
+      
+      res.json({
+        success: true,
+        playerKey,
+        slug,
+        isPublic: updated?.isPublic,
+        url: isPublic ? `/outlook/${cached.sport}/${slug}` : null,
+      });
+    } catch (error) {
+      console.error("Error updating outlook public status:", error);
+      res.status(500).json({ message: "Failed to update outlook public status" });
+    }
+  });
+
+  // Admin: Seed public outlooks for a list of top players
+  app.post("/api/admin/outlook/seed", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getPlayerOutlook, normalizePlayerKey } = await import("./playerOutlookEngine");
+      
+      const topPlayers = [
+        { name: "Patrick Mahomes", sport: "football" },
+        { name: "Josh Allen", sport: "football" },
+        { name: "CJ Stroud", sport: "football" },
+        { name: "Caleb Williams", sport: "football" },
+        { name: "Lamar Jackson", sport: "football" },
+        { name: "Jayden Daniels", sport: "football" },
+        { name: "Victor Wembanyama", sport: "basketball" },
+        { name: "Anthony Edwards", sport: "basketball" },
+        { name: "Luka Doncic", sport: "basketball" },
+        { name: "Shohei Ohtani", sport: "baseball" },
+        { name: "Connor McDavid", sport: "hockey" },
+      ];
+      
+      const results: { playerName: string; sport: string; success: boolean; url?: string; error?: string }[] = [];
+      
+      for (const player of topPlayers) {
+        try {
+          const outlook = await getPlayerOutlook({ 
+            playerName: player.name, 
+            sport: player.sport 
+          });
+          
+          if (outlook) {
+            const playerKey = normalizePlayerKey(player.sport, player.name);
+            const slug = generatePlayerSlug(player.name);
+            const seoTitle = generateSeoTitle(player.name);
+            const seoDescription = generateSeoDescription(player.name, player.sport);
+            
+            const updated = await storage.updatePlayerOutlookPublicFields(playerKey, {
+              slug,
+              isPublic: true,
+              seoTitle,
+              seoDescription,
+            });
+            
+            if (updated) {
+              results.push({
+                playerName: player.name,
+                sport: player.sport,
+                success: true,
+                url: `/outlook/${player.sport}/${slug}`,
+              });
+            } else {
+              results.push({
+                playerName: player.name,
+                sport: player.sport,
+                success: false,
+                error: `Cache entry not found for key: ${playerKey}`,
+              });
+            }
+          } else {
+            results.push({
+              playerName: player.name,
+              sport: player.sport,
+              success: false,
+              error: "No outlook generated",
+            });
+          }
+        } catch (err) {
+          results.push({
+            playerName: player.name,
+            sport: player.sport,
+            success: false,
+            error: err instanceof Error ? err.message : "Unknown error",
+          });
+        }
+      }
+      
+      res.json({
+        message: "Seeding complete",
+        total: topPlayers.length,
+        successful: results.filter(r => r.success).length,
+        results,
+      });
+    } catch (error) {
+      console.error("Error seeding public outlooks:", error);
+      res.status(500).json({ message: "Failed to seed public outlooks" });
+    }
+  });
+
   // Public blog routes
   app.get("/api/blog", async (req, res) => {
     try {
@@ -4374,10 +4548,168 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // =========================================================================
+  // PUBLIC PLAYER OUTLOOK ROUTES (SEO-optimized pages)
+  // =========================================================================
+
+  // Get all public player outlooks (for sitemap and index)
+  app.get("/api/outlook", async (req, res) => {
+    try {
+      const outlooks = await storage.getAllPublicPlayerOutlooks();
+      res.json(outlooks.map(o => ({
+        sport: o.sport,
+        slug: o.slug,
+        playerName: o.playerName,
+        seoTitle: o.seoTitle,
+        seoDescription: o.seoDescription,
+        updatedAt: o.updatedAt,
+      })));
+    } catch (error) {
+      console.error("Error fetching public outlooks:", error);
+      res.status(500).json({ message: "Failed to fetch player outlooks" });
+    }
+  });
+
+  // Get single public player outlook by sport and slug
+  app.get("/api/outlook/:sport/:slug", async (req, res) => {
+    try {
+      const { sport, slug } = req.params;
+      const outlook = await storage.getPublicPlayerOutlookBySlug(sport, slug);
+      
+      if (!outlook) {
+        return res.status(404).json({ message: "Player outlook not found" });
+      }
+      
+      // Return the full outlook data
+      res.json({
+        playerName: outlook.playerName,
+        sport: outlook.sport,
+        slug: outlook.slug,
+        seoTitle: outlook.seoTitle,
+        seoDescription: outlook.seoDescription,
+        classification: outlook.classificationJson,
+        outlook: outlook.outlookJson,
+        lastUpdated: outlook.updatedAt || outlook.lastFetchedAt,
+      });
+    } catch (error) {
+      console.error("Error fetching player outlook:", error);
+      res.status(500).json({ message: "Failed to fetch player outlook" });
+    }
+  });
+
+  // SSR route for public player outlook pages (for crawlers)
+  app.get("/outlook/:sport/:slug", async (req, res, next) => {
+    const userAgent = req.headers["user-agent"] || "";
+    const isCrawler = /googlebot|bingbot|slurp|duckduckbot|baiduspider|yandexbot|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|discordbot|claude-web|chatgpt|gptbot/i.test(userAgent);
+    
+    if (!isCrawler) {
+      // For humans, let the SPA handle it
+      return next();
+    }
+    
+    try {
+      const { sport, slug } = req.params;
+      const outlook = await storage.getPublicPlayerOutlookBySlug(sport, slug);
+      
+      if (!outlook || !outlook.outlookJson) {
+        return next(); // Let SPA handle 404
+      }
+      
+      const origin = getOriginUrl(req);
+      const url = `${origin}/outlook/${sport}/${slug}`;
+      const title = outlook.seoTitle || `${outlook.playerName} Sports Card Investment Outlook`;
+      const description = outlook.seoDescription || 
+        `Should you buy or sell ${outlook.playerName} cards? Get AI-powered investment analysis, market temperature, and timing tips.`;
+      
+      const { transformToSSRAdvisorOutlook, applySSRVerdictGuardrails } = await import("./lib/outlookTransformServer");
+      const advisorOutlook = applySSRVerdictGuardrails(transformToSSRAdvisorOutlook(outlook.outlookJson));
+      
+      const verdict = advisorOutlook.verdict;
+      const verdictLabel = advisorOutlook.verdictLabel;
+      const advisorTake = advisorOutlook.advisorTake;
+      const topReasons = advisorOutlook.topReasons;
+      
+      // Generate JSON-LD structured data
+      const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": title,
+        "description": description,
+        "author": {
+          "@type": "Organization",
+          "name": "Sports Card Portfolio",
+          "url": origin
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Sports Card Portfolio",
+          "url": origin
+        },
+        "dateModified": outlook.updatedAt?.toISOString() || new Date().toISOString(),
+        "mainEntityOfPage": url,
+        "about": {
+          "@type": "Person",
+          "name": outlook.playerName
+        }
+      };
+      
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+  <meta name="description" content="${description}">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="${url}">
+  <meta property="og:site_name" content="Sports Card Portfolio">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <link rel="canonical" href="${url}">
+  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+</head>
+<body>
+  <main>
+    <article>
+      <h1>${outlook.playerName} Sports Card Investment Outlook</h1>
+      <p><strong>Sport:</strong> ${outlook.sport}</p>
+      <p><strong>Verdict:</strong> ${verdictLabel} (${verdict})</p>
+      <section>
+        <h2>Advisor Analysis</h2>
+        <p>${advisorTake}</p>
+      </section>
+      ${topReasons.length > 0 ? `
+      <section>
+        <h2>Key Reasons</h2>
+        <ul>
+          ${topReasons.map(r => `<li>${r}</li>`).join('\n          ')}
+        </ul>
+      </section>` : ''}
+      <section>
+        <h2>Get the Full Analysis</h2>
+        <p>Sign up at <a href="${origin}">Sports Card Portfolio</a> for real-time market intelligence, price tracking, and personalized investment recommendations.</p>
+      </section>
+    </article>
+  </main>
+</body>
+</html>`;
+      
+      res.set('Content-Type', 'text/html');
+      res.send(html);
+    } catch (error) {
+      console.error("Error serving SSR outlook page:", error);
+      next();
+    }
+  });
+
   // Sitemap for SEO
   app.get("/sitemap.xml", async (req, res) => {
     try {
       const posts = await storage.getBlogPosts(true);
+      const outlooks = await storage.getAllPublicPlayerOutlooks();
       const baseUrl = getOriginUrl(req);
       
       let sitemap = `<?xml version="1.0" encoding="UTF-8"?>
@@ -4398,6 +4730,7 @@ Sitemap: ${origin}/sitemap.xml
     <priority>0.7</priority>
   </url>`;
       
+      // Add blog posts
       for (const post of posts) {
         const lastmod = post.updatedAt ? new Date(post.updatedAt).toISOString().split('T')[0] : '';
         sitemap += `
@@ -4407,6 +4740,20 @@ Sitemap: ${origin}/sitemap.xml
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>`;
+      }
+      
+      // Add player outlook pages (high priority for SEO)
+      for (const outlook of outlooks) {
+        if (outlook.slug) {
+          const lastmod = outlook.updatedAt ? new Date(outlook.updatedAt).toISOString().split('T')[0] : '';
+          sitemap += `
+  <url>
+    <loc>${baseUrl}/outlook/${outlook.sport}/${outlook.slug}</loc>${lastmod ? `
+    <lastmod>${lastmod}</lastmod>` : ''}
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>`;
+        }
       }
       
       sitemap += `
