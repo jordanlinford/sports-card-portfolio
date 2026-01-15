@@ -1318,6 +1318,16 @@ export const playerOutlookCache = pgTable("player_outlook_cache", {
   sport: varchar("sport", { length: 50 }).notNull(),
   playerName: varchar("player_name", { length: 255 }).notNull(),
   
+  // SEO-friendly URL slug (e.g., "cj-stroud", "victor-wembanyama")
+  slug: varchar("slug", { length: 255 }),
+  
+  // Public visibility for SEO pages
+  isPublic: boolean("is_public").default(false),
+  
+  // SEO metadata
+  seoTitle: varchar("seo_title", { length: 255 }),
+  seoDescription: text("seo_description"),
+  
   // Classification outputs (deterministic)
   classificationJson: jsonb("classification_json").$type<{
     stage: PlayerStage;
@@ -1343,6 +1353,8 @@ export const playerOutlookCache = pgTable("player_outlook_cache", {
   index("idx_player_outlook_key").on(table.playerKey),
   index("idx_player_outlook_expires").on(table.expiresAt),
   index("idx_player_outlook_sport").on(table.sport),
+  index("idx_player_outlook_slug").on(table.slug),
+  index("idx_player_outlook_public").on(table.isPublic),
 ]);
 
 export type PlayerOutlookCache = typeof playerOutlookCache.$inferSelect;
