@@ -1467,14 +1467,17 @@ Sitemap: ${origin}/sitemap.xml
 
       const parsed = insertCardSchema.safeParse(cardData);
       if (!parsed.success) {
+        console.error("Card validation failed:", parsed.error.errors);
+        console.error("Card data received:", JSON.stringify(cardData, null, 2));
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
       }
 
       const card = await storage.createCard(displayCaseId, parsed.data);
       res.status(201).json(card);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating card:", error);
-      res.status(500).json({ message: "Failed to create card" });
+      console.error("Error details:", error?.message, error?.code);
+      res.status(500).json({ message: "Failed to create card", error: error?.message });
     }
   });
 

@@ -319,6 +319,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [scanImageUploading, setScanImageUploading] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
@@ -700,16 +701,43 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         }
       }
       
+      // Get estimated value - prefer eBay median, fall back to AI estimate midpoint
+      let estimatedValue: number | null = null;
+      if (scanResult.pricing?.medianPrice && typeof scanResult.pricing.medianPrice === "number" && !isNaN(scanResult.pricing.medianPrice)) {
+        estimatedValue = scanResult.pricing.medianPrice;
+      } else if (scanResult.pricing?.aiEstimate?.estimates && Array.isArray(scanResult.pricing.aiEstimate.estimates) && scanResult.pricing.aiEstimate.estimates.length > 0) {
+        // Use the first valid estimate's midpoint (usually Raw condition)
+        for (const est of scanResult.pricing.aiEstimate.estimates) {
+          if (est && typeof est === "object" && "minPrice" in est && "maxPrice" in est) {
+            const minPrice = typeof est.minPrice === "number" ? est.minPrice : parseFloat(String(est.minPrice));
+            const maxPrice = typeof est.maxPrice === "number" ? est.maxPrice : parseFloat(String(est.maxPrice));
+            if (!isNaN(minPrice) && !isNaN(maxPrice) && minPrice >= 0 && maxPrice >= minPrice) {
+              estimatedValue = Math.round(((minPrice + maxPrice) / 2) * 100) / 100;
+              break; // Found a valid estimate
+            }
+          }
+        }
+      }
+      
+      // Parse year safely
+      let parsedYear: number | null = null;
+      if (typeof card.year === "number" && !isNaN(card.year)) {
+        parsedYear = card.year;
+      } else if (card.year) {
+        const parsed = parseInt(String(card.year));
+        if (!isNaN(parsed)) parsedYear = parsed;
+      }
+      
       const cardData = {
         title: card.playerName || "Unknown Card",
-        year: card.year || null,
+        year: parsedYear,
         set: card.setName || null,
         cardNumber: card.cardNumber || null,
         variation: card.parallel || card.variation || null,
         grade: gradeInfo.grade || null,
         grader: gradeInfo.gradingCompany || (gradeInfo.appearsToBe === "raw" ? "raw" : null),
         imagePath: uploadedImagePath,
-        estimatedValue: scanResult.pricing?.medianPrice || null,
+        estimatedValue: estimatedValue,
         cardCategory: "sports" as const,
       };
       
@@ -851,7 +879,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   };
 
   // Use scan result to populate manual form and run full analysis
-  const useScanForAnalysis = () => {
+  const useScanForAnalysis = async () => {
     if (!scanResult?.scan?.cardIdentification) return;
     
     const card = scanResult.scan.cardIdentification;
@@ -864,6 +892,42 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setVariation(card.parallel || card.variation || "");
     setGrade(gradeInfo.grade || "");
     setGrader(gradeInfo.gradingCompany || (gradeInfo.appearsToBe === "raw" ? "raw" : ""));
+    
+    // Preserve the scanned image for the manual form
+    if (scanPreviewUrl) {
+      setPreviewUrl(scanPreviewUrl);
+      
+      // Upload the scanned image to object storage so it persists
+      if (scanPreviewUrl.startsWith("blob:")) {
+        try {
+          setScanImageUploading(true);
+          const response = await fetch(scanPreviewUrl);
+          const blob = await response.blob();
+          const file = new File([blob], `scan-${Date.now()}.jpg`, { type: blob.type || "image/jpeg" });
+          
+          const uploadUrlRes = await apiRequest("POST", "/api/objects/upload");
+          const { uploadURL } = uploadUrlRes;
+          
+          await fetch(uploadURL, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type },
+          });
+          
+          const updateRes = await apiRequest("PUT", "/api/card-images", { cardImageURL: uploadURL });
+          setImagePath(updateRes.objectPath);
+        } catch (uploadError) {
+          // Continue without image - it's not critical for analysis
+          toast({
+            title: "Image upload issue",
+            description: "Card details saved, but photo may not persist",
+            variant: "destructive",
+          });
+        } finally {
+          setScanImageUploading(false);
+        }
+      }
+    }
     
     // Switch to manual mode with pre-filled data
     setInputMode("manual");
@@ -1356,7 +1420,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                 {/* Add to Portfolio Dialog */}
                 <Dialog open={showScanAddDialog} onOpenChange={setShowScanAddDialog}>
                   <DialogTrigger asChild>
-                    <Button data-testid="button-scan-add-to-portfolio">
+                    <Button disabled={scanImageUploading} data-testid="button-scan-add-to-portfolio">
                       <Plus className="h-4 w-4 mr-2" />
                       Add to Portfolio
                     </Button>
@@ -1417,13 +1481,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                         </Button>
                         <Button
                           onClick={() => addScanToCollectionMutation.mutate()}
-                          disabled={!selectedCaseId || addScanToCollectionMutation.isPending}
+                          disabled={!selectedCaseId || addScanToCollectionMutation.isPending || scanImageUploading}
                           data-testid="button-confirm-scan-add"
                         >
-                          {addScanToCollectionMutation.isPending ? (
+                          {addScanToCollectionMutation.isPending || scanImageUploading ? (
                             <>
                               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Adding...
+                              {scanImageUploading ? "Uploading..." : "Adding..."}
                             </>
                           ) : (
                             "Add Card"
@@ -1434,9 +1498,23 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   </DialogContent>
                 </Dialog>
                 
-                <Button variant="outline" onClick={useScanForAnalysis} data-testid="button-scan-full-analysis">
-                  <Zap className="h-4 w-4 mr-2" />
-                  Get Full Outlook
+                <Button 
+                  variant="outline" 
+                  onClick={useScanForAnalysis} 
+                  disabled={scanImageUploading}
+                  data-testid="button-scan-full-analysis"
+                >
+                  {scanImageUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Preparing...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="h-4 w-4 mr-2" />
+                      Get Full Outlook
+                    </>
+                  )}
                 </Button>
                 <Button 
                   variant="outline" 
