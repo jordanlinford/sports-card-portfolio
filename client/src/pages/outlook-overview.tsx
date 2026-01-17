@@ -231,6 +231,20 @@ type QuickAnalyzeResult = {
   isPro: boolean;
 };
 
+// Types for AI price estimate
+type ConditionPriceEstimate = {
+  condition: string;
+  minPrice: number;
+  maxPrice: number;
+};
+
+type AIPriceEstimate = {
+  available: boolean;
+  estimates: ConditionPriceEstimate[];
+  marketNotes: string;
+  confidence: "high" | "medium" | "low";
+};
+
 // Types for card scan result
 type CardScanResult = {
   success: boolean;
@@ -265,6 +279,7 @@ type CardScanResult = {
   pricing: {
     available: boolean;
     isFetching: boolean;
+    isAIEstimate?: boolean;
     soldCount: number;
     medianPrice: number | null;
     minPrice: number | null;
@@ -277,6 +292,7 @@ type CardScanResult = {
       soldDate: string | null;
       url: string;
     }>;
+    aiEstimate?: AIPriceEstimate;
   };
   queryHash: string;
   usage: {
@@ -1216,41 +1232,85 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="h-4 w-4 text-primary" />
                   <h4 className="font-semibold">Market Pricing</h4>
+                  {scanResult.pricing.isAIEstimate && (
+                    <Badge variant="secondary" className="text-xs">
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      AI Estimate
+                    </Badge>
+                  )}
                 </div>
                 
                 {scanResult.pricing.available ? (
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Price Range</span>
-                      <span className="font-semibold text-lg" data-testid="text-scan-price-range">
-                        {scanResult.pricing.priceRange}
-                      </span>
-                    </div>
-                    {scanResult.pricing.medianPrice && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Median Price</span>
-                        <span className="font-medium">${scanResult.pricing.medianPrice.toFixed(2)}</span>
+                    {/* Show AI condition-based estimates */}
+                    {scanResult.pricing.isAIEstimate && scanResult.pricing.aiEstimate?.estimates?.length ? (
+                      <div className="space-y-2">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-muted-foreground text-left">
+                              <th className="pb-2 font-medium">Condition</th>
+                              <th className="pb-2 font-medium text-right">Estimated Value</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {scanResult.pricing.aiEstimate.estimates.map((est, idx) => (
+                              <tr key={idx} className="border-t border-border/50">
+                                <td className="py-2">{est.condition}</td>
+                                <td className="py-2 text-right font-medium">
+                                  ${est.minPrice.toLocaleString()} - ${est.maxPrice.toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <p className="text-sm text-muted-foreground pt-2 border-t">
+                          {scanResult.pricing.aiEstimate.marketNotes || scanResult.pricing.marketAssessment}
+                        </p>
                       </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Recent Sales</span>
-                      <span className="font-medium">{scanResult.pricing.soldCount} sold</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground pt-2 border-t">
-                      {scanResult.pricing.marketAssessment}
-                    </p>
-                    
-                    {/* Recent Sales List */}
-                    {scanResult.pricing.recentSales.length > 0 && (
-                      <div className="pt-3 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground">Recent Sales:</p>
-                        {scanResult.pricing.recentSales.slice(0, 3).map((sale, idx) => (
-                          <div key={idx} className="flex items-center justify-between text-sm">
-                            <span className="truncate flex-1 mr-2">{sale.title}</span>
-                            <span className="font-medium">${sale.price.toFixed(2)}</span>
+                    ) : scanResult.pricing.isAIEstimate ? (
+                      // AI estimate flag is set but no valid estimates - show fallback message
+                      <div className="text-center py-4">
+                        <p className="text-muted-foreground">AI pricing estimate unavailable for this card</p>
+                        {scanResult.pricing.marketAssessment && (
+                          <p className="text-sm text-muted-foreground mt-2">{scanResult.pricing.marketAssessment}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {/* Standard eBay pricing display */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Price Range</span>
+                          <span className="font-semibold text-lg" data-testid="text-scan-price-range">
+                            {scanResult.pricing.priceRange}
+                          </span>
+                        </div>
+                        {scanResult.pricing.medianPrice && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-muted-foreground">Median Price</span>
+                            <span className="font-medium">${scanResult.pricing.medianPrice.toFixed(2)}</span>
                           </div>
-                        ))}
-                      </div>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Recent Sales</span>
+                          <span className="font-medium">{scanResult.pricing.soldCount} sold</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground pt-2 border-t">
+                          {scanResult.pricing.marketAssessment}
+                        </p>
+                        
+                        {/* Recent Sales List */}
+                        {scanResult.pricing.recentSales.length > 0 && (
+                          <div className="pt-3 space-y-2">
+                            <p className="text-xs font-medium text-muted-foreground">Recent Sales:</p>
+                            {scanResult.pricing.recentSales.slice(0, 3).map((sale, idx) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <span className="truncate flex-1 mr-2">{sale.title}</span>
+                                <span className="font-medium">${sale.price.toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ) : (
@@ -1261,7 +1321,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                         <span className="text-muted-foreground">Fetching market data...</span>
                       </div>
                     ) : (
-                      <p className="text-muted-foreground">{scanResult.pricing.marketAssessment}</p>
+                      <p className="text-muted-foreground">{scanResult.pricing.marketAssessment || "Unable to determine pricing"}</p>
                     )}
                   </div>
                 )}
