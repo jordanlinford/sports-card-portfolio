@@ -37,6 +37,7 @@ import {
   Bug,
   Star,
   Info,
+  Camera,
 } from "lucide-react";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -636,30 +637,67 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setShowScanAddDialog(false);
   };
 
+  const compressImage = (file: File, maxWidth = 1200, quality = 0.8): Promise<{ blob: Blob; base64: string }> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Could not get canvas context"));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Failed to compress image"));
+              return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => resolve({ blob, base64: reader.result as string });
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   // Handle photo scan
   const handlePhotoScan = async (file: File) => {
     setScanning(true);
     setScanResult(null);
     
     try {
-      // Create preview URL
-      const previewDataUrl = URL.createObjectURL(file);
+      // Compress image to reduce payload size
+      const { blob, base64: base64Data } = await compressImage(file, 1200, 0.85);
+      
+      // Create preview URL from compressed image
+      const previewDataUrl = URL.createObjectURL(blob);
       setScanPreviewUrl(previewDataUrl);
-      
-      // Convert file to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      
-      const base64Data = await base64Promise;
       
       // Call the scan API
       const response = await apiRequest("POST", "/api/cards/scan-image", {
         imageData: base64Data,
-        mimeType: file.type,
+        mimeType: "image/jpeg",
       });
       
       // Handle service unavailable errors
@@ -819,30 +857,54 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       </div>
                     )}
                     
-                    <div className="relative">
-                      <Button 
-                        variant={scanPreviewUrl ? "outline" : "default"} 
-                        disabled={scanning}
-                        data-testid="button-scan-upload"
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        {scanPreviewUrl ? "Try Different Photo" : "Upload Card Photo"}
-                      </Button>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handlePhotoScan(file);
-                        }}
-                        disabled={scanning}
-                        data-testid="input-scan-photo"
-                      />
+                    <div className="flex flex-wrap gap-3 justify-center">
+                      <div className="relative">
+                        <Button 
+                          variant="default" 
+                          disabled={scanning}
+                          data-testid="button-scan-camera"
+                        >
+                          <Camera className="h-4 w-4 mr-2" />
+                          Take Photo
+                        </Button>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handlePhotoScan(file);
+                          }}
+                          disabled={scanning}
+                          data-testid="input-scan-camera"
+                        />
+                      </div>
+                      <div className="relative">
+                        <Button 
+                          variant={scanPreviewUrl ? "default" : "outline"} 
+                          disabled={scanning}
+                          data-testid="button-scan-upload"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {scanPreviewUrl ? "Try Different Photo" : "Upload Photo"}
+                        </Button>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handlePhotoScan(file);
+                          }}
+                          disabled={scanning}
+                          data-testid="input-scan-photo"
+                        />
+                      </div>
                     </div>
                     
                     {!scanning && (
-                      <p className="text-xs text-muted-foreground mt-4">
+                      <p className="text-xs text-muted-foreground mt-4 text-center">
                         Works best with clear, well-lit photos of the card front
                       </p>
                     )}
