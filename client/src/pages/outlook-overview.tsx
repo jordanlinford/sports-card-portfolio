@@ -306,6 +306,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [showScanAddDialog, setShowScanAddDialog] = useState(false);
   
   // Polling state for comps
   const [isPollingComps, setIsPollingComps] = useState(false);
@@ -546,6 +547,77 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     }
   });
 
+  // Mutation for adding scanned card to portfolio
+  const addScanToCollectionMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCaseId || !scanResult?.scan?.cardIdentification) {
+        throw new Error("Please select a display case");
+      }
+      
+      const card = scanResult.scan.cardIdentification;
+      const gradeInfo = scanResult.scan.gradeEstimate;
+      
+      // Upload the scan preview image if available
+      let uploadedImagePath: string | null = null;
+      if (scanPreviewUrl && scanPreviewUrl.startsWith("blob:")) {
+        // Convert blob URL to file and upload using object storage
+        try {
+          const response = await fetch(scanPreviewUrl);
+          const blob = await response.blob();
+          const file = new File([blob], `scan-${Date.now()}.jpg`, { type: blob.type || "image/jpeg" });
+          
+          // Get presigned upload URL
+          const uploadUrlRes = await apiRequest("POST", "/api/objects/upload");
+          const { uploadURL } = uploadUrlRes;
+          
+          // Upload file to presigned URL
+          await fetch(uploadURL, {
+            method: "PUT",
+            body: file,
+            headers: { "Content-Type": file.type },
+          });
+          
+          // Get the object path
+          const updateRes = await apiRequest("PUT", "/api/card-images", { cardImageURL: uploadURL });
+          uploadedImagePath = updateRes.objectPath;
+        } catch (uploadError) {
+          console.error("Failed to upload scan image:", uploadError);
+          toast({ 
+            title: "Image upload failed", 
+            description: "Card will be added without the photo",
+            variant: "destructive"
+          });
+        }
+      }
+      
+      const cardData = {
+        title: card.playerName || "Unknown Card",
+        year: card.year || null,
+        set: card.setName || null,
+        cardNumber: card.cardNumber || null,
+        variation: card.parallel || card.variation || null,
+        grade: gradeInfo.grade || null,
+        grader: gradeInfo.gradingCompany || (gradeInfo.appearsToBe === "raw" ? "raw" : null),
+        imagePath: uploadedImagePath,
+        estimatedValue: scanResult.pricing?.medianPrice || null,
+        cardCategory: "sports" as const,
+      };
+      
+      const data = await apiRequest("POST", `/api/display-cases/${selectedCaseId}/cards`, cardData);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      const cardName = scanResult?.scan?.cardIdentification?.playerName || "Card";
+      toast({ title: "Card added!", description: `${cardName} added to your collection` });
+      setShowScanAddDialog(false);
+      resetForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
   const resetForm = () => {
     setTitle("");
     setYear("");
@@ -561,6 +633,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setScanPreviewUrl(null);
     setSelectedCaseId("");
     setInputMode("manual");
+    setShowScanAddDialog(false);
   };
 
   // Handle photo scan
@@ -1060,7 +1133,88 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
 
               {/* Actions */}
               <div className="flex gap-2 flex-wrap justify-center">
-                <Button onClick={useScanForAnalysis} data-testid="button-scan-full-analysis">
+                {/* Add to Portfolio Dialog */}
+                <Dialog open={showScanAddDialog} onOpenChange={setShowScanAddDialog}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-scan-add-to-portfolio">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add to Portfolio
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add to Display Case</DialogTitle>
+                      <DialogDescription>
+                        Choose which display case to add "{scanResult.scan.cardIdentification.playerName}" to.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      {/* Card Preview */}
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                        {scanPreviewUrl && (
+                          <img 
+                            src={scanPreviewUrl} 
+                            alt="Card" 
+                            className="w-12 h-16 object-contain rounded"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{scanResult.scan.cardIdentification.playerName}</p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {scanResult.scan.cardIdentification.year} {scanResult.scan.cardIdentification.setName}
+                          </p>
+                          {scanResult.pricing?.medianPrice && (
+                            <p className="text-sm text-green-600 font-medium">
+                              Est. ${scanResult.pricing.medianPrice.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label>Select Display Case</Label>
+                        <Select value={selectedCaseId} onValueChange={setSelectedCaseId}>
+                          <SelectTrigger data-testid="select-scan-display-case">
+                            <SelectValue placeholder="Choose a display case" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userCases.map((c) => (
+                              <SelectItem key={c.id} value={c.id.toString()}>
+                                {c.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {userCases.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          You don't have any display cases yet. Create one first from your dashboard.
+                        </p>
+                      )}
+                      <div className="flex gap-2 justify-end">
+                        <Button variant="outline" onClick={() => setShowScanAddDialog(false)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={() => addScanToCollectionMutation.mutate()}
+                          disabled={!selectedCaseId || addScanToCollectionMutation.isPending}
+                          data-testid="button-confirm-scan-add"
+                        >
+                          {addScanToCollectionMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Adding...
+                            </>
+                          ) : (
+                            "Add Card"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                
+                <Button variant="outline" onClick={useScanForAnalysis} data-testid="button-scan-full-analysis">
                   <Zap className="h-4 w-4 mr-2" />
                   Get Full Outlook
                 </Button>
@@ -1075,7 +1229,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   <Search className="h-4 w-4 mr-2" />
                   Scan Another
                 </Button>
-                <Button variant="outline" onClick={resetForm} data-testid="button-scan-reset">
+                <Button variant="ghost" onClick={resetForm} data-testid="button-scan-reset">
                   <X className="h-4 w-4 mr-2" />
                   Close
                 </Button>
