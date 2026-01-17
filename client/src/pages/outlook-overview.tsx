@@ -230,10 +230,68 @@ type QuickAnalyzeResult = {
   isPro: boolean;
 };
 
+// Types for card scan result
+type CardScanResult = {
+  success: boolean;
+  scan: {
+    success: boolean;
+    confidence: "high" | "medium" | "low";
+    cardIdentification: {
+      playerName: string;
+      year: number | null;
+      setName: string;
+      cardNumber: string | null;
+      variation: string | null;
+      parallel: string | null;
+      isRookie: boolean;
+      sport: string;
+    };
+    gradeEstimate: {
+      appearsToBe: "graded" | "raw";
+      gradingCompany: string | null;
+      grade: string | null;
+      conditionNotes: string | null;
+    };
+    marketContext: {
+      rarity: string;
+      desirability: string;
+      collectibilityNotes: string;
+    };
+    rawAnalysis: string;
+    error?: string;
+  };
+  searchQuery: string;
+  pricing: {
+    available: boolean;
+    isFetching: boolean;
+    soldCount: number;
+    medianPrice: number | null;
+    minPrice: number | null;
+    maxPrice: number | null;
+    priceRange: string;
+    marketAssessment: string;
+    recentSales: Array<{
+      title: string;
+      price: number;
+      soldDate: string | null;
+      url: string;
+    }>;
+  };
+  queryHash: string;
+  usage: {
+    scansToday: number;
+    dailyLimit: number;
+    remainingScans: number;
+    isPro: boolean;
+  };
+};
+
 function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; userCases: DisplayCase[] }) {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
+  const [inputMode, setInputMode] = useState<"manual" | "scan">("manual");
   const [result, setResult] = useState<QuickAnalyzeResult | null>(null);
+  const [scanResult, setScanResult] = useState<CardScanResult | null>(null);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState("");
   const [set, setSet] = useState("");
@@ -246,6 +304,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [uploading, setUploading] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
+  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
   
   // Polling state for comps
   const [isPollingComps, setIsPollingComps] = useState(false);
@@ -497,7 +557,97 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setImagePath(null);
     setPreviewUrl(null);
     setResult(null);
+    setScanResult(null);
+    setScanPreviewUrl(null);
     setSelectedCaseId("");
+    setInputMode("manual");
+  };
+
+  // Handle photo scan
+  const handlePhotoScan = async (file: File) => {
+    setScanning(true);
+    setScanResult(null);
+    
+    try {
+      // Create preview URL
+      const previewDataUrl = URL.createObjectURL(file);
+      setScanPreviewUrl(previewDataUrl);
+      
+      // Convert file to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      
+      const base64Data = await base64Promise;
+      
+      // Call the scan API
+      const response = await apiRequest("POST", "/api/cards/scan-image", {
+        imageData: base64Data,
+        mimeType: file.type,
+      });
+      
+      // Handle service unavailable errors
+      if (response.serviceUnavailable || response.scanError) {
+        toast({
+          title: "Scan unavailable",
+          description: response.message || "Please try again or enter details manually.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      setScanResult(response as CardScanResult);
+      
+      if (response.scan?.success) {
+        toast({
+          title: "Card identified!",
+          description: `${response.scan.cardIdentification.playerName} - ${response.scan.cardIdentification.setName}`,
+        });
+      } else {
+        toast({
+          title: "Could not identify card",
+          description: response.scan?.error || "Please try a clearer photo or enter details manually.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error scanning card:", error);
+      toast({
+        title: "Scan failed",
+        description: error instanceof Error ? error.message : "Failed to scan card image",
+        variant: "destructive",
+      });
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Use scan result to populate manual form and run full analysis
+  const useScanForAnalysis = () => {
+    if (!scanResult?.scan?.cardIdentification) return;
+    
+    const card = scanResult.scan.cardIdentification;
+    const gradeInfo = scanResult.scan.gradeEstimate;
+    
+    setTitle(card.playerName || "");
+    setYear(card.year?.toString() || "");
+    setSet(card.setName || "");
+    setCardNumber(card.cardNumber || "");
+    setVariation(card.parallel || card.variation || "");
+    setGrade(gradeInfo.grade || "");
+    setGrader(gradeInfo.gradingCompany || (gradeInfo.appearsToBe === "raw" ? "raw" : ""));
+    
+    // Switch to manual mode with pre-filled data
+    setInputMode("manual");
+    setScanResult(null);
+    
+    toast({
+      title: "Card details loaded",
+      description: "Review and adjust the details, then click 'Get Outlook' for full analysis.",
+    });
   };
 
   const formatCurrency = (value: number | null | undefined) => {
@@ -542,39 +692,122 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
 
       {showForm && (
         <CardContent className="space-y-4">
-          {!result ? (
+          {!result && !scanResult ? (
             <>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-shrink-0">
-                  <Label className="mb-2 block">Card Image (optional)</Label>
-                  <div className="relative w-32 h-44 border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center">
-                    {previewUrl ? (
-                      <img src={previewUrl} alt="Card preview" className="w-full h-full object-contain" />
+              {/* Mode Toggle */}
+              <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit" data-testid="mode-toggle">
+                <Button
+                  variant={inputMode === "scan" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setInputMode("scan")}
+                  data-testid="button-mode-scan"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Scan Photo
+                </Button>
+                <Button
+                  variant={inputMode === "manual" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setInputMode("manual")}
+                  data-testid="button-mode-manual"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Enter Details
+                </Button>
+              </div>
+
+              {inputMode === "scan" ? (
+                /* Photo Scan Mode */
+                <div className="space-y-4">
+                  <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg bg-muted/30">
+                    {scanPreviewUrl ? (
+                      <div className="relative w-48 h-64 mb-4">
+                        <img 
+                          src={scanPreviewUrl} 
+                          alt="Card to scan" 
+                          className="w-full h-full object-contain rounded-lg"
+                        />
+                        {scanning && (
+                          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center rounded-lg">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                            <span className="text-sm font-medium">Identifying card...</span>
+                          </div>
+                        )}
+                      </div>
                     ) : (
-                      <div className="text-center p-2">
-                        <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-1" />
-                        <span className="text-xs text-muted-foreground">Upload image</span>
+                      <div className="text-center">
+                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Sparkles className="h-10 w-10 text-primary" />
+                        </div>
+                        <h3 className="font-semibold text-lg mb-2">AI Card Scanner</h3>
+                        <p className="text-muted-foreground text-sm mb-4 max-w-sm">
+                          Upload a photo of any sports card and our AI will identify it and look up current market prices
+                        </p>
                       </div>
                     )}
-                    {uploading && (
-                      <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                      </div>
+                    
+                    <div className="relative">
+                      <Button 
+                        variant={scanPreviewUrl ? "outline" : "default"} 
+                        disabled={scanning}
+                        data-testid="button-scan-upload"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {scanPreviewUrl ? "Try Different Photo" : "Upload Card Photo"}
+                      </Button>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handlePhotoScan(file);
+                        }}
+                        disabled={scanning}
+                        data-testid="input-scan-photo"
+                      />
+                    </div>
+                    
+                    {!scanning && (
+                      <p className="text-xs text-muted-foreground mt-4">
+                        Works best with clear, well-lit photos of the card front
+                      </p>
                     )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="absolute inset-0 opacity-0 cursor-pointer"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageUpload(file);
-                      }}
-                      disabled={uploading}
-                      data-testid="input-quick-image"
-                    />
                   </div>
                 </div>
-                <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+              ) : (
+                /* Manual Entry Mode */
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-shrink-0">
+                    <Label className="mb-2 block">Card Image (optional)</Label>
+                    <div className="relative w-32 h-44 border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center">
+                      {previewUrl ? (
+                        <img src={previewUrl} alt="Card preview" className="w-full h-full object-contain" />
+                      ) : (
+                        <div className="text-center p-2">
+                          <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-1" />
+                          <span className="text-xs text-muted-foreground">Upload image</span>
+                        </div>
+                      )}
+                      {uploading && (
+                        <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+                          <Loader2 className="h-6 w-6 animate-spin" />
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(file);
+                        }}
+                        disabled={uploading}
+                        data-testid="input-quick-image"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="title">Card Title / Player Name *</Label>
                     <Input
@@ -651,37 +884,204 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     </Select>
                   </div>
                 </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    onClick={() => analyzeMutation.mutate()}
+                    disabled={!title || analyzeMutation.isPending || !canAnalyze}
+                    data-testid="button-quick-analyze"
+                  >
+                    {analyzeMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-4 w-4 mr-2" />
+                        Get Outlook
+                      </>
+                    )}
+                  </Button>
+                  {!canAnalyze && (
+                    <Link href="/upgrade">
+                      <Button variant="outline">
+                        <Crown className="h-4 w-4 mr-2" />
+                        Upgrade for Analyses
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+              )}
+            </>
+          ) : scanResult ? (
+            /* Scan Result Display */
+            <div className="space-y-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  {scanPreviewUrl && (
+                    <img 
+                      src={scanPreviewUrl} 
+                      alt="Scanned card" 
+                      className="w-16 h-22 object-contain rounded-md border"
+                    />
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-lg" data-testid="text-scan-player">
+                      {scanResult.scan.cardIdentification.playerName}
+                    </h3>
+                    <p className="text-sm text-muted-foreground" data-testid="text-scan-card-info">
+                      {scanResult.scan.cardIdentification.year} {scanResult.scan.cardIdentification.setName}
+                      {scanResult.scan.cardIdentification.parallel && ` - ${scanResult.scan.cardIdentification.parallel}`}
+                    </p>
+                  </div>
+                </div>
+                <Badge 
+                  variant="secondary" 
+                  className={
+                    scanResult.scan.confidence === "high" ? "bg-green-500/10 text-green-600" :
+                    scanResult.scan.confidence === "medium" ? "bg-yellow-500/10 text-yellow-600" :
+                    "bg-red-500/10 text-red-600"
+                  }
+                  data-testid="badge-scan-confidence"
+                >
+                  {scanResult.scan.confidence.toUpperCase()} Confidence
+                </Badge>
               </div>
 
-              <div className="flex gap-2 pt-2">
-                <Button
-                  onClick={() => analyzeMutation.mutate()}
-                  disabled={!title || analyzeMutation.isPending || !canAnalyze}
-                  data-testid="button-quick-analyze"
-                >
-                  {analyzeMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-4 w-4 mr-2" />
-                      Get Outlook
-                    </>
-                  )}
-                </Button>
-                {!canAnalyze && (
-                  <Link href="/upgrade">
-                    <Button variant="outline">
-                      <Crown className="h-4 w-4 mr-2" />
-                      Upgrade for Analyses
-                    </Button>
-                  </Link>
+              {/* Card Details */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">Sport</p>
+                  <p className="font-medium capitalize">{scanResult.scan.cardIdentification.sport}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">Condition</p>
+                  <p className="font-medium capitalize">
+                    {scanResult.scan.gradeEstimate.appearsToBe === "graded" 
+                      ? `${scanResult.scan.gradeEstimate.gradingCompany} ${scanResult.scan.gradeEstimate.grade}`
+                      : "Raw"}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">Rarity</p>
+                  <p className="font-medium capitalize">{scanResult.scan.marketContext.rarity}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {scanResult.scan.cardIdentification.isRookie ? "Rookie Card" : "Card Type"}
+                  </p>
+                  <p className="font-medium">
+                    {scanResult.scan.cardIdentification.isRookie ? "Yes" : "Non-Rookie"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Pricing Section */}
+              <div className="p-4 rounded-lg border bg-card">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <h4 className="font-semibold">Market Pricing</h4>
+                </div>
+                
+                {scanResult.pricing.available ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Price Range</span>
+                      <span className="font-semibold text-lg" data-testid="text-scan-price-range">
+                        {scanResult.pricing.priceRange}
+                      </span>
+                    </div>
+                    {scanResult.pricing.medianPrice && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Median Price</span>
+                        <span className="font-medium">${scanResult.pricing.medianPrice.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Recent Sales</span>
+                      <span className="font-medium">{scanResult.pricing.soldCount} sold</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground pt-2 border-t">
+                      {scanResult.pricing.marketAssessment}
+                    </p>
+                    
+                    {/* Recent Sales List */}
+                    {scanResult.pricing.recentSales.length > 0 && (
+                      <div className="pt-3 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground">Recent Sales:</p>
+                        {scanResult.pricing.recentSales.slice(0, 3).map((sale, idx) => (
+                          <div key={idx} className="flex items-center justify-between text-sm">
+                            <span className="truncate flex-1 mr-2">{sale.title}</span>
+                            <span className="font-medium">${sale.price.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    {scanResult.pricing.isFetching ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-muted-foreground">Fetching market data...</span>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">{scanResult.pricing.marketAssessment}</p>
+                    )}
+                  </div>
                 )}
               </div>
-            </>
-          ) : (
+
+              {/* AI Analysis */}
+              {scanResult.scan.rawAnalysis && (
+                <div className="p-4 rounded-lg border bg-muted/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <h4 className="font-semibold text-sm">AI Analysis</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {scanResult.scan.rawAnalysis}
+                  </p>
+                  {scanResult.scan.marketContext.collectibilityNotes && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {scanResult.scan.marketContext.collectibilityNotes}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Usage Info */}
+              <div className="text-xs text-muted-foreground text-center">
+                {scanResult.usage.remainingScans} scans remaining today
+                {!scanResult.usage.isPro && " (Free tier)"}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 flex-wrap justify-center">
+                <Button onClick={useScanForAnalysis} data-testid="button-scan-full-analysis">
+                  <Zap className="h-4 w-4 mr-2" />
+                  Get Full Outlook
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setScanResult(null);
+                    setScanPreviewUrl(null);
+                  }}
+                  data-testid="button-scan-another"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Scan Another
+                </Button>
+                <Button variant="outline" onClick={resetForm} data-testid="button-scan-reset">
+                  <X className="h-4 w-4 mr-2" />
+                  Close
+                </Button>
+              </div>
+            </div>
+          ) : result ? (
             <Dialog open={!!result} onOpenChange={(open) => !open && resetForm()}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader className="flex flex-row items-center justify-between gap-4 pb-4 border-b">
@@ -807,7 +1207,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
 
               </DialogContent>
             </Dialog>
-          )}
+          ) : null}
         </CardContent>
       )}
     </Card>

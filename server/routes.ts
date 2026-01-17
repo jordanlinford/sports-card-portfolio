@@ -2738,6 +2738,193 @@ Sitemap: ${origin}/sitemap.xml
   });
 
   // ============================================================================
+  // Card Image Scanner - AI-powered card identification from photos
+  // ============================================================================
+
+  // Daily scan limits
+  const FREE_SCAN_DAILY_LIMIT = 10;
+  const PRO_SCAN_DAILY_LIMIT = 100;
+  
+  // In-memory daily scan counter (resets on server restart, but that's fine for rate limiting)
+  const dailyScanCounts = new Map<string, { count: number; date: string }>();
+  
+  function getScanCountForToday(userId: string): number {
+    const today = new Date().toISOString().split('T')[0];
+    const record = dailyScanCounts.get(userId);
+    if (record && record.date === today) {
+      return record.count;
+    }
+    return 0;
+  }
+  
+  function incrementScanCount(userId: string): void {
+    const today = new Date().toISOString().split('T')[0];
+    const record = dailyScanCounts.get(userId);
+    if (record && record.date === today) {
+      record.count++;
+    } else {
+      dailyScanCounts.set(userId, { count: 1, date: today });
+    }
+  }
+
+  // Scan a card image and get identification + pricing
+  app.post("/api/cards/scan-image", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { imageData, mimeType } = req.body;
+
+      if (!imageData) {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+
+      // Validate image data format
+      const isValidFormat = imageData.startsWith("data:image/") || 
+                           imageData.startsWith("http://") || 
+                           imageData.startsWith("https://") ||
+                           /^[A-Za-z0-9+/=]+$/.test(imageData.substring(0, 100));
+      
+      if (!isValidFormat) {
+        return res.status(400).json({ message: "Invalid image format. Please provide a base64 encoded image, data URL, or image URL." });
+      }
+
+      // Check subscription status for scan limits
+      const user = await storage.getUser(userId);
+      const isPro = user?.subscriptionStatus === "PRO";
+      const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
+      const scansToday = getScanCountForToday(userId);
+      
+      if (scansToday >= dailyLimit) {
+        return res.status(429).json({
+          message: isPro 
+            ? `You've reached your daily limit of ${dailyLimit} scans. Try again tomorrow.`
+            : `You've used all ${dailyLimit} free scans today. Upgrade to Pro for more scans.`,
+          limitReached: true,
+          used: scansToday,
+          limit: dailyLimit,
+          isPro,
+        });
+      }
+
+      // Check if Gemini credentials are configured
+      if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY || !process.env.AI_INTEGRATIONS_GEMINI_BASE_URL) {
+        console.error("[Card Scan] Gemini credentials not configured");
+        return res.status(503).json({ 
+          message: "Card scanning is not available. AI service not configured.",
+          serviceUnavailable: true,
+          usage: {
+            scansToday,
+            dailyLimit,
+            remainingScans: Math.max(0, dailyLimit - scansToday),
+            isPro,
+          },
+        });
+      }
+
+      // Import card scanner service
+      const { scanCardWithPricing } = await import("./cardImageScannerService");
+
+      console.log(`[Card Scan] User ${userId} scanning card image...`);
+      
+      // Perform the scan
+      let result;
+      try {
+        result = await scanCardWithPricing(imageData, mimeType || "image/jpeg");
+      } catch (scanError) {
+        console.error("[Card Scan] Scan failed:", scanError);
+        return res.status(500).json({
+          message: "Card scanning temporarily unavailable. Please try again or enter details manually.",
+          scanError: true,
+          usage: {
+            scansToday,
+            dailyLimit,
+            remainingScans: Math.max(0, dailyLimit - scansToday),
+            isPro,
+          },
+        });
+      }
+      
+      // Increment scan count after successful scan
+      incrementScanCount(userId);
+      
+      // Track usage (using the outlook usage system with 'scan' source)
+      try {
+        await storage.recordOutlookUsage(userId, 'quick', undefined, result.scan.cardIdentification?.playerName || 'Unknown');
+      } catch (trackError) {
+        console.error("[Card Scan] Failed to track usage:", trackError);
+        // Don't fail the request if tracking fails
+      }
+
+      const remainingScans = dailyLimit - scansToday - 1;
+      
+      res.json({
+        success: result.scan.success,
+        scan: result.scan,
+        searchQuery: result.searchQuery,
+        pricing: result.pricing,
+        queryHash: result.queryHash,
+        usage: {
+          scansToday: scansToday + 1,
+          dailyLimit,
+          remainingScans: Math.max(0, remainingScans),
+          isPro,
+        },
+      });
+    } catch (error) {
+      console.error("Error scanning card image:", error);
+      
+      // Try to get usage data even on error
+      try {
+        const userId = req.user?.claims?.sub;
+        if (userId) {
+          const user = await storage.getUser(userId);
+          const isPro = user?.subscriptionStatus === "PRO";
+          const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
+          const scansToday = getScanCountForToday(userId);
+          
+          return res.status(500).json({ 
+            message: "Failed to scan card image. Please try again or enter details manually.",
+            scanError: true,
+            usage: {
+              scansToday,
+              dailyLimit,
+              remainingScans: Math.max(0, dailyLimit - scansToday),
+              isPro,
+            },
+          });
+        }
+      } catch (usageError) {
+        // If we can't get usage data, just return the basic error
+      }
+      
+      res.status(500).json({ 
+        message: "Failed to scan card image. Please try again or enter details manually.",
+        scanError: true,
+      });
+    }
+  });
+
+  // Get scan usage for current user
+  app.get("/api/cards/scan-usage", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const isPro = user?.subscriptionStatus === "PRO";
+      const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
+      const scansToday = getScanCountForToday(userId);
+      
+      res.json({
+        scansToday,
+        dailyLimit,
+        remainingScans: Math.max(0, dailyLimit - scansToday),
+        isPro,
+      });
+    } catch (error) {
+      console.error("Error getting scan usage:", error);
+      res.status(500).json({ message: "Failed to get scan usage" });
+    }
+  });
+
+  // ============================================================================
   // Player Outlook V2 - Player-First Market Intelligence
   // ============================================================================
 
