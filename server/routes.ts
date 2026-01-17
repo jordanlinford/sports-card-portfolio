@@ -6549,8 +6549,10 @@ Sitemap: ${origin}/sitemap.xml
         return res.json({ status: "not_found", queryHash });
       }
       
-      res.json({
+      // When ready, include the pricing data
+      const response: Record<string, any> = {
         status: entry.fetchStatus,
+        fetchStatus: entry.fetchStatus, // Also include fetchStatus for compatibility
         queryHash: entry.queryHash,
         canonicalQuery: entry.canonicalQuery,
         soldCount: entry.soldCount,
@@ -6561,7 +6563,16 @@ Sitemap: ${origin}/sitemap.xml
         error: entry.fetchError,
         lastFetchedAt: entry.lastFetchedAt,
         expiresAt: entry.expiresAt
-      });
+      };
+      
+      // Include pricing data when status is complete
+      if (entry.fetchStatus === "complete" && entry.summaryJson) {
+        response.summaryJson = entry.summaryJson;
+        // Include comps for recent sales
+        response.comps = entry.compsJson as any[] || [];
+      }
+      
+      res.json(response);
       
     } catch (error) {
       console.error("[Comps API] Error getting status:", error);

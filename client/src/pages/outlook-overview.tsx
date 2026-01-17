@@ -464,15 +464,15 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
       
       const data = await response.json();
       
-      if (data.status === "ready" || data.fetchStatus === "ready") {
+      if (data.status === "complete" || data.fetchStatus === "complete") {
         // Update scanResult with pricing data
         setScanResult(prev => {
           if (!prev) return null;
-          const recentSales = data.comps?.slice(0, 5).map((c: { title: string; price: number; soldDate: string | null; url: string }) => ({
+          const recentSales = data.comps?.slice(0, 5).map((c: { title: string; totalPrice?: number; soldPrice?: number; soldDate?: string | null; itemUrl?: string }) => ({
             title: c.title,
-            price: c.price,
-            soldDate: c.soldDate,
-            url: c.url,
+            price: c.totalPrice ?? c.soldPrice ?? 0,
+            soldDate: c.soldDate ?? null,
+            url: c.itemUrl ?? "",
           })) || [];
           
           return {
