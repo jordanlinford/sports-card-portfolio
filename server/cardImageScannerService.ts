@@ -1,6 +1,4 @@
 import { GoogleGenAI } from "@google/genai";
-import * as ebayComps from "./ebayCompsService";
-import type { EbayComp } from "./ebayCompsService";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
