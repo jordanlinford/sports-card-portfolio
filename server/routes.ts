@@ -1021,11 +1021,17 @@ Sitemap: ${origin}/sitemap.xml
       const verdictLabels: Record<string, string> = {
         ACCUMULATE: "Accumulate",
         HOLD_CORE: "Hold",
+        HOLD_ROLE_RISK: "Hold (Role Risk)",
+        HOLD_INJURY_CONTINGENT: "Hold (Injury Upside)",
         TRADE_THE_HYPE: "Trade the Hype",
         AVOID_NEW_MONEY: "Avoid",
+        AVOID_STRUCTURAL: "Avoid",
         SPECULATIVE_FLYER: "Speculative",
+        SPECULATIVE_SUPPRESSED: "Speculative (Suppressed)",
+        MONITOR: "Monitor",
+        WATCH: "Watch",
       };
-      const verdictLabel = verdictLabels[verdict] || "Hold";
+      const verdictLabel = verdictLabels[verdict] || verdict.replace(/_/g, " ");
       
       // Escape all dynamic content for HTML safety
       const title = escapeHtml(`${playerName}: ${verdictLabel}`);
