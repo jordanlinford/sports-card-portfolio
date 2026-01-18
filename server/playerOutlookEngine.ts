@@ -138,7 +138,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 11; // v11: Relax AVOID_NEW_MONEY thresholds so verdict actually surfaces for risky/overpriced players
+const PROMPT_VERSION = 12; // v12: Fix early-career BUST miscaching - young backups should never get AVOID_STRUCTURAL
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {

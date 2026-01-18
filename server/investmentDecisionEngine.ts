@@ -998,10 +998,25 @@ function decideVerdict(
   }
 
   // ============================================================
-  // PRECEDENCE 1: BUST → AVOID_STRUCTURAL (always allowed)
+  // PRECEDENCE 1: BUST → AVOID_STRUCTURAL (with guardrails)
   // Busts have structural career problems = negative EV
+  // 
+  // CRITICAL GUARDRAIL: Backup RBs with low role stability might be
+  // incorrectly cached as BUST when they're actually young players
+  // still developing. Only apply AVOID_STRUCTURAL for BUST if:
+  // - Player has high downside risk (confirms structural problem)
+  // - OR player is NOT a backup-level player (role stability > 45)
   // ============================================================
   if (stage === "BUST") {
+    // True busts should have high downside risk from the scoring
+    // If downside is moderate and role stability is low, they might be
+    // a young backup incorrectly cached as BUST
+    const likelyMiscachedAsYoung = roleStabilityScore <= 45 && downsideRiskScore < 60;
+    if (likelyMiscachedAsYoung) {
+      // Treat as speculative young player, not structural decline
+      console.log(`[decideVerdict] BUST with low role stability (${roleStabilityScore}) and moderate downside (${downsideRiskScore}) - treating as speculative, not structural decline`);
+      return { verdict: "SPECULATIVE_FLYER", reason: "High uncertainty - unproven with unclear path but still developing" };
+    }
     return { verdict: "AVOID_STRUCTURAL", reason: "BUST - career stalled, structural problem" };
   }
 
