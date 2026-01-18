@@ -257,31 +257,30 @@ export interface AIPriceEstimate {
   confidence: "high" | "medium" | "low";
 }
 
-const PRICE_ESTIMATE_PROMPT = `You are an expert sports card appraiser with deep knowledge of current market values. Based on the card details provided, estimate the current market value in USD.
+const PRICE_ESTIMATE_PROMPT = `You are an expert sports card appraiser. Search for CURRENT market prices and recent eBay sold listings for this EXACT card.
 
 Card Details:
 {CARD_DETAILS}
 
-Return a JSON object with EXACTLY this structure (no markdown, just pure JSON):
+CRITICAL INSTRUCTIONS:
+1. You MUST use Google Search to find actual recent sold prices on eBay for this specific card
+2. Search for "[player name] [year] [set name] PSA 10 sold eBay" and similar queries
+3. Do NOT make up prices or use generic estimates - find REAL sale data from the past 30-90 days
+4. Base cards (non-parallel, non-numbered) typically sell for much less than parallels or short prints
+
+Return a JSON object with this structure (no markdown, just pure JSON):
 {
   "estimates": [
-    {"condition": "Raw (Ungraded)", "minPrice": 10, "maxPrice": 25},
-    {"condition": "PSA 8 (Near Mint-Mint)", "minPrice": 35, "maxPrice": 50},
-    {"condition": "PSA 9 (Mint)", "minPrice": 70, "maxPrice": 100},
-    {"condition": "PSA 10 (Gem Mint)", "minPrice": 400, "maxPrice": 600}
+    {"condition": "Raw (Ungraded)", "minPrice": <actual_number>, "maxPrice": <actual_number>},
+    {"condition": "PSA 8 (Near Mint-Mint)", "minPrice": <actual_number>, "maxPrice": <actual_number>},
+    {"condition": "PSA 9 (Mint)", "minPrice": <actual_number>, "maxPrice": <actual_number>},
+    {"condition": "PSA 10 (Gem Mint)", "minPrice": <actual_number>, "maxPrice": <actual_number|}
   ],
-  "marketNotes": "Brief 1-2 sentence note about this card's market demand and collectibility",
+  "marketNotes": "Brief note citing the actual sales data you found",
   "confidence": "high" | "medium" | "low"
 }
 
-Consider:
-- Player's career status and popularity
-- Card year, set, and variation/parallel
-- Rookie card premium if applicable
-- Current market trends for this sport/era
-- Rarity and print run if known
-
-Provide realistic price ranges based on actual market conditions.`;
+Use "confidence": "low" if you cannot find sufficient real sales data. Be conservative - it's better to estimate lower than to inflate prices.`;
 
 async function getGeminiPriceEstimate(scan: CardScanResult): Promise<AIPriceEstimate> {
   try {
@@ -302,6 +301,9 @@ async function getGeminiPriceEstimate(scan: CardScanResult): Promise<AIPriceEsti
     const response = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
     });
 
     const text = response.text || "";
