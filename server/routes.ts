@@ -1637,6 +1637,7 @@ Sitemap: ${origin}/sitemap.xml
         year: card.year,
         variation: card.variation,
         grade: card.grade,
+        grader: card.grader,
       });
 
       // If we got a value, update the card
@@ -1707,6 +1708,7 @@ Sitemap: ${origin}/sitemap.xml
             year: card.year,
             variation: card.variation,
             grade: card.grade,
+            grader: card.grader,
           });
 
           const oldValue = card.estimatedValue;

@@ -904,29 +904,37 @@ async function searchAndAnalyzeCardPrice(card: CardInfo): Promise<PriceLookupRes
   const maxRetries = 3;
   let lastError: Error | null = null;
   
+  // Build grade string with grader if available
+  const gradeString = card.grader 
+    ? `${card.grader.toUpperCase()} ${card.grade}` 
+    : (card.grade || "Raw/Ungraded");
+  
   // Build a comprehensive search prompt
-  const searchPrompt = `Search for recent eBay sold listings and price data for this sports card:
+  const searchPrompt = `Search for recent sold listings and market value for this sports card:
 
-Card: ${card.title}
+Player: ${card.title}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
 Variation: ${card.variation || "Base"}
-Grade: ${card.grade || "Raw/Ungraded"}
+Grade: ${gradeString}
 
-Search eBay sold listings, PSA price guides, and sports card pricing websites to find:
-1. Recent sold prices (last 30-90 days preferred)
-2. Current market value range
-3. Any notable price trends
+IMPORTANT: The grading company matters significantly for value. ${card.grader ? `This card is graded by ${card.grader.toUpperCase()}, NOT PSA.` : ""}
 
-Return ONLY a JSON object with these exact fields:
+Search eBay sold listings, price guides, and card pricing websites. Be AGGRESSIVE about finding a value:
+- If you find a price range (e.g., $10-$25), use the MIDPOINT ($17.50)
+- If you find ANY price reference at all, use it
+- Lower-tier grading companies (BCCG, CGC) are worth less than PSA/BGS
+- Even a single data point is valuable
+
+Return ONLY a JSON object:
 {
-  "estimatedValue": <number or null>,
+  "estimatedValue": <number - ALWAYS provide a number if ANY price data exists>,
   "salesFound": <number of price references found>,
   "confidence": "high" | "medium" | "low",
-  "details": "<brief explanation of sources and prices found>"
+  "details": "<brief explanation including the price range found>"
 }
 
-Be aggressive about finding prices - even a single price reference is valuable. If you find a price range like $400-$600, average it to $500.`;
+You MUST return an estimatedValue if you find ANY price information. Do not return null unless there is truly zero pricing data available.`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
