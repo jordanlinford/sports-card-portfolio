@@ -1612,7 +1612,7 @@ Sitemap: ${origin}/sitemap.xml
       const user = await storage.getUser(userId);
       if (user?.subscriptionStatus !== "PRO") {
         return res.status(403).json({ 
-          message: "AI price lookup is a Pro feature. Upgrade to Pro to automatically refresh card values from eBay." 
+          message: "AI price lookup is a Pro feature. Upgrade to Pro to automatically refresh card values." 
         });
       }
 
@@ -1676,7 +1676,7 @@ Sitemap: ${origin}/sitemap.xml
       const user = await storage.getUser(userId);
       if (user?.subscriptionStatus !== "PRO") {
         return res.status(403).json({ 
-          message: "AI price lookup is a Pro feature. Upgrade to Pro to automatically refresh card values from eBay." 
+          message: "AI price lookup is a Pro feature. Upgrade to Pro to automatically refresh card values." 
         });
       }
 

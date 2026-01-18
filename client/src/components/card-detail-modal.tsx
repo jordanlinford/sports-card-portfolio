@@ -65,7 +65,7 @@ interface EditFormData {
   careerStage: string;
   isRookie: boolean;
   purchasePrice: string;
-  manualValue: string; // User-entered value that overrides eBay estimates
+  manualValue: string; // User-entered value that overrides AI estimates
   notes: string;
   tags: string[];
   openToOffers: boolean;
@@ -687,7 +687,7 @@ export function CardDetailModal({
                   <div className="space-y-1">
                     <Label htmlFor="edit-manual-value">
                       Manual Value Override
-                      <span className="text-xs text-muted-foreground ml-1">(overrides eBay)</span>
+                      <span className="text-xs text-muted-foreground ml-1">(overrides AI estimate)</span>
                     </Label>
                     <Input
                       id="edit-manual-value"
@@ -695,7 +695,7 @@ export function CardDetailModal({
                       step="0.01"
                       value={formData.manualValue}
                       onChange={(e) => setFormData({ ...formData, manualValue: e.target.value })}
-                      placeholder="Leave empty to use eBay value"
+                      placeholder="Leave empty to use AI estimate"
                       data-testid="input-edit-manual-value"
                     />
                   </div>
@@ -925,28 +925,33 @@ export function CardDetailModal({
                 )}
 
                 {canEdit && (
-                  <ProFeatureGate
-                    isPro={isPro}
-                    featureName="AI Price Lookup"
-                    featureDescription="Get real-time card values from eBay sales data using AI-powered price analysis."
-                    showBadge={true}
-                    onProClick={() => refreshPriceMutation.mutate(card.id)}
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 mt-2"
-                      disabled={refreshPriceMutation.isPending}
-                      data-testid="button-refresh-price"
+                  <div className="space-y-2">
+                    <ProFeatureGate
+                      isPro={isPro}
+                      featureName="AI Price Lookup"
+                      featureDescription="Get real-time card values using AI-powered market analysis."
+                      showBadge={true}
+                      onProClick={() => refreshPriceMutation.mutate(card.id)}
                     >
-                      {refreshPriceMutation.isPending ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="h-4 w-4" />
-                      )}
-                      {refreshPriceMutation.isPending ? "Looking up..." : "Refresh Value from eBay"}
-                    </Button>
-                  </ProFeatureGate>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        disabled={refreshPriceMutation.isPending}
+                        data-testid="button-refresh-price"
+                      >
+                        {refreshPriceMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4" />
+                        )}
+                        {refreshPriceMutation.isPending ? "Looking up..." : "Refresh Value"}
+                      </Button>
+                    </ProFeatureGate>
+                    <p className="text-xs text-muted-foreground">
+                      You can manually override this value if you have more current data.
+                    </p>
+                  </div>
                 )}
               </div>
 
