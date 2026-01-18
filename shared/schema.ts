@@ -113,6 +113,7 @@ export const cards = pgTable("cards", {
   grade: varchar("grade", { length: 50 }),
   purchasePrice: real("purchase_price"),
   estimatedValue: real("estimated_value"),
+  manualValue: real("manual_value"), // User-set value that always takes precedence over eBay estimates
   previousValue: real("previous_value"),
   valueUpdatedAt: timestamp("value_updated_at"),
   notes: text("notes"),

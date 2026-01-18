@@ -65,7 +65,7 @@ interface EditFormData {
   careerStage: string;
   isRookie: boolean;
   purchasePrice: string;
-  estimatedValue: string;
+  manualValue: string; // User-entered value that overrides eBay estimates
   notes: string;
   tags: string[];
   openToOffers: boolean;
@@ -190,13 +190,10 @@ export function CardDetailModal({
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
       if (data.updated) {
         toast({
-          title: "Value Updated",
-          description: `Found ${data.salesFound} sales. New value: $${data.estimatedValue?.toFixed(2)} (${data.confidence} confidence)`,
+          title: "eBay Value Updated",
+          description: `Found ${data.salesFound} sales. eBay value: $${data.estimatedValue?.toFixed(2)} (${data.confidence} confidence)`,
         });
-        setFormData(prev => ({
-          ...prev,
-          estimatedValue: data.estimatedValue?.toString() || prev.estimatedValue,
-        }));
+        // Don't update manualValue - only update refreshedValue for display
         setRefreshedValue(data.estimatedValue);
       } else {
         toast({
@@ -228,7 +225,7 @@ export function CardDetailModal({
     careerStage: "",
     isRookie: false,
     purchasePrice: "",
-    estimatedValue: "",
+    manualValue: "",
     notes: "",
     tags: [],
     openToOffers: false,
@@ -251,7 +248,7 @@ export function CardDetailModal({
         careerStage: card.legacyTier || "",
         isRookie: card.isRookie || false,
         purchasePrice: card.purchasePrice?.toString() || "",
-        estimatedValue: card.estimatedValue?.toString() || "",
+        manualValue: card.manualValue?.toString() || "",
         notes: card.notes || "",
         tags: card.tags || [],
         openToOffers: card.openToOffers || false,
@@ -311,7 +308,7 @@ export function CardDetailModal({
         careerStage: formData.careerStage.trim() || null,
         isRookie: formData.isRookie,
         purchasePrice: formData.purchasePrice ? parseFloat(formData.purchasePrice) : null,
-        estimatedValue: formData.estimatedValue ? parseFloat(formData.estimatedValue) : null,
+        manualValue: formData.manualValue ? parseFloat(formData.manualValue) : null,
         notes: formData.notes.trim() || null,
         tags: formData.tags.length > 0 ? formData.tags : null,
         openToOffers: formData.openToOffers,
@@ -356,7 +353,7 @@ export function CardDetailModal({
           careerStage: card.legacyTier || "",
           isRookie: card.isRookie || false,
           purchasePrice: card.purchasePrice?.toString() || "",
-          estimatedValue: card.estimatedValue?.toString() || "",
+          manualValue: card.manualValue?.toString() || "",
           notes: card.notes || "",
           tags: card.tags || [],
           openToOffers: card.openToOffers || false,
@@ -385,7 +382,7 @@ export function CardDetailModal({
         careerStage: card.legacyTier || "",
         isRookie: card.isRookie || false,
         purchasePrice: card.purchasePrice?.toString() || "",
-        estimatedValue: card.estimatedValue?.toString() || "",
+        manualValue: card.manualValue?.toString() || "",
         notes: card.notes || "",
         tags: card.tags || [],
         openToOffers: card.openToOffers || false,
@@ -421,7 +418,10 @@ export function CardDetailModal({
     }).format(value);
   };
 
-  const currentValue = refreshedValue ?? card.estimatedValue;
+  // Manual value always takes precedence over eBay values
+  const manualVal = card.manualValue;
+  const currentValue = manualVal ?? refreshedValue ?? card.estimatedValue;
+  const hasManualOverride = manualVal != null;
   const profitLoss = currentValue && card.purchasePrice 
     ? currentValue - card.purchasePrice 
     : null;
@@ -685,15 +685,18 @@ export function CardDetailModal({
                   </div>
 
                   <div className="space-y-1">
-                    <Label htmlFor="edit-estimated-value">Estimated Value</Label>
+                    <Label htmlFor="edit-manual-value">
+                      Manual Value Override
+                      <span className="text-xs text-muted-foreground ml-1">(overrides eBay)</span>
+                    </Label>
                     <Input
-                      id="edit-estimated-value"
+                      id="edit-manual-value"
                       type="number"
                       step="0.01"
-                      value={formData.estimatedValue}
-                      onChange={(e) => setFormData({ ...formData, estimatedValue: e.target.value })}
-                      placeholder="0.00"
-                      data-testid="input-edit-estimated-value"
+                      value={formData.manualValue}
+                      onChange={(e) => setFormData({ ...formData, manualValue: e.target.value })}
+                      placeholder="Leave empty to use eBay value"
+                      data-testid="input-edit-manual-value"
                     />
                   </div>
                 </div>
@@ -863,16 +866,21 @@ export function CardDetailModal({
                   </span>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2 text-sm flex-wrap">
                   <TrendingUp className="w-4 h-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Estimated Value:</span>
                   <span className="font-medium" data-testid="text-estimated-value">
-                    {formatCurrency(refreshedValue ?? card.estimatedValue)}
+                    {formatCurrency(currentValue)}
                   </span>
+                  {hasManualOverride && (
+                    <Badge variant="secondary" className="gap-1 text-xs" data-testid="badge-manual-override">
+                      Manual
+                    </Badge>
+                  )}
                   {(() => {
-                    const displayValue = refreshedValue ?? card.estimatedValue;
+                    const displayValue = currentValue;
                     const prevValue = refreshedValue ? card.estimatedValue : card.previousValue;
-                    if (prevValue && prevValue > 0 && displayValue && displayValue !== prevValue) {
+                    if (!hasManualOverride && prevValue && prevValue > 0 && displayValue && displayValue !== prevValue) {
                       return (
                         <Badge 
                           variant={displayValue > prevValue ? "default" : "destructive"}
