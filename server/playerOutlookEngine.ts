@@ -138,7 +138,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 12; // v12: Fix early-career BUST miscaching - young backups should never get AVOID_STRUCTURAL
+const PROMPT_VERSION = 13; // v13: Only use careerStatus for BUST, not roleStatus - roleStatus=BUST just means backup player
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -493,13 +493,19 @@ Career status rules:
           const newsHype = newsCount >= 5 ? "high" : newsCount >= 3 ? "medium" : newsCount >= 1 ? "low" : "none";
           
           // Map career status to detected stage
+          // CRITICAL: Only use careerStatus for BUST classification, NOT roleStatus
+          // roleStatus="BUST" just means "backup/fringe player" - NOT that their career is over
+          // Young backups (YEAR_2 RBs like Bhayshul Tuten) were getting misclassified as BUST
+          // when they're actually still developing - this caused "structural decline" messaging
           let detectedStage: "BUST" | "RETIRED" | "RETIRED_HOF" | undefined = undefined;
           const careerStatus = parsed.careerStatus?.toUpperCase();
           if (careerStatus === "RETIRED_HOF" || careerStatus === "DECEASED") {
             detectedStage = "RETIRED_HOF";
           } else if (careerStatus === "RETIRED") {
             detectedStage = "RETIRED";
-          } else if (careerStatus === "BUST" || parsed.roleStatus === "BUST") {
+          } else if (careerStatus === "BUST") {
+            // Only explicit careerStatus=BUST triggers BUST stage
+            // NOT roleStatus - a backup RB isn't a "bust", just developing
             detectedStage = "BUST";
           }
           
