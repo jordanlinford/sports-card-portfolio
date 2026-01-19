@@ -315,8 +315,11 @@ export function CardDetailModal({
         minOfferAmount: formData.minOfferAmount ? parseFloat(formData.minOfferAmount) : null,
         ...(newImagePath && { imagePath: newImagePath }),
       });
+      
+      // Use refetchQueries to wait for fresh data before closing edit mode
+      await queryClient.refetchQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
+      
       toast({
         title: "Card updated",
         description: "Your card details have been saved.",
