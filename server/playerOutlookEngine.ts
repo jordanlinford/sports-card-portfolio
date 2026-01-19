@@ -138,7 +138,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 13; // v13: Only use careerStatus for BUST, not roleStatus - roleStatus=BUST just means backup player
+const PROMPT_VERSION = 14; // v14: Updated prompts to prevent young players (years 1-4) from being classified as BUST
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -442,18 +442,20 @@ Return ONLY a JSON object with these exact fields:
 
 Role status rules:
 - STARTER: Named starter, starting lineup, first-string
-- BACKUP: Lost starting job, second-string, depth chart QB2+, behind another player
+- BACKUP: Second-string, depth chart QB2+, behind another player (includes young developing backups)
 - INJURED_RESERVE: On IR, season-ending injury, had surgery, missed season
 - ROTATIONAL: Part-time role, platoon, time-share
 - OUT_OF_LEAGUE: Released, cut, waived, unsigned free agent, not on any roster
-- BUST: Practice squad, failed starter, career struggling
+- UNCERTAIN: Role unclear or in flux
 
-Career status rules:
-- ACTIVE: Currently playing
+Career status rules (BE CAREFUL - young players are rarely BUST):
+- ACTIVE: Currently playing professionally (includes starters, backups, practice squad, injured reserve)
 - RETIRED: No longer playing but not HOF
 - RETIRED_HOF: Hall of fame, legend, all-time great
 - DECEASED: Passed away
-- BUST: Career failed, out of league`;
+- BUST: ONLY for veterans (5+ years in league) whose careers have permanently failed with no path back
+
+CRITICAL: Players in years 1-4 of career should be ACTIVE, NOT BUST (they are still developing)`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -618,17 +620,26 @@ ${newsSnippets.map(s => `- ${s}`).join("\n")}
 IMPORTANT: The news above is from TODAY'S search results. If the news indicates the player has been drafted, traded, signed, or is playing in the NBA, you MUST use that information. Do NOT contradict this news with outdated information from your training data. For example, if news says a player was drafted or is playing in the NBA, they are NOT a prospect - they are a professional player.` : "No recent news available - use conditional reasoning."}
 
 CAREER STATUS RULES (CRITICAL - you MUST set careerStatus correctly):
-- "ACTIVE": Player is currently playing professionally
+- "ACTIVE": Player is currently playing professionally (includes ALL current players - starters, backups, injured reserve)
 - "RETIRED": Player has retired from professional play but is not a Hall of Famer
 - "RETIRED_HOF": Player is retired AND in the Hall of Fame (or clearly HOF-bound legend)
 - "DECEASED": Player has passed away (always set this if the player is deceased, even if they're also HOF)
-- "BUST": Player's career has failed/stalled (backup, out of league, never lived up to potential)
+- "BUST": ONLY for veteran players (5+ years) whose careers have PERMANENTLY failed with no path back
+
+CRITICAL RULE FOR BUST:
+- NEVER classify players in years 1-4 of their career as BUST - they are still developing
+- Backup players in their first 4 years are ACTIVE, not BUST (they still have development runway)
+- A young backup RB like Bhayshul Tuten is ACTIVE (Year 2 player with upside), NOT BUST
+- BUST is ONLY for veterans who had their chance and failed (e.g., 5+ year players who washed out)
 
 Examples:
 - Babe Ruth → "DECEASED" (he died in 1948)
 - Bart Starr → "DECEASED" (he died in 2019)
 - Tom Brady → "RETIRED_HOF" (retired, will be HOF)
-- Zach Wilson → "BUST" (failed as starter, now backup/out of league)
+- Zach Wilson → "BUST" (Year 4, failed multiple times, no path to starting)
+- JaMarcus Russell → "BUST" (out of league after multiple failed seasons)
+- Bhayshul Tuten → "ACTIVE" (Year 2 backup RB, still developing, has upside)
+- Kenny Pickett → "ACTIVE" (backup QB but only Year 3, still has development runway)
 - Patrick Mahomes → "ACTIVE" (currently playing)
 
 RESPOND IN EXACTLY THIS JSON FORMAT:
