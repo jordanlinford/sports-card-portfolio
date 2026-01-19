@@ -138,7 +138,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 14; // v14: Updated prompts to prevent young players (years 1-4) from being classified as BUST
+const PROMPT_VERSION = 15; // v15: BUST = out of league (not on any roster), ACTIVE = on a roster (even backups)
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -448,14 +448,17 @@ Role status rules:
 - OUT_OF_LEAGUE: Released, cut, waived, unsigned free agent, not on any roster
 - UNCERTAIN: Role unclear or in flux
 
-Career status rules (BE CAREFUL - young players are rarely BUST):
-- ACTIVE: Currently playing professionally (includes starters, backups, practice squad, injured reserve)
+Career status rules:
+- ACTIVE: Currently playing professionally (includes starters, backups, practice squad, injured reserve - anyone on a roster)
 - RETIRED: No longer playing but not HOF
 - RETIRED_HOF: Hall of fame, legend, all-time great
 - DECEASED: Passed away
-- BUST: ONLY for veterans (5+ years in league) whose careers have permanently failed with no path back
+- BUST: Career has failed - out of the league with no realistic path back (can be young OR veteran)
 
-CRITICAL: Players in years 1-4 of career should be ACTIVE, NOT BUST (they are still developing)`;
+BUST CLARIFICATION:
+- Young backup ON A TEAM = ACTIVE (still developing, has a roster spot)
+- Young player OUT OF LEAGUE = can be BUST (washed out, no team wants them)
+- The key is roster status: on a roster = ACTIVE, out of league = potentially BUST`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -620,26 +623,26 @@ ${newsSnippets.map(s => `- ${s}`).join("\n")}
 IMPORTANT: The news above is from TODAY'S search results. If the news indicates the player has been drafted, traded, signed, or is playing in the NBA, you MUST use that information. Do NOT contradict this news with outdated information from your training data. For example, if news says a player was drafted or is playing in the NBA, they are NOT a prospect - they are a professional player.` : "No recent news available - use conditional reasoning."}
 
 CAREER STATUS RULES (CRITICAL - you MUST set careerStatus correctly):
-- "ACTIVE": Player is currently playing professionally (includes ALL current players - starters, backups, injured reserve)
+- "ACTIVE": Player is currently on a roster (includes starters, backups, practice squad, injured reserve)
 - "RETIRED": Player has retired from professional play but is not a Hall of Famer
 - "RETIRED_HOF": Player is retired AND in the Hall of Fame (or clearly HOF-bound legend)
 - "DECEASED": Player has passed away (always set this if the player is deceased, even if they're also HOF)
-- "BUST": ONLY for veteran players (5+ years) whose careers have PERMANENTLY failed with no path back
+- "BUST": Player is OUT OF THE LEAGUE with no realistic path back (can be young OR veteran)
 
-CRITICAL RULE FOR BUST:
-- NEVER classify players in years 1-4 of their career as BUST - they are still developing
-- Backup players in their first 4 years are ACTIVE, not BUST (they still have development runway)
-- A young backup RB like Bhayshul Tuten is ACTIVE (Year 2 player with upside), NOT BUST
-- BUST is ONLY for veterans who had their chance and failed (e.g., 5+ year players who washed out)
+CRITICAL BUST CLARIFICATION:
+- The key distinction is ROSTER STATUS, not years in league
+- Backup player ON A TEAM = ACTIVE (they have a roster spot, still developing)
+- Player OUT OF LEAGUE = potentially BUST (no team wants them)
+- Bhayshul Tuten is ON the Jaguars roster as RB3 = ACTIVE, not BUST
 
 Examples:
 - Babe Ruth → "DECEASED" (he died in 1948)
 - Bart Starr → "DECEASED" (he died in 2019)
 - Tom Brady → "RETIRED_HOF" (retired, will be HOF)
-- Zach Wilson → "BUST" (Year 4, failed multiple times, no path to starting)
+- Trey Lance → "BUST" (out of the league, no team signed him)
 - JaMarcus Russell → "BUST" (out of league after multiple failed seasons)
-- Bhayshul Tuten → "ACTIVE" (Year 2 backup RB, still developing, has upside)
-- Kenny Pickett → "ACTIVE" (backup QB but only Year 3, still has development runway)
+- Bhayshul Tuten → "ACTIVE" (backup RB on Jaguars roster - has a team)
+- Kenny Pickett → "ACTIVE" (backup QB on a roster)
 - Patrick Mahomes → "ACTIVE" (currently playing)
 
 RESPOND IN EXACTLY THIS JSON FORMAT:
