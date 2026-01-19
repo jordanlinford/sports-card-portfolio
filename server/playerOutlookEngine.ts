@@ -138,7 +138,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 15; // v15: BUST = out of league (not on any roster), ACTIVE = on a roster (even backups)
+const PROMPT_VERSION = 16; // v16: UNKNOWN stage now blocks AVOID_STRUCTURAL verdict (can't claim decline without knowing career stage)
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
