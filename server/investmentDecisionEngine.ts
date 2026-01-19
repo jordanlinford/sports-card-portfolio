@@ -624,7 +624,8 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
   // CRITICAL GUARDRAIL: Young players (ROOKIE through YEAR_3) can NEVER get AVOID_STRUCTURAL
   // "Structural decline" implies a deteriorating baseline - rookies haven't established one yet
   // Even struggling rookies should be SPECULATIVE or HOLD, not decline warnings
-  const isEarlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3";
+  // ALSO: UNKNOWN stage should NOT get structural decline - we can't claim decline without knowing career stage
+  const isEarlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3" || stage === "UNKNOWN";
   
   // AVOID_STRUCTURAL: 3+ negative factors AND fewer positive factors
   // But block for early-career players (they haven't had enough time to "decline")
