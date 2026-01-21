@@ -699,46 +699,6 @@ export function OutlookDetails({
         </Card>
       )}
 
-      {data.matchConfidence && (
-        <Card className={
-          data.matchConfidence.tier === "HIGH" 
-            ? "bg-green-500/5 border-green-500/30" 
-            : data.matchConfidence.tier === "MEDIUM"
-            ? "bg-yellow-500/5 border-yellow-500/30"
-            : "bg-red-500/5 border-red-500/30"
-        }>
-          <CardContent className="py-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                {data.matchConfidence.tier === "HIGH" && <CheckCircle className="h-5 w-5 text-green-500" />}
-                {data.matchConfidence.tier === "MEDIUM" && <AlertTriangle className="h-5 w-5 text-yellow-500" />}
-                {data.matchConfidence.tier === "LOW" && <XCircle className="h-5 w-5 text-red-500" />}
-                <span className="font-semibold">Card Match Confidence</span>
-                <Badge 
-                  variant={data.matchConfidence.tier === "HIGH" ? "default" : data.matchConfidence.tier === "MEDIUM" ? "secondary" : "destructive"}
-                  data-testid="badge-match-confidence"
-                >
-                  {data.matchConfidence.tier} ({Math.round(data.matchConfidence.score * 100)}%)
-                </Badge>
-              </div>
-              {data.matchConfidence.samples && data.matchConfidence.samples.length > 0 && onShowMatchSamples && (
-                <Button variant="ghost" size="sm" onClick={onShowMatchSamples}>
-                  View Samples
-                  <ExternalLink className="h-4 w-4 ml-1" />
-                </Button>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              {data.matchConfidence.reason}
-            </p>
-            {data.matchConfidence.tier === "LOW" && (
-              <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-2 font-medium">
-                Pricing data may not accurately reflect this exact card.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
 
       {data.generatedAt && (
         <div className="text-xs text-muted-foreground text-center">
