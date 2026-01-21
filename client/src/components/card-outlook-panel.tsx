@@ -31,8 +31,17 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Card as CardType } from "@shared/schema";
+import type { Card as CardType, LiquidityTier } from "@shared/schema";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
+import { LiquidityBadge } from "@/components/liquidity-badge";
+
+function getLiquidityTierFromScore(score: number | undefined): LiquidityTier {
+  if (score === undefined || score === null) return "UNCERTAIN";
+  if (score >= 0.9) return "VERY_HIGH";
+  if (score >= 0.7) return "HIGH";
+  if (score >= 0.4) return "MEDIUM";
+  return "LOW"; // Scores below 0.4 indicate weak liquidity
+}
 
 function safeCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined || isNaN(value)) return "-";
@@ -409,6 +418,12 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                 {getActionIcon(outlook.action)}
                 {getActionLabel(outlook.action)}
               </Badge>
+              {outlook.factors?.liquidityScore !== undefined && (
+                <LiquidityBadge 
+                  tier={getLiquidityTierFromScore(outlook.factors.liquidityScore)} 
+                  size="sm"
+                />
+              )}
               {card.cardCategory && card.cardCategory !== "sports" && (
                 <Badge variant="outline" className="text-[10px] uppercase">
                   {card.cardCategory === "tcg" ? "TCG" : "Non-Sport"}

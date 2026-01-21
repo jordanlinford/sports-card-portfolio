@@ -25,6 +25,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { LiquidityBadge, DivergenceWarning, getDivergenceStatus } from "@/components/liquidity-badge";
+import type { LiquidityTier } from "@shared/schema";
 import {
   AreaChart,
   Area,
@@ -154,6 +156,21 @@ function formatCurrency(value: number | null | undefined): string {
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function getLiquidityTierFromScore(score: number | undefined): LiquidityTier {
+  if (score === undefined || score === null) return "UNCERTAIN";
+  if (score >= 9) return "VERY_HIGH";
+  if (score >= 7) return "HIGH";
+  if (score >= 4) return "MEDIUM";
+  return "LOW"; // Scores 0-3 indicate weak liquidity
+}
+
+function getPriceDirection(trendScore: number | undefined): "up" | "down" | "stable" {
+  if (trendScore === undefined || trendScore === null) return "stable";
+  if (trendScore >= 7) return "up";
+  if (trendScore <= 3) return "down";
+  return "stable";
 }
 
 function SignalBar({ label, value, max = 10, tooltip }: { label: string; value?: number; max?: number; tooltip?: string }) {
@@ -414,6 +431,10 @@ export function OutlookDetails({
                     Big Mover
                   </Badge>
                 )}
+                <LiquidityBadge 
+                  tier={getLiquidityTierFromScore(data.signals.liquidity)} 
+                  size="sm"
+                />
                 <Button
                   variant="ghost"
                   size="sm"
@@ -462,6 +483,17 @@ export function OutlookDetails({
               )}
             </div>
           </div>
+          {data.isPro && getDivergenceStatus(
+            getPriceDirection(data.signals.trend),
+            getLiquidityTierFromScore(data.signals.liquidity)
+          ) && (
+            <div className="pt-4 border-t mt-4">
+              <DivergenceWarning 
+                priceDirection={getPriceDirection(data.signals.trend)}
+                liquidityTier={getLiquidityTierFromScore(data.signals.liquidity)}
+              />
+            </div>
+          )}
         </CardHeader>
       </Card>
 
