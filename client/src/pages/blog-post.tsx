@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { ArrowLeft, Calendar, Video } from "lucide-react";
+import { ArrowLeft, Calendar, Video, Share2, Link2, Check } from "lucide-react";
+import { useState } from "react";
+import { SiX, SiFacebook } from "react-icons/si";
 import type { BlogPostWithAuthor } from "@shared/schema";
 
 function extractVideoId(url: string, provider: string): string | null {
@@ -287,7 +289,84 @@ export default function BlogPostPage() {
             ))}
           </div>
         )}
+
+        <ShareSection title={post.title} />
       </article>
+    </div>
+  );
+}
+
+function ShareSection({ title }: { title: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = typeof window !== "undefined" ? window.location.href : "";
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const shareToTwitter = () => {
+    const text = encodeURIComponent(title);
+    const shareUrl = encodeURIComponent(url);
+    window.open(`https://twitter.com/intent/tweet?text=${text}&url=${shareUrl}`, "_blank");
+  };
+
+  const shareToFacebook = () => {
+    const shareUrl = encodeURIComponent(url);
+    window.open(`https://www.facebook.com/sharer/sharer.php?u=${shareUrl}`, "_blank");
+  };
+
+  return (
+    <div className="mt-12 pt-8 border-t">
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-sm text-muted-foreground flex items-center gap-2">
+          <Share2 className="h-4 w-4" />
+          Share this post
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={copyLink}
+            data-testid="button-copy-link"
+          >
+            {copied ? (
+              <>
+                <Check className="h-4 w-4 mr-1" />
+                Copied
+              </>
+            ) : (
+              <>
+                <Link2 className="h-4 w-4 mr-1" />
+                Copy link
+              </>
+            )}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={shareToTwitter}
+            data-testid="button-share-twitter"
+          >
+            <SiX className="h-4 w-4 mr-1" />
+            X
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={shareToFacebook}
+            data-testid="button-share-facebook"
+          >
+            <SiFacebook className="h-4 w-4 mr-1" />
+            Facebook
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
