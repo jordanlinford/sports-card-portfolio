@@ -3,7 +3,8 @@ import type {
   AdvisorOutlook, 
   AdvisorVerdict, 
   AdvisorConfidence,
-  AdvisorHorizon 
+  AdvisorHorizon,
+  LiquidityTier 
 } from "@shared/schema";
 
 function mapVerdictToAdvisor(
@@ -269,6 +270,54 @@ function extractCards(outlook: PlayerOutlookResponse): { buy: string[]; avoid: s
   };
 }
 
+function deriveLiquidityTier(outlook: PlayerOutlookResponse): LiquidityTier | undefined {
+  const exposures = outlook.exposures || [];
+  
+  // Map exposure liquidity levels to our tier system
+  // Exposures use HIGH/MEDIUM/LOW, we map to our VERY_HIGH/HIGH/MEDIUM/LOW/UNCERTAIN tiers
+  const liquidityLevels = exposures
+    .map(exp => exp.liquidity)
+    .filter((liq): liq is "HIGH" | "MEDIUM" | "LOW" => !!liq);
+  
+  if (liquidityLevels.length === 0) return undefined;
+  
+  const highCount = liquidityLevels.filter(l => l === "HIGH").length;
+  const medCount = liquidityLevels.filter(l => l === "MEDIUM").length;
+  const lowCount = liquidityLevels.filter(l => l === "LOW").length;
+  const total = liquidityLevels.length;
+  
+  // Priority order: VERY_HIGH > HIGH > MEDIUM > LOW > UNCERTAIN
+  // We lean optimistic - presence of HIGH is a good signal
+  
+  // VERY_HIGH: All exposures are HIGH (strong liquidity across all tiers)
+  if (highCount === total && total >= 2) {
+    return "VERY_HIGH";
+  }
+  
+  // HIGH: Any HIGH exposure means decent market (lean optimistic)
+  // HIGH dominates ties with MEDIUM
+  if (highCount >= medCount && highCount > 0 && lowCount < highCount) {
+    return "HIGH";
+  }
+  
+  // LOW: Only when LOW is the dominant signal (more LOW than HIGH+MEDIUM combined)
+  if (lowCount > (highCount + medCount)) {
+    return "LOW";
+  }
+  
+  // MEDIUM: Mixed signals or moderate liquidity dominates
+  if (medCount > 0 || (highCount > 0 && lowCount > 0)) {
+    return "MEDIUM";
+  }
+  
+  // LOW: Only LOW signals present
+  if (lowCount > 0) {
+    return "LOW";
+  }
+  
+  return "UNCERTAIN";
+}
+
 function buildEvidenceNote(outlook: PlayerOutlookResponse): string {
   const evidence = outlook.evidence;
   const parts: string[] = [];
@@ -312,6 +361,7 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     buyTriggers: extractBuyTriggers(outlook),
     cards: extractCards(outlook),
     evidenceNote: buildEvidenceNote(outlook),
+    liquidityTier: deriveLiquidityTier(outlook),
   };
 }
 

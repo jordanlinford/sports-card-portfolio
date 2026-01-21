@@ -1411,6 +1411,7 @@ export type AdvisorOutlook = {
     avoid: string[]; // 0-6 specific cards to avoid
   };
   evidenceNote: string; // 1 sentence: data sources and limitations
+  liquidityTier?: LiquidityTier; // Overall player market liquidity (derived from exposures)
 };
 
 // Player Outlook Cache table

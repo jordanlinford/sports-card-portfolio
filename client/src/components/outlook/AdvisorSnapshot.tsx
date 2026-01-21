@@ -12,6 +12,7 @@ import {
   Heart,
 } from "lucide-react";
 import type { AdvisorOutlook } from "@shared/schema";
+import { LiquidityBadge } from "@/components/liquidity-badge";
 
 function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
   switch (verdict) {
@@ -84,7 +85,10 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
             </div>
           </div>
           
-          {/* Removed confidence/horizon badges - advisor voice doesn't expose system mechanics */}
+          {/* Liquidity badge - shows overall market health for this player's cards */}
+          {advisor.liquidityTier && (
+            <LiquidityBadge tier={advisor.liquidityTier} />
+          )}
         </div>
       </CardHeader>
       
