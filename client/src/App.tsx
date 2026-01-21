@@ -67,6 +67,7 @@ function Router() {
       <Route path="/player-outlook" component={PlayerOutlookPage} />
       <Route path="/outlook/:sport/:slug" component={PublicPlayerOutlookPage} />
       <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
+      <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
       <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
       {/* Show loading only for auth-dependent routes */}
       {isLoading ? (
@@ -103,7 +104,6 @@ function Router() {
           <Route path="/hidden-gems" component={HiddenGemsPage} />
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
           <Route path="/portfolio/next-buys" component={NextBuysPage} />
-          <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
           <Route path="/portfolio-builder/splits/:id/preferences" component={PortfolioBuilderPreferencesPage} />
           <Route path="/admin/portfolio-builder" component={AdminPortfolioBuilderPage} />
           <Route path="/search" component={SearchPage} />
