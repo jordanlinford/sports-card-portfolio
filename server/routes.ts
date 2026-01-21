@@ -2177,6 +2177,25 @@ Sitemap: ${origin}/sitemap.xml
           (signals.sportScore * 0.3) + 
           (signals.positionScore * 0.3)
         ) * 10;
+        
+        // CRITICAL: Recompute action with updated liquidity to fix verdict/explanation mismatch
+        // Without this, the action/reasons reflect old low-liquidity even when Gemini found plenty of sales
+        const { computeAction } = await import("./outlookEngine");
+        const originalAction = signals.action;
+        const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
+          signals.qualityScore,
+          signals.demandScore,
+          signals.momentumScore,
+          signals.trendScore,
+          signals.volatilityScore,
+          signals.liquidityScore,
+          geminiMarketData.avgPrice,
+          signals.careerStageAuto,
+          card.year ?? undefined
+        );
+        signals.action = recomputedAction;
+        signals.actionReasons = recomputedReasons;
+        console.log(`[Outlook 2.0] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
       }
       
       // Use Gemini's price data if available and better
@@ -2714,6 +2733,25 @@ Sitemap: ${origin}/sitemap.xml
           (signals.sportScore * 0.3) + 
           (signals.positionScore * 0.3)
         ) * 10;
+        
+        // CRITICAL: Recompute action with updated liquidity to fix verdict/explanation mismatch
+        // Without this, the action/reasons reflect old low-liquidity even when Gemini found plenty of sales
+        const { computeAction } = await import("./outlookEngine");
+        const originalAction = signals.action;
+        const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
+          signals.qualityScore,
+          signals.demandScore,
+          signals.momentumScore,
+          signals.trendScore,
+          signals.volatilityScore,
+          signals.liquidityScore,
+          geminiMarketData.avgPrice,
+          signals.careerStageAuto,
+          tempCard.year ? parseInt(String(tempCard.year)) : undefined
+        );
+        signals.action = recomputedAction;
+        signals.actionReasons = recomputedReasons;
+        console.log(`[Quick Analyze] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
       }
       
       // Use Gemini's price data if available and better
