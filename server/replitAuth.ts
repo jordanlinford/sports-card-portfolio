@@ -20,13 +20,17 @@ const getOidcConfig = memoize(
   { maxAge: 3600 * 1000 }
 );
 
+// Session TTL constants
+export const DEFAULT_SESSION_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+export const EXTENDED_SESSION_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days for "stay logged in"
+
 export function getSession() {
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const sessionTtl = DEFAULT_SESSION_TTL;
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: false,
-    ttl: sessionTtl,
+    ttl: EXTENDED_SESSION_TTL, // Use max TTL for store, cookie controls actual expiry
     tableName: "sessions",
   });
   const isProduction = process.env.NODE_ENV === "production";
@@ -113,6 +117,10 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
+    // Store "remember me" preference in session before redirecting to OIDC
+    const rememberMe = req.query.remember === "true";
+    (req.session as any).rememberMe = rememberMe;
+    
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
@@ -125,7 +133,17 @@ export async function setupAuth(app: Express) {
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
-    })(req, res, next);
+    })(req, res, (err: any) => {
+      if (err) return next(err);
+      
+      // If user chose "stay logged in", extend the session cookie
+      if ((req.session as any).rememberMe) {
+        req.session.cookie.maxAge = EXTENDED_SESSION_TTL;
+        console.log("[Auth] Extended session for 'stay logged in' - 30 days");
+      }
+      
+      res.redirect("/");
+    });
   });
 
   app.get("/api/logout", (req, res) => {
