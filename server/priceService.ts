@@ -780,7 +780,7 @@ function computeCardMatchConfidence(
     return {
       tier: "LOW",
       score: 0,
-      reason: "No comparable listings found",
+      reason: "No exact matches found for this specific card variation",
       matchedComps: 0,
       totalComps: 0,
       samples: [],
