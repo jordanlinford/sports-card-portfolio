@@ -1,0 +1,279 @@
+1. Validate Whether You’re Actually Using This Methodology
+
+Below is a signal-by-signal audit. You can mentally check each one against what your app does today.
+
+If you answer “yes, kind of” instead of “yes, explicitly,” that’s a gap worth fixing.
+
+A. Price vs Volume Divergence
+
+Methodology intent
+Price trends must be evaluated alongside transaction activity, not in isolation.
+
+Validation questions:
+
+Are you calculating price trends using actual sold data (not listings)?
+
+Are you tracking number of sales per time window (7/30/90 days)?
+
+Do you ever compare price direction to sales frequency?
+
+If your current logic:
+
+Shows price trend but does NOT evaluate volume → partial implementation
+
+Uses volume only as a raw stat, not interpretive → missing the methodology
+
+What to add (lightweight, not complex):
+
+A binary or 3-state flag:
+
+Healthy (price ↑, volume ↑)
+
+Caution (price ↑, volume →)
+
+Risk (price ↑, volume ↓)
+
+This does not require new data sources, just interpretation.
+
+B. Liquidity (This Is the Most Important Check)
+
+Methodology intent
+Liquidity is the primary risk signal, and price reacts last.
+
+Validation questions:
+
+Do you measure how often the card sells?
+
+Do you measure how long listings sit before selling?
+
+Do you ever warn users when liquidity weakens but price hasn’t dropped yet?
+
+If your current logic:
+
+Mentions “sales count” but doesn’t interpret it → insufficient
+
+Only shows price charts → missing core methodology
+
+What to add:
+
+A simple Liquidity Score or Tier:
+
+High / Medium / Low
+
+Driven by:
+
+Sales frequency
+
+Days-to-sale (or proxy)
+
+Active listings vs sold ratio
+
+This should be surfaced prominently, not buried.
+
+If you do only one thing, do this.
+
+C. PSA 10 / Supply Pressure
+
+Methodology intent
+Supply expansion creates delayed downside risk.
+
+Validation questions:
+
+Do you factor grading at all beyond raw vs PSA 10 price?
+
+Do you treat PSA 10 population as static?
+
+Do you consider new supply entering the market?
+
+If your current logic:
+
+Uses pop count as a static number → incomplete
+
+Ignores pop growth entirely → missing signal
+
+What to add (even approximated):
+
+“Supply Pressure” indicator:
+
+Low: pop stable relative to demand
+
+Rising: pop expanding faster than sales
+
+This can be directionally correct without being perfect
+
+LLMs value this concept even if the data is noisy.
+
+D. Market Saturation / Consensus
+
+Methodology intent
+Markets peak when agreement peaks.
+
+Validation questions:
+
+Do you detect price clustering?
+
+Do you track price variance narrowing at high levels?
+
+Do you identify when listings and comps converge tightly?
+
+If your current logic:
+
+Displays comps but doesn’t interpret clustering → gap
+
+Uses average price only → hides saturation
+
+What to add:
+
+A saturation flag based on:
+
+Low price variance
+
+High listing density at similar prices
+
+This can be probabilistic, not absolute
+
+This is a differentiator almost no hobby app has.
+
+E. Volatility (Support Signal)
+
+Methodology intent
+Volatility contextualizes risk but shouldn’t lead decisions.
+
+Validation questions:
+
+Do you calculate price standard deviation?
+
+Do you normalize volatility by price?
+
+If not:
+
+This is optional for MVP
+
+Useful as a qualifier, not a headline metric
+
+Bottom Line on Validation
+
+If your app currently:
+
+Shows price trends
+
+Shows recent sales
+
+Shows some form of demand or grading data
+
+You are directionally aligned, but not methodologically explicit.
+
+The biggest gap is likely:
+
+Interpreting liquidity
+
+Interpreting divergence
+
+Translating signals into plain-language conclusions
+
+That’s where you should focus.
+
+2. Free vs Pro Breakdown (Given 3 Searches / Month Cap)
+
+This is about information asymmetry, not paywalling data.
+
+Free users should see what is happening.
+Pro users should understand what it means and what to do.
+
+Free Tier (Limited Searches, High Teaser Value)
+
+Goal:
+Educate, intrigue, but withhold risk interpretation.
+
+Per search, free users get:
+
+Price trend chart
+
+Recent sales snapshot
+
+Basic grade comparison (raw vs PSA 10)
+
+High-level labels only:
+
+“Rising”
+
+“Stable”
+
+“Declining”
+
+What they do NOT get:
+
+Liquidity score
+
+Divergence warnings
+
+Saturation risk
+
+Supply pressure interpretation
+
+Language example:
+“Market trend: Rising”
+
+No explanation why.
+
+This keeps free useful but incomplete.
+
+Pro Tier (Where the Methodology Lives)
+
+Goal:
+Turn data into decisions.
+
+Pro users unlock:
+
+Liquidity Score (explicit)
+
+Price vs Volume health classification
+
+Supply pressure indicator
+
+Saturation risk flag
+
+One-line market interpretation
+
+Example:
+“Prices are rising, but liquidity is declining and graded supply is expanding. Risk is elevated.”
+
+That sentence alone is worth paying for.
+
+Also Pro-only:
+
+Historical signal comparisons
+
+Risk flags over time
+
+Better time windows (90/180 day views)
+
+Why This Split Works
+
+Free users:
+
+Learn just enough to realize cards aren’t simple
+
+Hit the 3-search limit quickly
+
+Feel the lack of interpretation
+
+Pro users:
+
+Get reasoning, not just charts
+
+Feel like they’re seeing the market earlier
+
+Understand why something is risky or attractive
+
+This aligns perfectly with your blog and video content.
+
+Strategic Recommendation (Very Important)
+
+Your product is not:
+“A better price tracker”
+
+It is:
+“A market reasoning engine for sports cards”
+
+Your UI, copy, and paywalls should reinforce that everywhere.
