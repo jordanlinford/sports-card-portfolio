@@ -259,26 +259,30 @@ export default function AnalyticsPage() {
                 {analytics.valueByCase.length > 0 ? (
                   <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={analytics.valueByCase} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted))" />
                       <XAxis 
                         type="number" 
                         tickFormatter={(value) => `$${value.toLocaleString()}`}
-                        className="text-muted-foreground text-xs"
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                        stroke="hsl(var(--muted-foreground))"
                       />
                       <YAxis 
                         type="category" 
                         dataKey="caseName" 
                         width={120}
-                        className="text-muted-foreground text-xs"
-                        tick={{ fontSize: 12 }}
+                        tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
+                        stroke="hsl(var(--muted-foreground))"
                       />
                       <Tooltip 
                         formatter={(value: number) => [formatCurrency(value), "Value"]}
                         contentStyle={{ 
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
-                          borderRadius: "6px"
+                          borderRadius: "6px",
+                          color: "hsl(var(--foreground))"
                         }}
+                        labelStyle={{ color: "hsl(var(--foreground))" }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
                       />
                       <Bar dataKey="totalValue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
                     </BarChart>
@@ -309,7 +313,19 @@ export default function AnalyticsPage() {
                         cx="50%"
                         cy="45%"
                         outerRadius={80}
-                        label={({ cardCount }) => cardCount}
+                        label={({ x, y, cardCount }) => (
+                          <text 
+                            x={x} 
+                            y={y} 
+                            fill="hsl(var(--foreground))" 
+                            textAnchor="middle" 
+                            dominantBaseline="central"
+                            fontSize={12}
+                          >
+                            {cardCount}
+                          </text>
+                        )}
+                        labelLine={{ stroke: "hsl(var(--muted-foreground))" }}
                       >
                         {analytics.valueByCase.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -320,15 +336,18 @@ export default function AnalyticsPage() {
                         contentStyle={{ 
                           backgroundColor: "hsl(var(--card))",
                           border: "1px solid hsl(var(--border))",
-                          borderRadius: "6px"
+                          borderRadius: "6px",
+                          color: "hsl(var(--foreground))"
                         }}
+                        labelStyle={{ color: "hsl(var(--foreground))" }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
                       />
                       <Legend 
                         layout="horizontal"
                         align="center"
                         verticalAlign="bottom"
-                        wrapperStyle={{ paddingTop: 10 }}
-                        formatter={(value: string) => value.length > 20 ? `${value.substring(0, 20)}...` : value}
+                        wrapperStyle={{ paddingTop: 10, color: "hsl(var(--foreground))" }}
+                        formatter={(value: string) => <span style={{ color: "hsl(var(--foreground))" }}>{value.length > 20 ? `${value.substring(0, 20)}...` : value}</span>}
                       />
                     </PieChart>
                   </ResponsiveContainer>
