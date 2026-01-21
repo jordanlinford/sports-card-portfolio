@@ -125,6 +125,140 @@ Be specific about role and injury status. If the player:
   return { snippets: [], momentum: "flat", newsCount: 0 };
 }
 
+// Structured market data from Gemini with Google Search grounding
+export type GeminiMarketData = {
+  soldCount: number;
+  avgPrice: number;
+  minPrice: number;
+  maxPrice: number;
+  activeListing: number;
+  liquidity: "HIGH" | "MEDIUM" | "LOW";
+  priceStability: "STABLE" | "VOLATILE" | "UNKNOWN";
+  dataSource: "gemini_grounded";
+  searchQuery: string;
+};
+
+// Fetch real eBay market data using Gemini with Google Search grounding
+// This leverages Gemini's ability to search eBay and extract structured data
+export async function fetchGeminiMarketData(card: {
+  title: string;
+  playerName?: string | null;
+  year?: number | null;
+  set?: string | null;
+  variation?: string | null;
+  grade?: string | null;
+  grader?: string | null;
+}): Promise<GeminiMarketData | null> {
+  const maxRetries = 2;
+  let lastError: Error | null = null;
+  
+  // Build search description
+  const parts: string[] = [];
+  if (card.year) parts.push(String(card.year));
+  if (card.set) parts.push(card.set);
+  if (card.playerName) parts.push(card.playerName);
+  if (card.variation) parts.push(card.variation);
+  if (card.grade && card.grader) {
+    parts.push(`${card.grader} ${card.grade}`);
+  } else if (card.grade) {
+    parts.push(card.grade);
+  } else {
+    parts.push("raw ungraded");
+  }
+  
+  const searchDescription = parts.join(" ") || card.title;
+  
+  const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
+
+Look at eBay's "Sold Items" filter to find actual completed sales from the last 30-60 days.
+
+Return ONLY a JSON object with these exact fields:
+{
+  "soldCount": <number of sold listings found in last 30-60 days, be specific>,
+  "avgPrice": <average sale price in USD as a number>,
+  "minPrice": <lowest sale price in USD>,
+  "maxPrice": <highest sale price in USD>,
+  "activeListing": <number of current active listings>,
+  "liquidity": "HIGH" | "MEDIUM" | "LOW",
+  "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
+  "confidence": "HIGH" | "MEDIUM" | "LOW",
+  "notes": "<brief note about the market for this card>"
+}
+
+Liquidity guidelines:
+- HIGH: 15+ sales per month, sells almost daily
+- MEDIUM: 5-15 sales per month, sells weekly
+- LOW: Under 5 sales per month, may take time to sell
+
+Price stability:
+- STABLE: Prices within 20% of average
+- VOLATILE: Prices vary more than 40%
+- UNKNOWN: Not enough data
+
+Be specific with numbers. If you find 19 sold listings, say 19, not "approximately 20".`;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[OutlookEngine] Market data fetch attempt ${attempt} for: ${searchDescription}`);
+      
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: searchPrompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      });
+      
+      let responseText = response.text || "";
+      console.log(`[OutlookEngine] Gemini market data response length: ${responseText.length}`);
+      
+      // Strip markdown code fences
+      responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+      
+      // Extract JSON
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          
+          // Validate required fields
+          if (typeof parsed.soldCount === "number" && typeof parsed.avgPrice === "number") {
+            console.log(`[OutlookEngine] Found market data: ${parsed.soldCount} sold, avg $${parsed.avgPrice}`);
+            
+            return {
+              soldCount: parsed.soldCount || 0,
+              avgPrice: parsed.avgPrice || 0,
+              minPrice: parsed.minPrice || parsed.avgPrice * 0.8,
+              maxPrice: parsed.maxPrice || parsed.avgPrice * 1.2,
+              activeListing: parsed.activeListing || 0,
+              liquidity: parsed.liquidity || "MEDIUM",
+              priceStability: parsed.priceStability || "UNKNOWN",
+              dataSource: "gemini_grounded",
+              searchQuery: searchDescription,
+            };
+          } else {
+            console.log(`[OutlookEngine] Invalid market data structure:`, parsed);
+          }
+        } catch (parseError) {
+          console.error(`[OutlookEngine] Failed to parse market data JSON:`, responseText.substring(0, 300));
+        }
+      }
+      
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[OutlookEngine] Gemini market data error (attempt ${attempt}):`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delay = 1000 * attempt;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  console.error("[OutlookEngine] Market data fetch failed:", lastError?.message);
+  return null;
+}
+
 // Static score mappings
 const SPORT_SCORES: Record<string, number> = {
   basketball: 10,

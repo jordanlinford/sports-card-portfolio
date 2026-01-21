@@ -2092,11 +2092,23 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       // Import the outlook engine dynamically to avoid circular dependencies
-      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews } = await import("./outlookEngine");
+      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
-      // First, get enhanced price data with individual price points
-      console.log(`[Outlook 2.0] Fetching enhanced price data for card ${cardId}`);
+      // First, fetch Gemini grounded market data (uses Google Search to find real eBay data)
+      console.log(`[Outlook 2.0] Fetching Gemini grounded market data for card ${cardId}`);
+      const geminiMarketData = await fetchGeminiMarketData({
+        title: card.title,
+        playerName: card.playerName,
+        year: card.year,
+        set: card.set,
+        variation: card.variation,
+        grade: card.grade,
+        grader: card.grader,
+      });
+      
+      // Also get legacy price data as fallback
+      console.log(`[Outlook 2.0] Fetching legacy price data for card ${cardId}`);
       const priceData = await lookupEnhancedCardPrice({
         title: card.title,
         set: card.set,
@@ -2121,15 +2133,76 @@ Sitemap: ${origin}/sitemap.xml
       console.log(`[Outlook 2.0] Computing signals for card ${cardId}`);
       const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
       
-      // Get match confidence from price data
-      const matchConfidence = priceData.matchConfidence;
+      // Override signals with Gemini market data if available (more accurate)
+      if (geminiMarketData) {
+        console.log(`[Outlook 2.0] Enhancing signals with Gemini market data: ${geminiMarketData.soldCount} sold, avg $${geminiMarketData.avgPrice}`);
+        
+        // Map Gemini soldCount to liquidity score (1-10)
+        // HIGH liquidity: 15+ sales = 8-10 score
+        // MEDIUM liquidity: 5-14 sales = 5-7 score  
+        // LOW liquidity: 0-4 sales = 1-4 score
+        if (geminiMarketData.soldCount >= 25) {
+          signals.liquidityScore = 10;
+        } else if (geminiMarketData.soldCount >= 15) {
+          signals.liquidityScore = 8;
+        } else if (geminiMarketData.soldCount >= 10) {
+          signals.liquidityScore = 7;
+        } else if (geminiMarketData.soldCount >= 5) {
+          signals.liquidityScore = 5;
+        } else if (geminiMarketData.soldCount >= 2) {
+          signals.liquidityScore = 3;
+        } else {
+          signals.liquidityScore = 1;
+        }
+        
+        // Update data confidence based on Gemini data quality
+        if (geminiMarketData.soldCount >= 10) {
+          signals.dataConfidence = "HIGH";
+          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found on eBay`;
+        } else if (geminiMarketData.soldCount >= 5) {
+          signals.dataConfidence = "MEDIUM";
+          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
+        }
+        
+        // Update market friction based on liquidity
+        if (geminiMarketData.liquidity === "HIGH") {
+          signals.marketFriction = Math.min(signals.marketFriction, 30);
+        } else if (geminiMarketData.liquidity === "MEDIUM") {
+          signals.marketFriction = Math.min(signals.marketFriction, 50);
+        }
+        
+        // Recalculate demand score with updated liquidity
+        signals.demandScore = Math.round(
+          (signals.liquidityScore * 0.4) + 
+          (signals.sportScore * 0.3) + 
+          (signals.positionScore * 0.3)
+        ) * 10;
+      }
       
-      // Override action to MONITOR if match confidence is LOW
+      // Use Gemini's price data if available and better
+      let marketValue = priceData.estimatedValue;
+      let priceMin = filteredPriceData.min;
+      let priceMax = filteredPriceData.max;
+      let compCount = priceData.salesFound;
+      
+      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+        marketValue = geminiMarketData.avgPrice;
+        priceMin = geminiMarketData.minPrice;
+        priceMax = geminiMarketData.maxPrice;
+        compCount = geminiMarketData.soldCount;
+      }
+      
+      // Determine final action - use matchConfidence safeguard when Gemini data unavailable
       let finalAction = signals.action;
       let finalActionReasons = [...signals.actionReasons];
-      if (matchConfidence && matchConfidence.tier === "LOW") {
-        finalAction = "MONITOR";
-        finalActionReasons = [`Low card match confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+      
+      // If no Gemini data, fall back to legacy matchConfidence check
+      if (!geminiMarketData) {
+        const matchConfidence = priceData.matchConfidence;
+        if (matchConfidence && matchConfidence.tier === "LOW") {
+          finalAction = "MONITOR";
+          finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+        }
       }
 
       // Fetch real-time player news for current context (sports cards only)
@@ -2141,18 +2214,19 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       // Generate AI explanation (AI explains, doesn't decide)
+      // Use the selected marketValue (Gemini or legacy) for consistent explanation
       console.log(`[Outlook 2.0] Generating AI explanation for ${finalAction}`);
       const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
-      const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue, newsSnippets);
+      const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
 
-      // Store outlook in the new card_outlooks table (use filtered min/max for tighter range)
+      // Store outlook in the new card_outlooks table (use Gemini data if available)
       const outlookData = {
         cardId,
         pricePoints: pricePointsForSchema,
-        marketValue: priceData.estimatedValue ? Math.round(priceData.estimatedValue * 100) : null, // Store in cents
-        priceMin: filteredPriceData.min ? Math.round(filteredPriceData.min * 100) : null,
-        priceMax: filteredPriceData.max ? Math.round(filteredPriceData.max * 100) : null,
-        compCount: priceData.salesFound,
+        marketValue: marketValue ? Math.round(marketValue * 100) : null, // Store in cents
+        priceMin: priceMin ? Math.round(priceMin * 100) : null,
+        priceMax: priceMax ? Math.round(priceMax * 100) : null,
+        compCount: compCount,
         trendScore: signals.trendScore,
         liquidityScore: signals.liquidityScore,
         volatilityScore: signals.volatilityScore,
@@ -2187,8 +2261,8 @@ Sitemap: ${origin}/sitemap.xml
         outlookBigMover: signals.bigMoverFlag,
         outlookBigMoverReason: signals.bigMoverReason,
       };
-      if (priceData.estimatedValue) {
-        cardUpdate.estimatedValue = priceData.estimatedValue;
+      if (marketValue) {
+        cardUpdate.estimatedValue = marketValue;
       }
       await storage.updateCard(cardId, cardUpdate);
 
@@ -2207,11 +2281,17 @@ Sitemap: ${origin}/sitemap.xml
           variation: card.variation,
         },
         market: {
-          value: priceData.estimatedValue,
-          min: filteredPriceData.min,
-          max: filteredPriceData.max,
-          compCount: priceData.salesFound,
+          value: marketValue,
+          min: priceMin,
+          max: priceMax,
+          compCount: compCount,
           pricePoints: priceData.pricePoints,
+          geminiData: geminiMarketData ? {
+            soldCount: geminiMarketData.soldCount,
+            liquidity: geminiMarketData.liquidity,
+            priceStability: geminiMarketData.priceStability,
+            dataSource: geminiMarketData.dataSource,
+          } : null,
         },
         signals: {
           trend: signals.trendScore,
@@ -2234,7 +2314,6 @@ Sitemap: ${origin}/sitemap.xml
           level: signals.dataConfidence,
           reason: signals.confidenceReason,
         },
-        matchConfidence: matchConfidence || null,
         explanation: {
           short: explanation.short,
           long: explanation.long,
