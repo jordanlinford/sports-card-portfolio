@@ -30,6 +30,7 @@ The application supports core functionalities including:
 - **Trading & Communication**: An offers system for cards marked "Open to Offers" and a direct messaging system between collectors.
 - **Analytics & Sharing**: Portfolio analytics page, and viral sharing features allowing export of cases as various image formats for social media.
 - **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts at 3/6/12 month intervals, showing bear/base/bull scenarios based on market temperature, investment verdicts, and upside/risk scores from player outlook data.
+- **Liquidity Scoring UI**: Visual badges (VERY_HIGH/HIGH/MEDIUM/LOW/UNCERTAIN) showing market health and exit risk for each card. Integrated into card outlook displays and Quick Card Check. Pro users see divergence warnings when price rises on weak liquidity.
 - **Next Buys Recommendation Engine**: Balanced, investment-focused recommendation system with multiple recommendation sources:
   - **Watchlist**: Players user is actively tracking
   - **Breakout**: HOT temperature players with strong momentum
