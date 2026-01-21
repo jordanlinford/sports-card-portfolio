@@ -139,6 +139,7 @@ export async function setupAuth(app: Express) {
       // If user chose "stay logged in", extend the session cookie
       if ((req.session as any).rememberMe) {
         req.session.cookie.maxAge = EXTENDED_SESSION_TTL;
+        delete (req.session as any).rememberMe; // Clear flag after use
         console.log("[Auth] Extended session for 'stay logged in' - 30 days");
       }
       

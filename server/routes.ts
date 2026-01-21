@@ -3133,6 +3133,32 @@ Sitemap: ${origin}/sitemap.xml
   // Player Outlook V2 - Player-First Market Intelligence
   // ============================================================================
 
+  // Player name suggestions for autocomplete
+  app.get("/api/player-suggestions", async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== "string" || q.length < 2) {
+        return res.json([]);
+      }
+      
+      const { searchPlayers } = await import("./playerRegistry");
+      const players = searchPlayers(q, 8);
+      
+      // Return simplified player info for autocomplete
+      const suggestions = players.map(p => ({
+        name: p.playerName,
+        sport: p.sport,
+        position: p.positionGroup,
+        stage: p.careerStage,
+      }));
+      
+      res.json(suggestions);
+    } catch (error) {
+      console.error("[Player Suggestions] Error:", error);
+      res.json([]);
+    }
+  });
+
   // Get player image from Wikipedia
   app.get("/api/player-image", async (req, res) => {
     try {

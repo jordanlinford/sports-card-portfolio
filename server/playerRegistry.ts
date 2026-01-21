@@ -253,3 +253,44 @@ export function getRegistryStats(): { totalEntries: number; loaded: boolean; sou
     source: registrySource,
   };
 }
+
+export function searchPlayers(query: string, limit: number = 10): PlayerRegistryEntry[] {
+  loadRegistry();
+  
+  if (!query || query.length < 2) {
+    return [];
+  }
+  
+  const normalizedQuery = normalizeForLookup(query);
+  const results: PlayerRegistryEntry[] = [];
+  const seenNames = new Set<string>();
+  const entries = Array.from(registryMap.entries());
+  
+  // First pass: exact prefix matches on player name
+  for (const [key, entry] of entries) {
+    if (seenNames.has(entry.playerName)) continue;
+    
+    const normalizedName = normalizeForLookup(entry.playerName);
+    if (normalizedName.startsWith(normalizedQuery)) {
+      results.push(entry);
+      seenNames.add(entry.playerName);
+      if (results.length >= limit) break;
+    }
+  }
+  
+  // Second pass: contains matches if we need more results
+  if (results.length < limit) {
+    for (const [key, entry] of entries) {
+      if (seenNames.has(entry.playerName)) continue;
+      
+      const normalizedName = normalizeForLookup(entry.playerName);
+      if (normalizedName.includes(normalizedQuery)) {
+        results.push(entry);
+        seenNames.add(entry.playerName);
+        if (results.length >= limit) break;
+      }
+    }
+  }
+  
+  return results;
+}

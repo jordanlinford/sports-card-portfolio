@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PlayerAutocomplete } from "@/components/player-autocomplete";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1051,11 +1051,17 @@ export default function PlayerOutlookPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <Label htmlFor="playerName" className="sr-only">Player Name</Label>
-              <Input
+              <PlayerAutocomplete
                 id="playerName"
                 placeholder="Enter player name (e.g., Shedeur Sanders)"
                 value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
+                onChange={setPlayerName}
+                onSelect={(player) => {
+                  setPlayerName(player.name);
+                  if (player.sport) {
+                    setSport(player.sport.toLowerCase());
+                  }
+                }}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 data-testid="input-player-name"
               />
