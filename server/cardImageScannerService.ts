@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import * as ebayComps from "./ebayCompsService";
+import { fetchGeminiMarketData } from "./outlookEngine";
 import type { EbayComp } from "@shared/schema";
 
 const gemini = new GoogleGenAI({
@@ -479,6 +480,84 @@ export async function scanCardWithPricing(
   
   const normalized = ebayComps.normalizeEbayQuery(searchQuery);
   
+  // Try Gemini with Google Search grounding first (primary source)
+  console.log("[CardScanner] Fetching market data via Gemini grounded search");
+  
+  try {
+    const geminiData = await fetchGeminiMarketData({
+      title: searchQuery,
+      playerName: scan.cardIdentification.playerName,
+      year: scan.cardIdentification.year,
+      set: scan.cardIdentification.setName,
+      variation: scan.cardIdentification.variation || scan.cardIdentification.parallel,
+      grade: scan.gradeEstimate.grade,
+      grader: scan.gradeEstimate.gradingCompany,
+    });
+    
+    if (geminiData && geminiData.avgPrice > 0) {
+      console.log(`[CardScanner] Gemini found ${geminiData.soldCount} sales, avg $${geminiData.avgPrice}`);
+      
+      const priceRange = geminiData.minPrice && geminiData.maxPrice
+        ? `$${geminiData.minPrice.toFixed(2)} - $${geminiData.maxPrice.toFixed(2)}`
+        : `~$${geminiData.avgPrice.toFixed(2)}`;
+      
+      let marketAssessment = "";
+      if (geminiData.soldCount >= 25) {
+        marketAssessment = "Strong market activity - prices are well established";
+      } else if (geminiData.soldCount >= 10) {
+        marketAssessment = "Good market activity - solid price reference";
+      } else if (geminiData.soldCount >= 5) {
+        marketAssessment = "Moderate market activity - decent price reference";
+      } else if (geminiData.soldCount >= 1) {
+        marketAssessment = "Limited sales data - prices may vary";
+      } else {
+        marketAssessment = "No recent sales found";
+      }
+      
+      // Map soldCount to liquidity score (consistent with outlookEngine)
+      let liquidityScore: number;
+      if (geminiData.soldCount >= 25) {
+        liquidityScore = 10;
+      } else if (geminiData.soldCount >= 15) {
+        liquidityScore = 8;
+      } else if (geminiData.soldCount >= 10) {
+        liquidityScore = 7;
+      } else if (geminiData.soldCount >= 5) {
+        liquidityScore = 5;
+      } else if (geminiData.soldCount >= 2) {
+        liquidityScore = 3;
+      } else {
+        liquidityScore = 1;
+      }
+      
+      return {
+        scan,
+        searchQuery: normalized.canonicalQuery,
+        pricing: {
+          available: true,
+          isFetching: false,
+          isAIEstimate: false,
+          soldCount: geminiData.soldCount,
+          medianPrice: geminiData.avgPrice,
+          minPrice: geminiData.minPrice,
+          maxPrice: geminiData.maxPrice,
+          trendSlope: null,
+          volatility: null,
+          liquidity: liquidityScore,
+          recentSales: [],
+          priceRange,
+          marketAssessment,
+        },
+        queryHash: normalized.queryHash,
+      };
+    }
+  } catch (error) {
+    console.error("[CardScanner] Gemini market data failed:", error);
+  }
+  
+  // Fallback to legacy eBay cache if Gemini fails or returns no results
+  console.log("[CardScanner] Gemini returned no results, falling back to eBay cache");
+  
   const swrResult = await ebayComps.getCachedCompsWithSWR(
     normalized.queryHash,
     normalized.canonicalQuery,
@@ -493,7 +572,6 @@ export async function scanCardWithPricing(
     const minPrice = summary?.minPrice ?? null;
     const maxPrice = summary?.maxPrice ?? null;
     
-    // If eBay has data, use it
     if (soldCount > 0 && medianPrice) {
       const recentSales = (compsJson || [])
         .slice(0, 5)
@@ -540,51 +618,18 @@ export async function scanCardWithPricing(
         queryHash: normalized.queryHash,
       };
     }
-    
-    // eBay cache exists but has 0 results - fall back to Gemini
-    console.log("[CardScanner] eBay returned 0 results, falling back to AI estimate");
-    const aiEstimate = await getGeminiPriceEstimate(scan);
-    
-    if (aiEstimate.available && aiEstimate.estimates.length > 0) {
-      const rawEstimate = aiEstimate.estimates.find(e => e.condition.toLowerCase().includes("raw"));
-      const priceRange = rawEstimate 
-        ? `$${rawEstimate.minPrice} - $${rawEstimate.maxPrice}`
-        : `$${aiEstimate.estimates[0].minPrice} - $${aiEstimate.estimates[0].maxPrice}`;
-      
-      return {
-        scan,
-        searchQuery: normalized.canonicalQuery,
-        pricing: {
-          available: true,
-          isFetching: false,
-          isAIEstimate: true,
-          soldCount: 0,
-          medianPrice: rawEstimate ? (rawEstimate.minPrice + rawEstimate.maxPrice) / 2 : null,
-          minPrice: rawEstimate?.minPrice || null,
-          maxPrice: rawEstimate?.maxPrice || null,
-          trendSlope: null,
-          volatility: null,
-          liquidity: null,
-          recentSales: [],
-          priceRange,
-          marketAssessment: aiEstimate.marketNotes || "AI-powered estimate based on market knowledge",
-          aiEstimate,
-        },
-        queryHash: normalized.queryHash,
-      };
-    }
   }
   
-  // No cached data - enqueue eBay fetch AND get immediate AI estimate
-  console.log("[CardScanner] No cached eBay data, getting AI estimate while fetching");
+  // Fallback to AI estimate if both Gemini and eBay fail
+  console.log("[CardScanner] No eBay cache, getting AI estimate");
   
+  // Enqueue eBay fetch for future requests
   await ebayComps.enqueueFetchJob(
     normalized.canonicalQuery,
     normalized.queryHash,
     normalized.filters
   );
   
-  // Get AI estimate to show immediately while eBay fetches in background
   const aiEstimate = await getGeminiPriceEstimate(scan);
   
   if (aiEstimate.available && aiEstimate.estimates.length > 0) {
@@ -598,7 +643,7 @@ export async function scanCardWithPricing(
       searchQuery: normalized.canonicalQuery,
       pricing: {
         available: true,
-        isFetching: true, // Still fetching eBay in background
+        isFetching: true,
         isAIEstimate: true,
         soldCount: 0,
         medianPrice: rawEstimate ? (rawEstimate.minPrice + rawEstimate.maxPrice) / 2 : null,
