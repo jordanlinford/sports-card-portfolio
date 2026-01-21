@@ -2558,11 +2558,23 @@ Sitemap: ${origin}/sitemap.xml
       };
 
       // Import the outlook engine dynamically
-      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews } = await import("./outlookEngine");
+      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
-      // Fetch enhanced price data
-      console.log(`[Quick Analyze] Fetching price data for: ${title}`);
+      // First, fetch Gemini grounded market data (uses Google Search to find real eBay data)
+      console.log(`[Quick Analyze] Fetching Gemini grounded market data for: ${title}`);
+      const geminiMarketData = await fetchGeminiMarketData({
+        title,
+        playerName: title, // For quick analyze, title often contains player name
+        year: year ? parseInt(year) : undefined,
+        set: set || undefined,
+        variation: variation || undefined,
+        grade: grade || undefined,
+        grader: grader || undefined,
+      });
+
+      // Also fetch legacy price data as fallback
+      console.log(`[Quick Analyze] Fetching legacy price data for: ${title}`);
       const priceData = await lookupEnhancedCardPrice({
         title,
         set: set || undefined,
@@ -2661,15 +2673,73 @@ Sitemap: ${origin}/sitemap.xml
       console.log(`[Quick Analyze] Computing signals`);
       const signals = computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
       
-      // Get match confidence from price data
+      // Override signals with Gemini market data if available (more accurate)
+      if (geminiMarketData) {
+        console.log(`[Quick Analyze] Enhancing signals with Gemini market data: ${geminiMarketData.soldCount} sold, avg $${geminiMarketData.avgPrice}`);
+        
+        // Map Gemini soldCount to liquidity score (1-10)
+        if (geminiMarketData.soldCount >= 25) {
+          signals.liquidityScore = 10;
+        } else if (geminiMarketData.soldCount >= 15) {
+          signals.liquidityScore = 8;
+        } else if (geminiMarketData.soldCount >= 10) {
+          signals.liquidityScore = 7;
+        } else if (geminiMarketData.soldCount >= 5) {
+          signals.liquidityScore = 5;
+        } else if (geminiMarketData.soldCount >= 2) {
+          signals.liquidityScore = 3;
+        } else {
+          signals.liquidityScore = 1;
+        }
+        
+        // Update data confidence based on Gemini data quality
+        if (geminiMarketData.soldCount >= 10) {
+          signals.dataConfidence = "HIGH";
+          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found on eBay`;
+        } else if (geminiMarketData.soldCount >= 5) {
+          signals.dataConfidence = "MEDIUM";
+          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
+        }
+        
+        // Update market friction based on liquidity
+        if (geminiMarketData.liquidity === "HIGH") {
+          signals.marketFriction = Math.min(signals.marketFriction, 30);
+        } else if (geminiMarketData.liquidity === "MEDIUM") {
+          signals.marketFriction = Math.min(signals.marketFriction, 50);
+        }
+        
+        // Recalculate demand score with updated liquidity
+        signals.demandScore = Math.round(
+          (signals.liquidityScore * 0.4) + 
+          (signals.sportScore * 0.3) + 
+          (signals.positionScore * 0.3)
+        ) * 10;
+      }
+      
+      // Use Gemini's price data if available and better
+      let marketValue = priceData.estimatedValue;
+      let priceMin = filteredPriceData.min;
+      let priceMax = filteredPriceData.max;
+      let compCount = priceData.salesFound;
+      
+      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+        marketValue = geminiMarketData.avgPrice;
+        priceMin = geminiMarketData.minPrice;
+        priceMax = geminiMarketData.maxPrice;
+        compCount = geminiMarketData.soldCount;
+      }
+      
+      // Get match confidence from price data (only used as fallback when no Gemini data)
       const matchConfidence = priceData.matchConfidence;
       
-      // Override action to MONITOR if match confidence is LOW
+      // Determine final action
       let finalAction = signals.action;
       let finalActionReasons = [...signals.actionReasons];
-      if (matchConfidence && matchConfidence.tier === "LOW") {
+      
+      // If no Gemini data, fall back to legacy matchConfidence check
+      if (!geminiMarketData && matchConfidence && matchConfidence.tier === "LOW") {
         finalAction = "MONITOR";
-        finalActionReasons = [`Low card match confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+        finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
       }
 
       // Attempt to extract player name from title for news lookup
@@ -2682,9 +2752,10 @@ Sitemap: ${origin}/sitemap.xml
       newsSnippets = newsData.snippets;
 
       // Generate AI explanation
+      // Use the selected marketValue for consistent explanation
       console.log(`[Quick Analyze] Generating AI explanation for ${finalAction}`);
       const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
-      const explanation = await generateOutlookExplanation(tempCard as any, signalsForExplanation, priceData.pricePoints, priceData.estimatedValue, newsSnippets);
+      const explanation = await generateOutlookExplanation(tempCard as any, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
 
       // Record usage for free tier tracking
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);
@@ -2701,13 +2772,19 @@ Sitemap: ${origin}/sitemap.xml
           imagePath,
         },
         market: {
-          value: priceData.estimatedValue,
-          min: filteredPriceData.min,
-          max: filteredPriceData.max,
-          compCount: priceData.salesFound,
+          value: marketValue,
+          min: priceMin,
+          max: priceMax,
+          compCount: compCount,
           pricePoints: isPro ? priceData.pricePoints : null,
           // Modeled estimates disabled - strict matching only
           modeledEstimate: null,
+          geminiData: geminiMarketData ? {
+            soldCount: geminiMarketData.soldCount,
+            liquidity: geminiMarketData.liquidity,
+            priceStability: geminiMarketData.priceStability,
+            dataSource: geminiMarketData.dataSource,
+          } : null,
         },
         signals: isPro ? {
           trend: signals.trendScore,
