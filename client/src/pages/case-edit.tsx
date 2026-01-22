@@ -67,7 +67,11 @@ import {
   ArrowUpDown,
   ArrowDownAZ,
   CalendarDays,
-  DollarSign
+  DollarSign,
+  Camera,
+  Sparkles,
+  Search,
+  CheckCircle,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -211,6 +215,13 @@ export default function CaseEdit() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [duplicateCheckTitle, setDuplicateCheckTitle] = useState("");
+  
+  // Scan mode state for Add Card
+  const [addCardMode, setAddCardMode] = useState<"manual" | "scan">("manual");
+  const [scanning, setScanning] = useState(false);
+  const [scanConfirmed, setScanConfirmed] = useState(false);
+  const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
+  const [scanConfidence, setScanConfidence] = useState<"high" | "medium" | "low" | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -357,8 +368,14 @@ export default function CaseEdit() {
         description: "Your card has been added to the display case.",
       });
       setShowAddCard(false);
+      // Reset all form and scan state
       setSelectedFile(null);
       setPreviewUrl(null);
+      setScanPreviewUrl(null);
+      setScanConfirmed(false);
+      setScanConfidence(null);
+      setAddCardMode("manual");
+      setDuplicateCheckTitle("");
       cardForm.reset();
     },
     onError: (error: Error) => {
@@ -533,6 +550,134 @@ export default function CaseEdit() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  // Compress image for scanning
+  const compressImage = (file: File, maxWidth = 1200, quality = 0.8): Promise<{ blob: Blob; base64: string }> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Failed to get canvas context"));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64 = (reader.result as string).split(",")[1];
+              resolve({ blob, base64 });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          } else {
+            reject(new Error("Failed to create blob"));
+          }
+        }, "image/jpeg", quality);
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Handle scan photo - identifies card and populates form
+  const handleScanPhoto = async (file: File) => {
+    setScanning(true);
+    setScanConfirmed(false);
+    setScanConfidence(null);
+    
+    try {
+      const { blob, base64: base64Data } = await compressImage(file, 1200, 0.85);
+      
+      // Create preview URL
+      const previewDataUrl = URL.createObjectURL(blob);
+      setScanPreviewUrl(previewDataUrl);
+      setPreviewUrl(previewDataUrl);
+      setSelectedFile(new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" }));
+      
+      // Call scan-identify API
+      const response = await apiRequest("POST", "/api/cards/scan-identify", {
+        imageData: base64Data,
+        mimeType: "image/jpeg",
+      });
+      
+      if (response.success && response.scan?.cardIdentification) {
+        const card = response.scan.cardIdentification;
+        const gradeInfo = response.scan.gradeEstimate;
+        
+        // Populate form with scanned data
+        cardForm.setValue("title", card.playerName || "");
+        cardForm.setValue("year", card.year?.toString() || "");
+        cardForm.setValue("set", card.setName || "");
+        cardForm.setValue("cardNumber", card.cardNumber || "");
+        cardForm.setValue("variation", card.parallel || card.variation || "");
+        cardForm.setValue("grade", gradeInfo?.grade || "");
+        // Only set grader if it's a valid enum value (raw cards have no grader)
+        const validGraders = ["PSA", "BGS", "SGC", "CGC", "HGA", "CSG", "other"];
+        if (gradeInfo?.gradingCompany && validGraders.includes(gradeInfo.gradingCompany)) {
+          cardForm.setValue("grader", gradeInfo.gradingCompany as "PSA" | "BGS" | "SGC" | "CGC" | "HGA" | "CSG" | "other");
+        }
+        // If raw card, don't set grader (leave as undefined)
+        cardForm.setValue("cardCategory", "sports");
+        
+        // Set player name for sports card details
+        cardForm.setValue("playerName", card.playerName || "");
+        
+        // Set for duplicate detection
+        setDuplicateCheckTitle(card.playerName || "");
+        
+        setScanConfidence(response.scan.confidence || "medium");
+        
+        toast({
+          title: "Card identified",
+          description: "Review and adjust the details, then add to your collection.",
+        });
+      } else {
+        toast({
+          title: "Couldn't identify card",
+          description: "Please enter the card details manually.",
+          variant: "destructive",
+        });
+        setAddCardMode("manual");
+      }
+    } catch (error) {
+      console.error("Scan error:", error);
+      toast({
+        title: "Scan failed",
+        description: error instanceof Error ? error.message : "Please try again or enter details manually.",
+        variant: "destructive",
+      });
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  // Reset scan state when dialog closes
+  const resetAddCardForm = () => {
+    cardForm.reset();
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setScanPreviewUrl(null);
+    setScanConfirmed(false);
+    setScanConfidence(null);
+    setAddCardMode("manual");
+    setDuplicateCheckTitle("");
   };
 
   const handleAddCard = async (data: AddCardFormData) => {
@@ -1018,7 +1163,7 @@ export default function CaseEdit() {
                 <Dialog open={showAddCard} onOpenChange={(open) => {
                   setShowAddCard(open);
                   if (!open) {
-                    setDuplicateCheckTitle("");
+                    resetAddCardForm();
                   }
                 }}>
                   <DialogTrigger asChild>
@@ -1031,50 +1176,170 @@ export default function CaseEdit() {
                   <DialogHeader>
                     <DialogTitle>Add New Card</DialogTitle>
                     <DialogDescription>
-                      Upload an image and add details about your card
+                      Scan a photo to auto-fill details or enter manually
                     </DialogDescription>
                   </DialogHeader>
+                  
+                  {/* Mode Toggle */}
+                  <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit" data-testid="add-card-mode-toggle">
+                    <Button
+                      type="button"
+                      variant={addCardMode === "scan" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => {
+                        setAddCardMode("scan");
+                        // Clear form when switching to scan mode
+                        if (addCardMode !== "scan") {
+                          cardForm.reset();
+                          setPreviewUrl(null);
+                          setSelectedFile(null);
+                          setScanConfidence(null);
+                        }
+                      }}
+                      data-testid="button-mode-scan-add"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Scan Photo
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={addCardMode === "manual" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setAddCardMode("manual")}
+                      data-testid="button-mode-manual-add"
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Enter Details
+                    </Button>
+                  </div>
+
                   <Form {...cardForm}>
                     <form onSubmit={cardForm.handleSubmit(handleAddCard)} className="flex flex-col flex-1 overflow-hidden">
                       <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                      <div className="space-y-2">
-                        <FormLabel>Card Image</FormLabel>
-                        <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                          {previewUrl ? (
-                            <div className="relative">
-                              <img
-                                src={previewUrl}
-                                alt="Preview"
-                                className="max-h-48 mx-auto rounded-lg object-contain"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedFile(null);
-                                  setPreviewUrl(null);
-                                }}
-                                className="absolute top-2 right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ) : (
-                            <label className="cursor-pointer block py-8">
-                              <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                              <p className="text-sm text-muted-foreground">
-                                Click to upload or drag and drop
-                              </p>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileChange}
-                                className="hidden"
-                                data-testid="input-card-image"
-                              />
-                            </label>
-                          )}
+                      
+                      {/* Scan Mode - Photo Upload with AI */}
+                      {addCardMode === "scan" && !scanConfidence && (
+                        <div className="space-y-2">
+                          <FormLabel>Scan Card Photo</FormLabel>
+                          <div className="border-2 border-dashed rounded-lg p-6 text-center bg-muted/50">
+                            {scanning ? (
+                              <div className="py-8">
+                                <Loader2 className="h-8 w-8 mx-auto animate-spin text-primary mb-3" />
+                                <p className="text-sm text-muted-foreground">Identifying card...</p>
+                              </div>
+                            ) : (
+                              <label className="cursor-pointer block py-4">
+                                <Camera className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                                <p className="font-medium mb-1">Take or upload a photo</p>
+                                <p className="text-sm text-muted-foreground mb-3">
+                                  AI will identify the card and fill in the details
+                                </p>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleScanPhoto(file);
+                                  }}
+                                  className="hidden"
+                                  data-testid="input-scan-card-image"
+                                />
+                                <Button type="button" variant="secondary" size="sm">
+                                  <Sparkles className="h-4 w-4 mr-2" />
+                                  Select Photo
+                                </Button>
+                              </label>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
+
+                      {/* Show scan result confidence badge when scanned */}
+                      {addCardMode === "scan" && scanConfidence && scanPreviewUrl && (
+                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                          <img 
+                            src={scanPreviewUrl} 
+                            alt="Scanned card" 
+                            className="w-16 h-22 object-contain rounded-md border"
+                          />
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                              <span className="font-medium text-sm">Card Identified</span>
+                              <Badge 
+                                variant="secondary" 
+                                className={
+                                  scanConfidence === "high" ? "bg-green-500/10 text-green-600" :
+                                  scanConfidence === "medium" ? "bg-yellow-500/10 text-yellow-600" :
+                                  "bg-red-500/10 text-red-600"
+                                }
+                              >
+                                {scanConfidence.toUpperCase()}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Review the details below and adjust if needed
+                            </p>
+                          </div>
+                          <Button 
+                            type="button"
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => {
+                              setScanConfidence(null);
+                              setScanPreviewUrl(null);
+                              setPreviewUrl(null);
+                              setSelectedFile(null);
+                              cardForm.reset();
+                            }}
+                          >
+                            Rescan
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Manual Mode - Regular Image Upload */}
+                      {addCardMode === "manual" && (
+                        <div className="space-y-2">
+                          <FormLabel>Card Image</FormLabel>
+                          <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                            {previewUrl ? (
+                              <div className="relative">
+                                <img
+                                  src={previewUrl}
+                                  alt="Preview"
+                                  className="max-h-48 mx-auto rounded-lg object-contain"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedFile(null);
+                                    setPreviewUrl(null);
+                                  }}
+                                  className="absolute top-2 right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ) : (
+                              <label className="cursor-pointer block py-8">
+                                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                <p className="text-sm text-muted-foreground">
+                                  Click to upload or drag and drop
+                                </p>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleFileChange}
+                                  className="hidden"
+                                  data-testid="input-card-image"
+                                />
+                              </label>
+                            )}
+                          </div>
+                        </div>
+                      )}
 
                       <FormField
                         control={cardForm.control}

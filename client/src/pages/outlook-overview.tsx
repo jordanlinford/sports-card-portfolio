@@ -283,19 +283,6 @@ type ScanIdentifyResult = {
   };
 };
 
-// Type for quick market check result (signals only)
-type QuickMarketCheckResult = {
-  success: boolean;
-  signals: {
-    trend: "up" | "flat" | "down";
-    liquidity: "HIGH" | "MEDIUM" | "LOW";
-    demandLevel: "hot" | "moderate" | "low";
-    verdictLabel: "Healthy" | "Watch" | "Risk" | "Unknown";
-    soldCount: number;
-  };
-  note: string;
-};
-
 // Types for card scan result (legacy, includes pricing)
 type CardScanResult = {
   success: boolean;
@@ -378,11 +365,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [showScanAddDialog, setShowScanAddDialog] = useState(false);
   const [showConfirmedAddDialog, setShowConfirmedAddDialog] = useState(false);
   
-  // NEW: Confirmation workflow state
+  // Confirmation workflow state
   const [scanIdentifyResult, setScanIdentifyResult] = useState<ScanIdentifyResult | null>(null);
   const [isConfirmed, setIsConfirmed] = useState(false);
-  const [quickMarketCheckResult, setQuickMarketCheckResult] = useState<QuickMarketCheckResult | null>(null);
-  const [runningQuickCheck, setRunningQuickCheck] = useState(false);
   const [analysisInvalidated, setAnalysisInvalidated] = useState(false);
   
   // Polling state for comps
@@ -875,10 +860,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setSelectedCaseId("");
     setInputMode("manual");
     setShowScanAddDialog(false);
-    // NEW: Reset confirmation workflow state
+    // Reset confirmation workflow state
     setScanIdentifyResult(null);
     setIsConfirmed(false);
-    setQuickMarketCheckResult(null);
     setAnalysisInvalidated(false);
   };
 
@@ -932,7 +916,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setScanResult(null);
     setScanIdentifyResult(null);
     setIsConfirmed(false);
-    setQuickMarketCheckResult(null);
     setResult(null);
     setAnalysisInvalidated(false);
     
@@ -1002,10 +985,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   // Handle field change - invalidates any previous analysis results
   const handleFieldChange = (field: string, value: string) => {
     // Invalidate results when any field changes after confirmation
-    if (isConfirmed && (result || quickMarketCheckResult)) {
+    if (isConfirmed && result) {
       setAnalysisInvalidated(true);
       setResult(null);
-      setQuickMarketCheckResult(null);
     }
     
     switch (field) {
@@ -1061,49 +1043,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setAnalysisInvalidated(false);
     toast({
       title: "Details confirmed",
-      description: "Choose Quick Market Check or Full Market Outlook.",
+      description: "Get market outlook or add directly to your portfolio.",
     });
-  };
-  
-  // Run Quick Market Check (fast, signals only)
-  const runQuickMarketCheck = async () => {
-    setRunningQuickCheck(true);
-    setQuickMarketCheckResult(null);
-    
-    try {
-      const response = await apiRequest("POST", "/api/outlook/quick-market-check", {
-        title,
-        year,
-        set,
-        variation,
-        grade,
-        grader,
-      });
-      
-      setQuickMarketCheckResult(response as QuickMarketCheckResult);
-      
-      if (response.success) {
-        toast({
-          title: "Quick check complete",
-          description: `Market verdict: ${response.signals.verdictLabel}`,
-        });
-      }
-    } catch (error) {
-      console.error("Error running quick market check:", error);
-      toast({
-        title: "Quick check failed",
-        description: error instanceof Error ? error.message : "Failed to run quick market check",
-        variant: "destructive",
-      });
-    } finally {
-      setRunningQuickCheck(false);
-    }
   };
   
   // Reset to edit mode (go back to confirmation step)
   const handleEditDetails = () => {
     setIsConfirmed(false);
-    setQuickMarketCheckResult(null);
     setResult(null);
     setAnalysisInvalidated(false);
   };
@@ -1338,97 +1284,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                 AI scan is assistive only. Please verify all details before analysis.
               </p>
             </div>
-          ) : isConfirmed && !result && !quickMarketCheckResult ? (
-            /* Analysis Selection Screen */
-            <div className="space-y-6">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <h3 className="font-semibold text-lg">{title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {[year, set, variation, grade ? `${grader} ${grade}` : null].filter(Boolean).join(" • ")}
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={handleEditDetails} data-testid="button-edit-details">
-                  Edit Details
-                </Button>
-              </div>
-
-              {analysisInvalidated && (
-                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-2">
-                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm text-yellow-600">Card details were changed. Previous results have been cleared.</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Quick Market Check Option */}
-                <div 
-                  className="p-4 rounded-lg border bg-card hover-elevate cursor-pointer"
-                  onClick={runQuickMarketCheck}
-                  data-testid="option-quick-check"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Zap className="h-5 w-5 text-primary" />
-                    <h4 className="font-semibold">Quick Market Check</h4>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Fast signals: trend, liquidity, demand, and verdict
-                  </p>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    disabled={runningQuickCheck}
-                    data-testid="button-run-quick-check"
-                  >
-                    {runningQuickCheck ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Checking...
-                      </>
-                    ) : (
-                      "Run Quick Check"
-                    )}
-                  </Button>
-                </div>
-
-                {/* Full Market Outlook Option */}
-                <div 
-                  className="p-4 rounded-lg border bg-card hover-elevate cursor-pointer"
-                  onClick={() => !analyzeMutation.isPending && analyzeMutation.mutate()}
-                  data-testid="option-full-outlook"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    <h4 className="font-semibold">Full Market Outlook</h4>
-                    <Badge variant="secondary" className="text-xs">Recommended</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Complete analysis: pricing, comps, AI verdict, risk signals
-                  </p>
-                  <Button 
-                    size="sm"
-                    disabled={analyzeMutation.isPending || !canAnalyze}
-                    data-testid="button-run-full-outlook"
-                  >
-                    {analyzeMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Analyzing...
-                      </>
-                    ) : (
-                      "Run Full Outlook"
-                    )}
-                  </Button>
-                  {!canAnalyze && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Free limit reached. <Link href="/upgrade" className="text-primary hover:underline">Upgrade to Pro</Link>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-          ) : quickMarketCheckResult && !result ? (
-            /* Quick Market Check Results */
+          ) : isConfirmed && !result ? (
+            /* Confirmed Card - Ready for Action */
             <div className="space-y-6">
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-3">
@@ -1442,107 +1299,62 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   <div>
                     <h3 className="font-semibold text-lg">{title}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {[year, set, variation].filter(Boolean).join(" • ")}
+                      {[year, set, variation, grade ? `${grader === "raw" ? "Raw" : `${grader} ${grade}`}` : null].filter(Boolean).join(" • ")}
                     </p>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" onClick={handleEditDetails} data-testid="button-edit-after-check">
-                    Edit Details
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={resetForm} data-testid="button-new-check">
-                    New Card
-                  </Button>
-                </div>
+                <Button variant="ghost" size="sm" onClick={handleEditDetails} data-testid="button-edit-details">
+                  Edit Details
+                </Button>
               </div>
 
-              {/* Quick signals display */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Trend</p>
-                  <div className="flex items-center justify-center gap-1">
-                    {quickMarketCheckResult.signals.trend === "up" ? (
-                      <TrendingUp className="h-5 w-5 text-green-500" />
-                    ) : quickMarketCheckResult.signals.trend === "down" ? (
-                      <TrendingDown className="h-5 w-5 text-red-500" />
-                    ) : (
-                      <span className="text-xl">→</span>
-                    )}
-                    <span className="font-semibold capitalize">{quickMarketCheckResult.signals.trend}</span>
-                  </div>
+              {analysisInvalidated && (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                  <span className="text-sm text-yellow-600">Card details were changed. Previous results have been cleared.</span>
                 </div>
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Liquidity</p>
-                  <Badge 
-                    variant="secondary"
-                    className={
-                      quickMarketCheckResult.signals.liquidity === "HIGH" ? "bg-green-500/10 text-green-600" :
-                      quickMarketCheckResult.signals.liquidity === "MEDIUM" ? "bg-yellow-500/10 text-yellow-600" :
-                      "bg-red-500/10 text-red-600"
-                    }
-                  >
-                    {quickMarketCheckResult.signals.liquidity}
-                  </Badge>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Demand</p>
-                  <span className="font-semibold capitalize">{quickMarketCheckResult.signals.demandLevel}</span>
-                </div>
-                <div className="p-4 rounded-lg bg-muted/50 text-center">
-                  <p className="text-xs text-muted-foreground mb-1">Verdict</p>
-                  <Badge 
-                    variant="secondary"
-                    className={
-                      quickMarketCheckResult.signals.verdictLabel === "Healthy" ? "bg-green-500/10 text-green-600" :
-                      quickMarketCheckResult.signals.verdictLabel === "Watch" ? "bg-yellow-500/10 text-yellow-600" :
-                      quickMarketCheckResult.signals.verdictLabel === "Risk" ? "bg-red-500/10 text-red-600" :
-                      "bg-muted"
-                    }
-                  >
-                    {quickMarketCheckResult.signals.verdictLabel}
-                  </Badge>
-                </div>
-              </div>
+              )}
 
-              <p className="text-sm text-muted-foreground text-center">
-                {quickMarketCheckResult.signals.soldCount} recent sales found
-              </p>
-
-              {/* Action buttons */}
-              <div className="flex flex-wrap justify-center gap-3">
+              {/* Action Buttons - Full Outlook & Add to Portfolio */}
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Button
                   onClick={() => analyzeMutation.mutate()}
                   disabled={analyzeMutation.isPending || !canAnalyze}
-                  data-testid="button-upgrade-to-full"
+                  className="flex-1 sm:flex-none"
+                  data-testid="button-run-full-outlook"
                 >
                   {analyzeMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Running Full Outlook...
+                      Analyzing...
                     </>
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
-                      Get Full Market Outlook
+                      Get Market Outlook
                     </>
                   )}
                 </Button>
-                {scanPreviewUrl && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowConfirmedAddDialog(true)}
-                    data-testid="button-add-to-portfolio-quick"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add to Portfolio
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  onClick={() => setShowConfirmedAddDialog(true)}
+                  className="flex-1 sm:flex-none"
+                  data-testid="button-add-to-portfolio-confirmed"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add to Portfolio
+                </Button>
               </div>
+              
               {!canAnalyze && (
                 <p className="text-xs text-muted-foreground text-center">
-                  Free limit reached. <Link href="/upgrade" className="text-primary hover:underline">Upgrade to Pro</Link> for full analysis.
+                  Free limit reached. <Link href="/upgrade" className="text-primary hover:underline">Upgrade to Pro</Link> for market analysis.
                 </p>
               )}
+              
+              <p className="text-sm text-muted-foreground text-center">
+                Get AI-powered investment insights or add directly to your collection
+              </p>
             </div>
           ) : !result && !scanResult ? (
             <>

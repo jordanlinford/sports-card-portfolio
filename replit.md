@@ -21,14 +21,21 @@ The application supports core functionalities including:
 - **Authentication**: Secure user authentication and authorization using Replit Auth.
 - **Image Handling**: Integration with Google Cloud Storage for card image uploads.
 - **Value Tracking & AI**: Tracks estimated card values with historical data and offers AI-powered price lookups and card outlook analysis (buy/watch/sell recommendations) for Pro users. Includes Quick Card Check for analyzing cards before purchase without adding to collection.
-- **Card Image Scanner**: Gemini 2.5 Flash vision-based card identification from photos. Automatically identifies player, year, set, variation, grade, and grading company from card images. Uses new 3-step workflow:
-  1. **Scan** - Fast identification-only (`/api/cards/scan-identify`) extracts card details without pricing
-  2. **Confirm** - User reviews/edits detected fields with confidence indicators before analysis. Image is automatically uploaded to object storage for persistence.
-  3. **Analyze** - User chooses Quick Market Check (fast signals) or Full Market Outlook (comprehensive)
+- **Card Image Scanner**: Gemini 2.5 Flash vision-based card identification from photos. Automatically identifies player, year, set, variation, grade, and grading company from card images.
   
-  **Image Persistence**: Scanned card image persists throughout the entire workflow and is displayed in analysis results. When adding to portfolio, the same scanned image is used - no need to re-upload.
-  Daily limits: 10 scans/day for free users, 100 scans/day for Pro users. Located in Quick Card Check under "Scan Photo" mode.
-- **Quick Market Check**: Fast signals-only analysis (`/api/outlook/quick-market-check`) returning trend, liquidity, demand level, and verdict without full pricing/comps work. Good for quick validation before deeper analysis.
+  **Quick Card Check Workflow** (for analyzing cards before buying):
+  1. **Scan** - Fast identification-only (`/api/cards/scan-identify`) extracts card details without pricing
+  2. **Confirm** - User reviews/edits detected fields with confidence indicators. Image automatically uploaded to object storage.
+  3. **Action** - User can get Full Market Outlook (comprehensive analysis) or Add to Portfolio directly
+  
+  **Add Card Scan Workflow** (for adding cards to collection):
+  - Available in display case edit page under "Add Card" → "Scan Photo" mode
+  - Scans photo, auto-fills form fields with AI-identified card details
+  - User reviews/edits prefilled fields, then adds to collection with one click
+  - Scanned image persists throughout workflow and is saved with the card
+  
+  **Image Persistence**: Scanned card images persist throughout workflows and are displayed in analysis results. When adding to portfolio, the same scanned image is used - no need to re-upload.
+  Daily limits: 10 scans/day for free users, 100 scans/day for Pro users.
 - **Role Stability System**: 6-tier player role classification (FRANCHISE_CORE → OUT_OF_LEAGUE) with associated stability scores (95 → 15). Used to filter backup/inactive players with automatic AVOID verdicts for low stability + unreliable comps, and restricts ACCUMULATE verdicts for uncertain-role players.
 - **Unified Usage Tracking**: Both collection and quick analyses are tracked in the `outlook_usage` table for consistent free tier enforcement (3 analyses/month for free users).
 - **Display Customization**: Multiple layout styles (grid, row, showcase) and premium themes for display cases.
