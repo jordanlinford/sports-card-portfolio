@@ -245,7 +245,58 @@ type AIPriceEstimate = {
   confidence: "high" | "medium" | "low";
 };
 
-// Types for card scan result
+// Type for scan-identify-only result (no pricing, faster)
+type ScanIdentifyResult = {
+  success: boolean;
+  scan: {
+    success: boolean;
+    confidence: "high" | "medium" | "low";
+    cardIdentification: {
+      playerName: string;
+      year: number | null;
+      setName: string;
+      cardNumber: string | null;
+      variation: string | null;
+      parallel: string | null;
+      isRookie: boolean;
+      sport: string;
+    };
+    gradeEstimate: {
+      appearsToBe: "graded" | "raw";
+      gradingCompany: string | null;
+      grade: string | null;
+      conditionNotes: string | null;
+    };
+    marketContext: {
+      rarity: string;
+      desirability: string;
+      collectibilityNotes: string;
+    };
+    rawAnalysis: string;
+    error?: string;
+  };
+  usage: {
+    scansToday: number;
+    dailyLimit: number;
+    remainingScans: number;
+    isPro: boolean;
+  };
+};
+
+// Type for quick market check result (signals only)
+type QuickMarketCheckResult = {
+  success: boolean;
+  signals: {
+    trend: "up" | "flat" | "down";
+    liquidity: "HIGH" | "MEDIUM" | "LOW";
+    demandLevel: "hot" | "moderate" | "low";
+    verdictLabel: "Healthy" | "Watch" | "Risk" | "Unknown";
+    soldCount: number;
+  };
+  note: string;
+};
+
+// Types for card scan result (legacy, includes pricing)
 type CardScanResult = {
   success: boolean;
   scan: {
@@ -325,6 +376,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [showScanAddDialog, setShowScanAddDialog] = useState(false);
+  
+  // NEW: Confirmation workflow state
+  const [scanIdentifyResult, setScanIdentifyResult] = useState<ScanIdentifyResult | null>(null);
+  const [isConfirmed, setIsConfirmed] = useState(false);
+  const [quickMarketCheckResult, setQuickMarketCheckResult] = useState<QuickMarketCheckResult | null>(null);
+  const [runningQuickCheck, setRunningQuickCheck] = useState(false);
+  const [analysisInvalidated, setAnalysisInvalidated] = useState(false);
   
   // Polling state for comps
   const [isPollingComps, setIsPollingComps] = useState(false);
@@ -772,6 +830,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setSelectedCaseId("");
     setInputMode("manual");
     setShowScanAddDialog(false);
+    // NEW: Reset confirmation workflow state
+    setScanIdentifyResult(null);
+    setIsConfirmed(false);
+    setQuickMarketCheckResult(null);
+    setAnalysisInvalidated(false);
   };
 
   const compressImage = (file: File, maxWidth = 1200, quality = 0.8): Promise<{ blob: Blob; base64: string }> => {
@@ -818,10 +881,15 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     });
   };
 
-  // Handle photo scan
+  // Handle photo scan - NEW: Uses scan-identify endpoint (faster, no pricing)
   const handlePhotoScan = async (file: File) => {
     setScanning(true);
     setScanResult(null);
+    setScanIdentifyResult(null);
+    setIsConfirmed(false);
+    setQuickMarketCheckResult(null);
+    setResult(null);
+    setAnalysisInvalidated(false);
     
     try {
       // Compress image to reduce payload size
@@ -831,8 +899,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
       const previewDataUrl = URL.createObjectURL(blob);
       setScanPreviewUrl(previewDataUrl);
       
-      // Call the scan API
-      const response = await apiRequest("POST", "/api/cards/scan-image", {
+      // Call the NEW scan-identify API (faster, no pricing)
+      const response = await apiRequest("POST", "/api/cards/scan-identify", {
         imageData: base64Data,
         mimeType: "image/jpeg",
       });
@@ -847,17 +915,25 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         return;
       }
       
-      setScanResult(response as CardScanResult);
+      // Store the scan identification result
+      setScanIdentifyResult(response as ScanIdentifyResult);
       
-      // Start polling for market data if it's still fetching
-      if (response.pricing?.isFetching && response.queryHash) {
-        startScanPolling(response.queryHash);
-      }
-      
+      // Auto-populate form fields from scan result for editing
       if (response.scan?.success) {
+        const card = response.scan.cardIdentification;
+        const gradeInfo = response.scan.gradeEstimate;
+        
+        setTitle(card.playerName || "");
+        setYear(card.year?.toString() || "");
+        setSet(card.setName || "");
+        setCardNumber(card.cardNumber || "");
+        setVariation(card.parallel || card.variation || "");
+        setGrade(gradeInfo.grade || "");
+        setGrader(gradeInfo.gradingCompany || (gradeInfo.appearsToBe === "raw" ? "raw" : ""));
+        
         toast({
           title: "Card identified!",
-          description: `${response.scan.cardIdentification.playerName} - ${response.scan.cardIdentification.setName}`,
+          description: "Review the details below and confirm before analysis.",
         });
       } else {
         toast({
@@ -876,6 +952,87 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     } finally {
       setScanning(false);
     }
+  };
+  
+  // Handle field change - invalidates any previous analysis results
+  const handleFieldChange = (field: string, value: string) => {
+    // Invalidate results when any field changes after confirmation
+    if (isConfirmed && (result || quickMarketCheckResult)) {
+      setAnalysisInvalidated(true);
+      setResult(null);
+      setQuickMarketCheckResult(null);
+    }
+    
+    switch (field) {
+      case "title": setTitle(value); break;
+      case "year": setYear(value); break;
+      case "set": setSet(value); break;
+      case "cardNumber": setCardNumber(value); break;
+      case "variation": setVariation(value); break;
+      case "grade": setGrade(value); break;
+      case "grader": setGrader(value); break;
+    }
+  };
+  
+  // Handle confirmation
+  const handleConfirmDetails = () => {
+    if (!title.trim()) {
+      toast({
+        title: "Player name required",
+        description: "Please enter at least the player name to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsConfirmed(true);
+    setAnalysisInvalidated(false);
+    toast({
+      title: "Details confirmed",
+      description: "Choose Quick Market Check or Full Market Outlook.",
+    });
+  };
+  
+  // Run Quick Market Check (fast, signals only)
+  const runQuickMarketCheck = async () => {
+    setRunningQuickCheck(true);
+    setQuickMarketCheckResult(null);
+    
+    try {
+      const response = await apiRequest("POST", "/api/outlook/quick-market-check", {
+        title,
+        year,
+        set,
+        variation,
+        grade,
+        grader,
+      });
+      
+      setQuickMarketCheckResult(response as QuickMarketCheckResult);
+      
+      if (response.success) {
+        toast({
+          title: "Quick check complete",
+          description: `Market verdict: ${response.signals.verdictLabel}`,
+        });
+      }
+    } catch (error) {
+      console.error("Error running quick market check:", error);
+      toast({
+        title: "Quick check failed",
+        description: error instanceof Error ? error.message : "Failed to run quick market check",
+        variant: "destructive",
+      });
+    } finally {
+      setRunningQuickCheck(false);
+    }
+  };
+  
+  // Reset to edit mode (go back to confirmation step)
+  const handleEditDetails = () => {
+    setIsConfirmed(false);
+    setQuickMarketCheckResult(null);
+    setResult(null);
+    setAnalysisInvalidated(false);
   };
 
   // Use scan result to populate manual form and run full analysis
@@ -981,7 +1138,314 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
 
       {showForm && (
         <CardContent className="space-y-4">
-          {!result && !scanResult ? (
+          {/* NEW WORKFLOW: Confirmation screen after scan */}
+          {scanIdentifyResult && !isConfirmed ? (
+            <div className="space-y-6">
+              {/* Header with scanned image and confidence */}
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  {scanPreviewUrl && (
+                    <img 
+                      src={scanPreviewUrl} 
+                      alt="Scanned card" 
+                      className="w-16 h-22 object-contain rounded-md border"
+                    />
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-lg">Confirm Card Details</h3>
+                    <p className="text-sm text-muted-foreground">Review and edit before analysis</p>
+                  </div>
+                </div>
+                <Badge 
+                  variant="secondary" 
+                  className={
+                    scanIdentifyResult.scan.confidence === "high" ? "bg-green-500/10 text-green-600" :
+                    scanIdentifyResult.scan.confidence === "medium" ? "bg-yellow-500/10 text-yellow-600" :
+                    "bg-red-500/10 text-red-600"
+                  }
+                >
+                  {scanIdentifyResult.scan.confidence.toUpperCase()} Scan Confidence
+                </Badge>
+              </div>
+
+              {/* Editable fields */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-title">Player Name *</Label>
+                  <Input
+                    id="confirm-title"
+                    value={title}
+                    onChange={(e) => handleFieldChange("title", e.target.value)}
+                    className={scanIdentifyResult.scan.confidence === "low" ? "border-yellow-500" : ""}
+                    data-testid="input-confirm-title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-year">Year</Label>
+                  <Input
+                    id="confirm-year"
+                    value={year}
+                    onChange={(e) => handleFieldChange("year", e.target.value)}
+                    data-testid="input-confirm-year"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-set">Set</Label>
+                  <Input
+                    id="confirm-set"
+                    value={set}
+                    onChange={(e) => handleFieldChange("set", e.target.value)}
+                    data-testid="input-confirm-set"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-cardNumber">Card #</Label>
+                  <Input
+                    id="confirm-cardNumber"
+                    value={cardNumber}
+                    onChange={(e) => handleFieldChange("cardNumber", e.target.value)}
+                    data-testid="input-confirm-card-number"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-variation">Variation / Parallel</Label>
+                  <Input
+                    id="confirm-variation"
+                    value={variation}
+                    onChange={(e) => handleFieldChange("variation", e.target.value)}
+                    data-testid="input-confirm-variation"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-grade">Grade</Label>
+                  <Input
+                    id="confirm-grade"
+                    value={grade}
+                    onChange={(e) => handleFieldChange("grade", e.target.value)}
+                    data-testid="input-confirm-grade"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-grader">Grading Company</Label>
+                  <Select value={grader} onValueChange={(val) => handleFieldChange("grader", val)}>
+                    <SelectTrigger data-testid="select-confirm-grader">
+                      <SelectValue placeholder="Select grader" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PSA">PSA</SelectItem>
+                      <SelectItem value="BGS">BGS</SelectItem>
+                      <SelectItem value="SGC">SGC</SelectItem>
+                      <SelectItem value="CGC">CGC</SelectItem>
+                      <SelectItem value="raw">Raw (ungraded)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={handleConfirmDetails} disabled={!title.trim()} data-testid="button-confirm-details">
+                  Confirm & Continue
+                </Button>
+                <Button variant="outline" onClick={resetForm} data-testid="button-skip-scan">
+                  <X className="h-4 w-4 mr-2" />
+                  Start Over
+                </Button>
+              </div>
+
+              {/* Scan info note */}
+              <p className="text-xs text-muted-foreground">
+                AI scan is assistive only. Please verify all details before analysis.
+              </p>
+            </div>
+          ) : isConfirmed && !result && !quickMarketCheckResult ? (
+            /* Analysis Selection Screen */
+            <div className="space-y-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h3 className="font-semibold text-lg">{title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {[year, set, variation, grade ? `${grader} ${grade}` : null].filter(Boolean).join(" • ")}
+                  </p>
+                </div>
+                <Button variant="ghost" size="sm" onClick={handleEditDetails} data-testid="button-edit-details">
+                  Edit Details
+                </Button>
+              </div>
+
+              {analysisInvalidated && (
+                <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                  <span className="text-sm text-yellow-600">Card details were changed. Previous results have been cleared.</span>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Quick Market Check Option */}
+                <div 
+                  className="p-4 rounded-lg border bg-card hover-elevate cursor-pointer"
+                  onClick={runQuickMarketCheck}
+                  data-testid="option-quick-check"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="h-5 w-5 text-primary" />
+                    <h4 className="font-semibold">Quick Market Check</h4>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Fast signals: trend, liquidity, demand, and verdict
+                  </p>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    disabled={runningQuickCheck}
+                    data-testid="button-run-quick-check"
+                  >
+                    {runningQuickCheck ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Checking...
+                      </>
+                    ) : (
+                      "Run Quick Check"
+                    )}
+                  </Button>
+                </div>
+
+                {/* Full Market Outlook Option */}
+                <div 
+                  className="p-4 rounded-lg border bg-card hover-elevate cursor-pointer"
+                  onClick={() => !analyzeMutation.isPending && analyzeMutation.mutate()}
+                  data-testid="option-full-outlook"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <h4 className="font-semibold">Full Market Outlook</h4>
+                    <Badge variant="secondary" className="text-xs">Recommended</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Complete analysis: pricing, comps, AI verdict, risk signals
+                  </p>
+                  <Button 
+                    size="sm"
+                    disabled={analyzeMutation.isPending || !canAnalyze}
+                    data-testid="button-run-full-outlook"
+                  >
+                    {analyzeMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      "Run Full Outlook"
+                    )}
+                  </Button>
+                  {!canAnalyze && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Free limit reached. <Link href="/upgrade" className="text-primary hover:underline">Upgrade to Pro</Link>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : quickMarketCheckResult && !result ? (
+            /* Quick Market Check Results */
+            <div className="space-y-6">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <h3 className="font-semibold text-lg">{title}</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {[year, set, variation].filter(Boolean).join(" • ")}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={handleEditDetails} data-testid="button-edit-after-check">
+                    Edit Details
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={resetForm} data-testid="button-new-check">
+                    New Card
+                  </Button>
+                </div>
+              </div>
+
+              {/* Quick signals display */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Trend</p>
+                  <div className="flex items-center justify-center gap-1">
+                    {quickMarketCheckResult.signals.trend === "up" ? (
+                      <TrendingUp className="h-5 w-5 text-green-500" />
+                    ) : quickMarketCheckResult.signals.trend === "down" ? (
+                      <TrendingDown className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <span className="text-xl">→</span>
+                    )}
+                    <span className="font-semibold capitalize">{quickMarketCheckResult.signals.trend}</span>
+                  </div>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Liquidity</p>
+                  <Badge 
+                    variant="secondary"
+                    className={
+                      quickMarketCheckResult.signals.liquidity === "HIGH" ? "bg-green-500/10 text-green-600" :
+                      quickMarketCheckResult.signals.liquidity === "MEDIUM" ? "bg-yellow-500/10 text-yellow-600" :
+                      "bg-red-500/10 text-red-600"
+                    }
+                  >
+                    {quickMarketCheckResult.signals.liquidity}
+                  </Badge>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Demand</p>
+                  <span className="font-semibold capitalize">{quickMarketCheckResult.signals.demandLevel}</span>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/50 text-center">
+                  <p className="text-xs text-muted-foreground mb-1">Verdict</p>
+                  <Badge 
+                    variant="secondary"
+                    className={
+                      quickMarketCheckResult.signals.verdictLabel === "Healthy" ? "bg-green-500/10 text-green-600" :
+                      quickMarketCheckResult.signals.verdictLabel === "Watch" ? "bg-yellow-500/10 text-yellow-600" :
+                      quickMarketCheckResult.signals.verdictLabel === "Risk" ? "bg-red-500/10 text-red-600" :
+                      "bg-muted"
+                    }
+                  >
+                    {quickMarketCheckResult.signals.verdictLabel}
+                  </Badge>
+                </div>
+              </div>
+
+              <p className="text-sm text-muted-foreground text-center">
+                {quickMarketCheckResult.signals.soldCount} recent sales found
+              </p>
+
+              {/* Option to run full analysis */}
+              <div className="flex justify-center">
+                <Button
+                  onClick={() => analyzeMutation.mutate()}
+                  disabled={analyzeMutation.isPending || !canAnalyze}
+                  data-testid="button-upgrade-to-full"
+                >
+                  {analyzeMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Running Full Outlook...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Get Full Market Outlook
+                    </>
+                  )}
+                </Button>
+              </div>
+              {!canAnalyze && (
+                <p className="text-xs text-muted-foreground text-center">
+                  Free limit reached. <Link href="/upgrade" className="text-primary hover:underline">Upgrade to Pro</Link> for full analysis.
+                </p>
+              )}
+            </div>
+          ) : !result && !scanResult ? (
             <>
               {/* Mode Toggle */}
               <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit" data-testid="mode-toggle">

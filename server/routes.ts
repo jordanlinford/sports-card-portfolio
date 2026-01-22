@@ -2470,7 +2470,96 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
-  // One-off card analysis - analyze a card without adding to collection
+  // Quick Market Check - FAST signals-only analysis (no comps tables, no projections)
+  // Returns: trend, liquidity, demand, verdict label
+  app.post("/api/outlook/quick-market-check", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title, year, set, variation, grade, grader, sport } = req.body;
+
+      if (!title) {
+        return res.status(400).json({ message: "Card title is required" });
+      }
+
+      // Import required functions
+      const { fetchGeminiMarketData } = await import("./outlookEngine");
+
+      console.log(`[Quick Market Check] Starting for: ${title}`);
+      
+      // Fetch Gemini grounded market data (primary source for signals)
+      const geminiMarketData = await fetchGeminiMarketData({
+        title,
+        playerName: title,
+        year: year ? parseInt(year) : undefined,
+        set: set || undefined,
+        variation: variation || undefined,
+        grade: grade || undefined,
+        grader: grader || undefined,
+      });
+
+      // Compute quick signals from market data
+      let trend: "up" | "flat" | "down" = "flat";
+      let liquidity: "HIGH" | "MEDIUM" | "LOW" = "LOW";
+      let demandLevel: "hot" | "moderate" | "low" = "low";
+      let verdictLabel: "Healthy" | "Watch" | "Risk" | "Unknown" = "Unknown";
+      let soldCount = 0;
+
+      if (geminiMarketData) {
+        soldCount = geminiMarketData.soldCount || 0;
+        
+        // Liquidity based on sold count
+        if (soldCount >= 15) {
+          liquidity = "HIGH";
+        } else if (soldCount >= 5) {
+          liquidity = "MEDIUM";
+        }
+
+        // Trend estimation based on price stability and volume
+        if (geminiMarketData.priceStability === "VOLATILE" && soldCount < 5) {
+          trend = "down"; // Volatile with low volume = concerning
+        } else if (geminiMarketData.priceStability === "STABLE" && soldCount >= 15) {
+          trend = "up"; // Stable with high volume = positive
+        }
+        // Otherwise stays "flat"
+
+        // Demand estimation
+        if (soldCount >= 20) {
+          demandLevel = "hot";
+        } else if (soldCount >= 8) {
+          demandLevel = "moderate";
+        }
+
+        // Verdict label based on signals
+        if (liquidity === "HIGH") {
+          verdictLabel = trend === "down" ? "Watch" : "Healthy";
+        } else if (liquidity === "MEDIUM") {
+          verdictLabel = "Watch";
+        } else {
+          verdictLabel = "Risk";
+        }
+      }
+
+      res.json({
+        success: true,
+        signals: {
+          trend,
+          liquidity,
+          demandLevel,
+          verdictLabel,
+          soldCount,
+        },
+        note: "Quick check based on market signals. Run Full Market Outlook for detailed analysis.",
+      });
+    } catch (error) {
+      console.error("Error in quick market check:", error);
+      res.status(500).json({ 
+        message: "Failed to perform quick market check",
+        success: false,
+      });
+    }
+  });
+
+  // One-off card analysis - analyze a card without adding to collection (Full Market Outlook)
   // Returns analysis that can optionally be saved to a display case
   app.post("/api/outlook/quick-analyze", isAuthenticated, async (req: any, res) => {
     try {
@@ -2970,7 +3059,133 @@ Sitemap: ${origin}/sitemap.xml
     }
   }
 
-  // Scan a card image and get identification + pricing
+  // Scan a card image - IDENTIFICATION ONLY (no pricing, much faster)
+  // This is the new workflow: scan first, confirm details, then analyze
+  app.post("/api/cards/scan-identify", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { imageData, mimeType } = req.body;
+
+      if (!imageData) {
+        return res.status(400).json({ message: "Image data is required" });
+      }
+
+      // Validate image data format
+      const isValidFormat = imageData.startsWith("data:image/") || 
+                           imageData.startsWith("http://") || 
+                           imageData.startsWith("https://") ||
+                           /^[A-Za-z0-9+/=]+$/.test(imageData.substring(0, 100));
+      
+      if (!isValidFormat) {
+        return res.status(400).json({ message: "Invalid image format. Please provide a base64 encoded image, data URL, or image URL." });
+      }
+
+      // Check subscription status for scan limits
+      const user = await storage.getUser(userId);
+      const isPro = user?.subscriptionStatus === "PRO";
+      const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
+      const scansToday = getScanCountForToday(userId);
+      
+      if (scansToday >= dailyLimit) {
+        return res.status(429).json({
+          message: isPro 
+            ? `You've reached your daily limit of ${dailyLimit} scans. Try again tomorrow.`
+            : `You've used all ${dailyLimit} free scans today. Upgrade to Pro for more scans.`,
+          limitReached: true,
+          used: scansToday,
+          limit: dailyLimit,
+          isPro,
+        });
+      }
+
+      // Check if Gemini credentials are configured
+      if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY || !process.env.AI_INTEGRATIONS_GEMINI_BASE_URL) {
+        console.error("[Card Scan] Gemini credentials not configured");
+        return res.status(503).json({ 
+          message: "Card scanning is not available. AI service not configured.",
+          serviceUnavailable: true,
+          usage: {
+            scansToday,
+            dailyLimit,
+            remainingScans: Math.max(0, dailyLimit - scansToday),
+            isPro,
+          },
+        });
+      }
+
+      // Import card scanner service - use scanCardImage directly (not scanCardWithPricing)
+      const { scanCardImage } = await import("./cardImageScannerService");
+
+      console.log(`[Card Scan] User ${userId} scanning card image (identify only)...`);
+      
+      // Perform the scan - identification ONLY (no pricing)
+      let scanResult;
+      try {
+        scanResult = await scanCardImage(imageData, mimeType || "image/jpeg");
+      } catch (scanError) {
+        console.error("[Card Scan] Scan failed:", scanError);
+        return res.status(500).json({
+          message: "Card scanning temporarily unavailable. Please try again or enter details manually.",
+          scanError: true,
+          usage: {
+            scansToday,
+            dailyLimit,
+            remainingScans: Math.max(0, dailyLimit - scansToday),
+            isPro,
+          },
+        });
+      }
+      
+      // Increment scan count after successful scan
+      incrementScanCount(userId);
+
+      const remainingScans = dailyLimit - scansToday - 1;
+      
+      res.json({
+        success: scanResult.success,
+        scan: scanResult,
+        usage: {
+          scansToday: scansToday + 1,
+          dailyLimit,
+          remainingScans: Math.max(0, remainingScans),
+          isPro,
+        },
+      });
+    } catch (error) {
+      console.error("Error scanning card image:", error);
+      
+      // Try to get usage data even on error
+      try {
+        const userId = req.user?.claims?.sub;
+        if (userId) {
+          const user = await storage.getUser(userId);
+          const isPro = user?.subscriptionStatus === "PRO";
+          const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
+          const scansToday = getScanCountForToday(userId);
+          
+          return res.status(500).json({ 
+            message: "Failed to scan card image. Please try again or enter details manually.",
+            scanError: true,
+            usage: {
+              scansToday,
+              dailyLimit,
+              remainingScans: Math.max(0, dailyLimit - scansToday),
+              isPro,
+            },
+          });
+        }
+      } catch (usageError) {
+        // If we can't get usage data, just return the basic error
+      }
+      
+      res.status(500).json({ 
+        message: "Failed to scan card image. Please try again or enter details manually.",
+        scanError: true,
+      });
+    }
+  });
+
+  // Scan a card image and get identification + pricing (legacy endpoint)
   app.post("/api/cards/scan-image", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
