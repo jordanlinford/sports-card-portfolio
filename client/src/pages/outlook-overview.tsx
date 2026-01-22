@@ -375,6 +375,14 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollStartTimeRef = useRef<number>(0);
   
+  // Rotating loading messages
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const loadingMessages = [
+    "Searching live market data...",
+    "Analyzing player trajectory...",
+    "Building your investment outlook..."
+  ];
+  
   // Check for debug mode via query param
   const searchParams = new URLSearchParams(window.location.search);
   const showDebug = searchParams.get("debug") === "1";
@@ -672,6 +680,20 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
       toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   });
+
+  // Rotate loading messages while analyzing
+  useEffect(() => {
+    if (!analyzeMutation.isPending) {
+      setLoadingMessageIndex(0);
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
+    }, 2500);
+    
+    return () => clearInterval(interval);
+  }, [analyzeMutation.isPending, loadingMessages.length]);
 
   const addToCollectionMutation = useMutation({
     mutationFn: async () => {
@@ -1326,7 +1348,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   {analyzeMutation.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Analyzing...
+                      <span className="min-w-[200px] text-left">{loadingMessages[loadingMessageIndex]}</span>
                     </>
                   ) : (
                     <>
@@ -1582,7 +1604,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     {analyzeMutation.isPending ? (
                       <>
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Analyzing...
+                        <span className="min-w-[200px] text-left">{loadingMessages[loadingMessageIndex]}</span>
                       </>
                     ) : (
                       <>
