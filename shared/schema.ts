@@ -2194,3 +2194,60 @@ export type SeatCounts = {
   paid: number;
   total: number;
 };
+
+// ============================================================================
+// ACTIVITY LOGS - Track user actions for analytics
+// ============================================================================
+export const ACTIVITY_TYPES = [
+  "card_scan",           // User scanned a card photo
+  "card_add",            // User added a card to collection
+  "card_edit",           // User edited a card
+  "card_delete",         // User deleted a card
+  "outlook_request",     // User requested card outlook analysis
+  "case_view",           // Someone viewed a display case
+  "case_create",         // User created a display case
+  "offer_send",          // User sent an offer
+  "offer_respond",       // User responded to an offer
+  "message_send",        // User sent a message
+  "login",               // User logged in
+  "signup",              // New user signed up
+  "subscription_change", // User changed subscription
+  "card_analysis",       // User ran Card Analysis (quick check)
+  "share_case",          // User shared a display case
+] as const;
+
+export type ActivityType = typeof ACTIVITY_TYPES[number];
+
+export const activityLogs = pgTable("activity_logs", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  activityType: varchar("activity_type", { length: 50 }).notNull(),
+  targetId: varchar("target_id", { length: 255 }), // ID of the entity (card, case, etc.)
+  targetType: varchar("target_type", { length: 50 }), // Type of entity
+  metadata: jsonb("metadata"), // Additional context (player name, card title, etc.)
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_activity_logs_user_id").on(table.userId),
+  index("idx_activity_logs_type").on(table.activityType),
+  index("idx_activity_logs_created_at").on(table.createdAt),
+]);
+
+export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [activityLogs.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertActivityLogSchema = createInsertSchema(activityLogs).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertActivityLog = z.infer<typeof insertActivityLogSchema>;
+export type ActivityLog = typeof activityLogs.$inferSelect;
+
+export type ActivityLogWithUser = ActivityLog & {
+  user: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> | null;
+};
