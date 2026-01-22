@@ -23,8 +23,10 @@ The application supports core functionalities including:
 - **Value Tracking & AI**: Tracks estimated card values with historical data and offers AI-powered price lookups and card outlook analysis (buy/watch/sell recommendations) for Pro users. Includes Quick Card Check for analyzing cards before purchase without adding to collection.
 - **Card Image Scanner**: Gemini 2.5 Flash vision-based card identification from photos. Automatically identifies player, year, set, variation, grade, and grading company from card images. Uses new 3-step workflow:
   1. **Scan** - Fast identification-only (`/api/cards/scan-identify`) extracts card details without pricing
-  2. **Confirm** - User reviews/edits detected fields with confidence indicators before analysis
+  2. **Confirm** - User reviews/edits detected fields with confidence indicators before analysis. Image is automatically uploaded to object storage for persistence.
   3. **Analyze** - User chooses Quick Market Check (fast signals) or Full Market Outlook (comprehensive)
+  
+  **Image Persistence**: Scanned card image persists throughout the entire workflow and is displayed in analysis results. When adding to portfolio, the same scanned image is used - no need to re-upload.
   Daily limits: 10 scans/day for free users, 100 scans/day for Pro users. Located in Quick Card Check under "Scan Photo" mode.
 - **Quick Market Check**: Fast signals-only analysis (`/api/outlook/quick-market-check`) returning trend, liquidity, demand level, and verdict without full pricing/comps work. Good for quick validation before deeper analysis.
 - **Role Stability System**: 6-tier player role classification (FRANCHISE_CORE → OUT_OF_LEAGUE) with associated stability scores (95 → 15). Used to filter backup/inactive players with automatic AVOID verdicts for low stability + unreliable comps, and restricts ACCUMULATE verdicts for uncertain-role players.

@@ -376,6 +376,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [showScanAddDialog, setShowScanAddDialog] = useState(false);
+  const [showConfirmedAddDialog, setShowConfirmedAddDialog] = useState(false);
   
   // NEW: Confirmation workflow state
   const [scanIdentifyResult, setScanIdentifyResult] = useState<ScanIdentifyResult | null>(null);
@@ -814,6 +815,50 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     }
   });
 
+  // Mutation for adding card from new confirmation workflow (uses state variables)
+  const addConfirmedCardMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCaseId || !title.trim()) {
+        throw new Error("Please select a display case");
+      }
+      
+      // Parse year safely
+      let parsedYear: number | null = null;
+      if (year) {
+        const parsed = parseInt(year);
+        if (!isNaN(parsed)) parsedYear = parsed;
+      }
+      
+      // Estimated value will be set later when user adds actual pricing
+      const estimatedValue: number | null = null;
+      
+      const cardData = {
+        title: title,
+        year: parsedYear,
+        set: set || null,
+        cardNumber: cardNumber || null,
+        variation: variation || null,
+        grade: grade || null,
+        grader: grader === "raw" ? null : (grader || null),
+        imagePath: imagePath || null, // Already uploaded during confirmation
+        estimatedValue: estimatedValue,
+        cardCategory: "sports" as const,
+      };
+      
+      const data = await apiRequest("POST", `/api/display-cases/${selectedCaseId}/cards`, cardData);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      toast({ title: "Card added!", description: `${title} added to your collection` });
+      setShowScanAddDialog(false);
+      resetForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+
   const resetForm = () => {
     setTitle("");
     setYear("");
@@ -974,8 +1019,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     }
   };
   
-  // Handle confirmation
-  const handleConfirmDetails = () => {
+  // Handle confirmation - also upload the scanned image for later use
+  const handleConfirmDetails = async () => {
     if (!title.trim()) {
       toast({
         title: "Player name required",
@@ -984,6 +1029,34 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
       });
       return;
     }
+    
+    // Upload scanned image to object storage so it can be used when adding to portfolio
+    if (scanPreviewUrl && scanPreviewUrl.startsWith("blob:") && !imagePath) {
+      try {
+        setScanImageUploading(true);
+        const response = await fetch(scanPreviewUrl);
+        const blob = await response.blob();
+        const file = new File([blob], `scan-${Date.now()}.jpg`, { type: blob.type || "image/jpeg" });
+        
+        const uploadUrlRes = await apiRequest("POST", "/api/objects/upload");
+        const { uploadURL } = uploadUrlRes;
+        
+        await fetch(uploadURL, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+        
+        const updateRes = await apiRequest("PUT", "/api/card-images", { cardImageURL: uploadURL });
+        setImagePath(updateRes.objectPath);
+      } catch (uploadError) {
+        console.error("Image upload error:", uploadError);
+        // Continue without image - it's not critical
+      } finally {
+        setScanImageUploading(false);
+      }
+    }
+    
     setIsConfirmed(true);
     setAnalysisInvalidated(false);
     toast({
@@ -1244,10 +1317,17 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
 
               {/* Action buttons */}
               <div className="flex flex-wrap gap-3">
-                <Button onClick={handleConfirmDetails} disabled={!title.trim()} data-testid="button-confirm-details">
-                  Confirm & Continue
+                <Button onClick={handleConfirmDetails} disabled={!title.trim() || scanImageUploading} data-testid="button-confirm-details">
+                  {scanImageUploading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Preparing...
+                    </>
+                  ) : (
+                    "Confirm & Continue"
+                  )}
                 </Button>
-                <Button variant="outline" onClick={resetForm} data-testid="button-skip-scan">
+                <Button variant="outline" onClick={resetForm} disabled={scanImageUploading} data-testid="button-skip-scan">
                   <X className="h-4 w-4 mr-2" />
                   Start Over
                 </Button>
@@ -1351,11 +1431,20 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
             /* Quick Market Check Results */
             <div className="space-y-6">
               <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div>
-                  <h3 className="font-semibold text-lg">{title}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {[year, set, variation].filter(Boolean).join(" • ")}
-                  </p>
+                <div className="flex items-center gap-3">
+                  {scanPreviewUrl && (
+                    <img 
+                      src={scanPreviewUrl} 
+                      alt="Scanned card" 
+                      className="w-16 h-22 object-contain rounded-md border"
+                    />
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-lg">{title}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {[year, set, variation].filter(Boolean).join(" • ")}
+                    </p>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <Button variant="ghost" size="sm" onClick={handleEditDetails} data-testid="button-edit-after-check">
@@ -1419,8 +1508,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                 {quickMarketCheckResult.signals.soldCount} recent sales found
               </p>
 
-              {/* Option to run full analysis */}
-              <div className="flex justify-center">
+              {/* Action buttons */}
+              <div className="flex flex-wrap justify-center gap-3">
                 <Button
                   onClick={() => analyzeMutation.mutate()}
                   disabled={analyzeMutation.isPending || !canAnalyze}
@@ -1438,6 +1527,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     </>
                   )}
                 </Button>
+                {scanPreviewUrl && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowConfirmedAddDialog(true)}
+                    data-testid="button-add-to-portfolio-quick"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add to Portfolio
+                  </Button>
+                )}
               </div>
               {!canAnalyze && (
                 <p className="text-xs text-muted-foreground text-center">
@@ -2001,11 +2100,20 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
             <Dialog open={!!result} onOpenChange={(open) => !open && resetForm()}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader className="flex flex-row items-center justify-between gap-4 pb-4 border-b">
-                  <div>
-                    <DialogTitle className="text-xl">Quick Card Check Result</DialogTitle>
-                    <DialogDescription>
-                      Market analysis for {result.tempCard.title}
-                    </DialogDescription>
+                  <div className="flex items-center gap-3">
+                    {scanPreviewUrl && (
+                      <img 
+                        src={scanPreviewUrl} 
+                        alt="Scanned card" 
+                        className="w-16 h-22 object-contain rounded-md border"
+                      />
+                    )}
+                    <div>
+                      <DialogTitle className="text-xl">Quick Card Check Result</DialogTitle>
+                      <DialogDescription>
+                        Market analysis for {result.tempCard.title}
+                      </DialogDescription>
+                    </div>
                   </div>
                   <div className="flex gap-2 flex-wrap">
                     <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
@@ -2126,6 +2234,81 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
           ) : null}
         </CardContent>
       )}
+
+      {/* Add to Portfolio Dialog for new confirmation workflow */}
+      <Dialog open={showConfirmedAddDialog} onOpenChange={setShowConfirmedAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add to Display Case</DialogTitle>
+            <DialogDescription>
+              Choose which display case to add "{title}" to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            {/* Card Preview */}
+            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+              {scanPreviewUrl && (
+                <img 
+                  src={scanPreviewUrl} 
+                  alt="Card" 
+                  className="w-12 h-16 object-contain rounded"
+                />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{title}</p>
+                <p className="text-sm text-muted-foreground truncate">
+                  {[year, set, variation].filter(Boolean).join(" • ")}
+                </p>
+                {grade && grader && (
+                  <p className="text-sm text-muted-foreground">
+                    {grader === "raw" ? "Raw" : `${grader} ${grade}`}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Select Display Case</Label>
+              <Select value={selectedCaseId} onValueChange={setSelectedCaseId}>
+                <SelectTrigger data-testid="select-confirmed-display-case">
+                  <SelectValue placeholder="Choose a display case" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userCases.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {userCases.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                You don't have any display cases yet. Create one first from your dashboard.
+              </p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowConfirmedAddDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => addConfirmedCardMutation.mutate()}
+                disabled={!selectedCaseId || addConfirmedCardMutation.isPending}
+                data-testid="button-confirm-add-confirmed"
+              >
+                {addConfirmedCardMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Card"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
