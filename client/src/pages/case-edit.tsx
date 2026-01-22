@@ -1278,10 +1278,10 @@ export default function CaseEdit() {
                                   className="hidden"
                                   data-testid="input-scan-card-image"
                                 />
-                                <Button type="button" variant="secondary" size="sm">
-                                  <Sparkles className="h-4 w-4 mr-2" />
+                                <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-secondary text-secondary-foreground hover-elevate">
+                                  <Sparkles className="h-4 w-4" />
                                   Select Photo
-                                </Button>
+                                </span>
                               </label>
                             )}
                           </div>
