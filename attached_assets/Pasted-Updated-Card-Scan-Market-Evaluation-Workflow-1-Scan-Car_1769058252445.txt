@@ -1,0 +1,110 @@
+Updated Card Scan → Market Evaluation Workflow
+
+1. Scan Card (Assistive Identification)
+	•	User uploads or captures a card image
+	•	AI performs visual recognition
+	•	System extracts and auto-fills the following fields:
+	•	Player Name
+	•	Sport
+	•	Year
+	•	Set
+	•	Card Number
+	•	Parallel / Variant (if detected)
+	•	Serial Number (if detected)
+	•	Grading Company + Grade (if detected)
+
+Important:
+	•	Do NOT calculate prices, trends, or outlooks at this stage
+	•	Treat all extracted values as provisional
+
+⸻
+
+2. Confirm Card Details (Required Gate)
+	•	Display a “Confirm Card Details” screen
+	•	All auto-filled fields are editable
+	•	Each field has one of three internal states:
+	•	High confidence (auto-filled)
+	•	Medium confidence (auto-filled, editable)
+	•	Low confidence (highlighted for review)
+
+UI requirements:
+	•	User must explicitly confirm before proceeding
+	•	Primary CTA:
+Confirm & Continue
+	•	Secondary CTA (optional):
+Skip Scan and Enter Manually
+
+Blocking logic:
+	•	No market data is shown until confirmation is complete
+	•	If the user edits any field later, all downstream results are invalidated and must be re-run
+
+⸻
+
+3. Analysis Selection (Post-Validation)
+
+After confirmation, present two analysis options:
+
+Option A: Quick Market Check
+	•	Fast execution
+	•	High-level signals only
+	•	Uses confirmed card data
+
+Displays:
+	•	Trend direction (Up / Flat / Down)
+	•	Liquidity classification (High / Medium / Low)
+	•	Demand or heat indicator
+	•	Short verdict label (e.g., Healthy, Watch, Risk)
+
+Constraints:
+	•	No exact prices
+	•	No projections
+	•	No comps tables
+
+CTA:
+Run Quick Market Check
+
+⸻
+
+Option B: Full Market Outlook (Recommended)
+	•	Slower execution
+	•	Comprehensive analysis
+	•	Uses confirmed card data
+
+Displays:
+	•	Historical pricing
+	•	Comps and recent sales
+	•	Liquidity analysis
+	•	Supply pressure indicators
+	•	AI verdict and rationale
+	•	Risk signals and opportunity flags
+
+CTA:
+Run Full Market Outlook
+
+⸻
+
+4. State Management Rules (Critical)
+	•	Confirmed card data becomes the single source of truth
+	•	Any field change after analysis:
+	•	Invalidates all prior results
+	•	Requires re-confirmation
+	•	Quick Market Check does NOT cache or feed into Full Outlook
+	•	Full Outlook always runs fresh from confirmed inputs
+
+⸻
+
+5. Product Positioning (Implicit, Not UI Copy)
+	•	Scanning = assistive input
+	•	Validation = accuracy gate
+	•	Analysis = core product value
+
+No messaging should imply scan accuracy equals analysis accuracy.
+
+⸻
+
+Summary for Replit
+	•	Add a hard validation gate between scan and analysis
+	•	Do not allow any evaluation pre-validation
+	•	Preserve both quick and in-depth analysis paths
+	•	Invalidate downstream data on any input change
+	•	Treat scanning as a helper, not a conclusion
