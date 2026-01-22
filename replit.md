@@ -20,10 +20,10 @@ The application supports core functionalities including:
 - **Subscription Model**: Free and Pro tiers managed via Stripe for payments.
 - **Authentication**: Secure user authentication and authorization using Replit Auth.
 - **Image Handling**: Integration with Google Cloud Storage for card image uploads.
-- **Value Tracking & AI**: Tracks estimated card values with historical data and offers AI-powered price lookups and card outlook analysis (buy/watch/sell recommendations) for Pro users. Includes Quick Card Check for analyzing cards before purchase without adding to collection.
+- **Value Tracking & AI**: Tracks estimated card values with historical data and offers AI-powered price lookups and card outlook analysis (buy/watch/sell recommendations) for Pro users. Includes Card Analysis for analyzing cards before purchase without adding to collection.
 - **Card Image Scanner**: Gemini 2.5 Flash vision-based card identification from photos. Automatically identifies player, year, set, variation, grade, and grading company from card images.
   
-  **Quick Card Check Workflow** (for analyzing cards before buying):
+  **Card Analysis Workflow** (for analyzing cards before buying):
   1. **Scan** - Fast identification-only (`/api/cards/scan-identify`) extracts card details without pricing
   2. **Confirm** - User reviews/edits detected fields with confidence indicators. Image automatically uploaded to object storage.
   3. **Action** - User can get Full Market Outlook (comprehensive analysis) or Add to Portfolio directly
@@ -44,7 +44,7 @@ The application supports core functionalities including:
 - **Trading & Communication**: An offers system for cards marked "Open to Offers" and a direct messaging system between collectors.
 - **Analytics & Sharing**: Portfolio analytics page, and viral sharing features allowing export of cases as various image formats for social media.
 - **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts at 3/6/12 month intervals, showing bear/base/bull scenarios based on market temperature, investment verdicts, and upside/risk scores from player outlook data.
-- **Liquidity Scoring UI**: Visual badges (VERY_HIGH/HIGH/MEDIUM/LOW/UNCERTAIN) showing market health and exit risk for each card. Integrated into card outlook displays and Quick Card Check. Pro users see divergence warnings when price rises on weak liquidity.
+- **Liquidity Scoring UI**: Visual badges (VERY_HIGH/HIGH/MEDIUM/LOW/UNCERTAIN) showing market health and exit risk for each card. Integrated into card outlook displays and Card Analysis. Pro users see divergence warnings when price rises on weak liquidity.
 - **Next Buys Recommendation Engine**: Balanced, investment-focused recommendation system with multiple recommendation sources:
   - **Watchlist**: Players user is actively tracking
   - **Breakout**: HOT temperature players with strong momentum

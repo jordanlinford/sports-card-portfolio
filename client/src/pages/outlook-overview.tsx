@@ -1179,7 +1179,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Quick Card Check</CardTitle>
+            <CardTitle className="text-lg">Card Analysis</CardTitle>
           </div>
           <Button
             variant="outline"
@@ -1204,7 +1204,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
           </Button>
         </div>
         <CardDescription>
-          Check a card before buying or get a quick outlook without adding to your collection
+          Check a card before buying or get an outlook without adding to your collection
         </CardDescription>
       </CardHeader>
 
@@ -1990,7 +1990,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       />
                     )}
                     <div>
-                      <DialogTitle className="text-xl">Quick Card Check Result</DialogTitle>
+                      <DialogTitle className="text-xl">Card Analysis Result</DialogTitle>
                       <DialogDescription>
                         Market analysis for {result.tempCard.title}
                       </DialogDescription>
