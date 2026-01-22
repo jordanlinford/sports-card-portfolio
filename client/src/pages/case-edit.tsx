@@ -257,29 +257,6 @@ export default function CaseEdit() {
     ? displayCase.cards.find(c => c.id === selectedCardId) || null
     : null;
 
-  // Keyboard shortcuts for adding cards
-  const openAddCardManual = useCallback(() => {
-    setAddCardMode("manual");
-    setShowAddCard(true);
-  }, []);
-
-  const openAddCardScan = useCallback(() => {
-    setAddCardMode("scan");
-    cardForm.reset();
-    setPreviewUrl(null);
-    setSelectedFile(null);
-    setScanConfidence(null);
-    setShowAddCard(true);
-  }, []);
-
-  useKeyboardShortcuts(
-    useMemo(() => [
-      { key: 'n', callback: openAddCardManual, description: 'Add new card' },
-      { key: 's', callback: openAddCardScan, description: 'Scan card photo' },
-    ], [openAddCardManual, openAddCardScan]),
-    !showAddCard && !selectedCard
-  );
-
   // Duplicate detection - check when title changes
   const { data: duplicates } = useQuery<CardType[]>({
     queryKey: ["/api/cards/duplicates", duplicateCheckTitle],
@@ -329,6 +306,29 @@ export default function CaseEdit() {
       franchiseHeat: "",
     },
   });
+
+  // Keyboard shortcuts for adding cards
+  const openAddCardManual = useCallback(() => {
+    setAddCardMode("manual");
+    setShowAddCard(true);
+  }, []);
+
+  const openAddCardScan = useCallback(() => {
+    setAddCardMode("scan");
+    cardForm.reset();
+    setPreviewUrl(null);
+    setSelectedFile(null);
+    setScanConfidence(null);
+    setShowAddCard(true);
+  }, [cardForm]);
+
+  useKeyboardShortcuts(
+    useMemo(() => [
+      { key: 'n', callback: openAddCardManual, description: 'Add new card' },
+      { key: 's', callback: openAddCardScan, description: 'Scan card photo' },
+    ], [openAddCardManual, openAddCardScan]),
+    !showAddCard && !selectedCard
+  );
 
   useEffect(() => {
     if (displayCase) {
