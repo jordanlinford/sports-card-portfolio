@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
+import { logActivity, getRecentActivity, getActivityStats } from "./activityLogger";
 import { 
   insertDisplayCaseSchema, 
   insertCardSchema, 
@@ -879,6 +880,18 @@ Sitemap: ${origin}/sitemap.xml
       storage.incrementViewCount(id).catch(err => {
         console.error("Failed to increment view count:", err);
       });
+      
+      // Log case view activity (fire and forget)
+      logActivity("case_view", {
+        userId: null,
+        targetId: id,
+        targetType: "display_case",
+        metadata: { 
+          caseName: displayCase.name,
+          ownerId: displayCase.userId,
+        },
+        req,
+      });
 
       res.json(displayCase);
     } catch (error) {
@@ -1209,6 +1222,15 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       const displayCase = await storage.createDisplayCase(userId, parsed.data);
+      
+      logActivity("case_create", {
+        userId,
+        targetId: displayCase.id,
+        targetType: "display_case",
+        metadata: { name: displayCase.name },
+        req,
+      });
+      
       res.status(201).json(displayCase);
     } catch (error) {
       console.error("Error creating display case:", error);
@@ -1479,6 +1501,19 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       const card = await storage.createCard(displayCaseId, parsed.data);
+      
+      logActivity("card_add", {
+        userId,
+        targetId: card.id,
+        targetType: "card",
+        metadata: { 
+          title: card.title, 
+          playerName: card.playerName,
+          displayCaseId,
+        },
+        req,
+      });
+      
       res.status(201).json(card);
     } catch (error: any) {
       console.error("Error creating card:", error);
@@ -2885,6 +2920,18 @@ Sitemap: ${origin}/sitemap.xml
       // Record usage for free tier tracking
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);
 
+      logActivity("card_analysis", {
+        userId,
+        metadata: { 
+          title,
+          year,
+          set,
+          action: finalAction,
+          marketValue,
+        },
+        req,
+      });
+
       // Return the analysis without saving
       res.json({
         tempCard: {
@@ -3138,6 +3185,17 @@ Sitemap: ${origin}/sitemap.xml
       
       // Increment scan count after successful scan
       incrementScanCount(userId);
+
+      logActivity("card_scan", {
+        userId,
+        metadata: { 
+          playerName: scanResult.cardIdentification?.playerName,
+          year: scanResult.cardIdentification?.year,
+          set: scanResult.cardIdentification?.setName,
+          confidence: scanResult.confidence,
+        },
+        req,
+      });
 
       const remainingScans = dailyLimit - scansToday - 1;
       
@@ -4275,6 +4333,30 @@ Sitemap: ${origin}/sitemap.xml
     } catch (error) {
       console.error("Error checking admin status:", error);
       res.status(500).json({ message: "Failed to check admin status" });
+    }
+  });
+
+  // Admin: Get recent activity logs
+  app.get("/api/admin/activity", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const activity = await getRecentActivity(Math.min(limit, 500));
+      res.json(activity);
+    } catch (error) {
+      console.error("Error fetching activity logs:", error);
+      res.status(500).json({ message: "Failed to fetch activity logs" });
+    }
+  });
+
+  // Admin: Get activity statistics
+  app.get("/api/admin/activity/stats", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7;
+      const stats = await getActivityStats(Math.min(days, 30));
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching activity stats:", error);
+      res.status(500).json({ message: "Failed to fetch activity stats" });
     }
   });
 
@@ -5796,6 +5878,19 @@ Sitemap: ${origin}/sitemap.xml
       // Award offer badge
       prestigeService.checkAndAwardOfferBadge(userId).catch(err => {
         console.error("Error awarding offer badge:", err);
+      });
+
+      logActivity("offer_send", {
+        userId,
+        targetId: offer.id,
+        targetType: "offer",
+        metadata: { 
+          cardId: numericCardId,
+          cardTitle: card.title,
+          amount: numericAmount,
+          recipientId: displayCase.userId,
+        },
+        req,
       });
 
       res.status(201).json(offer);
