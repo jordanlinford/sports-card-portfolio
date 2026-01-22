@@ -942,6 +942,151 @@ const TICKET_STATUS_CONFIG: Record<SupportTicketStatus, { label: string; variant
   CLOSED: { label: "Closed", variant: "outline", icon: CheckCircle },
 };
 
+interface ActivityLog {
+  id: number;
+  userId: string | null;
+  activityType: string;
+  targetId: string | null;
+  targetType: string | null;
+  metadata: Record<string, any> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
+interface ActivityStats {
+  totalActivities: number;
+  byType: Record<string, number>;
+  byDay: { date: string; count: number }[];
+  topUsers: { userId: string; count: number }[];
+}
+
+const ACTIVITY_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+  card_scan: { label: "Card Scan", color: "bg-blue-500" },
+  card_add: { label: "Card Added", color: "bg-green-500" },
+  card_edit: { label: "Card Edited", color: "bg-yellow-500" },
+  card_delete: { label: "Card Deleted", color: "bg-red-500" },
+  outlook_request: { label: "Outlook Request", color: "bg-purple-500" },
+  case_view: { label: "Case Viewed", color: "bg-cyan-500" },
+  case_create: { label: "Case Created", color: "bg-emerald-500" },
+  offer_send: { label: "Offer Sent", color: "bg-orange-500" },
+  offer_respond: { label: "Offer Response", color: "bg-amber-500" },
+  message_send: { label: "Message Sent", color: "bg-indigo-500" },
+  login: { label: "Login", color: "bg-slate-500" },
+  signup: { label: "Signup", color: "bg-teal-500" },
+  subscription_change: { label: "Subscription Change", color: "bg-pink-500" },
+  card_analysis: { label: "Card Analysis", color: "bg-violet-500" },
+  share_case: { label: "Case Shared", color: "bg-rose-500" },
+};
+
+function ActivityTab() {
+  const { data: activity, isLoading } = useQuery<ActivityLog[]>({
+    queryKey: ["/api/admin/activity?limit=100"],
+  });
+
+  const { data: stats } = useQuery<ActivityStats>({
+    queryKey: ["/api/admin/activity/stats?days=7"],
+  });
+
+  const getActivityLabel = (type: string) => {
+    return ACTIVITY_TYPE_LABELS[type] || { label: type, color: "bg-gray-500" };
+  };
+
+  const formatMetadata = (metadata: Record<string, any> | null) => {
+    if (!metadata) return "";
+    const parts = [];
+    if (metadata.playerName) parts.push(metadata.playerName);
+    if (metadata.title) parts.push(metadata.title);
+    if (metadata.name) parts.push(metadata.name);
+    if (metadata.action) parts.push(`Action: ${metadata.action}`);
+    if (metadata.amount) parts.push(`$${metadata.amount}`);
+    return parts.join(" · ");
+  };
+
+  return (
+    <div className="space-y-4">
+      {stats && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">7 Day Activity</CardTitle>
+              <Zap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalActivities}</div>
+            </CardContent>
+          </Card>
+          
+          {Object.entries(stats.byType).slice(0, 3).map(([type, count]) => (
+            <Card key={type}>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{getActivityLabel(type).label}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{count}</div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Activity</CardTitle>
+          <CardDescription>Last 100 user activities across the platform</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <ScrollArea className="h-[500px]">
+            {isLoading ? (
+              <div className="p-4 space-y-4">
+                {[...Array(10)].map((_, i) => (
+                  <Skeleton key={i} className="h-12" />
+                ))}
+              </div>
+            ) : activity && activity.length > 0 ? (
+              <div className="divide-y">
+                {activity.map((log) => {
+                  const typeInfo = getActivityLabel(log.activityType);
+                  return (
+                    <div key={log.id} className="flex items-center gap-4 p-4" data-testid={`activity-log-${log.id}`}>
+                      <div className={`h-2 w-2 rounded-full ${typeInfo.color}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {typeInfo.label}
+                          </Badge>
+                          {log.userId && (
+                            <span className="text-xs text-muted-foreground">
+                              User: {log.userId.substring(0, 8)}...
+                            </span>
+                          )}
+                          {!log.userId && (
+                            <span className="text-xs text-muted-foreground">Anonymous</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {formatMetadata(log.metadata)}
+                        </p>
+                      </div>
+                      <div className="text-xs text-muted-foreground whitespace-nowrap">
+                        {log.createdAt && format(new Date(log.createdAt), "MMM d, h:mm a")}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-muted-foreground">
+                No activity recorded yet. Activity will appear here as users interact with the platform.
+              </div>
+            )}
+          </ScrollArea>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function SupportTicketsTab() {
   const { toast } = useToast();
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
@@ -1756,6 +1901,10 @@ export default function AdminDashboard() {
               <MessageCircle className="h-4 w-4 mr-1" />
               Support
             </TabsTrigger>
+            <TabsTrigger value="activity" data-testid="tab-activity">
+              <Clock className="h-4 w-4 mr-1" />
+              Activity
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -1828,6 +1977,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="support">
             <SupportTicketsTab />
+          </TabsContent>
+
+          <TabsContent value="activity">
+            <ActivityTab />
           </TabsContent>
         </Tabs>
       </div>

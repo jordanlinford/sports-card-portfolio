@@ -39,13 +39,15 @@ function getClientIp(req: Request): string | null {
 }
 
 export async function getRecentActivity(limit: number = 100): Promise<any[]> {
+  const { desc } = await import("drizzle-orm");
+  
   const results = await db
     .select()
     .from(activityLogs)
-    .orderBy(activityLogs.createdAt)
+    .orderBy(desc(activityLogs.createdAt))
     .limit(limit);
   
-  return results.reverse();
+  return results;
 }
 
 export async function getActivityStats(days: number = 7): Promise<{
