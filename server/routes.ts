@@ -2095,28 +2095,27 @@ Sitemap: ${origin}/sitemap.xml
       const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
-      // First, fetch Gemini grounded market data (uses Google Search to find real eBay data)
-      console.log(`[Outlook 2.0] Fetching Gemini grounded market data for card ${cardId}`);
-      const geminiMarketData = await fetchGeminiMarketData({
-        title: card.title,
-        playerName: card.playerName,
-        year: card.year,
-        set: card.set,
-        variation: card.variation,
-        grade: card.grade,
-        grader: card.grader,
-      });
-      
-      // Also get legacy price data as fallback
-      console.log(`[Outlook 2.0] Fetching legacy price data for card ${cardId}`);
-      const priceData = await lookupEnhancedCardPrice({
-        title: card.title,
-        set: card.set,
-        year: card.year,
-        variation: card.variation,
-        grade: card.grade,
-        grader: card.grader,
-      });
+      // Fetch Gemini grounded market data AND legacy price data in PARALLEL for speed
+      console.log(`[Outlook 2.0] Fetching market data in parallel for card ${cardId}`);
+      const [geminiMarketData, priceData] = await Promise.all([
+        fetchGeminiMarketData({
+          title: card.title,
+          playerName: card.playerName,
+          year: card.year,
+          set: card.set,
+          variation: card.variation,
+          grade: card.grade,
+          grader: card.grader,
+        }),
+        lookupEnhancedCardPrice({
+          title: card.title,
+          set: card.set,
+          year: card.year,
+          variation: card.variation,
+          grade: card.grade,
+          grader: card.grader,
+        }),
+      ]);
 
       // Convert price points to the schema format
       const pricePointsForSchema = priceData.pricePoints.map(pp => ({
@@ -2580,28 +2579,27 @@ Sitemap: ${origin}/sitemap.xml
       const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
-      // First, fetch Gemini grounded market data (uses Google Search to find real eBay data)
-      console.log(`[Quick Analyze] Fetching Gemini grounded market data for: ${title}`);
-      const geminiMarketData = await fetchGeminiMarketData({
-        title,
-        playerName: title, // For quick analyze, title often contains player name
-        year: year ? parseInt(year) : undefined,
-        set: set || undefined,
-        variation: variation || undefined,
-        grade: grade || undefined,
-        grader: grader || undefined,
-      });
-
-      // Also fetch legacy price data as fallback
-      console.log(`[Quick Analyze] Fetching legacy price data for: ${title}`);
-      const priceData = await lookupEnhancedCardPrice({
-        title,
-        set: set || undefined,
-        year: year ? parseInt(year) : undefined,
-        variation: variation || undefined,
-        grade: grade || undefined,
-        grader: grader || undefined,
-      });
+      // Fetch Gemini grounded market data AND legacy price data in PARALLEL for speed
+      console.log(`[Quick Analyze] Fetching market data in parallel for: ${title}`);
+      const [geminiMarketData, priceData] = await Promise.all([
+        fetchGeminiMarketData({
+          title,
+          playerName: title, // For quick analyze, title often contains player name
+          year: year ? parseInt(year) : undefined,
+          set: set || undefined,
+          variation: variation || undefined,
+          grade: grade || undefined,
+          grader: grader || undefined,
+        }),
+        lookupEnhancedCardPrice({
+          title,
+          set: set || undefined,
+          year: year ? parseInt(year) : undefined,
+          variation: variation || undefined,
+          grade: grade || undefined,
+          grader: grader || undefined,
+        }),
+      ]);
 
       // Filter outliers to get tighter price range
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
