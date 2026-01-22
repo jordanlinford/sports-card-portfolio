@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -6,9 +6,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { SuccessOverlay } from "@/components/success-animation";
+import { KeyboardHint } from "@/components/keyboard-hint";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -224,6 +226,28 @@ export default function CaseEdit() {
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [scanConfidence, setScanConfidence] = useState<"high" | "medium" | "low" | null>(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+
+  const openAddCardManual = useCallback(() => {
+    setAddCardMode("manual");
+    setShowAddCard(true);
+  }, []);
+
+  const openAddCardScan = useCallback(() => {
+    setAddCardMode("scan");
+    cardForm.reset();
+    setPreviewUrl(null);
+    setSelectedFile(null);
+    setScanConfidence(null);
+    setShowAddCard(true);
+  }, []);
+
+  useKeyboardShortcuts(
+    useMemo(() => [
+      { key: 'n', callback: openAddCardManual, description: 'Add new card' },
+      { key: 's', callback: openAddCardScan, description: 'Scan card photo' },
+    ], [openAddCardManual, openAddCardScan]),
+    !showAddCard && !selectedCard
+  );
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -1176,6 +1200,7 @@ export default function CaseEdit() {
                     <Button className="gap-2" data-testid="button-add-card">
                       <Plus className="h-4 w-4" />
                       Add Card
+                      <KeyboardHint shortcut="N" />
                     </Button>
                   </DialogTrigger>
                 <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
@@ -1206,6 +1231,7 @@ export default function CaseEdit() {
                     >
                       <Camera className="h-4 w-4 mr-2" />
                       Scan Photo
+                      <KeyboardHint shortcut="S" />
                     </Button>
                     <Button
                       type="button"

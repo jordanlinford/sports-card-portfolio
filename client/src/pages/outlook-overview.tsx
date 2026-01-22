@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -389,6 +389,30 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   // Success animation state
   const [showAnalysisSuccess, setShowAnalysisSuccess] = useState(false);
   
+  // Recent searches state
+  const RECENT_SEARCHES_KEY = "sports-card-recent-searches";
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(RECENT_SEARCHES_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const addRecentSearch = useCallback((searchTerm: string) => {
+    if (!searchTerm.trim()) return;
+    const term = searchTerm.trim();
+    setRecentSearches(prev => {
+      const filtered = prev.filter(s => s.toLowerCase() !== term.toLowerCase());
+      const updated = [term, ...filtered].slice(0, 5);
+      try {
+        localStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  }, []);
+  
   // Check for debug mode via query param
   const searchParams = new URLSearchParams(window.location.search);
   const showDebug = searchParams.get("debug") === "1";
@@ -676,6 +700,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
       setResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
       setShowAnalysisSuccess(true);
+      addRecentSearch(title);
       
       // Start polling if comps are being fetched
       if (data.comps && (data.comps.status === "queued" || data.comps.status === "fetching")) {
@@ -1533,6 +1558,22 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       onChange={(e) => setTitle(e.target.value)}
                       data-testid="input-quick-title"
                     />
+                    {recentSearches.length > 0 && !title && (
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        <span className="text-xs text-muted-foreground">Recent:</span>
+                        {recentSearches.slice(0, 5).map((search, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            className="text-xs px-2 py-0.5 rounded-full bg-muted hover-elevate text-muted-foreground"
+                            onClick={() => setTitle(search)}
+                            data-testid={`chip-recent-search-${idx}`}
+                          >
+                            {search}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="year">Year</Label>
