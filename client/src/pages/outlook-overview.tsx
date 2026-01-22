@@ -202,6 +202,12 @@ type QuickAnalyzeResult = {
     min: number | null; 
     max: number | null; 
     compCount: number;
+    pricePoints?: Array<{
+      date: string;
+      price: number;
+      source: string;
+      url?: string;
+    }> | null;
     modeledEstimate?: {
       low: number;
       mid: number;
@@ -2096,6 +2102,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       max: result.market.max,
                       compCount: result.matchConfidence?.totalComps ?? result.comps?.soldCount ?? result.market.compCount,
                       modeledEstimate: result.market.modeledEstimate,
+                      pricePoints: result.market.pricePoints ?? undefined,
                     },
                     signals: result.signals,
                     action: result.action,
