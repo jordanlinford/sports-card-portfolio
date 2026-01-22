@@ -232,7 +232,7 @@ export function Navigation() {
                   <DropdownMenuItem asChild>
                     <Link href="/outlook" className="flex items-center gap-2 cursor-pointer">
                       <Lightbulb className="h-4 w-4" />
-                      Quick Card Check
+                      Card Analysis
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -562,7 +562,7 @@ export function Navigation() {
                   <Link href="/outlook" onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/outlook") && "bg-accent")}>
                       <Zap className="h-4 w-4" />
-                      Quick Card Check
+                      Card Analysis
                     </Button>
                   </Link>
                   <Link href="/hidden-gems" onClick={() => setMobileMenuOpen(false)}>
