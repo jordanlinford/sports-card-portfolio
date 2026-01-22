@@ -595,18 +595,20 @@ export default function CardOutlookPage() {
                   value={outlook.signals.upside} 
                   icon={TrendingUp} 
                   description="Growth potential"
+                  helperText="How much room to grow"
                 />
                 <CompositeScoreCard 
-                  label="Downside Risk" 
+                  label="Downside" 
                   value={outlook.signals.downsideRisk} 
                   icon={ShieldAlert} 
-                  description="Chance of losing value"
+                  description="Loss exposure"
+                  helperText="Risk of losing value"
                 />
                 <CompositeScoreCard 
-                  label="Market Friction" 
+                  label="Friction" 
                   value={outlook.signals.marketFriction} 
-                  icon={ShieldAlert} 
-                  description="Difficulty buying/selling"
+                  icon={Clock} 
+                  description="Time to sell"
                   helperText={getMarketFrictionHelperText(outlook.signals.marketFriction, outlook?.action)}
                 />
               </div>
@@ -614,9 +616,9 @@ export default function CardOutlookPage() {
                 <>
                   <Separator />
                   <div className="space-y-3">
-                    <SignalBar label="Trend" value={outlook.signals.trend} />
-                    <SignalBar label="Liquidity" value={outlook.signals.liquidity} />
-                    <SignalBar label="Volatility" value={outlook.signals.volatility} />
+                    <SignalBar label="Recent Momentum" value={outlook.signals.trend} />
+                    <SignalBar label="Comp Volume" value={outlook.signals.liquidity} />
+                    <SignalBar label="Price Volatility" value={outlook.signals.volatility} />
                     <SignalBar label="Card Quality" value={outlook.signals.cardType} />
                   </div>
                 </>
