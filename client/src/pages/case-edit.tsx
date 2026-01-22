@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { SuccessOverlay } from "@/components/success-animation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -222,6 +223,7 @@ export default function CaseEdit() {
   const [scanConfirmed, setScanConfirmed] = useState(false);
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [scanConfidence, setScanConfidence] = useState<"high" | "medium" | "low" | null>(null);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -363,20 +365,7 @@ export default function CaseEdit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
-      toast({
-        title: "Card added",
-        description: "Your card has been added to the display case.",
-      });
-      setShowAddCard(false);
-      // Reset all form and scan state
-      setSelectedFile(null);
-      setPreviewUrl(null);
-      setScanPreviewUrl(null);
-      setScanConfirmed(false);
-      setScanConfidence(null);
-      setAddCardMode("manual");
-      setDuplicateCheckTitle("");
-      cardForm.reset();
+      setShowSuccessAnimation(true);
     },
     onError: (error: Error) => {
       if (isUnauthorizedError(error)) {
@@ -397,6 +386,23 @@ export default function CaseEdit() {
       });
     },
   });
+
+  const handleSuccessAnimationComplete = () => {
+    setShowSuccessAnimation(false);
+    toast({
+      title: "Card added",
+      description: "Your card has been added to the display case.",
+    });
+    setShowAddCard(false);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setScanPreviewUrl(null);
+    setScanConfirmed(false);
+    setScanConfidence(null);
+    setAddCardMode("manual");
+    setDuplicateCheckTitle("");
+    cardForm.reset();
+  };
 
   const deleteCardMutation = useMutation({
     mutationFn: async (cardId: number) => {
@@ -1837,6 +1843,12 @@ export default function CaseEdit() {
         displayCaseId={parseInt(id || "0")}
         canEdit={true}
         isPro={isPro}
+      />
+
+      <SuccessOverlay
+        show={showSuccessAnimation}
+        message="Card Added!"
+        onComplete={handleSuccessAnimationComplete}
       />
     </div>
   );

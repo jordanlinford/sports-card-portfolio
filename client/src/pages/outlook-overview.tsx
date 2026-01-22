@@ -38,11 +38,14 @@ import {
   Star,
   Info,
   Camera,
+  Check,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OutlookDetails, type OutlookDisplayData } from "@/components/outlook-details";
+import { SuccessOverlay } from "@/components/success-animation";
 
 type CaseWithCards = DisplayCase & { cards: CardType[] };
 type UsageInfo = { used: number; limit: number | null; remaining: number | null; isPro: boolean };
@@ -383,6 +386,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     "Building your investment outlook..."
   ];
   
+  // Success animation state
+  const [showAnalysisSuccess, setShowAnalysisSuccess] = useState(false);
+  
   // Check for debug mode via query param
   const searchParams = new URLSearchParams(window.location.search);
   const showDebug = searchParams.get("debug") === "1";
@@ -669,7 +675,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     onSuccess: (data) => {
       setResult(data);
       queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
-      toast({ title: "Analysis complete", description: `Got ${data.action} recommendation for ${title}` });
+      setShowAnalysisSuccess(true);
       
       // Start polling if comps are being fetched
       if (data.comps && (data.comps.status === "queued" || data.comps.status === "fetching")) {
@@ -2143,6 +2149,17 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
           </div>
         </DialogContent>
       </Dialog>
+
+      <SuccessOverlay
+        show={showAnalysisSuccess}
+        message="Analysis Complete!"
+        onComplete={() => {
+          setShowAnalysisSuccess(false);
+          if (result) {
+            toast({ title: "Analysis complete", description: `Got ${result.action} recommendation for ${title}` });
+          }
+        }}
+      />
     </Card>
   );
 }
