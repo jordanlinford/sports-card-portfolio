@@ -1767,6 +1767,21 @@ export type NextBuy = typeof nextBuys.$inferSelect;
 export type InsertNextBuy = typeof nextBuys.$inferInsert;
 export const insertNextBuySchema = createInsertSchema(nextBuys).omit({ id: true, createdAt: true });
 
+// Dismissed Recommendations - tracks players user doesn't want to see in recommendations
+export const dismissedRecommendations = pgTable("dismissed_recommendations", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  reason: varchar("reason", { length: 50 }), // "already_own", "not_interested"
+  dismissedAt: timestamp("dismissed_at").defaultNow(),
+}, (table) => [
+  index("idx_dismissed_recs_user").on(table.userId),
+  unique("unique_user_dismissed_player").on(table.userId, table.playerName),
+]);
+
+export type DismissedRecommendation = typeof dismissedRecommendations.$inferSelect;
+export type InsertDismissedRecommendation = typeof dismissedRecommendations.$inferInsert;
+
 // Shared Snapshots - allows public viewing of private reports via token
 export const sharedSnapshots = pgTable("shared_snapshots", {
   id: serial("id").primaryKey(),

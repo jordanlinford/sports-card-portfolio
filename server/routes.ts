@@ -7310,6 +7310,58 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // POST /api/portfolio/next-buys/dismiss - Dismiss a recommendation (already own / not interested)
+  app.post("/api/portfolio/next-buys/dismiss", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { playerName, reason } = req.body;
+      if (!playerName) {
+        return res.status(400).json({ error: "playerName is required" });
+      }
+
+      const validReasons = ["already_own", "not_interested"];
+      const dismissReason = validReasons.includes(reason) ? reason : "not_interested";
+
+      // Import required modules
+      const { db } = await import("./db");
+      const { and, eq, sql } = await import("drizzle-orm");
+      const { dismissedRecommendations, nextBuys } = await import("@shared/schema");
+      
+      // Insert or update the dismissal
+      await db
+        .insert(dismissedRecommendations)
+        .values({
+          userId,
+          playerName: playerName.trim(),
+          reason: dismissReason,
+        })
+        .onConflictDoUpdate({
+          target: [dismissedRecommendations.userId, dismissedRecommendations.playerName],
+          set: { reason: dismissReason, dismissedAt: new Date() },
+        });
+
+      // Delete from next_buys so it disappears immediately
+      await db
+        .delete(nextBuys)
+        .where(
+          and(
+            eq(nextBuys.userId, userId),
+            sql`LOWER(${nextBuys.playerName}) = LOWER(${playerName.trim()})`
+          )
+        );
+
+      console.log(`[NextBuys] User ${userId} dismissed ${playerName} (${dismissReason})`);
+      res.json({ success: true, dismissed: playerName });
+    } catch (error) {
+      console.error("[NextBuys] Error dismissing:", error);
+      res.status(500).json({ error: "Failed to dismiss recommendation" });
+    }
+  });
+
   // ============================================================================
   // Hidden Gems - Data-driven undervalued player picks
   // ============================================================================

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { cards, displayCases, playerWatchlist, portfolioSnapshots, nextBuys, cardOutlooks, hiddenGems } from "@shared/schema";
+import { cards, displayCases, playerWatchlist, portfolioSnapshots, nextBuys, cardOutlooks, hiddenGems, dismissedRecommendations } from "@shared/schema";
 import type { 
   PortfolioProfile, 
   PortfolioExposures, 
@@ -1093,6 +1093,42 @@ function computePortfolioImpact(
 export async function generateNextBuys(userId: string): Promise<import("@shared/schema").NextBuy[]> {
   const profile = await buildPortfolioProfile(userId);
   
+  // Get players the user already owns (to exclude from recommendations)
+  const ownedPlayerNames = new Set(
+    profile.concentration.topPlayers.map(p => p.player.toLowerCase().trim())
+  );
+  
+  // Also get ALL player names from user's collection (not just top players)
+  const allOwnedCards = await db
+    .select({ playerName: cards.playerName })
+    .from(cards)
+    .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+    .where(eq(displayCases.userId, userId));
+  
+  for (const card of allOwnedCards) {
+    if (card.playerName) {
+      ownedPlayerNames.add(card.playerName.toLowerCase().trim());
+    }
+  }
+  
+  // Get dismissed players
+  const dismissedPlayers = await db
+    .select({ playerName: dismissedRecommendations.playerName })
+    .from(dismissedRecommendations)
+    .where(eq(dismissedRecommendations.userId, userId));
+  
+  const dismissedPlayerNames = new Set(
+    dismissedPlayers.map(d => d.playerName.toLowerCase().trim())
+  );
+  
+  console.log(`[NextBuys] User owns ${ownedPlayerNames.size} players, dismissed ${dismissedPlayerNames.size} players`);
+  
+  // Helper to check if a player should be excluded
+  const shouldExcludePlayer = (playerName: string): boolean => {
+    const normalized = playerName.toLowerCase().trim();
+    return ownedPlayerNames.has(normalized) || dismissedPlayerNames.has(normalized);
+  };
+  
   // Detect user's team preferences from their portfolio
   const topTeams = profile.concentration.topTeams
     .filter(t => t.pct > 0.05) // Teams with at least 5% of portfolio
@@ -1114,8 +1150,12 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
 
   const candidates: NextBuyCandidate[] = [];
   
-  // Source 1: User's watchlist
+  // Source 1: User's watchlist (skip if already owned or dismissed)
   for (const watched of watchlistPlayers) {
+    if (shouldExcludePlayer(watched.playerName)) {
+      console.log(`[NextBuys] Skipping watchlist player ${watched.playerName} - already owned or dismissed`);
+      continue;
+    }
     candidates.push({
       title: `${watched.playerName} Base Rookie`,
       playerName: watched.playerName,
@@ -1146,6 +1186,7 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
     let breakoutCount = 0;
     for (const gem of sortedGems) {
       if (breakoutCount >= 3) break;
+      if (shouldExcludePlayer(gem.playerName)) continue; // Skip owned/dismissed
       if (gem.temperature === "HOT" && !candidates.some(c => c.playerName === gem.playerName)) {
         candidates.push({
           title: `${gem.playerName} - ${gem.team || gem.sport}`,
@@ -1169,6 +1210,7 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
     if (topTeams.length > 0) {
       for (const gem of sortedGems) {
         if (teamThemeCount >= 3) break;
+        if (shouldExcludePlayer(gem.playerName)) continue; // Skip owned/dismissed
         const matchesTeam = gem.team && topTeams.some(userTeam => 
           teamsMatch(gem.team, userTeam)
         );
@@ -1196,6 +1238,7 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
     let sportMatchCount = 0;
     for (const gem of sortedGems) {
       if (sportMatchCount >= 4) break;
+      if (shouldExcludePlayer(gem.playerName)) continue; // Skip owned/dismissed
       const matchesSport = dominantSports.includes(gem.sport.toLowerCase());
       
       if (matchesSport && !candidates.some(c => c.playerName === gem.playerName)) {
@@ -1269,6 +1312,7 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
       });
       
       for (const player of prioritizedPlayers) {
+        if (shouldExcludePlayer(player.name)) continue; // Skip owned/dismissed
         if (!candidates.some(c => c.playerName === player.name) && candidates.length < 10) {
           const matchesTeam = player.team && topTeams.some(t => teamsMatch(player.team!, t));
           

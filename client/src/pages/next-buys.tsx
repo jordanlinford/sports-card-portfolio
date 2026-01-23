@@ -19,13 +19,22 @@ import {
   Clock,
   Plus,
   Search,
-  Info
+  Info,
+  X,
+  CheckCircle
 } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { NextBuy, NextBuyPortfolioImpact } from "@shared/schema";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PageShareButton } from "@/components/page-share-button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 
 function formatTimestamp(date: Date | string | null | undefined): string {
   if (!date) return "Unknown";
@@ -139,21 +148,55 @@ function getVerdictLine(buy: NextBuy): string {
   return "Wait for better entry. Monitor for price dips or news.";
 }
 
-function NextBuyCard({ buy, isBestOpportunity = false }: { buy: NextBuy; isBestOpportunity?: boolean }) {
+function NextBuyCard({ 
+  buy, 
+  isBestOpportunity = false,
+  onDismiss
+}: { 
+  buy: NextBuy; 
+  isBestOpportunity?: boolean;
+  onDismiss?: (playerName: string, reason: "already_own" | "not_interested") => void;
+}) {
   const whyBullets = (buy.whyBullets as string[] | null) || [];
   const portfolioImpact = buy.portfolioImpact as NextBuyPortfolioImpact | null;
 
   return (
     <Card className={`overflow-hidden ${isBestOpportunity ? "ring-2 ring-primary" : ""}`} data-testid={`card-next-buy-${buy.id}`}>
       <CardContent className="pt-4">
-        {isBestOpportunity && (
-          <div className="flex items-center gap-1 mb-2">
+        <div className="flex items-start justify-between gap-2 mb-2">
+          {isBestOpportunity && (
             <Badge className="bg-primary text-primary-foreground gap-1">
               <Sparkles className="h-3 w-3" />
-              Best Opportunity
+              Best
             </Badge>
-          </div>
-        )}
+          )}
+          <div className="flex-1" />
+          {onDismiss && buy.playerName && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="shrink-0 px-2" data-testid={`button-dismiss-${buy.id}`}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem 
+                  onClick={() => onDismiss(buy.playerName!, "already_own")}
+                  data-testid={`menu-already-own-${buy.id}`}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Already Own
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => onDismiss(buy.playerName!, "not_interested")}
+                  data-testid={`menu-not-interested-${buy.id}`}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Not Interested
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
         <div className="flex items-start justify-between gap-3 mb-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -229,6 +272,7 @@ function NextBuyCard({ buy, isBestOpportunity = false }: { buy: NextBuy; isBestO
 export default function NextBuysPage() {
   const [showBuyOnly, setShowBuyOnly] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast } = useToast();
 
   const { data, isLoading, error } = useQuery<{ buys: NextBuy[]; count: number; generatedAt?: string }>({
     queryKey: ["/api/portfolio/next-buys"],
@@ -250,6 +294,35 @@ export default function NextBuysPage() {
       setIsRefreshing(false);
     },
   });
+
+  const dismissMutation = useMutation({
+    mutationFn: async ({ playerName, reason }: { playerName: string; reason: "already_own" | "not_interested" }) => {
+      const result = await apiRequest(
+        "POST",
+        "/api/portfolio/next-buys/dismiss",
+        { playerName, reason }
+      );
+      return result;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio/next-buys"] });
+      toast({
+        title: "Removed",
+        description: `${variables.playerName} won't be suggested again.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to dismiss recommendation. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDismiss = (playerName: string, reason: "already_own" | "not_interested") => {
+    dismissMutation.mutate({ playerName, reason });
+  };
 
   const handleGenerate = (refresh: boolean = false) => {
     setIsRefreshing(true);
@@ -393,6 +466,7 @@ export default function NextBuysPage() {
             key={buy.id} 
             buy={buy} 
             isBestOpportunity={index === 0 && (buy.overallScore ?? 0) >= 60}
+            onDismiss={handleDismiss}
           />
         ))}
       </div>
