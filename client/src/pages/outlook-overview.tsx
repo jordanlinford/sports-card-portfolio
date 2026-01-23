@@ -2670,6 +2670,9 @@ export default function OutlookOverviewPage() {
                   {buyCards.length}
                 </Badge>
               </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Cards you own that are good opportunities to add more of. Market conditions favor accumulating these players.
+              </p>
               <div className="space-y-2">
                 {buyCards.map(card => (
                   <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
@@ -2687,6 +2690,9 @@ export default function OutlookOverviewPage() {
                   {sellCards.length}
                 </Badge>
               </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Cards you own where the AI suggests considering an exit. Market conditions or player outlook may be declining.
+              </p>
               <div className="space-y-2">
                 {sellCards.map(card => (
                   <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
@@ -2704,6 +2710,9 @@ export default function OutlookOverviewPage() {
                   {holdCards.length}
                 </Badge>
               </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Cards you own with stable long-term value. These players have established careers worth holding onto.
+              </p>
               <div className="space-y-2">
                 {holdCards.map(card => (
                   <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
