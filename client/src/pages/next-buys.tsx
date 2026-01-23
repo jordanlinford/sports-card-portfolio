@@ -34,6 +34,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 function formatTimestamp(date: Date | string | null | undefined): string {
@@ -272,6 +279,7 @@ function NextBuyCard({
 export default function NextBuysPage() {
   const [showBuyOnly, setShowBuyOnly] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sportFilter, setSportFilter] = useState<string>("all");
   const { toast } = useToast();
 
   const { data, isLoading, error } = useQuery<{ buys: NextBuy[]; count: number; generatedAt?: string }>({
@@ -358,7 +366,16 @@ export default function NextBuysPage() {
   }
 
   const buys = data?.buys || [];
-  const filteredBuys = showBuyOnly ? buys.filter(b => b.verdict === "BUY") : buys;
+  
+  // Get unique sports for filter options
+  const sports = Array.from(new Set(buys.map(b => b.sport).filter((s): s is string => s !== null)));
+  
+  // Apply all filters
+  const filteredBuys = buys.filter(b => {
+    if (showBuyOnly && b.verdict !== "BUY") return false;
+    if (sportFilter !== "all" && b.sport !== sportFilter) return false;
+    return true;
+  });
 
   if (buys.length === 0) {
     return (
@@ -451,13 +468,40 @@ export default function NextBuysPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <Badge variant="default" className="bg-green-600">
           {buyCount} BUY
         </Badge>
         <Badge variant="secondary">
           {monitorCount} MONITOR
         </Badge>
+        
+        {sports.length > 1 && (
+          <Select value={sportFilter} onValueChange={setSportFilter}>
+            <SelectTrigger className="w-[130px] h-8" data-testid="select-sport-filter">
+              <SelectValue placeholder="Sport" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Sports</SelectItem>
+              {sports.map(sport => (
+                <SelectItem key={sport} value={sport}>{sport}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        
+        {sportFilter !== "all" && (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setSportFilter("all")}
+            className="h-8 px-2"
+            data-testid="button-clear-filters"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Clear
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
