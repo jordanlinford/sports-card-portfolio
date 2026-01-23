@@ -351,14 +351,30 @@ export default function NextBuysPage() {
   }
 
   if (error) {
+    // Check if it's an auth error
+    const isAuthError = error instanceof Error && 
+      (error.message.includes("401") || error.message.includes("Unauthorized"));
+    
     return (
       <div className="max-w-5xl mx-auto p-6">
         <Card>
           <CardContent className="py-8 text-center">
             <TrendingUp className="h-12 w-12 mx-auto mb-4 text-destructive" />
-            <h3 className="text-lg font-medium mb-2">Failed to load recommendations</h3>
-            <p className="text-muted-foreground mb-4">There was an error loading your next buys.</p>
-            <Button onClick={() => handleGenerate(true)}>Try Again</Button>
+            <h3 className="text-lg font-medium mb-2">
+              {isAuthError ? "Please log in" : "Failed to load recommendations"}
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              {isAuthError 
+                ? "You need to be logged in to view your buy recommendations." 
+                : "There was an error loading your next buys."}
+            </p>
+            {isAuthError ? (
+              <Link href="/">
+                <Button>Go to Home</Button>
+              </Link>
+            ) : (
+              <Button onClick={() => handleGenerate(true)}>Try Again</Button>
+            )}
           </CardContent>
         </Card>
       </div>
