@@ -1,7 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { db } from "./db";
-import { playerOutlookCache } from "@shared/schema";
-import { eq, and, gt, lt } from "drizzle-orm";
+import { playerOutlookCache, playerOutlookHistory } from "@shared/schema";
+import { eq, and, gt, lt, desc } from "drizzle-orm";
+import crypto from "crypto";
 import { classifyPlayer, getExposureRecommendations, type ClassificationInput, type ClassificationOutput } from "./playerClassificationEngine";
 import { calculateValuation } from "./valuationService";
 import { generateInvestmentCall, type RoleTier } from "./investmentDecisionEngine";
@@ -193,6 +194,69 @@ async function getCachedOutlook(playerKey: string): Promise<{
   };
 }
 
+// Generate hash for outlook snapshot to detect changes
+function generateSnapshotHash(verdict: string, modifier: string, temperature: string): string {
+  const input = `${verdict}:${modifier}:${temperature}`;
+  return crypto.createHash('sha256').update(input).digest('hex').substring(0, 16);
+}
+
+// Save outlook history snapshot (only when verdict/modifier/temperature changes)
+async function saveToHistory(
+  playerKey: string,
+  playerName: string,
+  sport: string,
+  outlook: PlayerOutlookResponse
+): Promise<void> {
+  const verdict = outlook.investmentCall?.verdict || outlook.verdict?.action || "UNKNOWN";
+  const modifier = outlook.investmentCall?.postureLabel || outlook.verdict?.modifier || "NONE";
+  const temperature = outlook.snapshot?.temperature || "NEUTRAL";
+  const confidence = outlook.investmentCall?.confidence || "LOW";
+  
+  const snapshotHash = generateSnapshotHash(verdict, modifier, temperature);
+  
+  // Check if we already have a snapshot with this exact hash (no change)
+  const existingWithHash = await db
+    .select({ id: playerOutlookHistory.id })
+    .from(playerOutlookHistory)
+    .where(and(
+      eq(playerOutlookHistory.playerKey, playerKey),
+      eq(playerOutlookHistory.snapshotHash, snapshotHash)
+    ))
+    .limit(1);
+  
+  // Only record if this is a new state (hash changed)
+  if (existingWithHash.length === 0) {
+    console.log(`[OutlookHistory] Recording new snapshot for ${playerName}: ${verdict}/${modifier}/${temperature}`);
+    await db.insert(playerOutlookHistory).values({
+      playerKey,
+      playerName,
+      sport,
+      verdict,
+      modifier,
+      temperature,
+      confidence,
+      outlookJson: outlook,
+      snapshotHash,
+      snapshotAt: new Date(),
+    });
+  } else {
+    console.log(`[OutlookHistory] No change for ${playerName}, skipping history record`);
+  }
+}
+
+// Get outlook history for a player
+export async function getPlayerOutlookHistory(
+  playerKey: string,
+  limit: number = 10
+): Promise<typeof playerOutlookHistory.$inferSelect[]> {
+  return await db
+    .select()
+    .from(playerOutlookHistory)
+    .where(eq(playerOutlookHistory.playerKey, playerKey))
+    .orderBy(desc(playerOutlookHistory.snapshotAt))
+    .limit(limit);
+}
+
 // Save outlook to cache
 async function saveToCache(
   playerKey: string,
@@ -206,6 +270,14 @@ async function saveToCache(
   
   // Add prompt version to cached outlook for version checking on retrieval
   const outlookWithVersion = { ...outlook, _promptVersion: PROMPT_VERSION };
+  
+  // Record to history before updating cache (only if verdict/modifier/temp changed)
+  try {
+    await saveToHistory(playerKey, playerName, sport, outlook);
+  } catch (historyError) {
+    console.error(`[OutlookHistory] Failed to save history for ${playerName}:`, historyError);
+    // Don't fail the main cache operation if history fails
+  }
   
   await db
     .insert(playerOutlookCache)

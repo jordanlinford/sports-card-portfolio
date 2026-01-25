@@ -27,7 +27,8 @@ import {
   Clock,
   Info,
   Sun,
-  Trophy
+  Trophy,
+  History
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -114,6 +115,22 @@ interface OutlookData {
 }
 
 type OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
+
+interface OutlookHistoryEntry {
+  id: number;
+  verdict: string;
+  modifier: string;
+  temperature: string;
+  confidence: string;
+  snapshotAt: string;
+  summary?: string;
+}
+
+interface OutlookHistoryResponse {
+  playerKey: string;
+  history: OutlookHistoryEntry[];
+  count: number;
+}
 
 function getMarketFrictionFromLiquidity(liquidityScore?: number): number {
   if (liquidityScore === undefined || liquidityScore === null) return 50;
@@ -340,6 +357,11 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/cards", card.id, "outlook"] });
+      // Also invalidate history when a new outlook is generated
+      if (card.playerName && card.sport) {
+        const playerKey = `${card.sport.toLowerCase()}:${card.playerName.toLowerCase().trim().replace(/\s+/g, "_")}`;
+        queryClient.invalidateQueries({ queryKey: ["/api/player-outlook/history", playerKey] });
+      }
       toast({
         title: "Outlook Generated",
         description: `Analysis complete: ${data.action} recommendation with ${data.confidenceScore}% confidence.`,
@@ -352,6 +374,24 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
         variant: "destructive",
       });
     },
+  });
+
+  // Build player key for history lookup
+  const playerKey = card.playerName && card.sport 
+    ? `${card.sport.toLowerCase()}:${card.playerName.toLowerCase().trim().replace(/\s+/g, "_")}`
+    : null;
+
+  // Fetch outlook history (only if we have a valid player key and isPro)
+  const { data: historyData } = useQuery<OutlookHistoryResponse>({
+    queryKey: ["/api/player-outlook/history", playerKey],
+    queryFn: async () => {
+      if (!playerKey) throw new Error("No player key");
+      const res = await fetch(`/api/player-outlook/history/${encodeURIComponent(playerKey)}`);
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return res.json();
+    },
+    enabled: !!playerKey && isPro,
+    staleTime: 1000 * 60 * 10, // 10 minutes
   });
 
   if (isLoading) {
@@ -773,6 +813,62 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
               </Button>
             </div>
           </>
+        )}
+
+        {/* Outlook History Section (Pro only, when history exists) */}
+        {isPro && historyData && historyData.history.length > 1 && (
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-1 p-0 h-auto text-xs text-muted-foreground" data-testid="button-view-history">
+                <History className="h-3 w-3" />
+                View outlook history ({historyData.history.length} snapshots)
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              <div className="space-y-2">
+                {historyData.history.map((entry, index) => {
+                  const date = new Date(entry.snapshotAt);
+                  const isLatest = index === 0;
+                  const prevEntry = historyData.history[index + 1];
+                  const verdictChanged = prevEntry && prevEntry.verdict !== entry.verdict;
+                  
+                  return (
+                    <div 
+                      key={entry.id} 
+                      className={`flex items-center justify-between p-2 rounded-md text-xs ${isLatest ? 'bg-muted' : 'bg-muted/30'}`}
+                      data-testid={`history-entry-${entry.id}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={entry.verdict === "ACCUMULATE" || entry.verdict === "BUY" ? "default" : "secondary"}
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {entry.verdict}
+                        </Badge>
+                        {verdictChanged && (
+                          <span className="text-amber-500 text-[10px]">
+                            (was {prevEntry.verdict})
+                          </span>
+                        )}
+                        <span className="text-muted-foreground capitalize">
+                          {entry.temperature.toLowerCase()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <span>{date.toLocaleDateString()}</span>
+                        {isLatest && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">Current</Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-2">
+                History shows how the outlook has changed over time. Each entry represents a significant change in verdict or market conditions.
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {/* Single consolidated disclaimer */}

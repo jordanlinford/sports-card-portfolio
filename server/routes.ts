@@ -3593,6 +3593,112 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // Get player outlook history (shows how verdicts changed over time)
+  app.get("/api/player-outlook/history/:playerKey", isAuthenticated, async (req: any, res) => {
+    try {
+      const { playerKey } = req.params;
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+      
+      // Decode player key (e.g., "nba:lebron_james")
+      const decodedKey = decodeURIComponent(playerKey);
+      
+      const { getPlayerOutlookHistory } = await import("./playerOutlookEngine");
+      const history = await getPlayerOutlookHistory(decodedKey, limit);
+      
+      // Transform for client consumption
+      const historyData = history.map(h => ({
+        id: h.id,
+        verdict: h.verdict,
+        modifier: h.modifier,
+        temperature: h.temperature,
+        confidence: h.confidence,
+        snapshotAt: h.snapshotAt,
+        // Include key outlook metrics if available
+        summary: h.outlookJson?.investmentCall?.oneLineRationale || h.outlookJson?.verdict?.summary,
+      }));
+      
+      res.json({ 
+        playerKey: decodedKey,
+        history: historyData,
+        count: historyData.length 
+      });
+    } catch (error) {
+      console.error("Error getting player outlook history:", error);
+      res.status(500).json({ message: "Failed to get outlook history" });
+    }
+  });
+
+  // Get user's cards for a specific player (portfolio context)
+  app.get("/api/portfolio/player-cards/:playerName", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { playerName } = req.params;
+      const sport = req.query.sport as string || undefined;
+      
+      // Decode player name (URL encoded)
+      const decodedPlayerName = decodeURIComponent(playerName);
+      
+      // Import db and schema dynamically
+      const { db } = await import("./db");
+      const { cards, displayCases } = await import("@shared/schema");
+      const { eq, and, sql } = await import("drizzle-orm");
+      
+      // Build where conditions
+      const conditions = [
+        eq(displayCases.userId, userId),
+        sql`LOWER(${cards.playerName}) = LOWER(${decodedPlayerName})`
+      ];
+      if (sport) {
+        conditions.push(eq(cards.sport, sport));
+      }
+      
+      // Get user's cards matching this player
+      const userCards = await db
+        .select({
+          id: cards.id,
+          title: cards.title,
+          playerName: cards.playerName,
+          sport: cards.sport,
+          estimatedValue: cards.estimatedValue,
+          set: cards.set,
+          year: cards.year,
+          variation: cards.variation,
+          grade: cards.grade,
+          imagePath: cards.imagePath,
+        })
+        .from(cards)
+        .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+        .where(and(...conditions));
+      
+      // Calculate total value
+      const totalValue = userCards.reduce((sum: number, card: typeof userCards[0]) => sum + (card.estimatedValue || 0), 0);
+      
+      // Group by card type/set
+      const cardsBySet = userCards.reduce((acc: Record<string, typeof userCards>, card: typeof userCards[0]) => {
+        const key = card.set || "Unknown Set";
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(card);
+        return acc;
+      }, {} as Record<string, typeof userCards>);
+      
+      res.json({
+        playerName: decodedPlayerName,
+        cardCount: userCards.length,
+        totalValue,
+        cards: userCards.slice(0, 10), // Limit to 10 for preview
+        cardsBySet: Object.entries(cardsBySet).map(([set, setCards]) => ({
+          set,
+          count: setCards.length,
+          totalValue: setCards.reduce((sum: number, c: typeof userCards[0]) => sum + (c.estimatedValue || 0), 0),
+        })),
+        hasMore: userCards.length > 10,
+      });
+    } catch (error) {
+      console.error("Error getting player cards:", error);
+      res.status(500).json({ message: "Failed to get player cards" });
+    }
+  });
+
   // ====== PLAYER WATCHLIST ROUTES ======
   
   // Add player to watchlist

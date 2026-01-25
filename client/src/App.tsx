@@ -46,6 +46,7 @@ import BlogListing from "@/pages/blog";
 import BlogPostPage from "@/pages/blog-post";
 import PublicPlayerOutlookPage from "@/pages/public-player-outlook";
 import SupportPage from "@/pages/support";
+import ComparePage from "@/pages/compare";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -104,6 +105,7 @@ function Router() {
           <Route path="/hidden-gems" component={HiddenGemsPage} />
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
           <Route path="/portfolio/next-buys" component={NextBuysPage} />
+          <Route path="/compare" component={ComparePage} />
           <Route path="/portfolio-builder/splits/:id/preferences" component={PortfolioBuilderPreferencesPage} />
           <Route path="/admin/portfolio-builder" component={AdminPortfolioBuilderPage} />
           <Route path="/search" component={SearchPage} />

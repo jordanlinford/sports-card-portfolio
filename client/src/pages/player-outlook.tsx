@@ -43,6 +43,8 @@ import {
   Star,
   StarOff,
   Sparkles,
+  Briefcase,
+  History,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -581,6 +583,393 @@ function DiscountAnalysisCard({ analysis }: { analysis?: DiscountAnalysis }) {
   );
 }
 
+// Portfolio Context Panel - shows user's ownership of this player
+interface PortfolioContextProps {
+  playerName: string;
+  cardCount: number;
+  totalValue: number;
+  cards: Array<{
+    id: number;
+    title: string;
+    set: string | null;
+    estimatedValue: number | null;
+  }>;
+  cardsBySet: Array<{
+    set: string;
+    count: number;
+    totalValue: number;
+  }>;
+  hasMore: boolean;
+}
+
+function PortfolioContextPanel({ data }: { data: PortfolioContextProps }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  if (data.cardCount === 0) return null;
+  
+  return (
+    <Card className="border-primary/30 bg-primary/5" data-testid="card-portfolio-context">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover-elevate pb-3" data-testid="trigger-portfolio-context">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary" />
+                Your {data.playerName} Holdings
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-primary/20 text-primary border-primary/30" data-testid="badge-card-count">
+                  {data.cardCount} {data.cardCount === 1 ? "Card" : "Cards"}
+                </Badge>
+                <Badge variant="outline" className="gap-1" data-testid="badge-total-value">
+                  <DollarSign className="h-3 w-3" />
+                  ${data.totalValue.toLocaleString()}
+                </Badge>
+                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </div>
+            </div>
+            <CardDescription>
+              You own cards of this player worth ${data.totalValue.toLocaleString()} total
+            </CardDescription>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            <div className="space-y-3">
+              {data.cardsBySet.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">By Set</h4>
+                  <div className="grid gap-2">
+                    {data.cardsBySet.map((setGroup, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-md bg-background/50 border" data-testid={`set-group-${i}`}>
+                        <span className="text-sm">{setGroup.set}</span>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">{setGroup.count}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            ${setGroup.totalValue.toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {data.cards.length > 0 && (
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">Your Cards</h4>
+                  <div className="grid gap-2">
+                    {data.cards.slice(0, 5).map((card) => (
+                      <div key={card.id} className="flex items-center justify-between p-2 rounded-md bg-background/50 border text-sm" data-testid={`portfolio-card-${card.id}`}>
+                        <span className="truncate flex-1 mr-2">{card.title}</span>
+                        {card.estimatedValue && (
+                          <span className="text-muted-foreground whitespace-nowrap">
+                            ${card.estimatedValue.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {data.hasMore && (
+                      <p className="text-xs text-muted-foreground text-center py-1">
+                        + {data.cardCount - 5} more cards
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+}
+
+// Confidence Breakdown Panel - shows confidence levels for different analysis dimensions
+interface ConfidenceBreakdownProps {
+  investmentCall?: InvestmentCall;
+  evidence: PlayerOutlookResponse["evidence"];
+}
+
+function ConfidenceBreakdownPanel({ investmentCall, evidence }: ConfidenceBreakdownProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  // Calculate confidence dimensions
+  const analysisConfidence = investmentCall?.confidence || "LOW";
+  const dataQuality = evidence?.dataQuality || "LOW";
+  
+  // Market data quality based on comps
+  const marketDataQuality: "HIGH" | "MEDIUM" | "LOW" = 
+    evidence?.compsSummary?.available && evidence?.compsSummary?.soldCount
+      ? evidence.compsSummary.soldCount >= 15 ? "HIGH"
+        : evidence.compsSummary.soldCount >= 5 ? "MEDIUM" : "LOW"
+      : "LOW";
+  
+  // News coverage quality
+  const newsSnippetCount = evidence?.newsSnippets?.length || 0;
+  const newsCoverage: "HIGH" | "MEDIUM" | "LOW" = 
+    newsSnippetCount >= 5 ? "HIGH" : newsSnippetCount >= 2 ? "MEDIUM" : "LOW";
+  
+  const getConfidenceColor = (level: string) => {
+    switch (level) {
+      case "HIGH": return "bg-green-500";
+      case "MEDIUM": return "bg-yellow-500";
+      default: return "bg-red-500";
+    }
+  };
+  
+  const getConfidenceWidth = (level: string) => {
+    switch (level) {
+      case "HIGH": return "100%";
+      case "MEDIUM": return "60%";
+      default: return "30%";
+    }
+  };
+  
+  const confidenceDimensions = [
+    {
+      label: "Analysis Confidence",
+      level: analysisConfidence,
+      description: "AI's confidence in its investment verdict",
+      icon: <Target className="h-4 w-4" />,
+    },
+    {
+      label: "Data Quality",
+      level: dataQuality,
+      description: "Overall quality of available player data",
+      icon: <BarChart3 className="h-4 w-4" />,
+    },
+    {
+      label: "Market Data",
+      level: marketDataQuality,
+      description: `${evidence?.compsSummary?.soldCount || 0} comparable sales found`,
+      icon: <DollarSign className="h-4 w-4" />,
+    },
+    {
+      label: "News Coverage",
+      level: newsCoverage,
+      description: `${newsSnippetCount} recent news items`,
+      icon: <BookOpen className="h-4 w-4" />,
+    },
+  ];
+  
+  // Overall confidence (average)
+  const confidenceScores = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+  const avgScore = confidenceDimensions.reduce((sum, d) => 
+    sum + confidenceScores[d.level as keyof typeof confidenceScores], 0
+  ) / confidenceDimensions.length;
+  const overallConfidence = avgScore >= 2.5 ? "HIGH" : avgScore >= 1.5 ? "MEDIUM" : "LOW";
+  
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card data-testid="card-confidence-breakdown">
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover-elevate pb-3" data-testid="trigger-confidence-breakdown">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Activity className="h-5 w-5 text-muted-foreground" />
+                Confidence Breakdown
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge 
+                  data-testid="badge-overall-confidence"
+                  className={`${
+                    overallConfidence === "HIGH" ? "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30" :
+                    overallConfidence === "MEDIUM" ? "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30" :
+                    "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30"
+                  }`}
+                >
+                  {overallConfidence} Overall
+                </Badge>
+                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </div>
+            </div>
+            <CardDescription>
+              Transparency into data quality and analysis certainty
+            </CardDescription>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0 space-y-4">
+            {confidenceDimensions.map((dim, i) => (
+              <div key={i} className="space-y-1" data-testid={`confidence-dimension-${dim.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">{dim.icon}</span>
+                    <span className="font-medium">{dim.label}</span>
+                  </div>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${
+                      dim.level === "HIGH" ? "text-green-600 dark:text-green-400 border-green-500/50" :
+                      dim.level === "MEDIUM" ? "text-yellow-600 dark:text-yellow-400 border-yellow-500/50" :
+                      "text-red-600 dark:text-red-400 border-red-500/50"
+                    }`}
+                  >
+                    {dim.level}
+                  </Badge>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all ${getConfidenceColor(dim.level)}`}
+                    style={{ width: getConfidenceWidth(dim.level) }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">{dim.description}</p>
+              </div>
+            ))}
+            
+            {investmentCall?.confidenceNote && (
+              <div className="mt-4 p-3 rounded-md bg-muted/50 border">
+                <p className="text-sm text-muted-foreground flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{investmentCall.confidenceNote}</span>
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
+// Outlook History Panel - shows how verdicts/scores change over time
+interface OutlookHistoryEntry {
+  id: number;
+  playerKey: string;
+  verdict: string;
+  temperature: string;
+  verdictModifier: string | null;
+  snapshotHash: string;
+  createdAt: string;
+}
+
+function OutlookHistoryPanel({ playerKey }: { playerKey: string | null }) {
+  const [isOpen, setIsOpen] = useState(false);
+  
+  const { data: history, isLoading } = useQuery<OutlookHistoryEntry[]>({
+    queryKey: ["/api/player-outlook/history", playerKey],
+    queryFn: async () => {
+      if (!playerKey) throw new Error("No player key");
+      const res = await fetch(`/api/player-outlook/history/${encodeURIComponent(playerKey)}`);
+      if (!res.ok) throw new Error("Failed to fetch history");
+      return res.json();
+    },
+    enabled: !!playerKey,
+    staleTime: 1000 * 60 * 5,
+  });
+  
+  // Don't render if no player key
+  if (!playerKey) return null;
+  
+  // Don't show panel if no history data after loading
+  if (!isLoading && (!history || history.length === 0)) return null;
+  
+  const getVerdictColor = (verdict: string) => {
+    switch (verdict) {
+      case "ACCUMULATE": return "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30";
+      case "BUY": return "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30";
+      case "HOLD": return "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30";
+      case "MONITOR": return "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30";
+      case "SELL": return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30";
+      case "AVOID": return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30";
+      default: return "bg-muted text-muted-foreground";
+    }
+  };
+  
+  const getTemperatureBgColor = (temp: string) => {
+    switch (temp) {
+      case "HOT": return "bg-red-500";
+      case "WARM": return "bg-orange-500";
+      case "NEUTRAL": return "bg-blue-500";
+      case "COLD": return "bg-blue-600";
+      default: return "bg-muted-foreground";
+    }
+  };
+  
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+  
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <Card data-testid="card-outlook-history">
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer hover-elevate pb-3" data-testid="trigger-outlook-history">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <History className="h-5 w-5 text-muted-foreground" />
+                Outlook History
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Badge variant="outline" className="text-xs" data-testid="badge-history-count">
+                    {history?.length || 0} {history?.length === 1 ? "change" : "changes"}
+                  </Badge>
+                )}
+                {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </div>
+            </div>
+            <CardDescription>
+              Track how verdicts and scores have changed over time
+            </CardDescription>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {history?.slice(0, 10).map((entry) => (
+                  <div 
+                    key={entry.id} 
+                    className="flex items-center justify-between p-3 rounded-md bg-muted/30 border"
+                    data-testid={`history-entry-${entry.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`h-2 w-2 rounded-full ${getTemperatureBgColor(entry.temperature)}`} />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={getVerdictColor(entry.verdict)} data-testid={`badge-verdict-${entry.id}`}>
+                            {entry.verdict}
+                          </Badge>
+                          {entry.verdictModifier && (
+                            <span className="text-xs text-muted-foreground">
+                              ({entry.verdictModifier})
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{entry.temperature}</span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground" data-testid={`text-date-${entry.id}`}>
+                      {formatDate(entry.createdAt)}
+                    </span>
+                  </div>
+                ))}
+                {history && history.length > 10 && (
+                  <p className="text-xs text-muted-foreground text-center py-1">
+                    + {history.length - 10} older entries
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
+  );
+}
+
 function ExposureRecommendations({ exposures }: { exposures: PlayerOutlookResponse["exposures"] }) {
   return (
     <Card data-testid="card-exposures">
@@ -788,6 +1177,37 @@ export default function PlayerOutlookPage() {
       setCachedWatchlistItemId(null);
     }
   }, [watchlistStatus]);
+
+  // Portfolio context - fetch user's cards for this player
+  interface PortfolioContextData {
+    playerName: string;
+    cardCount: number;
+    totalValue: number;
+    cards: Array<{
+      id: number;
+      title: string;
+      set: string | null;
+      estimatedValue: number | null;
+    }>;
+    cardsBySet: Array<{
+      set: string;
+      count: number;
+      totalValue: number;
+    }>;
+    hasMore: boolean;
+  }
+  
+  const { data: portfolioContext } = useQuery<PortfolioContextData>({
+    queryKey: ["/api/portfolio/player-cards", outlookData?.player?.name, outlookSport],
+    queryFn: async () => {
+      if (!outlookData?.player?.name) throw new Error("No player");
+      const res = await fetch(`/api/portfolio/player-cards/${encodeURIComponent(outlookData.player.name)}?sport=${outlookSport}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!outlookData?.player?.name && !!user,
+    staleTime: 1000 * 60 * 5,
+  });
 
   const addToWatchlistMutation = useMutation({
     mutationFn: async () => {
@@ -1134,10 +1554,24 @@ export default function PlayerOutlookPage() {
             playerName={outlookData.player.name} 
           />
 
+          {/* Portfolio context - show user's holdings of this player */}
+          {portfolioContext && portfolioContext.cardCount > 0 && (
+            <PortfolioContextPanel data={portfolioContext} />
+          )}
+
           <OutlookAccordions 
             advisor={advisorOutlook} 
             outlook={outlookData} 
           />
+          
+          {/* Confidence breakdown - show analysis transparency */}
+          <ConfidenceBreakdownPanel 
+            investmentCall={outlookData.investmentCall}
+            evidence={outlookData.evidence}
+          />
+          
+          {/* Outlook history - track verdict changes over time */}
+          <OutlookHistoryPanel playerKey={playerKey} />
           
           <Card>
             <CardContent className="pt-6">
