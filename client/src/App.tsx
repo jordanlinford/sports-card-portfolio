@@ -70,6 +70,7 @@ function Router() {
       <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
       <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
       <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
+      <Route path="/compare" component={ComparePage} />
       {/* Show loading only for auth-dependent routes */}
       {isLoading ? (
         <Route>
@@ -105,7 +106,6 @@ function Router() {
           <Route path="/hidden-gems" component={HiddenGemsPage} />
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
           <Route path="/portfolio/next-buys" component={NextBuysPage} />
-          <Route path="/compare" component={ComparePage} />
           <Route path="/portfolio-builder/splits/:id/preferences" component={PortfolioBuilderPreferencesPage} />
           <Route path="/admin/portfolio-builder" component={AdminPortfolioBuilderPage} />
           <Route path="/search" component={SearchPage} />

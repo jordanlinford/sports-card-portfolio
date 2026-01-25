@@ -854,7 +854,9 @@ function OutlookHistoryPanel({ playerKey }: { playerKey: string | null }) {
       if (!playerKey) throw new Error("No player key");
       const res = await fetch(`/api/player-outlook/history/${encodeURIComponent(playerKey)}`);
       if (!res.ok) throw new Error("Failed to fetch history");
-      return res.json();
+      const data = await res.json();
+      // API returns { playerKey, history, count }, extract the history array
+      return data.history || [];
     },
     enabled: !!playerKey,
     staleTime: 1000 * 60 * 5,
