@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { PlayerAutocomplete } from "@/components/player-autocomplete";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ArrowLeftRight,
   Flame,
@@ -19,11 +21,12 @@ import {
   Ban,
   Target,
   TrendingUp,
-  TrendingDown,
   AlertCircle,
   Crown,
   Loader2,
   Trophy,
+  Users,
+  CreditCard,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -38,6 +41,23 @@ const SPORTS = [
   { value: "basketball", label: "Basketball (NBA)" },
   { value: "baseball", label: "Baseball (MLB)" },
   { value: "hockey", label: "Hockey (NHL)" },
+];
+
+const GRADES = [
+  { value: "10", label: "PSA 10 / BGS 10" },
+  { value: "9.5", label: "BGS 9.5" },
+  { value: "9", label: "PSA 9 / BGS 9" },
+  { value: "8", label: "PSA 8 / BGS 8" },
+  { value: "raw", label: "Raw (Ungraded)" },
+];
+
+const CARD_TIERS = [
+  { value: "base", label: "Base" },
+  { value: "parallel", label: "Parallel (Silver, Holo, etc.)" },
+  { value: "numbered", label: "Numbered (/499, /199, /99, etc.)" },
+  { value: "auto", label: "Autograph" },
+  { value: "rpa", label: "RPA (Rookie Patch Auto)" },
+  { value: "1of1", label: "1/1" },
 ];
 
 function getTemperatureIcon(temp: MarketTemperature) {
@@ -60,7 +80,7 @@ function getTemperatureColor(temp: MarketTemperature) {
   }
 }
 
-function getVerdictIcon(verdict: PlayerVerdict) {
+function getVerdictIcon(verdict?: PlayerVerdict | null) {
   switch (verdict) {
     case "BUY": return <ShoppingCart className="h-5 w-5" />;
     case "MONITOR": return <Eye className="h-5 w-5" />;
@@ -69,7 +89,7 @@ function getVerdictIcon(verdict: PlayerVerdict) {
   }
 }
 
-function getVerdictColor(verdict: PlayerVerdict) {
+function getVerdictColor(verdict?: PlayerVerdict | null) {
   switch (verdict) {
     case "BUY": return "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30";
     case "MONITOR": return "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30";
@@ -79,10 +99,8 @@ function getVerdictColor(verdict: PlayerVerdict) {
 }
 
 function getVerdictLabel(verdict?: string, postureLabel?: string) {
-  // Prefer the friendly postureLabel from the API
   if (postureLabel) return postureLabel;
   if (!verdict) return "Unknown";
-  // Fallback for legacy data
   switch (verdict) {
     case "ACCUMULATE": return "Buy";
     case "HOLD_CORE": return "Hold";
@@ -97,7 +115,6 @@ function getVerdictLabel(verdict?: string, postureLabel?: string) {
   }
 }
 
-// Scoring system for investment verdicts - higher = better investment
 const VERDICT_SCORES: Record<string, number> = {
   ACCUMULATE: 100,
   SPECULATIVE_SUPPRESSED: 85,
@@ -114,6 +131,23 @@ function getVerdictScore(verdict?: string): number {
   if (!verdict) return 0;
   return VERDICT_SCORES[verdict] ?? 50;
 }
+
+const TIER_SCORES: Record<string, number> = {
+  "1of1": 100,
+  "rpa": 90,
+  "auto": 75,
+  "numbered": 60,
+  "parallel": 40,
+  "base": 20,
+};
+
+const GRADE_SCORES: Record<string, number> = {
+  "10": 100,
+  "9.5": 90,
+  "9": 75,
+  "8": 50,
+  "raw": 30,
+};
 
 function comparePlayers(player1: PlayerOutlookResponse | null, player2: PlayerOutlookResponse | null): {
   betterPlayer: "left" | "right" | "equal" | null;
@@ -137,6 +171,100 @@ interface ComparisonPlayer {
   sport: string;
   outlook: PlayerOutlookResponse | null;
   isLoading: boolean;
+}
+
+interface ComparisonCard {
+  playerName: string;
+  sport: string;
+  year: string;
+  setName: string;
+  tier: string;
+  grade: string;
+  outlook: PlayerOutlookResponse | null;
+  isLoading: boolean;
+}
+
+interface CardComparisonResult {
+  winner: "left" | "right" | "equal";
+  reason: string;
+  breakdown: {
+    playerScore: { left: number; right: number };
+    tierScore: { left: number; right: number };
+    gradeScore: { left: number; right: number };
+    totalScore: { left: number; right: number };
+  };
+}
+
+function compareCards(
+  card1: ComparisonCard,
+  card2: ComparisonCard
+): CardComparisonResult | null {
+  if (!card1.outlook || !card2.outlook) return null;
+
+  const playerScore1 = getVerdictScore(card1.outlook.investmentCall?.verdict);
+  const playerScore2 = getVerdictScore(card2.outlook.investmentCall?.verdict);
+  
+  const tierScore1 = TIER_SCORES[card1.tier] || 30;
+  const tierScore2 = TIER_SCORES[card2.tier] || 30;
+  
+  const gradeScore1 = GRADE_SCORES[card1.grade] || 50;
+  const gradeScore2 = GRADE_SCORES[card2.grade] || 50;
+
+  const total1 = (playerScore1 * 0.5) + (tierScore1 * 0.3) + (gradeScore1 * 0.2);
+  const total2 = (playerScore2 * 0.5) + (tierScore2 * 0.3) + (gradeScore2 * 0.2);
+
+  let winner: "left" | "right" | "equal";
+  let reason: string;
+
+  if (Math.abs(total1 - total2) < 5) {
+    winner = "equal";
+    reason = "These cards have similar investment potential";
+  } else if (total1 > total2) {
+    winner = "left";
+    const playerBetter = playerScore1 > playerScore2;
+    const tierBetter = tierScore1 > tierScore2;
+    const gradeBetter = gradeScore1 > gradeScore2;
+    
+    if (playerBetter && tierBetter) {
+      reason = `${card1.playerName}'s card has a stronger player outlook and better card tier`;
+    } else if (playerBetter) {
+      reason = `${card1.playerName} has a stronger investment outlook`;
+    } else if (tierBetter) {
+      reason = `The ${card1.tier} tier offers better long-term value`;
+    } else if (gradeBetter) {
+      reason = `The higher grade provides more investment security`;
+    } else {
+      reason = `${card1.playerName}'s card scores higher overall`;
+    }
+  } else {
+    winner = "right";
+    const playerBetter = playerScore2 > playerScore1;
+    const tierBetter = tierScore2 > tierScore1;
+    const gradeBetter = gradeScore2 > gradeScore1;
+    
+    if (playerBetter && tierBetter) {
+      reason = `${card2.playerName}'s card has a stronger player outlook and better card tier`;
+    } else if (playerBetter) {
+      reason = `${card2.playerName} has a stronger investment outlook`;
+    } else if (tierBetter) {
+      reason = `The ${card2.tier} tier offers better long-term value`;
+    } else if (gradeBetter) {
+      reason = `The higher grade provides more investment security`;
+    } else {
+      reason = `${card2.playerName}'s card scores higher overall`;
+    }
+  }
+
+  return {
+    winner,
+    reason,
+    breakdown: {
+      playerScore: { left: playerScore1, right: playerScore2 },
+      tierScore: { left: tierScore1, right: tierScore2 },
+      gradeScore: { left: gradeScore1, right: gradeScore2 },
+      totalScore: { left: Math.round(total1), right: Math.round(total2) },
+    },
+  };
 }
 
 function PlayerComparisonCard({ 
@@ -230,7 +358,7 @@ function PlayerComparisonCard({
           <div>
             <p className="text-sm font-medium">{outlook.player?.name}</p>
             <p className="text-xs text-muted-foreground capitalize">
-              {outlook.player?.position} • {outlook.player?.team} • {outlook.player?.stage?.replace(/_/g, " ")}
+              {outlook.player?.position} · {outlook.player?.team} · {outlook.player?.stage?.replace(/_/g, " ")}
             </p>
           </div>
           
@@ -290,10 +418,292 @@ function PlayerComparisonCard({
   );
 }
 
+function CardComparisonInput({ 
+  card, 
+  side,
+  onUpdate,
+  onAnalyze,
+  isAnalyzing 
+}: { 
+  card: ComparisonCard;
+  side: "left" | "right";
+  onUpdate: (updates: Partial<ComparisonCard>) => void;
+  onAnalyze: () => void;
+  isAnalyzing: boolean;
+}) {
+  const outlook = card.outlook;
+  const cardDescription = [card.year, card.setName, card.tier, card.grade !== "raw" ? `Grade ${card.grade}` : "Raw"].filter(Boolean).join(" · ");
+  
+  return (
+    <Card className="flex-1">
+      <CardHeader className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Sport</Label>
+            <Select value={card.sport} onValueChange={(v) => onUpdate({ sport: v, outlook: null })}>
+              <SelectTrigger data-testid={`select-card-sport-${side}`}>
+                <SelectValue placeholder="Select sport" />
+              </SelectTrigger>
+              <SelectContent>
+                {SPORTS.map(sport => (
+                  <SelectItem key={sport.value} value={sport.value}>
+                    {sport.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Year</Label>
+            <Input 
+              placeholder="2020"
+              value={card.year}
+              onChange={(e) => onUpdate({ year: e.target.value })}
+              data-testid={`input-card-year-${side}`}
+            />
+          </div>
+        </div>
+        
+        <div className="space-y-2">
+          <Label>Player</Label>
+          <PlayerAutocomplete
+            value={card.playerName}
+            onChange={(name) => onUpdate({ playerName: name, outlook: null })}
+            placeholder="Search for a player..."
+            data-testid={`input-card-player-${side}`}
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label>Set Name</Label>
+          <Input 
+            placeholder="Prizm, Select, Optic, etc."
+            value={card.setName}
+            onChange={(e) => onUpdate({ setName: e.target.value })}
+            data-testid={`input-card-set-${side}`}
+          />
+        </div>
+        
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Card Tier</Label>
+            <Select value={card.tier} onValueChange={(v) => onUpdate({ tier: v })}>
+              <SelectTrigger data-testid={`select-card-tier-${side}`}>
+                <SelectValue placeholder="Select tier" />
+              </SelectTrigger>
+              <SelectContent>
+                {CARD_TIERS.map(tier => (
+                  <SelectItem key={tier.value} value={tier.value}>
+                    {tier.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Grade</Label>
+            <Select value={card.grade} onValueChange={(v) => onUpdate({ grade: v })}>
+              <SelectTrigger data-testid={`select-card-grade-${side}`}>
+                <SelectValue placeholder="Select grade" />
+              </SelectTrigger>
+              <SelectContent>
+                {GRADES.map(grade => (
+                  <SelectItem key={grade.value} value={grade.value}>
+                    {grade.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        {card.playerName && !outlook && (
+          <div className="space-y-2">
+            {(!card.tier || !card.grade) && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Please select card tier and grade for accurate comparison
+              </p>
+            )}
+            <Button 
+              onClick={onAnalyze} 
+              disabled={isAnalyzing || !card.playerName || !card.tier || !card.grade}
+              className="w-full"
+              data-testid={`button-analyze-card-${side}`}
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Analyzing Player...
+                </>
+              ) : (
+                "Get Player Outlook"
+              )}
+            </Button>
+          </div>
+        )}
+      </CardHeader>
+      
+      {card.isLoading && (
+        <CardContent className="space-y-4">
+          <Skeleton className="h-8 w-32" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </CardContent>
+      )}
+      
+      {outlook && !card.isLoading && (
+        <CardContent className="space-y-4">
+          <div className="p-3 rounded-lg bg-muted/50 border">
+            <p className="text-sm font-medium">{card.playerName}</p>
+            <p className="text-xs text-muted-foreground">{cardDescription}</p>
+          </div>
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge className={`${getVerdictColor(outlook.verdict?.action)} gap-1 text-sm px-3 py-1`}>
+              {getVerdictIcon(outlook.verdict?.action)}
+              {getVerdictLabel(outlook.investmentCall?.verdict, outlook.investmentCall?.postureLabel)}
+            </Badge>
+            <Badge variant="outline" className={getTemperatureColor(outlook.snapshot?.temperature)}>
+              {getTemperatureIcon(outlook.snapshot?.temperature)}
+              <span className="ml-1">{outlook.snapshot?.temperature}</span>
+            </Badge>
+          </div>
+          
+          <p className="text-xs text-muted-foreground capitalize">
+            {outlook.player?.position} · {outlook.player?.team} · {outlook.player?.stage?.replace(/_/g, " ")}
+          </p>
+          
+          {outlook.investmentCall?.oneLineRationale && (
+            <p className="text-sm text-muted-foreground">
+              {outlook.investmentCall.oneLineRationale}
+            </p>
+          )}
+          
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg bg-muted/30 space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <TrendingUp className="h-3 w-3" />
+                <span>Volatility</span>
+              </div>
+              <p className="text-sm font-medium">{outlook.snapshot?.volatility}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/30 space-y-1">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <AlertCircle className="h-3 w-3" />
+                <span>Risk</span>
+              </div>
+              <p className="text-sm font-medium">{outlook.snapshot?.risk}</p>
+            </div>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+function CardComparisonSummary({ 
+  leftCard, 
+  rightCard 
+}: { 
+  leftCard: ComparisonCard; 
+  rightCard: ComparisonCard;
+}) {
+  const comparison = compareCards(leftCard, rightCard);
+  if (!comparison) return null;
+
+  const leftDescription = [leftCard.year, leftCard.setName, leftCard.tier].filter(Boolean).join(" ");
+  const rightDescription = [rightCard.year, rightCard.setName, rightCard.tier].filter(Boolean).join(" ");
+
+  return (
+    <Card className="mt-8">
+      <CardHeader>
+        <CardTitle>Card Comparison Summary</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20" data-testid="better-card-verdict">
+          <div className="flex items-center gap-2 justify-center">
+            <Trophy className="h-5 w-5 text-amber-500" />
+            <span className="font-semibold text-lg">
+              {comparison.winner === "equal" 
+                ? "These cards are equally attractive" 
+                : `${comparison.winner === "left" ? leftCard.playerName : rightCard.playerName}'s card is the better investment`}
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground text-center mt-1">
+            {comparison.reason}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 text-center mb-6">
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{leftCard.playerName}</p>
+            <p className="text-xs text-muted-foreground">{leftDescription}</p>
+            <Badge className={getVerdictColor(leftCard.outlook?.verdict?.action)}>
+              {getVerdictLabel(leftCard.outlook?.investmentCall?.verdict, leftCard.outlook?.investmentCall?.postureLabel)}
+            </Badge>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">vs</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-medium">{rightCard.playerName}</p>
+            <p className="text-xs text-muted-foreground">{rightDescription}</p>
+            <Badge className={getVerdictColor(rightCard.outlook?.verdict?.action)}>
+              {getVerdictLabel(rightCard.outlook?.investmentCall?.verdict, rightCard.outlook?.investmentCall?.postureLabel)}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <p className="text-sm font-medium text-muted-foreground">Score Breakdown</p>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-lg font-bold">{comparison.breakdown.playerScore.left}</div>
+            </div>
+            <div className="text-center text-muted-foreground">Player Outlook (50%)</div>
+            <div className="text-center">
+              <div className="text-lg font-bold">{comparison.breakdown.playerScore.right}</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-lg font-bold">{comparison.breakdown.tierScore.left}</div>
+            </div>
+            <div className="text-center text-muted-foreground">Card Tier (30%)</div>
+            <div className="text-center">
+              <div className="text-lg font-bold">{comparison.breakdown.tierScore.right}</div>
+            </div>
+
+            <div className="text-center">
+              <div className="text-lg font-bold">{comparison.breakdown.gradeScore.left}</div>
+            </div>
+            <div className="text-center text-muted-foreground">Grade (20%)</div>
+            <div className="text-center">
+              <div className="text-lg font-bold">{comparison.breakdown.gradeScore.right}</div>
+            </div>
+
+            <div className="text-center border-t pt-2">
+              <div className={`text-xl font-bold ${comparison.winner === "left" ? "text-green-600 dark:text-green-400" : ""}`}>
+                {comparison.breakdown.totalScore.left}
+              </div>
+            </div>
+            <div className="text-center text-muted-foreground border-t pt-2">Total Score</div>
+            <div className="text-center border-t pt-2">
+              <div className={`text-xl font-bold ${comparison.winner === "right" ? "text-green-600 dark:text-green-400" : ""}`}>
+                {comparison.breakdown.totalScore.right}
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ComparePage() {
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const isPro = user?.subscriptionStatus === "PRO";
+  const [activeTab, setActiveTab] = useState<string>("players");
   
   const [leftPlayer, setLeftPlayer] = useState<ComparisonPlayer>({
     name: "",
@@ -305,6 +715,28 @@ export default function ComparePage() {
   const [rightPlayer, setRightPlayer] = useState<ComparisonPlayer>({
     name: "",
     sport: "football",
+    outlook: null,
+    isLoading: false,
+  });
+
+  const [leftCard, setLeftCard] = useState<ComparisonCard>({
+    playerName: "",
+    sport: "football",
+    year: "",
+    setName: "",
+    tier: "parallel",
+    grade: "10",
+    outlook: null,
+    isLoading: false,
+  });
+
+  const [rightCard, setRightCard] = useState<ComparisonCard>({
+    playerName: "",
+    sport: "football",
+    year: "",
+    setName: "",
+    tier: "parallel",
+    grade: "10",
     outlook: null,
     isLoading: false,
   });
@@ -353,14 +785,58 @@ export default function ComparePage() {
     },
   });
 
+  const analyzeLeftCardMutation = useMutation({
+    mutationFn: async () => {
+      setLeftCard(c => ({ ...c, isLoading: true }));
+      const response = await apiRequest("POST", "/api/player-outlook", {
+        playerName: leftCard.playerName,
+        sport: leftCard.sport,
+      });
+      return response;
+    },
+    onSuccess: (data: PlayerOutlookResponse) => {
+      setLeftCard(c => ({ ...c, outlook: data, isLoading: false }));
+    },
+    onError: (error: Error) => {
+      setLeftCard(c => ({ ...c, isLoading: false }));
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to get player outlook",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const analyzeRightCardMutation = useMutation({
+    mutationFn: async () => {
+      setRightCard(c => ({ ...c, isLoading: true }));
+      const response = await apiRequest("POST", "/api/player-outlook", {
+        playerName: rightCard.playerName,
+        sport: rightCard.sport,
+      });
+      return response;
+    },
+    onSuccess: (data: PlayerOutlookResponse) => {
+      setRightCard(c => ({ ...c, outlook: data, isLoading: false }));
+    },
+    onError: (error: Error) => {
+      setRightCard(c => ({ ...c, isLoading: false }));
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to get player outlook",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!isAuthenticated) {
     return (
       <div className="container mx-auto px-4 py-8">
         <Card className="max-w-md mx-auto" data-testid="card-login-required">
           <CardHeader>
-            <CardTitle>Compare Players</CardTitle>
+            <CardTitle>Compare Players & Cards</CardTitle>
             <CardDescription>
-              Please log in to compare player outlooks side by side.
+              Please log in to compare player and card outlooks side by side.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -383,7 +859,7 @@ export default function ComparePage() {
               Pro Feature
             </CardTitle>
             <CardDescription>
-              Player comparison is available for Pro subscribers. Upgrade to compare players side by side.
+              Player and card comparison is available for Pro subscribers. Upgrade to compare investments side by side.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -399,118 +875,165 @@ export default function ComparePage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold mb-2" data-testid="heading-compare">Compare Players</h1>
+        <h1 className="text-3xl font-bold mb-2" data-testid="heading-compare">Compare Investments</h1>
         <p className="text-muted-foreground">
-          Compare two players side by side to make better investment decisions
+          Compare players or specific cards side by side to make better investment decisions
         </p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 items-stretch">
-        <PlayerComparisonCard
-          player={leftPlayer}
-          side="left"
-          onSelectPlayer={(name) => setLeftPlayer(p => ({ ...p, name, outlook: null }))}
-          onSelectSport={(sport) => setLeftPlayer(p => ({ ...p, sport, outlook: null }))}
-          onAnalyze={() => analyzeLeftMutation.mutate()}
-          isAnalyzing={analyzeLeftMutation.isPending}
-        />
-        
-        <div className="flex items-center justify-center py-4 md:py-0">
-          <div className="bg-muted rounded-full p-3">
-            <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
-          </div>
-        </div>
-        
-        <PlayerComparisonCard
-          player={rightPlayer}
-          side="right"
-          onSelectPlayer={(name) => setRightPlayer(p => ({ ...p, name, outlook: null }))}
-          onSelectSport={(sport) => setRightPlayer(p => ({ ...p, sport, outlook: null }))}
-          onAnalyze={() => analyzeRightMutation.mutate()}
-          isAnalyzing={analyzeRightMutation.isPending}
-        />
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+          <TabsTrigger value="players" className="gap-2" data-testid="tab-players">
+            <Users className="h-4 w-4" />
+            Players
+          </TabsTrigger>
+          <TabsTrigger value="cards" className="gap-2" data-testid="tab-cards">
+            <CreditCard className="h-4 w-4" />
+            Cards
+          </TabsTrigger>
+        </TabsList>
 
-      {leftPlayer.outlook && rightPlayer.outlook && (
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle>Comparison Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Better Investment Verdict */}
-            {(() => {
-              const comparison = comparePlayers(leftPlayer.outlook, rightPlayer.outlook);
-              if (!comparison.betterPlayer) return null;
-              
-              const winnerName = comparison.betterPlayer === "left" 
-                ? leftPlayer.name 
-                : comparison.betterPlayer === "right" 
-                  ? rightPlayer.name 
-                  : null;
-              
-              return (
-                <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20" data-testid="better-investment-verdict">
-                  <div className="flex items-center gap-2 justify-center">
-                    <Trophy className="h-5 w-5 text-amber-500" />
-                    <span className="font-semibold text-lg">
-                      {comparison.betterPlayer === "equal" 
-                        ? "Tie" 
-                        : `${winnerName} is the better investment`}
-                    </span>
+        <TabsContent value="players">
+          <div className="flex flex-col md:flex-row gap-4 items-stretch">
+            <PlayerComparisonCard
+              player={leftPlayer}
+              side="left"
+              onSelectPlayer={(name) => setLeftPlayer(p => ({ ...p, name, outlook: null }))}
+              onSelectSport={(sport) => setLeftPlayer(p => ({ ...p, sport, outlook: null }))}
+              onAnalyze={() => analyzeLeftMutation.mutate()}
+              isAnalyzing={analyzeLeftMutation.isPending}
+            />
+            
+            <div className="flex items-center justify-center py-4 md:py-0">
+              <div className="bg-muted rounded-full p-3">
+                <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
+              </div>
+            </div>
+            
+            <PlayerComparisonCard
+              player={rightPlayer}
+              side="right"
+              onSelectPlayer={(name) => setRightPlayer(p => ({ ...p, name, outlook: null }))}
+              onSelectSport={(sport) => setRightPlayer(p => ({ ...p, sport, outlook: null }))}
+              onAnalyze={() => analyzeRightMutation.mutate()}
+              isAnalyzing={analyzeRightMutation.isPending}
+            />
+          </div>
+
+          {leftPlayer.outlook && rightPlayer.outlook && (
+            <Card className="mt-8">
+              <CardHeader>
+                <CardTitle>Comparison Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  const comparison = comparePlayers(leftPlayer.outlook, rightPlayer.outlook);
+                  if (!comparison.betterPlayer) return null;
+                  
+                  const winnerName = comparison.betterPlayer === "left" 
+                    ? leftPlayer.name 
+                    : comparison.betterPlayer === "right" 
+                      ? rightPlayer.name 
+                      : null;
+                  
+                  return (
+                    <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20" data-testid="better-investment-verdict">
+                      <div className="flex items-center gap-2 justify-center">
+                        <Trophy className="h-5 w-5 text-amber-500" />
+                        <span className="font-semibold text-lg">
+                          {comparison.betterPlayer === "equal" 
+                            ? "Tie" 
+                            : `${winnerName} is the better investment`}
+                        </span>
+                      </div>
+                      <p className="text-sm text-muted-foreground text-center mt-1">
+                        {comparison.reason}
+                      </p>
+                    </div>
+                  );
+                })()}
+                
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{leftPlayer.name}</p>
+                    <Badge className={getVerdictColor(leftPlayer.outlook.verdict?.action)}>
+                      {getVerdictLabel(leftPlayer.outlook.investmentCall?.verdict, leftPlayer.outlook.investmentCall?.postureLabel)}
+                    </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground text-center mt-1">
-                    {comparison.reason}
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">vs</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">{rightPlayer.name}</p>
+                    <Badge className={getVerdictColor(rightPlayer.outlook.verdict?.action)}>
+                      {getVerdictLabel(rightPlayer.outlook.investmentCall?.verdict, rightPlayer.outlook.investmentCall?.postureLabel)}
+                    </Badge>
+                  </div>
                 </div>
-              );
-            })()}
+                
+                <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
+                  <div className="text-center">
+                    <Badge variant="outline" className={getTemperatureColor(leftPlayer.outlook.snapshot?.temperature)}>
+                      {leftPlayer.outlook.snapshot?.temperature}
+                    </Badge>
+                  </div>
+                  <div className="text-center text-muted-foreground">Temperature</div>
+                  <div className="text-center">
+                    <Badge variant="outline" className={getTemperatureColor(rightPlayer.outlook.snapshot?.temperature)}>
+                      {rightPlayer.outlook.snapshot?.temperature}
+                    </Badge>
+                  </div>
+                  
+                  <div className="text-center">{leftPlayer.outlook.snapshot?.volatility}</div>
+                  <div className="text-center text-muted-foreground">Volatility</div>
+                  <div className="text-center">{rightPlayer.outlook.snapshot?.volatility}</div>
+                  
+                  <div className="text-center">{leftPlayer.outlook.snapshot?.risk}</div>
+                  <div className="text-center text-muted-foreground">Risk</div>
+                  <div className="text-center">{rightPlayer.outlook.snapshot?.risk}</div>
+                  
+                  <div className="text-center">{leftPlayer.outlook.snapshot?.horizon}</div>
+                  <div className="text-center text-muted-foreground">Horizon</div>
+                  <div className="text-center">{rightPlayer.outlook.snapshot?.horizon}</div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="cards">
+          <p className="text-xs text-muted-foreground text-center mb-6">
+            Compares player outlook (50%) + card tier (30%) + grade (20%) to determine the better investment
+          </p>
+          <div className="flex flex-col md:flex-row gap-4 items-stretch">
+            <CardComparisonInput
+              card={leftCard}
+              side="left"
+              onUpdate={(updates) => setLeftCard(c => ({ ...c, ...updates }))}
+              onAnalyze={() => analyzeLeftCardMutation.mutate()}
+              isAnalyzing={analyzeLeftCardMutation.isPending}
+            />
             
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{leftPlayer.name}</p>
-                <Badge className={getVerdictColor(leftPlayer.outlook.verdict?.action)}>
-                  {getVerdictLabel(leftPlayer.outlook.investmentCall?.verdict, leftPlayer.outlook.investmentCall?.postureLabel)}
-                </Badge>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">vs</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-sm font-medium">{rightPlayer.name}</p>
-                <Badge className={getVerdictColor(rightPlayer.outlook.verdict?.action)}>
-                  {getVerdictLabel(rightPlayer.outlook.investmentCall?.verdict, rightPlayer.outlook.investmentCall?.postureLabel)}
-                </Badge>
+            <div className="flex items-center justify-center py-4 md:py-0">
+              <div className="bg-muted rounded-full p-3">
+                <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
               </div>
             </div>
             
-            <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
-              <div className="text-center">
-                <Badge variant="outline" className={getTemperatureColor(leftPlayer.outlook.snapshot?.temperature)}>
-                  {leftPlayer.outlook.snapshot?.temperature}
-                </Badge>
-              </div>
-              <div className="text-center text-muted-foreground">Temperature</div>
-              <div className="text-center">
-                <Badge variant="outline" className={getTemperatureColor(rightPlayer.outlook.snapshot?.temperature)}>
-                  {rightPlayer.outlook.snapshot?.temperature}
-                </Badge>
-              </div>
-              
-              <div className="text-center">{leftPlayer.outlook.snapshot?.volatility}</div>
-              <div className="text-center text-muted-foreground">Volatility</div>
-              <div className="text-center">{rightPlayer.outlook.snapshot?.volatility}</div>
-              
-              <div className="text-center">{leftPlayer.outlook.snapshot?.risk}</div>
-              <div className="text-center text-muted-foreground">Risk</div>
-              <div className="text-center">{rightPlayer.outlook.snapshot?.risk}</div>
-              
-              <div className="text-center">{leftPlayer.outlook.snapshot?.horizon}</div>
-              <div className="text-center text-muted-foreground">Horizon</div>
-              <div className="text-center">{rightPlayer.outlook.snapshot?.horizon}</div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            <CardComparisonInput
+              card={rightCard}
+              side="right"
+              onUpdate={(updates) => setRightCard(c => ({ ...c, ...updates }))}
+              onAnalyze={() => analyzeRightCardMutation.mutate()}
+              isAnalyzing={analyzeRightCardMutation.isPending}
+            />
+          </div>
+
+          {leftCard.outlook && rightCard.outlook && (
+            <CardComparisonSummary leftCard={leftCard} rightCard={rightCard} />
+          )}
+        </TabsContent>
+      </Tabs>
 
       <p className="text-xs text-muted-foreground text-center mt-8">
         Not financial advice. Do your own research before acting.
