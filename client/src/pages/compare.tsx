@@ -27,6 +27,8 @@ import {
   Trophy,
   Users,
   CreditCard,
+  Lightbulb,
+  BookOpen,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +37,29 @@ import type {
   MarketTemperature, 
   PlayerVerdict 
 } from "@shared/schema";
+
+interface ComparisonNarrative {
+  caseForPlayer1: {
+    title: string;
+    strategy: string;
+    summary: string;
+    points: string[];
+  };
+  caseForPlayer2: {
+    title: string;
+    strategy: string;
+    summary: string;
+    points: string[];
+  };
+  myTake: {
+    agreement: boolean;
+    winner: string;
+    reasoning: string;
+    valueInvestorPick: string;
+    blueChipPick: string;
+    bottomLine: string;
+  };
+}
 
 const SPORTS = [
   { value: "football", label: "Football (NFL)" },
@@ -740,6 +765,9 @@ export default function ComparePage() {
     outlook: null,
     isLoading: false,
   });
+  
+  const [narrative, setNarrative] = useState<ComparisonNarrative | null>(null);
+  const [isLoadingNarrative, setIsLoadingNarrative] = useState(false);
 
   const analyzeLeftMutation = useMutation({
     mutationFn: async () => {
@@ -828,6 +856,37 @@ export default function ComparePage() {
       });
     },
   });
+  
+  const fetchNarrativeMutation = useMutation({
+    mutationFn: async () => {
+      setIsLoadingNarrative(true);
+      const response = await apiRequest("POST", "/api/compare-players/narrative", {
+        player1: {
+          name: leftPlayer.name,
+          sport: leftPlayer.sport,
+          outlook: leftPlayer.outlook,
+        },
+        player2: {
+          name: rightPlayer.name,
+          sport: rightPlayer.sport,
+          outlook: rightPlayer.outlook,
+        },
+      });
+      return response as ComparisonNarrative;
+    },
+    onSuccess: (data: ComparisonNarrative) => {
+      setNarrative(data);
+      setIsLoadingNarrative(false);
+    },
+    onError: (error: Error) => {
+      setIsLoadingNarrative(false);
+      toast({
+        title: "Analysis Failed",
+        description: error.message || "Failed to generate comparison narrative",
+        variant: "destructive",
+      });
+    },
+  });
 
   if (!isAuthenticated) {
     return (
@@ -898,8 +957,8 @@ export default function ComparePage() {
             <PlayerComparisonCard
               player={leftPlayer}
               side="left"
-              onSelectPlayer={(name) => setLeftPlayer(p => ({ ...p, name, outlook: null }))}
-              onSelectSport={(sport) => setLeftPlayer(p => ({ ...p, sport, outlook: null }))}
+              onSelectPlayer={(name) => { setLeftPlayer(p => ({ ...p, name, outlook: null })); setNarrative(null); }}
+              onSelectSport={(sport) => { setLeftPlayer(p => ({ ...p, sport, outlook: null })); setNarrative(null); }}
               onAnalyze={() => analyzeLeftMutation.mutate()}
               isAnalyzing={analyzeLeftMutation.isPending}
             />
@@ -913,8 +972,8 @@ export default function ComparePage() {
             <PlayerComparisonCard
               player={rightPlayer}
               side="right"
-              onSelectPlayer={(name) => setRightPlayer(p => ({ ...p, name, outlook: null }))}
-              onSelectSport={(sport) => setRightPlayer(p => ({ ...p, sport, outlook: null }))}
+              onSelectPlayer={(name) => { setRightPlayer(p => ({ ...p, name, outlook: null })); setNarrative(null); }}
+              onSelectSport={(sport) => { setRightPlayer(p => ({ ...p, sport, outlook: null })); setNarrative(null); }}
               onAnalyze={() => analyzeRightMutation.mutate()}
               isAnalyzing={analyzeRightMutation.isPending}
             />
@@ -996,8 +1055,114 @@ export default function ComparePage() {
                   <div className="text-center text-muted-foreground">Horizon</div>
                   <div className="text-center">{rightPlayer.outlook.snapshot?.horizon}</div>
                 </div>
+                
+                {!narrative && (
+                  <div className="mt-6 text-center">
+                    <Button 
+                      onClick={() => fetchNarrativeMutation.mutate()}
+                      disabled={isLoadingNarrative}
+                      variant="outline"
+                      className="gap-2"
+                      data-testid="button-deep-analysis"
+                    >
+                      {isLoadingNarrative ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating Deep Analysis...
+                        </>
+                      ) : (
+                        <>
+                          <Lightbulb className="h-4 w-4" />
+                          Get Deep Analysis
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      AI-powered investment comparison with "The Case For" each player
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
+          )}
+          
+          {narrative && leftPlayer.outlook && rightPlayer.outlook && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <Card className="bg-muted/20" data-testid="card-case-player1">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="text-lg" data-testid="text-case-title-player1">{narrative.caseForPlayer1.title}</CardTitle>
+                      <Badge variant="outline" className="text-xs" data-testid="badge-strategy-player1">
+                        {narrative.caseForPlayer1.strategy}
+                      </Badge>
+                    </div>
+                    <CardDescription data-testid="text-case-summary-player1">{narrative.caseForPlayer1.summary}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2" data-testid="list-case-points-player1">
+                      {narrative.caseForPlayer1.points.map((point, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <span className="text-muted-foreground font-bold mt-0.5">•</span>
+                          <span className="text-muted-foreground">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-amber-500/5 dark:bg-amber-500/10" data-testid="card-case-player2">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <CardTitle className="text-lg" data-testid="text-case-title-player2">{narrative.caseForPlayer2.title}</CardTitle>
+                      <Badge variant="outline" className="text-xs" data-testid="badge-strategy-player2">
+                        {narrative.caseForPlayer2.strategy}
+                      </Badge>
+                    </div>
+                    <CardDescription data-testid="text-case-summary-player2">{narrative.caseForPlayer2.summary}</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2" data-testid="list-case-points-player2">
+                      {narrative.caseForPlayer2.points.map((point, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <span className="text-amber-600 dark:text-amber-400 font-bold mt-0.5">•</span>
+                          <span className="text-muted-foreground">{point}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              <Card className="mt-6 bg-muted/30" data-testid="card-my-take">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BookOpen className="h-5 w-5" />
+                    My Take
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm" data-testid="text-mytake-reasoning">{narrative.myTake.reasoning}</p>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="p-3 rounded-lg bg-background border" data-testid="card-value-investor-pick">
+                      <p className="text-xs text-muted-foreground mb-1">Value Investor Pick</p>
+                      <p className="font-medium" data-testid="text-value-investor-pick">{narrative.myTake.valueInvestorPick}</p>
+                    </div>
+                    <div className="p-3 rounded-lg bg-background border" data-testid="card-bluechip-pick">
+                      <p className="text-xs text-muted-foreground mb-1">Blue Chip Pick</p>
+                      <p className="font-medium" data-testid="text-bluechip-pick">{narrative.myTake.blueChipPick}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 rounded-lg bg-muted/50 border" data-testid="card-bottom-line">
+                    <p className="text-sm font-medium text-center" data-testid="text-bottom-line">
+                      {narrative.myTake.bottomLine}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
