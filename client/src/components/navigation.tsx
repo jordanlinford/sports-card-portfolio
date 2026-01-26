@@ -56,7 +56,8 @@ import {
   LineChart,
   Package,
   Newspaper,
-  Menu
+  Menu,
+  GitCompareArrows
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -246,7 +247,7 @@ export function Navigation() {
                     size="sm" 
                     className={cn(
                       "gap-1",
-                      isActiveSection(["/player-outlook", "/watchlist"]) && "bg-accent"
+                      isActiveSection(["/player-outlook", "/watchlist", "/compare"]) && "bg-accent"
                     )}
                     data-testid="nav-players"
                   >
@@ -264,6 +265,13 @@ export function Navigation() {
                     <Link href="/player-outlook" className="flex items-center gap-2 cursor-pointer">
                       <TrendingUp className="h-4 w-4" />
                       Player Analysis
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/compare" className="flex items-center gap-2 cursor-pointer" data-testid="nav-compare">
+                      <GitCompareArrows className="h-4 w-4" />
+                      Compare Players
+                      <Badge variant="secondary" className="ml-auto text-xs">Pro</Badge>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -580,6 +588,13 @@ export function Navigation() {
                     <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/player-outlook") && "bg-accent")}>
                       <TrendingUp className="h-4 w-4" />
                       Player Analysis
+                    </Button>
+                  </Link>
+                  <Link href="/compare" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/compare") && "bg-accent")} data-testid="nav-compare-mobile">
+                      <GitCompareArrows className="h-4 w-4" />
+                      Compare Players
+                      <Badge variant="secondary" className="ml-auto text-xs">Pro</Badge>
                     </Button>
                   </Link>
                   <Link href="/watchlist" onClick={() => setMobileMenuOpen(false)}>
