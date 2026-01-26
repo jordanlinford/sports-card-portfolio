@@ -2063,17 +2063,15 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   // Compute base confidence
   let confidence = computeConfidence(scores);
   
-  // Confidence capping rules (CRITICAL: enforce at the end, no overrides after this)
-  // If comps are not reliable (modeled or missing) → MUST be LOW
-  // Only allow MEDIUM/HIGH with reliable (live) comps
-  if (!compsReliable) {
-    // No reliable comps = LOW confidence, period
-    confidence = "LOW";
-  }
-  // lowMeta also forces LOW even with reliable comps (can't trust data)
+  // Confidence capping rules
+  // Note: eBay comps are ancillary - Gemini handles confidence assessment
+  // Only force LOW for truly problematic data scenarios
   if (lowMeta) {
+    // lowMeta = true unknown player or truly sparse data - force LOW
     confidence = "LOW";
   }
+  // Add a note if comps are modeled rather than live (but don't force LOW)
+  // The Gemini-provided confidence assessment takes precedence
   
   // Check for explicit player overrides (canonical test expectations)
   let overrideApplied = false;
