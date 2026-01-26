@@ -456,15 +456,15 @@ function ComparisonVerdict({
       <div className="mt-4 space-y-2">
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Upside</span>
-          <span className="font-medium text-green-600 dark:text-green-400">{card.signals.upside}/10</span>
+          <span className="font-medium text-green-600 dark:text-green-400">{(card.signals.upside / 10).toFixed(1)}/10</span>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Downside Risk</span>
-          <span className="font-medium text-red-600 dark:text-red-400">{card.signals.downsideRisk}/10</span>
+          <span className="font-medium text-red-600 dark:text-red-400">{(card.signals.downsideRisk / 10).toFixed(1)}/10</span>
         </div>
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Market Friction</span>
-          <span className="font-medium">{card.signals.marketFriction}/10</span>
+          <span className="font-medium">{(card.signals.marketFriction / 10).toFixed(1)}/10</span>
         </div>
       </div>
       
@@ -474,6 +474,52 @@ function ComparisonVerdict({
       </p>
     </div>
   );
+  
+  // Generate explanation for why one card is the better pick
+  const getComparisonExplanation = () => {
+    if (winner === "tie") {
+      return "Both cards have similar investment profiles with comparable action recommendations and market signals.";
+    }
+    
+    const better = winnerCard!;
+    const other = winner === "left" ? rightCard : leftCard;
+    
+    const reasons: string[] = [];
+    
+    // Compare actions
+    const actionRank: Record<string, number> = {
+      "BUY": 6, "MONITOR": 5, "LONG_HOLD": 4, "LEGACY_HOLD": 3, "SELL": 2, "LITTLE_VALUE": 1
+    };
+    
+    if (actionRank[better.action] > actionRank[other.action]) {
+      reasons.push(`${better.tempCard.title} has a stronger "${getActionLabel(better.action)}" recommendation vs "${getActionLabel(other.action)}"`);
+    }
+    
+    // Compare upside
+    if (better.signals.upside > other.signals.upside + 10) {
+      reasons.push("higher upside potential");
+    }
+    
+    // Compare downside risk
+    if (better.signals.downsideRisk < other.signals.downsideRisk - 10) {
+      reasons.push("lower downside risk");
+    }
+    
+    // Compare market friction
+    if (better.signals.marketFriction < other.signals.marketFriction - 10) {
+      reasons.push("better market liquidity");
+    }
+    
+    if (reasons.length === 0) {
+      return `${better.tempCard.title} edges out with slightly better overall investment metrics.`;
+    }
+    
+    if (reasons.length === 1) {
+      return reasons[0] + ".";
+    }
+    
+    return reasons[0] + ", with " + reasons.slice(1).join(" and ") + ".";
+  };
 
   return (
     <div className="space-y-6">
@@ -483,7 +529,8 @@ function ComparisonVerdict({
           <TrendingUp className="h-5 w-5 text-primary" />
           <h3 className="font-semibold">Investment Recommendation</h3>
         </div>
-        <p className="text-sm">{getVerdictMessage()}</p>
+        <p className="text-sm font-medium">{getVerdictMessage()}</p>
+        <p className="text-sm text-muted-foreground mt-1">{getComparisonExplanation()}</p>
       </div>
       
       {/* Side by Side Cards */}
@@ -2234,7 +2281,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       onClick={() => {
                         // Store current result as first card and enter comparison mode
                         setFirstCardResult(result);
-                        setFirstCardPreviewUrl(previewUrl);
+                        // Capture whichever image URL is available (could be from scan or manual upload)
+                        setFirstCardPreviewUrl(previewUrl || scanPreviewUrl || result.tempCard.imagePath || null);
                         setComparisonMode(true);
                         // Reset all form state for second card entry
                         setTitle("");
