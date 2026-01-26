@@ -39,6 +39,8 @@ import {
   Info,
   Camera,
   Check,
+  GitCompareArrows,
+  ArrowLeftRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
@@ -350,6 +352,153 @@ type CardScanResult = {
   };
 };
 
+// Comparison Verdict Component - shows side-by-side analysis with recommendation
+function ComparisonVerdict({ 
+  leftCard, 
+  rightCard, 
+  leftImageUrl, 
+  rightImageUrl 
+}: { 
+  leftCard: QuickAnalyzeResult; 
+  rightCard: QuickAnalyzeResult;
+  leftImageUrl: string | null;
+  rightImageUrl: string | null;
+}) {
+  // Calculate investment scores - action is primary, signals are tiebreaker
+  const calculateScore = (card: QuickAnalyzeResult): number => {
+    // Action rank (0-100 scale) - primary differentiator
+    const actionScore = 
+      card.action === "BUY" ? 100 :
+      card.action === "MONITOR" ? 70 :
+      card.action === "LONG_HOLD" ? 60 :
+      card.action === "LEGACY_HOLD" ? 50 :
+      card.action === "SELL" ? 20 :
+      card.action === "LITTLE_VALUE" ? 10 : 50;
+    
+    // Signal adjustment (0-10 scale) - secondary tiebreaker
+    // Higher upside is good, higher downside/friction is bad
+    const signalAdjustment = (
+      (card.signals.upside * 0.5) - 
+      (card.signals.downsideRisk * 0.3) - 
+      (card.signals.marketFriction * 0.2)
+    );
+    
+    // Combine: action dominates (90%) + signals break ties (10%)
+    return Math.round((actionScore * 0.9) + (signalAdjustment * 1.0));
+  };
+  
+  const leftScore = calculateScore(leftCard);
+  const rightScore = calculateScore(rightCard);
+  
+  const winner = leftScore > rightScore ? "left" : rightScore > leftScore ? "right" : "tie";
+  const winnerCard = winner === "left" ? leftCard : winner === "right" ? rightCard : null;
+  
+  const getVerdictMessage = () => {
+    if (winner === "tie") {
+      return "Both cards present similar investment opportunities";
+    }
+    const card = winnerCard!;
+    return `${card.tempCard.title} appears to be the stronger investment choice`;
+  };
+
+  const renderCardSummary = (card: QuickAnalyzeResult, imageUrl: string | null, isWinner: boolean) => (
+    <div className={`flex-1 p-4 rounded-lg border ${isWinner ? "border-green-500/50 bg-green-500/5" : "border-muted"}`}>
+      <div className="flex items-start gap-3 mb-4">
+        {imageUrl && (
+          <img 
+            src={imageUrl} 
+            alt={card.tempCard.title}
+            className="w-16 h-22 object-contain rounded-md border"
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="font-semibold truncate">{card.tempCard.title}</h4>
+            {isWinner && winner !== "tie" && (
+              <Badge className="bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30">
+                Better Pick
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {[card.tempCard.year, card.tempCard.set, card.tempCard.variation].filter(Boolean).join(" • ")}
+          </p>
+          {card.tempCard.grade && (
+            <p className="text-sm text-muted-foreground">
+              {card.tempCard.grader === "raw" ? "Raw" : `${card.tempCard.grader || ""} ${card.tempCard.grade}`.trim()}
+            </p>
+          )}
+        </div>
+      </div>
+      
+      {/* Price */}
+      {card.market.value && (
+        <div className="mb-3">
+          <p className="text-2xl font-bold">${card.market.value.toLocaleString()}</p>
+          {card.market.min && card.market.max && (
+            <p className="text-xs text-muted-foreground">
+              Range: ${card.market.min.toLocaleString()} - ${card.market.max.toLocaleString()}
+            </p>
+          )}
+        </div>
+      )}
+      
+      {/* Action Badge */}
+      <Badge className={getActionColor(card.action)}>
+        {getActionIcon(card.action)}
+        <span className="ml-1">{getActionLabel(card.action)}</span>
+      </Badge>
+      
+      {/* Signals */}
+      <div className="mt-4 space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Upside</span>
+          <span className="font-medium text-green-600 dark:text-green-400">{card.signals.upside}/10</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Downside Risk</span>
+          <span className="font-medium text-red-600 dark:text-red-400">{card.signals.downsideRisk}/10</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Market Friction</span>
+          <span className="font-medium">{card.signals.marketFriction}/10</span>
+        </div>
+      </div>
+      
+      {/* Short explanation */}
+      <p className="mt-4 text-sm text-muted-foreground">
+        {card.explanation.short}
+      </p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Verdict Banner */}
+      <div className={`p-4 rounded-lg ${winner === "tie" ? "bg-blue-500/10 border-blue-500/20" : "bg-green-500/10 border-green-500/20"} border`}>
+        <div className="flex items-center gap-2 mb-2">
+          <TrendingUp className="h-5 w-5 text-primary" />
+          <h3 className="font-semibold">Investment Recommendation</h3>
+        </div>
+        <p className="text-sm">{getVerdictMessage()}</p>
+      </div>
+      
+      {/* Side by Side Cards */}
+      <div className="flex flex-col md:flex-row gap-4">
+        {renderCardSummary(leftCard, leftImageUrl, winner === "left")}
+        
+        <div className="flex items-center justify-center py-4 md:py-0">
+          <div className="bg-muted rounded-full p-3">
+            <ArrowLeftRight className="h-6 w-6 text-muted-foreground" />
+          </div>
+        </div>
+        
+        {renderCardSummary(rightCard, rightImageUrl, winner === "right")}
+      </div>
+    </div>
+  );
+}
+
 function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; userCases: DisplayCase[] }) {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
@@ -394,6 +543,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   
   // Success animation state
   const [showAnalysisSuccess, setShowAnalysisSuccess] = useState(false);
+  
+  // Comparison mode state
+  const [comparisonMode, setComparisonMode] = useState(false);
+  const [firstCardResult, setFirstCardResult] = useState<QuickAnalyzeResult | null>(null);
+  const [firstCardPreviewUrl, setFirstCardPreviewUrl] = useState<string | null>(null);
   
   // Recent searches state
   const RECENT_SEARCHES_KEY = "sports-card-recent-searches";
@@ -923,6 +1077,10 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setScanIdentifyResult(null);
     setIsConfirmed(false);
     setAnalysisInvalidated(false);
+    // Reset comparison state
+    setComparisonMode(false);
+    setFirstCardResult(null);
+    setFirstCardPreviewUrl(null);
   };
 
   const compressImage = (file: File, maxWidth = 1200, quality = 0.8): Promise<{ blob: Blob; base64: string }> => {
@@ -2068,6 +2226,41 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       <Search className="h-4 w-4 mr-2" />
                       Check Another
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        // Store current result as first card and enter comparison mode
+                        setFirstCardResult(result);
+                        setFirstCardPreviewUrl(previewUrl);
+                        setComparisonMode(true);
+                        // Reset all form state for second card entry
+                        setTitle("");
+                        setYear("");
+                        setSet("");
+                        setCardNumber("");
+                        setVariation("");
+                        setGrade("");
+                        setGrader("");
+                        setImagePath(null);
+                        setPreviewUrl(null);
+                        setResult(null);
+                        setScanIdentifyResult(null);
+                        setIsConfirmed(false);
+                        setScanResult(null);
+                        setScanPreviewUrl(null);
+                        setInputMode("manual");
+                        // Stop any ongoing polling
+                        if (pollIntervalRef.current) {
+                          clearInterval(pollIntervalRef.current);
+                          pollIntervalRef.current = null;
+                        }
+                        setIsPollingComps(false);
+                      }}
+                      data-testid="button-compare-card"
+                    >
+                      <GitCompareArrows className="h-4 w-4 mr-2" />
+                      Compare to Another
+                    </Button>
                   </div>
                 </DialogHeader>
                 
@@ -2119,6 +2312,63 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
 
               </DialogContent>
             </Dialog>
+          ) : null}
+          
+          {/* Comparison View - Shows when comparing two cards */}
+          {comparisonMode && firstCardResult && result ? (
+            <Dialog open={true} onOpenChange={() => { setComparisonMode(false); resetForm(); }}>
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <GitCompareArrows className="h-5 w-5 text-primary" />
+                    Card Comparison
+                  </DialogTitle>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      onClick={() => { setComparisonMode(false); resetForm(); }}
+                      data-testid="button-new-comparison"
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      New Analysis
+                    </Button>
+                  </div>
+                </DialogHeader>
+                
+                {/* Comparison Verdict */}
+                <ComparisonVerdict
+                  leftCard={firstCardResult}
+                  rightCard={result}
+                  leftImageUrl={firstCardPreviewUrl}
+                  rightImageUrl={previewUrl}
+                />
+              </DialogContent>
+            </Dialog>
+          ) : null}
+          
+          {/* Comparison Mode - Entering second card */}
+          {comparisonMode && firstCardResult && !result && !analyzeMutation.isPending ? (
+            <div className="border rounded-lg p-4 bg-muted/30">
+              <div className="flex items-center gap-2 mb-4">
+                <GitCompareArrows className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold">Comparing to: {firstCardResult.tempCard.title}</h3>
+                <Badge variant="secondary" className={getActionColor(firstCardResult.action)}>
+                  {getActionLabel(firstCardResult.action)}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => { setComparisonMode(false); setFirstCardResult(null); setFirstCardPreviewUrl(null); }}
+                  className="ml-auto"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Cancel
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Enter the second card details below to compare investments
+              </p>
+            </div>
           ) : null}
         </CardContent>
       )}
