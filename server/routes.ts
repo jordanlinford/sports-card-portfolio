@@ -3628,6 +3628,104 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // Generate comparison narrative for two players (Pro feature)
+  app.post("/api/compare-players/narrative", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const isPro = user?.subscriptionStatus === "PRO";
+      
+      if (!isPro) {
+        return res.status(403).json({ message: "Pro subscription required" });
+      }
+      
+      const { player1, player2 } = req.body;
+      
+      if (!player1?.name || !player2?.name || !player1?.outlook || !player2?.outlook) {
+        return res.status(400).json({ message: "Both players with outlook data required" });
+      }
+      
+      const { GoogleGenAI } = await import("@google/genai");
+      const gemini = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+      
+      const prompt = `You are a sports card investment analyst comparing two players for collecting/investment purposes.
+
+Player 1: ${player1.name}
+- Sport: ${player1.sport}
+- Position: ${player1.outlook?.player?.position || "Unknown"}
+- Team: ${player1.outlook?.player?.team || "Unknown"}
+- Career Stage: ${player1.outlook?.player?.stage || "Unknown"}
+- Verdict: ${player1.outlook?.investmentCall?.verdict || "Unknown"}
+- Temperature: ${player1.outlook?.snapshot?.temperature || "Unknown"}
+- Volatility: ${player1.outlook?.snapshot?.volatility || "Unknown"}
+- Risk: ${player1.outlook?.snapshot?.risk || "Unknown"}
+- Key Points: ${(player1.outlook?.thesis || []).slice(0, 3).join("; ")}
+
+Player 2: ${player2.name}
+- Sport: ${player2.sport}
+- Position: ${player2.outlook?.player?.position || "Unknown"}
+- Team: ${player2.outlook?.player?.team || "Unknown"}
+- Career Stage: ${player2.outlook?.player?.stage || "Unknown"}
+- Verdict: ${player2.outlook?.investmentCall?.verdict || "Unknown"}
+- Temperature: ${player2.outlook?.snapshot?.temperature || "Unknown"}
+- Volatility: ${player2.outlook?.snapshot?.volatility || "Unknown"}
+- Risk: ${player2.outlook?.snapshot?.risk || "Unknown"}
+- Key Points: ${(player2.outlook?.thesis || []).slice(0, 3).join("; ")}
+
+Generate an investment comparison analysis. Return ONLY a valid JSON object (no markdown, no code fences):
+
+{
+  "caseForPlayer1": {
+    "title": "The Case for [Player1 Name]",
+    "strategy": "Value Investor" | "Blue Chip" | "Speculative" | "Momentum",
+    "summary": "One compelling sentence explaining why someone would choose this player",
+    "points": ["Point 1 about performance/narrative", "Point 2 about market dynamics", "Point 3 about value proposition"]
+  },
+  "caseForPlayer2": {
+    "title": "The Case for [Player2 Name]",
+    "strategy": "Value Investor" | "Blue Chip" | "Speculative" | "Momentum",
+    "summary": "One compelling sentence explaining why someone would choose this player",
+    "points": ["Point 1 about performance/narrative", "Point 2 about market dynamics", "Point 3 about value proposition"]
+  },
+  "myTake": {
+    "agreement": true | false,
+    "winner": "${player1.name}" | "${player2.name}" | "tie",
+    "reasoning": "2-3 sentence nuanced analysis of the comparison that acknowledges both sides",
+    "valueInvestorPick": "${player1.name}" | "${player2.name}",
+    "blueChipPick": "${player1.name}" | "${player2.name}",
+    "bottomLine": "Short actionable summary like 'Buy X if you want Y, Hold Z if you believe W'"
+  }
+}
+
+Focus on current market dynamics, career trajectory, and card market narratives. Be specific about what type of collector each player appeals to.`;
+
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      });
+      
+      let responseText = response.text || "";
+      
+      // Strip markdown code fences if present
+      responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+      
+      // Extract JSON
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return res.json(parsed);
+      }
+      
+      res.status(500).json({ message: "Failed to generate comparison narrative" });
+    } catch (error) {
+      console.error("Error generating comparison narrative:", error);
+      res.status(500).json({ message: "Failed to generate comparison narrative" });
+    }
+  });
+
   // Get user's cards for a specific player (portfolio context)
   app.get("/api/portfolio/player-cards/:playerName", isAuthenticated, async (req: any, res) => {
     try {
