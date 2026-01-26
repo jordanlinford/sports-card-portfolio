@@ -270,7 +270,7 @@ export function Navigation() {
                   <DropdownMenuItem asChild>
                     <Link href="/compare" className="flex items-center gap-2 cursor-pointer" data-testid="nav-compare">
                       <GitCompareArrows className="h-4 w-4" />
-                      Compare Players
+                      Compare
                       <Badge variant="secondary" className="ml-auto text-xs">Pro</Badge>
                     </Link>
                   </DropdownMenuItem>
@@ -593,7 +593,7 @@ export function Navigation() {
                   <Link href="/compare" onClick={() => setMobileMenuOpen(false)}>
                     <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/compare") && "bg-accent")} data-testid="nav-compare-mobile">
                       <GitCompareArrows className="h-4 w-4" />
-                      Compare Players
+                      Compare
                       <Badge variant="secondary" className="ml-auto text-xs">Pro</Badge>
                     </Button>
                   </Link>
