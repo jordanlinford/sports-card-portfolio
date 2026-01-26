@@ -2064,18 +2064,16 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     }
   }
   
-  // Compute base confidence
-  let confidence = computeConfidence(scores);
+  // Use Gemini's confidence assessment as the primary source
+  // Gemini has access to news, player context, and market data - trust its judgment
+  // Only override for truly problematic data scenarios (lowMeta = unknown player)
+  let confidence: DataConfidence = input.confidence || computeConfidence(scores);
   
-  // Confidence capping rules
-  // Note: eBay comps are ancillary - Gemini handles confidence assessment
-  // Only force LOW for truly problematic data scenarios
+  // lowMeta only applies to active players with genuinely missing data (not retired legends)
   if (lowMeta) {
-    // lowMeta = true unknown player or truly sparse data - force LOW
+    // lowMeta = truly unknown player with no identifiable team/position - force LOW
     confidence = "LOW";
   }
-  // Add a note if comps are modeled rather than live (but don't force LOW)
-  // The Gemini-provided confidence assessment takes precedence
   
   // Check for explicit player overrides (canonical test expectations)
   let overrideApplied = false;
