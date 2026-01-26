@@ -3649,7 +3649,8 @@ Sitemap: ${origin}/sitemap.xml
       const gemini = new GoogleGenAI({
         apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
         httpOptions: {
-          baseUrl: "https://gateway.ai.cloudflare.com/v1/b7e485f65be4e2be5be9a21d72c185be/ai-integrations/google-ai-studio",
+          apiVersion: "",
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
         },
       });
       
