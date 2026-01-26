@@ -2391,7 +2391,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   leftCard={firstCardResult}
                   rightCard={result}
                   leftImageUrl={firstCardPreviewUrl}
-                  rightImageUrl={previewUrl}
+                  rightImageUrl={previewUrl || scanPreviewUrl || result.tempCard.imagePath || null}
                 />
               </DialogContent>
             </Dialog>
