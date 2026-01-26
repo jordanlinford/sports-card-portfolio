@@ -81,14 +81,14 @@
   "screenshots": [
     {
       "src": "/screenshots/screenshot-wide.png",
-      "sizes": "1456x816",
+      "sizes": "1408x768",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Sports Card Portfolio Dashboard"
     },
     {
       "src": "/screenshots/screenshot-narrow.png",
-      "sizes": "816x1456",
+      "sizes": "768x1408",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Mobile Collection View"
