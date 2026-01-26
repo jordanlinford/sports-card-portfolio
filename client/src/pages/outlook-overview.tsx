@@ -403,32 +403,35 @@ function ComparisonVerdict({
 
   const renderCardSummary = (card: QuickAnalyzeResult, imageUrl: string | null, isWinner: boolean) => (
     <div className={`flex-1 p-4 rounded-lg border ${isWinner ? "border-green-500/50 bg-green-500/5" : "border-muted"}`}>
-      <div className="flex items-start gap-3 mb-4">
-        {imageUrl && (
+      {/* Card Image - prominent display */}
+      {imageUrl && (
+        <div className="mb-4 flex justify-center">
           <img 
             src={imageUrl} 
             alt={card.tempCard.title}
-            className="w-16 h-22 object-contain rounded-md border"
+            className="w-24 h-32 object-contain rounded-lg border shadow-sm"
           />
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="font-semibold truncate">{card.tempCard.title}</h4>
-            {isWinner && winner !== "tie" && (
-              <Badge className="bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30">
-                Better Pick
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {[card.tempCard.year, card.tempCard.set, card.tempCard.variation].filter(Boolean).join(" • ")}
-          </p>
-          {card.tempCard.grade && (
-            <p className="text-sm text-muted-foreground">
-              {card.tempCard.grader === "raw" ? "Raw" : `${card.tempCard.grader || ""} ${card.tempCard.grade}`.trim()}
-            </p>
+        </div>
+      )}
+      
+      {/* Card Info */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 flex-wrap justify-center">
+          <h4 className="font-semibold text-center">{card.tempCard.title}</h4>
+          {isWinner && winner !== "tie" && (
+            <Badge className="bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30">
+              Better Pick
+            </Badge>
           )}
         </div>
+        <p className="text-sm text-muted-foreground text-center">
+          {[card.tempCard.year, card.tempCard.set, card.tempCard.variation].filter(Boolean).join(" • ")}
+        </p>
+        {card.tempCard.grade && (
+          <p className="text-sm text-muted-foreground text-center">
+            {card.tempCard.grader === "raw" ? "Raw" : `${card.tempCard.grader || ""} ${card.tempCard.grade}`.trim()}
+          </p>
+        )}
       </div>
       
       {/* Price */}
