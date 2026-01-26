@@ -138,8 +138,38 @@ export type GeminiMarketData = {
   searchQuery: string;
 };
 
+// 24-hour cache for Gemini market data to ensure consistent pricing
+interface GeminiMarketCache {
+  data: GeminiMarketData;
+  cachedAt: number;
+}
+const geminiMarketCache = new Map<string, GeminiMarketCache>();
+const GEMINI_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Generate cache key from card attributes
+function getGeminiCacheKey(card: {
+  title: string;
+  playerName?: string | null;
+  year?: number | null;
+  set?: string | null;
+  variation?: string | null;
+  grade?: string | null;
+  grader?: string | null;
+}): string {
+  const parts = [
+    card.title.toLowerCase().trim(),
+    card.year?.toString() || "",
+    (card.set || "").toLowerCase().trim(),
+    (card.variation || "").toLowerCase().trim(),
+    (card.grade || "").toLowerCase().trim(),
+    (card.grader || "").toLowerCase().trim(),
+  ];
+  return parts.join("|");
+}
+
 // Fetch real eBay market data using Gemini with Google Search grounding
 // This leverages Gemini's ability to search eBay and extract structured data
+// Results are cached for 24 hours to ensure consistent pricing
 export async function fetchGeminiMarketData(card: {
   title: string;
   playerName?: string | null;
@@ -149,6 +179,14 @@ export async function fetchGeminiMarketData(card: {
   grade?: string | null;
   grader?: string | null;
 }): Promise<GeminiMarketData | null> {
+  // Check cache first
+  const cacheKey = getGeminiCacheKey(card);
+  const cached = geminiMarketCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < GEMINI_CACHE_TTL_MS) {
+    console.log(`[Gemini Market] Cache hit for: ${cacheKey.split("|")[0]} (${Math.round((Date.now() - cached.cachedAt) / 1000 / 60)}min old)`);
+    return cached.data;
+  }
+
   const maxRetries = 2;
   let lastError: Error | null = null;
   
@@ -225,7 +263,7 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
           if (typeof parsed.soldCount === "number" && typeof parsed.avgPrice === "number") {
             console.log(`[OutlookEngine] Found market data: ${parsed.soldCount} sold, avg $${parsed.avgPrice}`);
             
-            return {
+            const marketData: GeminiMarketData = {
               soldCount: parsed.soldCount || 0,
               avgPrice: parsed.avgPrice || 0,
               minPrice: parsed.minPrice || parsed.avgPrice * 0.8,
@@ -236,6 +274,12 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
               dataSource: "gemini_grounded",
               searchQuery: searchDescription,
             };
+            
+            // Cache result for 24 hours
+            geminiMarketCache.set(cacheKey, { data: marketData, cachedAt: Date.now() });
+            console.log(`[Gemini Market] Cached result for: ${cacheKey.split("|")[0]}`);
+            
+            return marketData;
           } else {
             console.log(`[OutlookEngine] Invalid market data structure:`, parsed);
           }
