@@ -2244,7 +2244,8 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
   // Use card's stored player name and sport, fallback to extraction from title
   const playerName = card.playerName || extractPlayerName(card.title);
   const sport = card.sport || 'football'; // Default to football if not specified
-  const playerKey = `${sport}:${playerName.toLowerCase().replace(/\s+/g, '_')}`;
+  // Player key must match server normalization: all lowercase, no spaces/special chars
+  const playerKey = `${sport}:${playerName.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
   
   // Check if player is in watchlist
   const { data: watchlistStatus } = useQuery({

@@ -546,7 +546,8 @@ function CreateCaseStep({
   const [watchlistAdded, setWatchlistAdded] = useState(false);
   const addToWatchlistMutation = useMutation({
     mutationFn: async () => {
-      const playerKey = `${sport.toLowerCase()}:${playerName.toLowerCase().trim().replace(/\s+/g, "_")}`;
+      // Player key must match server normalization: all lowercase, no spaces/special chars
+      const playerKey = `${sport.toLowerCase()}:${playerName.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
       return await apiRequest("POST", "/api/unified-watchlist", {
         itemType: "player",
         playerKey,

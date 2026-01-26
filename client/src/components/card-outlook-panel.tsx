@@ -359,7 +359,8 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
       queryClient.invalidateQueries({ queryKey: ["/api/cards", card.id, "outlook"] });
       // Also invalidate history when a new outlook is generated
       if (card.playerName && card.sport) {
-        const playerKey = `${card.sport.toLowerCase()}:${card.playerName.toLowerCase().trim().replace(/\s+/g, "_")}`;
+        // Player key must match server normalization
+        const playerKey = `${card.sport.toLowerCase()}:${card.playerName.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
         queryClient.invalidateQueries({ queryKey: ["/api/player-outlook/history", playerKey] });
       }
       toast({
@@ -376,9 +377,9 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
     },
   });
 
-  // Build player key for history lookup
+  // Build player key for history lookup (must match server normalization)
   const playerKey = card.playerName && card.sport 
-    ? `${card.sport.toLowerCase()}:${card.playerName.toLowerCase().trim().replace(/\s+/g, "_")}`
+    ? `${card.sport.toLowerCase()}:${card.playerName.toLowerCase().replace(/[^a-z0-9]/g, "")}`
     : null;
 
   // Fetch outlook history (only if we have a valid player key and isPro)

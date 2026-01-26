@@ -1142,8 +1142,9 @@ export default function PlayerOutlookPage() {
   const [isLoadingShared, setIsLoadingShared] = useState(false);
   const initialSearchDone = useRef(false);
 
+  // Player key must match server's normalization: sport:playername (all lowercase, no spaces/special chars)
   const playerKey = outlookData?.player?.name 
-    ? `${outlookSport.toLowerCase()}:${outlookData.player.name.toLowerCase().trim().replace(/\s+/g, "_")}`
+    ? `${outlookSport.toLowerCase()}:${outlookData.player.name.toLowerCase().replace(/[^a-z0-9]/g, "")}`
     : null;
 
   // Cache watchlist item ID locally for immediate access after adding
