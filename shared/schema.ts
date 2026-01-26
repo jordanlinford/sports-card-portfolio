@@ -1308,6 +1308,8 @@ export type EvidenceData = {
   newsSnippets?: string[]; // Recent news/hype if available
   lastUpdated?: string;
   dataQuality?: DataConfidence; // Overall data quality: HIGH, MEDIUM, LOW
+  marketDataConfidence?: DataConfidence; // Gemini's assessment of card market activity
+  newsCoverageConfidence?: DataConfidence; // Gemini's assessment of news coverage
 };
 
 // Discount Analysis - explains why a player might be cheap and what could change

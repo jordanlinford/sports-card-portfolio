@@ -639,6 +639,8 @@ async function generatePlayerOutlookAI(
   verdict: PlayerVerdictResult;
   confidence: DataConfidence;
   dataQuality: DataConfidence;
+  marketDataConfidence: DataConfidence;
+  newsCoverageConfidence: DataConfidence;
   aiDetectedCareerStatus?: "ACTIVE" | "RETIRED" | "RETIRED_HOF" | "DECEASED" | "BUST";
   discountAnalysis?: {
     whyDiscounted: string[];
@@ -779,20 +781,33 @@ RESPOND IN EXACTLY THIS JSON FORMAT:
     ]
   },
   "confidence": "HIGH|MEDIUM|LOW",
-  "dataQuality": "HIGH|MEDIUM|LOW"
+  "dataQuality": "HIGH|MEDIUM|LOW",
+  "marketDataConfidence": "HIGH|MEDIUM|LOW",
+  "newsCoverageConfidence": "HIGH|MEDIUM|LOW"
 }
 
-CONFIDENCE & DATA QUALITY RULES:
-- confidence: How certain are you about your analysis/verdict?
+CONFIDENCE ASSESSMENT RULES (all 4 fields required):
+- confidence: How certain are you about your overall investment verdict?
   * HIGH: Well-known player with clear career trajectory, reliable data, obvious investment thesis
-  * MEDIUM: Good player data but some uncertainty in outlook (injury recovery, role changes, etc.)
-  * LOW: Sparse data, unknown player, highly speculative thesis, multiple key unknowns
-- dataQuality: How much real-time data did you have to work with?
-  * HIGH: 3+ recent news items, player is well-covered, clear current situation
-  * MEDIUM: 1-2 news items, some gaps but enough to analyze
-  * LOW: No recent news, relying mostly on historical knowledge
+  * MEDIUM: Good player data but some uncertainty (injury recovery, role changes, etc.)
+  * LOW: Sparse data, unknown player, highly speculative thesis
 
-IMPORTANT: For established star players (All-Stars, MVPs, Pro Bowlers) with recent news coverage, confidence should typically be MEDIUM or HIGH, not LOW. Reserve LOW confidence for truly obscure players or situations with major unknowns.
+- dataQuality: How much reliable player/career data did you find?
+  * HIGH: Established player, clear stats history, defined role on team
+  * MEDIUM: Known player but some gaps in data or recent changes
+  * LOW: Unknown/obscure player, minimal background info
+
+- marketDataConfidence: How confident are you about card market activity for this player?
+  * HIGH: Star player whose cards trade frequently (All-Stars, MVPs, popular players)
+  * MEDIUM: Solid player with moderate card market activity
+  * LOW: Obscure player with likely minimal card market activity
+
+- newsCoverageConfidence: How much current news/media coverage exists?
+  * HIGH: Major news, trending topics, recent headlines about this player
+  * MEDIUM: Some recent coverage or mentions
+  * LOW: Minimal to no recent news found
+
+CRITICAL: For established star players (All-Stars, MVPs, Pro Bowlers, franchise QBs like Josh Allen, Patrick Mahomes, etc.), ALL FOUR confidence fields should typically be MEDIUM or HIGH. Reserve LOW only for truly obscure players or genuine data gaps.
 
 PEAK TIMING RULES (critical for collectors):
 - PRE_PEAK: Player's narrative is still building. Cards have more upside. Examples: emerging stars, pre-All-Star selection, before breakout playoff run.
@@ -877,6 +892,16 @@ TONE ENFORCEMENT:
     const dataQuality = (["HIGH", "MEDIUM", "LOW"].includes(parsed.dataQuality) 
       ? parsed.dataQuality 
       : newsSnippets.length >= 3 ? "MEDIUM" : "LOW") as DataConfidence;
+    
+    // Determine market data confidence (from Gemini)
+    const marketDataConfidence = (["HIGH", "MEDIUM", "LOW"].includes(parsed.marketDataConfidence) 
+      ? parsed.marketDataConfidence 
+      : "MEDIUM") as DataConfidence;
+    
+    // Determine news coverage confidence (from Gemini)
+    const newsCoverageConfidence = (["HIGH", "MEDIUM", "LOW"].includes(parsed.newsCoverageConfidence) 
+      ? parsed.newsCoverageConfidence 
+      : newsSnippets.length >= 3 ? "HIGH" : newsSnippets.length >= 1 ? "MEDIUM" : "LOW") as DataConfidence;
     
     // Extract AI-detected career status
     const validCareerStatuses = ["ACTIVE", "RETIRED", "RETIRED_HOF", "DECEASED", "BUST"];
@@ -1042,6 +1067,8 @@ TONE ENFORCEMENT:
         ? parsed.confidence 
         : "LOW") as DataConfidence,
       dataQuality,
+      marketDataConfidence,
+      newsCoverageConfidence,
     };
   } catch (error) {
     console.error("[PlayerOutlook] AI generation error:", error);
@@ -1075,6 +1102,8 @@ TONE ENFORCEMENT:
       },
       confidence: "LOW",
       dataQuality: "LOW",
+      marketDataConfidence: "LOW",
+      newsCoverageConfidence: "LOW",
     };
   }
 }
@@ -1144,7 +1173,7 @@ async function generateFreshOutlook(
   const teamContextWithTeam = analyzeTeamContext(snippets, classification.team);
   
   // Step 3: Generate AI narrative
-  const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality, aiDetectedCareerStatus, peakTiming, tieredRecommendations } = await generatePlayerOutlookAI(
+  const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality, marketDataConfidence, newsCoverageConfidence, aiDetectedCareerStatus, peakTiming, tieredRecommendations } = await generatePlayerOutlookAI(
     playerName,
     sport,
     classification,
@@ -1298,6 +1327,8 @@ async function generateFreshOutlook(
     newsSnippets: snippets.slice(0, 3),
     lastUpdated: new Date().toISOString(),
     dataQuality,
+    marketDataConfidence,
+    newsCoverageConfidence,
   };
   
   // Step 8: Generate Investment Call (new 5-state forced-decision system)

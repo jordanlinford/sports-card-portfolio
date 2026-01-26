@@ -694,21 +694,11 @@ interface ConfidenceBreakdownProps {
 function ConfidenceBreakdownPanel({ investmentCall, evidence }: ConfidenceBreakdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   
-  // Calculate confidence dimensions
-  const analysisConfidence = investmentCall?.confidence || "LOW";
-  const dataQuality = evidence?.dataQuality || "LOW";
-  
-  // Market data quality based on comps
-  const marketDataQuality: "HIGH" | "MEDIUM" | "LOW" = 
-    evidence?.compsSummary?.available && evidence?.compsSummary?.soldCount
-      ? evidence.compsSummary.soldCount >= 15 ? "HIGH"
-        : evidence.compsSummary.soldCount >= 5 ? "MEDIUM" : "LOW"
-      : "LOW";
-  
-  // News coverage quality
-  const newsSnippetCount = evidence?.newsSnippets?.length || 0;
-  const newsCoverage: "HIGH" | "MEDIUM" | "LOW" = 
-    newsSnippetCount >= 5 ? "HIGH" : newsSnippetCount >= 2 ? "MEDIUM" : "LOW";
+  // Use Gemini-provided confidence assessments (not threshold-based calculations)
+  const analysisConfidence = investmentCall?.confidence || "MEDIUM";
+  const dataQuality = evidence?.dataQuality || "MEDIUM";
+  const marketDataConfidence = evidence?.marketDataConfidence || "MEDIUM";
+  const newsCoverageConfidence = evidence?.newsCoverageConfidence || "MEDIUM";
   
   const getConfidenceColor = (level: string) => {
     switch (level) {
@@ -736,19 +726,19 @@ function ConfidenceBreakdownPanel({ investmentCall, evidence }: ConfidenceBreakd
     {
       label: "Data Quality",
       level: dataQuality,
-      description: "Overall quality of available player data",
+      description: "Quality of player career/performance data",
       icon: <BarChart3 className="h-4 w-4" />,
     },
     {
-      label: "Market Data",
-      level: marketDataQuality,
-      description: `${evidence?.compsSummary?.soldCount || 0} comparable sales found`,
+      label: "Market Activity",
+      level: marketDataConfidence,
+      description: "Expected card market liquidity for this player",
       icon: <DollarSign className="h-4 w-4" />,
     },
     {
       label: "News Coverage",
-      level: newsCoverage,
-      description: `${newsSnippetCount} recent news items`,
+      level: newsCoverageConfidence,
+      description: "Current media coverage and trending status",
       icon: <BookOpen className="h-4 w-4" />,
     },
   ];
