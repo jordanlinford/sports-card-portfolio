@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Crown,
   Loader2,
+  Trophy,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -77,16 +78,58 @@ function getVerdictColor(verdict: PlayerVerdict) {
   }
 }
 
-function getVerdictLabel(verdict?: string) {
+function getVerdictLabel(verdict?: string, postureLabel?: string) {
+  // Prefer the friendly postureLabel from the API
+  if (postureLabel) return postureLabel;
   if (!verdict) return "Unknown";
+  // Fallback for legacy data
   switch (verdict) {
-    case "ACCUMULATE": return "BUY";
-    case "HOLD": return "HOLD";
-    case "TRIM": return "SELL";
-    case "AVOID": return "AVOID";
-    case "AVOID_STRUCTURAL": return "AVOID";
-    default: return verdict;
+    case "ACCUMULATE": return "Buy";
+    case "HOLD_CORE": return "Hold";
+    case "HOLD_ROLE_RISK": return "Hold (Uncertain Role)";
+    case "HOLD_INJURY_CONTINGENT": return "Hold (Injury Watch)";
+    case "TRADE_THE_HYPE": return "Sell Into Hype";
+    case "AVOID_NEW_MONEY": return "Avoid";
+    case "AVOID_STRUCTURAL": return "Avoid (Declining)";
+    case "SPECULATIVE_FLYER": return "Risky Buy";
+    case "SPECULATIVE_SUPPRESSED": return "Buy (Undervalued)";
+    default: return verdict.replace(/_/g, " ");
   }
+}
+
+// Scoring system for investment verdicts - higher = better investment
+const VERDICT_SCORES: Record<string, number> = {
+  ACCUMULATE: 100,
+  SPECULATIVE_SUPPRESSED: 85,
+  SPECULATIVE_FLYER: 70,
+  HOLD_CORE: 60,
+  HOLD_INJURY_CONTINGENT: 50,
+  HOLD_ROLE_RISK: 40,
+  TRADE_THE_HYPE: 30,
+  AVOID_NEW_MONEY: 10,
+  AVOID_STRUCTURAL: 5,
+};
+
+function getVerdictScore(verdict?: string): number {
+  if (!verdict) return 0;
+  return VERDICT_SCORES[verdict] ?? 50;
+}
+
+function comparePlayers(player1: PlayerOutlookResponse | null, player2: PlayerOutlookResponse | null): {
+  betterPlayer: "left" | "right" | "equal" | null;
+  reason: string;
+} {
+  if (!player1 || !player2) return { betterPlayer: null, reason: "" };
+  
+  const score1 = getVerdictScore(player1.investmentCall?.verdict);
+  const score2 = getVerdictScore(player2.investmentCall?.verdict);
+  
+  if (score1 > score2) {
+    return { betterPlayer: "left", reason: `${player1.player?.name} has a stronger investment outlook` };
+  } else if (score2 > score1) {
+    return { betterPlayer: "right", reason: `${player2.player?.name} has a stronger investment outlook` };
+  }
+  return { betterPlayer: "equal", reason: "Both players have similar investment outlooks" };
 }
 
 interface ComparisonPlayer {
@@ -176,7 +219,7 @@ function PlayerComparisonCard({
           <div className="flex items-center gap-2 flex-wrap">
             <Badge className={`${getVerdictColor(outlook.verdict?.action)} gap-1 text-sm px-3 py-1`}>
               {getVerdictIcon(outlook.verdict?.action)}
-              {getVerdictLabel(outlook.investmentCall?.verdict || outlook.verdict?.action)}
+              {getVerdictLabel(outlook.investmentCall?.verdict, outlook.investmentCall?.postureLabel)}
             </Badge>
             <Badge variant="outline" className={getTemperatureColor(outlook.snapshot?.temperature)}>
               {getTemperatureIcon(outlook.snapshot?.temperature)}
@@ -394,11 +437,39 @@ export default function ComparePage() {
             <CardTitle>Comparison Summary</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Better Investment Verdict */}
+            {(() => {
+              const comparison = comparePlayers(leftPlayer.outlook, rightPlayer.outlook);
+              if (!comparison.betterPlayer) return null;
+              
+              const winnerName = comparison.betterPlayer === "left" 
+                ? leftPlayer.name 
+                : comparison.betterPlayer === "right" 
+                  ? rightPlayer.name 
+                  : null;
+              
+              return (
+                <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20" data-testid="better-investment-verdict">
+                  <div className="flex items-center gap-2 justify-center">
+                    <Trophy className="h-5 w-5 text-amber-500" />
+                    <span className="font-semibold text-lg">
+                      {comparison.betterPlayer === "equal" 
+                        ? "Tie" 
+                        : `${winnerName} is the better investment`}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground text-center mt-1">
+                    {comparison.reason}
+                  </p>
+                </div>
+              );
+            })()}
+            
             <div className="grid grid-cols-3 gap-4 text-center">
               <div className="space-y-1">
                 <p className="text-sm font-medium">{leftPlayer.name}</p>
                 <Badge className={getVerdictColor(leftPlayer.outlook.verdict?.action)}>
-                  {getVerdictLabel(leftPlayer.outlook.investmentCall?.verdict || leftPlayer.outlook.verdict?.action)}
+                  {getVerdictLabel(leftPlayer.outlook.investmentCall?.verdict, leftPlayer.outlook.investmentCall?.postureLabel)}
                 </Badge>
               </div>
               <div className="space-y-1">
@@ -407,7 +478,7 @@ export default function ComparePage() {
               <div className="space-y-1">
                 <p className="text-sm font-medium">{rightPlayer.name}</p>
                 <Badge className={getVerdictColor(rightPlayer.outlook.verdict?.action)}>
-                  {getVerdictLabel(rightPlayer.outlook.investmentCall?.verdict || rightPlayer.outlook.verdict?.action)}
+                  {getVerdictLabel(rightPlayer.outlook.investmentCall?.verdict, rightPlayer.outlook.investmentCall?.postureLabel)}
                 </Badge>
               </div>
             </div>

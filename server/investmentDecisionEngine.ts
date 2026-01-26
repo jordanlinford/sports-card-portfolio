@@ -1207,15 +1207,15 @@ function computeConfidence(scores: InvestmentScores): DataConfidence {
 }
 
 const POSTURE_LABELS: Record<InvestmentVerdict, string> = {
-  ACCUMULATE: "Buy during dips",
-  HOLD_CORE: "Hold, don't chase",
-  TRADE_THE_HYPE: "Sell into spikes",
-  AVOID_NEW_MONEY: "Stay away",
-  SPECULATIVE_FLYER: "Small, high-upside position",
-  HOLD_ROLE_RISK: "Hold, monitor role situation",
-  HOLD_INJURY_CONTINGENT: "Hold for injury opportunity",
-  SPECULATIVE_SUPPRESSED: "Buy suppressed value",
-  AVOID_STRUCTURAL: "Avoid, structural decline",
+  ACCUMULATE: "Buy",
+  HOLD_CORE: "Hold",
+  TRADE_THE_HYPE: "Sell Into Hype",
+  AVOID_NEW_MONEY: "Avoid",
+  SPECULATIVE_FLYER: "Risky Buy",
+  HOLD_ROLE_RISK: "Hold (Uncertain Role)",
+  HOLD_INJURY_CONTINGENT: "Hold (Injury Watch)",
+  SPECULATIVE_SUPPRESSED: "Buy (Undervalued)",
+  AVOID_STRUCTURAL: "Avoid (Declining)",
 };
 
 function getContextAwarePostureLabel(
