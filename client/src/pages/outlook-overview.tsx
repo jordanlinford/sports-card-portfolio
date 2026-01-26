@@ -437,10 +437,10 @@ function ComparisonVerdict({
       {/* Price */}
       {card.market.value && (
         <div className="mb-3">
-          <p className="text-2xl font-bold">${card.market.value.toLocaleString()}</p>
+          <p className="text-2xl font-bold">${card.market.value.toFixed(2)}</p>
           {card.market.min && card.market.max && (
             <p className="text-xs text-muted-foreground">
-              Range: ${card.market.min.toLocaleString()} - ${card.market.max.toLocaleString()}
+              Range: ${card.market.min.toFixed(2)} - ${card.market.max.toFixed(2)}
             </p>
           )}
         </div>
@@ -1979,7 +1979,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                               <tr key={idx} className="border-t border-border/50">
                                 <td className="py-2">{est.condition}</td>
                                 <td className="py-2 text-right font-medium">
-                                  ${est.minPrice.toLocaleString()} - ${est.maxPrice.toLocaleString()}
+                                  ${est.minPrice.toFixed(2)} - ${est.maxPrice.toFixed(2)}
                                 </td>
                               </tr>
                             ))}
