@@ -1578,7 +1578,10 @@ Sitemap: ${origin}/sitemap.xml
         ...(careerStage !== undefined ? { legacyTier: careerStage || null } : {}),
       };
 
+      console.log("[CardUpdate] Updating card", cardId, "with manualValue:", updateData.manualValue);
+
       const updatedCard = await storage.updateCard(cardId, updateData);
+      console.log("[CardUpdate] Updated card manualValue:", updatedCard?.manualValue);
       res.json(updatedCard);
     } catch (error) {
       console.error("Error updating card:", error);
