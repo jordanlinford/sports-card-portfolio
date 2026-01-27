@@ -45,6 +45,7 @@ The application supports core functionalities including:
 - **Analytics & Sharing**: Portfolio analytics page, and viral sharing features allowing export of cases as various image formats for social media.
 - **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts at 3/6/12 month intervals, showing bear/base/bull scenarios based on market temperature, investment verdicts, and upside/risk scores from player outlook data.
 - **Liquidity Scoring UI**: Visual badges (VERY_HIGH/HIGH/MEDIUM/LOW/UNCERTAIN) showing market health and exit risk for each card. Integrated into card outlook displays and Card Analysis. Pro users see divergence warnings when price rises on weak liquidity.
+- **Portfolio-Specific Next Buys**: AI-powered recommendations tailored to each display case's theme. Uses Gemini 2.0 Flash with Google Search grounding to analyze a portfolio's cards, detect themes (teams, eras, positions, card types), and suggest 5 complementary cards with pricing and investment rationale. Accessible via button on individual display case pages (Pro feature).
 - **Next Buys Recommendation Engine**: Balanced, investment-focused recommendation system with multiple recommendation sources:
   - **Watchlist**: Players user is actively tracking
   - **Breakout**: HOT temperature players with strong momentum
