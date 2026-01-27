@@ -1696,18 +1696,29 @@ Important:
         players: uniquePlayers,
         cardTypes: uniqueCardTypes,
       },
-      recommendations: (parsed.recommendations || []).slice(0, 5).map((rec: any) => ({
-        playerName: rec.playerName || "Unknown Player",
-        cardSuggestion: rec.cardSuggestion || "Base Card",
-        sport: rec.sport || uniqueSports[0] || "Unknown",
-        position: rec.position,
-        estimatedPrice: typeof rec.estimatedPrice === 'number' ? rec.estimatedPrice : avgPrice,
-        whyItFits: rec.whyItFits || "Complements your collection theme",
-        investmentRationale: rec.investmentRationale || "Good investment potential",
-      })),
+      recommendations: (() => {
+        const aiRecs = (parsed.recommendations || []).slice(0, 5).map((rec: any) => ({
+          playerName: rec.playerName || "Unknown Player",
+          cardSuggestion: rec.cardSuggestion || "Base Card",
+          sport: rec.sport || uniqueSports[0] || "Unknown",
+          position: rec.position,
+          estimatedPrice: typeof rec.estimatedPrice === 'number' ? rec.estimatedPrice : avgPrice,
+          whyItFits: rec.whyItFits || "Complements your collection theme",
+          investmentRationale: rec.investmentRationale || "Good investment potential",
+        }));
+        // If AI returned no recommendations, use fallback
+        if (aiRecs.length === 0) {
+          console.log("[PortfolioNextBuys] AI returned empty recommendations, using fallback");
+          return generateFallbackRecommendations(uniqueSports, uniqueTeams, uniquePositions, avgPrice, uniquePlayers);
+        }
+        return aiRecs;
+      })(),
     };
   } catch (error) {
     console.error("[PortfolioNextBuys] AI analysis failed:", error);
+    
+    // Generate fallback recommendations based on detected patterns
+    const fallbackRecs = generateFallbackRecommendations(uniqueSports, uniqueTeams, uniquePositions, avgPrice, uniquePlayers);
     
     return {
       identifiedTheme: caseInfo.name || "Custom Collection",
@@ -1720,7 +1731,76 @@ Important:
         players: uniquePlayers,
         cardTypes: uniqueCardTypes,
       },
-      recommendations: [],
+      recommendations: fallbackRecs,
     };
   }
+}
+
+// Generate fallback recommendations when AI fails
+function generateFallbackRecommendations(
+  sports: string[],
+  teams: string[],
+  positions: string[],
+  avgPrice: number,
+  existingPlayers: string[]
+): PortfolioNextBuyRecommendation[] {
+  const recommendations: PortfolioNextBuyRecommendation[] = [];
+  const sport = sports[0]?.toLowerCase() || "basketball";
+  const priceRange = avgPrice > 0 ? avgPrice : 50;
+  
+  // Sport-specific popular players that are common recommendations
+  const FALLBACK_PLAYERS: Record<string, Array<{name: string, position: string, card: string, rationale: string}>> = {
+    basketball: [
+      { name: "Jayson Tatum", position: "Forward", card: "2017 Prizm Base PSA 10", rationale: "Elite two-way player, championship pedigree" },
+      { name: "Luka Doncic", position: "Guard", card: "2018 Prizm Base PSA 10", rationale: "Generational talent, MVP caliber" },
+      { name: "Anthony Edwards", position: "Guard", card: "2020 Prizm Base PSA 10", rationale: "Rising superstar, explosive upside" },
+      { name: "Victor Wembanyama", position: "Center", card: "2023 Prizm Base PSA 10", rationale: "Generational prospect, unicorn potential" },
+      { name: "Shai Gilgeous-Alexander", position: "Guard", card: "2018 Prizm Base PSA 10", rationale: "Elite scorer, ascending value" },
+    ],
+    football: [
+      { name: "Patrick Mahomes", position: "Quarterback", card: "2017 Prizm Base PSA 10", rationale: "Generational QB, multiple championships" },
+      { name: "Justin Jefferson", position: "Wide Receiver", card: "2020 Prizm Base PSA 10", rationale: "Elite route runner, record-breaking pace" },
+      { name: "CJ Stroud", position: "Quarterback", card: "2023 Prizm Base PSA 10", rationale: "Rising star QB, excellent rookie year" },
+      { name: "Ja'Marr Chase", position: "Wide Receiver", card: "2021 Prizm Base PSA 10", rationale: "Elite WR, championship experience" },
+      { name: "Brock Bowers", position: "Tight End", card: "2024 Prizm Base PSA 10", rationale: "Record-breaking rookie, rare TE talent" },
+    ],
+    baseball: [
+      { name: "Shohei Ohtani", position: "DH/Pitcher", card: "2018 Topps Chrome PSA 10", rationale: "Unicorn two-way player, historic talent" },
+      { name: "Gunnar Henderson", position: "Shortstop", card: "2023 Topps Chrome PSA 10", rationale: "Rising young star, elite power" },
+      { name: "Elly De La Cruz", position: "Shortstop", card: "2023 Topps Chrome PSA 10", rationale: "Electric talent, game-changing speed" },
+      { name: "Bobby Witt Jr", position: "Shortstop", card: "2022 Topps Chrome PSA 10", rationale: "Complete player, superstar trajectory" },
+      { name: "Paul Skenes", position: "Pitcher", card: "2024 Topps Chrome PSA 10", rationale: "Dominant rookie, ace potential" },
+    ],
+    hockey: [
+      { name: "Connor McDavid", position: "Center", card: "2015 Upper Deck Young Guns PSA 10", rationale: "Best player in hockey, generational" },
+      { name: "Auston Matthews", position: "Center", card: "2016 Upper Deck Young Guns PSA 10", rationale: "Elite goal scorer, MVP caliber" },
+      { name: "Connor Bedard", position: "Center", card: "2023 Upper Deck Young Guns PSA 10", rationale: "Top prospect, franchise player" },
+      { name: "Cale Makar", position: "Defense", card: "2019 Upper Deck Young Guns PSA 10", rationale: "Best defenseman, Norris winner" },
+      { name: "Jack Hughes", position: "Center", card: "2019 Upper Deck Young Guns PSA 10", rationale: "Elite playmaker, ascending star" },
+    ],
+  };
+  
+  const players = FALLBACK_PLAYERS[sport] || FALLBACK_PLAYERS.basketball;
+  const existingLower = existingPlayers.map(p => p.toLowerCase());
+  
+  for (const player of players) {
+    // Skip if already in collection
+    if (existingLower.some(p => p.includes(player.name.toLowerCase().split(' ')[1]))) {
+      continue;
+    }
+    
+    recommendations.push({
+      playerName: player.name,
+      cardSuggestion: player.card,
+      sport: sport.charAt(0).toUpperCase() + sport.slice(1),
+      position: player.position,
+      estimatedPrice: Math.round(priceRange * (0.8 + Math.random() * 0.4)),
+      whyItFits: `Popular ${sport} player that complements your collection`,
+      investmentRationale: player.rationale,
+    });
+    
+    if (recommendations.length >= 5) break;
+  }
+  
+  return recommendations;
 }
