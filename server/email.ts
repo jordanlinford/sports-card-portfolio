@@ -2,16 +2,16 @@ import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
   host: process.env.ZOHO_SMTP_HOST || "smtp.zoho.com",
-  port: parseInt(process.env.ZOHO_SMTP_PORT || "587"),
-  secure: false,
+  port: 465,
+  secure: true,
   auth: {
     user: process.env.ZOHO_EMAIL,
-    pass: process.env.ZOHO_PASSWORD,
+    pass: process.env.ZOHO_APP_PASSWORD,
   },
 });
 
 export async function sendWelcomeEmail(userEmail: string, userName: string): Promise<void> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping welcome email");
     return;
   }
@@ -48,7 +48,7 @@ export async function sendPaymentConfirmationEmail(
   userEmail: string,
   userName: string
 ): Promise<void> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping payment confirmation email");
     return;
   }
@@ -90,7 +90,7 @@ export async function sendPriceAlertEmail(
   threshold: number,
   currentPrice: number
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping price alert email");
     return true;
   }
@@ -146,7 +146,7 @@ export async function sendWeeklyDigestEmail(
   userName: string,
   data: DigestData
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping weekly digest email");
     return true;
   }
@@ -233,7 +233,7 @@ export async function sendSplitJoinedEmail(
   userName: string,
   splitInfo: { title: string; sport: string; brand: string; year: string; formatType: string; seatPrice: number }
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping split joined email");
     return true;
   }
@@ -271,7 +271,7 @@ export async function sendSplitPaymentOpenEmail(
   userName: string,
   splitInfo: { title: string; sport: string; seatPrice: number; deadline: Date }
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping payment open email");
     return true;
   }
@@ -314,7 +314,7 @@ export async function sendSplitAssignmentEmail(
   assignment: string,
   priorityNumber: number
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping assignment email");
     return true;
   }
@@ -354,7 +354,7 @@ export async function sendBreakCompleteEmail(
   assignment: string,
   youtubeUrl: string
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping break complete email");
     return true;
   }
@@ -395,7 +395,7 @@ export async function sendSplitShippedEmail(
   assignment: string,
   trackingInfo?: string
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping shipped email");
     return true;
   }
@@ -432,7 +432,7 @@ export async function sendNewParticipantJoinedEmail(
   userName: string,
   splitInfo: { title: string; currentCount: number; totalCount: number }
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_PASSWORD) {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping new participant email");
     return true;
   }
