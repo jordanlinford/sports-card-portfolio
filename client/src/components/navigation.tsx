@@ -154,12 +154,6 @@ export function Navigation() {
                       Portfolio Outlook
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/portfolio/next-buys" className="flex items-center gap-2 cursor-pointer">
-                      <Target className="h-4 w-4" />
-                      Next Buys
-                    </Link>
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
                     <Link href="/cases/new" className="flex items-center gap-2 cursor-pointer">
@@ -523,12 +517,6 @@ export function Navigation() {
                     <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/portfolio/outlook") && "bg-accent")}>
                       <BarChart3 className="h-4 w-4" />
                       Portfolio Outlook
-                    </Button>
-                  </Link>
-                  <Link href="/portfolio/next-buys" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/portfolio/next-buys") && "bg-accent")}>
-                      <Target className="h-4 w-4" />
-                      Next Buys
                     </Button>
                   </Link>
                   <Link href="/cases/new" onClick={() => setMobileMenuOpen(false)}>

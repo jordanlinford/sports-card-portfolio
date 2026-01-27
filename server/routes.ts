@@ -48,7 +48,8 @@ import {
   getLatestPortfolioSnapshot, 
   isSnapshotFresh,
   generateNextBuys,
-  getLatestNextBuys
+  getLatestNextBuys,
+  generatePortfolioNextBuys
 } from "./portfolioIntelligenceService";
 
 // ============================================================================
@@ -95,8 +96,22 @@ function recordFreeUserLookup(userId: string) {
 const PORTFOLIO_AI_RATE_LIMIT_MS = 60000; // 1 minute between calls per endpoint
 const portfolioOutlookLastCall = new Map<string, number>();
 const nextBuysLastCall = new Map<string, number>();
+const portfolioNextBuysLastCall = new Map<string, number>(); // Per display case rate limiting
 
-function checkPortfolioAIRateLimit(userId: string, endpoint: 'outlook' | 'nextbuys'): { allowed: boolean; retryAfter?: number } {
+function checkPortfolioAIRateLimit(userId: string, endpoint: 'outlook' | 'nextbuys' | string): { allowed: boolean; retryAfter?: number } {
+  // For portfolio-specific next buys (includes display case ID in key)
+  if (endpoint.startsWith('nextbuys-')) {
+    const key = `${userId}:${endpoint}`;
+    const lastCall = portfolioNextBuysLastCall.get(key);
+    const now = Date.now();
+    
+    if (lastCall && (now - lastCall) < PORTFOLIO_AI_RATE_LIMIT_MS) {
+      const retryAfter = Math.ceil((PORTFOLIO_AI_RATE_LIMIT_MS - (now - lastCall)) / 1000);
+      return { allowed: false, retryAfter };
+    }
+    return { allowed: true };
+  }
+  
   const lastCallMap = endpoint === 'outlook' ? portfolioOutlookLastCall : nextBuysLastCall;
   const lastCall = lastCallMap.get(userId);
   const now = Date.now();
@@ -109,7 +124,14 @@ function checkPortfolioAIRateLimit(userId: string, endpoint: 'outlook' | 'nextbu
   return { allowed: true };
 }
 
-function recordPortfolioAICall(userId: string, endpoint: 'outlook' | 'nextbuys') {
+function recordPortfolioAICall(userId: string, endpoint: 'outlook' | 'nextbuys' | string) {
+  // For portfolio-specific next buys
+  if (endpoint.startsWith('nextbuys-')) {
+    const key = `${userId}:${endpoint}`;
+    portfolioNextBuysLastCall.set(key, Date.now());
+    return;
+  }
+  
   const lastCallMap = endpoint === 'outlook' ? portfolioOutlookLastCall : nextBuysLastCall;
   lastCallMap.set(userId, Date.now());
   
@@ -1789,6 +1811,54 @@ Sitemap: ${origin}/sitemap.xml
     } catch (error) {
       console.error("Error refreshing prices:", error);
       res.status(500).json({ message: "Failed to refresh prices" });
+    }
+  });
+
+  // Portfolio-specific Next Buys - Generate themed recommendations for a specific display case (Pro feature)
+  app.post("/api/display-cases/:id/next-buys", isAuthenticated, async (req: any, res) => {
+    try {
+      const displayCaseId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+
+      // Check if user has Pro subscription
+      const user = await storage.getUser(userId);
+      if (user?.subscriptionStatus !== "PRO") {
+        return res.status(403).json({ 
+          message: "Portfolio Next Buys is a Pro feature. Upgrade to Pro to get themed recommendations for your collections.",
+          proRequired: true
+        });
+      }
+
+      if (isNaN(displayCaseId)) {
+        return res.status(400).json({ message: "Invalid display case ID" });
+      }
+
+      // Rate limit to prevent abuse (1 call per 30 seconds per display case)
+      const rateCheck = checkPortfolioAIRateLimit(userId, `nextbuys-${displayCaseId}`);
+      if (!rateCheck.allowed) {
+        return res.status(429).json({ 
+          message: `Please wait ${rateCheck.retryAfter} seconds before refreshing.`,
+          rateLimited: true,
+          retryAfter: rateCheck.retryAfter
+        });
+      }
+
+      console.log(`[Portfolio Next Buys] Generating for display case ${displayCaseId}...`);
+      recordPortfolioAICall(userId, `nextbuys-${displayCaseId}`);
+      
+      const analysis = await generatePortfolioNextBuys(displayCaseId, userId);
+      
+      res.json({
+        ...analysis,
+        displayCaseId,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      console.error("[Portfolio Next Buys] Error:", error);
+      if (error.message === "Display case not found or access denied") {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to generate recommendations" });
     }
   });
 

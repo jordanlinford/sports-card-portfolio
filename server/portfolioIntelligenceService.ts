@@ -1490,3 +1490,223 @@ export async function getLatestNextBuys(userId: string): Promise<import("@shared
 
   return buys;
 }
+
+export interface PortfolioNextBuyRecommendation {
+  playerName: string;
+  cardSuggestion: string;
+  sport: string;
+  position?: string;
+  estimatedPrice: number;
+  whyItFits: string;
+  investmentRationale: string;
+}
+
+export interface PortfolioThemeAnalysis {
+  identifiedTheme: string;
+  themeDescription: string;
+  detectedPatterns: {
+    teams: string[];
+    sports: string[];
+    positions: string[];
+    eras: string[];
+    players: string[];
+    cardTypes: string[];
+  };
+  recommendations: PortfolioNextBuyRecommendation[];
+}
+
+export async function generatePortfolioNextBuys(
+  displayCaseId: number,
+  userId: string
+): Promise<PortfolioThemeAnalysis> {
+  const displayCase = await db
+    .select()
+    .from(displayCases)
+    .where(and(
+      eq(displayCases.id, displayCaseId),
+      eq(displayCases.userId, userId)
+    ))
+    .limit(1);
+
+  if (displayCase.length === 0) {
+    throw new Error("Display case not found or access denied");
+  }
+
+  const caseInfo = displayCase[0];
+
+  const caseCards = await db
+    .select()
+    .from(cards)
+    .where(eq(cards.displayCaseId, displayCaseId));
+
+  if (caseCards.length === 0) {
+    return {
+      identifiedTheme: "Empty Portfolio",
+      themeDescription: "Add some cards to this portfolio to get personalized recommendations.",
+      detectedPatterns: {
+        teams: [],
+        sports: [],
+        positions: [],
+        eras: [],
+        players: [],
+        cardTypes: [],
+      },
+      recommendations: [],
+    };
+  }
+
+  const teams: string[] = [];
+  const sports: string[] = [];
+  const positions: string[] = [];
+  const years: number[] = [];
+  const players: string[] = [];
+  const cardTypes: string[] = [];
+  const grades: string[] = [];
+  const sets: string[] = [];
+
+  for (const card of caseCards) {
+    if (card.playerName) players.push(card.playerName);
+    if (card.sport) sports.push(card.sport.toLowerCase());
+    if (card.position) positions.push(card.position);
+    if (card.year) years.push(card.year);
+    if (card.grade) grades.push(card.grade);
+    if (card.set) sets.push(card.set);
+    
+    const team = extractTeamFromText(card.title) || extractTeamFromText(card.variation);
+    if (team) teams.push(team);
+    
+    if (card.isRookie) cardTypes.push("Rookie");
+    if (card.hasAuto) cardTypes.push("Auto");
+    if (card.isNumbered) cardTypes.push("Numbered");
+    if (card.variation) cardTypes.push(card.variation);
+  }
+
+  const uniqueTeams = Array.from(new Set(teams));
+  const uniqueSports = Array.from(new Set(sports));
+  const uniquePositions = Array.from(new Set(positions));
+  const uniquePlayers = Array.from(new Set(players));
+  const uniqueCardTypes = Array.from(new Set(cardTypes));
+  const uniqueSets = Array.from(new Set(sets));
+  const avgYear = years.length > 0 ? Math.round(years.reduce((a, b) => a + b, 0) / years.length) : null;
+  const yearRange = years.length > 0 ? `${Math.min(...years)}-${Math.max(...years)}` : null;
+
+  const avgPrice = caseCards.reduce((sum, c) => {
+    const val = c.manualValue ?? c.estimatedValue ?? c.purchasePrice ?? 0;
+    return sum + val;
+  }, 0) / caseCards.length;
+
+  const prompt = `You are a sports card investment expert. Analyze this portfolio and recommend 5 specific cards that would perfectly complement the collection.
+
+PORTFOLIO NAME: "${caseInfo.name}"
+PORTFOLIO DESCRIPTION: "${caseInfo.description || 'None provided'}"
+
+CARDS IN PORTFOLIO (${caseCards.length} cards):
+${caseCards.map(c => `- ${c.playerName || c.title} | ${c.set || 'Unknown Set'} ${c.year || ''} | ${c.grade || 'Raw'} | ${c.sport || 'Unknown Sport'} | ${c.position || ''}`).join('\n')}
+
+DETECTED PATTERNS:
+- Teams: ${uniqueTeams.join(', ') || 'Various'}
+- Sports: ${uniqueSports.join(', ') || 'Mixed'}
+- Positions: ${uniquePositions.join(', ') || 'Various'}
+- Era: ${yearRange || 'Mixed years'}
+- Card Types: ${uniqueCardTypes.join(', ') || 'Base cards'}
+- Common Sets: ${uniqueSets.slice(0, 5).join(', ') || 'Various'}
+- Average Card Value: $${avgPrice.toFixed(0)}
+
+Based on your analysis:
+1. First, identify the THEME of this portfolio (e.g., "Super Bowl Winning QBs", "Utah Jazz Legends", "2020 Rookie Class", etc.)
+2. Then recommend 5 SPECIFIC cards that would fit this theme perfectly - players/cards the collector likely doesn't have yet
+
+Respond in this exact JSON format:
+{
+  "identifiedTheme": "Short theme name (3-6 words)",
+  "themeDescription": "One sentence explaining the collection theme and what makes it cohesive",
+  "recommendations": [
+    {
+      "playerName": "Full player name",
+      "cardSuggestion": "Specific card recommendation (e.g., '2020 Prizm Base PSA 10')",
+      "sport": "Sport name",
+      "position": "Position if applicable",
+      "estimatedPrice": estimated price as number,
+      "whyItFits": "One sentence on why this fits the theme",
+      "investmentRationale": "One sentence on investment potential"
+    }
+  ]
+}
+
+Important:
+- DO NOT recommend players already in the portfolio: ${uniquePlayers.join(', ')}
+- Recommend cards at similar price points ($${Math.round(avgPrice * 0.5)} - $${Math.round(avgPrice * 2)})
+- Focus on cards that complete or enhance the theme
+- Include a mix of safe picks and upside plays`;
+
+  try {
+    const model = gemini.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: prompt,
+      config: {
+        temperature: 0.7,
+        topP: 0.9,
+        maxOutputTokens: 2000,
+        responseMimeType: "application/json",
+      },
+    });
+
+    const response = await model;
+    const text = response.text || "";
+    
+    let parsed: any;
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error("No JSON found in response");
+      }
+    } catch (parseError) {
+      console.error("[PortfolioNextBuys] Failed to parse AI response:", parseError);
+      parsed = {
+        identifiedTheme: caseInfo.name || "Custom Collection",
+        themeDescription: `A curated collection of ${uniqueSports[0] || 'sports'} cards`,
+        recommendations: [],
+      };
+    }
+
+    return {
+      identifiedTheme: parsed.identifiedTheme || caseInfo.name || "Custom Collection",
+      themeDescription: parsed.themeDescription || "A personalized sports card collection",
+      detectedPatterns: {
+        teams: uniqueTeams,
+        sports: uniqueSports,
+        positions: uniquePositions,
+        eras: yearRange ? [yearRange] : [],
+        players: uniquePlayers,
+        cardTypes: uniqueCardTypes,
+      },
+      recommendations: (parsed.recommendations || []).slice(0, 5).map((rec: any) => ({
+        playerName: rec.playerName || "Unknown Player",
+        cardSuggestion: rec.cardSuggestion || "Base Card",
+        sport: rec.sport || uniqueSports[0] || "Unknown",
+        position: rec.position,
+        estimatedPrice: typeof rec.estimatedPrice === 'number' ? rec.estimatedPrice : avgPrice,
+        whyItFits: rec.whyItFits || "Complements your collection theme",
+        investmentRationale: rec.investmentRationale || "Good investment potential",
+      })),
+    };
+  } catch (error) {
+    console.error("[PortfolioNextBuys] AI analysis failed:", error);
+    
+    return {
+      identifiedTheme: caseInfo.name || "Custom Collection",
+      themeDescription: caseInfo.description || `A collection of ${uniqueSports[0] || 'sports'} cards`,
+      detectedPatterns: {
+        teams: uniqueTeams,
+        sports: uniqueSports,
+        positions: uniquePositions,
+        eras: yearRange ? [yearRange] : [],
+        players: uniquePlayers,
+        cardTypes: uniqueCardTypes,
+      },
+      recommendations: [],
+    };
+  }
+}

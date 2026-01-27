@@ -23,7 +23,13 @@ import {
   Smartphone,
   Trophy,
   Wallet,
-  Zap
+  Zap,
+  ShoppingCart,
+  Sparkles,
+  X,
+  Target,
+  AlertCircle,
+  Check
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -33,6 +39,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Card as CardUI, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DisplayCaseWithCards, Card, User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -280,10 +295,38 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
   );
 }
 
+interface PortfolioNextBuyRecommendation {
+  playerName: string;
+  cardSuggestion: string;
+  sport: string;
+  position?: string;
+  estimatedPrice: number;
+  whyItFits: string;
+  investmentRationale: string;
+}
+
+interface PortfolioThemeAnalysis {
+  identifiedTheme: string;
+  themeDescription: string;
+  detectedPatterns: {
+    teams: string[];
+    sports: string[];
+    positions: string[];
+    eras: string[];
+    players: string[];
+    cardTypes: string[];
+  };
+  recommendations: PortfolioNextBuyRecommendation[];
+  displayCaseId: number;
+  generatedAt: string;
+}
+
 export default function CaseView() {
   const { id } = useParams<{ id: string }>();
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
   const [showProUpgradeModal, setShowProUpgradeModal] = useState(false);
+  const [showNextBuysModal, setShowNextBuysModal] = useState(false);
+  const [nextBuysAnalysis, setNextBuysAnalysis] = useState<PortfolioThemeAnalysis | null>(null);
   const { toast } = useToast();
 
   const { data: displayCase, isLoading, error } = useQuery<DisplayCaseWithCards>({
@@ -324,6 +367,27 @@ export default function CaseView() {
         description: error.message || "Failed to refresh card values",
         variant: "destructive",
       });
+    },
+  });
+
+  const portfolioNextBuysMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", `/api/display-cases/${id}/next-buys`);
+    },
+    onSuccess: (data: PortfolioThemeAnalysis) => {
+      setNextBuysAnalysis(data);
+      setShowNextBuysModal(true);
+    },
+    onError: (error: any) => {
+      if (error.message?.includes("Pro feature") || error.proRequired) {
+        setShowProUpgradeModal(true);
+      } else {
+        toast({
+          title: "Couldn't Generate Recommendations",
+          description: error.message || "Failed to generate recommendations for this portfolio",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -400,6 +464,24 @@ export default function CaseView() {
                           <RefreshCw className="h-4 w-4" />
                         )}
                         {refreshAllPricesMutation.isPending ? "Refreshing..." : "Refresh Values"}
+                      </Button>
+                    )}
+                    {displayCase.cards && displayCase.cards.length > 0 && (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => portfolioNextBuysMutation.mutate()}
+                        disabled={portfolioNextBuysMutation.isPending}
+                        data-testid="button-portfolio-next-buys"
+                      >
+                        {portfolioNextBuysMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ShoppingCart className="h-4 w-4" />
+                        )}
+                        {portfolioNextBuysMutation.isPending ? "Analyzing..." : "Next Buys"}
+                        {!isPro && <Crown className="h-3 w-3 text-yellow-500" />}
                       </Button>
                     )}
                   </div>
@@ -713,22 +795,95 @@ export default function CaseView() {
       <ProUpgradeDialog
         open={showProUpgradeModal}
         onOpenChange={setShowProUpgradeModal}
-        featureName="Premium Sharing Formats"
-        featureDescription="Upgrade to Pro to unlock Brag Images - special sharing formats designed to show off your best cards and portfolio value."
+        featureName="Portfolio Next Buys"
+        featureDescription="Upgrade to Pro to get AI-powered recommendations tailored to each of your portfolios."
       />
+
+      {/* Portfolio Next Buys Modal */}
+      <Dialog open={showNextBuysModal} onOpenChange={setShowNextBuysModal}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Target className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">Next Buys for This Portfolio</DialogTitle>
+                {nextBuysAnalysis && (
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    Theme: {nextBuysAnalysis.identifiedTheme}
+                  </p>
+                )}
+              </div>
+            </div>
+            {nextBuysAnalysis && (
+              <DialogDescription className="text-sm">
+                {nextBuysAnalysis.themeDescription}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {nextBuysAnalysis && nextBuysAnalysis.recommendations.length > 0 ? (
+            <div className="space-y-3 py-2">
+              {nextBuysAnalysis.recommendations.map((rec, index) => (
+                <CardUI key={index} className="hover-elevate">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1">
+                        <CardTitle className="text-base flex items-center gap-2">
+                          {rec.playerName}
+                          <Badge variant="secondary" className="text-xs">
+                            {rec.sport}
+                          </Badge>
+                          {rec.position && (
+                            <Badge variant="outline" className="text-xs">
+                              {rec.position}
+                            </Badge>
+                          )}
+                        </CardTitle>
+                        <CardDescription className="text-sm">
+                          {rec.cardSuggestion}
+                        </CardDescription>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <span className="text-lg font-semibold text-primary">
+                          ~${typeof rec.estimatedPrice === 'number' ? rec.estimatedPrice.toLocaleString() : '???'}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-2 pt-0">
+                    <div className="flex items-start gap-2">
+                      <Sparkles className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-muted-foreground">{rec.whyItFits}</p>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <TrendingUp className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-muted-foreground">{rec.investmentRationale}</p>
+                    </div>
+                  </CardContent>
+                </CardUI>
+              ))}
+            </div>
+          ) : nextBuysAnalysis ? (
+            <div className="py-8 text-center">
+              <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                No recommendations available for this portfolio yet.
+              </p>
+            </div>
+          ) : null}
+
+          <div className="flex justify-end pt-2">
+            <Button variant="outline" onClick={() => setShowNextBuysModal(false)}>
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Check, Sparkles } from "lucide-react";
 
 const PRO_BENEFITS = [
   "Unlimited display cases",
