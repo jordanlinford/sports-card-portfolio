@@ -98,6 +98,13 @@ const portfolioOutlookLastCall = new Map<string, number>();
 const nextBuysLastCall = new Map<string, number>();
 const portfolioNextBuysLastCall = new Map<string, number>(); // Per display case rate limiting
 
+// Portfolio Next Buys Result Cache (1 hour TTL to reduce AI costs)
+const portfolioNextBuysCache = new Map<string, {
+  data: any;
+  generatedAt: string;
+  expiresAt: number;
+}>();
+
 function checkPortfolioAIRateLimit(userId: string, endpoint: 'outlook' | 'nextbuys' | string): { allowed: boolean; retryAfter?: number } {
   // For portfolio-specific next buys (includes display case ID in key)
   if (endpoint.startsWith('nextbuys-')) {
@@ -1843,15 +1850,36 @@ Sitemap: ${origin}/sitemap.xml
         });
       }
 
+      // Check cache first (1 hour TTL) to save on AI costs
+      const cacheKey = `nextbuys-${displayCaseId}`;
+      const cached = portfolioNextBuysCache.get(cacheKey);
+      if (cached && cached.expiresAt > Date.now()) {
+        console.log(`[Portfolio Next Buys] Returning cached result for display case ${displayCaseId}`);
+        return res.json({
+          ...cached.data,
+          displayCaseId,
+          generatedAt: cached.generatedAt,
+          cached: true,
+        });
+      }
+
       console.log(`[Portfolio Next Buys] Generating for display case ${displayCaseId}...`);
       recordPortfolioAICall(userId, `nextbuys-${displayCaseId}`);
       
       const analysis = await generatePortfolioNextBuys(displayCaseId, userId);
+      const generatedAt = new Date().toISOString();
+      
+      // Cache the result for 1 hour
+      portfolioNextBuysCache.set(cacheKey, {
+        data: analysis,
+        generatedAt,
+        expiresAt: Date.now() + 60 * 60 * 1000, // 1 hour
+      });
       
       res.json({
         ...analysis,
         displayCaseId,
-        generatedAt: new Date().toISOString(),
+        generatedAt,
       });
     } catch (error: any) {
       console.error("[Portfolio Next Buys] Error:", error);
