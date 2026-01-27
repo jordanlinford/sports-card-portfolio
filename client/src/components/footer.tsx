@@ -13,7 +13,7 @@ export function Footer() {
           </p>
           <nav className="flex flex-wrap items-center gap-6">
             <a 
-              href="mailto:support@sportscardportfolio.com" 
+              href="mailto:info@sportscardportfolio.io" 
               className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
               data-testid="link-support-email"
             >

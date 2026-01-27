@@ -5,7 +5,7 @@ export default function PrivacyPolicy() {
   const lastUpdated = "December 18, 2024";
   const companyName = "Sports Card Portfolio";
   const websiteUrl = "sportscardportfolio.com";
-  const contactEmail = "support@sportscardportfolio.com";
+  const contactEmail = "info@sportscardportfolio.io";
 
   return (
     <div className="min-h-screen bg-background">
