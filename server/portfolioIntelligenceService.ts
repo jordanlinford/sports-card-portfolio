@@ -1654,13 +1654,27 @@ Important:
     const response = await model;
     const text = response.text || "";
     
+    console.log("[PortfolioNextBuys] AI Response text length:", text.length);
+    console.log("[PortfolioNextBuys] AI Response preview:", text.substring(0, 500));
+    
     let parsed: any;
     try {
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("No JSON found in response");
+      // First try direct JSON parse (if responseMimeType worked)
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        // Fall back to extracting JSON from markdown code blocks or raw text
+        const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (codeBlockMatch) {
+          parsed = JSON.parse(codeBlockMatch[1].trim());
+        } else {
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            parsed = JSON.parse(jsonMatch[0]);
+          } else {
+            throw new Error("No JSON found in response");
+          }
+        }
       }
     } catch (parseError) {
       console.error("[PortfolioNextBuys] Failed to parse AI response:", parseError);
