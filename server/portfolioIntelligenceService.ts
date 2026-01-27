@@ -1641,12 +1641,12 @@ Important:
 
   try {
     const model = gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-pro",
       contents: prompt,
       config: {
         temperature: 0.7,
         topP: 0.9,
-        maxOutputTokens: 2000,
+        maxOutputTokens: 4096,
         responseMimeType: "application/json",
       },
     });
