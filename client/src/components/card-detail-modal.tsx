@@ -107,6 +107,7 @@ export function CardDetailModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}/public`] });
       toast({
         title: "Card deleted",
         description: "The card has been removed from your collection.",
@@ -188,6 +189,7 @@ export function CardDetailModal({
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}/public`] });
       if (data.updated) {
         toast({
           title: "eBay Value Updated",
@@ -318,6 +320,7 @@ export function CardDetailModal({
       
       // Use refetchQueries to wait for fresh data before closing edit mode
       await queryClient.refetchQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
+      await queryClient.refetchQueries({ queryKey: [`/api/display-cases/${displayCaseId}/public`] });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       
       toast({
