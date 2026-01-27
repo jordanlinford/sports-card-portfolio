@@ -240,12 +240,21 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
   console.log(`[HiddenGems] Starting refresh, batchId: ${batchId}, target: ${targetCount}`);
   
   try {
+    // Fetch all cached outlooks, prioritizing recently searched players
     const cachedOutlooks = await db
       .select()
       .from(playerOutlookCache)
-      .where(isNotNull(playerOutlookCache.outlookJson));
+      .where(isNotNull(playerOutlookCache.outlookJson))
+      .orderBy(desc(playerOutlookCache.lastFetchedAt));
     
-    console.log(`[HiddenGems] Found ${cachedOutlooks.length} cached player outlooks`);
+    // Count recent searches (last 7 days) vs older data
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const recentSearches = cachedOutlooks.filter(o => 
+      o.lastFetchedAt && new Date(o.lastFetchedAt) > oneWeekAgo
+    );
+    
+    console.log(`[HiddenGems] Found ${cachedOutlooks.length} cached player outlooks (${recentSearches.length} from last 7 days)`);
     
     if (cachedOutlooks.length === 0) {
       return { success: false, gemsCreated: 0, batchId, error: "No cached player outlooks found" };
@@ -275,8 +284,12 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
       
       const verdict = outlook.investmentCall.verdict;
       
+      // Boost score for recently searched players (within 7 days)
+      const isRecentSearch = cached.lastFetchedAt && new Date(cached.lastFetchedAt) > oneWeekAgo;
+      const recencyBoost = isRecentSearch ? 10 : 0;
+      
       if (["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER"].includes(verdict)) {
-        const discountScore = calculateDiscountScore(outlook);
+        const discountScore = calculateDiscountScore(outlook) + recencyBoost;
         if (discountScore >= 40) {
           buyCandidates.push({
             playerKey: cached.playerKey,
@@ -288,7 +301,7 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
           });
         }
       } else if (verdict === "TRADE_THE_HYPE" || verdict === "AVOID_NEW_MONEY") {
-        const cautionScore = calculateCautionScore(outlook);
+        const cautionScore = calculateCautionScore(outlook) + recencyBoost;
         if (cautionScore >= 40) {
           avoidCandidates.push({
             playerKey: cached.playerKey,
