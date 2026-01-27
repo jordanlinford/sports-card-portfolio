@@ -304,8 +304,45 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
     
     console.log(`[HiddenGems] ${buyCandidates.length} BUY candidates, ${avoidCandidates.length} AVOID candidates`);
     
-    buyCandidates.sort((a, b) => b.discountScore - a.discountScore);
-    avoidCandidates.sort((a, b) => b.discountScore - a.discountScore);
+    // Shuffle candidates to get different gems each refresh, then sort by score
+    // This ensures variety while still prioritizing high-scoring candidates
+    const shuffleArray = <T>(arr: T[]): T[] => {
+      const shuffled = [...arr];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      return shuffled;
+    };
+    
+    // Group by score tiers (within 10 points) and shuffle within tiers
+    const shuffleWithinTiers = <T extends { discountScore: number }>(arr: T[]): T[] => {
+      const sorted = [...arr].sort((a, b) => b.discountScore - a.discountScore);
+      const result: T[] = [];
+      let tierStart = 0;
+      
+      for (let i = 0; i < sorted.length; i++) {
+        const isLastItem = i === sorted.length - 1;
+        const scoreDiff = isLastItem ? 0 : sorted[tierStart].discountScore - sorted[i + 1].discountScore;
+        
+        if (isLastItem || scoreDiff > 10) {
+          // End of tier, shuffle this tier and add to result
+          const tier = sorted.slice(tierStart, i + 1);
+          result.push(...shuffleArray(tier));
+          tierStart = i + 1;
+        }
+      }
+      return result;
+    };
+    
+    const shuffledBuyCandidates = shuffleWithinTiers(buyCandidates);
+    const shuffledAvoidCandidates = shuffleWithinTiers(avoidCandidates);
+    
+    // Replace original sorted arrays with shuffled versions
+    buyCandidates.length = 0;
+    buyCandidates.push(...shuffledBuyCandidates);
+    avoidCandidates.length = 0;
+    avoidCandidates.push(...shuffledAvoidCandidates);
     
     let buyTargetCount = Math.ceil(targetCount * 0.7);
     let avoidTargetCount = Math.floor(targetCount * 0.3);
@@ -733,6 +770,64 @@ const SEED_PLAYERS: Array<{ name: string; sport: string }> = [
   // NHL - Rising
   { name: "Matvei Michkov", sport: "NHL" },
   { name: "Macklin Celebrini", sport: "NHL" },
+  
+  // Additional NFL players for variety
+  { name: "Amon-Ra St. Brown", sport: "NFL" },
+  { name: "Garrett Wilson", sport: "NFL" },
+  { name: "Chris Olave", sport: "NFL" },
+  { name: "Drake London", sport: "NFL" },
+  { name: "Jalen Hurts", sport: "NFL" },
+  { name: "Dak Prescott", sport: "NFL" },
+  { name: "Jaxon Smith-Njigba", sport: "NFL" },
+  { name: "Rome Odunze", sport: "NFL" },
+  { name: "Breece Hall", sport: "NFL" },
+  { name: "Bijan Robinson", sport: "NFL" },
+  { name: "Jahmyr Gibbs", sport: "NFL" },
+  { name: "De'Von Achane", sport: "NFL" },
+  { name: "Sam LaPorta", sport: "NFL" },
+  { name: "Trey McBride", sport: "NFL" },
+  
+  // Additional NBA players
+  { name: "Jalen Brunson", sport: "NBA" },
+  { name: "Donovan Mitchell", sport: "NBA" },
+  { name: "De'Aaron Fox", sport: "NBA" },
+  { name: "Ja Morant", sport: "NBA" },
+  { name: "Darius Garland", sport: "NBA" },
+  { name: "Scottie Barnes", sport: "NBA" },
+  { name: "Franz Wagner", sport: "NBA" },
+  { name: "Evan Mobley", sport: "NBA" },
+  { name: "Jalen Green", sport: "NBA" },
+  { name: "Alperen Sengun", sport: "NBA" },
+  { name: "Keyonte George", sport: "NBA" },
+  { name: "Jaime Jaquez Jr", sport: "NBA" },
+  { name: "Amen Thompson", sport: "NBA" },
+  { name: "Scoot Henderson", sport: "NBA" },
+  { name: "Brandon Miller", sport: "NBA" },
+  
+  // Additional MLB players
+  { name: "Bobby Witt Jr", sport: "MLB" },
+  { name: "Julio Rodriguez", sport: "MLB" },
+  { name: "Corey Seager", sport: "MLB" },
+  { name: "Marcus Semien", sport: "MLB" },
+  { name: "Francisco Lindor", sport: "MLB" },
+  { name: "Trea Turner", sport: "MLB" },
+  { name: "Adley Rutschman", sport: "MLB" },
+  { name: "Spencer Strider", sport: "MLB" },
+  { name: "Kodai Senga", sport: "MLB" },
+  { name: "Evan Carter", sport: "MLB" },
+  { name: "Jordan Walker", sport: "MLB" },
+  { name: "James Wood", sport: "MLB" },
+  
+  // Additional NHL players
+  { name: "Cale Makar", sport: "NHL" },
+  { name: "Jack Hughes", sport: "NHL" },
+  { name: "Trevor Zegras", sport: "NHL" },
+  { name: "Tim Stutzle", sport: "NHL" },
+  { name: "Cole Caufield", sport: "NHL" },
+  { name: "Lucas Raymond", sport: "NHL" },
+  { name: "Moritz Seider", sport: "NHL" },
+  { name: "Adam Fantilli", sport: "NHL" },
+  { name: "Leo Carlsson", sport: "NHL" },
 ];
 
 export async function seedPlayerOutlooks(
