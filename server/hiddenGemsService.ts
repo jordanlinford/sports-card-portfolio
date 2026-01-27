@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { hiddenGems, playerOutlookCache, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
-import { eq, desc, and, isNotNull } from "drizzle-orm";
+import { hiddenGems, playerOutlookCache, cards, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
+import { eq, desc, and, isNotNull, sql } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { fetchPlayerNews as fetchPlayerNewsFromEngine } from "./outlookEngine";
 
@@ -230,6 +230,33 @@ export async function getActiveHiddenGems(): Promise<HiddenGem[]> {
   return gems;
 }
 
+// Get unique players from all user portfolios (no AI cost - just database query)
+async function getPlayersFromPortfolios(): Promise<Array<{ playerName: string; sport: string }>> {
+  const portfolioCards = await db
+    .select({
+      playerName: cards.playerName,
+      sport: cards.sport,
+    })
+    .from(cards)
+    .where(isNotNull(cards.playerName));
+  
+  // Deduplicate by player name + sport
+  const uniquePlayers = new Map<string, { playerName: string; sport: string }>();
+  for (const card of portfolioCards) {
+    if (!card.playerName || !card.sport) continue;
+    const key = `${card.playerName.toLowerCase()}-${card.sport.toLowerCase()}`;
+    if (!uniquePlayers.has(key)) {
+      uniquePlayers.set(key, {
+        playerName: card.playerName,
+        sport: card.sport,
+      });
+    }
+  }
+  
+  console.log(`[HiddenGems] Found ${uniquePlayers.size} unique players from user portfolios`);
+  return Array.from(uniquePlayers.values());
+}
+
 export async function refreshHiddenGems(targetCount: number = 25): Promise<{
   success: boolean;
   gemsCreated: number;
@@ -240,6 +267,12 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
   console.log(`[HiddenGems] Starting refresh, batchId: ${batchId}, target: ${targetCount}`);
   
   try {
+    // Get players from user portfolios (no AI cost!)
+    const portfolioPlayers = await getPlayersFromPortfolios();
+    const portfolioPlayerKeys = new Set(
+      portfolioPlayers.map(p => `${p.playerName.toLowerCase()}-${p.sport.toLowerCase()}`)
+    );
+    
     // Fetch all cached outlooks, prioritizing recently searched players
     const cachedOutlooks = await db
       .select()
@@ -254,7 +287,13 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
       o.lastFetchedAt && new Date(o.lastFetchedAt) > oneWeekAgo
     );
     
-    console.log(`[HiddenGems] Found ${cachedOutlooks.length} cached player outlooks (${recentSearches.length} from last 7 days)`);
+    // Count how many cached players are from portfolios
+    const portfolioMatches = cachedOutlooks.filter(o => {
+      const key = `${o.playerName.toLowerCase()}-${o.sport.toLowerCase()}`;
+      return portfolioPlayerKeys.has(key);
+    });
+    
+    console.log(`[HiddenGems] Found ${cachedOutlooks.length} cached player outlooks (${recentSearches.length} from last 7 days, ${portfolioMatches.length} from user portfolios)`);
     
     if (cachedOutlooks.length === 0) {
       return { success: false, gemsCreated: 0, batchId, error: "No cached player outlooks found" };
@@ -288,8 +327,13 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
       const isRecentSearch = cached.lastFetchedAt && new Date(cached.lastFetchedAt) > oneWeekAgo;
       const recencyBoost = isRecentSearch ? 10 : 0;
       
+      // Boost score for players in user portfolios (shows demand)
+      const playerKey = `${cached.playerName.toLowerCase()}-${cached.sport.toLowerCase()}`;
+      const isInPortfolio = portfolioPlayerKeys.has(playerKey);
+      const portfolioBoost = isInPortfolio ? 15 : 0;
+      
       if (["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER"].includes(verdict)) {
-        const discountScore = calculateDiscountScore(outlook) + recencyBoost;
+        const discountScore = calculateDiscountScore(outlook) + recencyBoost + portfolioBoost;
         if (discountScore >= 40) {
           buyCandidates.push({
             playerKey: cached.playerKey,
@@ -301,7 +345,7 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
           });
         }
       } else if (verdict === "TRADE_THE_HYPE" || verdict === "AVOID_NEW_MONEY") {
-        const cautionScore = calculateCautionScore(outlook) + recencyBoost;
+        const cautionScore = calculateCautionScore(outlook) + recencyBoost + portfolioBoost;
         if (cautionScore >= 40) {
           avoidCandidates.push({
             playerKey: cached.playerKey,
