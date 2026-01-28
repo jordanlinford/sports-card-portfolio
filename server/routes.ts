@@ -3707,10 +3707,11 @@ Sitemap: ${origin}/sitemap.xml
       const historyData = history.map(h => ({
         id: h.id,
         verdict: h.verdict,
-        modifier: h.modifier,
+        verdictModifier: h.modifier,
         temperature: h.temperature,
         confidence: h.confidence,
-        snapshotAt: h.snapshotAt,
+        snapshotHash: h.snapshotHash || "",
+        createdAt: h.snapshotAt, // Client expects createdAt
         // Include key outlook metrics if available
         summary: h.outlookJson?.investmentCall?.oneLineRationale || h.outlookJson?.verdict?.summary,
       }));
