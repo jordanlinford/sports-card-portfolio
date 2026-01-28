@@ -262,11 +262,18 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
           <div className="space-y-3">
             {outlook.evidence.compsSummary?.available && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Comps</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  Comps <span className="font-normal text-muted-foreground/70">(all cards sold for this player in last 30 days)</span>
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {outlook.evidence.compsSummary.median && (
                     <Badge variant="outline" className="text-xs" data-testid="badge-comps-avg">
                       Avg: ${outlook.evidence.compsSummary.median.toFixed(2)}
+                    </Badge>
+                  )}
+                  {outlook.evidence.compsSummary.low !== undefined && outlook.evidence.compsSummary.high !== undefined && (
+                    <Badge variant="outline" className="text-xs" data-testid="badge-comps-range">
+                      Low: ${outlook.evidence.compsSummary.low.toFixed(2)} / High: ${outlook.evidence.compsSummary.high.toFixed(2)}
                     </Badge>
                   )}
                   {outlook.evidence.compsSummary.estimatedVolume && (
