@@ -338,7 +338,7 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
           <div className="space-y-3">
             {outlook.evidence.compsSummary?.available && (
               <div>
-                <p className="text-xs font-medium text-muted-foreground mb-1">eBay Comps</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">Comps</p>
                 <div className="flex flex-wrap gap-2">
                   {outlook.evidence.compsSummary.median && (
                     <Badge variant="outline" className="text-xs">
