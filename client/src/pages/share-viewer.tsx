@@ -327,30 +327,6 @@ function PlayerOutlookView({ data }: { data: any }) {
         </Card>
       )}
 
-      {data.exposures && data.exposures.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Card Exposure Recommendations</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {data.exposures.map((exp: any, index: number) => (
-                <div key={index} className="border-b last:border-0 pb-3 last:pb-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Badge variant="outline">{exp.tier}</Badge>
-                  </div>
-                  {exp.cardTargets && exp.cardTargets.length > 0 && (
-                    <p className="text-sm text-muted-foreground mb-1">
-                      {exp.cardTargets.join(", ")}
-                    </p>
-                  )}
-                  {exp.why && <p className="text-sm">{exp.why}</p>}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Backward compatibility for legacy snapshots */}
       {data.keyFactors && data.keyFactors.length > 0 && !data.thesis && (

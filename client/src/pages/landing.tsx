@@ -233,7 +233,7 @@ export default function Landing() {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  Card exposure recommendations
+                  Real market comps data
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />

@@ -30,11 +30,8 @@ import {
   Ban,
   Target,
   Layers,
-  Zap,
   DollarSign,
-  Users,
   ArrowRight,
-  Crown,
   RefreshCw,
   Loader2,
   BarChart3,
@@ -53,7 +50,7 @@ import { InvestmentCallCard } from "@/components/investment-call-card";
 import { AdvisorSnapshot } from "@/components/outlook/AdvisorSnapshot";
 import { OutlookAccordions } from "@/components/outlook/OutlookAccordions";
 import { transformToAdvisorOutlook, applyVerdictGuardrails } from "@/lib/transformToAdvisorOutlook";
-import type { PlayerOutlookResponse, StockTier, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, BuyerProfile, LiquidityLevel, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext, AdvisorOutlook } from "@shared/schema";
+import type { PlayerOutlookResponse, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext, AdvisorOutlook } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
   switch (temp) {
@@ -111,46 +108,6 @@ function getVerdictColor(verdict: PlayerVerdict) {
   }
 }
 
-function getTierIcon(tier: StockTier) {
-  switch (tier) {
-    case "PREMIUM": return <Crown className="h-4 w-4" />;
-    case "GROWTH": return <TrendingUp className="h-4 w-4" />;
-    case "CORE": return <Target className="h-4 w-4" />;
-    case "COMMON": return <Layers className="h-4 w-4" />;
-    case "SPECULATIVE": return <Zap className="h-4 w-4" />;
-    default: return null;
-  }
-}
-
-function getTierColor(tier: StockTier) {
-  switch (tier) {
-    case "PREMIUM": return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
-    case "GROWTH": return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20";
-    case "CORE": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
-    case "COMMON": return "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
-    case "SPECULATIVE": return "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20";
-    default: return "bg-muted text-muted-foreground";
-  }
-}
-
-function getLiquidityLabel(liq: LiquidityLevel) {
-  switch (liq) {
-    case "HIGH": return "High volume (likely higher)";
-    case "MEDIUM": return "Moderate liquidity";
-    case "LOW": return "Lower activity in sample";
-    default: return "";
-  }
-}
-
-function getBuyerProfileLabel(profile: BuyerProfile) {
-  switch (profile) {
-    case "FLIPPER": return "Best for: Quick flips";
-    case "COLLECTOR": return "Best for: Collectors";
-    case "INVESTOR": return "Best for: Long-term investors";
-    case "BUDGET": return "Best for: Budget collectors";
-    default: return "";
-  }
-}
 
 function getModifierColor(modifier: VerdictModifier) {
   switch (modifier) {
@@ -962,62 +919,6 @@ function OutlookHistoryPanel({ playerKey }: { playerKey: string | null }) {
   );
 }
 
-function ExposureRecommendations({ exposures }: { exposures: PlayerOutlookResponse["exposures"] }) {
-  return (
-    <Card data-testid="card-exposures">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Layers className="h-5 w-5 text-primary" />
-          Card Exposure Recommendations
-        </CardTitle>
-        <CardDescription>Stock tiers ranked by fit for this player</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {exposures.map((exp, i) => (
-          <div key={i} className="p-4 rounded-lg border hover-elevate" data-testid={`exposure-${exp.tier.toLowerCase()}`}>
-            <div className="flex items-start justify-between gap-2 mb-2 flex-wrap">
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge className={`${getTierColor(exp.tier)} gap-1`}>
-                  {getTierIcon(exp.tier)}
-                  {exp.tier}
-                </Badge>
-                <Badge variant="outline" className="text-xs">
-                  <DollarSign className="h-3 w-3 mr-1" />
-                  {exp.liquidity} Liquidity
-                </Badge>
-              </div>
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                {getBuyerProfileLabel(exp.buyerProfile)}
-              </span>
-            </div>
-            <p className="text-sm text-foreground mb-2">{exp.why}</p>
-            <div className="flex flex-wrap gap-1 mb-2">
-              {exp.cardTargets.map((target, j) => (
-                <Badge key={j} variant="secondary" className="text-xs font-normal">
-                  {target}
-                </Badge>
-              ))}
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {exp.riskNote}
-              </p>
-              {exp.timingGuidance && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1" data-testid={`timing-${exp.tier.toLowerCase()}`}>
-                  <Clock className="h-3 w-3" />
-                  <span className="font-medium">Best Entry:</span> {exp.timingGuidance}
-                </p>
-              )}
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
-
 function EvidencePanel({ evidence, cacheStatus }: { evidence: PlayerOutlookResponse["evidence"]; cacheStatus?: string }) {
   const [isOpen, setIsOpen] = useState(false);
   
@@ -1455,7 +1356,7 @@ export default function PlayerOutlookPage() {
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold" data-testid="text-page-title">Player Outlook</h1>
         <p className="text-muted-foreground">
-          Analyze any player as a stock. Get investment verdicts and card exposure recommendations.
+          Analyze any player as a stock. Get investment verdicts and real market data.
         </p>
       </div>
 

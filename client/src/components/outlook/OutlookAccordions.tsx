@@ -7,9 +7,7 @@ import {
   ChevronUp,
   AlertTriangle,
   ShoppingCart,
-  Ban,
   BookOpen,
-  Zap,
   FileText,
   TrendingUp,
   TrendingDown,
@@ -17,7 +15,6 @@ import {
   Layers,
   Target,
   DollarSign,
-  Crown,
   Eye,
 } from "lucide-react";
 import type { AdvisorOutlook, PlayerOutlookResponse } from "@shared/schema";
@@ -100,48 +97,6 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
               </li>
             ))}
           </ul>
-        </AccordionSection>
-      )}
-      
-      {(advisor.cards.buy.length > 0 || advisor.cards.avoid.length > 0) && (
-        <AccordionSection
-          title="Cards to Target"
-          description="Specific cards to buy or avoid"
-          icon={<Zap className="h-4 w-4 text-primary" />}
-          testId="accordion-cards"
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {advisor.cards.buy.length > 0 && (
-              <div>
-                <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                  <ShoppingCart className="h-3 w-3 text-green-600" />
-                  Cards to Buy
-                </h5>
-                <div className="flex flex-wrap gap-1">
-                  {advisor.cards.buy.map((card, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs bg-green-500/10 text-green-700 dark:text-green-400">
-                      {card}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {advisor.cards.avoid.length > 0 && (
-              <div>
-                <h5 className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                  <Ban className="h-3 w-3 text-red-600" />
-                  Cards to Avoid
-                </h5>
-                <div className="flex flex-wrap gap-1">
-                  {advisor.cards.avoid.map((card, i) => (
-                    <Badge key={i} variant="secondary" className="text-xs bg-red-500/10 text-red-700 dark:text-red-400">
-                      {card}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
         </AccordionSection>
       )}
       
@@ -293,37 +248,6 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
                 </ul>
               </div>
             )}
-          </div>
-        </AccordionSection>
-      )}
-      
-      {outlook.exposures && outlook.exposures.length > 0 && (
-        <AccordionSection
-          title="Card Exposure Tiers"
-          description="Stock tiers ranked by fit for this player"
-          icon={<Crown className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
-          testId="accordion-exposures"
-        >
-          <div className="space-y-3">
-            {outlook.exposures.map((exp, i) => (
-              <div key={i} className="p-3 rounded-lg border">
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className="text-xs">
-                    {exp.tier}
-                  </Badge>
-                  <span className="text-sm font-medium flex-1">{exp.why}</span>
-                </div>
-                {exp.cardTargets && exp.cardTargets.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {exp.cardTargets.map((card, j) => (
-                      <Badge key={j} variant="secondary" className="text-xs">
-                        {card}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         </AccordionSection>
       )}
