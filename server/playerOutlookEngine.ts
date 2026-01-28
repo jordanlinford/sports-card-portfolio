@@ -139,7 +139,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 16; // v16: UNKNOWN stage now blocks AVOID_STRUCTURAL verdict (can't claim decline without knowing career stage)
+const PROMPT_VERSION = 17; // v17: Added Gemini search for player market data (real avg price, volume, tier breakdown)
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -623,6 +623,127 @@ BUST CLARIFICATION:
   
   console.error("[PlayerOutlook] News fetch failed after retries:", lastError?.message);
   return { momentum: "flat", newsHype: "none", snippets: [] };
+}
+
+// Fetch player market data (all cards sold) using Gemini with Google Search grounding
+interface PlayerMarketData {
+  available: boolean;
+  totalAvgPrice?: number;
+  estimatedVolume?: "high" | "medium" | "low";
+  volumeTrend?: "up" | "stable" | "down";
+  priceRange?: { low: number; high: number };
+  breakdown?: {
+    category: string;
+    avgPrice: number;
+    priceRange: string;
+  }[];
+  source: "gemini_search" | "unavailable";
+  observations?: string[];
+}
+
+async function fetchPlayerMarketData(playerName: string, sport: string): Promise<PlayerMarketData> {
+  const maxRetries = 2;
+  let lastError: Error | null = null;
+  
+  const searchPrompt = `Search for all sports cards sold for ${playerName} (${sport}) over the last 30 days on eBay and other card marketplaces.
+
+Provide a market summary with:
+1. Total average sale price across ALL cards (base, parallels, autos, graded, etc.)
+2. Estimated sales volume (high/medium/low based on number of listings)
+3. Volume trend compared to previous period (up/stable/down)
+4. Price range from lowest to highest sale
+5. Breakdown by card category with average prices
+
+Return ONLY a JSON object:
+{
+  "totalAvgPrice": <number - average sale price across all cards>,
+  "estimatedVolume": "high" | "medium" | "low",
+  "volumeTrend": "up" | "stable" | "down",
+  "priceRange": { "low": <number>, "high": <number> },
+  "breakdown": [
+    { "category": "Base/Common", "avgPrice": <number>, "priceRange": "$X - $Y" },
+    { "category": "Refractors/Inserts", "avgPrice": <number>, "priceRange": "$X - $Y" },
+    { "category": "Numbered/Auto", "avgPrice": <number>, "priceRange": "$X - $Y" },
+    { "category": "High-End/PSA 10", "avgPrice": <number>, "priceRange": "$X - $Y" }
+  ],
+  "observations": ["<key market observation 1>", "<key market observation 2>"]
+}
+
+If no sales data is found, return: { "available": false }`;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[PlayerOutlook] Market data fetch attempt ${attempt} for: ${playerName}`);
+      
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: searchPrompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      });
+      
+      let responseText = response.text || "";
+      console.log(`[PlayerOutlook] Gemini market data response length: ${responseText.length}`);
+      
+      // Strip markdown code fences if present
+      responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+      
+      // Extract JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          
+          if (parsed.available === false) {
+            console.log(`[PlayerOutlook] No market data available for ${playerName}`);
+            return { available: false, source: "unavailable" };
+          }
+          
+          console.log(`[PlayerOutlook] Market data for ${playerName}: avg=$${parsed.totalAvgPrice}, volume=${parsed.estimatedVolume}`);
+          
+          // Validate and cast estimatedVolume to the expected union type
+          const validVolumes = ["high", "medium", "low"] as const;
+          const estimatedVolume = validVolumes.includes(parsed.estimatedVolume) 
+            ? parsed.estimatedVolume as "high" | "medium" | "low"
+            : undefined;
+          
+          // Validate and cast volumeTrend
+          const validTrends = ["up", "stable", "down"] as const;
+          const volumeTrend = validTrends.includes(parsed.volumeTrend)
+            ? parsed.volumeTrend as "up" | "stable" | "down"
+            : undefined;
+          
+          return {
+            available: true,
+            totalAvgPrice: parsed.totalAvgPrice,
+            estimatedVolume,
+            volumeTrend,
+            priceRange: parsed.priceRange,
+            breakdown: Array.isArray(parsed.breakdown) ? parsed.breakdown : undefined,
+            observations: Array.isArray(parsed.observations) ? parsed.observations.slice(0, 2) : undefined,
+            source: "gemini_search",
+          };
+        } catch (parseError) {
+          console.error(`[PlayerOutlook] Failed to parse market data JSON (attempt ${attempt}):`, responseText.substring(0, 200));
+        }
+      } else {
+        console.log(`[PlayerOutlook] No JSON found in market data response (attempt ${attempt})`);
+      }
+      
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[PlayerOutlook] Gemini market data error (attempt ${attempt}):`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 3000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  console.error("[PlayerOutlook] Market data fetch failed after retries:", lastError?.message);
+  return { available: false, source: "unavailable" };
 }
 
 // Use AI to infer player info and generate thesis
@@ -1307,22 +1428,33 @@ async function generateFreshOutlook(
   // Step 6: Calculate valuation using heuristic model
   const valuation = calculateValuation(sport, finalClassification, verdict.modifier);
   
-  // Step 7: Build evidence with modeled valuation
+  // Step 6.5: Fetch real player market data from Gemini search
+  const marketData = await fetchPlayerMarketData(playerName, sport);
+  
+  // Step 7: Build evidence with real market data when available, fallback to modeled
+  const useRealMarketData = marketData.available && marketData.totalAvgPrice !== undefined;
+  
   const evidence: EvidenceData = {
     compsSummary: {
       available: true,
-      median: valuation.estimatedRange.mid,
-      low: valuation.estimatedRange.low,
-      high: valuation.estimatedRange.high,
+      median: useRealMarketData ? marketData.totalAvgPrice! : valuation.estimatedRange.mid,
+      low: useRealMarketData && marketData.priceRange ? marketData.priceRange.low : valuation.estimatedRange.low,
+      high: useRealMarketData && marketData.priceRange ? marketData.priceRange.high : valuation.estimatedRange.high,
       soldCount: undefined,
-      source: "modeled",
+      source: useRealMarketData ? "gemini_search" : "modeled",
+      // New fields for player market data
+      estimatedVolume: marketData.estimatedVolume,
+      volumeTrend: marketData.volumeTrend,
+      breakdown: marketData.breakdown,
     },
     referenceComps: valuation.referenceComps,
     notes: [
       snippets.length === 0 ? "Limited news data available" : `${snippets.length} recent news items analyzed`,
       `Classification: ${finalClassification.stage} stage, ${finalClassification.baseTemperature} market`,
-      valuation.methodology,
-      "Modeled estimate - not live market data. Use as directional guidance.",
+      ...(useRealMarketData && marketData.observations ? marketData.observations : [valuation.methodology]),
+      useRealMarketData 
+        ? `Market data from search - avg across all ${playerName} cards sold in last 30 days.`
+        : "Modeled estimate - not live market data. Use as directional guidance.",
     ],
     newsSnippets: snippets.slice(0, 3),
     lastUpdated: new Date().toISOString(),

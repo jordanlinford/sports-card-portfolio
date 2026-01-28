@@ -337,20 +337,52 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
         >
           <div className="space-y-3">
             {outlook.evidence.compsSummary?.available && (
-              <div>
+              <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground mb-1">Comps</p>
                 <div className="flex flex-wrap gap-2">
                   {outlook.evidence.compsSummary.median && (
-                    <Badge variant="outline" className="text-xs">
-                      Median: ${outlook.evidence.compsSummary.median.toFixed(2)}
+                    <Badge variant="outline" className="text-xs" data-testid="badge-comps-avg">
+                      Avg: ${outlook.evidence.compsSummary.median.toFixed(2)}
+                    </Badge>
+                  )}
+                  {outlook.evidence.compsSummary.estimatedVolume && (
+                    <Badge variant="outline" className="text-xs" data-testid="badge-comps-volume">
+                      Volume: {outlook.evidence.compsSummary.estimatedVolume}
+                    </Badge>
+                  )}
+                  {outlook.evidence.compsSummary.volumeTrend && (
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        outlook.evidence.compsSummary.volumeTrend === "up" ? "text-green-600" :
+                        outlook.evidence.compsSummary.volumeTrend === "down" ? "text-red-600" : ""
+                      }`}
+                      data-testid="badge-comps-trend"
+                    >
+                      Trend: {outlook.evidence.compsSummary.volumeTrend === "up" ? "↑" : 
+                              outlook.evidence.compsSummary.volumeTrend === "down" ? "↓" : "→"}
                     </Badge>
                   )}
                   {outlook.evidence.compsSummary.soldCount && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs" data-testid="badge-comps-sales">
                       {outlook.evidence.compsSummary.soldCount} sales
                     </Badge>
                   )}
                 </div>
+                {/* Category breakdown from Gemini search */}
+                {outlook.evidence.compsSummary.breakdown && outlook.evidence.compsSummary.breakdown.length > 0 && (
+                  <div className="mt-2 space-y-1" data-testid="comps-breakdown">
+                    <p className="text-xs text-muted-foreground">Price by Category:</p>
+                    <div className="grid grid-cols-2 gap-1">
+                      {outlook.evidence.compsSummary.breakdown.map((cat, i) => (
+                        <div key={i} className="text-xs text-muted-foreground bg-muted/30 rounded px-2 py-1" data-testid={`comps-category-${i}`}>
+                          <span className="font-medium">{cat.category}:</span> ${cat.avgPrice.toFixed(2)}
+                          <span className="text-muted-foreground/60 ml-1">({cat.priceRange})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {outlook.evidence.notes && outlook.evidence.notes.length > 0 && (

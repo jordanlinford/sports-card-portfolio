@@ -744,9 +744,11 @@ export type DecisionInput = {
     low?: number;
     high?: number;
     available: boolean;
-    source?: "live" | "modeled";
+    source?: "live" | "modeled" | "gemini_search";
     trendSlope?: number;  // Actual eBay price trend: positive = rising, negative = falling
     soldCount?: number;   // Number of recent sales for confidence
+    estimatedVolume?: "high" | "medium" | "low";
+    volumeTrend?: "up" | "stable" | "down";
   };
   newsCount?: number;
   momentum?: "UP" | "DOWN" | "STABLE";
@@ -764,7 +766,7 @@ export type DecisionDebug = {
   stage: PlayerStage;
   temperature: MarketTemperature;
   compAvailable: boolean;
-  compSource: "live" | "modeled" | "unknown";
+  compSource: "live" | "modeled" | "gemini_search" | "unknown";
   compsReliable: boolean;
   lowMeta: boolean;
   overheated: boolean;
@@ -1864,8 +1866,9 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   
   // Compute helper flags for gating logic
   const hasCompData = input.compData?.available === true;
-  const compSource: "live" | "modeled" | "unknown" = input.compData?.source ?? "unknown";
-  const compsReliable = hasCompData && compSource === "live";
+  const compSource: "live" | "modeled" | "gemini_search" | "unknown" = input.compData?.source ?? "unknown";
+  // Both live scraping and gemini_search are considered reliable data sources
+  const compsReliable = hasCompData && (compSource === "live" || compSource === "gemini_search");
   
   // lowMeta: team or position is unknown/missing/placeholder
   // Normalize and check for common placeholder values

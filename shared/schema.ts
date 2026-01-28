@@ -1300,8 +1300,16 @@ export type EvidenceData = {
     high?: number;
     soldCount?: number;
     trendSlope?: number;  // eBay price trend: positive = rising, negative = falling
-    source?: "live" | "modeled"; // Whether data is live market or modeled estimate
+    source?: "live" | "modeled" | "gemini_search"; // Data source: live scrape, modeled estimate, or Gemini search
     recentSales?: Array<{ price: number; date: string; source: string }>;
+    // Player-level market data from Gemini search
+    estimatedVolume?: "high" | "medium" | "low"; // Overall sales volume for this player
+    volumeTrend?: "up" | "stable" | "down"; // Volume trend vs previous period
+    breakdown?: Array<{
+      category: string;
+      avgPrice: number;
+      priceRange: string;
+    }>; // Price breakdown by card category
   };
   referenceComps?: ReferenceComp[]; // Synthetic reference cards with estimated values
   notes: string[]; // e.g., ["thin comps", "match quality medium"]
