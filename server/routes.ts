@@ -3652,8 +3652,9 @@ Sitemap: ${origin}/sitemap.xml
         .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(" ");
       
-      // Build the player key for cache lookup
-      const playerKey = `${sport.toLowerCase()}:${playerName.toLowerCase().trim().replace(/\s+/g, "_")}`;
+      // Build the player key for cache lookup - must match normalizePlayerKey in playerOutlookEngine
+      // Format: sport:playername (all lowercase, no spaces or special chars)
+      const playerKey = `${sport.toLowerCase()}:${playerName.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
       
       // Look up cached outlook
       const cachedOutlook = await storage.getCachedPlayerOutlook(playerKey);
