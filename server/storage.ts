@@ -1534,15 +1534,18 @@ export class DatabaseStorage implements IStorage {
     }
     const uniqueCards = Array.from(uniqueCardsMap.values());
 
+    // Helper to get effective value (manualValue takes precedence over estimatedValue)
+    const getEffectiveValue = (c: typeof uniqueCards[0]) => c.manualValue ?? c.estimatedValue ?? 0;
+
     // Calculate totals using deduplicated cards
-    const totalValue = uniqueCards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
+    const totalValue = uniqueCards.reduce((sum, c) => sum + getEffectiveValue(c), 0);
     const totalCards = uniqueCards.length;
     const totalCases = userCases.length;
 
     // Get top 10 cards by value (from unique cards)
     const topCards = [...uniqueCards]
-      .filter(c => c.estimatedValue && c.estimatedValue > 0)
-      .sort((a, b) => (b.estimatedValue || 0) - (a.estimatedValue || 0))
+      .filter(c => getEffectiveValue(c) > 0)
+      .sort((a, b) => getEffectiveValue(b) - getEffectiveValue(a))
       .slice(0, 10);
 
     // Calculate value by case
@@ -1550,7 +1553,7 @@ export class DatabaseStorage implements IStorage {
       const caseCards = allCards.filter(card => card.displayCaseId === c.id);
       return {
         caseName: c.name,
-        totalValue: caseCards.reduce((sum, card) => sum + (card.estimatedValue || 0), 0),
+        totalValue: caseCards.reduce((sum, card) => sum + (card.manualValue ?? card.estimatedValue ?? 0), 0),
         cardCount: caseCards.length,
       };
     }).filter(c => c.cardCount > 0);

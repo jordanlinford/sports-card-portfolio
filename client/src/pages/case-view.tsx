@@ -126,9 +126,11 @@ function PortfolioInsightLine({ cards }: { cards: Card[] }) {
 }
 
 function ValueChangeIndicator({ card }: { card: Card }) {
-  if (!card.estimatedValue || !card.previousValue || card.previousValue <= 0) return null;
+  // Use manualValue if set, otherwise estimatedValue
+  const currentValue = card.manualValue ?? card.estimatedValue;
+  if (!currentValue || !card.previousValue || card.previousValue <= 0) return null;
   
-  const change = card.estimatedValue - card.previousValue;
+  const change = currentValue - card.previousValue;
   if (Math.abs(change) < 0.01) return null;
   
   const percentChange = ((change / card.previousValue) * 100).toFixed(1);
@@ -281,10 +283,10 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
               )}
             </div>
           )}
-          {card.estimatedValue && !compact && (
+          {(card.manualValue ?? card.estimatedValue) && !compact && (
             <div className="mt-1 flex items-center gap-1.5">
               <span className="text-xs text-primary font-semibold">
-                ${card.estimatedValue.toFixed(2)}
+                ${(card.manualValue ?? card.estimatedValue)?.toFixed(2)}
               </span>
               <ValueChangeIndicator card={card} />
             </div>
@@ -424,7 +426,7 @@ export default function CaseView() {
   }
 
   const cardCount = displayCase.cards?.length || 0;
-  const totalValue = displayCase.cards?.reduce((sum, card) => sum + (card.estimatedValue || 0), 0) || 0;
+  const totalValue = displayCase.cards?.reduce((sum, card) => sum + (card.manualValue ?? card.estimatedValue ?? 0), 0) || 0;
 
   return (
     <div className="min-h-screen">

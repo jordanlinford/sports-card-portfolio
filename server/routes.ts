@@ -1710,9 +1710,13 @@ Sitemap: ${origin}/sitemap.xml
         grader: card.grader,
       });
 
-      // If we got a value, update the card
+      // If we got a value, update the card and clear any manual override
+      // (user explicitly requested a refresh, so the new value should take precedence)
       if (result.estimatedValue !== null) {
-        await storage.updateCard(cardId, { estimatedValue: result.estimatedValue });
+        await storage.updateCard(cardId, { 
+          estimatedValue: result.estimatedValue,
+          manualValue: null, // Clear manual override when refreshing
+        });
       }
 
       res.json({
@@ -1781,11 +1785,14 @@ Sitemap: ${origin}/sitemap.xml
             grader: card.grader,
           });
 
-          const oldValue = card.estimatedValue;
+          const oldValue = card.manualValue ?? card.estimatedValue;
           let newValue = oldValue;
 
           if (result.estimatedValue !== null) {
-            await storage.updateCard(card.id, { estimatedValue: result.estimatedValue });
+            await storage.updateCard(card.id, { 
+              estimatedValue: result.estimatedValue,
+              manualValue: null, // Clear manual override when refreshing
+            });
             newValue = result.estimatedValue;
           }
 

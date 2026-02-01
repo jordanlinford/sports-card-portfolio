@@ -363,22 +363,33 @@ function isStrictComp(
     return { isStrict: false, excludeReason: `Has qualifier: ${listingGrade.qualifiers.join(", ")}` };
   }
   
-  // HARD GATE 2.5: RAW listings don't match GRADED cards
-  // If user wants PSA 10/BGS 9.5/etc., reject listings mentioning "raw", "ungraded", or lacking grader
+  // HARD GATE 2.5: RAW listings don't match GRADED cards (and vice versa)
   const cardGrade = parseGradeInfo(card.grade);
   // Assume PSA if grade is just a number like "10" (most common grader)
   const effectiveCardGrader = card.grader?.toLowerCase() || cardGrade.grader || 
     (card.grade && /^\d+\.?\d*$/.test(card.grade.trim()) ? "psa" : null);
   const cardWantsGraded = effectiveCardGrader || (card.grade && /\d/.test(card.grade));
   
-  if (cardWantsGraded) {
+  // Check if the user's card is explicitly RAW/ungraded
+  // Only treat as RAW if explicitly marked "raw" or has no grade AND no grader
+  // Cards with grades like "NM", "Mint" without a grader are ambiguous - don't filter
+  const graderLower = card.grader?.toLowerCase() || "";
+  const gradeLower = card.grade?.toLowerCase() || "";
+  const cardIsExplicitlyRaw = 
+    graderLower === "raw" || 
+    gradeLower === "raw" ||
+    graderLower === "ungraded" ||
+    gradeLower === "ungraded";
+  // Only treat as raw if explicitly marked OR completely empty (no grade/grader at all)
+  const cardIsRaw = cardIsExplicitlyRaw || (!card.grade && !card.grader);
+  
+  // CASE A: User wants GRADED, reject RAW listings
+  if (cardWantsGraded && !cardIsRaw) {
     // Raw/ungraded detection keywords - ONLY explicit indicators
-    // Avoid "mint condition" which appears in "Gem Mint Condition" for graded cards
     const rawKeywords = [
       "raw condition", "raw card", "in raw", " raw ", "ungraded", 
       "not graded", "no grade"
     ];
-    // Only trigger if raw keyword found WITHOUT a grader nearby
     const hasRawKeyword = rawKeywords.some(kw => combined.includes(kw));
     const hasAnyGraderMention = ["psa", "bgs", "sgc", "cgc"].some(g => combined.includes(g));
     
@@ -388,13 +399,22 @@ function isStrictComp(
     }
     
     // If listing has no detected grader and user wants graded, it's likely raw
-    // Exception: eBay sold listings that have the grader in the title but not parsed from snippet
     if (!listingGrade.grader && effectiveCardGrader) {
-      // Check if the grader appears anywhere in combined text
       const graderInText = combined.includes(effectiveCardGrader);
       if (!graderInText) {
         return { isStrict: false, excludeReason: `No grader detected - user wants ${effectiveCardGrader.toUpperCase()} graded` };
       }
+    }
+  }
+  
+  // CASE B: User has RAW card, reject GRADED listings (PSA 10, BGS 9.5, etc.)
+  // This prevents raw cards from getting inflated PSA 10 prices
+  if (cardIsRaw) {
+    const listingHasGrader = listingGrade.grader || ["psa", "bgs", "sgc", "cgc"].some(g => combined.includes(g));
+    const listingHasGrade = /\b(psa|bgs|sgc|cgc)\s*\d+/i.test(combined) || /\b(gem\s*mint|mint)\s*\d+\b/i.test(combined);
+    
+    if (listingHasGrader || listingHasGrade) {
+      return { isStrict: false, excludeReason: "GRADED listing - user has RAW card" };
     }
   }
   
@@ -1597,10 +1617,10 @@ function filterExtremeOutliers(
   const q3 = prices[q3Index];
   const iqr = q3 - q1;
   
-  // Use 2x IQR for outlier bounds (more conservative than typical 1.5x)
-  // This only filters EXTREME outliers, preserving legitimate 20-50% price movements
-  const lowerBound = q1 - (2 * iqr);
-  const upperBound = q3 + (2 * iqr);
+  // Use 1.5x IQR for outlier bounds (standard IQR method)
+  // This filters outliers more aggressively for consistent valuations
+  const lowerBound = q1 - (1.5 * iqr);
+  const upperBound = q3 + (1.5 * iqr);
   
   const filtered: PricePoint[] = [];
   const removed: PricePoint[] = [];

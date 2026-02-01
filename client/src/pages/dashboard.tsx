@@ -271,9 +271,9 @@ export default function Dashboard() {
   const isPro = user?.subscriptionStatus === "PRO";
   const canCreate = isPro || caseCount < 3;
   
-  // Check if user has any cards with values
+  // Check if user has any cards with values (use manualValue if set, otherwise estimatedValue)
   const hasValuableCards = displayCases?.some(dc => 
-    dc.cards?.some(card => card.estimatedValue && card.estimatedValue > 0)
+    dc.cards?.some(card => (card.manualValue ?? card.estimatedValue) && (card.manualValue ?? card.estimatedValue)! > 0)
   ) ?? false;
 
   if (isLoading) {
