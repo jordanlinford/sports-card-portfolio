@@ -1261,28 +1261,48 @@ export default function CaseEdit() {
                                 <p className="text-sm text-muted-foreground">Identifying card...</p>
                               </div>
                             ) : (
-                              <label className="cursor-pointer block py-4">
+                              <div className="py-4">
                                 <Camera className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
                                 <p className="font-medium mb-1">Take or upload a photo</p>
-                                <p className="text-sm text-muted-foreground mb-3">
+                                <p className="text-sm text-muted-foreground mb-4">
                                   AI will identify the card and fill in the details
                                 </p>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  capture="environment"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleScanPhoto(file);
-                                  }}
-                                  className="hidden"
-                                  data-testid="input-scan-card-image"
-                                />
-                                <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-secondary text-secondary-foreground hover-elevate">
-                                  <Sparkles className="h-4 w-4" />
-                                  Select Photo
-                                </span>
-                              </label>
+                                <div className="flex gap-3 justify-center flex-wrap">
+                                  <label className="cursor-pointer">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      capture="environment"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleScanPhoto(file);
+                                      }}
+                                      className="hidden"
+                                      data-testid="input-scan-camera"
+                                    />
+                                    <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-primary text-primary-foreground hover-elevate">
+                                      <Camera className="h-4 w-4" />
+                                      Take Photo
+                                    </span>
+                                  </label>
+                                  <label className="cursor-pointer">
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) handleScanPhoto(file);
+                                      }}
+                                      className="hidden"
+                                      data-testid="input-scan-library"
+                                    />
+                                    <span className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-secondary text-secondary-foreground hover-elevate">
+                                      <ImageIcon className="h-4 w-4" />
+                                      Photo Library
+                                    </span>
+                                  </label>
+                                </div>
+                              </div>
                             )}
                           </div>
                         </div>
