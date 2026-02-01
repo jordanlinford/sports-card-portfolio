@@ -219,8 +219,8 @@ export default function CaseEdit() {
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [duplicateCheckTitle, setDuplicateCheckTitle] = useState("");
   
-  // Scan mode state for Add Card
-  const [addCardMode, setAddCardMode] = useState<"manual" | "scan">("manual");
+  // Scan mode state for Add Card - default to scan for easier workflow
+  const [addCardMode, setAddCardMode] = useState<"manual" | "scan">("scan");
   const [scanning, setScanning] = useState(false);
   const [scanConfirmed, setScanConfirmed] = useState(false);
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
@@ -707,7 +707,7 @@ export default function CaseEdit() {
     setScanPreviewUrl(null);
     setScanConfirmed(false);
     setScanConfidence(null);
-    setAddCardMode("manual");
+    setAddCardMode("scan"); // Default back to scan mode
     setDuplicateCheckTitle("");
   };
 
