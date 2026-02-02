@@ -3746,11 +3746,16 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(403).json({ message: "Pro subscription required" });
       }
       
-      const { player1, player2 } = req.body;
+      const { player1, player2, algorithmicWinner } = req.body;
       
       if (!player1?.name || !player2?.name || !player1?.outlook || !player2?.outlook) {
         return res.status(400).json({ message: "Both players with outlook data required" });
       }
+      
+      // Determine winner name for AI context
+      const winnerName = algorithmicWinner === "left" ? player1.name 
+        : algorithmicWinner === "right" ? player2.name 
+        : null;
       
       const { GoogleGenAI } = await import("@google/genai");
       const gemini = new GoogleGenAI({
@@ -3785,6 +3790,8 @@ Player 2: ${player2.name}
 - Risk: ${player2.outlook?.snapshot?.risk || "Unknown"}
 - Key Points: ${(player2.outlook?.thesis || []).slice(0, 3).join("; ")}
 
+${winnerName ? `IMPORTANT: Our algorithm has determined that ${winnerName} is the better overall investment based on investment verdict analysis. Your "myTake" section should align with this conclusion - the winner field MUST be "${winnerName}". However, you can still highlight the strengths of each player for different investor types.` : ""}
+
 Generate an investment comparison analysis. Return ONLY a valid JSON object (no markdown, no code fences):
 
 {
@@ -3801,16 +3808,19 @@ Generate an investment comparison analysis. Return ONLY a valid JSON object (no 
     "points": ["Point 1 about performance/narrative", "Point 2 about market dynamics", "Point 3 about value proposition"]
   },
   "myTake": {
-    "agreement": true | false,
-    "winner": "${player1.name}" | "${player2.name}" | "tie",
-    "reasoning": "2-3 sentence nuanced analysis of the comparison that acknowledges both sides",
+    "winner": "${winnerName || "tie"}",
+    "reasoning": "2-3 sentence nuanced analysis explaining why ${winnerName || "neither"} is the better investment while acknowledging the other player's appeal",
     "valueInvestorPick": "${player1.name}" | "${player2.name}",
     "blueChipPick": "${player1.name}" | "${player2.name}",
     "bottomLine": "Short actionable summary like 'Buy X if you want Y, Hold Z if you believe W'"
   }
 }
 
-Focus on current market dynamics, career trajectory, and card market narratives. Be specific about what type of collector each player appeals to.`;
+RULES:
+- The "winner" in myTake MUST match the algorithmic winner: "${winnerName || "tie"}"
+- valueInvestorPick and blueChipPick can differ based on collector type, but at least one should typically be the winner
+- Focus on current market dynamics, career trajectory, and card market narratives
+- Be specific about what type of collector each player appeals to`;
 
       const response = await gemini.models.generateContent({
         model: "gemini-2.5-flash",

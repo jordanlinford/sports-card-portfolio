@@ -860,6 +860,8 @@ export default function ComparePage() {
   const fetchNarrativeMutation = useMutation({
     mutationFn: async () => {
       setIsLoadingNarrative(true);
+      // Calculate algorithmic winner to pass to AI for consistency
+      const comparison = comparePlayers(leftPlayer.outlook, rightPlayer.outlook);
       const response = await apiRequest("POST", "/api/compare-players/narrative", {
         player1: {
           name: leftPlayer.name,
@@ -871,6 +873,7 @@ export default function ComparePage() {
           sport: rightPlayer.sport,
           outlook: rightPlayer.outlook,
         },
+        algorithmicWinner: comparison.betterPlayer, // Pass to ensure AI aligns with algorithm
       });
       return response as ComparisonNarrative;
     },
