@@ -1417,8 +1417,11 @@ async function generateFreshOutlook(
   const exposures = getExposureRecommendations(finalClassification, sport, playerName);
   
   // Step 5: Build snapshot (use finalClassification which may have been corrected by AI)
+  // Note: Temperature may be adjusted later for verdict consistency
+  let snapshotTemperature: MarketTemperature = finalClassification.baseTemperature;
+  
   const snapshot: PlayerSnapshot = {
-    temperature: finalClassification.baseTemperature,
+    temperature: snapshotTemperature,
     volatility: finalClassification.baseVolatility,
     risk: finalClassification.baseRisk,
     horizon: finalClassification.baseHorizon,
@@ -1498,6 +1501,28 @@ async function generateFreshOutlook(
     playerName: playerName,
     inferredRoleTier: inferredRoleTier,
   });
+  
+  // Step 8.5: Ensure temperature-verdict consistency
+  // TRADE_THE_HYPE = "sell into spikes" implies HOT market
+  // HOLD_ROLE_RISK + down momentum = COOLING market
+  // This prevents UI showing identical temps for very different market dynamics
+  const verdictValue = investmentCall.verdict;
+  let adjustedTemperature: MarketTemperature = snapshot.temperature;
+  
+  if (verdictValue === "TRADE_THE_HYPE" && snapshot.temperature !== "HOT") {
+    console.log(`[PlayerOutlook] Temperature adjustment: ${snapshot.temperature} → HOT (TRADE_THE_HYPE verdict implies hot market)`);
+    adjustedTemperature = "HOT";
+  } else if (verdictValue === "HOLD_ROLE_RISK" && momentum === "down" && snapshot.temperature !== "COOLING") {
+    console.log(`[PlayerOutlook] Temperature adjustment: ${snapshot.temperature} → COOLING (HOLD_ROLE_RISK + down momentum)`);
+    adjustedTemperature = "COOLING";
+  } else if (verdictValue === "AVOID_STRUCTURAL" && snapshot.temperature !== "COOLING") {
+    console.log(`[PlayerOutlook] Temperature adjustment: ${snapshot.temperature} → COOLING (AVOID_STRUCTURAL verdict)`);
+    adjustedTemperature = "COOLING";
+  }
+  
+  // Apply adjusted temperature to both snapshot and classification for cache consistency
+  snapshot.temperature = adjustedTemperature;
+  finalClassification.baseTemperature = adjustedTemperature;
   
   // Step 9: Build response
   const response: PlayerOutlookResponse = {

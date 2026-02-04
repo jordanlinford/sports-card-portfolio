@@ -140,21 +140,37 @@ function getVerdictLabel(verdict?: string, postureLabel?: string) {
   }
 }
 
+// Verdict scores for comparison - higher = more attractive investment opportunity
+// Key insight: TRADE_THE_HYPE (hot momentum, take profits) > HOLD_ROLE_RISK (uncertain role)
+// because a player with proven momentum is a better investment than one with uncertain role
 const VERDICT_SCORES: Record<string, number> = {
-  ACCUMULATE: 100,
-  SPECULATIVE_SUPPRESSED: 85,
-  SPECULATIVE_FLYER: 70,
-  HOLD_CORE: 60,
-  HOLD_INJURY_CONTINGENT: 50,
-  HOLD_ROLE_RISK: 40,
-  TRADE_THE_HYPE: 30,
-  AVOID_NEW_MONEY: 10,
-  AVOID_STRUCTURAL: 5,
+  ACCUMULATE: 100,           // Strong buy - best opportunity
+  SPECULATIVE_SUPPRESSED: 85, // Undervalued speculative play
+  TRADE_THE_HYPE: 75,        // HOT momentum - valuable but at peak (moved UP from 30)
+  SPECULATIVE_FLYER: 70,     // High upside speculative
+  HOLD_CORE: 60,             // Established value, stable
+  HOLD_INJURY_CONTINGENT: 50, // Uncertain due to injury
+  HOLD_ROLE_RISK: 35,        // Uncertain role - risky (moved DOWN from 40)
+  AVOID_NEW_MONEY: 10,       // Don't buy new
+  AVOID_STRUCTURAL: 5,       // Structural problems
+};
+
+// Temperature scores for momentum tiebreaker
+const TEMPERATURE_SCORES: Record<string, number> = {
+  HOT: 20,
+  WARM: 10,
+  NEUTRAL: 0,
+  COOLING: -10,
 };
 
 function getVerdictScore(verdict?: string): number {
   if (!verdict) return 0;
   return VERDICT_SCORES[verdict] ?? 50;
+}
+
+function getTemperatureScore(temperature?: string): number {
+  if (!temperature) return 0;
+  return TEMPERATURE_SCORES[temperature] ?? 0;
 }
 
 const TIER_SCORES: Record<string, number> = {
@@ -177,18 +193,83 @@ const GRADE_SCORES: Record<string, number> = {
 function comparePlayers(player1: PlayerOutlookResponse | null, player2: PlayerOutlookResponse | null): {
   betterPlayer: "left" | "right" | "equal" | null;
   reason: string;
+  investmentType?: { left: string; right: string };
 } {
   if (!player1 || !player2) return { betterPlayer: null, reason: "" };
   
-  const score1 = getVerdictScore(player1.investmentCall?.verdict);
-  const score2 = getVerdictScore(player2.investmentCall?.verdict);
+  const verdict1 = player1.investmentCall?.verdict;
+  const verdict2 = player2.investmentCall?.verdict;
+  const temp1 = player1.snapshot?.temperature;
+  const temp2 = player2.snapshot?.temperature;
   
-  if (score1 > score2) {
-    return { betterPlayer: "left", reason: `${player1.player?.name} has a stronger investment outlook` };
-  } else if (score2 > score1) {
-    return { betterPlayer: "right", reason: `${player2.player?.name} has a stronger investment outlook` };
+  // Calculate composite score: verdict (85%) + momentum/temperature (15%)
+  // Verdict scores: 5-100, Temperature bonus: 0-20 (scaled to ~15% impact)
+  const verdictScore1 = getVerdictScore(verdict1);
+  const verdictScore2 = getVerdictScore(verdict2);
+  const tempBonus1 = getTemperatureScore(temp1) * 0.75; // Scale ±20 to ±15 (max 15% of 100)
+  const tempBonus2 = getTemperatureScore(temp2) * 0.75;
+  
+  const compositeScore1 = verdictScore1 + tempBonus1;
+  const compositeScore2 = verdictScore2 + tempBonus2;
+  
+  // Determine investment type for context
+  const getInvestmentType = (verdict?: string, temp?: string): string => {
+    if (verdict === "TRADE_THE_HYPE" || temp === "HOT") return "Momentum Play";
+    if (verdict === "ACCUMULATE" || verdict === "SPECULATIVE_SUPPRESSED") return "Value Play";
+    if (verdict?.startsWith("HOLD_")) return "Hold Position";
+    if (verdict?.startsWith("SPECULATIVE_")) return "Speculative";
+    if (verdict?.startsWith("AVOID_")) return "Avoid";
+    return "Neutral";
+  };
+  
+  const type1 = getInvestmentType(verdict1, temp1);
+  const type2 = getInvestmentType(verdict2, temp2);
+  
+  // Generate contextual reason
+  const generateReason = (winner: PlayerOutlookResponse, loser: PlayerOutlookResponse, winnerType: string): string => {
+    const winnerName = winner.player?.name;
+    const loserName = loser.player?.name;
+    const winnerVerdict = winner.investmentCall?.verdict;
+    const loserVerdict = loser.investmentCall?.verdict;
+    
+    // Hot momentum vs uncertain role
+    if (winnerVerdict === "TRADE_THE_HYPE" && loserVerdict === "HOLD_ROLE_RISK") {
+      return `${winnerName} has proven momentum and market demand, while ${loserName}'s role remains uncertain`;
+    }
+    // Hot momentum vs speculative
+    if (winnerVerdict === "TRADE_THE_HYPE" && loserVerdict?.includes("SPECULATIVE")) {
+      return `${winnerName} has established value at current highs, while ${loserName} is still speculative`;
+    }
+    // Value play wins
+    if (winnerType === "Value Play") {
+      return `${winnerName} offers better value entry point with stronger fundamentals`;
+    }
+    // Momentum play wins
+    if (winnerType === "Momentum Play") {
+      return `${winnerName} has stronger market momentum and proven demand`;
+    }
+    // Default
+    return `${winnerName} has a stronger investment outlook`;
+  };
+  
+  if (compositeScore1 > compositeScore2) {
+    return { 
+      betterPlayer: "left", 
+      reason: generateReason(player1, player2, type1),
+      investmentType: { left: type1, right: type2 }
+    };
+  } else if (compositeScore2 > compositeScore1) {
+    return { 
+      betterPlayer: "right", 
+      reason: generateReason(player2, player1, type2),
+      investmentType: { left: type1, right: type2 }
+    };
   }
-  return { betterPlayer: "equal", reason: "Both players have similar investment outlooks" };
+  return { 
+    betterPlayer: "equal", 
+    reason: "Both players have similar investment outlooks",
+    investmentType: { left: type1, right: type2 }
+  };
 }
 
 interface ComparisonPlayer {
