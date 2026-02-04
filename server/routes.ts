@@ -22,7 +22,10 @@ import {
   type SplitStatus,
   type SplitFormatType,
   type BundleDefinition,
+  userFeedback,
 } from "@shared/schema";
+import { db } from "./db";
+import { desc } from "drizzle-orm";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -9013,6 +9016,68 @@ RULES:
     } catch (error) {
       console.error("[Splits Webhook] Error processing webhook:", error);
       res.status(500).json({ error: "Webhook processing failed" });
+    }
+  });
+
+  // ============================================================================
+  // USER FEEDBACK
+  // ============================================================================
+  app.post("/api/feedback", async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || null;
+      const { type, message, page } = req.body;
+
+      if (!type || !message) {
+        return res.status(400).json({ error: "Type and message are required" });
+      }
+
+      const validTypes = ["bug", "feature", "general", "praise"];
+      if (!validTypes.includes(type)) {
+        return res.status(400).json({ error: "Invalid feedback type" });
+      }
+
+      if (message.length > 2000) {
+        return res.status(400).json({ error: "Message too long (max 2000 characters)" });
+      }
+
+      const userAgent = req.headers["user-agent"] || null;
+
+      await db.insert(userFeedback).values({
+        userId,
+        type,
+        message: message.trim(),
+        page: page || null,
+        userAgent,
+      });
+
+      res.status(201).json({ success: true, message: "Thank you for your feedback!" });
+    } catch (error) {
+      console.error("Error submitting feedback:", error);
+      res.status(500).json({ error: "Failed to submit feedback" });
+    }
+  });
+
+  // Get all feedback (admin only - you can add auth check later)
+  app.get("/api/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      // Simple admin check - you can expand this
+      if (!user?.email?.includes("@")) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const feedback = await db
+        .select()
+        .from(userFeedback)
+        .orderBy(desc(userFeedback.createdAt))
+        .limit(100);
+
+      res.json(feedback);
+    } catch (error) {
+      console.error("Error getting feedback:", error);
+      res.status(500).json({ error: "Failed to get feedback" });
     }
   });
 

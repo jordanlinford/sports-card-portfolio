@@ -2276,3 +2276,32 @@ export type ActivityLog = typeof activityLogs.$inferSelect;
 export type ActivityLogWithUser = ActivityLog & {
   user: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> | null;
 };
+
+// ============================================================================
+// USER FEEDBACK
+// ============================================================================
+export const userFeedback = pgTable("user_feedback", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").references(() => users.id),
+  type: varchar("type", { length: 50 }).notNull(), // bug, feature, general, praise
+  message: text("message").notNull(),
+  page: varchar("page", { length: 255 }), // Current page URL when submitted
+  userAgent: text("user_agent"),
+  status: varchar("status", { length: 50 }).default("new"), // new, reviewed, resolved
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const userFeedbackRelations = relations(userFeedback, ({ one }) => ({
+  user: one(users, {
+    fields: [userFeedback.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertUserFeedbackSchema = createInsertSchema(userFeedback).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+});
+export type InsertUserFeedback = z.infer<typeof insertUserFeedbackSchema>;
+export type UserFeedback = typeof userFeedback.$inferSelect;
