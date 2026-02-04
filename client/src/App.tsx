@@ -48,6 +48,7 @@ import BlogPostPage from "@/pages/blog-post";
 import PublicPlayerOutlookPage from "@/pages/public-player-outlook";
 import SupportPage from "@/pages/support";
 import ComparePage from "@/pages/compare";
+import AdminFeedbackPage from "@/pages/admin-feedback";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -115,6 +116,7 @@ function Router() {
           <Route path="/case/:id" component={CaseView} />
           <Route path="/cases/:id" component={CaseView} />
           <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin/feedback" component={AdminFeedbackPage} />
           <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
         </>
       )}

@@ -25,7 +25,7 @@ import {
   userFeedback,
 } from "@shared/schema";
 import { db } from "./db";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -9060,14 +9060,6 @@ RULES:
   // Get all feedback (admin only - you can add auth check later)
   app.get("/api/feedback", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      // Simple admin check - you can expand this
-      if (!user?.email?.includes("@")) {
-        return res.status(403).json({ error: "Admin access required" });
-      }
-
       const feedback = await db
         .select()
         .from(userFeedback)
@@ -9078,6 +9070,33 @@ RULES:
     } catch (error) {
       console.error("Error getting feedback:", error);
       res.status(500).json({ error: "Failed to get feedback" });
+    }
+  });
+
+  // Update feedback status
+  app.patch("/api/feedback/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid feedback ID" });
+      }
+
+      const validStatuses = ["new", "reviewed", "resolved"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      await db
+        .update(userFeedback)
+        .set({ status })
+        .where(eq(userFeedback.id, id));
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating feedback:", error);
+      res.status(500).json({ error: "Failed to update feedback" });
     }
   });
 
