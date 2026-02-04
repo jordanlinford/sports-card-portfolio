@@ -444,12 +444,20 @@ export function Navigation() {
                       </Link>
                     </DropdownMenuItem>
                     {isAdmin && (
-                      <DropdownMenuItem asChild>
-                        <Link href="/admin" className="flex items-center gap-2 cursor-pointer" data-testid="link-admin">
-                          <Shield className="h-4 w-4" />
-                          Admin Dashboard
-                        </Link>
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link href="/admin" className="flex items-center gap-2 cursor-pointer" data-testid="link-admin">
+                            <Shield className="h-4 w-4" />
+                            Admin Dashboard
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href="/admin/feedback" className="flex items-center gap-2 cursor-pointer" data-testid="link-admin-feedback">
+                            <MessageSquare className="h-4 w-4" />
+                            User Feedback
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
@@ -646,12 +654,20 @@ export function Navigation() {
                     </Button>
                   </Link>
                   {isAdmin && (
-                    <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
-                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/admin") && "bg-accent")}>
-                        <Shield className="h-4 w-4" />
-                        Admin Dashboard
-                      </Button>
-                    </Link>
+                    <>
+                      <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                        <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/admin") && "bg-accent")}>
+                          <Shield className="h-4 w-4" />
+                          Admin Dashboard
+                        </Button>
+                      </Link>
+                      <Link href="/admin/feedback" onClick={() => setMobileMenuOpen(false)}>
+                        <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/admin/feedback") && "bg-accent")}>
+                          <MessageSquare className="h-4 w-4" />
+                          User Feedback
+                        </Button>
+                      </Link>
+                    </>
                   )}
                   <a href="/api/logout" className="mt-2">
                     <Button variant="ghost" className="w-full justify-start gap-3 text-destructive hover:text-destructive">
