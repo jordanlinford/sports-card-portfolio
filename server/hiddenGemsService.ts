@@ -2,7 +2,6 @@ import { db } from "./db";
 import { hiddenGems, playerOutlookCache, cards, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
 import { eq, desc, and, isNotNull, sql } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
-import { fetchPlayerNews as fetchPlayerNewsFromEngine } from "./outlookEngine";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -115,10 +114,14 @@ async function generateGemContent(
   const thesisPoints = outlook.thesis || [];
   const realityCheck = outlook.marketRealityCheck || [];
   
-  const newsResult = await fetchPlayerNewsFromEngine(playerName, sport);
-  const newsContext = newsResult.snippets.length > 0 
-    ? `\n\nCURRENT NEWS (use this for up-to-date context):\n${newsResult.snippets.join("\n")}`
+  const existingRationale = outlook.investmentCall?.oneLineRationale || "";
+  const playerInfo = outlook.player;
+  const playerContext = playerInfo 
+    ? `\nPlayer Info: ${playerInfo.team || "Unknown team"}, ${playerInfo.position || "Unknown position"}, ${playerInfo.stage || "Unknown stage"}`
     : "";
+  const newsContext = existingRationale 
+    ? `\n\nCACHED ANALYSIS CONTEXT:${playerContext}\n${existingRationale}`
+    : playerContext;
   
   const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   
@@ -172,52 +175,61 @@ CRITICAL: Base analysis on current news and verified facts. Do NOT make assumpti
 Be specific to ${sport} and ${playerName}. Reference team, position, market dynamics.
 Return ONLY valid JSON, no markdown.`;
 
-  try {
-    const systemPrompt = "You are a sports card market analyst. Generate concise, specific analysis. Return only valid JSON.";
-    
-    const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `${systemPrompt}\n\n${prompt}`,
-    });
+  const maxRetries = 2;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const systemPrompt = "You are a sports card market analyst. Generate concise, specific analysis. Return only valid JSON.";
+      
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `${systemPrompt}\n\n${prompt}`,
+      });
 
-    const content = response.text || "{}";
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON found");
-    
-    const parsed = JSON.parse(jsonMatch[0]);
-    
-    if (isAvoid) {
+      const content = response.text || "{}";
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error("No JSON found");
+      
+      const parsed = JSON.parse(jsonMatch[0]);
+      
+      if (isAvoid) {
+        return {
+          thesis: parsed.thesis || `${playerName} cards appear overpriced relative to current situation.`,
+          whyDiscounted: Array.isArray(parsed.whyOverpriced) ? parsed.whyOverpriced.slice(0, 2) : ["Market hasn't fully priced in recent concerns."],
+          repricingCatalysts: Array.isArray(parsed.downwardCatalysts) ? parsed.downwardCatalysts.slice(0, 2) : ["Continued poor performance could trigger sell-off."],
+          trapRisks: Array.isArray(parsed.contraryBullCase) ? parsed.contraryBullCase.slice(0, 2) : ["Situation could improve unexpectedly."],
+        };
+      }
+      
       return {
-        thesis: parsed.thesis || `${playerName} cards appear overpriced relative to current situation.`,
-        whyDiscounted: Array.isArray(parsed.whyOverpriced) ? parsed.whyOverpriced.slice(0, 2) : ["Market hasn't fully priced in recent concerns."],
-        repricingCatalysts: Array.isArray(parsed.downwardCatalysts) ? parsed.downwardCatalysts.slice(0, 2) : ["Continued poor performance could trigger sell-off."],
-        trapRisks: Array.isArray(parsed.contraryBullCase) ? parsed.contraryBullCase.slice(0, 2) : ["Situation could improve unexpectedly."],
+        thesis: parsed.thesis || `${playerName} may be undervalued relative to talent level.`,
+        whyDiscounted: Array.isArray(parsed.whyDiscounted) ? parsed.whyDiscounted.slice(0, 2) : ["Market hasn't recognized full potential yet."],
+        repricingCatalysts: Array.isArray(parsed.repricingCatalysts) ? parsed.repricingCatalysts.slice(0, 2) : ["Strong performance could shift market sentiment."],
+        trapRisks: Array.isArray(parsed.trapRisks) ? parsed.trapRisks.slice(0, 2) : ["Situation could deteriorate further."],
       };
+    } catch (error: any) {
+      console.error(`[HiddenGems] Content generation attempt ${attempt} failed for ${playerName}:`, error?.message || error);
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        continue;
+      }
     }
-    
+  }
+
+  console.warn(`[HiddenGems] All retries exhausted for ${playerName}, using fallback content`);
+  if (isAvoid) {
     return {
-      thesis: parsed.thesis || `${playerName} may be undervalued relative to talent level.`,
-      whyDiscounted: Array.isArray(parsed.whyDiscounted) ? parsed.whyDiscounted.slice(0, 2) : ["Market hasn't recognized full potential yet."],
-      repricingCatalysts: Array.isArray(parsed.repricingCatalysts) ? parsed.repricingCatalysts.slice(0, 2) : ["Strong performance could shift market sentiment."],
-      trapRisks: Array.isArray(parsed.trapRisks) ? parsed.trapRisks.slice(0, 2) : ["Situation could deteriorate further."],
-    };
-  } catch (error) {
-    console.error(`[HiddenGems] Failed to generate content for ${playerName}:`, error);
-    if (isAvoid) {
-      return {
-        thesis: `${playerName} cards may be overpriced based on current analysis.`,
-        whyDiscounted: ["Market sentiment overly optimistic.", "Risk factors not fully reflected in pricing."],
-        repricingCatalysts: ["Poor performance could shift perception.", "Negative news could trigger correction."],
-        trapRisks: ["Player could outperform expectations."],
-      };
-    }
-    return {
-      thesis: `${playerName} may be undervalued based on current market analysis.`,
-      whyDiscounted: ["Market sentiment not aligned with talent level.", "External factors creating temporary discount."],
-      repricingCatalysts: ["Strong performance could shift perception.", "Positive news catalyst could reprice cards."],
-      trapRisks: ["Situation could remain unchanged or worsen."],
+      thesis: `${playerName} cards may be overpriced based on current analysis.`,
+      whyDiscounted: ["Market sentiment overly optimistic.", "Risk factors not fully reflected in pricing."],
+      repricingCatalysts: ["Poor performance could shift perception.", "Negative news could trigger correction."],
+      trapRisks: ["Player could outperform expectations."],
     };
   }
+  return {
+    thesis: `${playerName} may be undervalued based on current market analysis.`,
+    whyDiscounted: ["Market sentiment not aligned with talent level.", "External factors creating temporary discount."],
+    repricingCatalysts: ["Strong performance could shift perception.", "Positive news catalyst could reprice cards."],
+    trapRisks: ["Situation could remain unchanged or worsen."],
+  };
 }
 
 export async function getActiveHiddenGems(): Promise<HiddenGem[]> {
@@ -488,6 +500,10 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
         console.log(`[HiddenGems] Created gem ${gemsCreated}: ${candidate.playerName} (${gemVerdict})`);
       } catch (err) {
         console.error(`[HiddenGems] Failed to create gem for ${candidate.playerName}:`, err);
+      }
+      
+      if (i < selectedCandidates.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
     
