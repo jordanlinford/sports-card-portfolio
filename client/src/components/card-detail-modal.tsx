@@ -94,6 +94,15 @@ export function CardDetailModal({
   const [showTradeModal, setShowTradeModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [refreshedValue, setRefreshedValue] = useState<number | null>(null);
+  const [oneOfOneProjection, setOneOfOneProjection] = useState<{
+    isOneOfOne: boolean;
+    projectedValue: number | null;
+    multiplierUsed: number | null;
+    baseParallel: string | null;
+    baseParallelValue: number | null;
+    parallelComps: Array<{ parallel: string; estimatedValue: number | null; salesFound: number; confidence: string }>;
+    projectionMethod: string;
+  } | null>(null);
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string | undefined>(undefined);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -190,12 +199,19 @@ export function CardDetailModal({
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${displayCaseId}/public`] });
+      
+      if (data.oneOfOneProjection) {
+        setOneOfOneProjection(data.oneOfOneProjection);
+      }
+      
       if (data.updated) {
+        const isProjected = data.oneOfOneProjection?.baseParallel;
         toast({
-          title: "eBay Value Updated",
-          description: `Found ${data.salesFound} sales. eBay value: $${data.estimatedValue?.toFixed(2)} (${data.confidence} confidence)`,
+          title: isProjected ? "1/1 Value Projected" : "Value Updated",
+          description: isProjected 
+            ? `Projected from ${data.oneOfOneProjection.baseParallel} parallel: $${data.estimatedValue?.toFixed(2)} (${data.oneOfOneProjection.multiplierUsed}x multiplier)`
+            : `Found ${data.salesFound} sales. Value: $${data.estimatedValue?.toFixed(2)} (${data.confidence} confidence)`,
         });
-        // Don't update manualValue - only update refreshedValue for display
         setRefreshedValue(data.estimatedValue);
       } else {
         toast({
@@ -257,6 +273,7 @@ export function CardDetailModal({
         minOfferAmount: card.minOfferAmount?.toString() || "",
       });
       setRefreshedValue(null);
+      setOneOfOneProjection(null);
     }
   }, [card]);
 
@@ -906,6 +923,35 @@ export function CardDetailModal({
                     return null;
                   })()}
                 </div>
+
+                {oneOfOneProjection && oneOfOneProjection.isOneOfOne && oneOfOneProjection.baseParallel && (
+                  <div className="rounded-md border border-dashed p-3 space-y-2" data-testid="section-1of1-projection">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Sparkles className="w-4 h-4 text-amber-500" />
+                      <span className="font-medium">1/1 Projected Value</span>
+                      <Badge variant="outline" className="text-xs" data-testid="badge-projected-value">
+                        Projected
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground" data-testid="text-projection-method">
+                      {oneOfOneProjection.projectionMethod}
+                    </p>
+                    {oneOfOneProjection.parallelComps.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">Reference Parallels:</p>
+                        {oneOfOneProjection.parallelComps.map((comp) => (
+                          <div key={comp.parallel} className="flex items-center justify-between text-xs" data-testid={`text-parallel-comp-${comp.parallel}`}>
+                            <span>{comp.parallel} parallel</span>
+                            <span className="font-medium">
+                              {comp.estimatedValue ? `$${comp.estimatedValue.toFixed(2)}` : "N/A"} 
+                              <span className="text-muted-foreground ml-1">({comp.salesFound} sales)</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {card.previousValue && (
                   <div className="flex items-center gap-2 text-sm">

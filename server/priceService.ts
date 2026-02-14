@@ -32,6 +32,23 @@ interface CardInfo {
   grader?: string | null; // Separate grader field (PSA, BGS, SGC, CGC)
 }
 
+interface ParallelCompData {
+  parallel: string;
+  estimatedValue: number | null;
+  salesFound: number;
+  confidence: "high" | "medium" | "low";
+}
+
+interface OneOfOneProjection {
+  isOneOfOne: boolean;
+  projectedValue: number | null;
+  multiplierUsed: number | null;
+  baseParallel: string | null;
+  baseParallelValue: number | null;
+  parallelComps: ParallelCompData[];
+  projectionMethod: string;
+}
+
 interface PriceLookupResult {
   estimatedValue: number | null;
   source: string;
@@ -39,6 +56,7 @@ interface PriceLookupResult {
   salesFound: number;
   confidence: "high" | "medium" | "low";
   details?: string;
+  oneOfOneProjection?: OneOfOneProjection;
 }
 
 // Enhanced price data for Card Outlook AI 2.0
@@ -1148,16 +1166,178 @@ function buildSearchQuery(card: CardInfo): string {
 
 // Note: trySearchQuery removed - now using searchAndAnalyzeCardPrice with Gemini + Google Search
 
+// ==================== 1-of-1 Detection & Parallel Comp Fallback ====================
+
+const ONE_OF_ONE_PATTERNS = [
+  /\b1\s*\/\s*1\b/,
+  /\bone\s+of\s+one\b/i,
+  /\b1\s+of\s+1\b/i,
+  /\bsuperfractor\b/i,
+];
+
+export function isOneOfOneCard(card: CardInfo & { serialNumber?: number | string | null }): boolean {
+  const variation = (card.variation || "").toLowerCase();
+  const title = (card.title || "").toLowerCase();
+  const combined = `${variation} ${title}`;
+  
+  if (ONE_OF_ONE_PATTERNS.some(pattern => pattern.test(combined))) {
+    return true;
+  }
+  
+  const serial = String(card.serialNumber || "").trim();
+  if (serial === "1" || serial === "1/1") {
+    return true;
+  }
+  
+  return false;
+}
+
+const PARALLEL_TIERS = [
+  { label: "/5", searchTerm: "/5", multiplier: 2.5 },
+  { label: "/10", searchTerm: "/10", multiplier: 3.5 },
+  { label: "/25", searchTerm: "/25", multiplier: 5.0 },
+  { label: "/50", searchTerm: "/50", multiplier: 7.0 },
+  { label: "/99", searchTerm: "/99", multiplier: 10.0 },
+];
+
+async function lookupParallelComps(card: CardInfo): Promise<OneOfOneProjection> {
+  console.log(`[1/1 Fallback] Starting parallel comp search for: ${card.title}`);
+  
+  const parallelComps: ParallelCompData[] = [];
+  
+  const strip1of1Tokens = (text: string) => text
+    .replace(/1\s*\/\s*1/gi, "")
+    .replace(/one[\s-]+of[\s-]+one/gi, "")
+    .replace(/1\s+of\s+1/gi, "")
+    .replace(/superfractor/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  
+  const cleanVariation = strip1of1Tokens(card.variation || "");
+  const cleanTitle = strip1of1Tokens(card.title || "");
+  
+  for (const tier of PARALLEL_TIERS) {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      const parallelVariation = cleanVariation 
+        ? `${cleanVariation} ${tier.searchTerm}`.trim()
+        : tier.searchTerm;
+      
+      const parallelCard: CardInfo = {
+        ...card,
+        title: cleanTitle,
+        variation: parallelVariation,
+      };
+      
+      console.log(`[1/1 Fallback] Searching parallel: ${tier.label} (variation: "${parallelVariation}")`);
+      const result = await searchAndAnalyzeCardPrice(parallelCard);
+      
+      if (result && result.estimatedValue && result.estimatedValue > 0) {
+        parallelComps.push({
+          parallel: tier.label,
+          estimatedValue: result.estimatedValue,
+          salesFound: result.salesFound,
+          confidence: result.confidence,
+        });
+        console.log(`[1/1 Fallback] Found ${tier.label} comp: $${result.estimatedValue} (${result.salesFound} sales, ${result.confidence} confidence)`);
+      }
+      
+      if (parallelComps.length >= 2) {
+        console.log(`[1/1 Fallback] Found 2 parallel comps, stopping search`);
+        break;
+      }
+    } catch (error) {
+      console.error(`[1/1 Fallback] Error searching ${tier.label}:`, error);
+    }
+  }
+  
+  if (parallelComps.length === 0) {
+    console.log(`[1/1 Fallback] No parallel comps found`);
+    return {
+      isOneOfOne: true,
+      projectedValue: null,
+      multiplierUsed: null,
+      baseParallel: null,
+      baseParallelValue: null,
+      parallelComps: [],
+      projectionMethod: "No parallel comps found for projection",
+    };
+  }
+  
+  const bestComp = parallelComps.reduce((best, comp) => {
+    if (comp.confidence === "high" && best.confidence !== "high") return comp;
+    if (comp.salesFound > best.salesFound) return comp;
+    return best;
+  }, parallelComps[0]);
+  
+  const tier = PARALLEL_TIERS.find(t => t.label === bestComp.parallel);
+  const multiplier = tier?.multiplier || 5.0;
+  
+  const projectedValue = Math.round(bestComp.estimatedValue! * multiplier);
+  
+  console.log(`[1/1 Fallback] Projecting 1/1 value: $${bestComp.estimatedValue} (${bestComp.parallel}) × ${multiplier} = $${projectedValue}`);
+  
+  return {
+    isOneOfOne: true,
+    projectedValue,
+    multiplierUsed: multiplier,
+    baseParallel: bestComp.parallel,
+    baseParallelValue: bestComp.estimatedValue,
+    parallelComps,
+    projectionMethod: `Projected from ${bestComp.parallel} parallel (${bestComp.salesFound} sales, ${bestComp.confidence} confidence) × ${multiplier}x multiplier`,
+  };
+}
+
 export async function lookupCardPrice(card: CardInfo): Promise<PriceLookupResult> {
   try {
+    const is1of1 = isOneOfOneCard(card);
+    
     // Use Gemini with Google Search grounding (no Serper needed)
     const result = await searchAndAnalyzeCardPrice(card);
     
     if (result && result.estimatedValue) {
+      if (is1of1) {
+        result.oneOfOneProjection = {
+          isOneOfOne: true,
+          projectedValue: result.estimatedValue,
+          multiplierUsed: null,
+          baseParallel: null,
+          baseParallelValue: null,
+          parallelComps: [],
+          projectionMethod: "Direct 1/1 sales data found",
+        };
+      }
       return result;
     }
 
-    // If no price found, return a failure result
+    if (is1of1) {
+      console.log(`[Price Lookup] No direct 1/1 comps found, trying parallel fallback for: ${card.title}`);
+      const projection = await lookupParallelComps(card);
+      
+      if (projection.projectedValue) {
+        return {
+          estimatedValue: projection.projectedValue,
+          source: "Projected from Parallel Comps",
+          searchQuery: `${card.title} ${card.set || ""} ${card.grade || ""}`,
+          salesFound: projection.parallelComps.reduce((sum, c) => sum + c.salesFound, 0),
+          confidence: "low",
+          details: projection.projectionMethod,
+          oneOfOneProjection: projection,
+        };
+      }
+      
+      return {
+        estimatedValue: null,
+        source: "No comps available",
+        searchQuery: `${card.title} ${card.set || ""} ${card.grade || ""}`,
+        salesFound: 0,
+        confidence: "low",
+        details: "No direct 1/1 sales or parallel comps found. This is a truly unique card — consider setting a manual value.",
+        oneOfOneProjection: projection,
+      };
+    }
+
     return {
       estimatedValue: null,
       source: "eBay (no sales found)",
@@ -1948,4 +2128,4 @@ function filterPriceOutliers(pricePoints: PricePoint[]): {
   };
 }
 
-export { type EnhancedPriceLookupResult, type PricePoint, computeCardMatchConfidence, filterPriceOutliers };
+export { type EnhancedPriceLookupResult, type PricePoint, type OneOfOneProjection, type ParallelCompData, computeCardMatchConfidence, filterPriceOutliers };

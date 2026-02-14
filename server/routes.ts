@@ -1704,11 +1704,16 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(403).json({ message: "You don't have permission to update this card" });
       }
 
+      let variationForLookup = card.variation;
+      if (card.serialNumber === 1 && !(card.variation || "").toLowerCase().includes("1/1")) {
+        variationForLookup = ((card.variation || "") + " 1/1").trim();
+      }
+      
       const result = await lookupCardPrice({
         title: card.title,
         set: card.set,
         year: card.year,
-        variation: card.variation,
+        variation: variationForLookup,
         grade: card.grade,
         grader: card.grader,
       });
@@ -1779,11 +1784,16 @@ Sitemap: ${origin}/sitemap.xml
           // Add delay between requests to avoid rate limiting
           await new Promise((resolve) => setTimeout(resolve, 1500));
 
+          let bulkVariation = card.variation;
+          if (card.serialNumber === 1 && !(card.variation || "").toLowerCase().includes("1/1")) {
+            bulkVariation = ((card.variation || "") + " 1/1").trim();
+          }
+          
           const result = await lookupCardPrice({
             title: card.title,
             set: card.set,
             year: card.year,
-            variation: card.variation,
+            variation: bulkVariation,
             grade: card.grade,
             grader: card.grader,
           });
