@@ -1317,19 +1317,33 @@ function generateWhyBullets(verdict: InvestmentVerdict, scores: InvestmentScores
 
   switch (verdict) {
     case "ACCUMULATE":
-      if (mispricingScore >= 15) bullets.push("Market pricing trails production—classic buy window.");
-      if (stage === "ROOKIE" || stage === "YEAR_2") bullets.push(`${stageLabel} ${positionLabel}s with proven roles historically appreciate 20-40%.`);
-      else if (stage === "YEAR_3" || stage === "YEAR_4") bullets.push(`${stageLabel} ${positionLabel}s entering prime typically see sustained demand.`);
-      else bullets.push(`${stageLabel} ${positionLabel}s with elite production command premium multiples.`);
-      if (liquidityScore >= 60) bullets.push("Strong liquidity means easy entry and exit at fair spreads.");
-      else bullets.push("Position sizing allows for gradual accumulation at favorable prices.");
+      if (stage === "VETERAN" || stage === "AGING") {
+        if (mispricingScore >= 15) bullets.push("Market is overweighting near-term decline—structural value remains underpriced.");
+        bullets.push(`${stageLabel} ${positionLabel}s with legacy-tier status hold terminal value through brand equity and post-career narrative.`);
+        if (liquidityScore >= 60) bullets.push("Strong liquidity ensures the exit is there when the thesis plays out.");
+        else bullets.push("Sentiment compression creates asymmetric entry—downside is limited relative to structural floor.");
+      } else {
+        if (mispricingScore >= 15) bullets.push("Market pricing trails production—classic buy window.");
+        if (stage === "ROOKIE" || stage === "YEAR_2") bullets.push(`${stageLabel} ${positionLabel}s with proven roles historically appreciate 20-40%.`);
+        else if (stage === "YEAR_3" || stage === "YEAR_4") bullets.push(`${stageLabel} ${positionLabel}s entering prime typically see sustained demand.`);
+        else bullets.push(`${stageLabel} ${positionLabel}s with elite production command premium multiples.`);
+        if (liquidityScore >= 60) bullets.push("Strong liquidity means easy entry and exit at fair spreads.");
+        else bullets.push("Position sizing allows for gradual accumulation at favorable prices.");
+      }
       break;
 
     case "HOLD_CORE":
-      bullets.push(`${stageLabel} ${positionLabel}s at this tier typically see flat-to-modest appreciation.`);
-      if (downsideRiskScore <= 50) bullets.push("Stable role and production protect existing positions.");
-      else bullets.push("Current pricing reflects known story—no margin of safety for buyers.");
-      bullets.push("Capital better deployed chasing undervalued opportunities elsewhere.");
+      if (stage === "VETERAN" || stage === "AGING") {
+        bullets.push(`${stageLabel} ${positionLabel}s at this tier have priced in the legacy narrative—appreciation requires a catalyst.`);
+        if (downsideRiskScore <= 50) bullets.push("Structural floor intact—legacy value provides downside protection.");
+        else bullets.push("Current pricing reflects the known story. Wait for a milestone catalyst before adding.");
+        bullets.push("Sell into narrative spikes (milestones, retirement buzz, HOF conversations).");
+      } else {
+        bullets.push(`${stageLabel} ${positionLabel}s at this tier typically see flat-to-modest appreciation.`);
+        if (downsideRiskScore <= 50) bullets.push("Stable role and production protect existing positions.");
+        else bullets.push("Current pricing reflects known story—no margin of safety for buyers.");
+        bullets.push("Capital better deployed chasing undervalued opportunities elsewhere.");
+      }
       break;
 
     case "TRADE_THE_HYPE":
@@ -1720,20 +1734,33 @@ function generateTriggers(verdict: InvestmentVerdict, input: DecisionInput): { u
 
 function generateAdvisorTake(verdict: InvestmentVerdict, input: DecisionInput, scores: InvestmentScores): string {
   const name = input.playerName || "This player";
-  // Treat "Unknown" position as missing - use "player" instead
   const positionLabel = (input.position && input.position.toLowerCase() !== "unknown") ? input.position : "player";
+  const { stage } = input;
   
-  // Pattern-based templates that sound like judgment, not data dumping
+  const isLateCareer = stage === "VETERAN" || stage === "AGING";
+  const isPrime = stage === "PRIME";
+  const isEarlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3" || stage === "YEAR_4";
+  
+  const accumulateThesis = isLateCareer
+    ? `${name} is a buy because the market is pricing near-term decline more heavily than long-term terminal value. While the on-field peak may be behind, legacy status, brand equity, and the post-retirement narrative provide structural support to long-term pricing. Current sentiment compression creates asymmetric upside relative to downside. This thesis changes only if long-term collectibility deteriorates structurally—sustained role loss, reputational damage, or a material decline in market liquidity. Short-term statistical decline alone does not invalidate the collectible thesis.`
+    : isEarlyCareer
+    ? `${name} is a buy because the market still isn't fully pricing the ceiling. Early-career ${positionLabel}s with proven production and role security historically appreciate as the narrative matures. The upside runway remains significant. This view changes only if the player loses role certainty or a structural change undermines the long-term profile.`
+    : `${name} is a buy because the market still isn't fully pricing the ceiling. The combination of ${positionLabel} role certainty and upside runway creates a profile that continues to absorb capital rather than leak it. This view changes only if a structural shift occurs—sustained role loss, significant injury, or a material change in market liquidity. Short-term performance variance alone doesn't invalidate this thesis.`;
+  
+  const holdCoreThesis = isLateCareer
+    ? `${name} is a hold, not a buy. At this stage the market has priced in the legacy narrative—appreciation requires a catalytic event like a milestone, retirement announcement, or Hall of Fame induction. Sit tight and sell into narrative spikes. This view changes only under structural deterioration—not statistical decline.`
+    : `${name} is a hold, not a buy. ${isPrime ? "Prime-age" : "Established"} ${positionLabel}s with this production profile typically see flat-to-modest appreciation—the market has priced in the known story. Sit tight and sell into any short-term narrative spike. This view changes only if a clear breakout catalyst or structural shift emerges.`;
+  
   const templates: Record<InvestmentVerdict, string> = {
-    ACCUMULATE: `${name} is a buy because the market still isn't fully pricing the ceiling. The combination of ${positionLabel} role certainty and upside runway creates a profile that continues to absorb capital rather than leak it. This view only changes if performance meaningfully regresses or the team situation deteriorates.`,
+    ACCUMULATE: accumulateThesis,
     
-    HOLD_CORE: `${name} is a hold, not a buy. Prime-age ${positionLabel}s with established production typically see flat-to-modest appreciation—the market has priced in the known story. Sit tight and sell into any short-term narrative spike. This view only changes if a clear breakout catalyst emerges.`,
+    HOLD_CORE: holdCoreThesis,
     
     TRADE_THE_HYPE: `${name} is a sell at current prices. Market pricing has outrun realistic production outcomes—history shows these peaks rarely sustain. Late-stage hype cycles for ${positionLabel}s often retrace 30-50% within 6 months. Lock in gains before the correction. Only reconsider if a career-defining moment extends the runway.`,
     
     AVOID_NEW_MONEY: `${name} is a pass at current prices. The position/age profile suggests elevated downside risk—${positionLabel}s in similar situations historically see value compression. Better capital deployment opportunities exist elsewhere. Wait for a 40%+ pullback or fundamental change before reconsidering.`,
     
-    SPECULATIVE_FLYER: `${name} is a small speculative bet only. The upside is real but so is the risk of total loss. Keep position sizing small—lottery ticket territory. This view only changes if role certainty emerges and performance confirms the projection.`,
+    SPECULATIVE_FLYER: `${name} is a small speculative bet only. The upside is real but so is the risk of total loss. Keep position sizing small—lottery ticket territory. This view changes only if role certainty emerges and performance confirms the projection.`,
     
     HOLD_ROLE_RISK: `${name} is a hold with elevated role risk. The talent profile may be strong but the current role situation creates uncertainty. Monitor for path back to relevance—one opportunity away from repricing. Don't add until role clarity emerges.`,
     
