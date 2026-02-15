@@ -39,17 +39,29 @@ export interface CardScanResult {
   error?: string;
 }
 
-const CARD_SCAN_PROMPT = `You are an expert sports card identifier and appraiser. Analyze this card image and provide detailed identification.
+const CARD_SCAN_PROMPT = `You are an expert sports card identifier. Use your knowledge and web search to identify this card with maximum accuracy.
+
+CRITICAL: Look at the PHYSICAL CARD carefully:
+- Read ALL text on the card (player name, team, set logos, card number, serial numbering)
+- Examine the BORDER COLOR and PATTERN to determine the exact parallel (Gold borders = Gold Prizm, Silver shimmer = Silver Prizm, Rainbow = Hyper Prizm, etc.)
+- Check for "RC" or "Rookie" logos
+- Look at the BACK of the card if visible for set name, card number, and serial numbering
+- Use web search to cross-reference what you see with actual card checklists and eBay listings
+
+PARALLEL IDENTIFICATION GUIDE (look at border color/pattern):
+- Prizm parallels: Base (no color), Silver (silver shimmer), Red (/299), Blue (/199), Green, Pink, Orange (/49), Gold (/10), Black (/1), Gold Vinyl (/5), Mojo, Hyper, Camo, Snakeskin, Disco, Tiger, Marble, Nebula, Cosmic
+- Topps Chrome parallels: Base, Refractor, Pink Refractor, Gold Refractor (/50), Superfractor (/1)
+- Donruss parallels: Base, Rated Rookie, Press Proof, Holo, Elite Series
+- Select parallels: Base, Silver, Concourse, Premier Level, Tie-Dye, Zebra, Disco, Gold (/10)
 
 Return a JSON object with EXACTLY this structure (no markdown, just pure JSON):
 {
   "confidence": "high" | "medium" | "low",
-  "playerName": "Full player name",
-  "year": 2023,
-  "setName": "Full set name (e.g., 'Panini Prizm', 'Topps Chrome')",
-  "cardNumber": "Card number if visible (e.g., '123', '12-SP')",
-  "variation": "Variation name if any (e.g., 'Base', 'Silver', 'Photo Variation', 'SP')",
-  "parallel": "Parallel name if any (e.g., 'Prizm Silver', 'Refractor', 'Gold /50')",
+  "playerName": "Full player name exactly as printed on card",
+  "year": 2025,
+  "setName": "Exact product name (e.g., 'Prizm', 'Prizm Draft Picks', 'Select', 'Donruss', 'Topps Chrome')",
+  "cardNumber": "Card number if visible (e.g., '123')",
+  "variation": "The EXACT parallel/variation name matching how it's listed on eBay (e.g., 'Gold Prizm /10', 'Silver Prizm', 'Hyper Prizm', 'Red White Blue', 'Downtown'). Include serial numbering if visible (e.g., '/10', '/25', '/50'). Use 'Base' for no parallel.",
   "isRookie": true or false,
   "sport": "football" | "basketball" | "baseball" | "hockey" | "soccer",
   "appearsToBe": "graded" | "raw",
@@ -58,18 +70,15 @@ Return a JSON object with EXACTLY this structure (no markdown, just pure JSON):
   "conditionNotes": "Notes about visible condition if raw",
   "rarity": "common" | "uncommon" | "rare" | "super-rare",
   "desirability": "high" | "medium" | "low",
-  "collectibilityNotes": "Brief notes about why collectors want this card",
-  "analysis": "2-3 sentence summary of what you identified and key details"
+  "collectibilityNotes": "Brief notes about collectibility",
+  "analysis": "2-3 sentence summary of what you identified"
 }
 
-Be specific about:
-- Exact set name (Prizm vs Prizm Draft Picks vs Select, etc.)
-- Parallel colors and numbering if visible
-- SP/SSP/Photo variations
-- Rookie designation
-- Any serial numbering visible
-
-If you cannot identify something with confidence, use null or "unknown".`;
+IMPORTANT:
+- The "variation" field should contain the COMPLETE parallel name as a collector would search it on eBay. Do NOT split parallel info between variation and a separate field.
+- For Prizm cards: ALWAYS identify the exact parallel by border color. A gold-bordered Prizm is "Gold Prizm /10", not just "Gold".
+- If you see serial numbering (like "5/10" or "23/99"), include it in the variation field.
+- Search the web to verify the exact set name and year — newer products (2024, 2025) may not be in training data.`;
 
 export async function scanCardImage(imageData: string, mimeType: string = "image/jpeg"): Promise<CardScanResult> {
   try {
@@ -116,6 +125,9 @@ export async function scanCardImage(imageData: string, mimeType: string = "image
           ],
         },
       ],
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
     });
 
     const text = response.text || "";
@@ -154,6 +166,14 @@ export async function scanCardImage(imageData: string, mimeType: string = "image
 
     const parsed = JSON.parse(jsonMatch[0]);
     
+    let variation = parsed.variation || null;
+    const parallel = parsed.parallel || null;
+    if (parallel && (!variation || variation.toLowerCase() === "base")) {
+      variation = parallel;
+    } else if (parallel && variation && !variation.toLowerCase().includes(parallel.toLowerCase())) {
+      variation = `${variation} ${parallel}`.trim();
+    }
+    
     return {
       success: true,
       confidence: parsed.confidence || "medium",
@@ -162,8 +182,8 @@ export async function scanCardImage(imageData: string, mimeType: string = "image
         year: parsed.year || null,
         setName: parsed.setName || "Unknown",
         cardNumber: parsed.cardNumber || null,
-        variation: parsed.variation || null,
-        parallel: parsed.parallel || null,
+        variation,
+        parallel,
         isRookie: parsed.isRookie || false,
         sport: parsed.sport || "unknown",
       },
