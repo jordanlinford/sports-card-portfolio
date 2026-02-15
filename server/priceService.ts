@@ -947,32 +947,48 @@ async function searchAndAnalyzeCardPrice(card: CardInfo): Promise<PriceLookupRes
     ? `${card.grader.toUpperCase()} ${card.grade}` 
     : (card.grade || "Raw/Ungraded");
   
-  // Build a comprehensive search prompt
-  const searchPrompt = `Search for recent sold listings and market value for this sports card:
+  // Build variation-aware search query hints
+  const variationStr = card.variation || "Base";
+  const isNumbered = variationStr.match(/\/\d+/);
+  const searchHints = isNumbered 
+    ? `This is a NUMBERED parallel (${variationStr}) — it is significantly more valuable than a base card. Search specifically for this parallel.`
+    : (variationStr.toLowerCase() !== "base" 
+      ? `This is a ${variationStr} parallel — search for this specific variation, not the base card.`
+      : "");
+
+  const searchPrompt = `Search for recent sold listings and current market value for this sports card:
 
 Player: ${card.title}
 Set: ${card.set || "Unknown"}
 Year: ${card.year || "Unknown"}
-Variation: ${card.variation || "Base"}
+Variation: ${variationStr}
 Grade: ${gradeString}
 
-IMPORTANT: The grading company matters significantly for value. ${card.grader ? `This card is graded by ${card.grader.toUpperCase()}, NOT PSA.` : ""}
+${card.grader ? `GRADING: This card is graded by ${card.grader.toUpperCase()}, NOT PSA. Adjust value accordingly.` : ""}
+${searchHints}
 
-Search eBay sold listings, price guides, and card pricing websites. Be AGGRESSIVE about finding a value:
-- If you find a price range (e.g., $10-$25), use the MIDPOINT ($17.50)
-- If you find ANY price reference at all, use it
+SEARCH STRATEGY:
+1. Search eBay sold/completed listings for this EXACT card (player + year + set + variation + grade)
+2. Try queries like: "${card.title} ${card.year || ""} ${card.set || ""} ${variationStr} ${gradeString} sold"
+3. Check 130point.com, PSA card facts, and card pricing sites for recent sales data
+4. For numbered parallels (/10, /25, /50): These are RARE and command premium prices — do not confuse with base cards
+
+PRICING RULES:
+- Report ACTUAL recent sold prices, not deflated estimates
+- If recent solds show a range (e.g., $400-$600), report the market midpoint ($500), not the low end
+- Numbered rookie parallels of top draft picks are typically high-value cards — price accordingly
 - Lower-tier grading companies (BCCG, CGC) are worth less than PSA/BGS
-- Even a single data point is valuable
+- ACCURACY matters more than caution. Users rely on these values for investment decisions.
 
 Return ONLY a JSON object:
 {
-  "estimatedValue": <number - ALWAYS provide a number if ANY price data exists>,
+  "estimatedValue": <number based on actual market data>,
   "salesFound": <number of price references found>,
   "confidence": "high" | "medium" | "low",
-  "details": "<brief explanation including the price range found>"
+  "details": "<cite specific sold listings with prices and dates when possible>"
 }
 
-You MUST return an estimatedValue if you find ANY price information. Do not return null unless there is truly zero pricing data available.`;
+You MUST return an estimatedValue if you find ANY price information.`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {

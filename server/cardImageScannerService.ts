@@ -284,10 +284,15 @@ Card Details:
 {CARD_DETAILS}
 
 CRITICAL INSTRUCTIONS:
-1. You MUST use Google Search to find actual recent sold prices on eBay for this specific card
-2. Search for "[player name] [year] [set name] PSA 10 sold eBay" and similar queries
-3. Do NOT make up prices or use generic estimates - find REAL sale data from the past 30-90 days
-4. Base cards (non-parallel, non-numbered) typically sell for much less than parallels or short prints
+1. You MUST use Google Search to find actual recent sold prices on eBay for this EXACT card
+2. Search for the SPECIFIC variation/parallel — do NOT confuse a numbered parallel with a base card
+3. Try multiple search queries to find the best data:
+   - "[player name] [year] [set name] [variation] sold eBay"
+   - "[player name] [variation] [set name] /[numbering]"  
+   - "[player name] [set name] gold /10" (for numbered cards)
+4. For NUMBERED parallels (/10, /25, /50, /99): These are significantly more valuable than base cards. A Gold Prizm /10 of a top rookie can sell for $500-$5000+. Do NOT price them like base cards.
+5. For ROOKIE CARDS of current NFL/NBA draft picks: These are typically at PEAK demand. Recent sold prices will reflect high market interest.
+6. Report what the market is ACTUALLY paying based on recent sold data — do not discount or deflate. If recent solds show $500-$800, report that range, not a conservative $200.
 
 Return a JSON object with this structure (no markdown, just pure JSON):
 {
@@ -295,13 +300,13 @@ Return a JSON object with this structure (no markdown, just pure JSON):
     {"condition": "Raw (Ungraded)", "minPrice": <actual_number>, "maxPrice": <actual_number>},
     {"condition": "PSA 8 (Near Mint-Mint)", "minPrice": <actual_number>, "maxPrice": <actual_number>},
     {"condition": "PSA 9 (Mint)", "minPrice": <actual_number>, "maxPrice": <actual_number>},
-    {"condition": "PSA 10 (Gem Mint)", "minPrice": <actual_number>, "maxPrice": <actual_number|}
+    {"condition": "PSA 10 (Gem Mint)", "minPrice": <actual_number>, "maxPrice": <actual_number>}
   ],
-  "marketNotes": "Brief note citing the actual sales data you found",
+  "marketNotes": "Cite specific sold listings you found with dates and prices",
   "confidence": "high" | "medium" | "low"
 }
 
-Use "confidence": "low" if you cannot find sufficient real sales data. Be conservative - it's better to estimate lower than to inflate prices.`;
+ACCURACY IS MORE IMPORTANT THAN CAUTION. Report actual market prices. If you find sold listings at $500-$800, do NOT report $200 to "be safe". Users need accurate data to make investment decisions.`;
 
 async function getGeminiPriceEstimate(scan: CardScanResult): Promise<AIPriceEstimate> {
   try {
