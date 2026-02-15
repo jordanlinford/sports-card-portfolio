@@ -5286,6 +5286,48 @@ RULES:
     }
   });
 
+  app.post("/api/admin/registry/ai-refresh", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { sport, batchSize } = req.body;
+      const { startAiRefresh } = await import("./playerRegistryAiUpdate");
+      const jobId = await startAiRefresh(sport || null, batchSize || 20);
+      res.json({ jobId });
+    } catch (error: any) {
+      console.error("Error starting AI refresh:", error);
+      res.status(400).json({ message: error.message || "Failed to start AI refresh" });
+    }
+  });
+
+  app.get("/api/admin/registry/ai-refresh/:jobId", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { getJob } = await import("./playerRegistryAiUpdate");
+      const job = getJob(req.params.jobId);
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      res.json(job);
+    } catch (error) {
+      console.error("Error fetching AI refresh status:", error);
+      res.status(500).json({ message: "Failed to fetch job status" });
+    }
+  });
+
+  app.post("/api/admin/registry/ai-refresh/:jobId/apply", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { acceptedPlayerIds } = req.body;
+      if (!Array.isArray(acceptedPlayerIds)) {
+        return res.status(400).json({ message: "acceptedPlayerIds must be an array" });
+      }
+      const { applyProposals } = await import("./playerRegistryAiUpdate");
+      const adminId = req.user.claims.sub;
+      const result = await applyProposals(req.params.jobId, acceptedPlayerIds, adminId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error applying AI proposals:", error);
+      res.status(400).json({ message: error.message || "Failed to apply proposals" });
+    }
+  });
+
   // Blog Admin routes
   app.get("/api/admin/blog", isAuthenticated, isAdmin, async (req: any, res) => {
     try {

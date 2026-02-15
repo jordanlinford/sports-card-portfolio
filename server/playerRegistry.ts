@@ -172,6 +172,16 @@ export function getRegistrySource(): "database" | "csv" | "none" {
   return registrySource;
 }
 
+export async function reloadRegistry(): Promise<void> {
+  registryMap.clear();
+  registryLoaded = false;
+  loadingPromise = null;
+  registrySource = "none";
+  loadingPromise = loadRegistryAsync();
+  await loadingPromise;
+  console.log(`[PlayerRegistry] Registry reloaded: ${registryMap.size} entries from ${registrySource}`);
+}
+
 function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = "";

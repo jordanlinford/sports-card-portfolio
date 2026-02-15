@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download, Globe, Zap, ExternalLink, MessageCircle, Send, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download, Globe, Zap, ExternalLink, MessageCircle, Send, Clock, CheckCircle, AlertCircle, Sparkles, Loader2, ArrowRight, Check, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -196,6 +196,12 @@ function PlayerRegistryTab() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [clearAllBeforeImport, setClearAllBeforeImport] = useState(false);
+  const [aiRefreshOpen, setAiRefreshOpen] = useState(false);
+  const [aiRefreshSport, setAiRefreshSport] = useState("all");
+  const [aiJobId, setAiJobId] = useState<string | null>(null);
+  const [aiJob, setAiJob] = useState<any>(null);
+  const [selectedProposals, setSelectedProposals] = useState<Set<number>>(new Set());
+  const aiPollRef = useRef<NodeJS.Timeout | null>(null);
 
   const [formData, setFormData] = useState({
     sport: "NFL",
@@ -266,6 +272,70 @@ function PlayerRegistryTab() {
       toast({ title: "Upload Failed", description: error.message, variant: "destructive" });
     }
   });
+
+  const startAiRefreshMutation = useMutation({
+    mutationFn: async (sport: string) => {
+      return await apiRequest("POST", "/api/admin/registry/ai-refresh", { 
+        sport: sport === "all" ? null : sport 
+      });
+    },
+    onSuccess: (data: any) => {
+      setAiJob({ status: "running", batchesCompleted: 0, batchesTotal: 0, processedPlayers: 0, totalPlayers: 0, proposals: [], errors: [] });
+      setSelectedProposals(new Set());
+      setAiJobId(data.jobId);
+      startPolling(data.jobId);
+      toast({ title: "AI Refresh Started", description: "Analyzing players with AI..." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to Start", description: error.message, variant: "destructive" });
+    }
+  });
+
+  const applyProposalsMutation = useMutation({
+    mutationFn: async (acceptedPlayerIds: number[]) => {
+      return await apiRequest("POST", `/api/admin/registry/ai-refresh/${aiJobId}/apply`, { acceptedPlayerIds });
+    },
+    onSuccess: (data: any) => {
+      refetch();
+      refetchStats();
+      toast({ 
+        title: "Changes Applied", 
+        description: `Updated ${data.applied} players, skipped ${data.skipped}` 
+      });
+      setAiRefreshOpen(false);
+      setAiJobId(null);
+      setAiJob(null);
+      setSelectedProposals(new Set());
+    },
+    onError: (error: Error) => {
+      toast({ title: "Apply Failed", description: error.message, variant: "destructive" });
+    }
+  });
+
+  function startPolling(jobId: string) {
+    if (aiPollRef.current) clearInterval(aiPollRef.current);
+    aiPollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/registry/ai-refresh/${jobId}`);
+        if (!res.ok) return;
+        const job = await res.json();
+        setAiJob(job);
+        if (job.status === "completed" || job.status === "failed") {
+          if (aiPollRef.current) clearInterval(aiPollRef.current);
+          aiPollRef.current = null;
+          if (job.proposals?.length > 0) {
+            setSelectedProposals(new Set(job.proposals.map((p: any) => p.playerId)));
+          }
+        }
+      } catch {}
+    }, 3000);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (aiPollRef.current) clearInterval(aiPollRef.current);
+    };
+  }, []);
 
   const handleExportCSV = async () => {
     try {
@@ -417,6 +487,14 @@ function PlayerRegistryTab() {
               <CardDescription>Manage player status data for investment verdicts</CardDescription>
             </div>
             <div className="flex gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                onClick={() => setAiRefreshOpen(true)}
+                data-testid="button-ai-refresh"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                AI Refresh
+              </Button>
               <Button
                 variant="outline"
                 onClick={handleExportCSV}
@@ -729,6 +807,203 @@ function PlayerRegistryTab() {
               Upload and Update
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={aiRefreshOpen} onOpenChange={(open) => { 
+        if (!open && aiJob?.status !== "running") {
+          setAiRefreshOpen(false);
+          setAiJobId(null);
+          setAiJob(null);
+          setSelectedProposals(new Set());
+        }
+      }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              AI Registry Refresh
+            </DialogTitle>
+            <DialogDescription>
+              Use AI to scan for career stage and role tier changes across all players.
+            </DialogDescription>
+          </DialogHeader>
+
+          {!aiJobId ? (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Filter by Sport</Label>
+                <Select value={aiRefreshSport} onValueChange={setAiRefreshSport}>
+                  <SelectTrigger data-testid="select-ai-sport">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sports ({stats?.total || 0} players)</SelectItem>
+                    {SPORTS.map(sport => (
+                      <SelectItem key={sport} value={sport}>
+                        {sport} ({stats?.bySport[sport] || 0} players)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                AI will search for current player news, trades, injuries, and retirements to suggest updates. Players are processed in batches of 20 with a 3-second delay between batches.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Estimated time: ~{Math.ceil((aiRefreshSport === "all" ? (stats?.total || 792) : (stats?.bySport[aiRefreshSport] || 0)) / 20) * 6} seconds
+              </p>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setAiRefreshOpen(false)}>Cancel</Button>
+                <Button 
+                  onClick={() => startAiRefreshMutation.mutate(aiRefreshSport)}
+                  disabled={startAiRefreshMutation.isPending}
+                  data-testid="button-start-ai-refresh"
+                >
+                  {startAiRefreshMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Start AI Analysis
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : aiJob?.status === "running" ? (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="font-medium">Analyzing players...</span>
+              </div>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div 
+                  className="bg-primary h-2 rounded-full transition-all"
+                  style={{ width: `${aiJob.batchesTotal > 0 ? (aiJob.batchesCompleted / aiJob.batchesTotal) * 100 : 0}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Batch {aiJob.batchesCompleted} of {aiJob.batchesTotal} ({aiJob.processedPlayers} / {aiJob.totalPlayers} players)
+              </p>
+              {aiJob.proposals?.length > 0 && (
+                <p className="text-sm">{aiJob.proposals.length} changes found so far...</p>
+              )}
+            </div>
+          ) : aiJob?.status === "completed" ? (
+            <div className="space-y-4 py-2">
+              {aiJob.proposals.length === 0 ? (
+                <div className="text-center py-6">
+                  <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-500" />
+                  <p className="font-medium">All players are up to date</p>
+                  <p className="text-sm text-muted-foreground mt-1">No changes needed</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="font-medium">{aiJob.proposals.length} proposed changes</p>
+                    <div className="flex gap-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setSelectedProposals(new Set(aiJob.proposals.map((p: any) => p.playerId)))}
+                        data-testid="button-select-all"
+                      >
+                        Select All
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => setSelectedProposals(new Set())}
+                        data-testid="button-deselect-all"
+                      >
+                        Deselect All
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="border rounded-md divide-y max-h-[50vh] overflow-y-auto">
+                    {aiJob.proposals.map((p: any) => (
+                      <div 
+                        key={p.playerId} 
+                        className={`p-3 flex items-start gap-3 cursor-pointer transition-colors ${selectedProposals.has(p.playerId) ? 'bg-primary/5' : ''}`}
+                        onClick={() => {
+                          const next = new Set(selectedProposals);
+                          if (next.has(p.playerId)) next.delete(p.playerId);
+                          else next.add(p.playerId);
+                          setSelectedProposals(next);
+                        }}
+                        data-testid={`proposal-row-${p.playerId}`}
+                      >
+                        <Checkbox 
+                          checked={selectedProposals.has(p.playerId)} 
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium">{p.playerName}</span>
+                            <Badge variant="outline" className="no-default-hover-elevate no-default-active-elevate">{p.sport}</Badge>
+                            <Badge 
+                              variant={p.confidence === "HIGH" ? "default" : "secondary"}
+                              className="no-default-hover-elevate no-default-active-elevate"
+                            >
+                              {p.confidence}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                            {p.proposedCareerStage && (
+                              <span className="flex items-center gap-1">
+                                Career: <span className="text-muted-foreground">{p.currentCareerStage}</span>
+                                <ArrowRight className="h-3 w-3" />
+                                <span className="font-medium text-primary">{p.proposedCareerStage}</span>
+                              </span>
+                            )}
+                            {p.proposedRoleTier && (
+                              <span className="flex items-center gap-1">
+                                Role: <span className="text-muted-foreground">{p.currentRoleTier}</span>
+                                <ArrowRight className="h-3 w-3" />
+                                <span className="font-medium text-primary">{p.proposedRoleTier}</span>
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{p.rationale}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              {aiJob.errors?.length > 0 && (
+                <div className="text-sm text-destructive">
+                  {aiJob.errors.length} batch error(s) occurred during processing
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setAiRefreshOpen(false); setAiJobId(null); setAiJob(null); setSelectedProposals(new Set()); }}>
+                  {aiJob.proposals.length === 0 ? "Close" : "Cancel"}
+                </Button>
+                {aiJob.proposals.length > 0 && (
+                  <Button
+                    onClick={() => applyProposalsMutation.mutate(Array.from(selectedProposals))}
+                    disabled={selectedProposals.size === 0 || applyProposalsMutation.isPending}
+                    data-testid="button-apply-proposals"
+                  >
+                    {applyProposalsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Apply {selectedProposals.size} Changes
+                  </Button>
+                )}
+              </DialogFooter>
+            </div>
+          ) : aiJob?.status === "failed" ? (
+            <div className="text-center py-6">
+              <AlertCircle className="h-10 w-10 mx-auto mb-3 text-destructive" />
+              <p className="font-medium">Job Failed</p>
+              <p className="text-sm text-muted-foreground mt-1">{aiJob?.errors?.[0] || "Unknown error"}</p>
+              <Button variant="outline" className="mt-4" onClick={() => { setAiJobId(null); setAiJob(null); }}>
+                Try Again
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <span className="font-medium">Starting analysis...</span>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
