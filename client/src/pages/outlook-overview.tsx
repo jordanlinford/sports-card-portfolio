@@ -2194,18 +2194,18 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
           ) : result ? (
             <Dialog open={!!result} onOpenChange={(open) => !open && resetForm()}>
               <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader className="flex flex-row items-center justify-between gap-4 pb-4 border-b">
+                <DialogHeader className="pb-4 border-b space-y-3">
                   <div className="flex items-center gap-3">
                     {scanPreviewUrl && (
                       <img 
                         src={scanPreviewUrl} 
                         alt="Scanned card" 
-                        className="w-16 h-22 object-contain rounded-md border"
+                        className="w-12 h-16 sm:w-16 sm:h-22 object-contain rounded-md border flex-shrink-0"
                       />
                     )}
-                    <div>
-                      <DialogTitle className="text-xl">Card Analysis Result</DialogTitle>
-                      <DialogDescription>
+                    <div className="min-w-0">
+                      <DialogTitle className="text-lg sm:text-xl">Card Analysis Result</DialogTitle>
+                      <DialogDescription className="truncate">
                         Market analysis for {result.tempCard.title}
                       </DialogDescription>
                     </div>
@@ -2213,8 +2213,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   <div className="flex gap-2 flex-wrap">
                     <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
                       <DialogTrigger asChild>
-                        <Button data-testid="button-add-to-collection">
-                          <Plus className="h-4 w-4 mr-2" />
+                        <Button size="sm" data-testid="button-add-to-collection">
+                          <Plus className="h-4 w-4 mr-1" />
                           Add to Collection
                         </Button>
                       </DialogTrigger>
@@ -2270,14 +2270,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     </Dialog>
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={resetForm}
                       data-testid="button-quick-reset"
                     >
-                      <Search className="h-4 w-4 mr-2" />
+                      <Search className="h-4 w-4 mr-1" />
                       Check Another
                     </Button>
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={() => {
                         // Store current result as first card and enter comparison mode
                         setFirstCardResult(result);
@@ -2309,8 +2311,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       }}
                       data-testid="button-compare-card"
                     >
-                      <GitCompareArrows className="h-4 w-4 mr-2" />
-                      Compare to Another
+                      <GitCompareArrows className="h-4 w-4 mr-1" />
+                      Compare
                     </Button>
                   </div>
                 </DialogHeader>

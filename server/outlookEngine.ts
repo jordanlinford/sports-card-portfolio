@@ -206,9 +206,27 @@ export async function fetchGeminiMarketData(card: {
   
   const searchDescription = parts.join(" ") || card.title;
   
+  const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
+  const variationContext = isNumbered 
+    ? `\nCRITICAL: This is a NUMBERED parallel (${card.variation}). It is significantly rarer and more valuable than base cards. Search specifically for "${searchDescription}" — do NOT return base card prices for a numbered parallel.`
+    : (card.variation && card.variation.toLowerCase() !== "base"
+      ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
+      : "");
+
   const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
+${variationContext}
 
 Look at eBay's "Sold Items" filter to find actual completed sales from the last 30-60 days.
+Try multiple search queries if needed:
+- "${searchDescription}" 
+- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold"
+${isNumbered ? `- "${card.playerName || card.title} ${card.variation} sold eBay"\n- Include the numbering (e.g., /10, /25) in your search to find the correct parallel` : ""}
+
+PRICING ACCURACY:
+- Report ACTUAL sold prices from eBay, not conservative estimates
+- For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
+- If you find sales at $400-$800, report that range accurately — do not deflate to $100-$200
+- Accuracy matters more than caution. Users make investment decisions based on these values.
 
 Return ONLY a JSON object with these exact fields:
 {
@@ -220,7 +238,7 @@ Return ONLY a JSON object with these exact fields:
   "liquidity": "HIGH" | "MEDIUM" | "LOW",
   "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
   "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "notes": "<brief note about the market for this card>"
+  "notes": "<brief note citing specific sold listings with prices when possible>"
 }
 
 Liquidity guidelines:
