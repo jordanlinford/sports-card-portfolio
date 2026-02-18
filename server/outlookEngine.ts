@@ -381,28 +381,47 @@ export async function fetchMonthlyPriceHistory(params: {
   try {
     console.log(`[MonthlyPrice] Fetching 18-month history for: ${searchDescription}`);
 
-    // STEP 1: Ask Gemini to research prices naturally (like the Gemini chat app does)
-    const researchPrompt = `What is the price history and trend for this sports card on eBay?
+    const geminiCallWithRetry = async (callFn: () => Promise<any>, label: string, maxRetries = 2): Promise<any> => {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          return await callFn();
+        } catch (err: any) {
+          console.warn(`[MonthlyPrice] ${label} attempt ${attempt}/${maxRetries} failed: ${err.message}`);
+          if (attempt === maxRetries) throw err;
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+        }
+      }
+    };
 
-Card: ${searchDescription}
+    // STEP 1: Ask Gemini to research prices naturally with search grounding
+    const researchPrompt = `Search eBay for recent sold listings of this sports card and tell me what prices it has been selling for:
 
-Search for eBay sold/completed listings, 130point.com price data, PSA card values, Beckett, and COMC listings for this card.
+${searchDescription}
 
-I need the average sold price for each month from ${months[0]} to ${months[months.length - 1]}.
+Look up eBay sold/completed listings prices, 130point.com, PSA cert verification values, and any other price references you can find.
 
-Please provide a month-by-month price breakdown showing how the card's value has changed over time. Include the approximate average sold price for each month you can find data for.`;
+Tell me:
+1. What is this card currently selling for on eBay? Give specific recent sold prices with dates.
+2. What was it selling for 6 months ago? 12 months ago? 18 months ago?
+3. Has the price been trending up, down, or stable?
+4. What is the typical price range (low to high)?
 
-    const researchResponse = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: researchPrompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
-    });
+Give me as many specific sold prices with dates as you can find. Even a few data points are helpful.`;
+
+    const researchResponse = await geminiCallWithRetry(
+      () => gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: researchPrompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      }),
+      "Research"
+    );
 
     const researchText = researchResponse.text || "";
     console.log(`[MonthlyPrice] Research response length: ${researchText.length} chars`);
-    console.log(`[MonthlyPrice] Research response:\n${researchText.substring(0, 1000)}`);
+    console.log(`[MonthlyPrice] Research response:\n${researchText.substring(0, 1500)}`);
 
     if (researchText.length < 50) {
       console.log(`[MonthlyPrice] Research response too short, no data found`);
@@ -410,32 +429,38 @@ Please provide a month-by-month price breakdown showing how the card's value has
     }
 
     // STEP 2: Ask Gemini to extract structured data from the research (no search needed)
-    const extractPrompt = `Based on this price research for the sports card "${searchDescription}", extract monthly price data into JSON.
+    const extractPrompt = `You are a sports card price analyst. Based on the research below about "${searchDescription}", create a monthly price chart.
 
 RESEARCH DATA:
 ${researchText}
 
-Convert the above information into this exact JSON format. Fill in avgPrice for each month based on the research data. For months not directly mentioned, interpolate a realistic price based on the trend described. Prices should vary naturally — cards don't stay the exact same price month to month.
+TASK: Create a JSON object with estimated average prices for each month. Use the sold prices and trends mentioned in the research to estimate realistic monthly averages. If the research mentions a price at a specific date, use that as the anchor for that month. For months without direct data, estimate based on the overall trend direction.
 
-Return ONLY valid JSON, no other text:
+IMPORTANT: Every month MUST have a non-zero price estimate. Even if exact data is sparse, use the known prices to extrapolate reasonable estimates for all months. Cards always have some value.
+
+Return ONLY this JSON (no other text):
 {
   "dataPoints": [
 ${months.map(m => `    {"month": "${m}", "avgPrice": 0, "salesCount": 0}`).join(",\n")}
   ],
   "confidence": "MEDIUM",
-  "notes": "brief summary of trend"
+  "notes": "brief summary of price trend"
 }
 
 Rules:
-- avgPrice must be a number (no $ signs, no strings), e.g. 5.50 not "$5.50"
-- salesCount = number of actual sales found for that month (0 if estimated/interpolated)
-- Set confidence to HIGH if 8+ months have real data, MEDIUM for 4-7, LOW for fewer
-- Fill in ALL 18 months with realistic prices based on the trend data above`;
+- avgPrice must be a positive number (no $ signs, no strings), e.g. 115.00 not "$115"
+- Every month must have avgPrice > 0 — extrapolate from known data points
+- salesCount = number of actual sales you found data for that month (0 if estimated)
+- confidence: HIGH if 8+ months anchored to real data, MEDIUM for 4-7, LOW for fewer
+- Prices should vary naturally month to month based on the trend described`;
 
-    const extractResponse = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: extractPrompt,
-    });
+    const extractResponse = await geminiCallWithRetry(
+      () => gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: extractPrompt,
+      }),
+      "Extract"
+    );
 
     let extractText = extractResponse.text || "";
     console.log(`[MonthlyPrice] Extract response length: ${extractText.length} chars`);
