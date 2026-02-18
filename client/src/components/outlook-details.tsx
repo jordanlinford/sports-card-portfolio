@@ -28,15 +28,6 @@ import { useToast } from "@/hooks/use-toast";
 import { LiquidityBadge, DivergenceWarning, getDivergenceStatus } from "@/components/liquidity-badge";
 import type { LiquidityTier } from "@shared/schema";
 import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-} from "recharts";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -152,10 +143,6 @@ const CONFIDENCE_STYLES: Record<string, { color: string; icon: typeof CheckCircl
 function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined || isNaN(value)) return "N/A";
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
 function getLiquidityTierFromScore(score: number | undefined): LiquidityTier {
@@ -343,12 +330,6 @@ export function OutlookDetails({
   const ActionIcon = actionStyle.icon;
   const confidenceStyle = CONFIDENCE_STYLES[data.confidence?.level || "LOW"] || CONFIDENCE_STYLES.LOW;
   const ConfidenceIcon = confidenceStyle.icon;
-
-  const chartData = data.market?.pricePoints?.map(pp => ({
-    date: formatDate(pp.date),
-    price: pp.price,
-    fullDate: pp.date,
-  })).sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()) || [];
 
   const imageUrl = cardImageUrl || data.card.imagePath;
 
@@ -549,41 +530,6 @@ export function OutlookDetails({
       )}
 
       <div className="grid grid-cols-1 gap-6">
-        {chartData.length > 1 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Price Trend</CardTitle>
-              <CardDescription>Recent sold prices from market data</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="colorPriceOutlook" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="date" className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} />
-                    <YAxis className="text-xs" tick={{ fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `$${v}`} />
-                    <RechartsTooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px',
-                      }}
-                      formatter={(value: number) => [`$${value.toLocaleString()}`, 'Price']}
-                    />
-                    <Area type="monotone" dataKey="price" stroke="hsl(var(--primary))" fill="url(#colorPriceOutlook)" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {data.signals && (
           <Card>
             <CardHeader className="pb-2">
