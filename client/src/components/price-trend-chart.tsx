@@ -55,6 +55,8 @@ function formatMonth(month: string): string {
 function formatPrice(value: number): string {
   if (value >= 10000) return `$${(value / 1000).toFixed(0)}k`;
   if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
+  if (value < 1 && value > 0) return `$${value.toFixed(2)}`;
+  if (value < 10) return `$${value.toFixed(1)}`;
   return `$${value.toFixed(0)}`;
 }
 
@@ -85,7 +87,9 @@ function CustomTooltip({ active, payload, label }: any) {
             style={{ backgroundColor: entry.color }}
           />
           <span className="text-sm font-medium">
-            {entry.name}: ${entry.value?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            {entry.name}: ${entry.value < 10
+              ? entry.value?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : entry.value?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </span>
         </div>
       ))}

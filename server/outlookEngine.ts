@@ -378,43 +378,25 @@ export async function fetchMonthlyPriceHistory(params: {
     months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   }
 
-  const broaderSearch = [params.playerName, params.year || "", params.setName || "", params.sport].filter(Boolean).join(" ");
+  const prompt = `Search eBay sold listings and price guides for this sports card: "${searchDescription}"
 
-  const prompt = `You are a sports card market analyst. Search for REAL eBay completed/sold listing price data for this card: "${searchDescription}"
+Find the average monthly sold price for each month from ${months[0]} through ${months[months.length - 1]} (18 months total).
 
-TASK: Provide monthly AVERAGE SOLD PRICES for all 18 months from ${months[0]} to ${months[months.length - 1]}.
+Search for: "${searchDescription} eBay sold prices" and "${params.playerName} ${params.setName || ""} ${params.year || ""} card price history"
 
-SEARCH STRATEGY — try multiple searches to find price data:
-1. Search: "${searchDescription} eBay sold price"
-2. Search: "${broaderSearch} card eBay sold completed listings price history"
-3. Search: "${params.playerName} ${params.setName || ""} ${params.year || ""} card value price guide"
-4. Search: "eBay ${params.playerName} ${params.year || ""} ${params.sport} card sold prices 2024 2025"
+Also check 130point.com, PSA price guide, Beckett, COMC, and Market Movers for pricing data.
 
-Look at price guide sites (130point.com, PSA card values, Beckett, COMC, etc.) and eBay sold history pages for real pricing data across different months.
+Return JSON with numeric prices (no $ signs) for every month. Use 0 for avgPrice ONLY if the card did not exist yet. For months without direct sales, estimate based on nearby months and market trends — prices should vary realistically, not stay flat.
 
-IMPORTANT RULES:
-- You MUST return exactly 18 data points, one for each month from ${months[0]} to ${months[months.length - 1]}
-- Use real sold data when available
-- For months with no direct sales data, interpolate based on the overall trend and nearby months — but NEVER just repeat the same price for every month. Card prices fluctuate.
-- The price should reflect realistic market movement (seasonal trends, player performance, etc.)
-- Mark estimated months with salesCount: 0
-
-Here are the 18 months you must include:
-${months.join(", ")}
-
-Return ONLY valid JSON (no markdown, no explanation):
 {
   "dataPoints": [
-    { "month": "${months[0]}", "avgPrice": <number>, "salesCount": <number or 0 if estimated> },
-    { "month": "${months[1]}", "avgPrice": <number>, "salesCount": <number or 0 if estimated> },
-    ... (continue for all 18 months)
-    { "month": "${months[17]}", "avgPrice": <number>, "salesCount": <number or 0 if estimated> }
+${months.map(m => `    {"month": "${m}", "avgPrice": 0, "salesCount": 0}`).join(",\n")}
   ],
-  "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "notes": "<brief note about data quality, notable price movements, and what drove any trends>"
+  "confidence": "HIGH",
+  "notes": ""
 }
 
-Prices in USD. Do NOT return fewer than 18 data points.`;
+Fill in real avgPrice numbers. salesCount = actual sales found (0 if estimated). All prices in USD as plain numbers.`;
 
   try {
     console.log(`[MonthlyPrice] Fetching 18-month history for: ${searchDescription}`);
@@ -428,17 +410,43 @@ Prices in USD. Do NOT return fewer than 18 data points.`;
     });
 
     let responseText = response.text || "";
+    console.log(`[MonthlyPrice] Raw response length: ${responseText.length} chars`);
+    console.log(`[MonthlyPrice] Raw response preview: ${responseText.substring(0, 500)}`);
     responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
 
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       if (Array.isArray(parsed.dataPoints) && parsed.dataPoints.length > 0) {
+        console.log(`[MonthlyPrice] Gemini returned ${parsed.dataPoints.length} data points`);
+
+        const parsePrice = (val: any): number => {
+          if (typeof val === "number") return Math.max(0, val);
+          if (typeof val === "string") {
+            const cleaned = val.replace(/[$,\s]/g, "");
+            const num = parseFloat(cleaned);
+            return isNaN(num) ? 0 : Math.max(0, num);
+          }
+          return 0;
+        };
+
+        const normalizeMonth = (m: string): string => {
+          if (!m) return "";
+          const parts = m.split("-");
+          if (parts.length === 2) {
+            return `${parts[0]}-${parts[1].padStart(2, "0")}`;
+          }
+          return m;
+        };
+
         const rawPoints = parsed.dataPoints.map((dp: any) => ({
-          month: dp.month,
-          avgPrice: typeof dp.avgPrice === "number" ? Math.max(0, dp.avgPrice) : 0,
-          salesCount: typeof dp.salesCount === "number" ? dp.salesCount : 0,
+          month: normalizeMonth(dp.month || ""),
+          avgPrice: parsePrice(dp.avgPrice),
+          salesCount: typeof dp.salesCount === "number" ? dp.salesCount : parseInt(dp.salesCount) || 0,
         }));
+
+        const validPriceCount = rawPoints.filter((p: MonthlyPricePoint) => p.avgPrice > 0).length;
+        console.log(`[MonthlyPrice] Parsed ${rawPoints.length} points, ${validPriceCount} with valid prices`);
 
         const pointMap = new Map<string, MonthlyPricePoint>(rawPoints.map((dp: MonthlyPricePoint) => [dp.month, dp]));
         const filledPoints: MonthlyPricePoint[] = months.map((m) => {
