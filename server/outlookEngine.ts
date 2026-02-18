@@ -350,6 +350,7 @@ export async function fetchMonthlyPriceHistory(params: {
   variation?: string;
   grade?: string;
   grader?: string;
+  anchorCurrentPrice?: number;
 }): Promise<MonthlyPriceHistory | null> {
   const cacheKey = `monthly|${params.playerName}|${params.sport}|${params.year || ""}|${params.setName || ""}|${params.variation || ""}|${params.grade || ""}`.toLowerCase();
   const cached = monthlyPriceCache.get(cacheKey);
@@ -547,6 +548,20 @@ Rules:
           filledPoints[i].avgPrice = filledPoints[nextIdx].avgPrice;
         }
         filledPoints[i].salesCount = 0;
+      }
+    }
+
+    if (params.anchorCurrentPrice && params.anchorCurrentPrice > 0) {
+      const lastPoint = filledPoints[filledPoints.length - 1];
+      const chartCurrentPrice = lastPoint.avgPrice;
+      if (chartCurrentPrice > 0 && Math.abs(chartCurrentPrice - params.anchorCurrentPrice) / params.anchorCurrentPrice > 0.05) {
+        const scaleFactor = params.anchorCurrentPrice / chartCurrentPrice;
+        console.log(`[MonthlyPrice] Calibrating chart to anchor price $${params.anchorCurrentPrice} (chart was $${chartCurrentPrice}, scale ${scaleFactor.toFixed(3)})`);
+        for (const point of filledPoints) {
+          if (point.avgPrice > 0) {
+            point.avgPrice = Math.round(point.avgPrice * scaleFactor * 100) / 100;
+          }
+        }
       }
     }
 

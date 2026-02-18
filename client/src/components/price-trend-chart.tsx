@@ -115,16 +115,25 @@ export function PriceTrendChart({
   playerRequest,
   autoLoad = false,
   subtitle,
+  preloadedData,
 }: {
-  playerRequest: PlayerPriceRequest;
+  playerRequest?: PlayerPriceRequest;
   autoLoad?: boolean;
   subtitle?: string;
+  preloadedData?: MonthlyPriceHistory | null;
 }) {
-  const [history, setHistory] = useState<MonthlyPriceHistory | null>(null);
+  const [history, setHistory] = useState<MonthlyPriceHistory | null>(preloadedData || null);
   const [hasTriggeredAutoLoad, setHasTriggeredAutoLoad] = useState(false);
+
+  useEffect(() => {
+    if (preloadedData) {
+      setHistory(preloadedData);
+    }
+  }, [preloadedData]);
 
   const fetchMutation = useMutation({
     mutationFn: async () => {
+      if (!playerRequest) throw new Error("No player request provided");
       return await apiRequest("POST", "/api/player-outlook/price-history", playerRequest);
     },
     onSuccess: (data: MonthlyPriceHistory) => {
@@ -133,11 +142,11 @@ export function PriceTrendChart({
   });
 
   useEffect(() => {
-    if (autoLoad && !hasTriggeredAutoLoad && !history && !fetchMutation.isPending) {
+    if (autoLoad && !preloadedData && !hasTriggeredAutoLoad && !history && !fetchMutation.isPending) {
       setHasTriggeredAutoLoad(true);
       fetchMutation.mutate();
     }
-  }, [autoLoad, hasTriggeredAutoLoad, history, fetchMutation.isPending]);
+  }, [autoLoad, preloadedData, hasTriggeredAutoLoad, history, fetchMutation.isPending]);
 
   if (fetchMutation.isPending) {
     return (
@@ -154,7 +163,7 @@ export function PriceTrendChart({
             <Skeleton className="h-[200px] w-full" />
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Searching eBay sold data...
+              Searching market data...
             </div>
           </div>
         </CardContent>
@@ -163,6 +172,7 @@ export function PriceTrendChart({
   }
 
   if (!history) {
+    if (!playerRequest) return null;
     return (
       <Card>
         <CardHeader className="pb-2">

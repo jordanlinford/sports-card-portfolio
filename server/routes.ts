@@ -3035,6 +3035,23 @@ Sitemap: ${origin}/sitemap.xml
       const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
       const explanation = await generateOutlookExplanation(tempCard as any, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
 
+      let priceHistory = null;
+      try {
+        const { fetchMonthlyPriceHistory } = await import("./outlookEngine");
+        priceHistory = await fetchMonthlyPriceHistory({
+          playerName: title,
+          sport: "football",
+          year: year ? String(year) : undefined,
+          setName: set || undefined,
+          variation: variation || undefined,
+          grade: grade || undefined,
+          grader: grader || undefined,
+          anchorCurrentPrice: marketValue,
+        });
+      } catch (phErr: any) {
+        console.error(`[Quick Analyze] Price history fetch failed (non-critical):`, phErr.message);
+      }
+
       // Record usage for free tier tracking
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);
 
@@ -3153,6 +3170,14 @@ Sitemap: ${origin}/sitemap.xml
             ? "Updating in background..."
             : undefined,
         },
+        priceHistory: priceHistory ? {
+          dataPoints: priceHistory.dataPoints,
+          confidence: priceHistory.confidence,
+          notes: priceHistory.notes,
+          cardDescription: priceHistory.cardDescription,
+          playerName: priceHistory.playerName,
+          sport: priceHistory.sport,
+        } : null,
         generatedAt: new Date().toISOString(),
         isPro,
       });

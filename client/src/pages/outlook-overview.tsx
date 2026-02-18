@@ -240,6 +240,14 @@ type QuickAnalyzeResult = {
     }>;
   } | null;
   comps?: CompsData;
+  priceHistory?: {
+    dataPoints: Array<{ month: string; avgPrice: number; salesCount?: number }>;
+    confidence: "HIGH" | "MEDIUM" | "LOW";
+    notes: string;
+    cardDescription: string;
+    playerName: string;
+    sport: string;
+  } | null;
   isPro: boolean;
 };
 
@@ -2367,7 +2375,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                 {result.tempCard.title && (
                   <div className="mt-4">
                     <PriceTrendChart
-                      playerRequest={{
+                      preloadedData={result.priceHistory || undefined}
+                      subtitle={result.priceHistory?.cardDescription}
+                      playerRequest={!result.priceHistory ? {
                         playerName: result.tempCard.title,
                         sport: scanIdentifyResult?.scan?.cardIdentification?.sport || "football",
                         year: result.tempCard.year,
@@ -2375,7 +2385,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                         variation: result.tempCard.variation,
                         grade: result.tempCard.grade,
                         grader: result.tempCard.grader,
-                      }}
+                      } : undefined}
                     />
                   </div>
                 )}
