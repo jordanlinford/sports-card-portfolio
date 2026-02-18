@@ -1454,16 +1454,16 @@ export default function PlayerOutlookPage() {
             <PortfolioContextPanel data={portfolioContext} />
           )}
 
-          <OutlookAccordions 
-            advisor={advisorOutlook} 
-            outlook={outlookData} 
-          />
-          
           <PriceTrendChart
             playerRequest={{
               playerName: outlookData.player.name,
               sport: outlookData.player.sport || sport,
             }}
+          />
+
+          <OutlookAccordions 
+            advisor={advisorOutlook} 
+            outlook={outlookData} 
           />
 
           {/* Confidence breakdown - show analysis transparency */}
