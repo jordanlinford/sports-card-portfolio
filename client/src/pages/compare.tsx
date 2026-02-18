@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { ComparisonPriceTrendChart } from "@/components/price-trend-chart";
 import type { 
   PlayerOutlookResponse, 
   MarketTemperature, 
@@ -1170,6 +1171,23 @@ export default function ComparePage() {
             </Card>
           )}
           
+          {leftPlayer.outlook && rightPlayer.outlook && (
+            <div className="mt-6">
+              <ComparisonPriceTrendChart
+                player1Request={{
+                  playerName: leftPlayer.name,
+                  sport: leftPlayer.sport,
+                }}
+                player2Request={{
+                  playerName: rightPlayer.name,
+                  sport: rightPlayer.sport,
+                }}
+                player1Name={leftPlayer.name}
+                player2Name={rightPlayer.name}
+              />
+            </div>
+          )}
+
           {narrative && leftPlayer.outlook && rightPlayer.outlook && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
@@ -1279,7 +1297,31 @@ export default function ComparePage() {
           </div>
 
           {leftCard.outlook && rightCard.outlook && (
-            <CardComparisonSummary leftCard={leftCard} rightCard={rightCard} />
+            <>
+              <CardComparisonSummary leftCard={leftCard} rightCard={rightCard} />
+              <div className="mt-6">
+                <ComparisonPriceTrendChart
+                  player1Request={{
+                    playerName: leftCard.playerName,
+                    sport: leftCard.sport,
+                    year: leftCard.year,
+                    setName: leftCard.setName,
+                    variation: leftCard.tier,
+                    grade: leftCard.grade,
+                  }}
+                  player2Request={{
+                    playerName: rightCard.playerName,
+                    sport: rightCard.sport,
+                    year: rightCard.year,
+                    setName: rightCard.setName,
+                    variation: rightCard.tier,
+                    grade: rightCard.grade,
+                  }}
+                  player1Name={leftCard.playerName}
+                  player2Name={rightCard.playerName}
+                />
+              </div>
+            </>
           )}
         </TabsContent>
       </Tabs>

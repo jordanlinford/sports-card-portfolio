@@ -49,6 +49,7 @@ import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import { InvestmentCallCard } from "@/components/investment-call-card";
 import { AdvisorSnapshot } from "@/components/outlook/AdvisorSnapshot";
 import { OutlookAccordions } from "@/components/outlook/OutlookAccordions";
+import { PriceTrendChart } from "@/components/price-trend-chart";
 import { transformToAdvisorOutlook, applyVerdictGuardrails } from "@/lib/transformToAdvisorOutlook";
 import type { PlayerOutlookResponse, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext, AdvisorOutlook } from "@shared/schema";
 
@@ -1458,6 +1459,13 @@ export default function PlayerOutlookPage() {
             outlook={outlookData} 
           />
           
+          <PriceTrendChart
+            playerRequest={{
+              playerName: outlookData.player.name,
+              sport: outlookData.player.sport || sport,
+            }}
+          />
+
           {/* Confidence breakdown - show analysis transparency */}
           <ConfidenceBreakdownPanel 
             investmentCall={outlookData.investmentCall}

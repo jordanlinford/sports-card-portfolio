@@ -3659,6 +3659,36 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  app.post("/api/player-outlook/price-history", isAuthenticated, async (req: any, res) => {
+    try {
+      const { playerName, sport, year, setName, variation, grade, grader } = req.body;
+
+      if (!playerName || typeof playerName !== "string" || playerName.trim().length < 2) {
+        return res.status(400).json({ message: "Player name is required" });
+      }
+
+      const { fetchMonthlyPriceHistory } = await import("./outlookEngine");
+      const history = await fetchMonthlyPriceHistory({
+        playerName: playerName.trim(),
+        sport: sport || "football",
+        year,
+        setName,
+        variation,
+        grade,
+        grader,
+      });
+
+      if (!history) {
+        return res.status(404).json({ message: "Could not retrieve price history data" });
+      }
+
+      res.json(history);
+    } catch (error: any) {
+      console.error("[PriceHistory] Error:", error.message);
+      res.status(500).json({ message: "Failed to fetch price history" });
+    }
+  });
+
   // Get cached player outlook (PUBLIC - no auth required)
   // Used for shared links so visitors can see analysis results without signing up
   app.get("/api/player-outlook/shared/:playerSlug", async (req, res) => {

@@ -58,6 +58,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
+import { PriceTrendChart } from "@/components/price-trend-chart";
 
 type DisplayCase = {
   id: number;
@@ -544,6 +545,21 @@ export default function CardOutlookPage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {outlook?.card?.playerName && (
+        <div className="mb-6">
+          <PriceTrendChart
+            playerRequest={{
+              playerName: outlook.card.playerName,
+              sport: outlook.card.sport || "football",
+              year: outlook.card.year?.toString(),
+              setName: outlook.card.set,
+              variation: outlook.card.variation,
+              grade: outlook.card.grade,
+            }}
+          />
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">

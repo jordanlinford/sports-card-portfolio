@@ -321,6 +321,131 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
   return null;
 }
 
+// ============================================================
+// MONTHLY PRICE HISTORY - 18-month lookback via Gemini + Google Search
+// ============================================================
+export interface MonthlyPricePoint {
+  month: string; // "YYYY-MM" format
+  avgPrice: number;
+  salesCount?: number;
+}
+
+export interface MonthlyPriceHistory {
+  playerName: string;
+  sport: string;
+  cardDescription: string;
+  dataPoints: MonthlyPricePoint[];
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  notes: string;
+}
+
+const monthlyPriceCache = new Map<string, { data: MonthlyPriceHistory; cachedAt: number }>();
+const MONTHLY_CACHE_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+export async function fetchMonthlyPriceHistory(params: {
+  playerName: string;
+  sport: string;
+  year?: string;
+  setName?: string;
+  variation?: string;
+  grade?: string;
+  grader?: string;
+}): Promise<MonthlyPriceHistory | null> {
+  const cacheKey = `monthly|${params.playerName}|${params.sport}|${params.year || ""}|${params.setName || ""}|${params.variation || ""}|${params.grade || ""}`.toLowerCase();
+  const cached = monthlyPriceCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < MONTHLY_CACHE_TTL_MS) {
+    console.log(`[MonthlyPrice] Cache hit for: ${params.playerName}`);
+    return cached.data;
+  }
+
+  const parts: string[] = [];
+  if (params.year) parts.push(params.year);
+  if (params.setName) parts.push(params.setName);
+  parts.push(params.playerName);
+  if (params.variation && params.variation.toLowerCase() !== "base") parts.push(params.variation);
+  if (params.grade && params.grader) {
+    parts.push(`${params.grader} ${params.grade}`);
+  } else if (params.grade) {
+    parts.push(`PSA ${params.grade}`);
+  }
+
+  const searchDescription = parts.join(" ");
+
+  const now = new Date();
+  const months: string[] = [];
+  for (let i = 17; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+
+  const prompt = `Search eBay SOLD listings for this sports card over the last 18 months: "${searchDescription}"
+
+I need the AVERAGE SOLD PRICE by month for the last 18 months (${months[0]} through ${months[months.length - 1]}).
+
+Search for actual completed/sold eBay listings. Try queries like:
+- "${searchDescription} sold"
+- "${params.playerName} ${params.year || ""} ${params.setName || ""} card sold price history"
+
+For each month, find any available sold data and compute an average. If no sales occurred in a particular month, estimate based on surrounding months' trend. Focus on accuracy — report real market prices.
+
+Return ONLY a JSON object:
+{
+  "dataPoints": [
+    { "month": "YYYY-MM", "avgPrice": <number>, "salesCount": <number or 0 if estimated> }
+  ],
+  "confidence": "HIGH" | "MEDIUM" | "LOW",
+  "notes": "<brief note about data quality and any notable price movements>"
+}
+
+Include ALL 18 months from ${months[0]} to ${months[months.length - 1]}.
+If data is sparse, interpolate reasonably but mark salesCount as 0 for estimated months.
+Prices should be in USD.`;
+
+  try {
+    console.log(`[MonthlyPrice] Fetching 18-month history for: ${searchDescription}`);
+
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    let responseText = response.text || "";
+    responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (Array.isArray(parsed.dataPoints) && parsed.dataPoints.length > 0) {
+        const result: MonthlyPriceHistory = {
+          playerName: params.playerName,
+          sport: params.sport,
+          cardDescription: searchDescription,
+          dataPoints: parsed.dataPoints.map((dp: any) => ({
+            month: dp.month,
+            avgPrice: typeof dp.avgPrice === "number" ? dp.avgPrice : 0,
+            salesCount: typeof dp.salesCount === "number" ? dp.salesCount : 0,
+          })),
+          confidence: parsed.confidence || "MEDIUM",
+          notes: parsed.notes || "",
+        };
+
+        monthlyPriceCache.set(cacheKey, { data: result, cachedAt: Date.now() });
+        console.log(`[MonthlyPrice] Got ${result.dataPoints.length} months of data for ${params.playerName}`);
+        return result;
+      }
+    }
+
+    console.log(`[MonthlyPrice] No valid data parsed for: ${searchDescription}`);
+    return null;
+  } catch (error: any) {
+    console.error(`[MonthlyPrice] Error fetching history for ${params.playerName}:`, error.message);
+    return null;
+  }
+}
+
 // Static score mappings
 const SPORT_SCORES: Record<string, number> = {
   basketball: 10,
