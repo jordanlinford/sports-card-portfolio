@@ -47,6 +47,7 @@ import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OutlookDetails, type OutlookDisplayData } from "@/components/outlook-details";
+import { PriceTrendChart } from "@/components/price-trend-chart";
 import { SuccessOverlay } from "@/components/success-animation";
 
 type CaseWithCards = DisplayCase & { cards: CardType[] };
@@ -2362,6 +2363,22 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   cardImageUrl={previewUrl}
                   showDetailedSignals={result.isPro}
                 />
+
+                {result.tempCard.title && (
+                  <div className="mt-4">
+                    <PriceTrendChart
+                      playerRequest={{
+                        playerName: result.tempCard.title,
+                        sport: scanIdentifyResult?.scan?.cardIdentification?.sport || "football",
+                        year: result.tempCard.year,
+                        setName: result.tempCard.set,
+                        variation: result.tempCard.variation,
+                        grade: result.tempCard.grade,
+                        grader: result.tempCard.grader,
+                      }}
+                    />
+                  </div>
+                )}
 
               </DialogContent>
             </Dialog>
