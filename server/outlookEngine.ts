@@ -378,148 +378,169 @@ export async function fetchMonthlyPriceHistory(params: {
     months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   }
 
-  const prompt = `Search eBay sold listings and price guides for this sports card: "${searchDescription}"
-
-Find the average monthly sold price for each month from ${months[0]} through ${months[months.length - 1]} (18 months total).
-
-Search for: "${searchDescription} eBay sold prices" and "${params.playerName} ${params.setName || ""} ${params.year || ""} card price history"
-
-Also check 130point.com, PSA price guide, Beckett, COMC, and Market Movers for pricing data.
-
-Return JSON with numeric prices (no $ signs) for every month. Use 0 for avgPrice ONLY if the card did not exist yet. For months without direct sales, estimate based on nearby months and market trends — prices should vary realistically, not stay flat.
-
-{
-  "dataPoints": [
-${months.map(m => `    {"month": "${m}", "avgPrice": 0, "salesCount": 0}`).join(",\n")}
-  ],
-  "confidence": "HIGH",
-  "notes": ""
-}
-
-Fill in real avgPrice numbers. salesCount = actual sales found (0 if estimated). All prices in USD as plain numbers.`;
-
   try {
     console.log(`[MonthlyPrice] Fetching 18-month history for: ${searchDescription}`);
 
-    const response = await gemini.models.generateContent({
+    // STEP 1: Ask Gemini to research prices naturally (like the Gemini chat app does)
+    const researchPrompt = `What is the price history and trend for this sports card on eBay?
+
+Card: ${searchDescription}
+
+Search for eBay sold/completed listings, 130point.com price data, PSA card values, Beckett, and COMC listings for this card.
+
+I need the average sold price for each month from ${months[0]} to ${months[months.length - 1]}.
+
+Please provide a month-by-month price breakdown showing how the card's value has changed over time. Include the approximate average sold price for each month you can find data for.`;
+
+    const researchResponse = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: researchPrompt,
       config: {
         tools: [{ googleSearch: {} }],
       },
     });
 
-    let responseText = response.text || "";
-    console.log(`[MonthlyPrice] Raw response length: ${responseText.length} chars`);
-    console.log(`[MonthlyPrice] Raw response preview: ${responseText.substring(0, 500)}`);
-    responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+    const researchText = researchResponse.text || "";
+    console.log(`[MonthlyPrice] Research response length: ${researchText.length} chars`);
+    console.log(`[MonthlyPrice] Research response:\n${researchText.substring(0, 1000)}`);
 
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (Array.isArray(parsed.dataPoints) && parsed.dataPoints.length > 0) {
-        console.log(`[MonthlyPrice] Gemini returned ${parsed.dataPoints.length} data points`);
+    if (researchText.length < 50) {
+      console.log(`[MonthlyPrice] Research response too short, no data found`);
+      return null;
+    }
 
-        const parsePrice = (val: any): number => {
-          if (typeof val === "number") return Math.max(0, val);
-          if (typeof val === "string") {
-            const cleaned = val.replace(/[$,\s]/g, "");
-            const num = parseFloat(cleaned);
-            return isNaN(num) ? 0 : Math.max(0, num);
-          }
-          return 0;
-        };
+    // STEP 2: Ask Gemini to extract structured data from the research (no search needed)
+    const extractPrompt = `Based on this price research for the sports card "${searchDescription}", extract monthly price data into JSON.
 
-        const normalizeMonth = (m: string): string => {
-          if (!m) return "";
-          const parts = m.split("-");
-          if (parts.length === 2) {
-            return `${parts[0]}-${parts[1].padStart(2, "0")}`;
-          }
-          return m;
-        };
+RESEARCH DATA:
+${researchText}
 
-        const rawPoints = parsed.dataPoints.map((dp: any) => ({
-          month: normalizeMonth(dp.month || ""),
-          avgPrice: parsePrice(dp.avgPrice),
-          salesCount: typeof dp.salesCount === "number" ? dp.salesCount : parseInt(dp.salesCount) || 0,
-        }));
+Convert the above information into this exact JSON format. Fill in avgPrice for each month based on the research data. For months not directly mentioned, interpolate a realistic price based on the trend described. Prices should vary naturally — cards don't stay the exact same price month to month.
 
-        const validPriceCount = rawPoints.filter((p: MonthlyPricePoint) => p.avgPrice > 0).length;
-        console.log(`[MonthlyPrice] Parsed ${rawPoints.length} points, ${validPriceCount} with valid prices`);
+Return ONLY valid JSON, no other text:
+{
+  "dataPoints": [
+${months.map(m => `    {"month": "${m}", "avgPrice": 0, "salesCount": 0}`).join(",\n")}
+  ],
+  "confidence": "MEDIUM",
+  "notes": "brief summary of trend"
+}
 
-        const pointMap = new Map<string, MonthlyPricePoint>(rawPoints.map((dp: MonthlyPricePoint) => [dp.month, dp]));
-        const filledPoints: MonthlyPricePoint[] = months.map((m) => {
-          const existing = pointMap.get(m);
-          if (existing && existing.avgPrice > 0) return existing;
-          return { month: m, avgPrice: 0, salesCount: 0 };
-        });
+Rules:
+- avgPrice must be a number (no $ signs, no strings), e.g. 5.50 not "$5.50"
+- salesCount = number of actual sales found for that month (0 if estimated/interpolated)
+- Set confidence to HIGH if 8+ months have real data, MEDIUM for 4-7, LOW for fewer
+- Fill in ALL 18 months with realistic prices based on the trend data above`;
 
-        const nonZeroPrices = filledPoints.filter((p) => p.avgPrice > 0);
-        const realDataMonths = nonZeroPrices.length;
+    const extractResponse = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: extractPrompt,
+    });
 
-        if (realDataMonths < 2) {
-          console.log(`[MonthlyPrice] Only ${realDataMonths} real data point(s) for ${params.playerName} — insufficient for chart`);
-          const result: MonthlyPriceHistory = {
-            playerName: params.playerName,
-            sport: params.sport,
-            cardDescription: searchDescription,
-            dataPoints: nonZeroPrices.length > 0 ? filledPoints.map(p => p.avgPrice > 0 ? p : { ...p, avgPrice: nonZeroPrices[0].avgPrice }) : [],
-            confidence: "LOW",
-            notes: "Very limited sales data available. Chart shows estimated trend based on sparse data.",
-          };
-          monthlyPriceCache.set(cacheKey, { data: result, cachedAt: Date.now() });
-          return result;
+    let extractText = extractResponse.text || "";
+    console.log(`[MonthlyPrice] Extract response length: ${extractText.length} chars`);
+    console.log(`[MonthlyPrice] Extract response preview: ${extractText.substring(0, 500)}`);
+    extractText = extractText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+
+    const jsonMatch = extractText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.log(`[MonthlyPrice] No JSON found in extract response`);
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsed.dataPoints) || parsed.dataPoints.length === 0) {
+      console.log(`[MonthlyPrice] No dataPoints in parsed response`);
+      return null;
+    }
+
+    console.log(`[MonthlyPrice] Gemini returned ${parsed.dataPoints.length} data points`);
+
+    const parsePrice = (val: any): number => {
+      if (typeof val === "number") return Math.max(0, val);
+      if (typeof val === "string") {
+        const cleaned = val.replace(/[$,\s]/g, "");
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? 0 : Math.max(0, num);
+      }
+      return 0;
+    };
+
+    const normalizeMonth = (m: string): string => {
+      if (!m) return "";
+      const parts = m.split("-");
+      if (parts.length === 2) {
+        return `${parts[0]}-${parts[1].padStart(2, "0")}`;
+      }
+      return m;
+    };
+
+    const rawPoints = parsed.dataPoints.map((dp: any) => ({
+      month: normalizeMonth(dp.month || ""),
+      avgPrice: parsePrice(dp.avgPrice),
+      salesCount: typeof dp.salesCount === "number" ? dp.salesCount : parseInt(dp.salesCount) || 0,
+    }));
+
+    const validPriceCount = rawPoints.filter((p: MonthlyPricePoint) => p.avgPrice > 0).length;
+    console.log(`[MonthlyPrice] Parsed ${rawPoints.length} points, ${validPriceCount} with valid prices`);
+
+    const pointMap = new Map<string, MonthlyPricePoint>(rawPoints.map((dp: MonthlyPricePoint) => [dp.month, dp]));
+    const filledPoints: MonthlyPricePoint[] = months.map((m) => {
+      const existing = pointMap.get(m);
+      if (existing && existing.avgPrice > 0) return existing;
+      return { month: m, avgPrice: 0, salesCount: 0 };
+    });
+
+    const nonZeroPrices = filledPoints.filter((p) => p.avgPrice > 0);
+    const realDataMonths = nonZeroPrices.length;
+
+    if (realDataMonths < 2) {
+      console.log(`[MonthlyPrice] Only ${realDataMonths} data point(s) — insufficient for chart`);
+      return null;
+    }
+
+    // Linear interpolation for gaps
+    for (let i = 0; i < filledPoints.length; i++) {
+      if (filledPoints[i].avgPrice === 0) {
+        let prevIdx = -1;
+        let nextIdx = -1;
+        for (let j = i - 1; j >= 0; j--) {
+          if (filledPoints[j].avgPrice > 0) { prevIdx = j; break; }
         }
-
-        if (nonZeroPrices.length > 0) {
-          for (let i = 0; i < filledPoints.length; i++) {
-            if (filledPoints[i].avgPrice === 0) {
-              let prevIdx = -1;
-              let nextIdx = -1;
-              for (let j = i - 1; j >= 0; j--) {
-                if (filledPoints[j].avgPrice > 0) { prevIdx = j; break; }
-              }
-              for (let j = i + 1; j < filledPoints.length; j++) {
-                if (filledPoints[j].avgPrice > 0) { nextIdx = j; break; }
-              }
-              if (prevIdx >= 0 && nextIdx >= 0) {
-                const prevPrice = filledPoints[prevIdx].avgPrice;
-                const nextPrice = filledPoints[nextIdx].avgPrice;
-                const steps = nextIdx - prevIdx;
-                const stepSize = (nextPrice - prevPrice) / steps;
-                filledPoints[i].avgPrice = Math.round(prevPrice + stepSize * (i - prevIdx));
-              } else if (prevIdx >= 0) {
-                filledPoints[i].avgPrice = filledPoints[prevIdx].avgPrice;
-              } else if (nextIdx >= 0) {
-                filledPoints[i].avgPrice = filledPoints[nextIdx].avgPrice;
-              }
-              filledPoints[i].salesCount = 0;
-            }
-          }
+        for (let j = i + 1; j < filledPoints.length; j++) {
+          if (filledPoints[j].avgPrice > 0) { nextIdx = j; break; }
         }
-
-        let computedConfidence = parsed.confidence || "MEDIUM";
-        if (realDataMonths < 4) computedConfidence = "LOW";
-        else if (realDataMonths < 8 && computedConfidence === "HIGH") computedConfidence = "MEDIUM";
-
-        const result: MonthlyPriceHistory = {
-          playerName: params.playerName,
-          sport: params.sport,
-          cardDescription: searchDescription,
-          dataPoints: filledPoints,
-          confidence: computedConfidence as "HIGH" | "MEDIUM" | "LOW",
-          notes: parsed.notes || (realDataMonths < 6 ? `Based on ${realDataMonths} months of actual sales data with interpolation.` : ""),
-        };
-
-        monthlyPriceCache.set(cacheKey, { data: result, cachedAt: Date.now() });
-        console.log(`[MonthlyPrice] Got ${result.dataPoints.length} months of data for ${params.playerName}`);
-        return result;
+        if (prevIdx >= 0 && nextIdx >= 0) {
+          const prevPrice = filledPoints[prevIdx].avgPrice;
+          const nextPrice = filledPoints[nextIdx].avgPrice;
+          const steps = nextIdx - prevIdx;
+          const stepSize = (nextPrice - prevPrice) / steps;
+          filledPoints[i].avgPrice = Math.round((prevPrice + stepSize * (i - prevIdx)) * 100) / 100;
+        } else if (prevIdx >= 0) {
+          filledPoints[i].avgPrice = filledPoints[prevIdx].avgPrice;
+        } else if (nextIdx >= 0) {
+          filledPoints[i].avgPrice = filledPoints[nextIdx].avgPrice;
+        }
+        filledPoints[i].salesCount = 0;
       }
     }
 
-    console.log(`[MonthlyPrice] No valid data parsed for: ${searchDescription}`);
-    return null;
+    let computedConfidence = parsed.confidence || "MEDIUM";
+    if (realDataMonths < 4) computedConfidence = "LOW";
+    else if (realDataMonths < 8 && computedConfidence === "HIGH") computedConfidence = "MEDIUM";
+
+    const result: MonthlyPriceHistory = {
+      playerName: params.playerName,
+      sport: params.sport,
+      cardDescription: searchDescription,
+      dataPoints: filledPoints,
+      confidence: computedConfidence as "HIGH" | "MEDIUM" | "LOW",
+      notes: parsed.notes || (realDataMonths < 6 ? `Based on ${realDataMonths} months of data with interpolation.` : ""),
+    };
+
+    monthlyPriceCache.set(cacheKey, { data: result, cachedAt: Date.now() });
+    console.log(`[MonthlyPrice] Got ${result.dataPoints.length} months, ${realDataMonths} with real data for ${params.playerName}`);
+    return result;
   } catch (error: any) {
     console.error(`[MonthlyPrice] Error fetching history for ${params.playerName}:`, error.message);
     return null;
