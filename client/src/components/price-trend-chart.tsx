@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   LineChart,
@@ -9,12 +9,14 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
+  Area,
+  AreaChart,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, Loader2, BarChart3, AlertCircle } from "lucide-react";
+import { TrendingUp, TrendingDown, Loader2, BarChart3, AlertCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
 interface MonthlyPricePoint {
@@ -44,14 +46,15 @@ interface PlayerPriceRequest {
 
 function formatMonth(month: string): string {
   const [year, m] = month.split("-");
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${months[parseInt(m, 10) - 1]} '${year.slice(2)}`;
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const idx = parseInt(m, 10) - 1;
+  if (idx < 0 || idx > 11) return month;
+  return `${monthNames[idx]} '${year.slice(2)}`;
 }
 
 function formatPrice(value: number): string {
-  if (value >= 1000) {
-    return `$${(value / 1000).toFixed(1)}k`;
-  }
+  if (value >= 10000) return `$${(value / 1000).toFixed(0)}k`;
+  if (value >= 1000) return `$${(value / 1000).toFixed(1)}k`;
   return `$${value.toFixed(0)}`;
 }
 
@@ -90,14 +93,31 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
+function computeXAxisInterval(dataLength: number): number {
+  if (dataLength <= 6) return 0;
+  if (dataLength <= 12) return 1;
+  return 2;
+}
+
+function computePercentChange(dataPoints: MonthlyPricePoint[]): number {
+  const prices = dataPoints.map((dp) => dp.avgPrice);
+  const firstNonZero = prices.find((p) => p > 0);
+  const lastNonZero = [...prices].reverse().find((p) => p > 0);
+  if (!firstNonZero || !lastNonZero || firstNonZero === 0) return 0;
+  return ((lastNonZero - firstNonZero) / firstNonZero) * 100;
+}
+
 export function PriceTrendChart({
   playerRequest,
   autoLoad = false,
+  subtitle,
 }: {
   playerRequest: PlayerPriceRequest;
   autoLoad?: boolean;
+  subtitle?: string;
 }) {
   const [history, setHistory] = useState<MonthlyPriceHistory | null>(null);
+  const [hasTriggeredAutoLoad, setHasTriggeredAutoLoad] = useState(false);
 
   const fetchMutation = useMutation({
     mutationFn: async () => {
@@ -108,11 +128,12 @@ export function PriceTrendChart({
     },
   });
 
-  if (!history && !fetchMutation.isPending && !fetchMutation.isError) {
-    if (autoLoad && !fetchMutation.isSuccess) {
+  useEffect(() => {
+    if (autoLoad && !hasTriggeredAutoLoad && !history && !fetchMutation.isPending) {
+      setHasTriggeredAutoLoad(true);
       fetchMutation.mutate();
     }
-  }
+  }, [autoLoad, hasTriggeredAutoLoad, history, fetchMutation.isPending]);
 
   if (fetchMutation.isPending) {
     return (
@@ -120,8 +141,9 @@ export function PriceTrendChart({
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Price Trend (18 Months)
+            Price Trend
           </CardTitle>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -142,8 +164,9 @@ export function PriceTrendChart({
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Price Trend (18 Months)
+            Price Trend
           </CardTitle>
+          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </CardHeader>
         <CardContent>
           {fetchMutation.isError ? (
@@ -163,7 +186,7 @@ export function PriceTrendChart({
               data-testid="button-load-price-chart"
             >
               <BarChart3 className="h-4 w-4 mr-2" />
-              Load Price Chart
+              Load 18-Month Price Chart
             </Button>
           )}
         </CardContent>
@@ -173,71 +196,94 @@ export function PriceTrendChart({
 
   const chartData = history.dataPoints.map((dp) => ({
     month: formatMonth(dp.month),
-    [history.playerName]: dp.avgPrice,
+    price: dp.avgPrice,
+    salesCount: dp.salesCount || 0,
   }));
 
-  const allPricesRaw = history.dataPoints.map((dp) => dp.avgPrice);
-  const prices = allPricesRaw.filter((p) => p > 0);
+  const prices = history.dataPoints.map((dp) => dp.avgPrice).filter((p) => p > 0);
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
   const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
-  const firstPrice = allPricesRaw[0] || 0;
-  const lastPrice = allPricesRaw[allPricesRaw.length - 1] || 0;
-  const pctChange = firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
+  const pctChange = computePercentChange(history.dataPoints);
+  const TrendIcon = pctChange >= 0 ? TrendingUp : TrendingDown;
+
+  const yDomain = [
+    Math.max(0, Math.floor(minPrice * 0.8)),
+    Math.ceil(maxPrice * 1.15),
+  ];
+  const xInterval = computeXAxisInterval(chartData.length);
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Price Trend (18 Months)
-          </CardTitle>
+          <div>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Price Trend
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {subtitle || history.cardDescription || "Recent sold prices from market data"}
+            </p>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className={getConfidenceColor(history.confidence)}>
-              {history.confidence} Confidence
+              {history.confidence}
             </Badge>
-            <Badge
-              variant="outline"
-              className={
-                pctChange >= 0
-                  ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
-                  : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
-              }
-            >
-              <TrendingUp className="h-3 w-3 mr-1" />
-              {pctChange >= 0 ? "+" : ""}{pctChange.toFixed(1)}%
-            </Badge>
+            {pctChange !== 0 && (
+              <Badge
+                variant="outline"
+                className={
+                  pctChange >= 0
+                    ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                    : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                }
+              >
+                <TrendIcon className="h-3 w-3 mr-1" />
+                {pctChange >= 0 ? "+" : ""}{pctChange.toFixed(1)}%
+              </Badge>
+            )}
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[220px] w-full">
+        <div className="h-[240px] w-full" data-testid="price-trend-chart">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
+              <defs>
+                <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={CHART_COLORS.player1} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={CHART_COLORS.player1} stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" opacity={0.3} />
               <XAxis
                 dataKey="month"
                 tick={{ fontSize: 10 }}
                 className="fill-muted-foreground"
-                interval={2}
+                interval={xInterval}
+                angle={-30}
+                textAnchor="end"
+                height={40}
               />
               <YAxis
                 tickFormatter={formatPrice}
                 tick={{ fontSize: 10 }}
                 className="fill-muted-foreground"
-                domain={[Math.floor(minPrice * 0.85), Math.ceil(maxPrice * 1.1)]}
-                width={45}
+                domain={yDomain}
+                width={50}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Line
+              <Area
                 type="monotone"
-                dataKey={history.playerName}
+                dataKey="price"
+                name={history.playerName}
                 stroke={CHART_COLORS.player1}
                 strokeWidth={2}
+                fill="url(#priceGradient)"
                 dot={false}
-                activeDot={{ r: 4, fill: CHART_COLORS.player1 }}
+                activeDot={{ r: 4, fill: CHART_COLORS.player1, stroke: "hsl(var(--background))", strokeWidth: 2 }}
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
         {history.notes && (
@@ -287,8 +333,9 @@ export function ComparisonPriceTrendChart({
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Price Trend Comparison (18 Months)
+            Price Trend Comparison
           </CardTitle>
+          <p className="text-xs text-muted-foreground">18-month price history overlay</p>
         </CardHeader>
         <CardContent>
           <Skeleton className="h-[250px] w-full" />
@@ -307,8 +354,9 @@ export function ComparisonPriceTrendChart({
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            Price Trend Comparison (18 Months)
+            Price Trend Comparison
           </CardTitle>
+          <p className="text-xs text-muted-foreground">18-month price history overlay</p>
         </CardHeader>
         <CardContent>
           {error ? (
@@ -355,26 +403,28 @@ export function ComparisonPriceTrendChart({
     ...history2.dataPoints.map((dp) => dp.avgPrice),
   ].filter((p) => p > 0);
 
-  const minPrice = Math.min(...allPrices);
-  const maxPrice = Math.max(...allPrices);
+  const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : 0;
+  const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : 0;
 
-  const getChange = (h: MonthlyPriceHistory) => {
-    const prices = h.dataPoints.map((dp) => dp.avgPrice).filter((p) => p > 0);
-    if (prices.length < 2) return 0;
-    return ((prices[prices.length - 1] - prices[0]) / prices[0]) * 100;
-  };
+  const change1 = computePercentChange(history1.dataPoints);
+  const change2 = computePercentChange(history2.dataPoints);
 
-  const change1 = getChange(history1);
-  const change2 = getChange(history2);
+  const xInterval = computeXAxisInterval(chartData.length);
+
+  const TrendIcon1 = change1 >= 0 ? TrendingUp : TrendingDown;
+  const TrendIcon2 = change2 >= 0 ? TrendingUp : TrendingDown;
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Price Trend Comparison (18 Months)
-          </CardTitle>
+          <div>
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Price Trend Comparison
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">18-month price history overlay</p>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge
               variant="outline"
@@ -385,7 +435,8 @@ export function ComparisonPriceTrendChart({
               }
             >
               <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: CHART_COLORS.player1 }} />
-              {player1Name}: {change1 >= 0 ? "+" : ""}{change1.toFixed(1)}%
+              <TrendIcon1 className="h-3 w-3 mr-0.5" />
+              {change1 >= 0 ? "+" : ""}{change1.toFixed(1)}%
             </Badge>
             <Badge
               variant="outline"
@@ -396,13 +447,14 @@ export function ComparisonPriceTrendChart({
               }
             >
               <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: CHART_COLORS.player2 }} />
-              {player2Name}: {change2 >= 0 ? "+" : ""}{change2.toFixed(1)}%
+              <TrendIcon2 className="h-3 w-3 mr-0.5" />
+              {change2 >= 0 ? "+" : ""}{change2.toFixed(1)}%
             </Badge>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px] w-full">
+        <div className="h-[280px] w-full" data-testid="comparison-price-trend-chart">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData} margin={{ top: 5, right: 10, bottom: 5, left: 10 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" opacity={0.3} />
@@ -410,14 +462,17 @@ export function ComparisonPriceTrendChart({
                 dataKey="month"
                 tick={{ fontSize: 10 }}
                 className="fill-muted-foreground"
-                interval={2}
+                interval={xInterval}
+                angle={-30}
+                textAnchor="end"
+                height={40}
               />
               <YAxis
                 tickFormatter={formatPrice}
                 tick={{ fontSize: 10 }}
                 className="fill-muted-foreground"
-                domain={[Math.floor(minPrice * 0.85), Math.ceil(maxPrice * 1.1)]}
-                width={45}
+                domain={[Math.max(0, Math.floor(minPrice * 0.8)), Math.ceil(maxPrice * 1.15)]}
+                width={50}
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend
@@ -429,7 +484,7 @@ export function ComparisonPriceTrendChart({
                 stroke={CHART_COLORS.player1}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4, fill: CHART_COLORS.player1 }}
+                activeDot={{ r: 4, fill: CHART_COLORS.player1, stroke: "hsl(var(--background))", strokeWidth: 2 }}
               />
               <Line
                 type="monotone"
@@ -437,7 +492,7 @@ export function ComparisonPriceTrendChart({
                 stroke={CHART_COLORS.player2}
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4, fill: CHART_COLORS.player2 }}
+                activeDot={{ r: 4, fill: CHART_COLORS.player2, stroke: "hsl(var(--background))", strokeWidth: 2 }}
               />
             </LineChart>
           </ResponsiveContainer>

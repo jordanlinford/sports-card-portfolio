@@ -378,28 +378,43 @@ export async function fetchMonthlyPriceHistory(params: {
     months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
   }
 
-  const prompt = `Search eBay SOLD listings for this sports card over the last 18 months: "${searchDescription}"
+  const broaderSearch = [params.playerName, params.year || "", params.setName || "", params.sport].filter(Boolean).join(" ");
 
-I need the AVERAGE SOLD PRICE by month for the last 18 months (${months[0]} through ${months[months.length - 1]}).
+  const prompt = `You are a sports card market analyst. Search for REAL eBay completed/sold listing price data for this card: "${searchDescription}"
 
-Search for actual completed/sold eBay listings. Try queries like:
-- "${searchDescription} sold"
-- "${params.playerName} ${params.year || ""} ${params.setName || ""} card sold price history"
+TASK: Provide monthly AVERAGE SOLD PRICES for all 18 months from ${months[0]} to ${months[months.length - 1]}.
 
-For each month, find any available sold data and compute an average. If no sales occurred in a particular month, estimate based on surrounding months' trend. Focus on accuracy — report real market prices.
+SEARCH STRATEGY — try multiple searches to find price data:
+1. Search: "${searchDescription} eBay sold price"
+2. Search: "${broaderSearch} card eBay sold completed listings price history"
+3. Search: "${params.playerName} ${params.setName || ""} ${params.year || ""} card value price guide"
+4. Search: "eBay ${params.playerName} ${params.year || ""} ${params.sport} card sold prices 2024 2025"
 
-Return ONLY a JSON object:
+Look at price guide sites (130point.com, PSA card values, Beckett, COMC, etc.) and eBay sold history pages for real pricing data across different months.
+
+IMPORTANT RULES:
+- You MUST return exactly 18 data points, one for each month from ${months[0]} to ${months[months.length - 1]}
+- Use real sold data when available
+- For months with no direct sales data, interpolate based on the overall trend and nearby months — but NEVER just repeat the same price for every month. Card prices fluctuate.
+- The price should reflect realistic market movement (seasonal trends, player performance, etc.)
+- Mark estimated months with salesCount: 0
+
+Here are the 18 months you must include:
+${months.join(", ")}
+
+Return ONLY valid JSON (no markdown, no explanation):
 {
   "dataPoints": [
-    { "month": "YYYY-MM", "avgPrice": <number>, "salesCount": <number or 0 if estimated> }
+    { "month": "${months[0]}", "avgPrice": <number>, "salesCount": <number or 0 if estimated> },
+    { "month": "${months[1]}", "avgPrice": <number>, "salesCount": <number or 0 if estimated> },
+    ... (continue for all 18 months)
+    { "month": "${months[17]}", "avgPrice": <number>, "salesCount": <number or 0 if estimated> }
   ],
   "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "notes": "<brief note about data quality and any notable price movements>"
+  "notes": "<brief note about data quality, notable price movements, and what drove any trends>"
 }
 
-Include ALL 18 months from ${months[0]} to ${months[months.length - 1]}.
-If data is sparse, interpolate reasonably but mark salesCount as 0 for estimated months.
-Prices should be in USD.`;
+Prices in USD. Do NOT return fewer than 18 data points.`;
 
   try {
     console.log(`[MonthlyPrice] Fetching 18-month history for: ${searchDescription}`);
@@ -419,17 +434,74 @@ Prices should be in USD.`;
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       if (Array.isArray(parsed.dataPoints) && parsed.dataPoints.length > 0) {
+        const rawPoints = parsed.dataPoints.map((dp: any) => ({
+          month: dp.month,
+          avgPrice: typeof dp.avgPrice === "number" ? Math.max(0, dp.avgPrice) : 0,
+          salesCount: typeof dp.salesCount === "number" ? dp.salesCount : 0,
+        }));
+
+        const pointMap = new Map<string, MonthlyPricePoint>(rawPoints.map((dp: MonthlyPricePoint) => [dp.month, dp]));
+        const filledPoints: MonthlyPricePoint[] = months.map((m) => {
+          const existing = pointMap.get(m);
+          if (existing && existing.avgPrice > 0) return existing;
+          return { month: m, avgPrice: 0, salesCount: 0 };
+        });
+
+        const nonZeroPrices = filledPoints.filter((p) => p.avgPrice > 0);
+        const realDataMonths = nonZeroPrices.length;
+
+        if (realDataMonths < 2) {
+          console.log(`[MonthlyPrice] Only ${realDataMonths} real data point(s) for ${params.playerName} — insufficient for chart`);
+          const result: MonthlyPriceHistory = {
+            playerName: params.playerName,
+            sport: params.sport,
+            cardDescription: searchDescription,
+            dataPoints: nonZeroPrices.length > 0 ? filledPoints.map(p => p.avgPrice > 0 ? p : { ...p, avgPrice: nonZeroPrices[0].avgPrice }) : [],
+            confidence: "LOW",
+            notes: "Very limited sales data available. Chart shows estimated trend based on sparse data.",
+          };
+          monthlyPriceCache.set(cacheKey, { data: result, cachedAt: Date.now() });
+          return result;
+        }
+
+        if (nonZeroPrices.length > 0) {
+          for (let i = 0; i < filledPoints.length; i++) {
+            if (filledPoints[i].avgPrice === 0) {
+              let prevIdx = -1;
+              let nextIdx = -1;
+              for (let j = i - 1; j >= 0; j--) {
+                if (filledPoints[j].avgPrice > 0) { prevIdx = j; break; }
+              }
+              for (let j = i + 1; j < filledPoints.length; j++) {
+                if (filledPoints[j].avgPrice > 0) { nextIdx = j; break; }
+              }
+              if (prevIdx >= 0 && nextIdx >= 0) {
+                const prevPrice = filledPoints[prevIdx].avgPrice;
+                const nextPrice = filledPoints[nextIdx].avgPrice;
+                const steps = nextIdx - prevIdx;
+                const stepSize = (nextPrice - prevPrice) / steps;
+                filledPoints[i].avgPrice = Math.round(prevPrice + stepSize * (i - prevIdx));
+              } else if (prevIdx >= 0) {
+                filledPoints[i].avgPrice = filledPoints[prevIdx].avgPrice;
+              } else if (nextIdx >= 0) {
+                filledPoints[i].avgPrice = filledPoints[nextIdx].avgPrice;
+              }
+              filledPoints[i].salesCount = 0;
+            }
+          }
+        }
+
+        let computedConfidence = parsed.confidence || "MEDIUM";
+        if (realDataMonths < 4) computedConfidence = "LOW";
+        else if (realDataMonths < 8 && computedConfidence === "HIGH") computedConfidence = "MEDIUM";
+
         const result: MonthlyPriceHistory = {
           playerName: params.playerName,
           sport: params.sport,
           cardDescription: searchDescription,
-          dataPoints: parsed.dataPoints.map((dp: any) => ({
-            month: dp.month,
-            avgPrice: typeof dp.avgPrice === "number" ? dp.avgPrice : 0,
-            salesCount: typeof dp.salesCount === "number" ? dp.salesCount : 0,
-          })),
-          confidence: parsed.confidence || "MEDIUM",
-          notes: parsed.notes || "",
+          dataPoints: filledPoints,
+          confidence: computedConfidence as "HIGH" | "MEDIUM" | "LOW",
+          notes: parsed.notes || (realDataMonths < 6 ? `Based on ${realDataMonths} months of actual sales data with interpolation.` : ""),
         };
 
         monthlyPriceCache.set(cacheKey, { data: result, cachedAt: Date.now() });
