@@ -1912,7 +1912,9 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   // For retired players (RETIRED, RETIRED_HOF), we don't require current team/position
   // They're expected to have "unknown" team - that's not a data quality issue
   const isRetired = input.stage === "RETIRED" || input.stage === "RETIRED_HOF";
-  const lowMeta = isRetired ? false : (isUnknownValue(input.team) || isUnknownValue(input.position));
+  // High-tier registry players are well-known — don't flag as lowMeta even if team/position data is temporarily missing
+  const isHighTierPlayer = roleTier === "FRANCHISE_CORE" || roleTier === "STARTER";
+  const lowMeta = (isRetired || isHighTierPlayer) ? false : (isUnknownValue(input.team) || isUnknownValue(input.position));
   
   // overheated: high narrative heat with negative mispricing (loosened for better TRADE_THE_HYPE detection)
   // Original: mispricingScore <= -20 && narrativeHeatScore >= 65 (too strict)
