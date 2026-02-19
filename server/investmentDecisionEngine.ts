@@ -1914,7 +1914,10 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const isRetired = input.stage === "RETIRED" || input.stage === "RETIRED_HOF";
   // High-tier registry players are well-known — don't flag as lowMeta even if team/position data is temporarily missing
   const isHighTierPlayer = roleTier === "FRANCHISE_CORE" || roleTier === "STARTER";
-  const lowMeta = (isRetired || isHighTierPlayer) ? false : (isUnknownValue(input.team) || isUnknownValue(input.position));
+  // If AI (Gemini) assessed the player with MEDIUM or HIGH confidence, the player is clearly recognizable
+  // — don't flag as lowMeta just because team/position strings are missing from structured fields
+  const aiRecognizesPlayer = input.confidence === "HIGH" || input.confidence === "MEDIUM";
+  const lowMeta = (isRetired || isHighTierPlayer || aiRecognizesPlayer) ? false : (isUnknownValue(input.team) || isUnknownValue(input.position));
   
   // overheated: high narrative heat with negative mispricing (loosened for better TRADE_THE_HYPE detection)
   // Original: mispricingScore <= -20 && narrativeHeatScore >= 65 (too strict)
@@ -2098,12 +2101,10 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   
   // Use Gemini's confidence assessment as the primary source
   // Gemini has access to news, player context, and market data - trust its judgment
-  // Only override for truly problematic data scenarios (lowMeta = unknown player)
+  // lowMeta only triggers for truly obscure players where AI also couldn't identify them
   let confidence: DataConfidence = input.confidence || computeConfidence(scores);
   
-  // lowMeta only applies to active players with genuinely missing data (not retired legends)
   if (lowMeta) {
-    // lowMeta = truly unknown player with no identifiable team/position - force LOW
     confidence = "LOW";
   }
   

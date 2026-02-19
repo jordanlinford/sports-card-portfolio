@@ -978,7 +978,8 @@ TONE ENFORCEMENT:
 - NEVER use: "elite", "can't miss", "skyrocketing", "must own", "generational"
 - PREFER: "short leash", "fragile demand", "projection-heavy", "limited proof", "if X then Y"
 - NO percentages or fake precision
-- Reference team context, position premium, historical patterns for ${sport}`;
+- Reference team context, position premium, historical patterns for ${sport}
+- NEVER refer to ${playerName} as "unknown" or "this unknown player." Use their actual career context (MVP, All-Star, starter, etc.) — only use "unknown" for genuinely unrecognizable players.`;
 
   try {
     const response = await gemini.models.generateContent({

@@ -1375,7 +1375,8 @@ IMPORTANT RULES:
    - Cooling after a run-up (if recent trend spike)
 4. Only mention "data uncertainty" or "limited comps" when Data Confidence is actually LOW.
 5. The explanation must never contradict the displayed confidence indicators.
-6. If RECENT NEWS is provided, USE IT to inform your explanation about the player's current status. The news is real-time and supersedes your training data.`;
+6. If RECENT NEWS is provided, USE IT to inform your explanation about the player's current status. The news is real-time and supersedes your training data.
+7. NEVER refer to a player as "unknown" or "this unknown player." If you recognize the player at all (former MVP, All-Star, starter, etc.), reference their actual career context. Only use "unknown" for genuinely obscure, unrecognizable players.`;
 
   try {
     const response = await gemini.models.generateContent({
