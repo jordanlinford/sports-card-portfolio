@@ -355,7 +355,7 @@ export function ComparisonPriceTrendChart({
           <Skeleton className="h-[250px] w-full" />
           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Searching eBay sold data for both players...
+            Loading price history for both players...
           </div>
         </CardContent>
       </Card>
