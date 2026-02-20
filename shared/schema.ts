@@ -67,6 +67,9 @@ export const users = pgTable("users", {
   isAdmin: boolean("is_admin").default(false).notNull(),
   collectorScore: integer("collector_score").default(0).notNull(),
   collectorTier: varchar("collector_tier", { length: 50 }).default("bronze").notNull(),
+  trialStart: timestamp("trial_start"),
+  trialEnd: timestamp("trial_end"),
+  trialSource: varchar("trial_source", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -525,6 +528,13 @@ export const outlookUsageRelations = relations(outlookUsage, ({ one }) => ({
 // Schemas and Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export function hasProAccess(user: User | undefined | null): boolean {
+  if (!user) return false;
+  if (user.subscriptionStatus === "PRO") return true;
+  if (user.trialEnd && new Date(user.trialEnd) > new Date()) return true;
+  return false;
+}
 
 export const insertDisplayCaseSchema = createInsertSchema(displayCases).omit({
   id: true,

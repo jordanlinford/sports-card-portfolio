@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import { DISPLAY_CASE_THEMES } from "@/lib/themes";
 import { trackEvent } from "@/lib/analytics";
+import { hasProAccess } from "@shared/schema";
 import type { DisplayCaseWithCards, Card as CardType, PlayerOutlookResponse, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, VerdictModifier } from "@shared/schema";
 
 const ONBOARDING_THEMES = DISPLAY_CASE_THEMES.filter(t => 
@@ -439,7 +440,7 @@ function CreateCaseStep({
     queryKey: ["/api/auth/user"],
     enabled: isAuthenticated,
   });
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);

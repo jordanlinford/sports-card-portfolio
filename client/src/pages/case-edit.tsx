@@ -84,6 +84,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { hasProAccess } from "@shared/schema";
 import type { DisplayCaseWithCards, Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { Badge } from "@/components/ui/badge";
@@ -250,7 +251,7 @@ export default function CaseEdit() {
     enabled: isAuthenticated,
   });
 
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
 
   // Derive selected card from the latest query data to ensure updates are reflected
   const selectedCard = selectedCardId && displayCase?.cards

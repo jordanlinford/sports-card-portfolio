@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Search, Filter, ImageIcon, ArrowLeft, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
+import { hasProAccess } from "@shared/schema";
 import type { Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
 import { OutlookBadge } from "@/components/outlook-badge";
@@ -39,7 +40,7 @@ export default function SearchPage() {
     enabled: isAuthenticated,
   });
 
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
 
   const buildQueryString = () => {
     const params = new URLSearchParams();

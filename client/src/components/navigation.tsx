@@ -363,6 +363,11 @@ export function Navigation() {
                     <Crown className="h-3 w-3" />
                     Pro
                   </Badge>
+                ) : user.trialEnd && new Date(user.trialEnd) > new Date() ? (
+                  <Badge variant="secondary" className="gap-1">
+                    <Crown className="h-3 w-3" />
+                    Trial
+                  </Badge>
                 ) : (
                   <Link href="/upgrade">
                     <Button variant="outline" size="sm" data-testid="button-upgrade-nav">

@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useIOSStandalone } from "@/hooks/use-ios-standalone";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { hasProAccess } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -98,7 +99,7 @@ export default function Upgrade() {
     },
   });
 
-  if (user?.subscriptionStatus === "PRO") {
+  if (hasProAccess(user)) {
     return (
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
         <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">

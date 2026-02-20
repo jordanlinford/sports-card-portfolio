@@ -43,6 +43,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { hasProAccess } from "@shared/schema";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -2772,7 +2773,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
 
 export default function OutlookOverviewPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
 
   const { data: cases, isLoading } = useQuery<CaseWithCards[]>({
     queryKey: ["/api/display-cases"],

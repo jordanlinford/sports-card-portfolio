@@ -23,6 +23,7 @@ import {
   type SplitFormatType,
   type BundleDefinition,
   userFeedback,
+  hasProAccess,
 } from "@shared/schema";
 import { db } from "./db";
 import { desc, eq } from "drizzle-orm";
@@ -723,12 +724,47 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // Trial activation endpoint
+  app.post("/api/trial/activate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const source = req.body?.source || "podcast";
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      if (user.subscriptionStatus === "PRO") {
+        return res.status(400).json({ message: "You already have an active Pro subscription." });
+      }
+      if (user.trialEnd) {
+        const trialExpired = new Date(user.trialEnd) < new Date();
+        if (!trialExpired) {
+          return res.status(400).json({ message: "You already have an active trial.", trialEnd: user.trialEnd });
+        }
+        return res.status(400).json({ message: "You've already used your free trial. Upgrade to Pro for continued access." });
+      }
+      const now = new Date();
+      const trialEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      await storage.activateUserTrial(userId, now, trialEnd, source);
+      const updatedUser = await storage.getUser(userId);
+      res.json({
+        success: true,
+        message: `Your 7-day Pro trial is active. Ends on ${trialEnd.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`,
+        trialEnd: trialEnd.toISOString(),
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error("Error activating trial:", error);
+      res.status(500).json({ message: "Failed to activate trial" });
+    }
+  });
+
   // Onboarding status - check if user needs onboarding (has 0 display cases or 0 cards)
   app.get("/api/user/outlook-usage", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       const FREE_TIER_LIMIT = 3;
       
       const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
@@ -1239,7 +1275,7 @@ Sitemap: ${origin}/sitemap.xml
       
       // Check free tier limit
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         const caseCount = await storage.countDisplayCases(userId);
         if (caseCount >= 3) {
           return res.status(403).json({ 
@@ -1278,7 +1314,7 @@ Sitemap: ${origin}/sitemap.xml
       
       // Check free tier limit
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         const caseCount = await storage.countDisplayCases(userId);
         if (caseCount >= 3) {
           return res.status(403).json({ 
@@ -1362,7 +1398,7 @@ Sitemap: ${origin}/sitemap.xml
       
       // Check free tier limit
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         const caseCount = await storage.countDisplayCases(userId);
         if (caseCount >= 3) {
           return res.status(403).json({ 
@@ -1683,7 +1719,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check if user has Pro subscription
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         return res.status(403).json({ 
           message: "AI price lookup is a Pro feature. Upgrade to Pro to automatically refresh card values." 
         });
@@ -1757,7 +1793,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check if user has Pro subscription
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         return res.status(403).json({ 
           message: "AI price lookup is a Pro feature. Upgrade to Pro to automatically refresh card values." 
         });
@@ -1849,7 +1885,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check if user has Pro subscription
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         return res.status(403).json({ 
           message: "Portfolio Next Buys is a Pro feature. Upgrade to Pro to get themed recommendations for your collections.",
           proRequired: true
@@ -1919,7 +1955,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check if user has Pro subscription
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         return res.status(403).json({ 
           message: "Card Outlook AI is a Pro feature. Upgrade to Pro to get investment-grade insights on your cards." 
         });
@@ -2068,7 +2104,7 @@ Sitemap: ${origin}/sitemap.xml
       let isPro = false;
       if (userId) {
         const user = await storage.getUser(userId);
-        isPro = user?.subscriptionStatus === "PRO";
+        isPro = hasProAccess(user);
       }
 
       // Return cached outlook if available
@@ -2138,7 +2174,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check user is Pro
       const user = await storage.getUser(userId);
-      if (!user || user.subscriptionStatus !== "PRO") {
+      if (!user || !hasProAccess(user)) {
         return res.status(403).json({ message: "Pro subscription required" });
       }
 
@@ -2191,7 +2227,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check subscription - free users get 3 analyses per month
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       const FREE_TIER_LIMIT = 3;
       
       if (!isPro) {
@@ -2521,7 +2557,7 @@ Sitemap: ${origin}/sitemap.xml
       let isPro = false;
       if (userId) {
         const user = await storage.getUser(userId);
-        isPro = user?.subscriptionStatus === "PRO";
+        isPro = hasProAccess(user);
       }
 
       // Get cached outlook from card_outlooks table
@@ -2725,7 +2761,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check subscription - free users get 3 analyses per month
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       const FREE_TIER_LIMIT = 3;
       
       if (!isPro) {
@@ -3272,7 +3308,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check subscription status for scan limits
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
       const scansToday = getScanCountForToday(userId);
       
@@ -3360,7 +3396,7 @@ Sitemap: ${origin}/sitemap.xml
         const userId = req.user?.claims?.sub;
         if (userId) {
           const user = await storage.getUser(userId);
-          const isPro = user?.subscriptionStatus === "PRO";
+          const isPro = hasProAccess(user);
           const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
           const scansToday = getScanCountForToday(userId);
           
@@ -3408,7 +3444,7 @@ Sitemap: ${origin}/sitemap.xml
 
       // Check subscription status for scan limits
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
       const scansToday = getScanCountForToday(userId);
       
@@ -3496,7 +3532,7 @@ Sitemap: ${origin}/sitemap.xml
         const userId = req.user?.claims?.sub;
         if (userId) {
           const user = await storage.getUser(userId);
-          const isPro = user?.subscriptionStatus === "PRO";
+          const isPro = hasProAccess(user);
           const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
           const scansToday = getScanCountForToday(userId);
           
@@ -3527,7 +3563,7 @@ Sitemap: ${origin}/sitemap.xml
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
       const scansToday = getScanCountForToday(userId);
       
@@ -3629,7 +3665,7 @@ Sitemap: ${origin}/sitemap.xml
       // Check subscription - this is a Pro feature for full analysis
       // Free users can see limited info
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       
       if (!isPro) {
         // Check per-user rate limit (prevent abuse)
@@ -3808,7 +3844,7 @@ Sitemap: ${origin}/sitemap.xml
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       
       if (!isPro) {
         return res.status(403).json({ message: "Pro subscription required" });
@@ -6153,7 +6189,7 @@ RULES:
       
       // Check Pro subscription
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         return res.status(403).json({ 
           message: "Growth Projections is a Pro feature. Upgrade to see personalized value forecasts for your collection." 
         });
@@ -7142,7 +7178,7 @@ RULES:
 
       // Check Pro gating: Free users get 3 alerts, Pro gets unlimited
       const user = await storage.getUser(userId);
-      if (user?.subscriptionStatus !== "PRO") {
+      if (!hasProAccess(user)) {
         const alertCount = await storage.countUserPriceAlerts(userId);
         if (alertCount >= 3) {
           return res.status(403).json({ 
@@ -7258,7 +7294,7 @@ RULES:
       const alerts = await storage.getCardPriceAlerts(cardId, userId);
       const userAlertCount = await storage.countUserPriceAlerts(userId);
       const user = await storage.getUser(userId);
-      const isPro = user?.subscriptionStatus === "PRO";
+      const isPro = hasProAccess(user);
       const maxAlerts = isPro ? Infinity : 3;
       const canCreateMore = isPro || userAlertCount < 3;
 
@@ -7357,9 +7393,9 @@ RULES:
       const userId = req.user.claims.sub;
       const count = await storage.countUserPriceAlerts(userId);
       const user = await storage.getUser(userId);
-      const limit = user?.subscriptionStatus === "PRO" ? null : 3;
+      const limit = hasProAccess(user) ? null : 3;
       
-      res.json({ count, limit, isPro: user?.subscriptionStatus === "PRO" });
+      res.json({ count, limit, isPro: hasProAccess(user) });
     } catch (error) {
       console.error("Error fetching alert count:", error);
       res.status(500).json({ message: "Failed to fetch alert count" });

@@ -48,6 +48,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Card as CardUI, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { hasProAccess } from "@shared/schema";
 import type { DisplayCaseWithCards, Card, User } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -346,7 +347,7 @@ export default function CaseView() {
   });
 
   const isOwner = user?.id === displayCase?.userId;
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
 
   const refreshAllPricesMutation = useMutation({
     mutationFn: async () => {
@@ -451,7 +452,7 @@ export default function CaseView() {
                         Edit
                       </Button>
                     </Link>
-                    {user?.subscriptionStatus === "PRO" && displayCase.cards && displayCase.cards.length > 0 && (
+                    {hasProAccess(user) && displayCase.cards && displayCase.cards.length > 0 && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -789,7 +790,7 @@ export default function CaseView() {
         onClose={() => setSelectedCard(null)}
         displayCaseId={parseInt(id || "0")}
         canEdit={isOwner}
-        isPro={user?.subscriptionStatus === "PRO"}
+        isPro={hasProAccess(user)}
         isAuthenticated={!!user}
         ownerUserId={displayCase?.userId}
       />

@@ -1,5 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { hasProAccess } from "@shared/schema";
 import { useParams, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -355,7 +356,7 @@ export default function CardOutlookPage() {
   }
 
   const needsGeneration = outlook?.needsGeneration || (!outlook?.action && !outlook?.cached);
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
   
   const actionStyle = ACTION_STYLES[outlook?.action || "MONITOR"] || ACTION_STYLES.MONITOR;
   const ActionIcon = actionStyle.icon;

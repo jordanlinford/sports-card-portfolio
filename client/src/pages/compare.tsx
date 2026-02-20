@@ -33,10 +33,11 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ComparisonPriceTrendChart } from "@/components/price-trend-chart";
+import { hasProAccess } from "@shared/schema";
 import type { 
   PlayerOutlookResponse, 
   MarketTemperature, 
-  PlayerVerdict 
+  PlayerVerdict,
 } from "@shared/schema";
 
 interface ComparisonNarrative {
@@ -809,7 +810,7 @@ function CardComparisonSummary({
 export default function ComparePage() {
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
   const [activeTab, setActiveTab] = useState<string>("players");
   
   const [leftPlayer, setLeftPlayer] = useState<ComparisonPlayer>({

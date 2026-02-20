@@ -117,9 +117,15 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    // Store "remember me" preference in session before redirecting to OIDC
     const rememberMe = req.query.remember === "true";
     (req.session as any).rememberMe = rememberMe;
+    
+    if (req.query.returnTo && typeof req.query.returnTo === "string") {
+      const returnTo = req.query.returnTo;
+      if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
+        (req.session as any).returnTo = returnTo;
+      }
+    }
     
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
@@ -136,14 +142,15 @@ export async function setupAuth(app: Express) {
     })(req, res, (err: any) => {
       if (err) return next(err);
       
-      // If user chose "stay logged in", extend the session cookie
       if ((req.session as any).rememberMe) {
         req.session.cookie.maxAge = EXTENDED_SESSION_TTL;
-        delete (req.session as any).rememberMe; // Clear flag after use
+        delete (req.session as any).rememberMe;
         console.log("[Auth] Extended session for 'stay logged in' - 30 days");
       }
       
-      res.redirect("/");
+      const returnTo = (req.session as any).returnTo || "/";
+      delete (req.session as any).returnTo;
+      res.redirect(returnTo);
     });
   });
 

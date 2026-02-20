@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { hasProAccess } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -180,7 +181,7 @@ function InsightCard({ insight }: { insight: GrowthInsight }) {
 
 export default function GrowthProjectionsPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
 
   const { data, isLoading, error } = useQuery<GrowthProjectionsData>({
     queryKey: ["/api/analytics/growth-projections"],

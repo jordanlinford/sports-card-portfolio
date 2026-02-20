@@ -49,6 +49,8 @@ import PublicPlayerOutlookPage from "@/pages/public-player-outlook";
 import SupportPage from "@/pages/support";
 import ComparePage from "@/pages/compare";
 import AdminFeedbackPage from "@/pages/admin-feedback";
+import PodcastLanding from "@/pages/podcast";
+import { TrialBanner } from "@/components/trial-banner";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -73,6 +75,7 @@ function Router() {
       <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
       <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
       <Route path="/compare" component={ComparePage} />
+      <Route path="/podcast" component={PodcastLanding} />
       <Route path="/hidden-gems" component={HiddenGemsPage} />
       <Route path="/outlook" component={OutlookOverviewPage} />
       <Route path="/watchlist" component={WatchlistPage} />
@@ -140,6 +143,7 @@ function App() {
         <TooltipProvider>
           <div className="min-h-screen bg-background flex flex-col">
             <Navigation />
+            <TrialBanner />
             <main className="flex-1">
               <Router />
             </main>

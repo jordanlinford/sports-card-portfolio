@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { hasProAccess } from "@shared/schema";
 import type { DisplayCaseWithCards } from "@shared/schema";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -268,7 +269,7 @@ export default function Dashboard() {
 
   const isLoading = authLoading || casesLoading;
   const caseCount = displayCases?.length || 0;
-  const isPro = user?.subscriptionStatus === "PRO";
+  const isPro = hasProAccess(user);
   const canCreate = isPro || caseCount < 3;
   
   // Check if user has any cards with values (use manualValue if set, otherwise estimatedValue)

@@ -135,6 +135,7 @@ export interface IStorage {
   isHandleAvailable(handle: string, excludeUserId?: string): Promise<boolean>;
   updateUserSubscription(userId: string, status: string, stripeCustomerId?: string): Promise<User | undefined>;
   updateUserByStripeCustomerId(stripeCustomerId: string, data: { subscriptionStatus?: string; stripeSubscriptionId?: string | null }): Promise<User | undefined>;
+  activateUserTrial(userId: string, trialStart: Date, trialEnd: Date, source: string): Promise<User | undefined>;
 
   // Display Case operations
   getDisplayCases(userId: string): Promise<DisplayCaseWithCards[]>;
@@ -478,6 +479,20 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set(updateData)
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async activateUserTrial(userId: string, trialStart: Date, trialEnd: Date, source: string): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({
+        trialStart,
+        trialEnd,
+        trialSource: source,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, userId))
       .returning();
     return user;

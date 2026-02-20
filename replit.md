@@ -58,6 +58,8 @@ The application supports core functionalities including:
   
   Uses round-robin source selection with hard caps (max 2 per source) to ensure diverse recommendations. PLAYER_TEAM_MAP with 50+ popular player-to-team mappings enables reliable team detection. Scoring considers portfolio fit, diversification needs, career stage balance, value range alignment, and momentum signals.
 
+- **Podcast Landing Page & Pro Trial**: Public landing page at `/podcast` for converting podcast listeners. Grants 7-day Pro trial on signup with one-trial-per-user enforcement. Trial metadata stored on users table (trialStart, trialEnd, trialSource). `hasProAccess()` shared utility checks both paid Pro and active trial status. Trial banner shown app-wide during active trial with days remaining and upgrade CTA. Auth login supports `returnTo` parameter for post-login redirect flow.
+
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM for type-safe schema management and queries.
 - **API**: RESTful API design for all backend interactions.
