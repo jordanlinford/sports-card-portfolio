@@ -11,6 +11,40 @@ const gemini = new GoogleGenAI({
   },
 });
 
+interface RefreshStatus {
+  status: "idle" | "running" | "completed" | "failed";
+  progress: string;
+  sportsDone: number;
+  sportsTotal: number;
+  gemsFound: number;
+  gemsCreated: number;
+  batchId: string | null;
+  error: string | null;
+  startedAt: number | null;
+  completedAt: number | null;
+}
+
+let currentRefreshStatus: RefreshStatus = {
+  status: "idle",
+  progress: "",
+  sportsDone: 0,
+  sportsTotal: 4,
+  gemsFound: 0,
+  gemsCreated: 0,
+  batchId: null,
+  error: null,
+  startedAt: null,
+  completedAt: null,
+};
+
+export function getRefreshStatus(): RefreshStatus {
+  return { ...currentRefreshStatus };
+}
+
+function updateRefreshStatus(updates: Partial<RefreshStatus>) {
+  currentRefreshStatus = { ...currentRefreshStatus, ...updates };
+}
+
 function generateBatchId(): string {
   const now = new Date();
   return `gems-${now.toISOString().replace(/[:.]/g, "-")}`;
@@ -401,13 +435,38 @@ Return ONLY valid JSON array, no markdown.`;
   }
 }
 
-export async function refreshHiddenGems(targetCount: number = 25): Promise<{
-  success: boolean;
-  gemsCreated: number;
-  batchId: string;
-  error?: string;
-}> {
+export function startRefreshInBackground(targetCount: number = 25): { batchId: string; alreadyRunning: boolean } {
+  if (currentRefreshStatus.status === "running") {
+    return { batchId: currentRefreshStatus.batchId || "", alreadyRunning: true };
+  }
+
   const batchId = generateBatchId();
+  updateRefreshStatus({
+    status: "running",
+    progress: "Starting AI discovery...",
+    sportsDone: 0,
+    sportsTotal: 4,
+    gemsFound: 0,
+    gemsCreated: 0,
+    batchId,
+    error: null,
+    startedAt: Date.now(),
+    completedAt: null,
+  });
+
+  refreshHiddenGemsInternal(targetCount, batchId).catch(err => {
+    console.error("[HiddenGems] Background refresh crashed:", err);
+    updateRefreshStatus({
+      status: "failed",
+      error: err instanceof Error ? err.message : "Unknown error",
+      completedAt: Date.now(),
+    });
+  });
+
+  return { batchId, alreadyRunning: false };
+}
+
+async function refreshHiddenGemsInternal(targetCount: number, batchId: string): Promise<void> {
   console.log(`[HiddenGems] Starting fresh AI-powered refresh, batchId: ${batchId}, target: ${targetCount}`);
 
   try {
@@ -416,9 +475,16 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
     const allGems: AiDiscoveredGem[] = [];
     const seenPlayerKeys = new Set<string>();
 
-    for (const sport of sports) {
+    for (let si = 0; si < sports.length; si++) {
+      const sport = sports[si];
+      updateRefreshStatus({
+        progress: `Searching ${sport} market intelligence...`,
+        sportsDone: si,
+      });
+
       const existingNames = new Set(allGems.map(g => g.playerName));
       const discovered = await discoverGemsFromAI(sport, perSport + 2, existingNames);
+      console.log(`[HiddenGems] ${sport}: discovered ${discovered.length} gems`);
 
       for (const gem of discovered) {
         const normalizedName = normalizePlayerName(gem.playerName);
@@ -433,15 +499,28 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
         allGems.push(gem);
       }
 
-      if (sports.indexOf(sport) < sports.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      updateRefreshStatus({
+        sportsDone: si + 1,
+        gemsFound: allGems.length,
+        progress: si < sports.length - 1 
+          ? `Completed ${sport} (${discovered.length} found). Moving to ${sports[si + 1]}...`
+          : `All sports scanned. Saving ${allGems.length} gems...`,
+      });
+
+      if (si < sports.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 
     console.log(`[HiddenGems] Total unique gems discovered: ${allGems.length}`);
 
     if (allGems.length === 0) {
-      return { success: false, gemsCreated: 0, batchId, error: "AI discovery returned no results" };
+      updateRefreshStatus({
+        status: "failed",
+        error: "AI discovery returned no results for any sport",
+        completedAt: Date.now(),
+      });
+      return;
     }
 
     await db.update(hiddenGems).set({ isActive: false }).where(eq(hiddenGems.isActive, true));
@@ -500,6 +579,7 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
 
         await db.insert(hiddenGems).values(gemData);
         gemsCreated++;
+        updateRefreshStatus({ gemsCreated });
         console.log(`[HiddenGems] Created gem ${gemsCreated}: ${normalizedName} (${verdict})`);
       } catch (err) {
         console.error(`[HiddenGems] Failed to create gem for ${gem.playerName}:`, err);
@@ -507,16 +587,33 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
     }
 
     console.log(`[HiddenGems] Refresh complete. Created ${gemsCreated} gems.`);
-    return { success: true, gemsCreated, batchId };
+    updateRefreshStatus({
+      status: "completed",
+      progress: `Done! Created ${gemsCreated} fresh gems across all sports.`,
+      gemsCreated,
+      completedAt: Date.now(),
+    });
   } catch (error) {
     console.error("[HiddenGems] Refresh failed:", error);
-    return {
-      success: false,
-      gemsCreated: 0,
-      batchId,
-      error: error instanceof Error ? error.message : "Unknown error"
-    };
+    updateRefreshStatus({
+      status: "failed",
+      error: error instanceof Error ? error.message : "Unknown error",
+      completedAt: Date.now(),
+    });
   }
+}
+
+export async function refreshHiddenGems(targetCount: number = 25): Promise<{
+  success: boolean;
+  gemsCreated: number;
+  batchId: string;
+  error?: string;
+}> {
+  const { batchId, alreadyRunning } = startRefreshInBackground(targetCount);
+  if (alreadyRunning) {
+    return { success: false, gemsCreated: 0, batchId, error: "Refresh already in progress" };
+  }
+  return { success: true, gemsCreated: 0, batchId };
 }
 
 export async function getHiddenGemsStats(): Promise<{

@@ -7803,7 +7803,7 @@ RULES:
   // Hidden Gems - Data-driven undervalued player picks
   // ============================================================================
   
-  const { getActiveHiddenGems, refreshHiddenGems, getHiddenGemsStats, getFallbackFeaturedGems, seedPlayerOutlooks } = await import("./hiddenGemsService");
+  const { getActiveHiddenGems, refreshHiddenGems, getHiddenGemsStats, getFallbackFeaturedGems, seedPlayerOutlooks, getRefreshStatus } = await import("./hiddenGemsService");
   const { getPlayerOutlook } = await import("./playerOutlookEngine");
 
   // GET /api/hidden-gems - Get active hidden gems (public)
@@ -7835,7 +7835,7 @@ RULES:
     }
   });
 
-  // POST /api/hidden-gems/refresh - Admin-only refresh (generates new gems from AI)
+  // POST /api/hidden-gems/refresh - Admin-only refresh (generates new gems from AI in background)
   app.post("/api/hidden-gems/refresh", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -7843,7 +7843,6 @@ RULES:
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      // Check if user is admin
       const user = await storage.getUser(userId);
       if (!user?.isAdmin) {
         return res.status(403).json({ error: "Admin access required" });
@@ -7854,24 +7853,28 @@ RULES:
       console.log(`[Hidden Gems] Admin ${userId} triggered refresh...`);
       const result = await refreshHiddenGems(targetCount);
       
-      if (result.success) {
-        res.json({
-          success: true,
-          gemsCreated: result.gemsCreated,
-          batchId: result.batchId,
-          message: `Created ${result.gemsCreated} hidden gems`,
-        });
-      } else {
-        res.status(500).json({
+      if (result.error === "Refresh already in progress") {
+        return res.status(409).json({
           success: false,
-          error: result.error,
+          error: "A refresh is already in progress. Check status for updates.",
           batchId: result.batchId,
         });
       }
+
+      res.json({
+        success: true,
+        batchId: result.batchId,
+        message: "Refresh started in background. Poll /api/hidden-gems/refresh-status for progress.",
+      });
     } catch (error) {
       console.error("[Hidden Gems] Error refreshing:", error);
-      res.status(500).json({ error: "Failed to refresh hidden gems" });
+      res.status(500).json({ error: "Failed to start refresh" });
     }
+  });
+
+  // GET /api/hidden-gems/refresh-status - Check refresh progress
+  app.get("/api/hidden-gems/refresh-status", async (_req, res) => {
+    res.json(getRefreshStatus());
   });
 
   // GET /api/hidden-gems/stats - Get hidden gems statistics

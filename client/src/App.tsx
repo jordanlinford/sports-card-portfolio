@@ -73,6 +73,9 @@ function Router() {
       <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
       <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
       <Route path="/compare" component={ComparePage} />
+      <Route path="/hidden-gems" component={HiddenGemsPage} />
+      <Route path="/outlook" component={OutlookOverviewPage} />
+      <Route path="/watchlist" component={WatchlistPage} />
       {/* Show loading only for auth-dependent routes */}
       {isLoading ? (
         <Route>
@@ -103,9 +106,6 @@ function Router() {
           <Route path="/messages" component={MessagesPage} />
           <Route path="/messages/:conversationId" component={MessagesPage} />
           <Route path="/settings" component={SettingsPage} />
-          <Route path="/outlook" component={OutlookOverviewPage} />
-          <Route path="/watchlist" component={WatchlistPage} />
-          <Route path="/hidden-gems" component={HiddenGemsPage} />
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
           <Route path="/portfolio/next-buys" component={NextBuysPage} />
           <Route path="/portfolio-builder/splits/:id/preferences" component={PortfolioBuilderPreferencesPage} />

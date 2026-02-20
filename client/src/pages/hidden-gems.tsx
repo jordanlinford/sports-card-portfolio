@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -315,21 +315,73 @@ export default function HiddenGemsPage() {
     queryKey: ["/api/hidden-gems"],
   });
   
+  const [refreshProgress, setRefreshProgress] = useState<{
+    status: string;
+    progress: string;
+    sportsDone: number;
+    sportsTotal: number;
+    gemsFound: number;
+    gemsCreated: number;
+  } | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  const startPolling = () => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(async () => {
+      try {
+        const res = await fetch("/api/hidden-gems/refresh-status");
+        const status = await res.json();
+        setRefreshProgress(status);
+
+        if (status.status === "completed") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          toast({
+            title: "Hidden Gems Refreshed",
+            description: `Generated ${status.gemsCreated} fresh gems across all sports.`,
+          });
+          queryClient.invalidateQueries({ queryKey: ["/api/hidden-gems"] });
+          setTimeout(() => setRefreshProgress(null), 3000);
+        } else if (status.status === "failed") {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          toast({
+            title: "Refresh Failed",
+            description: status.error || "Something went wrong during AI discovery.",
+            variant: "destructive",
+          });
+          setTimeout(() => setRefreshProgress(null), 3000);
+        }
+      } catch {
+      }
+    }, 2000);
+  };
+
   const refreshMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", "/api/hidden-gems/refresh");
     },
-    onSuccess: (data) => {
-      toast({
-        title: "Hidden Gems Refreshed",
-        description: `Generated ${data.gemsCreated} new gems with current player data.`,
+    onSuccess: () => {
+      setRefreshProgress({
+        status: "running",
+        progress: "Starting AI discovery...",
+        sportsDone: 0,
+        sportsTotal: 4,
+        gemsFound: 0,
+        gemsCreated: 0,
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/hidden-gems"] });
+      startPolling();
     },
     onError: (error: Error) => {
       toast({
         title: "Refresh Failed",
-        description: error.message || "Failed to refresh hidden gems",
+        description: error.message || "Failed to start refresh",
         variant: "destructive",
       });
     },
@@ -413,17 +465,49 @@ export default function HiddenGemsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => refreshMutation.mutate()}
-                  disabled={refreshMutation.isPending}
+                  disabled={refreshMutation.isPending || refreshProgress?.status === "running"}
                   data-testid="button-refresh-gems"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? "animate-spin" : ""}`} />
-                  {refreshMutation.isPending ? "Refreshing..." : "Refresh Gems"}
+                  <RefreshCw className={`h-4 w-4 mr-2 ${(refreshMutation.isPending || refreshProgress?.status === "running") ? "animate-spin" : ""}`} />
+                  {refreshProgress?.status === "running" ? "Refreshing..." : "Refresh Gems"}
                 </Button>
               </>
             )}
             <PageShareButton pageSlug="hidden-gems" />
           </div>
         </div>
+        {refreshProgress?.status === "running" && (
+          <div className="flex items-center gap-3 mt-3 p-3 rounded-md bg-muted/50 border" data-testid="refresh-progress">
+            <RefreshCw className="h-4 w-4 animate-spin text-primary flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium" data-testid="text-refresh-progress">{refreshProgress.progress}</p>
+              <div className="flex items-center gap-4 mt-1">
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all duration-500" 
+                    style={{ width: `${(refreshProgress.sportsDone / refreshProgress.sportsTotal) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {refreshProgress.sportsDone}/{refreshProgress.sportsTotal} sports
+                  {refreshProgress.gemsFound > 0 && ` | ${refreshProgress.gemsFound} found`}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+        {refreshProgress?.status === "completed" && (
+          <div className="flex items-center gap-2 mt-3 p-3 rounded-md bg-green-500/10 border border-green-500/20" data-testid="refresh-complete">
+            <Gem className="h-4 w-4 text-green-600" />
+            <p className="text-sm text-green-700 dark:text-green-400">{refreshProgress.progress}</p>
+          </div>
+        )}
+        {refreshProgress?.status === "failed" && (
+          <div className="flex items-center gap-2 mt-3 p-3 rounded-md bg-destructive/10 border border-destructive/20" data-testid="refresh-failed">
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+            <p className="text-sm text-destructive">{(refreshProgress as any).error || "Refresh failed"}</p>
+          </div>
+        )}
         <p className="text-muted-foreground max-w-2xl">
           {isFallback 
             ? "Curated players across all sports who represent compelling value opportunities. Analyze any player to unlock AI-generated insights."
