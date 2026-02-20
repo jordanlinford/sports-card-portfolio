@@ -13,7 +13,38 @@ const gemini = new GoogleGenAI({
 
 function generateBatchId(): string {
   const now = new Date();
-  return `gems-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return `gems-${now.toISOString().replace(/[:.]/g, "-")}`;
+}
+
+function normalizePlayerName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ")
+    .replace(/\bMc(\w)/g, (_, c) => `Mc${c.toUpperCase()}`)
+    .replace(/\bO'(\w)/g, (_, c) => `O'${c.toUpperCase()}`)
+    .replace(/\bDe'(\w)/g, (_, c) => `De'${c.toUpperCase()}`)
+    .replace(/\bSt\.\s/g, "St. ")
+    .replace(/\bJr\b/gi, "Jr")
+    .replace(/\bIi\b/g, "II")
+    .replace(/\bIii\b/g, "III");
+}
+
+function normalizePlayerKey(name: string, sport: string): string {
+  return `${sport.toLowerCase()}:${name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+}
+
+function normalizeSport(sport: string): string {
+  const upper = sport.toUpperCase();
+  const sportMap: Record<string, string> = {
+    "FOOTBALL": "NFL", "NFL": "NFL",
+    "BASKETBALL": "NBA", "NBA": "NBA",
+    "BASEBALL": "MLB", "MLB": "MLB",
+    "HOCKEY": "NHL", "NHL": "NHL",
+    "SOCCER": "Soccer", "MLS": "Soccer",
+  };
+  return sportMap[upper] || sport;
 }
 
 function calculateDiscountScore(outlook: PlayerOutlookResponse): number {
@@ -269,6 +300,107 @@ async function getPlayersFromPortfolios(): Promise<Array<{ playerName: string; s
   return Array.from(uniquePlayers.values());
 }
 
+interface AiDiscoveredGem {
+  playerName: string;
+  sport: string;
+  position: string;
+  team: string;
+  verdict: string;
+  temperature: string;
+  tier: string;
+  riskLevel: string;
+  thesis: string;
+  whyDiscounted: string[];
+  repricingCatalysts: string[];
+  trapRisks: string[];
+  upsideScore: number;
+  confidenceScore: number;
+  discountScore: number;
+  isAvoid: boolean;
+}
+
+async function discoverGemsFromAI(sport: string, count: number, existingNames: Set<string>): Promise<AiDiscoveredGem[]> {
+  const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const existingList = existingNames.size > 0
+    ? `\nDO NOT include any of these players (already selected): ${Array.from(existingNames).join(", ")}`
+    : "";
+
+  const prompt = `You are a sports card market analyst. Today is ${currentDate}.
+
+Search the internet for current ${sport} player news, injuries, trades, performances, and card market trends.
+
+Based on CURRENT real-time information, identify ${count} players whose sports cards represent interesting investment opportunities RIGHT NOW. Mix of:
+- ~70% undervalued/buy opportunities (players whose cards are cheaper than they should be)
+- ~30% overvalued/avoid warnings (players whose cards are overpriced relative to current situation)
+
+For EACH player, provide fresh, specific analysis based on what's happening RIGHT NOW — not generic takes.
+${existingList}
+
+Return a JSON array of objects with this exact structure:
+[
+  {
+    "playerName": "Full Name (properly capitalized)",
+    "sport": "${sport}",
+    "position": "Position abbreviation",
+    "team": "Team abbreviation",
+    "isAvoid": false,
+    "verdict": "ACCUMULATE or HOLD_CORE or SPECULATIVE_FLYER or TRADE_THE_HYPE or AVOID_NEW_MONEY",
+    "temperature": "HOT or WARM or NEUTRAL or COOLING",
+    "tier": "PREMIUM or GROWTH or SPECULATIVE or CAUTION",
+    "riskLevel": "LOW or MEDIUM or HIGH",
+    "thesis": "One specific sentence about why this is an opportunity RIGHT NOW (max 120 chars)",
+    "whyDiscounted": ["Specific current reason 1", "Specific current reason 2"],
+    "repricingCatalysts": ["Specific upcoming catalyst 1", "Specific upcoming catalyst 2"],
+    "trapRisks": ["Specific risk that could make this wrong"],
+    "upsideScore": 65,
+    "confidenceScore": 70,
+    "discountScore": 72
+  }
+]
+
+RULES:
+- Use ONLY verifiable current information from your search results
+- Reference specific recent events, stats, trades, injuries happening NOW
+- Do NOT use generic/evergreen analysis like "hasn't reached full potential"
+- Scores should be 40-95 range, with discountScore reflecting how compelling the opportunity is
+- For avoid picks: set isAvoid=true, use TRADE_THE_HYPE or AVOID_NEW_MONEY verdict, tier=CAUTION
+- For buy picks: set isAvoid=false, use ACCUMULATE/HOLD_CORE/SPECULATIVE_FLYER verdict
+- Each player must be currently active in ${sport} (no retired players unless very recently retired)
+- Prefer interesting/surprising picks over obvious superstar picks
+
+Return ONLY valid JSON array, no markdown.`;
+
+  try {
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const content = response.text || "[]";
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error(`[HiddenGems] No JSON array found in AI discovery response for ${sport}`);
+      return [];
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as AiDiscoveredGem[];
+    const validGems = parsed.filter(g =>
+      g.playerName && g.sport && g.thesis &&
+      Array.isArray(g.whyDiscounted) && g.whyDiscounted.length > 0 &&
+      Array.isArray(g.repricingCatalysts) && g.repricingCatalysts.length > 0
+    );
+
+    console.log(`[HiddenGems] AI discovered ${validGems.length} valid gems for ${sport}`);
+    return validGems;
+  } catch (error: any) {
+    console.error(`[HiddenGems] AI discovery failed for ${sport}:`, error?.message || error);
+    return [];
+  }
+}
+
 export async function refreshHiddenGems(targetCount: number = 25): Promise<{
   success: boolean;
   gemsCreated: number;
@@ -276,247 +408,113 @@ export async function refreshHiddenGems(targetCount: number = 25): Promise<{
   error?: string;
 }> {
   const batchId = generateBatchId();
-  console.log(`[HiddenGems] Starting refresh, batchId: ${batchId}, target: ${targetCount}`);
-  
+  console.log(`[HiddenGems] Starting fresh AI-powered refresh, batchId: ${batchId}, target: ${targetCount}`);
+
   try {
-    // Get players from user portfolios (no AI cost!)
-    const portfolioPlayers = await getPlayersFromPortfolios();
-    const portfolioPlayerKeys = new Set(
-      portfolioPlayers.map(p => `${p.playerName.toLowerCase()}-${p.sport.toLowerCase()}`)
-    );
-    
-    // Fetch all cached outlooks, prioritizing recently searched players
-    const cachedOutlooks = await db
-      .select()
-      .from(playerOutlookCache)
-      .where(isNotNull(playerOutlookCache.outlookJson))
-      .orderBy(desc(playerOutlookCache.lastFetchedAt));
-    
-    // Count recent searches (last 7 days) vs older data
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    const recentSearches = cachedOutlooks.filter(o => 
-      o.lastFetchedAt && new Date(o.lastFetchedAt) > oneWeekAgo
-    );
-    
-    // Count how many cached players are from portfolios
-    const portfolioMatches = cachedOutlooks.filter(o => {
-      const key = `${o.playerName.toLowerCase()}-${o.sport.toLowerCase()}`;
-      return portfolioPlayerKeys.has(key);
-    });
-    
-    console.log(`[HiddenGems] Found ${cachedOutlooks.length} cached player outlooks (${recentSearches.length} from last 7 days, ${portfolioMatches.length} from user portfolios)`);
-    
-    if (cachedOutlooks.length === 0) {
-      return { success: false, gemsCreated: 0, batchId, error: "No cached player outlooks found" };
-    }
-    
-    const buyCandidates: Array<{
-      playerKey: string;
-      playerName: string;
-      sport: string;
-      outlook: PlayerOutlookResponse;
-      discountScore: number;
-      isAvoid: false;
-    }> = [];
-    
-    const avoidCandidates: Array<{
-      playerKey: string;
-      playerName: string;
-      sport: string;
-      outlook: PlayerOutlookResponse;
-      discountScore: number;
-      isAvoid: true;
-    }> = [];
-    
-    for (const cached of cachedOutlooks) {
-      const outlook = cached.outlookJson as PlayerOutlookResponse;
-      if (!outlook?.investmentCall) continue;
-      
-      const verdict = outlook.investmentCall.verdict;
-      
-      // Boost score for recently searched players (within 7 days)
-      const isRecentSearch = cached.lastFetchedAt && new Date(cached.lastFetchedAt) > oneWeekAgo;
-      const recencyBoost = isRecentSearch ? 10 : 0;
-      
-      // Boost score for players in user portfolios (shows demand)
-      const playerKey = `${cached.playerName.toLowerCase()}-${cached.sport.toLowerCase()}`;
-      const isInPortfolio = portfolioPlayerKeys.has(playerKey);
-      const portfolioBoost = isInPortfolio ? 15 : 0;
-      
-      if (["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER"].includes(verdict)) {
-        const discountScore = calculateDiscountScore(outlook) + recencyBoost + portfolioBoost;
-        if (discountScore >= 40) {
-          buyCandidates.push({
-            playerKey: cached.playerKey,
-            playerName: cached.playerName,
-            sport: cached.sport,
-            outlook,
-            discountScore,
-            isAvoid: false,
-          });
-        }
-      } else if (verdict === "TRADE_THE_HYPE" || verdict === "AVOID_NEW_MONEY") {
-        const cautionScore = calculateCautionScore(outlook) + recencyBoost + portfolioBoost;
-        if (cautionScore >= 40) {
-          avoidCandidates.push({
-            playerKey: cached.playerKey,
-            playerName: cached.playerName,
-            sport: cached.sport,
-            outlook,
-            discountScore: cautionScore,
-            isAvoid: true,
-          });
-        }
+    const sports = ["NFL", "NBA", "MLB", "NHL"];
+    const perSport = Math.ceil(targetCount / sports.length);
+    const allGems: AiDiscoveredGem[] = [];
+    const seenPlayerKeys = new Set<string>();
+
+    for (const sport of sports) {
+      const existingNames = new Set(allGems.map(g => g.playerName));
+      const discovered = await discoverGemsFromAI(sport, perSport + 2, existingNames);
+
+      for (const gem of discovered) {
+        const normalizedName = normalizePlayerName(gem.playerName);
+        const normalizedSport = normalizeSport(gem.sport || sport);
+        const key = normalizePlayerKey(normalizedName, normalizedSport);
+
+        if (seenPlayerKeys.has(key)) continue;
+        seenPlayerKeys.add(key);
+
+        gem.playerName = normalizedName;
+        gem.sport = normalizedSport;
+        allGems.push(gem);
+      }
+
+      if (sports.indexOf(sport) < sports.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
-    
-    console.log(`[HiddenGems] ${buyCandidates.length} BUY candidates, ${avoidCandidates.length} AVOID candidates`);
-    
-    // Shuffle candidates to get different gems each refresh, then sort by score
-    // This ensures variety while still prioritizing high-scoring candidates
-    const shuffleArray = <T>(arr: T[]): T[] => {
-      const shuffled = [...arr];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-      }
-      return shuffled;
-    };
-    
-    // Group by score tiers (within 10 points) and shuffle within tiers
-    const shuffleWithinTiers = <T extends { discountScore: number }>(arr: T[]): T[] => {
-      const sorted = [...arr].sort((a, b) => b.discountScore - a.discountScore);
-      const result: T[] = [];
-      let tierStart = 0;
-      
-      for (let i = 0; i < sorted.length; i++) {
-        const isLastItem = i === sorted.length - 1;
-        const scoreDiff = isLastItem ? 0 : sorted[tierStart].discountScore - sorted[i + 1].discountScore;
-        
-        if (isLastItem || scoreDiff > 10) {
-          // End of tier, shuffle this tier and add to result
-          const tier = sorted.slice(tierStart, i + 1);
-          result.push(...shuffleArray(tier));
-          tierStart = i + 1;
-        }
-      }
-      return result;
-    };
-    
-    const shuffledBuyCandidates = shuffleWithinTiers(buyCandidates);
-    const shuffledAvoidCandidates = shuffleWithinTiers(avoidCandidates);
-    
-    // Replace original sorted arrays with shuffled versions
-    buyCandidates.length = 0;
-    buyCandidates.push(...shuffledBuyCandidates);
-    avoidCandidates.length = 0;
-    avoidCandidates.push(...shuffledAvoidCandidates);
-    
-    let buyTargetCount = Math.ceil(targetCount * 0.7);
-    let avoidTargetCount = Math.floor(targetCount * 0.3);
-    
-    if (avoidCandidates.length < avoidTargetCount) {
-      avoidTargetCount = avoidCandidates.length;
-      buyTargetCount = targetCount - avoidTargetCount;
+
+    console.log(`[HiddenGems] Total unique gems discovered: ${allGems.length}`);
+
+    if (allGems.length === 0) {
+      return { success: false, gemsCreated: 0, batchId, error: "AI discovery returned no results" };
     }
-    if (buyCandidates.length < buyTargetCount) {
-      buyTargetCount = buyCandidates.length;
-      avoidTargetCount = Math.min(avoidCandidates.length, targetCount - buyTargetCount);
-    }
-    
-    const sportCounts: Record<string, number> = {};
-    const maxPerSport = Math.ceil(buyTargetCount / 4);
-    const selectedBuyCandidates = buyCandidates.filter(c => {
-      const count = sportCounts[c.sport] || 0;
-      if (count >= maxPerSport) return false;
-      sportCounts[c.sport] = count + 1;
-      return true;
-    }).slice(0, buyTargetCount);
-    
-    const avoidSportCounts: Record<string, number> = {};
-    const maxAvoidPerSport = Math.ceil(avoidTargetCount / 4);
-    const selectedAvoidCandidates = avoidCandidates.filter(c => {
-      const count = avoidSportCounts[c.sport] || 0;
-      if (count >= maxAvoidPerSport) return false;
-      avoidSportCounts[c.sport] = count + 1;
-      return true;
-    }).slice(0, avoidTargetCount);
-    
-    type Candidate = typeof buyCandidates[0] | typeof avoidCandidates[0];
-    const selectedCandidates: Candidate[] = [...selectedBuyCandidates, ...selectedAvoidCandidates];
-    
-    console.log(`[HiddenGems] Selected ${selectedCandidates.length} gems for generation`);
-    
+
     await db.update(hiddenGems).set({ isActive: false }).where(eq(hiddenGems.isActive, true));
-    
+
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
-    
+    expiresAt.setDate(expiresAt.getDate() + 14);
+
     let gemsCreated = 0;
-    for (let i = 0; i < selectedCandidates.length; i++) {
-      const candidate = selectedCandidates[i];
-      const isAvoid = candidate.isAvoid;
-      
+    const sortedGems = allGems
+      .sort((a, b) => (b.discountScore || 60) - (a.discountScore || 60))
+      .slice(0, targetCount);
+
+    for (let i = 0; i < sortedGems.length; i++) {
+      const gem = sortedGems[i];
+
       try {
-        const content = await generateGemContent(
-          candidate.playerName,
-          candidate.sport,
-          candidate.outlook,
-          isAvoid
-        );
-        
-        const gemVerdict = getDisplayVerdict(candidate.outlook.investmentCall?.verdict);
-        const modifier = isAvoid ? "Caution" : "Value";
-        const tier = isAvoid ? "CAUTION" : determineTier(candidate.outlook);
-        
+        const normalizedSport = normalizeSport(gem.sport);
+        const normalizedName = normalizePlayerName(gem.playerName);
+        const playerKey = normalizePlayerKey(normalizedName, normalizedSport);
+
+        const validVerdicts = ["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER", "TRADE_THE_HYPE", "AVOID_NEW_MONEY"];
+        const verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
+
+        const validTemps = ["HOT", "WARM", "NEUTRAL", "COOLING"];
+        const temperature = validTemps.includes(gem.temperature) ? gem.temperature : "NEUTRAL";
+
+        const validTiers = ["PREMIUM", "GROWTH", "SPECULATIVE", "CAUTION", "CORE"];
+        const tier = gem.isAvoid ? "CAUTION" : (validTiers.includes(gem.tier) ? gem.tier : "GROWTH");
+
+        const validRisks = ["LOW", "MEDIUM", "HIGH"];
+        const riskLevel = validRisks.includes(gem.riskLevel) ? gem.riskLevel : "MEDIUM";
+
         const gemData: InsertHiddenGem = {
-          playerKey: candidate.playerKey,
-          playerName: candidate.playerName,
-          sport: candidate.sport,
-          position: candidate.outlook.player?.position || null,
-          team: candidate.outlook.player?.team || null,
-          verdict: gemVerdict,
-          modifier,
-          temperature: candidate.outlook.snapshot?.temperature || "NEUTRAL",
+          playerKey,
+          playerName: normalizedName,
+          sport: normalizedSport,
+          position: gem.position || null,
+          team: gem.team || null,
+          verdict,
+          modifier: gem.isAvoid ? "Caution" : "Value",
+          temperature,
           tier,
-          riskLevel: determineRiskLevel(candidate.outlook),
-          thesis: content.thesis,
-          whyDiscounted: content.whyDiscounted,
-          repricingCatalysts: content.repricingCatalysts,
-          trapRisks: content.trapRisks,
-          upsideScore: isAvoid ? null : (candidate.outlook.investmentCall?.scores?.valuationScore || null),
-          confidenceScore: candidate.outlook.snapshot?.confidence === "HIGH" ? 85 : candidate.outlook.snapshot?.confidence === "MEDIUM" ? 60 : 40,
-          discountScore: Math.round(candidate.discountScore),
+          riskLevel,
+          thesis: gem.thesis?.slice(0, 200) || `${normalizedName} represents an interesting card market opportunity.`,
+          whyDiscounted: (gem.whyDiscounted || []).slice(0, 3),
+          repricingCatalysts: (gem.repricingCatalysts || []).slice(0, 3),
+          trapRisks: (gem.trapRisks || []).slice(0, 2),
+          upsideScore: gem.isAvoid ? null : Math.min(95, Math.max(30, gem.upsideScore || 65)),
+          confidenceScore: Math.min(95, Math.max(30, gem.confidenceScore || 65)),
+          discountScore: Math.min(95, Math.max(30, gem.discountScore || 60)),
           batchId,
           sortOrder: i,
           isActive: true,
           expiresAt,
         };
-        
+
         await db.insert(hiddenGems).values(gemData);
         gemsCreated++;
-        
-        console.log(`[HiddenGems] Created gem ${gemsCreated}: ${candidate.playerName} (${gemVerdict})`);
+        console.log(`[HiddenGems] Created gem ${gemsCreated}: ${normalizedName} (${verdict})`);
       } catch (err) {
-        console.error(`[HiddenGems] Failed to create gem for ${candidate.playerName}:`, err);
-      }
-      
-      if (i < selectedCandidates.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        console.error(`[HiddenGems] Failed to create gem for ${gem.playerName}:`, err);
       }
     }
-    
+
     console.log(`[HiddenGems] Refresh complete. Created ${gemsCreated} gems.`);
-    
     return { success: true, gemsCreated, batchId };
   } catch (error) {
     console.error("[HiddenGems] Refresh failed:", error);
-    return { 
-      success: false, 
-      gemsCreated: 0, 
-      batchId, 
-      error: error instanceof Error ? error.message : "Unknown error" 
+    return {
+      success: false,
+      gemsCreated: 0,
+      batchId,
+      error: error instanceof Error ? error.message : "Unknown error"
     };
   }
 }
@@ -752,9 +750,9 @@ const FALLBACK_FEATURED_PLAYERS: Array<{
 export function getFallbackFeaturedGems(): HiddenGem[] {
   return FALLBACK_FEATURED_PLAYERS.map((player, index) => ({
     id: 10000 + index,
-    playerKey: `${player.sport.toLowerCase()}-${player.playerName.toLowerCase().replace(/\s+/g, '-')}`,
-    playerName: player.playerName,
-    sport: player.sport,
+    playerKey: normalizePlayerKey(player.playerName, player.sport),
+    playerName: normalizePlayerName(player.playerName),
+    sport: normalizeSport(player.sport),
     position: player.position,
     team: player.team,
     verdict: player.verdict,

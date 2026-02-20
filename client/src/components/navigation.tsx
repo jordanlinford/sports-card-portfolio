@@ -110,10 +110,10 @@ export function Navigation() {
             </div>
           </Link>
 
-          {/* Main Navigation - Only show when authenticated */}
-          {isAuthenticated && user && (
-            <nav className="hidden md:flex items-center gap-1">
-              {/* Dashboard */}
+          {/* Public Navigation - Always visible */}
+          <nav className="hidden md:flex items-center gap-1">
+            {/* Dashboard - auth only */}
+            {isAuthenticated && user && (
               <Link href="/">
                 <Button 
                   variant="ghost" 
@@ -125,8 +125,10 @@ export function Navigation() {
                   Dashboard
                 </Button>
               </Link>
+            )}
 
-              {/* Portfolio Dropdown */}
+            {/* Portfolio Dropdown - auth only */}
+            {isAuthenticated && user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -189,8 +191,9 @@ export function Navigation() {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
 
-              {/* Market Dropdown */}
+            {/* Market Dropdown - Public */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button 
@@ -303,69 +306,52 @@ export function Navigation() {
                 </Button>
               </Link>
 
-              {/* Messages Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className={cn(
-                      "gap-1 relative",
-                      isActiveSection(["/messages", "/offers"]) && "bg-accent"
-                    )}
-                    data-testid="nav-messages"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    Messages
-                    {unreadCount?.count && unreadCount.count > 0 && (
-                      <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
-                        {unreadCount.count > 9 ? "9+" : unreadCount.count}
-                      </span>
-                    )}
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48">
-                  <DropdownMenuItem asChild>
-                    <Link href="/offers" className="flex items-center gap-2 cursor-pointer">
-                      <HandCoins className="h-4 w-4" />
-                      Offers
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/messages" className="flex items-center gap-2 cursor-pointer">
-                      <MessageSquare className="h-4 w-4" />
-                      Chats
-                      {unreadCount?.count && unreadCount.count > 0 && (
-                        <Badge variant="default" className="ml-auto text-xs">{unreadCount.count}</Badge>
+              {/* Messages Dropdown - auth only */}
+              {isAuthenticated && user && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className={cn(
+                        "gap-1 relative",
+                        isActiveSection(["/messages", "/offers"]) && "bg-accent"
                       )}
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                      data-testid="nav-messages"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      Messages
+                      {unreadCount?.count && unreadCount.count > 0 && (
+                        <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
+                          {unreadCount.count > 9 ? "9+" : unreadCount.count}
+                        </span>
+                      )}
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-48">
+                    <DropdownMenuItem asChild>
+                      <Link href="/offers" className="flex items-center gap-2 cursor-pointer">
+                        <HandCoins className="h-4 w-4" />
+                        Offers
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/messages" className="flex items-center gap-2 cursor-pointer">
+                        <MessageSquare className="h-4 w-4" />
+                        Chats
+                        {unreadCount?.count && unreadCount.count > 0 && (
+                          <Badge variant="default" className="ml-auto text-xs">{unreadCount.count}</Badge>
+                        )}
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </nav>
-          )}
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {/* Explore and Blog for non-authenticated users */}
-            {!isAuthenticated && (
-              <>
-                <Link href="/explore">
-                  <Button variant="ghost" size="sm" className="gap-2" data-testid="link-explore">
-                    <Compass className="h-4 w-4" />
-                    <span className="hidden sm:inline">Explore</span>
-                  </Button>
-                </Link>
-                <Link href="/blog">
-                  <Button variant="ghost" size="sm" className="gap-2" data-testid="link-blog">
-                    <Newspaper className="h-4 w-4" />
-                    <span className="hidden sm:inline">Blog</span>
-                  </Button>
-                </Link>
-              </>
-            )}
-            
             <ThemeToggle />
 
             {isLoading ? (
@@ -489,24 +475,24 @@ export function Navigation() {
         </div>
 
         {/* Mobile Menu Button */}
-        {isAuthenticated && user && (
-          <div className="md:hidden pb-2">
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2" data-testid="button-mobile-menu">
-                  <Menu className="h-5 w-5" />
-                  Menu
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-80 overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle className="flex items-center gap-2">
-                    <LayoutGrid className="h-5 w-5 text-primary" />
-                    Sports Card Portfolio
-                  </SheetTitle>
-                </SheetHeader>
-                <nav className="flex flex-col gap-1 mt-6">
-                  {/* Dashboard */}
+        <div className="md:hidden pb-2">
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="gap-2" data-testid="button-mobile-menu">
+                <Menu className="h-5 w-5" />
+                Menu
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-80 overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <LayoutGrid className="h-5 w-5 text-primary" />
+                  Sports Card Portfolio
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-1 mt-6">
+                {/* Dashboard - auth only */}
+                {isAuthenticated && user && (
                   <Link href="/" onClick={() => setMobileMenuOpen(false)}>
                     <Button 
                       variant="ghost" 
@@ -516,170 +502,177 @@ export function Navigation() {
                       Dashboard
                     </Button>
                   </Link>
+                )}
 
-                  {/* Portfolio Section */}
-                  <div className="mt-4 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground px-4">Portfolio</span>
-                  </div>
-                  <Link href="/portfolio/outlook" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/portfolio/outlook") && "bg-accent")}>
-                      <BarChart3 className="h-4 w-4" />
-                      Portfolio Outlook
-                    </Button>
-                  </Link>
-                  <Link href="/cases/new" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/cases/new") && "bg-accent")}>
-                      <FolderPlus className="h-4 w-4" />
-                      Create Portfolio
-                    </Button>
-                  </Link>
-                  <Link href="/search" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/search") && "bg-accent")}>
-                      <Search className="h-4 w-4" />
-                      My Cards
-                    </Button>
-                  </Link>
-                  <Link href="/analytics" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/analytics") && "bg-accent")}>
-                      <LineChart className="h-4 w-4" />
-                      Analytics
-                    </Button>
-                  </Link>
-                  <Link href="/analytics/growth" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/analytics/growth") && "bg-accent")}>
-                      <TrendingUp className="h-4 w-4" />
-                      Growth Projections
-                      <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-auto">Pro</Badge>
-                    </Button>
-                  </Link>
-                  <Link href="/portfolio-builder" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/portfolio-builder") && "bg-accent")}>
-                      <Package className="h-4 w-4" />
-                      Box Breaks
-                    </Button>
-                  </Link>
+                {/* Portfolio Section - auth only */}
+                {isAuthenticated && user && (
+                  <>
+                    <div className="mt-4 mb-2">
+                      <span className="text-xs font-medium text-muted-foreground px-4">Portfolio</span>
+                    </div>
+                    <Link href="/portfolio/outlook" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/portfolio/outlook") && "bg-accent")}>
+                        <BarChart3 className="h-4 w-4" />
+                        Portfolio Outlook
+                      </Button>
+                    </Link>
+                    <Link href="/cases/new" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/cases/new") && "bg-accent")}>
+                        <FolderPlus className="h-4 w-4" />
+                        Create Portfolio
+                      </Button>
+                    </Link>
+                    <Link href="/search" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/search") && "bg-accent")}>
+                        <Search className="h-4 w-4" />
+                        My Cards
+                      </Button>
+                    </Link>
+                    <Link href="/analytics" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/analytics") && "bg-accent")}>
+                        <LineChart className="h-4 w-4" />
+                        Analytics
+                      </Button>
+                    </Link>
+                    <Link href="/analytics/growth" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/analytics/growth") && "bg-accent")}>
+                        <TrendingUp className="h-4 w-4" />
+                        Growth Projections
+                        <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-auto">Pro</Badge>
+                      </Button>
+                    </Link>
+                    <Link href="/portfolio-builder" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/portfolio-builder") && "bg-accent")}>
+                        <Package className="h-4 w-4" />
+                        Box Breaks
+                      </Button>
+                    </Link>
+                  </>
+                )}
 
-                  {/* Market Section */}
-                  <div className="mt-4 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground px-4">Market</span>
-                  </div>
-                  <Link href="/outlook" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/outlook") && "bg-accent")}>
-                      <Zap className="h-4 w-4" />
-                      Card Analysis
-                    </Button>
-                  </Link>
-                  <Link href="/hidden-gems" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/hidden-gems") && "bg-accent")}>
-                      <Gem className="h-4 w-4" />
-                      Hidden Gems
-                    </Button>
-                  </Link>
+                {/* Market Section - Public */}
+                <div className="mt-4 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground px-4">Market</span>
+                </div>
+                <Link href="/outlook" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/outlook") && "bg-accent")}>
+                    <Zap className="h-4 w-4" />
+                    Card Analysis
+                  </Button>
+                </Link>
+                <Link href="/hidden-gems" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/hidden-gems") && "bg-accent")}>
+                    <Gem className="h-4 w-4" />
+                    Hidden Gems
+                  </Button>
+                </Link>
 
-                  {/* Players Section */}
-                  <div className="mt-4 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground px-4">Players</span>
-                  </div>
-                  <Link href="/player-outlook" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/player-outlook") && "bg-accent")}>
-                      <TrendingUp className="h-4 w-4" />
-                      Player Analysis
-                    </Button>
-                  </Link>
-                  <Link href="/compare" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/compare") && "bg-accent")} data-testid="nav-compare-mobile">
-                      <GitCompareArrows className="h-4 w-4" />
-                      Compare
-                      <Badge variant="secondary" className="ml-auto text-xs">Pro</Badge>
-                    </Button>
-                  </Link>
-                  <Link href="/watchlist" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/watchlist") && "bg-accent")}>
-                      <Star className="h-4 w-4" />
-                      Player Watchlist
-                    </Button>
-                  </Link>
+                {/* Players Section - Public */}
+                <div className="mt-4 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground px-4">Players</span>
+                </div>
+                <Link href="/player-outlook" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/player-outlook") && "bg-accent")}>
+                    <TrendingUp className="h-4 w-4" />
+                    Player Analysis
+                  </Button>
+                </Link>
+                <Link href="/compare" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/compare") && "bg-accent")} data-testid="nav-compare-mobile">
+                    <GitCompareArrows className="h-4 w-4" />
+                    Compare
+                    <Badge variant="secondary" className="ml-auto text-xs">Pro</Badge>
+                  </Button>
+                </Link>
+                <Link href="/watchlist" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/watchlist") && "bg-accent")}>
+                    <Star className="h-4 w-4" />
+                    Player Watchlist
+                  </Button>
+                </Link>
 
-                  {/* Explore & Social */}
-                  <div className="mt-4 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground px-4">Explore</span>
-                  </div>
-                  <Link href="/explore" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/explore") && "bg-accent")}>
-                      <Compass className="h-4 w-4" />
-                      Explore
-                    </Button>
-                  </Link>
-                  <Link href="/blog" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/blog") && "bg-accent")}>
-                      <Newspaper className="h-4 w-4" />
-                      Blog
-                    </Button>
-                  </Link>
+                {/* Explore & Social - Public */}
+                <div className="mt-4 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground px-4">Explore</span>
+                </div>
+                <Link href="/explore" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/explore") && "bg-accent")}>
+                    <Compass className="h-4 w-4" />
+                    Explore
+                  </Button>
+                </Link>
+                <Link href="/blog" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/blog") && "bg-accent")}>
+                    <Newspaper className="h-4 w-4" />
+                    Blog
+                  </Button>
+                </Link>
 
-                  {/* Messages */}
-                  <div className="mt-4 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground px-4">Messages</span>
-                  </div>
-                  <Link href="/offers" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/offers") && "bg-accent")}>
-                      <HandCoins className="h-4 w-4" />
-                      Offers
-                    </Button>
-                  </Link>
-                  <Link href="/messages" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/messages") && "bg-accent")}>
-                      <MessageSquare className="h-4 w-4" />
-                      Chats
-                      {unreadCount?.count && unreadCount.count > 0 && (
-                        <Badge variant="default" className="ml-auto text-xs">{unreadCount.count}</Badge>
-                      )}
-                    </Button>
-                  </Link>
+                {/* Messages & Account - auth only */}
+                {isAuthenticated && user && (
+                  <>
+                    <div className="mt-4 mb-2">
+                      <span className="text-xs font-medium text-muted-foreground px-4">Messages</span>
+                    </div>
+                    <Link href="/offers" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/offers") && "bg-accent")}>
+                        <HandCoins className="h-4 w-4" />
+                        Offers
+                      </Button>
+                    </Link>
+                    <Link href="/messages" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/messages") && "bg-accent")}>
+                        <MessageSquare className="h-4 w-4" />
+                        Chats
+                        {unreadCount?.count && unreadCount.count > 0 && (
+                          <Badge variant="default" className="ml-auto text-xs">{unreadCount.count}</Badge>
+                        )}
+                      </Button>
+                    </Link>
 
-                  {/* Account */}
-                  <div className="mt-4 mb-2">
-                    <span className="text-xs font-medium text-muted-foreground px-4">Account</span>
-                  </div>
-                  <Link href="/bookmarks" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/bookmarks") && "bg-accent")}>
-                      <Bookmark className="h-4 w-4" />
-                      My Bookmarks
-                    </Button>
-                  </Link>
-                  <Link href="/settings" onClick={() => setMobileMenuOpen(false)}>
-                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/settings") && "bg-accent")}>
-                      <Settings className="h-4 w-4" />
-                      Settings
-                    </Button>
-                  </Link>
-                  {isAdmin && (
-                    <>
-                      <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
-                        <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/admin") && "bg-accent")}>
-                          <Shield className="h-4 w-4" />
-                          Admin Dashboard
-                        </Button>
-                      </Link>
-                      <Link href="/admin/feedback" onClick={() => setMobileMenuOpen(false)}>
-                        <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/admin/feedback") && "bg-accent")}>
-                          <MessageSquare className="h-4 w-4" />
-                          User Feedback
-                        </Button>
-                      </Link>
-                    </>
-                  )}
-                  <a href="/api/logout" className="mt-2">
-                    <Button variant="ghost" className="w-full justify-start gap-3 text-destructive hover:text-destructive">
-                      <LogOut className="h-4 w-4" />
-                      Log out
-                    </Button>
-                  </a>
-                </nav>
-              </SheetContent>
-            </Sheet>
-          </div>
-        )}
+                    <div className="mt-4 mb-2">
+                      <span className="text-xs font-medium text-muted-foreground px-4">Account</span>
+                    </div>
+                    <Link href="/bookmarks" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/bookmarks") && "bg-accent")}>
+                        <Bookmark className="h-4 w-4" />
+                        My Bookmarks
+                      </Button>
+                    </Link>
+                    <Link href="/settings" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/settings") && "bg-accent")}>
+                        <Settings className="h-4 w-4" />
+                        Settings
+                      </Button>
+                    </Link>
+                    {isAdmin && (
+                      <>
+                        <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/admin") && "bg-accent")}>
+                            <Shield className="h-4 w-4" />
+                            Admin Dashboard
+                          </Button>
+                        </Link>
+                        <Link href="/admin/feedback" onClick={() => setMobileMenuOpen(false)}>
+                          <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/admin/feedback") && "bg-accent")}>
+                            <MessageSquare className="h-4 w-4" />
+                            User Feedback
+                          </Button>
+                        </Link>
+                      </>
+                    )}
+                    <a href="/api/logout" className="mt-2">
+                      <Button variant="ghost" className="w-full justify-start gap-3 text-destructive hover:text-destructive">
+                        <LogOut className="h-4 w-4" />
+                        Log out
+                      </Button>
+                    </a>
+                  </>
+                )}
+              </nav>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
     </header>
   );

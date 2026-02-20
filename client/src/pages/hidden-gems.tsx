@@ -373,7 +373,7 @@ export default function HiddenGemsPage() {
     return true;
   });
   
-  if (authLoading || gemsLoading) {
+  if (gemsLoading) {
     return (
       <div className="container max-w-6xl mx-auto px-4 py-8">
         <Skeleton className="h-10 w-64 mb-8" />
@@ -433,7 +433,8 @@ export default function HiddenGemsPage() {
         {lastRefresh && !isFallback && (
           <p className="text-xs text-muted-foreground mt-2">
             Last AI refresh: {new Date(lastRefresh).toLocaleDateString('en-US', { 
-              month: 'long', 
+              month: 'long',
+              day: 'numeric',
               year: 'numeric' 
             })}
           </p>
