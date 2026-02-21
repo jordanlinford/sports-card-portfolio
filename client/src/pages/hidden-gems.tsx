@@ -246,7 +246,7 @@ function GemCard({ gem }: { gem: GemCandidate }) {
         
         <div className="mt-auto pt-4">
           <Button variant="outline" className="w-full" asChild>
-            <Link href={`/player-outlook?player=${encodeURIComponent(gem.playerName)}&sport=${gem.sport}`}>
+            <Link href={`/player-outlook?player=${encodeURIComponent(gem.playerName)}&sport=${{ NFL: "football", NBA: "basketball", MLB: "baseball", NHL: "hockey" }[gem.sport.toUpperCase()] || gem.sport.toLowerCase()}`}>
               View Full Analysis
               <ArrowRight className="h-4 w-4 ml-2" />
             </Link>
