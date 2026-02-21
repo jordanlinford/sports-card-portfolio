@@ -130,9 +130,36 @@ function determineTier(outlook: PlayerOutlookResponse): string {
 
 // Return the actual verdict for display consistency with the analysis page
 function getDisplayVerdict(verdict?: string): string {
-  // Return the actual verdict so hidden gems matches full analysis page
   if (verdict) return verdict;
   return "MONITOR";
+}
+
+const BULLISH_VERDICTS = new Set(["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER", "BUY"]);
+const BEARISH_VERDICTS = new Set(["AVOID_NEW_MONEY", "TRADE_THE_HYPE", "AVOID", "AVOID_STRUCTURAL", "HOLD_ROLE_RISK", "SELL"]);
+
+async function getCachedOutlookVerdict(playerKey: string): Promise<string | null> {
+  try {
+    const cached = await db.select({
+      outlookJson: playerOutlookCache.outlookJson,
+    })
+      .from(playerOutlookCache)
+      .where(eq(playerOutlookCache.playerKey, playerKey))
+      .limit(1);
+
+    if (cached.length === 0 || !cached[0].outlookJson) return null;
+    const outlook = cached[0].outlookJson as PlayerOutlookResponse;
+    return outlook.investmentCall?.verdict || null;
+  } catch {
+    return null;
+  }
+}
+
+function verdictsConflict(gemVerdict: string, outlookVerdict: string): boolean {
+  const gemBullish = BULLISH_VERDICTS.has(gemVerdict);
+  const gemBearish = BEARISH_VERDICTS.has(gemVerdict);
+  const outlookBullish = BULLISH_VERDICTS.has(outlookVerdict);
+  const outlookBearish = BEARISH_VERDICTS.has(outlookVerdict);
+  return (gemBullish && outlookBearish) || (gemBearish && outlookBullish);
 }
 
 function calculateCautionScore(outlook: PlayerOutlookResponse): number {
@@ -542,7 +569,20 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         const playerKey = normalizePlayerKey(normalizedName, normalizedSport);
 
         const validVerdicts = ["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER", "TRADE_THE_HYPE", "AVOID_NEW_MONEY"];
-        const verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
+        let verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
+
+        const cachedVerdict = await getCachedOutlookVerdict(playerKey);
+        if (cachedVerdict && verdictsConflict(verdict, cachedVerdict)) {
+          console.log(`[HiddenGems] Verdict conflict for ${normalizedName}: gem=${verdict}, outlook=${cachedVerdict}. Adopting outlook verdict.`);
+          if (validVerdicts.includes(cachedVerdict)) {
+            verdict = cachedVerdict;
+          } else if (BEARISH_VERDICTS.has(cachedVerdict)) {
+            verdict = "AVOID_NEW_MONEY";
+          } else {
+            verdict = "ACCUMULATE";
+          }
+          gem.isAvoid = BEARISH_VERDICTS.has(verdict);
+        }
 
         const validTemps = ["HOT", "WARM", "NEUTRAL", "COOLING"];
         const temperature = validTemps.includes(gem.temperature) ? gem.temperature : "NEUTRAL";
