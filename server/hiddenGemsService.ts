@@ -2,6 +2,7 @@ import { db } from "./db";
 import { hiddenGems, playerOutlookCache, cards, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
 import { eq, desc, and, isNotNull, sql } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
+import { getPlayerOutlook } from "./playerOutlookEngine";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -137,30 +138,6 @@ function getDisplayVerdict(verdict?: string): string {
 const BULLISH_VERDICTS = new Set(["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER", "BUY"]);
 const BEARISH_VERDICTS = new Set(["AVOID_NEW_MONEY", "TRADE_THE_HYPE", "AVOID", "AVOID_STRUCTURAL", "HOLD_ROLE_RISK", "SELL"]);
 
-async function getCachedOutlookVerdict(playerKey: string): Promise<string | null> {
-  try {
-    const cached = await db.select({
-      outlookJson: playerOutlookCache.outlookJson,
-    })
-      .from(playerOutlookCache)
-      .where(eq(playerOutlookCache.playerKey, playerKey))
-      .limit(1);
-
-    if (cached.length === 0 || !cached[0].outlookJson) return null;
-    const outlook = cached[0].outlookJson as PlayerOutlookResponse;
-    return outlook.investmentCall?.verdict || null;
-  } catch {
-    return null;
-  }
-}
-
-function verdictsConflict(gemVerdict: string, outlookVerdict: string): boolean {
-  const gemBullish = BULLISH_VERDICTS.has(gemVerdict);
-  const gemBearish = BEARISH_VERDICTS.has(gemVerdict);
-  const outlookBullish = BULLISH_VERDICTS.has(outlookVerdict);
-  const outlookBearish = BEARISH_VERDICTS.has(outlookVerdict);
-  return (gemBullish && outlookBearish) || (gemBearish && outlookBullish);
-}
 
 function calculateCautionScore(outlook: PlayerOutlookResponse): number {
   const scores = outlook.investmentCall?.scores;
@@ -568,20 +545,30 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         const normalizedName = normalizePlayerName(gem.playerName);
         const playerKey = normalizePlayerKey(normalizedName, normalizedSport);
 
-        const validVerdicts = ["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER", "TRADE_THE_HYPE", "AVOID_NEW_MONEY"];
-        let verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
+        const validVerdicts = ["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER", "TRADE_THE_HYPE", "AVOID_NEW_MONEY",
+          "HOLD_ROLE_RISK", "HOLD_INJURY_CONTINGENT", "SPECULATIVE_SUPPRESSED", "AVOID_STRUCTURAL"];
+        let verdict: string;
 
-        const cachedVerdict = await getCachedOutlookVerdict(playerKey);
-        if (cachedVerdict && cachedVerdict !== verdict) {
-          console.log(`[HiddenGems] Aligning verdict for ${normalizedName}: gem=${verdict} → outlook=${cachedVerdict}`);
-          if (validVerdicts.includes(cachedVerdict)) {
-            verdict = cachedVerdict;
-          } else if (BEARISH_VERDICTS.has(cachedVerdict)) {
-            verdict = "AVOID_NEW_MONEY";
-          } else if (BULLISH_VERDICTS.has(cachedVerdict)) {
-            verdict = "ACCUMULATE";
+        try {
+          const sportForOutlook = normalizedSport.toLowerCase() === "nfl" ? "football" :
+            normalizedSport.toLowerCase() === "nba" ? "basketball" :
+            normalizedSport.toLowerCase() === "mlb" ? "baseball" :
+            normalizedSport.toLowerCase() === "nhl" ? "hockey" : normalizedSport.toLowerCase();
+          
+          const outlook = await getPlayerOutlook({ playerName: normalizedName, sport: sportForOutlook });
+          const outlookVerdict = outlook?.investmentCall?.verdict;
+          
+          if (outlookVerdict && validVerdicts.includes(outlookVerdict)) {
+            verdict = outlookVerdict;
+            console.log(`[HiddenGems] Using outlook engine verdict for ${normalizedName}: ${verdict}`);
+          } else {
+            verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
+            console.log(`[HiddenGems] No outlook verdict for ${normalizedName}, using AI verdict: ${verdict}`);
           }
           gem.isAvoid = BEARISH_VERDICTS.has(verdict);
+        } catch (err) {
+          verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
+          console.log(`[HiddenGems] Outlook lookup failed for ${normalizedName}, using AI verdict: ${verdict}`);
         }
 
         const validTemps = ["HOT", "WARM", "NEUTRAL", "COOLING"];
