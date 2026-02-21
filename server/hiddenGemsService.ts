@@ -572,13 +572,13 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         let verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
 
         const cachedVerdict = await getCachedOutlookVerdict(playerKey);
-        if (cachedVerdict && verdictsConflict(verdict, cachedVerdict)) {
-          console.log(`[HiddenGems] Verdict conflict for ${normalizedName}: gem=${verdict}, outlook=${cachedVerdict}. Adopting outlook verdict.`);
+        if (cachedVerdict && cachedVerdict !== verdict) {
+          console.log(`[HiddenGems] Aligning verdict for ${normalizedName}: gem=${verdict} → outlook=${cachedVerdict}`);
           if (validVerdicts.includes(cachedVerdict)) {
             verdict = cachedVerdict;
           } else if (BEARISH_VERDICTS.has(cachedVerdict)) {
             verdict = "AVOID_NEW_MONEY";
-          } else {
+          } else if (BULLISH_VERDICTS.has(cachedVerdict)) {
             verdict = "ACCUMULATE";
           }
           gem.isAvoid = BEARISH_VERDICTS.has(verdict);
