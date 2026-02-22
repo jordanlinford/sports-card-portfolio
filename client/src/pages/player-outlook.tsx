@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { useSearch } from "wouter";
+import { useSearch, Link } from "wouter";
 import { 
   Search,
   TrendingUp,
@@ -42,6 +42,7 @@ import {
   Sparkles,
   Briefcase,
   History,
+  ArrowLeft,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1354,6 +1355,25 @@ export default function PlayerOutlookPage() {
       </Dialog>
       
     <div className="container max-w-6xl py-8 px-4 space-y-6">
+      {(() => {
+        const params = new URLSearchParams(search);
+        const from = params.get("from");
+        const backRoutes: Record<string, { href: string; label: string }> = {
+          "hidden-gems": { href: "/hidden-gems", label: "Hidden Gems" },
+          "watchlist": { href: "/watchlist", label: "Watchlist" },
+          "next-buys": { href: "/next-buys", label: "Next Buys" },
+        };
+        const back = from ? backRoutes[from] : null;
+        if (!back) return null;
+        return (
+          <Link href={back.href}>
+            <Button variant="ghost" size="sm" className="gap-1.5 -ml-2" data-testid="button-back">
+              <ArrowLeft className="h-4 w-4" />
+              Back to {back.label}
+            </Button>
+          </Link>
+        );
+      })()}
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold" data-testid="text-page-title">Player Outlook</h1>
         <p className="text-muted-foreground">

@@ -220,7 +220,7 @@ function PlayerWatchlistItem({
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap mb-2">
-              <Link href={`/player-outlook?player=${encodeURIComponent(displayName)}&sport=${item.sport || 'football'}`}>
+              <Link href={`/player-outlook?player=${encodeURIComponent(displayName)}&sport=${item.sport || 'football'}&from=watchlist`}>
                 <span className="font-semibold text-lg hover:underline cursor-pointer capitalize" data-testid={`link-player-${item.id}`}>
                   {displayName}
                 </span>

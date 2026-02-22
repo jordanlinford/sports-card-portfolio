@@ -264,7 +264,7 @@ function NextBuyCard({
         <PortfolioImpactLine impact={portfolioImpact} />
 
         <div className="mt-3 pt-3 border-t flex items-center gap-2">
-          <Link href={`/player-outlook?player=${encodeURIComponent(buy.playerName || "")}${buy.sport ? `&sport=${buy.sport}` : ""}`}>
+          <Link href={`/player-outlook?player=${encodeURIComponent(buy.playerName || "")}${buy.sport ? `&sport=${buy.sport}` : ""}&from=next-buys`}>
             <Button variant="outline" size="sm" className="flex-1">
               <Eye className="h-3 w-3 mr-1" />
               Analyze
