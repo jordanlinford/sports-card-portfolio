@@ -2281,12 +2281,12 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       // Import the outlook engine dynamically to avoid circular dependencies
-      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData } = await import("./outlookEngine");
+      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData, fetchMonthlyPriceHistory } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
 
-      // Fetch Gemini grounded market data AND legacy price data in PARALLEL for speed
+      // Fetch Gemini grounded market data, legacy price data, AND monthly price history in PARALLEL for speed
       console.log(`[Outlook 2.0] Fetching market data in parallel for card ${cardId}`);
-      const [geminiMarketData, priceData] = await Promise.all([
+      const [geminiMarketData, priceData, monthlyPriceHistory] = await Promise.all([
         fetchGeminiMarketData({
           title: card.title,
           playerName: card.playerName,
@@ -2304,6 +2304,18 @@ Sitemap: ${origin}/sitemap.xml
           grade: card.grade,
           grader: card.grader,
         }),
+        card.playerName ? fetchMonthlyPriceHistory({
+          playerName: card.playerName,
+          sport: card.sport || "football",
+          year: card.year?.toString(),
+          setName: card.set || undefined,
+          variation: card.variation || undefined,
+          grade: card.grade || undefined,
+          grader: card.grader || undefined,
+        }).catch((err: any) => {
+          console.warn(`[Outlook 2.0] Monthly price history fetch failed (non-critical): ${err.message}`);
+          return null;
+        }) : Promise.resolve(null),
       ]);
 
       // Convert price points to the schema format
@@ -2397,6 +2409,34 @@ Sitemap: ${origin}/sitemap.xml
         priceMin = geminiMarketData.minPrice;
         priceMax = geminiMarketData.maxPrice;
         compCount = geminiMarketData.soldCount;
+      }
+
+      // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
+      // The price trend chart and displayed value should never wildly disagree
+      if (monthlyPriceHistory && monthlyPriceHistory.dataPoints && monthlyPriceHistory.dataPoints.length > 0) {
+        const recentPoints = monthlyPriceHistory.dataPoints.slice(-3);
+        const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
+
+        if (recentAvg > 0 && marketValue && marketValue > 0) {
+          const ratio = marketValue / recentAvg;
+          if (ratio < 0.25 || ratio > 4) {
+            console.warn(`[Outlook 2.0] PRICE CROSS-VALIDATION: Market value $${marketValue} diverges wildly from price trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Using price trend data.`);
+            marketValue = Math.round(recentAvg * 100) / 100;
+            const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+            if (allPrices.length > 0) {
+              priceMin = Math.min(...allPrices);
+              priceMax = Math.max(...allPrices);
+            }
+          }
+        } else if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
+          console.warn(`[Outlook 2.0] PRICE CROSS-VALIDATION: No market value found, using price trend avg $${recentAvg.toFixed(2)}`);
+          marketValue = Math.round(recentAvg * 100) / 100;
+          const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+          if (allPrices.length > 0) {
+            priceMin = Math.min(...allPrices);
+            priceMax = Math.max(...allPrices);
+          }
+        }
       }
       
       // Determine final action - use matchConfidence safeguard when Gemini data unavailable
@@ -2753,7 +2793,7 @@ Sitemap: ${origin}/sitemap.xml
   app.post("/api/outlook/quick-analyze", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { title, year, set, cardNumber, variation, grade, grader, imagePath } = req.body;
+      const { title, year, set, cardNumber, variation, grade, grader, imagePath, sport } = req.body;
 
       if (!title) {
         return res.status(400).json({ message: "Card title is required" });
@@ -3042,6 +3082,50 @@ Sitemap: ${origin}/sitemap.xml
         priceMax = geminiMarketData.maxPrice;
         compCount = geminiMarketData.soldCount;
       }
+
+      // Fetch monthly price history for cross-validation and display
+      let priceHistory = null;
+      try {
+        const { fetchMonthlyPriceHistory } = await import("./outlookEngine");
+        priceHistory = await fetchMonthlyPriceHistory({
+          playerName: title,
+          sport: sport || "football",
+          year: year ? String(year) : undefined,
+          setName: set || undefined,
+          variation: variation || undefined,
+          grade: grade || undefined,
+          grader: grader || undefined,
+        });
+      } catch (phErr: any) {
+        console.error(`[Quick Analyze] Price history fetch failed (non-critical):`, phErr.message);
+      }
+
+      // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
+      if (priceHistory && priceHistory.dataPoints && priceHistory.dataPoints.length > 0) {
+        const recentPoints = priceHistory.dataPoints.slice(-3);
+        const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
+
+        if (recentAvg > 0 && marketValue && marketValue > 0) {
+          const ratio = marketValue / recentAvg;
+          if (ratio < 0.25 || ratio > 4) {
+            console.warn(`[Quick Analyze] PRICE CROSS-VALIDATION: Market value $${marketValue} diverges wildly from price trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Using price trend data.`);
+            marketValue = Math.round(recentAvg * 100) / 100;
+            const allPrices = priceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+            if (allPrices.length > 0) {
+              priceMin = Math.min(...allPrices);
+              priceMax = Math.max(...allPrices);
+            }
+          }
+        } else if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
+          console.warn(`[Quick Analyze] PRICE CROSS-VALIDATION: No market value found, using price trend avg $${recentAvg.toFixed(2)}`);
+          marketValue = Math.round(recentAvg * 100) / 100;
+          const allPrices = priceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+          if (allPrices.length > 0) {
+            priceMin = Math.min(...allPrices);
+            priceMax = Math.max(...allPrices);
+          }
+        }
+      }
       
       // Get match confidence from price data (only used as fallback when no Gemini data)
       const matchConfidence = priceData.matchConfidence;
@@ -3057,36 +3141,16 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       // Attempt to extract player name from title for news lookup
-      // Common formats: "2024 Prizm Cooper Flagg RC", "Cooper Flagg 2024 Topps Chrome"
-      // We'll try to use the title as-is for the news search since player name isn't explicitly provided
       let newsSnippets: string[] = [];
-      const possiblePlayerName = title; // Use full title for search - Serper will find relevant news
+      const possiblePlayerName = title;
       console.log(`[Quick Analyze] Fetching real-time news for: ${possiblePlayerName}`);
       const newsData = await fetchPlayerNews(possiblePlayerName, null);
       newsSnippets = newsData.snippets;
 
       // Generate AI explanation
-      // Use the selected marketValue for consistent explanation
       console.log(`[Quick Analyze] Generating AI explanation for ${finalAction}`);
       const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
       const explanation = await generateOutlookExplanation(tempCard as any, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
-
-      let priceHistory = null;
-      try {
-        const { fetchMonthlyPriceHistory } = await import("./outlookEngine");
-        priceHistory = await fetchMonthlyPriceHistory({
-          playerName: title,
-          sport: "football",
-          year: year ? String(year) : undefined,
-          setName: set || undefined,
-          variation: variation || undefined,
-          grade: grade || undefined,
-          grader: grader || undefined,
-          anchorCurrentPrice: marketValue,
-        });
-      } catch (phErr: any) {
-        console.error(`[Quick Analyze] Price history fetch failed (non-critical):`, phErr.message);
-      }
 
       // Record usage for free tier tracking
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);

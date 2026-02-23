@@ -116,11 +116,13 @@ export function PriceTrendChart({
   autoLoad = false,
   subtitle,
   preloadedData,
+  onPriceLoaded,
 }: {
   playerRequest?: PlayerPriceRequest;
   autoLoad?: boolean;
   subtitle?: string;
   preloadedData?: MonthlyPriceHistory | null;
+  onPriceLoaded?: (latestPrice: number) => void;
 }) {
   const [history, setHistory] = useState<MonthlyPriceHistory | null>(preloadedData || null);
   const [hasTriggeredAutoLoad, setHasTriggeredAutoLoad] = useState(false);
@@ -130,6 +132,16 @@ export function PriceTrendChart({
       setHistory(preloadedData);
     }
   }, [preloadedData]);
+
+  useEffect(() => {
+    if (history && history.dataPoints && history.dataPoints.length > 0 && onPriceLoaded) {
+      const recentPoints = history.dataPoints.slice(-3);
+      const recentAvg = recentPoints.reduce((sum, p) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
+      if (recentAvg > 0) {
+        onPriceLoaded(Math.round(recentAvg * 100) / 100);
+      }
+    }
+  }, [history, onPriceLoaded]);
 
   const fetchMutation = useMutation({
     mutationFn: async () => {

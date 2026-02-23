@@ -260,6 +260,7 @@ export default function CardOutlookPage() {
   const [showAddToCaseModal, setShowAddToCaseModal] = useState(false);
   const [showMatchSamplesModal, setShowMatchSamplesModal] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
+  const [reconciledPrice, setReconciledPrice] = useState<number | null>(null);
   const { toast } = useToast();
 
   const { data: outlook, isLoading, error } = useQuery<OutlookData>({
@@ -488,9 +489,9 @@ export default function CardOutlookPage() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold" data-testid="text-market-value">
-                  {formatCurrency(outlook.market?.value)}
+                  {formatCurrency(reconciledPrice ?? outlook.market?.value)}
                 </div>
-                {outlook.market?.min && outlook.market?.max && (
+                {outlook.market?.min && outlook.market?.max && !reconciledPrice && (
                   <div className="text-sm text-muted-foreground">
                     Range: {formatCurrency(outlook.market.min)} - {formatCurrency(outlook.market.max)}
                   </div>
@@ -558,6 +559,15 @@ export default function CardOutlookPage() {
               setName: outlook.card.set,
               variation: outlook.card.variation,
               grade: outlook.card.grade,
+            }}
+            onPriceLoaded={(latestPrice) => {
+              const displayedValue = outlook.market?.value;
+              if (displayedValue && latestPrice > 0) {
+                const ratio = displayedValue / latestPrice;
+                if (ratio < 0.25 || ratio > 4) {
+                  setReconciledPrice(latestPrice);
+                }
+              }
             }}
           />
         </div>
