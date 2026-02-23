@@ -377,11 +377,12 @@ export default function CardOutlookPage() {
     const validPrices = outlook.market.pricePoints
       .map(pp => pp.price)
       .filter(p => typeof p === 'number' && p > 0);
-    if (validPrices.length < 3) return mv;
-    const ppAvg = validPrices.reduce((sum, p) => sum + p, 0) / validPrices.length;
-    const ratio = mv / ppAvg;
-    if (ratio < 0.25 || ratio > 4) {
-      return Math.round(ppAvg * 100) / 100;
+    if (validPrices.length === 0) return mv;
+    const sorted = [...validPrices].sort((a, b) => a - b);
+    const ppMedian = sorted[Math.floor(sorted.length / 2)];
+    const ratio = mv / ppMedian;
+    if (ratio < 0.33 || ratio > 3) {
+      return Math.round(ppMedian * 100) / 100;
     }
     return mv;
   }, [outlook?.market?.value, outlook?.market?.pricePoints, reconciledPrice]);
@@ -507,7 +508,7 @@ export default function CardOutlookPage() {
                 <div className="text-3xl font-bold" data-testid="text-market-value">
                   {formatCurrency(displayPrice)}
                 </div>
-                {displayPrice === outlook.market?.value && outlook.market?.min && outlook.market?.max && (
+                {outlook.market?.min != null && outlook.market?.max != null && (
                   <div className="text-sm text-muted-foreground">
                     Range: {formatCurrency(outlook.market.min)} - {formatCurrency(outlook.market.max)}
                   </div>

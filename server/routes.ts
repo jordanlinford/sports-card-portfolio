@@ -2398,17 +2398,33 @@ Sitemap: ${origin}/sitemap.xml
         console.log(`[Outlook 2.0] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
       }
       
-      // Use Gemini's price data if available and better
+      // Use Gemini's price data if available and reliable (must have actual sold items)
       let marketValue = priceData.estimatedValue;
       let priceMin = filteredPriceData.min;
       let priceMax = filteredPriceData.max;
       let compCount = priceData.salesFound;
       
-      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+      if (geminiMarketData && geminiMarketData.avgPrice > 0 && geminiMarketData.soldCount > 0) {
         marketValue = geminiMarketData.avgPrice;
         priceMin = geminiMarketData.minPrice;
         priceMax = geminiMarketData.maxPrice;
         compCount = geminiMarketData.soldCount;
+      }
+
+      // CROSS-VALIDATION: Reconcile market value against actual price points from comps
+      if (pricePointsForSchema.length > 0) {
+        const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
+        if (ppPrices.length > 0 && marketValue && marketValue > 0) {
+          const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
+          const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
+          const ratio = marketValue / ppMedian;
+          if (ratio < 0.33 || ratio > 3) {
+            console.warn(`[Outlook 2.0] PRICE-POINTS CROSS-VALIDATION: marketValue $${marketValue} diverges from pricePoints median $${ppMedian.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
+            marketValue = Math.round(ppMedian * 100) / 100;
+            priceMin = sortedPrices[0];
+            priceMax = sortedPrices[sortedPrices.length - 1];
+          }
+        }
       }
 
       // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
@@ -2619,14 +2635,15 @@ Sitemap: ${origin}/sitemap.xml
             .map((pp: any) => pp.price)
             .filter((p: number) => typeof p === 'number' && p > 0);
           
-          if (validPrices.length >= 3) {
-            const ppAvg = validPrices.reduce((sum: number, p: number) => sum + p, 0) / validPrices.length;
-            const ratio = marketValue / ppAvg;
-            if (ratio < 0.25 || ratio > 4) {
-              console.warn(`[Outlook GET] PRICE CROSS-VALIDATION: marketValue $${marketValue} diverges from pricePoints avg $${ppAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
-              marketValue = Math.round(ppAvg * 100) / 100;
-              priceMin = Math.min(...validPrices);
-              priceMax = Math.max(...validPrices);
+          if (validPrices.length > 0) {
+            const sortedPrices = [...validPrices].sort((a: number, b: number) => a - b);
+            const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
+            const ratio = marketValue / ppMedian;
+            if (ratio < 0.33 || ratio > 3) {
+              console.warn(`[Outlook GET] PRICE CROSS-VALIDATION: marketValue $${marketValue} diverges from pricePoints median $${ppMedian.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
+              marketValue = Math.round(ppMedian * 100) / 100;
+              priceMin = sortedPrices[0];
+              priceMax = sortedPrices[sortedPrices.length - 1];
             }
           }
         }
@@ -3093,17 +3110,34 @@ Sitemap: ${origin}/sitemap.xml
         console.log(`[Quick Analyze] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
       }
       
-      // Use Gemini's price data if available and better
+      // Use Gemini's price data if available and reliable (must have actual sold items)
       let marketValue = priceData.estimatedValue;
       let priceMin = filteredPriceData.min;
       let priceMax = filteredPriceData.max;
       let compCount = priceData.salesFound;
       
-      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+      if (geminiMarketData && geminiMarketData.avgPrice > 0 && geminiMarketData.soldCount > 0) {
         marketValue = geminiMarketData.avgPrice;
         priceMin = geminiMarketData.minPrice;
         priceMax = geminiMarketData.maxPrice;
         compCount = geminiMarketData.soldCount;
+      }
+
+      // CROSS-VALIDATION: Reconcile market value against actual price points from comps
+      const ppForValidation = priceData.pricePoints || [];
+      if (ppForValidation.length > 0) {
+        const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
+        if (ppPrices.length > 0 && marketValue && marketValue > 0) {
+          const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
+          const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
+          const ratio = marketValue / ppMedian;
+          if (ratio < 0.33 || ratio > 3) {
+            console.warn(`[Quick Analyze] PRICE-POINTS CROSS-VALIDATION: marketValue $${marketValue} diverges from pricePoints median $${ppMedian.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
+            marketValue = Math.round(ppMedian * 100) / 100;
+            priceMin = sortedPrices[0];
+            priceMax = sortedPrices[sortedPrices.length - 1];
+          }
+        }
       }
 
       // Fetch monthly price history for cross-validation and display
