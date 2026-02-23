@@ -41,7 +41,7 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -370,6 +370,22 @@ export default function CardOutlookPage() {
     fullDate: pp.date,
   })).sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()) || [];
 
+  const displayPrice = useMemo(() => {
+    if (reconciledPrice) return reconciledPrice;
+    const mv = outlook?.market?.value;
+    if (!mv || !outlook?.market?.pricePoints?.length) return mv ?? null;
+    const validPrices = outlook.market.pricePoints
+      .map(pp => pp.price)
+      .filter(p => typeof p === 'number' && p > 0);
+    if (validPrices.length < 3) return mv;
+    const ppAvg = validPrices.reduce((sum, p) => sum + p, 0) / validPrices.length;
+    const ratio = mv / ppAvg;
+    if (ratio < 0.25 || ratio > 4) {
+      return Math.round(ppAvg * 100) / 100;
+    }
+    return mv;
+  }, [outlook?.market?.value, outlook?.market?.pricePoints, reconciledPrice]);
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <Button 
@@ -489,9 +505,9 @@ export default function CardOutlookPage() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold" data-testid="text-market-value">
-                  {formatCurrency(reconciledPrice ?? outlook.market?.value)}
+                  {formatCurrency(displayPrice)}
                 </div>
-                {outlook.market?.min && outlook.market?.max && !reconciledPrice && (
+                {displayPrice === outlook.market?.value && outlook.market?.min && outlook.market?.max && (
                   <div className="text-sm text-muted-foreground">
                     Range: {formatCurrency(outlook.market.min)} - {formatCurrency(outlook.market.max)}
                   </div>
@@ -560,10 +576,11 @@ export default function CardOutlookPage() {
               variation: outlook.card.variation,
               grade: outlook.card.grade,
             }}
+            autoLoad={true}
             onPriceLoaded={(latestPrice) => {
-              const displayedValue = outlook.market?.value;
-              if (displayedValue && latestPrice > 0) {
-                const ratio = displayedValue / latestPrice;
+              const currentDisplay = displayPrice;
+              if (currentDisplay && latestPrice > 0) {
+                const ratio = currentDisplay / latestPrice;
                 if (ratio < 0.25 || ratio > 4) {
                   setReconciledPrice(latestPrice);
                 }

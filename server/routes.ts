@@ -2608,6 +2608,28 @@ Sitemap: ${origin}/sitemap.xml
           ? (Date.now() - new Date(outlook.updatedAt).getTime()) / (1000 * 60 * 60)
           : 999;
         
+        // CROSS-VALIDATION: Reconcile marketValue against stored pricePoints
+        let marketValue = outlook.marketValue ? outlook.marketValue / 100 : null;
+        let priceMin = outlook.priceMin ? outlook.priceMin / 100 : null;
+        let priceMax = outlook.priceMax ? outlook.priceMax / 100 : null;
+        
+        if (marketValue && outlook.pricePoints && Array.isArray(outlook.pricePoints) && outlook.pricePoints.length > 0) {
+          const validPrices = (outlook.pricePoints as any[])
+            .map((pp: any) => pp.price)
+            .filter((p: number) => typeof p === 'number' && p > 0);
+          
+          if (validPrices.length >= 3) {
+            const ppAvg = validPrices.reduce((sum: number, p: number) => sum + p, 0) / validPrices.length;
+            const ratio = marketValue / ppAvg;
+            if (ratio < 0.25 || ratio > 4) {
+              console.warn(`[Outlook GET] PRICE CROSS-VALIDATION: marketValue $${marketValue} diverges from pricePoints avg $${ppAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
+              marketValue = Math.round(ppAvg * 100) / 100;
+              priceMin = Math.min(...validPrices);
+              priceMax = Math.max(...validPrices);
+            }
+          }
+        }
+        
         return res.json({
           cardId,
           card: {
@@ -2623,9 +2645,9 @@ Sitemap: ${origin}/sitemap.xml
             imagePath: card.imagePath,
           },
           market: {
-            value: outlook.marketValue ? outlook.marketValue / 100 : null,
-            min: outlook.priceMin ? outlook.priceMin / 100 : null,
-            max: outlook.priceMax ? outlook.priceMax / 100 : null,
+            value: marketValue,
+            min: priceMin,
+            max: priceMax,
             compCount: outlook.compCount,
             pricePoints: isPro ? outlook.pricePoints : null,
           },
