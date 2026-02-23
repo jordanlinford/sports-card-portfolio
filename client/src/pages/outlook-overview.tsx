@@ -2616,12 +2616,14 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
     mutationFn: async () => {
       return await apiRequest("POST", `/api/cards/${card.id}/outlook-v2`);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
+      if (data) {
+        queryClient.setQueryData(["/api/cards", String(card.id), "outlook-v2"], { ...data, cached: true });
+      }
       toast({ title: "Outlook generated", description: `Analysis complete for ${card.title}` });
       onAnalyze?.();
-      // Navigate to the outlook details page so user can see results immediately
       navigate(`/card/${card.id}/outlook`);
     },
     onError: (error: Error) => {

@@ -2526,6 +2526,7 @@ Sitemap: ${origin}/sitemap.xml
           year: card.year,
           set: card.set,
           variation: card.variation,
+          imagePath: card.imagePath,
         },
         market: {
           value: marketValue,
