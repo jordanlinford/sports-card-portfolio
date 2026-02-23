@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Sparkles } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 interface SuccessCheckmarkProps {
   show: boolean;
@@ -108,6 +109,30 @@ interface SuccessOverlayProps {
 }
 
 export function SuccessOverlay({ show, message = "Success!", onComplete }: SuccessOverlayProps) {
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    if (!show) {
+      completedRef.current = false;
+      return;
+    }
+    completedRef.current = false;
+    const safetyTimer = setTimeout(() => {
+      if (!completedRef.current) {
+        completedRef.current = true;
+        onComplete?.();
+      }
+    }, 2000);
+    return () => clearTimeout(safetyTimer);
+  }, [show, onComplete]);
+
+  const handleAnimationComplete = () => {
+    if (!completedRef.current) {
+      completedRef.current = true;
+      onComplete?.();
+    }
+  };
+
   return (
     <AnimatePresence>
       {show && (
@@ -127,7 +152,7 @@ export function SuccessOverlay({ show, message = "Success!", onComplete }: Succe
           >
             <div className="relative">
               <SuccessCheckmark show={true} size="lg" />
-              <SparkleEffect show={true} onComplete={onComplete} />
+              <SparkleEffect show={true} onComplete={handleAnimationComplete} />
             </div>
             <motion.p
               className="text-lg font-medium text-foreground"
