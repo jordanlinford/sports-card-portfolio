@@ -2398,21 +2398,38 @@ Sitemap: ${origin}/sitemap.xml
         console.log(`[Outlook 2.0] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
       }
       
-      // Use Gemini's price data if available and reliable (must have actual sold items)
+      // Detect 1/1 and low-pop cards
+      const { isOneOfOneCard } = await import("./priceService");
+      const cardVariation = card.variation || "";
+      const is1of1 = isOneOfOneCard({ title: card.title, variation: cardVariation, serialNumber: (card as any).serialNumber });
+      const isLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(cardVariation); // /1 through /49
+      
+      // Use Gemini's price data if available and reliable
+      // For 1/1 and low-pop cards: trust Gemini even with soldCount 0 (these cards rarely have comps)
       let marketValue = priceData.estimatedValue;
       let priceMin = filteredPriceData.min;
       let priceMax = filteredPriceData.max;
       let compCount = priceData.salesFound;
       
-      if (geminiMarketData && geminiMarketData.avgPrice > 0 && geminiMarketData.soldCount > 0) {
-        marketValue = geminiMarketData.avgPrice;
-        priceMin = geminiMarketData.minPrice;
-        priceMax = geminiMarketData.maxPrice;
-        compCount = geminiMarketData.soldCount;
+      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+        if (geminiMarketData.soldCount > 0 || is1of1 || isLowPop) {
+          if (is1of1 || isLowPop) {
+            console.log(`[Outlook 2.0] 1/1 or low-pop card detected — trusting Gemini valuation: $${geminiMarketData.avgPrice}`);
+          }
+          // For 1/1 cards: prefer Gemini, especially if the price service returned a much higher multiplied value
+          if ((is1of1 || isLowPop) && marketValue && marketValue > geminiMarketData.avgPrice * 2) {
+            console.warn(`[Outlook 2.0] Price service value ($${marketValue}) is >2x Gemini ($${geminiMarketData.avgPrice}) for 1/1 card — using Gemini`);
+          }
+          marketValue = geminiMarketData.avgPrice;
+          priceMin = geminiMarketData.minPrice;
+          priceMax = geminiMarketData.maxPrice;
+          compCount = geminiMarketData.soldCount;
+        }
       }
 
       // CROSS-VALIDATION: Reconcile market value against actual price points from comps
-      if (pricePointsForSchema.length > 0) {
+      // Skip for 1/1 cards where price points may be from parallel comp projections
+      if (pricePointsForSchema.length > 0 && !is1of1) {
         const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
         if (ppPrices.length > 0 && marketValue && marketValue > 0) {
           const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
@@ -3110,22 +3127,39 @@ Sitemap: ${origin}/sitemap.xml
         console.log(`[Quick Analyze] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
       }
       
-      // Use Gemini's price data if available and reliable (must have actual sold items)
+      // Detect 1/1 and low-pop cards
+      const { isOneOfOneCard } = await import("./priceService");
+      const qaVariation = variation || "";
+      const qaSerialNumber = req.body.serialNumber || null;
+      const qaIs1of1 = isOneOfOneCard({ title: title, variation: qaVariation, serialNumber: qaSerialNumber });
+      const qaIsLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(qaVariation);
+      
+      // Use Gemini's price data if available and reliable
+      // For 1/1 and low-pop cards: trust Gemini even with soldCount 0
       let marketValue = priceData.estimatedValue;
       let priceMin = filteredPriceData.min;
       let priceMax = filteredPriceData.max;
       let compCount = priceData.salesFound;
       
-      if (geminiMarketData && geminiMarketData.avgPrice > 0 && geminiMarketData.soldCount > 0) {
-        marketValue = geminiMarketData.avgPrice;
-        priceMin = geminiMarketData.minPrice;
-        priceMax = geminiMarketData.maxPrice;
-        compCount = geminiMarketData.soldCount;
+      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+        if (geminiMarketData.soldCount > 0 || qaIs1of1 || qaIsLowPop) {
+          if (qaIs1of1 || qaIsLowPop) {
+            console.log(`[Quick Analyze] 1/1 or low-pop card detected — trusting Gemini valuation: $${geminiMarketData.avgPrice}`);
+          }
+          if ((qaIs1of1 || qaIsLowPop) && marketValue && marketValue > geminiMarketData.avgPrice * 2) {
+            console.warn(`[Quick Analyze] Price service value ($${marketValue}) is >2x Gemini ($${geminiMarketData.avgPrice}) for 1/1 card — using Gemini`);
+          }
+          marketValue = geminiMarketData.avgPrice;
+          priceMin = geminiMarketData.minPrice;
+          priceMax = geminiMarketData.maxPrice;
+          compCount = geminiMarketData.soldCount;
+        }
       }
 
       // CROSS-VALIDATION: Reconcile market value against actual price points from comps
+      // Skip for 1/1 cards where price points may be from parallel comp projections
       const ppForValidation = priceData.pricePoints || [];
-      if (ppForValidation.length > 0) {
+      if (ppForValidation.length > 0 && !qaIs1of1) {
         const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
         if (ppPrices.length > 0 && marketValue && marketValue > 0) {
           const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);

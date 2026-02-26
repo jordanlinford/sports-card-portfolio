@@ -1209,11 +1209,11 @@ export function isOneOfOneCard(card: CardInfo & { serialNumber?: number | string
 }
 
 const PARALLEL_TIERS = [
-  { label: "/5", searchTerm: "/5", multiplier: 2.5 },
-  { label: "/10", searchTerm: "/10", multiplier: 3.5 },
-  { label: "/25", searchTerm: "/25", multiplier: 5.0 },
-  { label: "/50", searchTerm: "/50", multiplier: 7.0 },
-  { label: "/99", searchTerm: "/99", multiplier: 10.0 },
+  { label: "/5", searchTerm: "/5", multiplier: 1.5 },
+  { label: "/10", searchTerm: "/10", multiplier: 2.0 },
+  { label: "/25", searchTerm: "/25", multiplier: 3.0 },
+  { label: "/50", searchTerm: "/50", multiplier: 4.0 },
+  { label: "/99", searchTerm: "/99", multiplier: 5.0 },
 ];
 
 async function lookupParallelComps(card: CardInfo): Promise<OneOfOneProjection> {
@@ -1288,11 +1288,30 @@ async function lookupParallelComps(card: CardInfo): Promise<OneOfOneProjection> 
   }, parallelComps[0]);
   
   const tier = PARALLEL_TIERS.find(t => t.label === bestComp.parallel);
-  const multiplier = tier?.multiplier || 5.0;
+  const multiplier = tier?.multiplier || 3.0;
   
-  const projectedValue = Math.round(bestComp.estimatedValue! * multiplier);
+  let projectedValue = Math.round(bestComp.estimatedValue! * multiplier);
   
-  console.log(`[1/1 Fallback] Projecting 1/1 value: $${bestComp.estimatedValue} (${bestComp.parallel}) × ${multiplier} = $${projectedValue}`);
+  console.log(`[1/1 Fallback] Raw projection: $${bestComp.estimatedValue} (${bestComp.parallel}) × ${multiplier} = $${projectedValue}`);
+  
+  // SANITY CHECK: Ask Gemini directly what this 1/1 card is worth
+  // The multiplier approach can wildly overshoot for high-value parallels
+  try {
+    const directResult = await searchAndAnalyzeCardPrice(card);
+    if (directResult && directResult.estimatedValue && directResult.estimatedValue > 0) {
+      console.log(`[1/1 Fallback] Gemini direct valuation for 1/1: $${directResult.estimatedValue}`);
+      // Use Gemini's direct estimate if lower than our projection
+      // Gemini has broader market context and won't blindly multiply
+      if (directResult.estimatedValue < projectedValue) {
+        console.log(`[1/1 Fallback] Using Gemini direct value ($${directResult.estimatedValue}) instead of projection ($${projectedValue})`);
+        projectedValue = directResult.estimatedValue;
+      }
+    }
+  } catch (err) {
+    console.warn(`[1/1 Fallback] Gemini sanity check failed, using projection: ${err}`);
+  }
+  
+  console.log(`[1/1 Fallback] Final projected 1/1 value: $${projectedValue}`);
   
   return {
     isOneOfOne: true,
