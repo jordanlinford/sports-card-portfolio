@@ -956,6 +956,17 @@ async function searchAndAnalyzeCardPrice(card: CardInfo): Promise<PriceLookupRes
       ? `This is a ${variationStr} parallel — search for this specific variation, not the base card.`
       : "");
 
+  const hasMissingIdentity = !card.set || variationStr === "Base";
+  const specificityWarning = hasMissingIdentity
+    ? `\nWARNING — INCOMPLETE CARD IDENTITY: ${!card.set ? "The card SET is unknown." : ""} ${variationStr === "Base" ? "The variation may be a base card or unknown insert." : ""}
+When card identity is incomplete:
+- Do NOT assume this is the player's most popular or valuable card
+- Search for the MOST COMMON/CHEAPEST version matching the known details
+- If you can't identify the specific card, set confidence to "low" and salesFound to 0
+- NEVER return prices for premium rookies/autos when the set/variation is unspecified
+- A star player's cheap insert card ($0.50-$3) is far more common than their $50+ rookie`
+    : "";
+
   const searchPrompt = `Search for recent sold listings and current market value for this sports card:
 
 Player: ${card.title}
@@ -966,12 +977,14 @@ Grade: ${gradeString}
 
 ${card.grader ? `GRADING: This card is graded by ${card.grader.toUpperCase()}, NOT PSA. Adjust value accordingly.` : ""}
 ${searchHints}
+${specificityWarning}
 
 SEARCH STRATEGY:
 1. Search eBay sold/completed listings for this EXACT card (player + year + set + variation + grade)
 2. Try queries like: "${card.title} ${card.year || ""} ${card.set || ""} ${variationStr} ${gradeString} sold"
 3. Check 130point.com, PSA card facts, and card pricing sites for recent sales data
 4. For numbered parallels (/10, /25, /50): These are RARE and command premium prices — do not confuse with base cards
+5. CRITICAL: Only price the EXACT card described — different sets/years/variations of the same player have VASTLY different values
 
 PRICING RULES:
 - Report ACTUAL recent sold prices, not deflated estimates

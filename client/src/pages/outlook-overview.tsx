@@ -2327,6 +2327,21 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   </div>
                 </DialogHeader>
                 
+                {(!result.tempCard.set || !result.tempCard.variation) && (
+                  <div className="mb-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-start gap-2" data-testid="warning-incomplete-details">
+                    <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                        Incomplete card details — price may be inaccurate
+                      </p>
+                      <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-0.5">
+                        Missing {[!result.tempCard.set ? "set" : null, !result.tempCard.variation ? "variation/parallel" : null].filter(Boolean).join(" and ")}. 
+                        Go back and add the missing details for a reliable estimate.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {result.comps && (
                   <div className="mb-4">
                     <CompsConfidencePanel 

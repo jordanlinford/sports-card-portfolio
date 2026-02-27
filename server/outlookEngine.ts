@@ -213,8 +213,19 @@ export async function fetchGeminiMarketData(card: {
       ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
       : "");
 
+  const hasMissingDetails = !card.set || !card.variation;
+  const specificityWarning = hasMissingDetails
+    ? `\nIMPORTANT SPECIFICITY WARNING: This search is missing ${!card.set ? "the card SET" : ""}${!card.set && !card.variation ? " and " : ""}${!card.variation ? "the card VARIATION/PARALLEL" : ""}. 
+DO NOT guess or assume it is the player's most popular/valuable card. The card could be a cheap base card, a common insert, or a low-value parallel.
+- If the search query is vague (just a player name), search for the MOST COMMON version of this card, NOT premium rookies or autos.
+- When set/variation is unknown, lean toward LOWER price estimates rather than higher ones.
+- Set confidence to "LOW" since the card identity is incomplete.
+- If you cannot determine the specific card, return soldCount: 0 rather than guessing.`
+    : "";
+
   const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
 ${variationContext}
+${specificityWarning}
 
 Look at eBay's "Sold Items" filter to find actual completed sales from the last 30-60 days.
 Try multiple search queries if needed:
@@ -227,6 +238,7 @@ PRICING ACCURACY:
 - For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
 - If you find sales at $400-$800, report that range accurately — do not deflate to $100-$200
 - Accuracy matters more than caution. Users make investment decisions based on these values.
+- CRITICAL: Only price the EXACT card described. If the search is for "2025 Phoenix Joe Burrow Thunderbirds Silver", do NOT return prices for "2020 Prizm Joe Burrow Rookie PSA 10". Different sets, years, and variations have VASTLY different values.
 
 Return ONLY a JSON object with these exact fields:
 {

@@ -3218,6 +3218,15 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
       
+      // SPECIFICITY GUARD: Force low confidence and cap price when key details are missing
+      const hasMissingDetails = !set || !variation;
+      if (hasMissingDetails && marketValue && marketValue > 5) {
+        const missingFields = [!set ? "set" : null, !variation ? "variation/parallel" : null].filter(Boolean).join(" and ");
+        console.warn(`[Quick Analyze] SPECIFICITY WARNING: Missing ${missingFields} for "${title}". Market value $${marketValue} may be inflated.`);
+        signals.dataConfidence = "LOW";
+        signals.confidenceReason = `Card identity incomplete — missing ${missingFields}. Price may not reflect this specific card.`;
+      }
+
       // Get match confidence from price data (only used as fallback when no Gemini data)
       const matchConfidence = priceData.matchConfidence;
       
@@ -3229,6 +3238,14 @@ Sitemap: ${origin}/sitemap.xml
       if (!geminiMarketData && matchConfidence && matchConfidence.tier === "LOW") {
         finalAction = "MONITOR";
         finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+      }
+      
+      // If key details are missing, force MONITOR and warn user
+      if (hasMissingDetails) {
+        if (finalAction !== "MONITOR" && finalAction !== "LITTLE_VALUE") {
+          finalAction = "MONITOR";
+        }
+        finalActionReasons = [`Incomplete card details — add set and variation for accurate pricing`, ...finalActionReasons];
       }
 
       // Attempt to extract player name from title for news lookup
