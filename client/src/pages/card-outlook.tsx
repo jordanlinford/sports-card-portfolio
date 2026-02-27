@@ -29,6 +29,8 @@ import {
   XCircle,
   RefreshCw,
   Plus,
+  Trophy,
+  Eye,
 } from "lucide-react";
 import {
   LineChart,
@@ -143,8 +145,10 @@ type OutlookData = {
 const ACTION_STYLES: Record<string, { bg: string; border: string; icon: typeof TrendingUp; label: string }> = {
   BUY: { bg: "bg-green-500/20", border: "border-green-500", icon: TrendingUp, label: "Buy Signal" },
   MONITOR: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Activity, label: "Monitor" },
+  WATCH: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Eye, label: "Watch" },
   SELL: { bg: "bg-red-500/20", border: "border-red-500", icon: TrendingDown, label: "Sell Signal" },
   LONG_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", icon: Clock, label: "Long Hold" },
+  LEGACY_HOLD: { bg: "bg-indigo-500/20", border: "border-indigo-500", icon: Trophy, label: "Legacy Hold" },
   LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", icon: Info, label: "Low Value" },
 };
 
@@ -334,6 +338,23 @@ export default function CardOutlookPage() {
     },
   });
 
+  const displayPrice = useMemo(() => {
+    if (reconciledPrice) return reconciledPrice;
+    const mv = outlook?.market?.value;
+    if (!mv || !outlook?.market?.pricePoints?.length) return mv ?? null;
+    const validPrices = outlook.market.pricePoints
+      .map(pp => pp.price)
+      .filter(p => typeof p === 'number' && p > 0);
+    if (validPrices.length === 0) return mv;
+    const sorted = [...validPrices].sort((a, b) => a - b);
+    const ppMedian = sorted[Math.floor(sorted.length / 2)];
+    const ratio = mv / ppMedian;
+    if (ratio < 0.33 || ratio > 3) {
+      return Math.round(ppMedian * 100) / 100;
+    }
+    return mv;
+  }, [outlook?.market?.value, outlook?.market?.pricePoints, reconciledPrice]);
+
   if (authLoading || isLoading) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -369,23 +390,6 @@ export default function CardOutlookPage() {
     price: pp.price,
     fullDate: pp.date,
   })).sort((a, b) => new Date(a.fullDate).getTime() - new Date(b.fullDate).getTime()) || [];
-
-  const displayPrice = useMemo(() => {
-    if (reconciledPrice) return reconciledPrice;
-    const mv = outlook?.market?.value;
-    if (!mv || !outlook?.market?.pricePoints?.length) return mv ?? null;
-    const validPrices = outlook.market.pricePoints
-      .map(pp => pp.price)
-      .filter(p => typeof p === 'number' && p > 0);
-    if (validPrices.length === 0) return mv;
-    const sorted = [...validPrices].sort((a, b) => a - b);
-    const ppMedian = sorted[Math.floor(sorted.length / 2)];
-    const ratio = mv / ppMedian;
-    if (ratio < 0.33 || ratio > 3) {
-      return Math.round(ppMedian * 100) / 100;
-    }
-    return mv;
-  }, [outlook?.market?.value, outlook?.market?.pricePoints, reconciledPrice]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
