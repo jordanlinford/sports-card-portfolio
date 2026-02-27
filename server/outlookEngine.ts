@@ -223,13 +223,10 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
     : "";
 
   const rawGradeWarning = isRaw
-    ? `\nGRADE FILTER — RAW/UNGRADED ONLY:
-This card is RAW (ungraded). You MUST:
-- ONLY report prices for RAW/UNGRADED copies
-- EXCLUDE all PSA, BGS, SGC, CGC, HGA, and any other graded card sales from your data
-- Graded cards (especially PSA 9/10) sell for 2x-10x more than raw copies — mixing them in will INFLATE the value
-- When searching eBay, mentally filter OUT any listings that mention PSA, BGS, SGC, or show slabbed cards
-- If you can only find graded sales, report soldCount: 0 rather than using graded prices for a raw card`
+    ? `\nGRADE NOTE: This card is RAW (ungraded). When reporting prices:
+- Prioritize raw/ungraded sold prices over graded ones
+- If you find both raw and graded sales, report the RAW prices for avgPrice/minPrice and note graded prices separately in notes
+- Raw cards typically sell for much less than PSA 9/10 graded copies`
     : "";
 
   const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
@@ -239,8 +236,8 @@ ${rawGradeWarning}
 
 Look at eBay's "Sold Items" filter to find actual completed sales from the last 30-60 days.
 Try multiple search queries if needed:
-- "${searchDescription}"${isRaw ? " -PSA -BGS -SGC -graded" : ""}
-- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold"${isRaw ? " -PSA -BGS -SGC" : ""}
+- "${searchDescription}" sold
+- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold"
 ${isNumbered ? `- "${card.playerName || card.title} ${card.variation} sold eBay"\n- Include the numbering (e.g., /10, /25) in your search to find the correct parallel` : ""}
 
 PRICING ACCURACY:
@@ -248,7 +245,7 @@ PRICING ACCURACY:
 - For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
 - If you find sales at $400-$800, report that range accurately — do not deflate to $100-$200
 - Accuracy matters more than caution. Users make investment decisions based on these values.
-- CRITICAL: Only price the EXACT card described. If the search is for "2025 Phoenix Joe Burrow Thunderbirds Silver", do NOT return prices for "2020 Prizm Joe Burrow Rookie PSA 10". Different sets, years, and variations have VASTLY different values.${isRaw ? "\n- Remember: This is a RAW card. Do NOT include ANY graded card prices." : ""}
+- CRITICAL: Only price the EXACT card described. If the search is for "2025 Phoenix Joe Burrow Thunderbirds Silver", do NOT return prices for "2020 Prizm Joe Burrow Rookie PSA 10". Different sets, years, and variations have VASTLY different values.
 
 Return ONLY a JSON object with these exact fields:
 {
@@ -438,7 +435,7 @@ export async function fetchMonthlyPriceHistory(params: {
       : "";
     const researchPrompt = `Search eBay for recent sold listings of this sports card and tell me what prices it has been selling for:
 
-${searchDescription}${isRawTrend ? " -PSA -BGS -SGC -graded" : ""}
+${searchDescription}${isRawTrend ? " raw" : ""}
 ${rawTrendNote}
 
 Look up eBay sold/completed listings prices${isRawTrend ? " for RAW/UNGRADED copies only" : ""}, 130point.com, and any other price references you can find.

@@ -976,13 +976,10 @@ When card identity is incomplete:
     : "";
 
   const rawGradeWarning = isRaw
-    ? `\nGRADE FILTER — RAW/UNGRADED ONLY:
-This card is RAW (ungraded). You MUST:
-- ONLY report prices for RAW/UNGRADED copies
-- EXCLUDE all PSA, BGS, SGC, CGC, HGA, and any other graded card sales from your data
-- Graded cards (especially PSA 9/10) sell for 2x-10x more than raw copies — mixing them in will INFLATE the value
-- When searching eBay, mentally filter OUT any listings that mention PSA, BGS, SGC, or show slabbed cards
-- If you can only find graded sales, report soldCount: 0 rather than using graded prices for a raw card`
+    ? `\nGRADE NOTE: This card is RAW (ungraded). When reporting prices:
+- Prioritize raw/ungraded sold prices over graded ones
+- If you find both raw and graded sales, use the RAW prices for estimatedValue/minPrice
+- Raw cards typically sell for much less than PSA 9/10 graded copies`
     : "";
 
   const searchPrompt = `Search for recent sold listings and current market value for this sports card:
@@ -1000,17 +997,17 @@ ${rawGradeWarning}
 
 SEARCH STRATEGY:
 1. Search eBay sold/completed listings for this EXACT card (player + year + set + variation + grade)
-2. Try queries like: "${card.title} ${card.year || ""} ${card.set || ""} ${variationStr} ${isRaw ? "-PSA -BGS -SGC -graded" : gradeString} sold"
+2. Try queries like: "${card.title} ${card.year || ""} ${card.set || ""} ${variationStr} ${isRaw ? "raw" : gradeString} sold"
 3. Check 130point.com, PSA card facts, and card pricing sites for recent sales data
 4. For numbered parallels (/10, /25, /50): These are RARE and command premium prices — do not confuse with base cards
-5. CRITICAL: Only price the EXACT card described — different sets/years/variations of the same player have VASTLY different values${isRaw ? "\n6. RAW ONLY: Exclude ALL graded card (PSA, BGS, SGC) prices from your analysis" : ""}
+5. CRITICAL: Only price the EXACT card described — different sets/years/variations of the same player have VASTLY different values
 
 PRICING RULES:
 - Report ACTUAL recent sold prices, not deflated estimates
 - If recent solds show a range (e.g., $400-$600), report the market midpoint ($500), not the low end
 - Numbered rookie parallels of top draft picks are typically high-value cards — price accordingly
 - Lower-tier grading companies (BCCG, CGC) are worth less than PSA/BGS
-- ACCURACY matters more than caution. Users rely on these values for investment decisions.${isRaw ? "\n- RAW CARD: Only use ungraded/raw sold prices. PSA/BGS/SGC graded prices must NOT be included." : ""}
+- ACCURACY matters more than caution. Users rely on these values for investment decisions.
 
 Return ONLY a JSON object:
 {
