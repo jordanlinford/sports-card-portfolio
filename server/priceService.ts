@@ -1014,11 +1014,13 @@ Return ONLY a JSON object:
   "estimatedValue": <number based on actual market data>,
   "minPrice": <lowest sale price found>,
   "maxPrice": <highest sale price found>,
+  "rawPrice": <average price for RAW/UNGRADED copies specifically, or null if unknown>,
   "salesFound": <number of price references found>,
   "confidence": "high" | "medium" | "low",
   "details": "<cite specific sold listings with prices and dates when possible>"
 }
 
+IMPORTANT: rawPrice should reflect ONLY ungraded/raw copies. estimatedValue can include all conditions.
 You MUST return an estimatedValue if you find ANY price information.`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1044,14 +1046,18 @@ You MUST return an estimatedValue if you find ANY price information.`;
           if (parsed.estimatedValue && parsed.estimatedValue > 0) {
             let finalValue = parsed.estimatedValue;
             
-            // RAW CARD CORRECTION: If the card is raw and the avg is much higher than the min,
-            // graded comps are leaking into the estimate. Use the low end instead.
-            if (isRaw && parsed.minPrice && parsed.minPrice > 0) {
-              const ratio = finalValue / parsed.minPrice;
-              if (ratio > 2) {
-                const corrected = Math.round(parsed.minPrice * 1.3 * 100) / 100;
-                console.warn(`[Price Lookup] RAW CORRECTION: est $${finalValue} is ${ratio.toFixed(1)}x min $${parsed.minPrice}. Graded comps likely mixed in. Using $${corrected}`);
-                finalValue = corrected;
+            // RAW CARD CORRECTION: Use raw-specific price when available
+            if (isRaw) {
+              if (parsed.rawPrice && parsed.rawPrice > 0) {
+                console.log(`[Price Lookup] RAW CARD: Using rawPrice $${parsed.rawPrice} (overall est was $${finalValue})`);
+                finalValue = parsed.rawPrice;
+              } else if (parsed.minPrice && parsed.minPrice > 0) {
+                const ratio = finalValue / parsed.minPrice;
+                if (ratio > 2) {
+                  const corrected = Math.round(parsed.minPrice * 1.3 * 100) / 100;
+                  console.warn(`[Price Lookup] RAW CORRECTION: est $${finalValue} is ${ratio.toFixed(1)}x min $${parsed.minPrice}. Using $${corrected}`);
+                  finalValue = corrected;
+                }
               }
             }
             

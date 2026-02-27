@@ -253,12 +253,17 @@ Return ONLY a JSON object with these exact fields:
   "avgPrice": <average sale price in USD as a number>,
   "minPrice": <lowest sale price in USD>,
   "maxPrice": <highest sale price in USD>,
+  "rawPrice": <average price for RAW/UNGRADED copies specifically, or null if unknown>,
+  "rawMinPrice": <lowest raw/ungraded sale price, or null if unknown>,
+  "rawMaxPrice": <highest raw/ungraded sale price, or null if unknown>,
   "activeListing": <number of current active listings>,
   "liquidity": "HIGH" | "MEDIUM" | "LOW",
   "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
   "confidence": "HIGH" | "MEDIUM" | "LOW",
   "notes": "<brief note citing specific sold listings with prices when possible>"
 }
+
+IMPORTANT: rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions. This distinction is critical for accurate valuations.
 
 Liquidity guidelines:
 - HIGH: 15+ sales per month, sells almost daily
@@ -304,14 +309,23 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
             let correctedMin = parsed.minPrice || parsed.avgPrice * 0.8;
             let correctedMax = parsed.maxPrice || parsed.avgPrice * 1.2;
             
-            // RAW CARD CORRECTION: If avg is much higher than min, graded prices are leaking in
-            if (isRaw && correctedMin > 0 && correctedAvg > 0) {
-              const ratio = correctedAvg / correctedMin;
-              if (ratio > 2) {
-                const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
-                console.warn(`[OutlookEngine] RAW CORRECTION: avg $${correctedAvg} is ${ratio.toFixed(1)}x min $${correctedMin}. Correcting avg to $${newAvg}`);
-                correctedAvg = newAvg;
-                correctedMax = Math.round(correctedMin * 2 * 100) / 100;
+            // RAW CARD CORRECTION: Use raw-specific prices when available for raw cards
+            if (isRaw) {
+              if (parsed.rawPrice && parsed.rawPrice > 0) {
+                // Gemini provided explicit raw pricing — use it directly
+                console.log(`[OutlookEngine] RAW CARD: Using Gemini rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg})`);
+                correctedAvg = parsed.rawPrice;
+                correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
+                correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
+              } else if (correctedMin > 0 && correctedAvg > 0) {
+                // No explicit raw price — fall back to ratio check
+                const ratio = correctedAvg / correctedMin;
+                if (ratio > 2) {
+                  const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
+                  console.warn(`[OutlookEngine] RAW CORRECTION: avg $${correctedAvg} is ${ratio.toFixed(1)}x min $${correctedMin}. Using min-based estimate $${newAvg}`);
+                  correctedAvg = newAvg;
+                  correctedMax = Math.round(correctedMin * 2 * 100) / 100;
+                }
               }
             }
             
