@@ -303,11 +303,26 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
           if (typeof parsed.soldCount === "number" && typeof parsed.avgPrice === "number") {
             console.log(`[OutlookEngine] Found market data: ${parsed.soldCount} sold, avg $${parsed.avgPrice}`);
             
+            let correctedAvg = parsed.avgPrice || 0;
+            let correctedMin = parsed.minPrice || parsed.avgPrice * 0.8;
+            let correctedMax = parsed.maxPrice || parsed.avgPrice * 1.2;
+            
+            // RAW CARD CORRECTION: If avg is much higher than min, graded prices are leaking in
+            if (isRaw && correctedMin > 0 && correctedAvg > 0) {
+              const ratio = correctedAvg / correctedMin;
+              if (ratio > 2) {
+                const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
+                console.warn(`[OutlookEngine] RAW CORRECTION: avg $${correctedAvg} is ${ratio.toFixed(1)}x min $${correctedMin}. Correcting avg to $${newAvg}`);
+                correctedAvg = newAvg;
+                correctedMax = Math.round(correctedMin * 2 * 100) / 100;
+              }
+            }
+            
             const marketData: GeminiMarketData = {
               soldCount: parsed.soldCount || 0,
-              avgPrice: parsed.avgPrice || 0,
-              minPrice: parsed.minPrice || parsed.avgPrice * 0.8,
-              maxPrice: parsed.maxPrice || parsed.avgPrice * 1.2,
+              avgPrice: correctedAvg,
+              minPrice: correctedMin,
+              maxPrice: correctedMax,
               activeListing: parsed.activeListing || 0,
               liquidity: parsed.liquidity || "MEDIUM",
               priceStability: parsed.priceStability || "UNKNOWN",

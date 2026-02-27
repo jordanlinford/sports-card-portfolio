@@ -3156,6 +3156,23 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // RAW CARD PRICE CORRECTION: When a card is raw/ungraded, Gemini often mixes
+      // graded card prices (PSA 9=$15, PSA 10=$40) into the average, inflating it.
+      // For raw cards, the actual value is at the LOW end of the range, not the average.
+      const { isRawCard: isRawCardCheck } = await import("./priceService");
+      const qaIsRaw = isRawCardCheck(grade, grader);
+      if (qaIsRaw && marketValue && priceMin && priceMin > 0 && !qaIs1of1 && !qaIsLowPop) {
+        const rawAvgToMinRatio = marketValue / priceMin;
+        if (rawAvgToMinRatio > 2) {
+          const correctedValue = Math.round(priceMin * 1.3 * 100) / 100;
+          console.warn(`[Quick Analyze] RAW CARD CORRECTION: avgPrice $${marketValue} is ${rawAvgToMinRatio.toFixed(1)}x the minPrice $${priceMin}. Graded comps likely inflating. Correcting to $${correctedValue}`);
+          marketValue = correctedValue;
+          priceMax = Math.round(priceMin * 2 * 100) / 100;
+        } else {
+          console.log(`[Quick Analyze] Raw card pricing looks clean: avg $${marketValue}, min $${priceMin} (ratio ${rawAvgToMinRatio.toFixed(1)})`);
+        }
+      }
+
       // CROSS-VALIDATION: Reconcile market value against actual price points from comps
       // Skip for 1/1 cards where price points may be from parallel comp projections
       const ppForValidation = priceData.pricePoints || [];

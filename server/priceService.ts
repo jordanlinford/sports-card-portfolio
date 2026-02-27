@@ -1015,6 +1015,8 @@ PRICING RULES:
 Return ONLY a JSON object:
 {
   "estimatedValue": <number based on actual market data>,
+  "minPrice": <lowest sale price found>,
+  "maxPrice": <highest sale price found>,
   "salesFound": <number of price references found>,
   "confidence": "high" | "medium" | "low",
   "details": "<cite specific sold listings with prices and dates when possible>"
@@ -1043,8 +1045,21 @@ You MUST return an estimatedValue if you find ANY price information.`;
         try {
           const parsed = JSON.parse(jsonMatch[0]);
           if (parsed.estimatedValue && parsed.estimatedValue > 0) {
+            let finalValue = parsed.estimatedValue;
+            
+            // RAW CARD CORRECTION: If the card is raw and the avg is much higher than the min,
+            // graded comps are leaking into the estimate. Use the low end instead.
+            if (isRaw && parsed.minPrice && parsed.minPrice > 0) {
+              const ratio = finalValue / parsed.minPrice;
+              if (ratio > 2) {
+                const corrected = Math.round(parsed.minPrice * 1.3 * 100) / 100;
+                console.warn(`[Price Lookup] RAW CORRECTION: est $${finalValue} is ${ratio.toFixed(1)}x min $${parsed.minPrice}. Graded comps likely mixed in. Using $${corrected}`);
+                finalValue = corrected;
+              }
+            }
+            
             return {
-              estimatedValue: parsed.estimatedValue,
+              estimatedValue: finalValue,
               source: "Market Data (AI + Google Search)",
               searchQuery: `${card.title} ${card.set || ""} ${card.grade || ""}`,
               salesFound: parsed.salesFound || 0,
