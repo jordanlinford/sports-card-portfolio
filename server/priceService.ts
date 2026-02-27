@@ -10,6 +10,13 @@ const gemini = new GoogleGenAI({
   },
 });
 
+export function isRawCard(grade?: string | null, grader?: string | null): boolean {
+  if (!grade && !grader) return true;
+  const g = (grade || "").toLowerCase().trim();
+  const gr = (grader || "").toLowerCase().trim();
+  return g === "" || g === "raw" || g === "ungraded" || g === "raw/ungraded" || gr === "raw" || gr === "ungraded";
+}
+
 // Helper to get current date in YYYY-MM-DD format for GPT prompts
 function getTodayDate(): string {
   return new Date().toISOString().split('T')[0];
@@ -943,9 +950,10 @@ async function searchAndAnalyzeCardPrice(card: CardInfo): Promise<PriceLookupRes
   let lastError: Error | null = null;
   
   // Build grade string with grader if available
-  const gradeString = card.grader 
+  const isRaw = isRawCard(card.grade, card.grader);
+  const gradeString = card.grader && !isRaw
     ? `${card.grader.toUpperCase()} ${card.grade}` 
-    : (card.grade || "Raw/Ungraded");
+    : (isRaw ? "Raw/Ungraded" : (card.grade || "Raw/Ungraded"));
   
   // Build variation-aware search query hints
   const variationStr = card.variation || "Base";
@@ -967,6 +975,16 @@ When card identity is incomplete:
 - A star player's cheap insert card ($0.50-$3) is far more common than their $50+ rookie`
     : "";
 
+  const rawGradeWarning = isRaw
+    ? `\nGRADE FILTER — RAW/UNGRADED ONLY:
+This card is RAW (ungraded). You MUST:
+- ONLY report prices for RAW/UNGRADED copies
+- EXCLUDE all PSA, BGS, SGC, CGC, HGA, and any other graded card sales from your data
+- Graded cards (especially PSA 9/10) sell for 2x-10x more than raw copies — mixing them in will INFLATE the value
+- When searching eBay, mentally filter OUT any listings that mention PSA, BGS, SGC, or show slabbed cards
+- If you can only find graded sales, report soldCount: 0 rather than using graded prices for a raw card`
+    : "";
+
   const searchPrompt = `Search for recent sold listings and current market value for this sports card:
 
 Player: ${card.title}
@@ -978,20 +996,21 @@ Grade: ${gradeString}
 ${card.grader ? `GRADING: This card is graded by ${card.grader.toUpperCase()}, NOT PSA. Adjust value accordingly.` : ""}
 ${searchHints}
 ${specificityWarning}
+${rawGradeWarning}
 
 SEARCH STRATEGY:
 1. Search eBay sold/completed listings for this EXACT card (player + year + set + variation + grade)
-2. Try queries like: "${card.title} ${card.year || ""} ${card.set || ""} ${variationStr} ${gradeString} sold"
+2. Try queries like: "${card.title} ${card.year || ""} ${card.set || ""} ${variationStr} ${isRaw ? "-PSA -BGS -SGC -graded" : gradeString} sold"
 3. Check 130point.com, PSA card facts, and card pricing sites for recent sales data
 4. For numbered parallels (/10, /25, /50): These are RARE and command premium prices — do not confuse with base cards
-5. CRITICAL: Only price the EXACT card described — different sets/years/variations of the same player have VASTLY different values
+5. CRITICAL: Only price the EXACT card described — different sets/years/variations of the same player have VASTLY different values${isRaw ? "\n6. RAW ONLY: Exclude ALL graded card (PSA, BGS, SGC) prices from your analysis" : ""}
 
 PRICING RULES:
 - Report ACTUAL recent sold prices, not deflated estimates
 - If recent solds show a range (e.g., $400-$600), report the market midpoint ($500), not the low end
 - Numbered rookie parallels of top draft picks are typically high-value cards — price accordingly
 - Lower-tier grading companies (BCCG, CGC) are worth less than PSA/BGS
-- ACCURACY matters more than caution. Users rely on these values for investment decisions.
+- ACCURACY matters more than caution. Users rely on these values for investment decisions.${isRaw ? "\n- RAW CARD: Only use ungraded/raw sold prices. PSA/BGS/SGC graded prices must NOT be included." : ""}
 
 Return ONLY a JSON object:
 {

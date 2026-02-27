@@ -4,6 +4,7 @@
 import { GoogleGenAI } from "@google/genai";
 import type { Card, CardOutlook, PricePoint } from "@shared/schema";
 import { lookupPlayer, mapRegistryStage } from "./playerRegistry";
+import { isRawCard } from "./priceService";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -196,14 +197,12 @@ export async function fetchGeminiMarketData(card: {
   if (card.set) parts.push(card.set);
   if (card.playerName) parts.push(card.playerName);
   if (card.variation) parts.push(card.variation);
-  if (card.grade && card.grader) {
+  const isRaw = isRawCard(card.grade, card.grader);
+  if (!isRaw && card.grade && card.grader) {
     parts.push(`${card.grader} ${card.grade}`);
-  } else if (card.grade) {
+  } else if (!isRaw && card.grade) {
     parts.push(card.grade);
-  } else {
-    parts.push("raw ungraded");
   }
-  
   const searchDescription = parts.join(" ") || card.title;
   
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
@@ -223,14 +222,25 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
 - If you cannot determine the specific card, return soldCount: 0 rather than guessing.`
     : "";
 
+  const rawGradeWarning = isRaw
+    ? `\nGRADE FILTER — RAW/UNGRADED ONLY:
+This card is RAW (ungraded). You MUST:
+- ONLY report prices for RAW/UNGRADED copies
+- EXCLUDE all PSA, BGS, SGC, CGC, HGA, and any other graded card sales from your data
+- Graded cards (especially PSA 9/10) sell for 2x-10x more than raw copies — mixing them in will INFLATE the value
+- When searching eBay, mentally filter OUT any listings that mention PSA, BGS, SGC, or show slabbed cards
+- If you can only find graded sales, report soldCount: 0 rather than using graded prices for a raw card`
+    : "";
+
   const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
 ${variationContext}
 ${specificityWarning}
+${rawGradeWarning}
 
 Look at eBay's "Sold Items" filter to find actual completed sales from the last 30-60 days.
 Try multiple search queries if needed:
-- "${searchDescription}" 
-- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold"
+- "${searchDescription}"${isRaw ? " -PSA -BGS -SGC -graded" : ""}
+- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold"${isRaw ? " -PSA -BGS -SGC" : ""}
 ${isNumbered ? `- "${card.playerName || card.title} ${card.variation} sold eBay"\n- Include the numbering (e.g., /10, /25) in your search to find the correct parallel` : ""}
 
 PRICING ACCURACY:
@@ -238,7 +248,7 @@ PRICING ACCURACY:
 - For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
 - If you find sales at $400-$800, report that range accurately — do not deflate to $100-$200
 - Accuracy matters more than caution. Users make investment decisions based on these values.
-- CRITICAL: Only price the EXACT card described. If the search is for "2025 Phoenix Joe Burrow Thunderbirds Silver", do NOT return prices for "2020 Prizm Joe Burrow Rookie PSA 10". Different sets, years, and variations have VASTLY different values.
+- CRITICAL: Only price the EXACT card described. If the search is for "2025 Phoenix Joe Burrow Thunderbirds Silver", do NOT return prices for "2020 Prizm Joe Burrow Rookie PSA 10". Different sets, years, and variations have VASTLY different values.${isRaw ? "\n- Remember: This is a RAW card. Do NOT include ANY graded card prices." : ""}
 
 Return ONLY a JSON object with these exact fields:
 {
@@ -376,9 +386,10 @@ export async function fetchMonthlyPriceHistory(params: {
   if (params.setName) parts.push(params.setName);
   parts.push(params.playerName);
   if (params.variation && params.variation.toLowerCase() !== "base") parts.push(params.variation);
-  if (params.grade && params.grader) {
+  const isRawTrend = isRawCard(params.grade, params.grader);
+  if (!isRawTrend && params.grade && params.grader) {
     parts.push(`${params.grader} ${params.grade}`);
-  } else if (params.grade) {
+  } else if (!isRawTrend && params.grade) {
     parts.push(`PSA ${params.grade}`);
   }
 
@@ -407,14 +418,18 @@ export async function fetchMonthlyPriceHistory(params: {
     };
 
     // STEP 1: Ask Gemini to research prices naturally with search grounding
+    const rawTrendNote = isRawTrend 
+      ? `\nIMPORTANT: This card is RAW/UNGRADED. Only report prices for raw, ungraded copies. EXCLUDE all PSA, BGS, SGC, and other graded card prices — graded copies sell for significantly more and will distort the trend data.`
+      : "";
     const researchPrompt = `Search eBay for recent sold listings of this sports card and tell me what prices it has been selling for:
 
-${searchDescription}
+${searchDescription}${isRawTrend ? " -PSA -BGS -SGC -graded" : ""}
+${rawTrendNote}
 
-Look up eBay sold/completed listings prices, 130point.com, PSA cert verification values, and any other price references you can find.
+Look up eBay sold/completed listings prices${isRawTrend ? " for RAW/UNGRADED copies only" : ""}, 130point.com, and any other price references you can find.
 
 Tell me:
-1. What is this card currently selling for on eBay? Give specific recent sold prices with dates.
+1. What is this card currently selling for on eBay?${isRawTrend ? " (raw/ungraded only)" : ""} Give specific recent sold prices with dates.
 2. What was it selling for 6 months ago? 12 months ago? 18 months ago?
 3. Has the price been trending up, down, or stable?
 4. What is the typical price range (low to high)?
