@@ -49,6 +49,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { OutlookDetails, type OutlookDisplayData } from "@/components/outlook-details";
 import { PriceTrendChart } from "@/components/price-trend-chart";
+import { GradedValueMatrix } from "@/components/graded-value-matrix";
 import { SuccessOverlay } from "@/components/success-animation";
 
 type CaseWithCards = DisplayCase & { cards: CardType[] };
@@ -220,6 +221,11 @@ type QuickAnalyzeResult = {
       referenceComps: Array<{ cardType: string; estimatedValue: number; liquidity: string }>;
       source: "MODEL";
     } | null;
+    gradedEstimates?: {
+      psa9: number | null;
+      psa10: number | null;
+    } | null;
+    isRaw?: boolean;
   };
   signals: { upside: number; downsideRisk: number; marketFriction: number };
   action: string;
@@ -2387,6 +2393,14 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   cardImageUrl={previewUrl}
                   showDetailedSignals={result.isPro}
                 />
+
+                {result.market.isRaw && result.market.gradedEstimates && (result.market.gradedEstimates.psa9 || result.market.gradedEstimates.psa10) && result.market.value && (
+                  <GradedValueMatrix
+                    rawValue={result.market.value}
+                    psa9Price={result.market.gradedEstimates.psa9}
+                    psa10Price={result.market.gradedEstimates.psa10}
+                  />
+                )}
 
                 {result.tempCard.title && (
                   <div className="mt-4">

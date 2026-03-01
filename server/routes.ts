@@ -3309,7 +3309,6 @@ Sitemap: ${origin}/sitemap.xml
           max: priceMax,
           compCount: compCount,
           pricePoints: isPro ? priceData.pricePoints : null,
-          // Modeled estimates disabled - strict matching only
           modeledEstimate: null,
           geminiData: geminiMarketData ? {
             soldCount: geminiMarketData.soldCount,
@@ -3317,6 +3316,11 @@ Sitemap: ${origin}/sitemap.xml
             priceStability: geminiMarketData.priceStability,
             dataSource: geminiMarketData.dataSource,
           } : null,
+          gradedEstimates: qaIsRaw && geminiMarketData ? {
+            psa9: geminiMarketData.psa9Price,
+            psa10: geminiMarketData.psa10Price,
+          } : null,
+          isRaw: qaIsRaw,
         },
         signals: isPro ? {
           trend: signals.trendScore,

@@ -132,6 +132,8 @@ export type GeminiMarketData = {
   avgPrice: number;
   minPrice: number;
   maxPrice: number;
+  psa9Price: number | null;
+  psa10Price: number | null;
   activeListing: number;
   liquidity: "HIGH" | "MEDIUM" | "LOW";
   priceStability: "STABLE" | "VOLATILE" | "UNKNOWN";
@@ -256,6 +258,8 @@ Return ONLY a JSON object with these exact fields:
   "rawPrice": <average price for RAW/UNGRADED copies specifically, or null if unknown>,
   "rawMinPrice": <lowest raw/ungraded sale price, or null if unknown>,
   "rawMaxPrice": <highest raw/ungraded sale price, or null if unknown>,
+  "psa9Price": <estimated value if graded PSA 9 (Mint), or null if unknown>,
+  "psa10Price": <estimated value if graded PSA 10 (Gem Mint), or null if unknown>,
   "activeListing": <number of current active listings>,
   "liquidity": "HIGH" | "MEDIUM" | "LOW",
   "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
@@ -263,7 +267,7 @@ Return ONLY a JSON object with these exact fields:
   "notes": "<brief note citing specific sold listings with prices when possible>"
 }
 
-IMPORTANT: rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions. This distinction is critical for accurate valuations.
+IMPORTANT: rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions. psa9Price and psa10Price should reflect what this card would sell for if professionally graded by PSA.
 
 Liquidity guidelines:
 - HIGH: 15+ sales per month, sells almost daily
@@ -334,6 +338,8 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
               avgPrice: correctedAvg,
               minPrice: correctedMin,
               maxPrice: correctedMax,
+              psa9Price: (typeof parsed.psa9Price === "number" && parsed.psa9Price > 0) ? parsed.psa9Price : null,
+              psa10Price: (typeof parsed.psa10Price === "number" && parsed.psa10Price > 0) ? parsed.psa10Price : null,
               activeListing: parsed.activeListing || 0,
               liquidity: parsed.liquidity || "MEDIUM",
               priceStability: parsed.priceStability || "UNKNOWN",
