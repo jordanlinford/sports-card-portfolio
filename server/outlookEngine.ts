@@ -249,25 +249,28 @@ ${variationContext}
 ${specificityWarning}
 ${rawGradeWarning}
 
-Look at eBay's "Sold Items" filter to find actual completed sales from the last 30-60 days.
+Search eBay completed/sold listings for this EXACT card. What does it ACTUALLY sell for RIGHT NOW?
 Try multiple search queries if needed:
 - "${searchDescription}" sold
 - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold"
 ${isNumbered ? `- "${card.playerName || card.title} ${card.variation} sold eBay"\n- Include the numbering (e.g., /10, /25) in your search to find the correct parallel` : ""}
 
-PRICING ACCURACY:
-- Report ACTUAL sold prices from eBay, not conservative estimates
+PRICING RULES — RECENCY IS KING:
+- Prioritize the MOST RECENT completed sales (last 14 days > last 30 days > last 60 days)
+- avgPrice should reflect what a buyer would REALISTICALLY PAY TODAY based on recent completed sales
+- Report COMPLETED SOLD prices only — NOT "Buy It Now" asking prices, NOT active unsold listings
+- Do NOT include "Best Offer accepted" sales where the actual price is hidden
+- Exclude sales that are obviously a different card, lot, bundle, or error
 - For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
-- If you find sales at $400-$800, report that range accurately — do not deflate to $100-$200
-- Accuracy matters more than caution. Users make investment decisions based on these values.
-- CRITICAL: Only price the EXACT card described. If the search is for "2025 Phoenix Joe Burrow Thunderbirds Silver", do NOT return prices for "2020 Prizm Joe Burrow Rookie PSA 10". Different sets, years, and variations have VASTLY different values.
+- CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values.
+- When in doubt: "What would this card sell for if I listed it on eBay today?" — that is your avgPrice
 
 Return ONLY a JSON object with these exact fields:
 {
-  "soldCount": <number of sold listings found in last 30-60 days, be specific>,
-  "avgPrice": <average sale price in USD as a number>,
-  "minPrice": <lowest sale price in USD>,
-  "maxPrice": <highest sale price in USD>,
+  "soldCount": <number of recent completed sold listings found>,
+  "avgPrice": <realistic current market price based on most recent completed sales>,
+  "minPrice": <lowest recent completed sale price>,
+  "maxPrice": <highest recent non-outlier sale price>,
   "rawPrice": <average price for RAW/UNGRADED copies specifically, or null if unknown>,
   "rawMinPrice": <lowest raw/ungraded sale price, or null if unknown>,
   "rawMaxPrice": <highest raw/ungraded sale price, or null if unknown>,
@@ -502,28 +505,34 @@ ${rawGradeWarning}
 
 Do ALL of the following in this single search:
 
-1. MARKET PRICING: Search eBay "Sold Items" for recently COMPLETED AUCTION sales (last 30-60 days) of this exact card. Try multiple queries if needed.
+1. MARKET PRICING (MOST IMPORTANT — get this right):
+   Search eBay completed/sold listings for this EXACT card. What does it ACTUALLY sell for RIGHT NOW?
+   - Prioritize the MOST RECENT sales (last 14 days > last 30 days > last 60 days)
+   - The avgPrice should reflect what a buyer would realistically pay TODAY based on recent completed sales
+   - If recent sales (last 14 days) show lower prices than older sales, use the recent prices — the market has moved down
+   - If recent sales show higher prices, use the recent prices — the market has moved up
+   - RECENCY MATTERS MOST: 3 sales from last week are more valuable than 20 sales from 2 months ago
 
 2. PLAYER NEWS: Search for ${card.playerName || card.title} latest news in ${currentYear} — current team, injuries, performance, trades, roster status.
 
 3. INVESTMENT ANALYSIS: Based on the pricing data AND player news, provide your investment verdict.
 
-PRICING ACCURACY:
-- Report ACTUAL completed/sold prices from eBay, NOT "Buy It Now" listing prices or active listings
-- Use the MEDIAN of sold prices for avgPrice, not the arithmetic mean — this avoids outlier distortion
-- Exclude obvious outliers: if one sale is 3x+ higher than the next-highest, it is likely a different card, lot, or error — exclude it
-- For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
-- Accuracy matters more than caution. Users make investment decisions based on these values.
-- CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values.
-- CRITICAL: Do NOT include "Best Offer accepted" sales where the actual sold price is unknown — these inflate averages.
+PRICING RULES:
+- Report COMPLETED SOLD prices only — NOT "Buy It Now" asking prices, NOT active unsold listings
+- avgPrice = what this card realistically sells for based on recent completed sales (use MEDIAN of recent sales, not mean)
+- Exclude sales that are obviously a different card, lot, bundle, or error
+- Do NOT include "Best Offer accepted" sales where the actual price is hidden
+- For numbered parallels (/25, /10, etc.) of stars, prices CAN be much higher — search specifically
+- CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values
+- When in doubt, ask yourself: "If I searched eBay sold listings for this exact card right now, what would the typical recent sale price be?" — that is your avgPrice
 
 Return ONLY a JSON object with this EXACT structure:
 {
   "market": {
-    "soldCount": <number of completed sold listings found, be specific>,
-    "avgPrice": <MEDIAN sale price in USD — use the middle value, not the mean>,
-    "minPrice": <lowest completed sale price>,
-    "maxPrice": <highest non-outlier sale price>,
+    "soldCount": <number of recent completed sold listings found>,
+    "avgPrice": <realistic current market price based on MOST RECENT completed sales — this is what it sells for TODAY>,
+    "minPrice": <lowest recent completed sale price>,
+    "maxPrice": <highest recent non-outlier sale price>,
     "rawPrice": <average raw/ungraded price, or null>,
     "psa9Price": <PSA 9 value — search for graded sales or estimate at 1.5-3x raw>,
     "psa10Price": <PSA 10 value — search for graded sales or estimate at 3-8x raw>,
@@ -531,7 +540,7 @@ Return ONLY a JSON object with this EXACT structure:
     "liquidity": "HIGH" | "MEDIUM" | "LOW",
     "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
     "confidence": "HIGH" | "MEDIUM" | "LOW",
-    "notes": "<cite specific sold listings with prices>"
+    "notes": "<cite specific recent sold prices with approximate dates, e.g. 'Sold $38 (Feb 2026), $42 (Feb 2026), $45 (Jan 2026)'>"
   },
   "player": {
     "status": "<active/injured/retired/prospect>",
