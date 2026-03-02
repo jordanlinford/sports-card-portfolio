@@ -3122,9 +3122,23 @@ Sitemap: ${origin}/sitemap.xml
       
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
         if (unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop) {
-          marketValue = unifiedResult.market.avgPrice;
-          priceMin = unifiedResult.market.minPrice;
-          priceMax = unifiedResult.market.maxPrice;
+          let unifiedAvg = unifiedResult.market.avgPrice;
+          const unifiedMin = unifiedResult.market.minPrice;
+          const unifiedMax = unifiedResult.market.maxPrice;
+          
+          // OUTLIER PROTECTION: If max is 3x+ the min with sparse comps, the average is likely inflated by outliers/BIN prices
+          if (unifiedMin > 0 && unifiedMax > 0 && unifiedMax / unifiedMin >= 3 && unifiedResult.market.soldCount <= 10) {
+            const spread = unifiedMax / unifiedMin;
+            // More aggressive correction for wider spreads
+            const weight = spread >= 5 ? 0.15 : 0.3;
+            const correctedAvg = Math.round((unifiedMin + (unifiedAvg - unifiedMin) * weight) * 100) / 100;
+            console.warn(`[Quick Analyze] OUTLIER PROTECTION: Unified avg $${unifiedAvg} with range $${unifiedMin}-$${unifiedMax} (${spread.toFixed(1)}x spread). Corrected to $${correctedAvg} (weight=${weight})`);
+            unifiedAvg = correctedAvg;
+          }
+          
+          marketValue = unifiedAvg;
+          priceMin = unifiedMin;
+          priceMax = unifiedMax;
           compCount = unifiedResult.market.soldCount;
         }
       }
@@ -3146,11 +3160,30 @@ Sitemap: ${origin}/sitemap.xml
       if (ppForValidation.length > 0 && !qaIs1of1) {
         const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
         if (ppPrices.length > 0 && marketValue && marketValue > 0) {
-          const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
-          const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
+          let sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
+          
+          // Remove outlier price points: if highest is 3x+ the next-highest, drop it
+          if (sortedPrices.length >= 2) {
+            const highest = sortedPrices[sortedPrices.length - 1];
+            const nextHighest = sortedPrices[sortedPrices.length - 2];
+            if (highest > nextHighest * 3) {
+              console.warn(`[Quick Analyze] PRICE POINT OUTLIER: Dropping $${highest} (${(highest/nextHighest).toFixed(1)}x next-highest $${nextHighest})`);
+              sortedPrices = sortedPrices.slice(0, -1);
+            }
+          }
+          
+          // Proper median: average middle two values for even-length arrays
+          let ppMedian: number;
+          const mid = Math.floor(sortedPrices.length / 2);
+          if (sortedPrices.length % 2 === 0) {
+            ppMedian = (sortedPrices[mid - 1] + sortedPrices[mid]) / 2;
+          } else {
+            ppMedian = sortedPrices[mid];
+          }
+          
           const ratio = marketValue / ppMedian;
-          if (ratio < 0.33 || ratio > 3) {
-            console.warn(`[Quick Analyze] CROSS-VALIDATION: $${marketValue} diverges from median $${ppMedian.toFixed(2)}. Correcting.`);
+          if (ratio < 0.33 || ratio > 2.5) {
+            console.warn(`[Quick Analyze] CROSS-VALIDATION: $${marketValue} diverges from median $${ppMedian.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
             marketValue = Math.round(ppMedian * 100) / 100;
             priceMin = sortedPrices[0];
             priceMax = sortedPrices[sortedPrices.length - 1];

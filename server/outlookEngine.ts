@@ -502,25 +502,28 @@ ${rawGradeWarning}
 
 Do ALL of the following in this single search:
 
-1. MARKET PRICING: Search eBay "Sold Items" for recently completed sales (last 30-60 days) of this exact card. Try multiple queries if needed.
+1. MARKET PRICING: Search eBay "Sold Items" for recently COMPLETED AUCTION sales (last 30-60 days) of this exact card. Try multiple queries if needed.
 
 2. PLAYER NEWS: Search for ${card.playerName || card.title} latest news in ${currentYear} — current team, injuries, performance, trades, roster status.
 
 3. INVESTMENT ANALYSIS: Based on the pricing data AND player news, provide your investment verdict.
 
 PRICING ACCURACY:
-- Report ACTUAL sold prices from eBay, not conservative estimates
+- Report ACTUAL completed/sold prices from eBay, NOT "Buy It Now" listing prices or active listings
+- Use the MEDIAN of sold prices for avgPrice, not the arithmetic mean — this avoids outlier distortion
+- Exclude obvious outliers: if one sale is 3x+ higher than the next-highest, it is likely a different card, lot, or error — exclude it
 - For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
 - Accuracy matters more than caution. Users make investment decisions based on these values.
 - CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values.
+- CRITICAL: Do NOT include "Best Offer accepted" sales where the actual sold price is unknown — these inflate averages.
 
 Return ONLY a JSON object with this EXACT structure:
 {
   "market": {
-    "soldCount": <number of sold listings found, be specific>,
-    "avgPrice": <average sale price in USD>,
-    "minPrice": <lowest sale price>,
-    "maxPrice": <highest sale price>,
+    "soldCount": <number of completed sold listings found, be specific>,
+    "avgPrice": <MEDIAN sale price in USD — use the middle value, not the mean>,
+    "minPrice": <lowest completed sale price>,
+    "maxPrice": <highest non-outlier sale price>,
     "rawPrice": <average raw/ungraded price, or null>,
     "psa9Price": <PSA 9 value — search for graded sales or estimate at 1.5-3x raw>,
     "psa10Price": <PSA 10 value — search for graded sales or estimate at 3-8x raw>,
