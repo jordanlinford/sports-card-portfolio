@@ -3161,6 +3161,7 @@ Sitemap: ${origin}/sitemap.xml
       // For raw cards, the actual value is at the LOW end of the range, not the average.
       const { isRawCard: isRawCardCheck } = await import("./priceService");
       const qaIsRaw = isRawCardCheck(grade, grader);
+      console.log(`[Quick Analyze] Grade="${grade}", Grader="${grader}", isRaw=${qaIsRaw}, geminiPsa9=${geminiMarketData?.psa9Price}, geminiPsa10=${geminiMarketData?.psa10Price}`);
       if (qaIsRaw && marketValue && priceMin && priceMin > 0 && !qaIs1of1 && !qaIsLowPop) {
         const rawAvgToMinRatio = marketValue / priceMin;
         if (rawAvgToMinRatio > 2) {
@@ -3316,10 +3317,18 @@ Sitemap: ${origin}/sitemap.xml
             priceStability: geminiMarketData.priceStability,
             dataSource: geminiMarketData.dataSource,
           } : null,
-          gradedEstimates: qaIsRaw && geminiMarketData ? {
-            psa9: geminiMarketData.psa9Price,
-            psa10: geminiMarketData.psa10Price,
-          } : null,
+          gradedEstimates: qaIsRaw && marketValue ? (() => {
+            const geminiPsa9 = geminiMarketData?.psa9Price ?? null;
+            const geminiPsa10 = geminiMarketData?.psa10Price ?? null;
+            if (geminiPsa9 || geminiPsa10) {
+              return { psa9: geminiPsa9, psa10: geminiPsa10 };
+            }
+            const rawVal = marketValue;
+            const estPsa9 = Math.round(rawVal * 2);
+            const estPsa10 = Math.round(rawVal * 4);
+            console.log(`[Quick Analyze] Graded estimates fallback: raw=$${rawVal}, PSA9≈$${estPsa9}, PSA10≈$${estPsa10}`);
+            return { psa9: estPsa9, psa10: estPsa10, estimated: true };
+          })() : null,
           isRaw: qaIsRaw,
         },
         signals: isPro ? {

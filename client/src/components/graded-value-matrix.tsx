@@ -6,6 +6,7 @@ interface GradedValueMatrixProps {
   rawValue: number;
   psa9Price: number | null;
   psa10Price: number | null;
+  estimated?: boolean;
 }
 
 const GRADING_COST = {
@@ -74,7 +75,7 @@ const VERDICT_STYLES = {
   },
 };
 
-export function GradedValueMatrix({ rawValue, psa9Price, psa10Price }: GradedValueMatrixProps) {
+export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated }: GradedValueMatrixProps) {
   if (!psa9Price && !psa10Price) return null;
   if (rawValue <= 0) return null;
 
@@ -87,6 +88,9 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price }: GradedVal
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <Award className="h-4 w-4 text-primary" />
           Should You Grade This Card?
+          {estimated && (
+            <Badge variant="outline" className="text-[10px] font-normal ml-auto">Estimated</Badge>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">

@@ -224,6 +224,7 @@ type QuickAnalyzeResult = {
     gradedEstimates?: {
       psa9: number | null;
       psa10: number | null;
+      estimated?: boolean;
     } | null;
     isRaw?: boolean;
   };
@@ -2399,6 +2400,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     rawValue={result.market.value}
                     psa9Price={result.market.gradedEstimates.psa9}
                     psa10Price={result.market.gradedEstimates.psa10}
+                    estimated={result.market.gradedEstimates.estimated}
                   />
                 )}
 

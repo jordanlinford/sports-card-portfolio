@@ -258,8 +258,8 @@ Return ONLY a JSON object with these exact fields:
   "rawPrice": <average price for RAW/UNGRADED copies specifically, or null if unknown>,
   "rawMinPrice": <lowest raw/ungraded sale price, or null if unknown>,
   "rawMaxPrice": <highest raw/ungraded sale price, or null if unknown>,
-  "psa9Price": <estimated value if graded PSA 9 (Mint), or null if unknown>,
-  "psa10Price": <estimated value if graded PSA 10 (Gem Mint), or null if unknown>,
+  "psa9Price": <estimated value if graded PSA 9 (Mint) — search for PSA 9 sold listings or estimate from raw price>,
+  "psa10Price": <estimated value if graded PSA 10 (Gem Mint) — search for PSA 10 sold listings or estimate from raw price>,
   "activeListing": <number of current active listings>,
   "liquidity": "HIGH" | "MEDIUM" | "LOW",
   "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
@@ -267,7 +267,7 @@ Return ONLY a JSON object with these exact fields:
   "notes": "<brief note citing specific sold listings with prices when possible>"
 }
 
-IMPORTANT: rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions. psa9Price and psa10Price should reflect what this card would sell for if professionally graded by PSA.
+IMPORTANT: rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions. psa9Price and psa10Price should reflect what this card would sell for if professionally graded by PSA. ALWAYS provide psa9Price and psa10Price estimates — search for graded sold listings, and if none are found, estimate based on typical raw-to-graded multipliers for this card type (PSA 9 is typically 1.5-3x raw, PSA 10 is typically 3-8x raw depending on player popularity and card scarcity). Never return null for both.
 
 Liquidity guidelines:
 - HIGH: 15+ sales per month, sells almost daily
