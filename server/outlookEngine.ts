@@ -14,6 +14,10 @@ const gemini = new GoogleGenAI({
   },
 });
 
+// 4-hour cache for player news to avoid redundant lookups
+const playerNewsCache = new Map<string, { data: { snippets: string[]; momentum: "up" | "flat" | "down"; newsCount: number; roleStatus?: string; injuryStatus?: string }; cachedAt: number }>();
+const NEWS_CACHE_TTL_MS = 4 * 60 * 60 * 1000;
+
 // Fetch real-time news about a player using Gemini with Google Search grounding
 // This ensures AI explanations use current information, not outdated training data
 export async function fetchPlayerNews(playerName: string | null | undefined, sport: string | null | undefined): Promise<{
@@ -25,6 +29,13 @@ export async function fetchPlayerNews(playerName: string | null | undefined, spo
 }> {
   if (!playerName) {
     return { snippets: [], momentum: "flat", newsCount: 0 };
+  }
+
+  const newsCacheKey = `${playerName.toLowerCase().trim()}|${(sport || "").toLowerCase()}`;
+  const cachedNews = playerNewsCache.get(newsCacheKey);
+  if (cachedNews && Date.now() - cachedNews.cachedAt < NEWS_CACHE_TTL_MS) {
+    console.log(`[OutlookEngine] News cache hit for: ${playerName} (${Math.round((Date.now() - cachedNews.cachedAt) / 1000 / 60)}min old)`);
+    return cachedNews.data;
   }
 
   const maxRetries = 3;
@@ -94,13 +105,15 @@ Be specific about role and injury status. If the player:
           
           console.log(`[OutlookEngine] News for ${playerName}: ${parsed.newsCount || snippets.length} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}`);
           
-          return {
+          const newsResult = {
             snippets,
             momentum,
             newsCount: parsed.newsCount || snippets.length,
             roleStatus: parsed.roleStatus,
             injuryStatus: parsed.injuryStatus,
           };
+          playerNewsCache.set(newsCacheKey, { data: newsResult, cachedAt: Date.now() });
+          return newsResult;
         } catch (parseError) {
           console.error(`[OutlookEngine] Failed to parse news JSON (attempt ${attempt}):`, responseText.substring(0, 200));
           // Continue to next retry attempt on parse failure
@@ -372,6 +385,295 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
   }
   
   console.error("[OutlookEngine] Market data fetch failed:", lastError?.message);
+  return null;
+}
+
+// ============================================================
+// UNIFIED CARD ANALYSIS - Single Gemini call for pricing + news + verdict
+// Replaces 4 separate calls (market data, news, price history, explanation)
+// ============================================================
+
+export interface UnifiedCardAnalysis {
+  market: {
+    soldCount: number;
+    avgPrice: number;
+    minPrice: number;
+    maxPrice: number;
+    rawPrice: number | null;
+    psa9Price: number | null;
+    psa10Price: number | null;
+    activeListing: number;
+    liquidity: "HIGH" | "MEDIUM" | "LOW";
+    priceStability: "STABLE" | "VOLATILE" | "UNKNOWN";
+    confidence: "HIGH" | "MEDIUM" | "LOW";
+    notes: string;
+  };
+  player: {
+    status: string;
+    recentNews: string;
+    momentum: "up" | "flat" | "down";
+    teamContext: string;
+    roleStatus: string;
+    injuryStatus: string;
+  };
+  analysis: {
+    verdict: string;
+    verdictReasons: string[];
+    shortSummary: string;
+    detailedAnalysis: string;
+    keyBullets: string[];
+  };
+  dataSource: "gemini_unified";
+}
+
+interface UnifiedAnalysisCache {
+  data: UnifiedCardAnalysis;
+  cachedAt: number;
+}
+const unifiedAnalysisCache = new Map<string, UnifiedAnalysisCache>();
+const UNIFIED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+export async function fetchUnifiedCardAnalysis(card: {
+  title: string;
+  playerName?: string | null;
+  year?: number | null;
+  set?: string | null;
+  variation?: string | null;
+  grade?: string | null;
+  grader?: string | null;
+}): Promise<UnifiedCardAnalysis | null> {
+  const cacheKey = "unified|" + getGeminiCacheKey(card);
+  const cached = unifiedAnalysisCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < UNIFIED_CACHE_TTL_MS) {
+    console.log(`[Unified Analysis] Cache hit for: ${card.title} (${Math.round((Date.now() - cached.cachedAt) / 1000 / 60)}min old)`);
+    return cached.data;
+  }
+
+  const maxRetries = 2;
+  let lastError: Error | null = null;
+
+  const parts: string[] = [];
+  if (card.year) parts.push(String(card.year));
+  if (card.set) parts.push(card.set);
+  if (card.playerName) parts.push(card.playerName);
+  if (card.variation) parts.push(card.variation);
+  const isRaw = isRawCard(card.grade, card.grader);
+  if (!isRaw && card.grade && card.grader) {
+    parts.push(`${card.grader} ${card.grade}`);
+  } else if (!isRaw && card.grade) {
+    parts.push(card.grade);
+  }
+  const searchDescription = parts.join(" ") || card.title;
+
+  const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
+  const variationContext = isNumbered
+    ? `\nCRITICAL: This is a NUMBERED parallel (${card.variation}). It is significantly rarer and more valuable than base cards. Search specifically for "${searchDescription}" — do NOT return base card prices for a numbered parallel.`
+    : (card.variation && card.variation.toLowerCase() !== "base"
+      ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
+      : "");
+
+  const hasMissingDetails = !card.set || !card.variation;
+  const specificityWarning = hasMissingDetails
+    ? `\nIMPORTANT SPECIFICITY WARNING: This search is missing ${!card.set ? "the card SET" : ""}${!card.set && !card.variation ? " and " : ""}${!card.variation ? "the card VARIATION/PARALLEL" : ""}. 
+DO NOT guess or assume it is the player's most popular/valuable card. The card could be a cheap base card, a common insert, or a low-value parallel.
+- If the search query is vague (just a player name), search for the MOST COMMON version of this card, NOT premium rookies or autos.
+- When set/variation is unknown, lean toward LOWER price estimates rather than higher ones.
+- Set market.confidence to "LOW" since the card identity is incomplete.`
+    : "";
+
+  const rawGradeWarning = isRaw
+    ? `\nGRADE NOTE: This card is RAW (ungraded). When reporting prices:
+- Prioritize raw/ungraded sold prices over graded ones for market pricing
+- Report graded PSA 9/10 values separately in psa9Price/psa10Price
+- Raw cards typically sell for much less than PSA 9/10 graded copies`
+    : "";
+
+  const currentYear = new Date().getFullYear();
+
+  const prompt = `You are a sports card market analyst. Search for this card and provide a COMPLETE analysis in ONE response.
+
+CARD: "${searchDescription}"
+Player: ${card.playerName || card.title}
+Year: ${card.year || "Unknown"} | Set: ${card.set || "Unknown"} | Variation: ${card.variation || "Base"}
+Grade: ${isRaw ? "RAW (ungraded)" : (card.grade || "Unknown")}${card.grader ? ` by ${card.grader}` : ""}
+${variationContext}
+${specificityWarning}
+${rawGradeWarning}
+
+Do ALL of the following in this single search:
+
+1. MARKET PRICING: Search eBay "Sold Items" for recently completed sales (last 30-60 days) of this exact card. Try multiple queries if needed.
+
+2. PLAYER NEWS: Search for ${card.playerName || card.title} latest news in ${currentYear} — current team, injuries, performance, trades, roster status.
+
+3. INVESTMENT ANALYSIS: Based on the pricing data AND player news, provide your investment verdict.
+
+PRICING ACCURACY:
+- Report ACTUAL sold prices from eBay, not conservative estimates
+- For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
+- Accuracy matters more than caution. Users make investment decisions based on these values.
+- CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values.
+
+Return ONLY a JSON object with this EXACT structure:
+{
+  "market": {
+    "soldCount": <number of sold listings found, be specific>,
+    "avgPrice": <average sale price in USD>,
+    "minPrice": <lowest sale price>,
+    "maxPrice": <highest sale price>,
+    "rawPrice": <average raw/ungraded price, or null>,
+    "psa9Price": <PSA 9 value — search for graded sales or estimate at 1.5-3x raw>,
+    "psa10Price": <PSA 10 value — search for graded sales or estimate at 3-8x raw>,
+    "activeListing": <current active listings count>,
+    "liquidity": "HIGH" | "MEDIUM" | "LOW",
+    "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
+    "confidence": "HIGH" | "MEDIUM" | "LOW",
+    "notes": "<cite specific sold listings with prices>"
+  },
+  "player": {
+    "status": "<active/injured/retired/prospect>",
+    "recentNews": "<1-2 sentence summary of latest news>",
+    "momentum": "up" | "flat" | "down",
+    "teamContext": "<current team and role>",
+    "roleStatus": "STARTER" | "BACKUP" | "INJURED_RESERVE" | "UNCERTAIN" | "UNKNOWN",
+    "injuryStatus": "HEALTHY" | "INJURED" | "RECOVERING" | "UNKNOWN"
+  },
+  "analysis": {
+    "verdict": "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "WATCH" | "LITTLE_VALUE",
+    "verdictReasons": ["reason 1", "reason 2", "reason 3"],
+    "shortSummary": "<one sentence investment summary>",
+    "detailedAnalysis": "<2-3 paragraph detailed analysis for pro users>",
+    "keyBullets": ["<key point 1>", "<key point 2>", "<key point 3>", "<key point 4>"]
+  }
+}
+
+VERDICT GUIDELINES:
+- BUY: Strong upside, good price entry point, healthy demand
+- MONITOR: Uncertain — wait for clearer signals or price stabilization
+- SELL: Declining value, negative momentum, or peak pricing
+- LONG_HOLD: Solid long-term value, hold for appreciation
+- LEGACY_HOLD: Vintage/retired player cards with historical significance
+- WATCH: Interesting but not ready to buy yet
+- LITTLE_VALUE: Card worth under $2-3 with minimal upside potential
+
+Liquidity: HIGH = 15+ sales/month, MEDIUM = 5-15, LOW = under 5.
+Price stability: STABLE = within 20%, VOLATILE = varies 40%+.
+
+ALWAYS provide psa9Price and psa10Price estimates. If no graded sales found, estimate from raw price multipliers. Never return null for both.
+If player is injured or lost starting role, reflect this in momentum and verdict.
+Be specific with numbers — if you find 19 sold listings, say 19.`;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Unified Analysis] Attempt ${attempt} for: ${searchDescription}`);
+      const startTime = Date.now();
+
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      });
+
+      const elapsed = Date.now() - startTime;
+      let responseText = response.text || "";
+      console.log(`[Unified Analysis] Response in ${elapsed}ms (${responseText.length} chars)`);
+
+      responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+
+          if (parsed.market && typeof parsed.market.avgPrice === "number") {
+            let correctedAvg = parsed.market.avgPrice || 0;
+            let correctedMin = parsed.market.minPrice || correctedAvg * 0.8;
+            let correctedMax = parsed.market.maxPrice || correctedAvg * 1.2;
+
+            if (isRaw) {
+              if (parsed.market.rawPrice && parsed.market.rawPrice > 0) {
+                console.log(`[Unified Analysis] RAW CARD: Using rawPrice $${parsed.market.rawPrice} (overall avg was $${correctedAvg})`);
+                correctedAvg = parsed.market.rawPrice;
+                correctedMin = parsed.market.rawMinPrice || parsed.market.rawPrice * 0.7;
+                correctedMax = parsed.market.rawMaxPrice || parsed.market.rawPrice * 1.5;
+              } else if (correctedMin > 0 && correctedAvg > 0) {
+                const ratio = correctedAvg / correctedMin;
+                if (ratio > 2) {
+                  const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
+                  console.warn(`[Unified Analysis] RAW CORRECTION: avg $${correctedAvg} is ${ratio.toFixed(1)}x min $${correctedMin}. Using $${newAvg}`);
+                  correctedAvg = newAvg;
+                  correctedMax = Math.round(correctedMin * 2 * 100) / 100;
+                }
+              }
+            }
+
+            const player = parsed.player || {};
+            let momentum: "up" | "flat" | "down" = player.momentum || "flat";
+            if (player.roleStatus === "INJURED_RESERVE" || player.injuryStatus === "INJURED") {
+              momentum = "down";
+            } else if (player.roleStatus === "BACKUP") {
+              momentum = momentum === "up" ? "flat" : "down";
+            }
+
+            const analysis = parsed.analysis || {};
+
+            const result: UnifiedCardAnalysis = {
+              market: {
+                soldCount: parsed.market.soldCount || 0,
+                avgPrice: correctedAvg,
+                minPrice: correctedMin,
+                maxPrice: correctedMax,
+                rawPrice: parsed.market.rawPrice || null,
+                psa9Price: (typeof parsed.market.psa9Price === "number" && parsed.market.psa9Price > 0) ? parsed.market.psa9Price : null,
+                psa10Price: (typeof parsed.market.psa10Price === "number" && parsed.market.psa10Price > 0) ? parsed.market.psa10Price : null,
+                activeListing: parsed.market.activeListing || 0,
+                liquidity: parsed.market.liquidity || "MEDIUM",
+                priceStability: parsed.market.priceStability || "UNKNOWN",
+                confidence: parsed.market.confidence || "MEDIUM",
+                notes: parsed.market.notes || "",
+              },
+              player: {
+                status: player.status || "unknown",
+                recentNews: player.recentNews || "",
+                momentum,
+                teamContext: player.teamContext || "",
+                roleStatus: player.roleStatus || "UNKNOWN",
+                injuryStatus: player.injuryStatus || "UNKNOWN",
+              },
+              analysis: {
+                verdict: analysis.verdict || "MONITOR",
+                verdictReasons: Array.isArray(analysis.verdictReasons) ? analysis.verdictReasons : ["Insufficient data for strong recommendation"],
+                shortSummary: analysis.shortSummary || `${analysis.verdict || "MONITOR"} recommendation based on current market data.`,
+                detailedAnalysis: analysis.detailedAnalysis || "",
+                keyBullets: Array.isArray(analysis.keyBullets) ? analysis.keyBullets : (Array.isArray(analysis.verdictReasons) ? analysis.verdictReasons : []),
+              },
+              dataSource: "gemini_unified",
+            };
+
+            unifiedAnalysisCache.set(cacheKey, { data: result, cachedAt: Date.now() });
+            console.log(`[Unified Analysis] Cached: ${card.title} | verdict=${result.analysis.verdict} | avg=$${correctedAvg} | ${result.market.soldCount} sold | ${elapsed}ms`);
+
+            return result;
+          } else {
+            console.log(`[Unified Analysis] Invalid structure:`, JSON.stringify(parsed).substring(0, 200));
+          }
+        } catch (parseError) {
+          console.error(`[Unified Analysis] JSON parse failed:`, responseText.substring(0, 300));
+        }
+      }
+    } catch (error: any) {
+      lastError = error;
+      console.error(`[Unified Analysis] Error (attempt ${attempt}):`, error.message);
+      if (attempt < maxRetries) {
+        const delay = 1000 * attempt;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  console.error("[Unified Analysis] Failed after retries:", lastError?.message);
   return null;
 }
 

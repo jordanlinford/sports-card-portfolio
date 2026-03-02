@@ -2950,16 +2950,17 @@ Sitemap: ${origin}/sitemap.xml
         outlookBigMoverReason: null,
       };
 
-      // Import the outlook engine dynamically
-      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData } = await import("./outlookEngine");
-      const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
+      // Import the outlook engine and price service
+      const { computeAllSignals, fetchUnifiedCardAnalysis, computeAction } = await import("./outlookEngine");
+      const { lookupEnhancedCardPrice, filterPriceOutliers, isOneOfOneCard, isRawCard: isRawCardCheck } = await import("./priceService");
 
-      // Fetch Gemini grounded market data AND legacy price data in PARALLEL for speed
-      console.log(`[Quick Analyze] Fetching market data in parallel for: ${title}`);
-      const [geminiMarketData, priceData] = await Promise.all([
-        fetchGeminiMarketData({
+      // UNIFIED APPROACH: One Gemini call for pricing + news + verdict, parallel with legacy price lookup
+      console.log(`[Quick Analyze] Starting unified analysis for: ${title}`);
+      const startTime = Date.now();
+      const [unifiedResult, priceData] = await Promise.all([
+        fetchUnifiedCardAnalysis({
           title,
-          playerName: title, // For quick analyze, title often contains player name
+          playerName: title,
           year: year ? parseInt(year) : undefined,
           set: set || undefined,
           variation: variation || undefined,
@@ -2975,14 +2976,13 @@ Sitemap: ${origin}/sitemap.xml
           grader: grader || undefined,
         }),
       ]);
+      console.log(`[Quick Analyze] Parallel fetch completed in ${Date.now() - startTime}ms`);
 
-      // Filter outliers to get tighter price range
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
-      // Check for eBay comps data with stale-while-revalidate pattern
+      // Check for eBay comps data with stale-while-revalidate pattern (non-blocking cache check)
       const { normalizeEbayQuery, getCachedCompsWithSWR, getCacheEntry, enqueueFetchJob, calculateQuerySpecificity, calculateLiquidityAssessment, fetchStatusToScrapeHealth } = await import("./ebayCompsService");
       
-      // Build query for comps lookup
       const compsQueryParts = [title];
       if (year) compsQueryParts.unshift(String(year));
       if (set) compsQueryParts.push(set);
@@ -2992,13 +2992,11 @@ Sitemap: ${origin}/sitemap.xml
       const compsQueryInput = compsQueryParts.join(" ");
       const normalized = normalizeEbayQuery(compsQueryInput);
       
-      // Check for cached eBay comps using SWR pattern (serves stale, refreshes in background)
       let ebayComps: any = null;
       let ebayCompsStatus: "hit" | "stale" | "complete" | "queued" | "fetching" | "failed" | "blocked" = "queued";
-      let ebayCompsSource: "EBAY_SOLD" | "SERPER" | "MIXED" = "SERPER"; // Fallback source
+      let ebayCompsSource: "EBAY_SOLD" | "SERPER" | "MIXED" = "SERPER";
       
       try {
-        // Use SWR pattern - returns stale data while triggering background refresh
         const swrResult = await getCachedCompsWithSWR(
           normalized.queryHash, 
           normalized.canonicalQuery, 
@@ -3009,7 +3007,6 @@ Sitemap: ${origin}/sitemap.xml
           ebayCompsStatus = swrResult.isStale ? "stale" : "hit";
           ebayCompsSource = "EBAY_SOLD";
           
-          // Calculate liquidity assessment
           const querySpecificity = calculateQuerySpecificity(normalized.filters);
           const scrapeHealth = fetchStatusToScrapeHealth(swrResult.data.fetchStatus, swrResult.data.failureCount);
           const summary = swrResult.data.summaryJson;
@@ -3035,23 +3032,17 @@ Sitemap: ${origin}/sitemap.xml
             refreshing: swrResult.needsRefresh,
             liquidityAssessment,
           };
-          console.log(`[Quick Analyze] eBay comps cache ${swrResult.isStale ? "stale" : "fresh"} hit: ${swrResult.data.soldCount} comps, liquidity: ${liquidityAssessment.tier}`);
         } else {
-          // Check if already fetching or has other status
           const entry = await getCacheEntry(normalized.queryHash);
-          
           if (entry?.fetchStatus === "fetching") {
             ebayCompsStatus = "fetching";
           } else if (entry?.fetchStatus === "blocked") {
             ebayCompsStatus = "blocked";
-            ebayCompsSource = "SERPER"; // Fall back to Serper
-            console.log(`[Quick Analyze] eBay comps blocked, using fallback`);
+            ebayCompsSource = "SERPER";
           } else if (entry?.fetchStatus === "failed") {
             ebayCompsStatus = "failed";
-            ebayCompsSource = "SERPER"; // Fall back to Serper
+            ebayCompsSource = "SERPER";
           } else {
-            // Enqueue a fetch job for background scraping
-            console.log(`[Quick Analyze] Enqueuing eBay comps fetch for: ${normalized.canonicalQuery}`);
             await enqueueFetchJob(normalized.canonicalQuery, normalized.queryHash, normalized.filters);
             ebayCompsStatus = "queued";
           }
@@ -3061,56 +3052,47 @@ Sitemap: ${origin}/sitemap.xml
         ebayCompsStatus = "failed";
       }
 
-      // Compute signals
-      console.log(`[Quick Analyze] Computing signals`);
+      // Compute deterministic signals from legacy price data
       const signals = computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
       
-      // Override signals with Gemini market data if available (more accurate)
-      if (geminiMarketData) {
-        console.log(`[Quick Analyze] Enhancing signals with Gemini market data: ${geminiMarketData.soldCount} sold, avg $${geminiMarketData.avgPrice}`);
+      // Enhance signals with unified Gemini data (more accurate than legacy alone)
+      if (unifiedResult) {
+        const uMarket = unifiedResult.market;
         
-        // Map Gemini soldCount to liquidity score (1-10)
-        if (geminiMarketData.soldCount >= 25) {
-          signals.liquidityScore = 10;
-        } else if (geminiMarketData.soldCount >= 15) {
-          signals.liquidityScore = 8;
-        } else if (geminiMarketData.soldCount >= 10) {
-          signals.liquidityScore = 7;
-        } else if (geminiMarketData.soldCount >= 5) {
-          signals.liquidityScore = 5;
-        } else if (geminiMarketData.soldCount >= 2) {
-          signals.liquidityScore = 3;
-        } else {
-          signals.liquidityScore = 1;
-        }
+        if (uMarket.soldCount >= 25) signals.liquidityScore = 10;
+        else if (uMarket.soldCount >= 15) signals.liquidityScore = 8;
+        else if (uMarket.soldCount >= 10) signals.liquidityScore = 7;
+        else if (uMarket.soldCount >= 5) signals.liquidityScore = 5;
+        else if (uMarket.soldCount >= 2) signals.liquidityScore = 3;
+        else signals.liquidityScore = 1;
         
-        // Update data confidence based on Gemini data quality
-        if (geminiMarketData.soldCount >= 10) {
+        if (uMarket.soldCount >= 10) {
           signals.dataConfidence = "HIGH";
-          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found on eBay`;
-        } else if (geminiMarketData.soldCount >= 5) {
+          signals.confidenceReason = `${uMarket.soldCount} recent sales found on eBay`;
+        } else if (uMarket.soldCount >= 5) {
           signals.dataConfidence = "MEDIUM";
-          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
+          signals.confidenceReason = `${uMarket.soldCount} recent sales found - moderate sample size`;
         }
         
-        // Update market friction based on liquidity
-        if (geminiMarketData.liquidity === "HIGH") {
-          signals.marketFriction = Math.min(signals.marketFriction, 30);
-        } else if (geminiMarketData.liquidity === "MEDIUM") {
-          signals.marketFriction = Math.min(signals.marketFriction, 50);
-        }
+        if (uMarket.liquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
+        else if (uMarket.liquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
         
-        // Recalculate demand score with updated liquidity
         signals.demandScore = Math.round(
           (signals.liquidityScore * 0.4) + 
           (signals.sportScore * 0.3) + 
           (signals.positionScore * 0.3)
         ) * 10;
         
-        // CRITICAL: Recompute action with updated liquidity to fix verdict/explanation mismatch
-        // Without this, the action/reasons reflect old low-liquidity even when Gemini found plenty of sales
-        const { computeAction } = await import("./outlookEngine");
-        const originalAction = signals.action;
+        // Enhance momentum based on player news
+        if (unifiedResult.player.momentum === "up") {
+          signals.trendScore = Math.min(10, signals.trendScore + 2);
+          signals.momentumScore = Math.min(100, signals.momentumScore + 15);
+        } else if (unifiedResult.player.momentum === "down") {
+          signals.trendScore = Math.max(1, signals.trendScore - 2);
+          signals.momentumScore = Math.max(0, signals.momentumScore - 15);
+        }
+        
+        // Recompute action with enhanced signals
         const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
           signals.qualityScore,
           signals.demandScore,
@@ -3118,64 +3100,48 @@ Sitemap: ${origin}/sitemap.xml
           signals.trendScore,
           signals.volatilityScore,
           signals.liquidityScore,
-          geminiMarketData.avgPrice,
+          uMarket.avgPrice,
           signals.careerStageAuto,
           tempCard.year ? parseInt(String(tempCard.year)) : undefined
         );
         signals.action = recomputedAction;
         signals.actionReasons = recomputedReasons;
-        console.log(`[Quick Analyze] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
       }
       
       // Detect 1/1 and low-pop cards
-      const { isOneOfOneCard } = await import("./priceService");
       const qaVariation = variation || "";
       const qaSerialNumber = req.body.serialNumber || null;
       const qaIs1of1 = isOneOfOneCard({ title: title, variation: qaVariation, serialNumber: qaSerialNumber });
       const qaIsLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(qaVariation);
       
-      // Use Gemini's price data if available and reliable
-      // For 1/1 and low-pop cards: trust Gemini even with soldCount 0
+      // Determine market value: prefer unified Gemini data, fall back to legacy
       let marketValue = priceData.estimatedValue;
       let priceMin = filteredPriceData.min;
       let priceMax = filteredPriceData.max;
       let compCount = priceData.salesFound;
       
-      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
-        if (geminiMarketData.soldCount > 0 || qaIs1of1 || qaIsLowPop) {
-          if (qaIs1of1 || qaIsLowPop) {
-            console.log(`[Quick Analyze] 1/1 or low-pop card detected — trusting Gemini valuation: $${geminiMarketData.avgPrice}`);
-          }
-          if ((qaIs1of1 || qaIsLowPop) && marketValue && marketValue > geminiMarketData.avgPrice * 2) {
-            console.warn(`[Quick Analyze] Price service value ($${marketValue}) is >2x Gemini ($${geminiMarketData.avgPrice}) for 1/1 card — using Gemini`);
-          }
-          marketValue = geminiMarketData.avgPrice;
-          priceMin = geminiMarketData.minPrice;
-          priceMax = geminiMarketData.maxPrice;
-          compCount = geminiMarketData.soldCount;
+      if (unifiedResult && unifiedResult.market.avgPrice > 0) {
+        if (unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop) {
+          marketValue = unifiedResult.market.avgPrice;
+          priceMin = unifiedResult.market.minPrice;
+          priceMax = unifiedResult.market.maxPrice;
+          compCount = unifiedResult.market.soldCount;
         }
       }
 
-      // RAW CARD PRICE CORRECTION: When a card is raw/ungraded, Gemini often mixes
-      // graded card prices (PSA 9=$15, PSA 10=$40) into the average, inflating it.
-      // For raw cards, the actual value is at the LOW end of the range, not the average.
-      const { isRawCard: isRawCardCheck } = await import("./priceService");
+      // RAW CARD PRICE CORRECTION
       const qaIsRaw = isRawCardCheck(grade, grader);
-      console.log(`[Quick Analyze] Grade="${grade}", Grader="${grader}", isRaw=${qaIsRaw}, geminiPsa9=${geminiMarketData?.psa9Price}, geminiPsa10=${geminiMarketData?.psa10Price}`);
       if (qaIsRaw && marketValue && priceMin && priceMin > 0 && !qaIs1of1 && !qaIsLowPop) {
         const rawAvgToMinRatio = marketValue / priceMin;
         if (rawAvgToMinRatio > 2) {
           const correctedValue = Math.round(priceMin * 1.3 * 100) / 100;
-          console.warn(`[Quick Analyze] RAW CARD CORRECTION: avgPrice $${marketValue} is ${rawAvgToMinRatio.toFixed(1)}x the minPrice $${priceMin}. Graded comps likely inflating. Correcting to $${correctedValue}`);
+          console.warn(`[Quick Analyze] RAW CARD CORRECTION: $${marketValue} → $${correctedValue}`);
           marketValue = correctedValue;
           priceMax = Math.round(priceMin * 2 * 100) / 100;
-        } else {
-          console.log(`[Quick Analyze] Raw card pricing looks clean: avg $${marketValue}, min $${priceMin} (ratio ${rawAvgToMinRatio.toFixed(1)})`);
         }
       }
 
-      // CROSS-VALIDATION: Reconcile market value against actual price points from comps
-      // Skip for 1/1 cards where price points may be from parallel comp projections
+      // CROSS-VALIDATION against legacy price points
       const ppForValidation = priceData.pricePoints || [];
       if (ppForValidation.length > 0 && !qaIs1of1) {
         const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
@@ -3184,81 +3150,60 @@ Sitemap: ${origin}/sitemap.xml
           const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
           const ratio = marketValue / ppMedian;
           if (ratio < 0.33 || ratio > 3) {
-            console.warn(`[Quick Analyze] PRICE-POINTS CROSS-VALIDATION: marketValue $${marketValue} diverges from pricePoints median $${ppMedian.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
+            console.warn(`[Quick Analyze] CROSS-VALIDATION: $${marketValue} diverges from median $${ppMedian.toFixed(2)}. Correcting.`);
             marketValue = Math.round(ppMedian * 100) / 100;
             priceMin = sortedPrices[0];
             priceMax = sortedPrices[sortedPrices.length - 1];
           }
         }
       }
-
-      // Fetch monthly price history for cross-validation and display
-      let priceHistory = null;
-      try {
-        const { fetchMonthlyPriceHistory } = await import("./outlookEngine");
-        priceHistory = await fetchMonthlyPriceHistory({
-          playerName: title,
-          sport: sport || "football",
-          year: year ? String(year) : undefined,
-          setName: set || undefined,
-          variation: variation || undefined,
-          grade: grade || undefined,
-          grader: grader || undefined,
-        });
-      } catch (phErr: any) {
-        console.error(`[Quick Analyze] Price history fetch failed (non-critical):`, phErr.message);
-      }
-
-      // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
-      if (priceHistory && priceHistory.dataPoints && priceHistory.dataPoints.length > 0) {
-        const recentPoints = priceHistory.dataPoints.slice(-3);
-        const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
-
-        if (recentAvg > 0 && marketValue && marketValue > 0) {
-          const ratio = marketValue / recentAvg;
-          if (ratio < 0.25 || ratio > 4) {
-            console.warn(`[Quick Analyze] PRICE CROSS-VALIDATION: Market value $${marketValue} diverges wildly from price trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Using price trend data.`);
-            marketValue = Math.round(recentAvg * 100) / 100;
-            const allPrices = priceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-            if (allPrices.length > 0) {
-              priceMin = Math.min(...allPrices);
-              priceMax = Math.max(...allPrices);
-            }
-          }
-        } else if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
-          console.warn(`[Quick Analyze] PRICE CROSS-VALIDATION: No market value found, using price trend avg $${recentAvg.toFixed(2)}`);
-          marketValue = Math.round(recentAvg * 100) / 100;
-          const allPrices = priceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-          if (allPrices.length > 0) {
-            priceMin = Math.min(...allPrices);
-            priceMax = Math.max(...allPrices);
-          }
-        }
-      }
       
-      // SPECIFICITY GUARD: Force low confidence and cap price when key details are missing
+      // SPECIFICITY GUARD
       const hasMissingDetails = !set || !variation;
       if (hasMissingDetails && marketValue && marketValue > 5) {
         const missingFields = [!set ? "set" : null, !variation ? "variation/parallel" : null].filter(Boolean).join(" and ");
-        console.warn(`[Quick Analyze] SPECIFICITY WARNING: Missing ${missingFields} for "${title}". Market value $${marketValue} may be inflated.`);
         signals.dataConfidence = "LOW";
         signals.confidenceReason = `Card identity incomplete — missing ${missingFields}. Price may not reflect this specific card.`;
       }
 
-      // Get match confidence from price data (only used as fallback when no Gemini data)
       const matchConfidence = priceData.matchConfidence;
       
-      // Determine final action
+      // Determine final action — prefer unified verdict with deterministic guardrails
+      const validVerdicts = ["BUY", "MONITOR", "SELL", "LONG_HOLD", "LEGACY_HOLD", "WATCH", "LITTLE_VALUE"];
       let finalAction = signals.action;
       let finalActionReasons = [...signals.actionReasons];
       
-      // If no Gemini data, fall back to legacy matchConfidence check
-      if (!geminiMarketData && matchConfidence && matchConfidence.tier === "LOW") {
+      if (unifiedResult) {
+        const unifiedVerdict = unifiedResult.analysis.verdict;
+        if (validVerdicts.includes(unifiedVerdict)) {
+          finalAction = unifiedVerdict;
+          finalActionReasons = unifiedResult.analysis.verdictReasons;
+        }
+        
+        // Guardrail: Low-stability players (injured/backup) should not get BUY
+        if (finalAction === "BUY" && (
+          unifiedResult.player.injuryStatus === "INJURED" || 
+          unifiedResult.player.roleStatus === "INJURED_RESERVE" ||
+          unifiedResult.player.roleStatus === "BACKUP"
+        )) {
+          finalAction = "WATCH";
+          finalActionReasons = [`Player status (${unifiedResult.player.roleStatus}/${unifiedResult.player.injuryStatus}) adds risk — watching for now`, ...finalActionReasons];
+          console.log(`[Quick Analyze] Guardrail: Downgraded BUY → WATCH due to player status`);
+        }
+        
+        // Guardrail: Low confidence data should not get aggressive verdicts
+        if (signals.dataConfidence === "LOW" && (finalAction === "BUY" || finalAction === "SELL")) {
+          finalAction = "MONITOR";
+          finalActionReasons = [`Limited market data — more sales needed to confirm ${unifiedResult.analysis.verdict}`, ...finalActionReasons];
+          console.log(`[Quick Analyze] Guardrail: Downgraded ${unifiedResult.analysis.verdict} → MONITOR due to low confidence`);
+        }
+      }
+      
+      if (!unifiedResult && matchConfidence && matchConfidence.tier === "LOW") {
         finalAction = "MONITOR";
         finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
       }
       
-      // If key details are missing, force MONITOR and warn user
       if (hasMissingDetails) {
         if (finalAction !== "MONITOR" && finalAction !== "LITTLE_VALUE") {
           finalAction = "MONITOR";
@@ -3266,34 +3211,28 @@ Sitemap: ${origin}/sitemap.xml
         finalActionReasons = [`Incomplete card details — add set and variation for accurate pricing`, ...finalActionReasons];
       }
 
-      // Attempt to extract player name from title for news lookup
-      let newsSnippets: string[] = [];
-      const possiblePlayerName = title;
-      console.log(`[Quick Analyze] Fetching real-time news for: ${possiblePlayerName}`);
-      const newsData = await fetchPlayerNews(possiblePlayerName, null);
-      newsSnippets = newsData.snippets;
+      // Use unified explanation directly (no separate AI call needed!)
+      const explanation = unifiedResult ? {
+        short: unifiedResult.analysis.shortSummary,
+        long: unifiedResult.analysis.detailedAnalysis,
+        bullets: unifiedResult.analysis.keyBullets,
+      } : {
+        short: `${finalAction} recommendation based on available market data.`,
+        long: `Analysis based on ${compCount} comparable sales. ${finalActionReasons.join(". ")}.`,
+        bullets: finalActionReasons,
+      };
 
-      // Generate AI explanation
-      console.log(`[Quick Analyze] Generating AI explanation for ${finalAction}`);
-      const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
-      const explanation = await generateOutlookExplanation(tempCard as any, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
-
-      // Record usage for free tier tracking
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);
 
       logActivity("card_analysis", {
         userId,
-        metadata: { 
-          title,
-          year,
-          set,
-          action: finalAction,
-          marketValue,
-        },
+        metadata: { title, year, set, action: finalAction, marketValue },
         req,
       });
 
-      // Return the analysis without saving
+      const totalTime = Date.now() - startTime;
+      console.log(`[Quick Analyze] Complete in ${totalTime}ms | ${title} | ${finalAction} | $${marketValue}`);
+
       res.json({
         tempCard: {
           title,
@@ -3311,22 +3250,20 @@ Sitemap: ${origin}/sitemap.xml
           compCount: compCount,
           pricePoints: isPro ? priceData.pricePoints : null,
           modeledEstimate: null,
-          geminiData: geminiMarketData ? {
-            soldCount: geminiMarketData.soldCount,
-            liquidity: geminiMarketData.liquidity,
-            priceStability: geminiMarketData.priceStability,
-            dataSource: geminiMarketData.dataSource,
+          geminiData: unifiedResult ? {
+            soldCount: unifiedResult.market.soldCount,
+            liquidity: unifiedResult.market.liquidity,
+            priceStability: unifiedResult.market.priceStability,
+            dataSource: "gemini_unified",
           } : null,
           gradedEstimates: qaIsRaw && marketValue ? (() => {
-            const geminiPsa9 = geminiMarketData?.psa9Price ?? null;
-            const geminiPsa10 = geminiMarketData?.psa10Price ?? null;
-            if (geminiPsa9 || geminiPsa10) {
-              return { psa9: geminiPsa9, psa10: geminiPsa10 };
+            const psa9 = unifiedResult?.market.psa9Price ?? null;
+            const psa10 = unifiedResult?.market.psa10Price ?? null;
+            if (psa9 || psa10) {
+              return { psa9, psa10 };
             }
-            const rawVal = marketValue;
-            const estPsa9 = Math.round(rawVal * 2);
-            const estPsa10 = Math.round(rawVal * 4);
-            console.log(`[Quick Analyze] Graded estimates fallback: raw=$${rawVal}, PSA9≈$${estPsa9}, PSA10≈$${estPsa10}`);
+            const estPsa9 = Math.round(marketValue * 2);
+            const estPsa10 = Math.round(marketValue * 4);
             return { psa9: estPsa9, psa10: estPsa10, estimated: true };
           })() : null,
           isRaw: qaIsRaw,
@@ -3366,7 +3303,6 @@ Sitemap: ${origin}/sitemap.xml
           flag: signals.bigMoverFlag,
           reason: isPro ? signals.bigMoverReason : null,
         },
-        // Comps data - unified contract
         comps: {
           status: ebayCompsStatus,
           source: ebayCompsSource,
@@ -3387,7 +3323,6 @@ Sitemap: ${origin}/sitemap.xml
             trendSeries: [],
           },
           queryHash: normalized.queryHash,
-          // Debug info (only for Pro)
           debug: isPro ? {
             canonicalQuery: normalized.canonicalQuery,
             pagesScraped: ebayComps?.pagesScraped ?? 0,
@@ -3395,7 +3330,6 @@ Sitemap: ${origin}/sitemap.xml
             itemsKept: ebayComps?.itemsKept ?? 0,
             lastFetchedAt: ebayComps?.lastFetchedAt ?? null,
           } : undefined,
-          // User-friendly message based on status
           message: ebayCompsStatus === "queued" || ebayCompsStatus === "fetching"
             ? "Gathering more sold comps in the background..."
             : ebayCompsStatus === "blocked"
@@ -3408,14 +3342,7 @@ Sitemap: ${origin}/sitemap.xml
             ? "Updating in background..."
             : undefined,
         },
-        priceHistory: priceHistory ? {
-          dataPoints: priceHistory.dataPoints,
-          confidence: priceHistory.confidence,
-          notes: priceHistory.notes,
-          cardDescription: priceHistory.cardDescription,
-          playerName: priceHistory.playerName,
-          sport: priceHistory.sport,
-        } : null,
+        priceHistory: null,
         generatedAt: new Date().toISOString(),
         isPro,
       });

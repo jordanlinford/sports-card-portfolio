@@ -67,7 +67,9 @@ The application supports core functionalities including:
 - **API**: RESTful API design for all backend interactions.
 - **Build Process**: Vite for client bundling and esbuild for server bundling, optimized for production deployment.
 - **Session Management**: Secure, HttpOnly cookies with a 7-day TTL, storing session data in PostgreSQL.
+- **Unified Card Analysis**: Card Analysis uses a single Gemini 2.5 Flash call with Google Search grounding (`fetchUnifiedCardAnalysis`) instead of 4-5 separate sequential calls. One prompt returns market pricing, player news, and investment verdict. Reduces analysis time from ~60-90s to ~10-15s. Price trend chart lazy-loads independently via `playerRequest` prop. Deterministic guardrails reconcile AI verdict with signal-based logic (injured/backup players can't get BUY, low-confidence data forces MONITOR). Function: `server/outlookEngine.ts`.
 - **eBay Comps Caching**: Uses a stale-while-revalidate (SWR) pattern with extended TTLs (7 days for 15+ comps, 72h for 6-14, 24h for sparse data). Includes query broadening ladder (stops at 12+ comps) and nightly prewarm job.
+- **Player News Caching**: 4-hour in-memory cache for `fetchPlayerNews` results to avoid redundant Gemini lookups for the same player within a session.
 - **VPS Worker Architecture**: Documented pattern for moving eBay scraper to dedicated-IP VPS for improved reliability (see docs/VPS_SCRAPER_ARCHITECTURE.md).
 
 ## External Dependencies
