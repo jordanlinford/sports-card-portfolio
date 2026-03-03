@@ -3121,7 +3121,7 @@ Sitemap: ${origin}/sitemap.xml
       let compCount = priceData.salesFound;
       
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
-        if (unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop) {
+        if (unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop || unifiedResult.market.confidence === "LOW") {
           let unifiedAvg = unifiedResult.market.avgPrice;
           const unifiedMin = unifiedResult.market.minPrice;
           const unifiedMax = unifiedResult.market.maxPrice;

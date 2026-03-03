@@ -295,7 +295,11 @@ Price stability:
 - VOLATILE: Prices vary more than 40%
 - UNKNOWN: Not enough data
 
-Be specific with numbers. If you find 19 sold listings, say 19, not "approximately 20".`;
+Be specific with numbers. If you find 19 sold listings, say 19, not "approximately 20".
+
+ZERO COMPS FALLBACK: If you find NO completed sales for this exact card, do NOT return avgPrice as 0 or null.
+Instead, estimate a value by searching for similar cards from the same set/player/year, checking active listings (discount BIN by ~30%), and considering player popularity. Set soldCount to 0, confidence to "LOW", and note that the value is an estimate.`;
+
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -525,6 +529,14 @@ PRICING RULES:
 - For numbered parallels (/25, /10, etc.) of stars, prices CAN be much higher — search specifically
 - CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values
 - When in doubt, ask yourself: "If I searched eBay sold listings for this exact card right now, what would the typical recent sale price be?" — that is your avgPrice
+
+ZERO COMPS FALLBACK — if you find NO completed sales for this exact card:
+- DO NOT return avgPrice as 0 or null. Instead, ESTIMATE a realistic value.
+- Search for similar cards from the same set/player/year with different variations to establish a price range
+- Search for current active listings of this exact card to gauge asking prices (discount active BIN prices by ~30% for estimated market value)
+- Consider the player's popularity, card rarity, and set desirability
+- Set soldCount to 0 but still provide your best avgPrice ESTIMATE
+- Set confidence to "LOW" and note in "notes" that this is an estimate based on comparable cards, not actual sales
 
 Return ONLY a JSON object with this EXACT structure:
 {
