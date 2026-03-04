@@ -2824,16 +2824,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                     <p className="text-xs text-muted-foreground">Waiting...</p>
                   )}
                 </div>
-                {card.status === "done" && card.confidence != null && (
+                {card.status === "done" && card.confidence != null && !isNaN(Number(card.confidence)) && (
                   <Badge 
                     variant="secondary" 
                     className={`shrink-0 text-xs ${
-                      card.confidence >= 0.8 ? "bg-green-500/10 text-green-600 dark:text-green-400" :
-                      card.confidence >= 0.5 ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
+                      Number(card.confidence) >= 8 ? "bg-green-500/10 text-green-600 dark:text-green-400" :
+                      Number(card.confidence) >= 5 ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
                       "bg-red-500/10 text-red-600 dark:text-red-400"
                     }`}
                   >
-                    {Math.round(card.confidence * 100)}%
+                    {Math.round(Number(card.confidence))}/10
                   </Badge>
                 )}
                 {card.status === "done" && (
