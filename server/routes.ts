@@ -1537,6 +1537,83 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // Bulk add cards from scan history to a display case
+  app.post("/api/display-cases/:id/cards/bulk-from-scans", isAuthenticated, async (req: any, res) => {
+    try {
+      const displayCaseId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { scanHistoryIds } = req.body;
+
+      if (isNaN(displayCaseId)) {
+        return res.status(400).json({ message: "Invalid display case ID" });
+      }
+
+      if (!Array.isArray(scanHistoryIds) || scanHistoryIds.length === 0) {
+        return res.status(400).json({ message: "No scan history IDs provided" });
+      }
+
+      const existing = await storage.getDisplayCaseByIdAndUser(displayCaseId, userId);
+      if (!existing) {
+        return res.status(404).json({ message: "Display case not found" });
+      }
+
+      const results: { scanHistoryId: number; success: boolean; cardId?: number; error?: string }[] = [];
+      const validIds = [...new Set(scanHistoryIds.map(Number).filter((n: number) => !isNaN(n)))];
+      const scans = await storage.getScanHistoryByIds(validIds, userId);
+      const scanMap = new Map(scans.map(s => [s.id, s]));
+
+      for (const scanId of validIds) {
+        try {
+          const scan = scanMap.get(scanId);
+          if (!scan) {
+            results.push({ scanHistoryId: scanId, success: false, error: "Scan not found" });
+            continue;
+          }
+
+          const title = [scan.playerName, scan.year, scan.setName].filter(Boolean).join(" ");
+          const cardData = {
+            title: title || "Unknown Card",
+            playerName: scan.playerName || null,
+            year: scan.year || null,
+            set: scan.setName || null,
+            cardNumber: scan.cardNumber || null,
+            variation: scan.variation || null,
+            grade: scan.grade || null,
+            grader: scan.grader === "raw" ? null : (scan.grader || null),
+            sport: scan.sport || null,
+            imagePath: scan.imagePath || null,
+            estimatedValue: scan.marketValue || null,
+            cardCategory: "sports" as const,
+          };
+
+          const parsed = insertCardSchema.safeParse(cardData);
+          if (!parsed.success) {
+            results.push({ scanHistoryId: scanId, success: false, error: "Invalid card data" });
+            continue;
+          }
+
+          const card = await storage.createCard(displayCaseId, parsed.data);
+          results.push({ scanHistoryId: scanId, success: true, cardId: card.id });
+
+          logActivity("card_add", {
+            userId,
+            targetId: card.id,
+            targetType: "card",
+            metadata: { title: card.title, playerName: card.playerName, displayCaseId, source: "batch_scan" },
+          }, req);
+        } catch (err: any) {
+          results.push({ scanHistoryId: scanId, success: false, error: err.message || "Failed" });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      res.status(201).json({ results, successCount, totalCount: scanHistoryIds.length });
+    } catch (error) {
+      console.error("Error bulk adding cards from scans:", error);
+      res.status(500).json({ message: "Failed to bulk add cards" });
+    }
+  });
+
   // Cards routes
   app.post("/api/display-cases/:id/cards", isAuthenticated, async (req: any, res) => {
     try {

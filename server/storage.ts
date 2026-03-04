@@ -396,6 +396,7 @@ export interface IStorage {
   getScanHistory(userId: string, limit?: number, offset?: number): Promise<ScanHistory[]>;
   getScanHistoryCount(userId: string): Promise<number>;
   deleteScanHistory(id: number, userId: string): Promise<void>;
+  getScanHistoryByIds(ids: number[], userId: string): Promise<ScanHistory[]>;
   updateScanHistoryAnalysis(id: number, userId: string, marketValue: number | null, action: string | null): Promise<ScanHistory | undefined>;
 }
 
@@ -3297,6 +3298,14 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(scanHistory)
       .where(and(eq(scanHistory.id, id), eq(scanHistory.userId, userId)));
+  }
+
+  async getScanHistoryByIds(ids: number[], userId: string): Promise<ScanHistory[]> {
+    if (ids.length === 0) return [];
+    return db
+      .select()
+      .from(scanHistory)
+      .where(and(inArray(scanHistory.id, ids), eq(scanHistory.userId, userId)));
   }
 
   async updateScanHistoryAnalysis(id: number, userId: string, marketValue: number | null, action: string | null): Promise<ScanHistory | undefined> {

@@ -575,7 +575,10 @@ type BatchScannedCard = {
   set: string | null;
   variation: string | null;
   grade: string | null;
-  confidence: number | null;
+  grader: string | null;
+  sport: string | null;
+  cardNumber: string | null;
+  confidence: string | null;
   status: "pending" | "processing" | "done" | "failed";
   error?: string;
   scanHistoryId?: number;
@@ -642,6 +645,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const batchFileInputRef = useRef<HTMLInputElement>(null);
   const batchObjectUrlsRef = useRef<string[]>([]);
   const batchCancelledRef = useRef(false);
+  const [showBatchAddDialog, setShowBatchAddDialog] = useState(false);
+  const [batchAddCaseId, setBatchAddCaseId] = useState<string>("");
+  const [batchAdding, setBatchAdding] = useState(false);
   const [, navigateTo] = useLocation();
 
   const MAX_BATCH_SIZE = 20;
@@ -1229,6 +1235,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         set: null,
         variation: null,
         grade: null,
+        grader: null,
+        sport: null,
+        cardNumber: null,
         confidence: null,
         status: "pending" as const,
       };
@@ -1270,10 +1279,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
           setBatchScannedCards(prev => prev.map((c, idx) => idx === i ? {
             ...c,
             playerName: card.playerName || "Unknown",
-            year: card.year || null,
-            set: card.set || null,
-            variation: card.variation || null,
+            year: card.year ? String(card.year) : null,
+            set: card.setName || card.set || null,
+            variation: card.parallel || card.variation || null,
             grade: gradeInfo?.grade || null,
+            grader: gradeInfo?.gradingCompany || (gradeInfo?.appearsToBe === "raw" ? "raw" : null),
+            sport: card.sport || null,
+            cardNumber: card.cardNumber || null,
             confidence: scanData.scan.confidence ?? null,
             status: "done",
             scanHistoryId: scanData.scanHistoryId,
@@ -1317,6 +1329,44 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     setBatchProcessing(false);
     setBatchCurrentIndex(0);
     navigateTo("/scan-history");
+  };
+
+  const handleBatchAddAll = async () => {
+    if (!batchAddCaseId) return;
+
+    const successfulCards = batchScannedCards.filter(c => c.status === "done" && c.scanHistoryId);
+    if (successfulCards.length === 0) {
+      toast({ title: "No cards to add", description: "No successfully scanned cards found", variant: "destructive" });
+      return;
+    }
+
+    setBatchAdding(true);
+    try {
+      const scanHistoryIds = successfulCards.map(c => c.scanHistoryId!);
+      const res = await apiRequest("POST", `/api/display-cases/${batchAddCaseId}/cards/bulk-from-scans`, { scanHistoryIds });
+      const data = await res.json();
+
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      setShowBatchAddDialog(false);
+      setBatchAddCaseId("");
+
+      toast({
+        title: "Cards added!",
+        description: `${data.successCount} of ${data.totalCount} cards added to your collection`,
+      });
+
+      batchCancelledRef.current = true;
+      batchObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      batchObjectUrlsRef.current = [];
+      setBatchMode(false);
+      setBatchScannedCards([]);
+      setBatchProcessing(false);
+      setBatchCurrentIndex(0);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to add cards", variant: "destructive" });
+    } finally {
+      setBatchAdding(false);
+    }
   };
 
   const startBatchMode = () => {
@@ -2740,6 +2790,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
               </span>
             </div>
             <div className="flex gap-2">
+              {!batchProcessing && batchScannedCards.some(c => c.status === "done" && c.scanHistoryId) && (
+                <Button
+                  size="sm"
+                  onClick={() => setShowBatchAddDialog(true)}
+                  data-testid="button-batch-add-all"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add All to Collection
+                </Button>
+              )}
               {!batchProcessing && (
                 <Button
                   variant="outline"
@@ -2824,16 +2884,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                     <p className="text-xs text-muted-foreground">Waiting...</p>
                   )}
                 </div>
-                {card.status === "done" && card.confidence != null && !isNaN(Number(card.confidence)) && (
+                {card.status === "done" && card.confidence && (
                   <Badge 
                     variant="secondary" 
                     className={`shrink-0 text-xs ${
-                      Number(card.confidence) >= 8 ? "bg-green-500/10 text-green-600 dark:text-green-400" :
-                      Number(card.confidence) >= 5 ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
+                      card.confidence === "high" ? "bg-green-500/10 text-green-600 dark:text-green-400" :
+                      card.confidence === "medium" ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
                       "bg-red-500/10 text-red-600 dark:text-red-400"
                     }`}
                   >
-                    {Math.round(Number(card.confidence))}/10
+                    {card.confidence === "high" ? "High" : card.confidence === "medium" ? "Med" : "Low"}
                   </Badge>
                 )}
                 {card.status === "done" && (
@@ -2850,8 +2910,14 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
           </div>
 
           {!batchProcessing && (
-            <div className="flex justify-center pt-2">
-              <Button onClick={handleBatchDone} data-testid="button-batch-view-history">
+            <div className="flex justify-center gap-3 pt-2">
+              {batchScannedCards.some(c => c.status === "done" && c.scanHistoryId) && (
+                <Button onClick={() => setShowBatchAddDialog(true)} data-testid="button-batch-add-all-bottom">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add All to Collection
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleBatchDone} data-testid="button-batch-view-history">
                 <History className="h-4 w-4 mr-2" />
                 View All in Scan History
               </Button>
@@ -2928,6 +2994,75 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   </>
                 ) : (
                   "Add Card"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showBatchAddDialog} onOpenChange={setShowBatchAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add All Cards to Collection</DialogTitle>
+            <DialogDescription>
+              Add {batchScannedCards.filter(c => c.status === "done" && c.scanHistoryId).length} scanned card{batchScannedCards.filter(c => c.status === "done" && c.scanHistoryId).length !== 1 ? "s" : ""} to a display case.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="max-h-48 overflow-y-auto space-y-2">
+              {batchScannedCards.filter(c => c.status === "done" && c.scanHistoryId).map((card, idx) => (
+                <div key={idx} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
+                  {card.imageUrl && (
+                    <img src={card.imageUrl} alt="Card" className="w-10 h-14 object-contain rounded" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{card.playerName}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {[card.year, card.set, card.variation].filter(Boolean).join(" · ")}
+                    </p>
+                  </div>
+                  <Check className="h-4 w-4 text-green-500 shrink-0" />
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Select Display Case</Label>
+              <Select value={batchAddCaseId} onValueChange={setBatchAddCaseId}>
+                <SelectTrigger data-testid="select-batch-display-case">
+                  <SelectValue placeholder="Choose a display case" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userCases.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {userCases.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                You don't have any display cases yet. Create one first from your dashboard.
+              </p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setShowBatchAddDialog(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBatchAddAll}
+                disabled={!batchAddCaseId || batchAdding}
+                data-testid="button-confirm-batch-add"
+              >
+                {batchAdding ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding {batchScannedCards.filter(c => c.status === "done" && c.scanHistoryId).length} Cards...
+                  </>
+                ) : (
+                  `Add ${batchScannedCards.filter(c => c.status === "done" && c.scanHistoryId).length} Cards`
                 )}
               </Button>
             </div>
