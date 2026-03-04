@@ -3641,7 +3641,11 @@ Sitemap: ${origin}/sitemap.xml
 
         let uploadedImagePath: string | null = null;
         try {
-          const imageBuffer = Buffer.from(imageData, "base64");
+          let rawBase64 = imageData;
+          if (rawBase64.startsWith("data:")) {
+            rawBase64 = rawBase64.split(",")[1] || rawBase64;
+          }
+          const imageBuffer = Buffer.from(rawBase64, "base64");
           const objService = new ObjectStorageService();
           uploadedImagePath = await objService.uploadBuffer(imageBuffer, mimeType || "image/jpeg", userId);
         } catch (uploadErr) {
