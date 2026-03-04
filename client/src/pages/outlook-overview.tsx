@@ -1252,26 +1252,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         const { blob, base64 } = await compressImage(fileArray[i]);
         if (batchCancelledRef.current) break;
 
-        const formData = new FormData();
-        formData.append("image", new File([blob], fileArray[i].name, { type: "image/jpeg" }));
-
-        const uploadRes = await fetch("/api/cards/upload-image", {
-          method: "POST",
-          body: formData,
-          credentials: "include",
-        });
-
-        if (!uploadRes.ok) throw new Error("Image upload failed");
-        const uploadData = await uploadRes.json();
-        const uploadedImagePath = uploadData.path || uploadData.url;
-
-        if (batchCancelledRef.current) break;
-
         const scanRes = await fetch("/api/cards/scan-identify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ imageData: base64, imagePath: uploadedImagePath }),
+          body: JSON.stringify({ imageData: base64 }),
         });
 
         if (!scanRes.ok) throw new Error("Scan failed");
