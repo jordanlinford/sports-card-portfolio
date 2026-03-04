@@ -297,7 +297,9 @@ Price stability:
 
 Be specific with numbers. If you find 19 sold listings, say 19, not "approximately 20".
 
-ZERO COMPS: If you find NO completed sales for this exact card, set soldCount to 0 and avgPrice to null. Note any active listings in the "notes" field for reference, but do NOT fabricate a value.`;
+SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries — drop words like "holo", "prizm", "insert" and search just the player name, year, set name, and card number. A comp from a similar parallel is better than 0 results.
+
+ZERO COMPS: If you STILL find NO completed sales after broadening, set soldCount to 0 and avgPrice to null. Note any active listings in "notes".`;
 
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -529,7 +531,14 @@ PRICING RULES:
 - CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values
 - When in doubt, ask yourself: "If I searched eBay sold listings for this exact card right now, what would the typical recent sale price be?" — that is your avgPrice
 
-ZERO COMPS: If you find NO completed sales for this exact card, set soldCount to 0 and avgPrice to null. Still search for active listings and note them in the "notes" field so users can see what the card is listed for, but do NOT fabricate a value from estimates.
+SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
+- Drop descriptive words like "holo", "prizm", "insert" from the search
+- Try just: "[year] [brand] Select [player name] [card number] sold"  
+- Try: "[year] Panini Select [player name] Certified sold"
+- Look for the same card number/player from the same set — base and silver prizm versions often share pricing
+Report whatever comps you find from these broader searches. A $5 comp from a slightly different parallel is better than $0.
+
+ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and avgPrice to null. Note any active listings in "notes" for reference.
 
 Return ONLY a JSON object with this EXACT structure:
 {
