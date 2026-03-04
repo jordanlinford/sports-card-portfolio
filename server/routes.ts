@@ -3121,7 +3121,7 @@ Sitemap: ${origin}/sitemap.xml
       let compCount = priceData.salesFound;
       
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
-        if (unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop || unifiedResult.market.confidence === "LOW") {
+        if (unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop) {
           let unifiedAvg = unifiedResult.market.avgPrice;
           const unifiedMin = unifiedResult.market.minPrice;
           const unifiedMax = unifiedResult.market.maxPrice;
@@ -3129,29 +3129,15 @@ Sitemap: ${origin}/sitemap.xml
           // OUTLIER PROTECTION: If max is 3x+ the min with sparse comps, the average is likely inflated by outliers/BIN prices
           if (unifiedMin > 0 && unifiedMax > 0 && unifiedMax / unifiedMin >= 3 && unifiedResult.market.soldCount <= 10) {
             const spread = unifiedMax / unifiedMin;
-            // More aggressive correction for wider spreads
             const weight = spread >= 5 ? 0.15 : 0.3;
             const correctedAvg = Math.round((unifiedMin + (unifiedAvg - unifiedMin) * weight) * 100) / 100;
             console.warn(`[Quick Analyze] OUTLIER PROTECTION: Unified avg $${unifiedAvg} with range $${unifiedMin}-$${unifiedMax} (${spread.toFixed(1)}x spread). Corrected to $${correctedAvg} (weight=${weight})`);
             unifiedAvg = correctedAvg;
           }
           
-          // ZERO-COMP ESTIMATE CROSS-CHECK: When soldCount=0, validate against legacy price points
-          const earlyPP = priceData.pricePoints || [];
-          if (unifiedResult.market.soldCount === 0 && earlyPP.length > 0) {
-            const ppPricesCheck = earlyPP.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
-            if (ppPricesCheck.length > 0) {
-              const ppLowest = Math.min(...ppPricesCheck);
-              if (unifiedAvg > ppLowest * 3 && ppLowest < 50) {
-                console.warn(`[Quick Analyze] ZERO-COMP CAP: Estimate $${unifiedAvg} capped to legacy low $${ppLowest} (zero sold comps, estimate was ${(unifiedAvg/ppLowest).toFixed(1)}x higher)`);
-                unifiedAvg = ppLowest;
-              }
-            }
-          }
-          
           marketValue = unifiedAvg;
-          priceMin = unifiedMin || marketValue * 0.7;
-          priceMax = unifiedMax || marketValue * 1.5;
+          priceMin = unifiedMin;
+          priceMax = unifiedMax;
           compCount = unifiedResult.market.soldCount;
         }
       }

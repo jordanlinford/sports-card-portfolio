@@ -297,8 +297,7 @@ Price stability:
 
 Be specific with numbers. If you find 19 sold listings, say 19, not "approximately 20".
 
-ZERO COMPS FALLBACK: If you find NO completed sales for this exact card, do NOT return avgPrice as 0 or null.
-Instead, search for the CHEAPEST active listing of this exact card on eBay. If cheapest BIN is $1-5, the card is common — use that price range. Base cards and common inserts from current sets are typically $1-5 raw. Do NOT estimate $20+ for common cards just because the player is popular. Set soldCount to 0, confidence to "LOW", and note the active listing prices as reference.`;
+ZERO COMPS: If you find NO completed sales for this exact card, set soldCount to 0 and avgPrice to null. Note any active listings in the "notes" field for reference, but do NOT fabricate a value.`;
 
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -530,16 +529,7 @@ PRICING RULES:
 - CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values
 - When in doubt, ask yourself: "If I searched eBay sold listings for this exact card right now, what would the typical recent sale price be?" — that is your avgPrice
 
-ZERO COMPS FALLBACK — if you find NO completed sales for this exact card:
-- DO NOT return avgPrice as 0 or null. Instead, ESTIMATE a realistic value.
-- FIRST: Search for current ACTIVE LISTINGS of this EXACT card on eBay. Find the CHEAPEST active listing.
-  - If the cheapest active BIN is $1-5, this is a COMMON card — avgPrice should be near the cheapest listing price ($1-5 range)
-  - If the cheapest active BIN is $5-20, avgPrice should be 60-70% of the cheapest listing
-  - If the cheapest active BIN is $20+, avgPrice should be 50-70% of the cheapest listing
-- SECOND: Cross-check with similar cards from the same set/player to confirm
-- CRITICAL: Base cards, common inserts, and "Certified Rookie" base versions from current sets are typically $1-5 raw. Do NOT estimate $20+ for common base cards just because the player is popular
-- Set soldCount to 0 but still provide your best avgPrice ESTIMATE
-- Set confidence to "LOW" and note in "notes" the active listing prices you found as reference
+ZERO COMPS: If you find NO completed sales for this exact card, set soldCount to 0 and avgPrice to null. Still search for active listings and note them in the "notes" field so users can see what the card is listed for, but do NOT fabricate a value from estimates.
 
 Return ONLY a JSON object with this EXACT structure:
 {
