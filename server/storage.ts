@@ -102,6 +102,9 @@ import {
   type SupportTicketMessage,
   type InsertSupportTicketMessage,
   type SupportTicketStatus,
+  scanHistory,
+  type ScanHistory,
+  type InsertScanHistory,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -387,6 +390,13 @@ export interface IStorage {
   createSupportTicket(data: InsertSupportTicket): Promise<SupportTicket>;
   updateSupportTicketStatus(id: number, status: SupportTicketStatus, adminId?: string): Promise<SupportTicket | undefined>;
   addSupportTicketMessage(data: InsertSupportTicketMessage & { isAdminReply: boolean }): Promise<SupportTicketMessage>;
+
+  // Scan History operations
+  createScanHistory(data: InsertScanHistory): Promise<ScanHistory>;
+  getScanHistory(userId: string, limit?: number, offset?: number): Promise<ScanHistory[]>;
+  getScanHistoryCount(userId: string): Promise<number>;
+  deleteScanHistory(id: number, userId: string): Promise<void>;
+  updateScanHistoryAnalysis(id: number, userId: string, marketValue: number | null, action: string | null): Promise<ScanHistory | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3255,6 +3265,47 @@ export class DatabaseStorage implements IStorage {
     }
     
     return message;
+  }
+
+  async createScanHistory(data: InsertScanHistory): Promise<ScanHistory> {
+    const [record] = await db
+      .insert(scanHistory)
+      .values(data)
+      .returning();
+    return record;
+  }
+
+  async getScanHistory(userId: string, limit: number = 50, offset: number = 0): Promise<ScanHistory[]> {
+    return db
+      .select()
+      .from(scanHistory)
+      .where(eq(scanHistory.userId, userId))
+      .orderBy(desc(scanHistory.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getScanHistoryCount(userId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(scanHistory)
+      .where(eq(scanHistory.userId, userId));
+    return result?.count ?? 0;
+  }
+
+  async deleteScanHistory(id: number, userId: string): Promise<void> {
+    await db
+      .delete(scanHistory)
+      .where(and(eq(scanHistory.id, id), eq(scanHistory.userId, userId)));
+  }
+
+  async updateScanHistoryAnalysis(id: number, userId: string, marketValue: number | null, action: string | null): Promise<ScanHistory | undefined> {
+    const [record] = await db
+      .update(scanHistory)
+      .set({ marketValue, action })
+      .where(and(eq(scanHistory.id, id), eq(scanHistory.userId, userId)))
+      .returning();
+    return record;
   }
 }
 

@@ -50,6 +50,7 @@ import SupportPage from "@/pages/support";
 import ComparePage from "@/pages/compare";
 import AdminFeedbackPage from "@/pages/admin-feedback";
 import PodcastLanding from "@/pages/podcast";
+import ScanHistoryPage from "@/pages/scan-history";
 import { TrialBanner } from "@/components/trial-banner";
 
 function Router() {
@@ -118,6 +119,7 @@ function Router() {
           <Route path="/cases/:id/edit" component={CaseEdit} />
           <Route path="/case/:id" component={CaseView} />
           <Route path="/cases/:id" component={CaseView} />
+          <Route path="/scan-history" component={ScanHistoryPage} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/feedback" component={AdminFeedbackPage} />
           <Route path="/card/:cardId/outlook" component={CardOutlookPage} />

@@ -41,6 +41,8 @@ import {
   Check,
   GitCompareArrows,
   ArrowLeftRight,
+  Layers,
+  History,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { hasProAccess } from "@shared/schema";
@@ -566,6 +568,15 @@ function ComparisonVerdict({
   );
 }
 
+type BatchScannedCard = {
+  playerName: string;
+  imageUrl: string | null;
+  marketValue: number | null;
+  action: string | null;
+  year: string | null;
+  set: string | null;
+};
+
 function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; userCases: DisplayCase[] }) {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
@@ -615,6 +626,14 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   const [comparisonMode, setComparisonMode] = useState(false);
   const [firstCardResult, setFirstCardResult] = useState<QuickAnalyzeResult | null>(null);
   const [firstCardPreviewUrl, setFirstCardPreviewUrl] = useState<string | null>(null);
+  
+  // Scan history tracking
+  const [currentScanHistoryId, setCurrentScanHistoryId] = useState<number | null>(null);
+  
+  // Batch scan mode state
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchScannedCards, setBatchScannedCards] = useState<BatchScannedCard[]>([]);
+  const [, navigateTo] = useLocation();
   
   // Recent searches state
   const RECENT_SEARCHES_KEY = "sports-card-recent-searches";
@@ -920,6 +939,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         grade: grade || undefined,
         grader: grader || undefined,
         imagePath: imagePath || undefined,
+        scanHistoryId: currentScanHistoryId || undefined,
       });
       return data;
     },
@@ -1144,10 +1164,75 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setScanIdentifyResult(null);
     setIsConfirmed(false);
     setAnalysisInvalidated(false);
+    setCurrentScanHistoryId(null);
     // Reset comparison state
     setComparisonMode(false);
     setFirstCardResult(null);
     setFirstCardPreviewUrl(null);
+    // Exit batch mode on full reset
+    setBatchMode(false);
+    setBatchScannedCards([]);
+  };
+
+  const handleBatchScanNext = () => {
+    const currentCard: BatchScannedCard = {
+      playerName: title || scanIdentifyResult?.scan?.cardIdentification?.playerName || "Unknown",
+      imageUrl: scanPreviewUrl || previewUrl || null,
+      marketValue: result?.market?.value ?? null,
+      action: result?.action ?? null,
+      year: year || null,
+      set: set || null,
+    };
+    setBatchScannedCards(prev => [...prev, currentCard]);
+
+    setTitle("");
+    setYear("");
+    setSet("");
+    setCardNumber("");
+    setVariation("");
+    setGrade("");
+    setGrader("");
+    setImagePath(null);
+    setPreviewUrl(null);
+    setResult(null);
+    setScanResult(null);
+    setScanPreviewUrl(null);
+    setSelectedCaseId("");
+    setInputMode("scan");
+    setScanIdentifyResult(null);
+    setIsConfirmed(false);
+    setAnalysisInvalidated(false);
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+    setIsPollingComps(false);
+  };
+
+  const handleBatchDone = () => {
+    if (title || scanIdentifyResult) {
+      const currentCard: BatchScannedCard = {
+        playerName: title || scanIdentifyResult?.scan?.cardIdentification?.playerName || "Unknown",
+        imageUrl: scanPreviewUrl || previewUrl || null,
+        marketValue: result?.market?.value ?? null,
+        action: result?.action ?? null,
+        year: year || null,
+        set: set || null,
+      };
+      setBatchScannedCards(prev => [...prev, currentCard]);
+    }
+    setBatchMode(false);
+    setBatchScannedCards([]);
+    resetForm();
+    navigateTo("/scan-history");
+  };
+
+  const startBatchMode = () => {
+    setBatchMode(true);
+    setBatchScannedCards([]);
+    setShowForm(true);
+    setInputMode("scan");
+    resetForm();
   };
 
   const compressImage = (file: File, maxWidth = 1200, quality = 0.8): Promise<{ blob: Blob; base64: string }> => {
@@ -1227,8 +1312,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
         return;
       }
       
-      // Store the scan identification result
+      // Store the scan identification result and history ID
       setScanIdentifyResult(response as ScanIdentifyResult);
+      if (response.scanHistoryId) {
+        setCurrentScanHistoryId(response.scanHistoryId);
+      }
       
       // Auto-populate form fields from scan result for editing
       if (response.scan?.success) {
@@ -1411,31 +1499,60 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
           <div className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
             <CardTitle className="text-lg">Card Analysis</CardTitle>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setShowForm(!showForm);
-              if (showForm) resetForm();
-            }}
-            data-testid="button-toggle-quick-analyze"
-          >
-            {showForm ? (
-              <>
-                <X className="h-4 w-4 mr-2" />
-                Close
-              </>
-            ) : (
-              <>
-                <Search className="h-4 w-4 mr-2" />
-                Analyze Any Card
-              </>
+            {batchMode && (
+              <Badge variant="secondary" className="bg-primary/10 text-primary" data-testid="badge-batch-mode">
+                <Layers className="h-3 w-3 mr-1" />
+                Batch Mode
+              </Badge>
             )}
-          </Button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!showForm && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startBatchMode}
+                data-testid="button-start-batch-scan"
+              >
+                <Layers className="h-4 w-4 mr-2" />
+                Batch Scan
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (showForm) {
+                  if (batchMode) {
+                    handleBatchDone();
+                  } else {
+                    resetForm();
+                  }
+                } else {
+                  setShowForm(true);
+                }
+              }}
+              data-testid="button-toggle-quick-analyze"
+            >
+              {showForm ? (
+                <>
+                  <X className="h-4 w-4 mr-2" />
+                  Close
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4 mr-2" />
+                  Analyze Any Card
+                </>
+              )}
+            </Button>
+          </div>
         </div>
         <CardDescription>
-          Check a card before buying or get an outlook without adding to your collection
+          {batchMode 
+            ? `Batch scanning — Card ${batchScannedCards.length + 1} of this session`
+            : "Check a card before buying or get an outlook without adding to your collection"
+          }
         </CardDescription>
       </CardHeader>
 
@@ -1628,6 +1745,17 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   <Plus className="h-4 w-4 mr-2" />
                   Add to Portfolio
                 </Button>
+                {batchMode && (
+                  <Button
+                    variant="outline"
+                    onClick={handleBatchScanNext}
+                    className="flex-1 sm:flex-none"
+                    data-testid="button-batch-scan-next-confirmed"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Scan Next Card
+                  </Button>
+                )}
               </div>
               
               {!canAnalyze && (
@@ -2191,21 +2319,43 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     </>
                   )}
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setScanResult(null);
-                    setScanPreviewUrl(null);
-                  }}
-                  data-testid="button-scan-another"
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  Scan Another
-                </Button>
-                <Button variant="ghost" onClick={resetForm} data-testid="button-scan-reset">
-                  <X className="h-4 w-4 mr-2" />
-                  Close
-                </Button>
+                {batchMode ? (
+                  <>
+                    <Button 
+                      onClick={handleBatchScanNext}
+                      data-testid="button-batch-scan-next-scan"
+                    >
+                      <Camera className="h-4 w-4 mr-2" />
+                      Scan Next Card
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleBatchDone}
+                      data-testid="button-batch-done-scan"
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Done ({batchScannedCards.length + 1} scanned)
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setScanResult(null);
+                        setScanPreviewUrl(null);
+                      }}
+                      data-testid="button-scan-another"
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Scan Another
+                    </Button>
+                    <Button variant="ghost" onClick={resetForm} data-testid="button-scan-reset">
+                      <X className="h-4 w-4 mr-2" />
+                      Close
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           ) : result ? (
@@ -2331,6 +2481,27 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       <GitCompareArrows className="h-4 w-4 mr-1" />
                       Compare
                     </Button>
+                    {batchMode && (
+                      <Button
+                        size="sm"
+                        onClick={handleBatchScanNext}
+                        data-testid="button-batch-scan-next-result"
+                      >
+                        <Camera className="h-4 w-4 mr-1" />
+                        Scan Next Card
+                      </Button>
+                    )}
+                    {batchMode && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleBatchDone}
+                        data-testid="button-batch-done-result"
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Done ({batchScannedCards.length + 1} scanned)
+                      </Button>
+                    )}
                   </div>
                 </DialogHeader>
                 
@@ -2482,6 +2653,64 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
               </p>
             </div>
           ) : null}
+          
+          {/* Batch Scan Session Summary */}
+          {batchMode && batchScannedCards.length > 0 && (
+            <div className="mt-6 border-t pt-4 space-y-3" data-testid="batch-scan-summary">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span className="font-medium text-sm">Scanned this session ({batchScannedCards.length})</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBatchDone}
+                  data-testid="button-batch-done"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Done — View History
+                </Button>
+              </div>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {batchScannedCards.map((card, idx) => (
+                  <div 
+                    key={idx} 
+                    className="flex-shrink-0 flex items-center gap-2 p-2 rounded-lg border bg-muted/30 min-w-[180px] max-w-[220px]"
+                    data-testid={`batch-card-${idx}`}
+                  >
+                    {card.imageUrl ? (
+                      <img 
+                        src={card.imageUrl} 
+                        alt={card.playerName} 
+                        className="w-10 h-14 object-contain rounded-md border flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-14 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate" data-testid={`batch-card-name-${idx}`}>{card.playerName}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[card.year, card.set].filter(Boolean).join(" ")}
+                      </p>
+                      {card.marketValue != null && (
+                        <p className="text-xs font-medium text-green-600 dark:text-green-400">
+                          ${card.marketValue.toFixed(2)}
+                        </p>
+                      )}
+                      {card.action && (
+                        <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 mt-0.5 ${getActionColor(card.action)}`}>
+                          {getActionLabel(card.action)}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       )}
 

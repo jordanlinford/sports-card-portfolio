@@ -57,7 +57,8 @@ import {
   Package,
   Newspaper,
   Menu,
-  GitCompareArrows
+  GitCompareArrows,
+  History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -201,7 +202,7 @@ export function Navigation() {
                     size="sm" 
                     className={cn(
                       "gap-1",
-                      isActiveSection(["/outlook", "/hidden-gems"]) && "bg-accent"
+                      isActiveSection(["/outlook", "/hidden-gems", "/scan-history"]) && "bg-accent"
                     )}
                     data-testid="nav-market"
                   >
@@ -233,6 +234,14 @@ export function Navigation() {
                       Card Analysis
                     </Link>
                   </DropdownMenuItem>
+                  {isAuthenticated && user && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/scan-history" className="flex items-center gap-2 cursor-pointer" data-testid="nav-scan-history">
+                        <History className="h-4 w-4" />
+                        Scan History
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -571,6 +580,14 @@ export function Navigation() {
                     Hidden Gems
                   </Button>
                 </Link>
+                {isAuthenticated && user && (
+                  <Link href="/scan-history" onClick={() => setMobileMenuOpen(false)}>
+                    <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/scan-history") && "bg-accent")} data-testid="nav-scan-history-mobile">
+                      <History className="h-4 w-4" />
+                      Scan History
+                    </Button>
+                  </Link>
+                )}
 
                 {/* Players Section - Public */}
                 <div className="mt-4 mb-2">

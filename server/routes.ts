@@ -2850,7 +2850,7 @@ Sitemap: ${origin}/sitemap.xml
   app.post("/api/outlook/quick-analyze", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { title, year, set, cardNumber, variation, grade, grader, imagePath, sport } = req.body;
+      const { title, year, set, cardNumber, variation, grade, grader, imagePath, sport, scanHistoryId } = req.body;
 
       if (!title) {
         return res.status(400).json({ message: "Card title is required" });
@@ -3264,6 +3264,19 @@ Sitemap: ${origin}/sitemap.xml
 
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);
 
+      if (scanHistoryId) {
+        try {
+          await storage.updateScanHistoryAnalysis(
+            parseInt(String(scanHistoryId)),
+            userId,
+            marketValue ?? null,
+            finalAction ?? null
+          );
+        } catch (shErr) {
+          console.error("[Quick Analyze] Failed to update scan history:", shErr);
+        }
+      }
+
       logActivity("card_analysis", {
         userId,
         metadata: { title, year, set, action: finalAction, marketValue },
@@ -3545,11 +3558,36 @@ Sitemap: ${origin}/sitemap.xml
         req,
       });
 
+      let scanHistoryId: number | undefined;
+      try {
+        const cardId = scanResult.cardIdentification;
+        const historyRecord = await storage.createScanHistory({
+          userId,
+          playerName: cardId?.playerName || null,
+          year: cardId?.year ? parseInt(String(cardId.year)) : null,
+          setName: cardId?.setName || null,
+          variation: cardId?.variation || null,
+          grade: (cardId as any)?.grade || null,
+          grader: (cardId as any)?.grader || null,
+          sport: cardId?.sport || null,
+          cardNumber: cardId?.cardNumber || null,
+          imagePath: null,
+          scanConfidence: scanResult.confidence || null,
+          marketValue: null,
+          action: null,
+          scanSource: "card_analysis",
+        });
+        scanHistoryId = historyRecord.id;
+      } catch (historyErr) {
+        console.error("[Card Scan] Failed to save scan history:", historyErr);
+      }
+
       const remainingScans = dailyLimit - scansToday - 1;
       
       res.json({
         success: scanResult.success,
         scan: scanResult,
+        scanHistoryId,
         usage: {
           scansToday: scansToday + 1,
           dailyLimit,
@@ -9412,6 +9450,45 @@ RULES:
     } catch (error) {
       console.error("Error updating feedback:", error);
       res.status(500).json({ error: "Failed to update feedback" });
+    }
+  });
+
+  // ============================================================================
+  // SCAN HISTORY
+  // ============================================================================
+
+  app.get("/api/scan-history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = Math.min(parseInt(String(req.query.limit)) || 50, 100);
+      const offset = parseInt(String(req.query.offset)) || 0;
+
+      const [items, total] = await Promise.all([
+        storage.getScanHistory(userId, limit, offset),
+        storage.getScanHistoryCount(userId),
+      ]);
+
+      res.json({ items, total, limit, offset });
+    } catch (error) {
+      console.error("Error fetching scan history:", error);
+      res.status(500).json({ message: "Failed to fetch scan history" });
+    }
+  });
+
+  app.delete("/api/scan-history/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid scan history ID" });
+      }
+
+      await storage.deleteScanHistory(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting scan history:", error);
+      res.status(500).json({ message: "Failed to delete scan history entry" });
     }
   });
 

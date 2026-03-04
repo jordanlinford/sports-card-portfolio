@@ -2315,3 +2315,39 @@ export const insertUserFeedbackSchema = createInsertSchema(userFeedback).omit({
 });
 export type InsertUserFeedback = z.infer<typeof insertUserFeedbackSchema>;
 export type UserFeedback = typeof userFeedback.$inferSelect;
+
+// ============================================================================
+// SCAN HISTORY
+// ============================================================================
+export const scanHistory = pgTable("scan_history", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  playerName: varchar("player_name", { length: 255 }),
+  year: integer("year"),
+  setName: varchar("set_name", { length: 255 }),
+  variation: varchar("variation", { length: 255 }),
+  grade: varchar("grade", { length: 50 }),
+  grader: varchar("grader", { length: 50 }),
+  sport: varchar("sport", { length: 50 }),
+  cardNumber: varchar("card_number", { length: 50 }),
+  imagePath: text("image_path"),
+  scanConfidence: varchar("scan_confidence", { length: 20 }),
+  marketValue: real("market_value"),
+  action: varchar("action", { length: 50 }),
+  scanSource: varchar("scan_source", { length: 30 }).notNull().default("card_analysis"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const scanHistoryRelations = relations(scanHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [scanHistory.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertScanHistorySchema = createInsertSchema(scanHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertScanHistory = z.infer<typeof insertScanHistorySchema>;
+export type ScanHistory = typeof scanHistory.$inferSelect;
