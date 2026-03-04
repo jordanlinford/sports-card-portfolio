@@ -17,8 +17,11 @@ function inferRoleTierFromContext(newsSnippets: string[], playerName: string, ro
   // If we have a direct roleStatus from Gemini search, use it first (most accurate)
   if (roleStatus) {
     const status = roleStatus.toUpperCase();
+    if (status === "STAR" || status === "FRANCHISE_CORE") {
+      console.log(`[RoleTierInference] ${playerName}: AI detected ${status} → FRANCHISE_CORE`);
+      return "FRANCHISE_CORE";
+    }
     if (status === "INJURED_RESERVE") {
-      // IR players are essentially out - treat as BACKUP with injury flag
       console.log(`[RoleTierInference] ${playerName}: AI detected INJURED_RESERVE → BACKUP`);
       return "BACKUP";
     }
@@ -52,6 +55,11 @@ function inferRoleTierFromContext(newsSnippets: string[], playerName: string, ro
     "super bowl favorite", "championship", "playoff contender",
     "leading the", "carries the team", "franchise qb",
     "all-nba", "all-nfl", "cy young", "triple crown",
+    "#1 pick", "#1 overall", "first overall", "number one pick",
+    "top prospect", "generational talent", "generational prospect",
+    "franchise cornerstone", "future star", "future franchise",
+    "consensus #1", "projected #1", "expected to go first",
+    "number 1 pick", "no. 1 pick", "no. 1 overall",
   ];
   
   // STARTER indicators (clear starting role)
@@ -506,14 +514,15 @@ Return ONLY a JSON object with these exact fields:
   "snippets": ["<news snippet 1>", "<news snippet 2>", ...],
   "newsCount": <number of news articles found>,
   "momentum": "up" | "flat" | "down",
-  "roleStatus": "<STARTER | BACKUP | INJURED_RESERVE | ROTATIONAL | UNCERTAIN | OUT_OF_LEAGUE | UNKNOWN>",
+  "roleStatus": "<STAR | STARTER | BACKUP | INJURED_RESERVE | ROTATIONAL | UNCERTAIN | OUT_OF_LEAGUE | UNKNOWN>",
   "injuryStatus": "<HEALTHY | INJURED | RECOVERING | UNKNOWN>",
   "careerStatus": "<ACTIVE | RETIRED | RETIRED_HOF | DECEASED | BUST | UNKNOWN>",
   "details": "<brief summary of current situation>"
 }
 
 Role status rules:
-- STARTER: Named starter, starting lineup, first-string
+- STAR: MVP candidate, All-Star/All-Pro, franchise player, #1 draft pick, generational talent, top prospect, face of the franchise
+- STARTER: Named starter, starting lineup, first-string (but not a star/franchise player)
 - BACKUP: Second-string, depth chart QB2+, behind another player (includes young developing backups)
 - INJURED_RESERVE: On IR, season-ending injury, had surgery, missed season
 - ROTATIONAL: Part-time role, platoon, time-share

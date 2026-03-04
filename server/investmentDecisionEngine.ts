@@ -1355,11 +1355,18 @@ function generateWhyBullets(verdict: InvestmentVerdict, scores: InvestmentScores
       break;
 
     case "AVOID_NEW_MONEY":
-      if (downsideRiskScore >= 70) bullets.push(`${positionLabel}s in this profile historically see 40-60% value compression.`);
-      else bullets.push("Position/age profile suggests elevated downside risk ahead.");
-      if (liquidityScore <= 40) bullets.push("Thin liquidity traps capital when you need to exit.");
-      else bullets.push("Better risk/reward opportunities exist elsewhere in this tier.");
-      bullets.push("Wait for 40%+ pullback before reconsidering entry.");
+      if (isEarlyCareer) {
+        bullets.push("Hype-driven pricing has outpaced proven production at this stage.");
+        if (liquidityScore <= 40) bullets.push("Thin liquidity makes it hard to exit if hype fades.");
+        else bullets.push("Wait for production to validate the premium before buying in.");
+        bullets.push("Prices often correct once the initial excitement settles.");
+      } else {
+        if (downsideRiskScore >= 70) bullets.push(`${positionLabel}s in this profile historically see 40-60% value compression.`);
+        else bullets.push("Position/age profile suggests elevated downside risk ahead.");
+        if (liquidityScore <= 40) bullets.push("Thin liquidity traps capital when you need to exit.");
+        else bullets.push("Better risk/reward opportunities exist elsewhere in this tier.");
+        bullets.push("Wait for 40%+ pullback before reconsidering entry.");
+      }
       break;
 
     case "SPECULATIVE_FLYER":
@@ -1758,7 +1765,9 @@ function generateAdvisorTake(verdict: InvestmentVerdict, input: DecisionInput, s
     
     TRADE_THE_HYPE: `${name} is a sell at current prices. Market pricing has outrun realistic production outcomes—history shows these peaks rarely sustain. Late-stage hype cycles for ${positionLabel}s often retrace 30-50% within 6 months. Lock in gains before the correction. Only reconsider if a career-defining moment extends the runway.`,
     
-    AVOID_NEW_MONEY: `${name} is a pass at current prices. The position/age profile suggests elevated downside risk—${positionLabel}s in similar situations historically see value compression. Better capital deployment opportunities exist elsewhere. Wait for a 40%+ pullback or fundamental change before reconsidering.`,
+    AVOID_NEW_MONEY: isEarlyCareer
+      ? `${name} is a pass at current prices. Early-career hype has pushed pricing beyond what production has proven—${positionLabel}s at this stage often see corrections once the initial excitement fades. Wait for prices to settle or production to validate the hype before entering. This view changes if on-field performance confirms the premium.`
+      : `${name} is a pass at current prices. The position/age profile suggests elevated downside risk—${positionLabel}s in similar situations historically see value compression. Better capital deployment opportunities exist elsewhere. Wait for a 40%+ pullback or fundamental change before reconsidering.`,
     
     SPECULATIVE_FLYER: `${name} is a small speculative bet only. The upside is real but so is the risk of total loss. Keep position sizing small—lottery ticket territory. This view changes only if role certainty emerges and performance confirms the projection.`,
     
@@ -2046,21 +2055,25 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
   const isRookie = input.stage === "ROOKIE";
   
   if (isRookie) {
+    const isFranchiseRookie = roleTier === "FRANCHISE_CORE";
+    
     // Rule 1: Rookies can never be HOLD_CORE - downgrade to appropriate verdict
     if (verdict === "HOLD_CORE") {
-      // Check if overheated with unreliable comps - that's AVOID territory
-      if (overheated && !compsReliable) {
+      if (overheated && !compsReliable && !isFranchiseRookie) {
         verdict = "AVOID_NEW_MONEY";
         reason = "Overhyped rookie with unproven production - wait for prices to settle";
       } else {
         verdict = "SPECULATIVE_FLYER";
-        reason = "Rookie with upside but unproven - small position only";
+        reason = isFranchiseRookie
+          ? "Top prospect with elite upside but unproven at pro level - speculative position"
+          : "Rookie with upside but unproven - small position only";
       }
     }
     
     // Rule 2: Overheated rookies with unreliable comps → AVOID_NEW_MONEY
-    // High narrative heat + no real pricing data = pure speculation at inflated prices
-    if (overheated && !compsReliable && verdict === "SPECULATIVE_FLYER") {
+    // BUT franchise-core rookies (top picks, consensus elite prospects) stay SPECULATIVE
+    // Their heat is expected — they're legitimately top prospects, not pure hype
+    if (overheated && !compsReliable && verdict === "SPECULATIVE_FLYER" && !isFranchiseRookie) {
       verdict = "AVOID_NEW_MONEY";
       reason = "Overhyped rookie priced on hype not production - avoid until proven";
     }
