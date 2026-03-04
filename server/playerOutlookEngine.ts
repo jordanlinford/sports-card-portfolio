@@ -483,6 +483,9 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
   teamContext?: TeamContext;
   roleStatus?: string;
   injuryStatus?: string;
+  aiCareerStage?: string;
+  aiRookieYear?: number;
+  aiPosition?: string;
 }> {
   // First check if this is a known legend - override everything
   if (isKnownLegend(playerName, sport)) {
@@ -517,6 +520,9 @@ Return ONLY a JSON object with these exact fields:
   "roleStatus": "<STAR | STARTER | BACKUP | INJURED_RESERVE | ROTATIONAL | UNCERTAIN | OUT_OF_LEAGUE | UNKNOWN>",
   "injuryStatus": "<HEALTHY | INJURED | RECOVERING | UNKNOWN>",
   "careerStatus": "<ACTIVE | RETIRED | RETIRED_HOF | DECEASED | BUST | UNKNOWN>",
+  "careerStage": "<ROOKIE | YEAR_2 | YEAR_3 | YEAR_4 | PRIME | VETERAN | AGING | UNKNOWN>",
+  "rookieYear": <year they were drafted or debuted professionally, or null if unknown>,
+  "position": "<their primary position, e.g. QB, RB, WR, C, PG, SG, SF, PF, SS, OF, SP, etc.>",
   "details": "<brief summary of current situation>"
 }
 
@@ -528,6 +534,16 @@ Role status rules:
 - ROTATIONAL: Part-time role, platoon, time-share
 - OUT_OF_LEAGUE: Released, cut, waived, unsigned free agent, not on any roster
 - UNCERTAIN: Role unclear or in flux
+
+Career stage rules (based on YEARS in the league, not age):
+- ROOKIE: First professional season (drafted or debuted this year ${currentYear})
+- YEAR_2: Second professional season (drafted/debuted ${currentYear - 1})
+- YEAR_3: Third professional season (drafted/debuted ${currentYear - 2})
+- YEAR_4: Fourth professional season (drafted/debuted ${currentYear - 3})
+- PRIME: Established player in their best years (typically years 4-10 in the league)
+- VETERAN: Experienced player past prime but still productive (typically 10+ years)
+- AGING: Late career, declining production, retirement approaching
+- UNKNOWN: Cannot determine career stage
 
 Career status rules:
 - ACTIVE: Currently playing professionally (includes starters, backups, practice squad, injured reserve - anyone on a roster)
@@ -598,7 +614,11 @@ BUST CLARIFICATION:
           // Analyze team context from snippets
           const teamContext = analyzeTeamContext(snippets, undefined);
           
-          console.log(`[PlayerOutlook] News for ${playerName}: ${newsCount} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}, career: ${careerStatus} → stage=${detectedStage || "none"}`);
+          const aiCareerStage = parsed.careerStage || undefined;
+          const aiRookieYear = parsed.rookieYear && typeof parsed.rookieYear === "number" ? parsed.rookieYear : undefined;
+          const aiPosition = parsed.position || undefined;
+          
+          console.log(`[PlayerOutlook] News for ${playerName}: ${newsCount} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}, career: ${careerStatus}, aiStage: ${aiCareerStage || "none"}, rookieYear: ${aiRookieYear || "none"}, position: ${aiPosition || "none"} → stage=${detectedStage || "none"}`);
           
           return { 
             momentum, 
@@ -608,6 +628,9 @@ BUST CLARIFICATION:
             teamContext,
             roleStatus: parsed.roleStatus,
             injuryStatus: parsed.injuryStatus,
+            aiCareerStage,
+            aiRookieYear,
+            aiPosition,
           };
         } catch (parseError) {
           console.error(`[PlayerOutlook] Failed to parse news JSON (attempt ${attempt}):`, responseText.substring(0, 200));
@@ -1284,21 +1307,36 @@ async function generateFreshOutlook(
   sport: string,
   playerKey: string
 ): Promise<PlayerOutlookResponse> {
-  // Step 1: Get news signals (now includes roleStatus and injuryStatus from Gemini search)
-  const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus } = await getPlayerNewsSignals(playerName, sport);
+  // Step 1: Get news signals (now includes roleStatus, injuryStatus, careerStage, rookieYear, position from Gemini search)
+  const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus, aiCareerStage, aiRookieYear, aiPosition } = await getPlayerNewsSignals(playerName, sport);
   
   // Step 2: Run classification engine
-  // If news detected a special stage (BUST, RETIRED, RETIRED_HOF), use it
+  // Priority for career stage: detectedStage (BUST/RETIRED/HOF from careerStatus) > aiCareerStage (from Gemini) > inferCareerStage
+  // For players not in registry, Gemini's careerStage is our best source of truth
+  let resolvedCareerStage: PlayerStage | undefined = detectedStage;
+  if (!resolvedCareerStage && aiCareerStage) {
+    const validStages: Record<string, PlayerStage> = {
+      "ROOKIE": "ROOKIE", "YEAR_2": "YEAR_2", "YEAR_3": "YEAR_3", "YEAR_4": "YEAR_4",
+      "PRIME": "PRIME", "VETERAN": "VETERAN", "AGING": "AGING",
+    };
+    resolvedCareerStage = validStages[aiCareerStage.toUpperCase()];
+    if (resolvedCareerStage) {
+      console.log(`[PlayerOutlook] Using AI-detected career stage for ${playerName}: ${resolvedCareerStage}`);
+    }
+  }
+  
   const classificationInput: ClassificationInput = {
     playerName,
     sport,
     recentMomentum: momentum,
     newsHype,
-    careerStage: detectedStage,
+    careerStage: resolvedCareerStage,
+    rookieYear: aiRookieYear,
+    position: aiPosition,
   };
   
   const classification = classifyPlayer(classificationInput);
-  console.log(`[PlayerOutlook] Classification for ${playerName}: stage=${classification.stage}, temp=${classification.baseTemperature}`);
+  console.log(`[PlayerOutlook] Classification for ${playerName}: stage=${classification.stage}, temp=${classification.baseTemperature}, aiStage=${aiCareerStage || "none"}, rookieYear=${aiRookieYear || "none"}, position=${aiPosition || "none"}`);
   
   // Step 2.5: Re-analyze team context with detected team
   const teamContextWithTeam = analyzeTeamContext(snippets, classification.team);
@@ -1401,7 +1439,7 @@ async function generateFreshOutlook(
     // Only apply AI override for players NOT in the registry
     // Map AI career status to our PlayerStage enum
     const stageMap: Record<string, PlayerStage> = {
-      "DECEASED": "RETIRED_HOF",    // Deceased legends = RETIRED_HOF for investment purposes
+      "DECEASED": "RETIRED_HOF",
       "RETIRED_HOF": "RETIRED_HOF",
       "RETIRED": "RETIRED",
       "BUST": "BUST",
@@ -1411,15 +1449,26 @@ async function generateFreshOutlook(
     if (correctedStage && correctedStage !== classification.stage) {
       console.log(`[PlayerOutlook] AI override (no registry entry): ${playerName} stage ${classification.stage} → ${correctedStage}`);
       
-      // Re-run classification with corrected stage
       const correctedInput: ClassificationInput = {
         playerName,
         sport,
         recentMomentum: momentum,
         newsHype,
         careerStage: correctedStage,
+        rookieYear: aiRookieYear,
+        position: aiPosition,
       };
       finalClassification = classifyPlayer(correctedInput);
+    }
+  }
+  
+  // For players NOT in registry, enrich playerInfo with AI-detected fields
+  if (!playerInRegistry) {
+    if (aiPosition && (!enrichedPlayerInfo.position || enrichedPlayerInfo.position === "Unknown")) {
+      enrichedPlayerInfo.position = aiPosition;
+    }
+    if (resolvedCareerStage && resolvedCareerStage !== "UNKNOWN") {
+      enrichedPlayerInfo.stage = resolvedCareerStage;
     }
   }
   
