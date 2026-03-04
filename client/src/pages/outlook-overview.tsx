@@ -1343,8 +1343,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     setBatchAdding(true);
     try {
       const scanHistoryIds = successfulCards.map(c => c.scanHistoryId!);
-      const res = await apiRequest("POST", `/api/display-cases/${batchAddCaseId}/cards/bulk-from-scans`, { scanHistoryIds });
-      const data = await res.json();
+      const data = await apiRequest("POST", `/api/display-cases/${batchAddCaseId}/cards/bulk-from-scans`, { scanHistoryIds });
 
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       setShowBatchAddDialog(false);
