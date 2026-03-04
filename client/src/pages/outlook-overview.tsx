@@ -1202,6 +1202,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     let fileArray = Array.from(files);
     if (fileArray.length === 0) return;
 
+    setBatchMode(true);
+    setBatchScannedCards([]);
+    setBatchProcessing(false);
+    setBatchCurrentIndex(0);
+
     if (fileArray.length > MAX_BATCH_SIZE) {
       toast({
         title: "Too many files",
@@ -1338,10 +1343,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
       });
       return;
     }
-    setBatchMode(true);
-    setBatchScannedCards([]);
-    setBatchProcessing(false);
-    setBatchCurrentIndex(0);
     batchFileInputRef.current?.click();
   };
 
@@ -1611,7 +1612,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
             <CardTitle className="text-lg">Card Analysis</CardTitle>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {!batchMode && !batchProcessing && (
+            {!batchMode && (
               <>
                 <input
                   ref={batchFileInputRef}
@@ -1621,7 +1622,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   className="hidden"
                   onChange={(e) => {
                     if (e.target.files && e.target.files.length > 0) {
-                      setBatchMode(true);
                       handleBatchFilesSelected(e.target.files);
                     }
                     e.target.value = "";
@@ -1643,7 +1643,25 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                 </Button>
               </>
             )}
-            {!batchMode && (
+            {batchMode ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  batchCancelledRef.current = true;
+                  batchObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+                  batchObjectUrlsRef.current = [];
+                  setBatchMode(false);
+                  setBatchScannedCards([]);
+                  setBatchProcessing(false);
+                  setBatchCurrentIndex(0);
+                }}
+                data-testid="button-exit-batch"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Exit Batch
+              </Button>
+            ) : (
               <Button
                 variant="outline"
                 size="sm"
