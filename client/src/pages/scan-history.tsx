@@ -148,9 +148,9 @@ function ScanHistoryItem({
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0 w-14 h-[72px] rounded-md bg-muted flex items-center justify-center overflow-hidden">
-              {(scan as any).imageUrl && !imgFailed ? (
+              {scan.imagePath && !imgFailed ? (
                 <img
-                  src={(scan as any).imageUrl}
+                  src={scan.imagePath}
                   alt=""
                   className="w-full h-full object-cover"
                   loading="lazy"
