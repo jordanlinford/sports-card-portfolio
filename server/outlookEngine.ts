@@ -298,7 +298,7 @@ Price stability:
 Be specific with numbers. If you find 19 sold listings, say 19, not "approximately 20".
 
 ZERO COMPS FALLBACK: If you find NO completed sales for this exact card, do NOT return avgPrice as 0 or null.
-Instead, estimate a value by searching for similar cards from the same set/player/year, checking active listings (discount BIN by ~30%), and considering player popularity. Set soldCount to 0, confidence to "LOW", and note that the value is an estimate.`;
+Instead, search for the CHEAPEST active listing of this exact card on eBay. If cheapest BIN is $1-5, the card is common — use that price range. Base cards and common inserts from current sets are typically $1-5 raw. Do NOT estimate $20+ for common cards just because the player is popular. Set soldCount to 0, confidence to "LOW", and note the active listing prices as reference.`;
 
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -532,11 +532,14 @@ PRICING RULES:
 
 ZERO COMPS FALLBACK — if you find NO completed sales for this exact card:
 - DO NOT return avgPrice as 0 or null. Instead, ESTIMATE a realistic value.
-- Search for similar cards from the same set/player/year with different variations to establish a price range
-- Search for current active listings of this exact card to gauge asking prices (discount active BIN prices by ~30% for estimated market value)
-- Consider the player's popularity, card rarity, and set desirability
+- FIRST: Search for current ACTIVE LISTINGS of this EXACT card on eBay. Find the CHEAPEST active listing.
+  - If the cheapest active BIN is $1-5, this is a COMMON card — avgPrice should be near the cheapest listing price ($1-5 range)
+  - If the cheapest active BIN is $5-20, avgPrice should be 60-70% of the cheapest listing
+  - If the cheapest active BIN is $20+, avgPrice should be 50-70% of the cheapest listing
+- SECOND: Cross-check with similar cards from the same set/player to confirm
+- CRITICAL: Base cards, common inserts, and "Certified Rookie" base versions from current sets are typically $1-5 raw. Do NOT estimate $20+ for common base cards just because the player is popular
 - Set soldCount to 0 but still provide your best avgPrice ESTIMATE
-- Set confidence to "LOW" and note in "notes" that this is an estimate based on comparable cards, not actual sales
+- Set confidence to "LOW" and note in "notes" the active listing prices you found as reference
 
 Return ONLY a JSON object with this EXACT structure:
 {

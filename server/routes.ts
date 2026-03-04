@@ -3136,9 +3136,22 @@ Sitemap: ${origin}/sitemap.xml
             unifiedAvg = correctedAvg;
           }
           
+          // ZERO-COMP ESTIMATE CROSS-CHECK: When soldCount=0, validate against legacy price points
+          const earlyPP = priceData.pricePoints || [];
+          if (unifiedResult.market.soldCount === 0 && earlyPP.length > 0) {
+            const ppPricesCheck = earlyPP.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
+            if (ppPricesCheck.length > 0) {
+              const ppLowest = Math.min(...ppPricesCheck);
+              if (unifiedAvg > ppLowest * 3 && ppLowest < 50) {
+                console.warn(`[Quick Analyze] ZERO-COMP CAP: Estimate $${unifiedAvg} capped to legacy low $${ppLowest} (zero sold comps, estimate was ${(unifiedAvg/ppLowest).toFixed(1)}x higher)`);
+                unifiedAvg = ppLowest;
+              }
+            }
+          }
+          
           marketValue = unifiedAvg;
-          priceMin = unifiedMin;
-          priceMax = unifiedMax;
+          priceMin = unifiedMin || marketValue * 0.7;
+          priceMax = unifiedMax || marketValue * 1.5;
           compCount = unifiedResult.market.soldCount;
         }
       }
