@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ import {
   Camera,
   FolderPlus,
   RefreshCw,
+  Crown,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -80,6 +81,8 @@ type ScanHistoryResponse = {
   total: number;
   limit: number;
   offset: number;
+  isPro?: boolean;
+  totalAll?: number;
 };
 
 function ScanHistorySkeleton() {
@@ -408,7 +411,29 @@ export default function ScanHistoryPage() {
             ))}
           </div>
 
-          {totalPages > 1 && (
+          {!data.isPro && data.totalAll != null && data.totalAll > data.total && (
+            <Card className="mt-4 border-primary/20 bg-primary/5">
+              <CardContent className="p-4 flex items-center gap-3">
+                <Crown className="h-5 w-5 text-yellow-500 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">
+                    Showing {data.total} of {data.totalAll} scans
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Upgrade to Pro for unlimited scan history
+                  </p>
+                </div>
+                <Link href="/upgrade">
+                  <Button size="sm" data-testid="button-upgrade-scan-history">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Upgrade
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {data.isPro && totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 mt-6">
               <Button
                 variant="outline"

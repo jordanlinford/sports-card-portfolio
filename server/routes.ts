@@ -9460,15 +9460,24 @@ RULES:
   app.get("/api/scan-history", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const limit = Math.min(parseInt(String(req.query.limit)) || 50, 100);
+      const user = await storage.getUser(userId);
+      const isPro = user ? hasProAccess(user) : false;
+
+      const FREE_SCAN_HISTORY_LIMIT = 10;
+      const requestedLimit = Math.min(parseInt(String(req.query.limit)) || 50, 100);
       const offset = parseInt(String(req.query.offset)) || 0;
 
+      const limit = isPro ? requestedLimit : Math.min(requestedLimit, FREE_SCAN_HISTORY_LIMIT);
+      const effectiveOffset = isPro ? offset : 0;
+
       const [items, total] = await Promise.all([
-        storage.getScanHistory(userId, limit, offset),
+        storage.getScanHistory(userId, limit, effectiveOffset),
         storage.getScanHistoryCount(userId),
       ]);
 
-      res.json({ items, total, limit, offset });
+      const visibleTotal = isPro ? total : Math.min(total, FREE_SCAN_HISTORY_LIMIT);
+
+      res.json({ items, total: visibleTotal, limit, offset: effectiveOffset, isPro, totalAll: total });
     } catch (error) {
       console.error("Error fetching scan history:", error);
       res.status(500).json({ message: "Failed to fetch scan history" });
