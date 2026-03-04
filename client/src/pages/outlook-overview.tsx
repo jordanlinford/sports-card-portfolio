@@ -684,10 +684,26 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     });
   }, []);
   
-  // Check for debug mode via query param
   const searchParams = new URLSearchParams(window.location.search);
   const showDebug = searchParams.get("debug") === "1";
-  
+
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const prefillTitle = sp.get("title");
+    if (prefillTitle) {
+      setTitle(prefillTitle);
+      if (sp.get("year")) setYear(sp.get("year")!);
+      if (sp.get("set")) setSet(sp.get("set")!);
+      if (sp.get("variation")) setVariation(sp.get("variation")!);
+      if (sp.get("grade")) setGrade(sp.get("grade")!);
+      if (sp.get("grader")) setGrader(sp.get("grader")!);
+      if (sp.get("cardNumber")) setCardNumber(sp.get("cardNumber")!);
+      setShowForm(true);
+      setInputMode("manual");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   // Cleanup polling on unmount or result clear
   useEffect(() => {
     return () => {
@@ -1320,6 +1336,10 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     }
   };
 
+  const [batchSingleAddCard, setBatchSingleAddCard] = useState<BatchScannedCard | null>(null);
+  const [batchSingleAddCaseId, setBatchSingleAddCaseId] = useState<string>("");
+  const [batchSingleAdding, setBatchSingleAdding] = useState(false);
+
   const handleBatchDone = () => {
     batchCancelledRef.current = true;
     batchObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
@@ -1329,6 +1349,48 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     setBatchProcessing(false);
     setBatchCurrentIndex(0);
     navigateTo("/scan-history");
+  };
+
+  const handleBatchCardAnalyze = (card: BatchScannedCard) => {
+    batchCancelledRef.current = true;
+    batchObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    batchObjectUrlsRef.current = [];
+    setBatchMode(false);
+    setBatchScannedCards([]);
+    setBatchProcessing(false);
+    setBatchCurrentIndex(0);
+
+    setTitle(card.playerName || "");
+    setYear(card.year || "");
+    setSet(card.set || "");
+    setVariation(card.variation || "");
+    setGrade(card.grade || "");
+    setGrader(card.grader || "");
+    setCardNumber(card.cardNumber || "");
+    setResult(null);
+    setShowForm(true);
+    setInputMode("manual");
+  };
+
+  const handleBatchSingleAdd = async () => {
+    if (!batchSingleAddCaseId || !batchSingleAddCard?.scanHistoryId) return;
+    setBatchSingleAdding(true);
+    try {
+      const data = await apiRequest("POST", `/api/display-cases/${batchSingleAddCaseId}/cards/bulk-from-scans`, {
+        scanHistoryIds: [batchSingleAddCard.scanHistoryId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      setBatchSingleAddCard(null);
+      setBatchSingleAddCaseId("");
+      toast({
+        title: "Card added!",
+        description: `${batchSingleAddCard.playerName} added to your collection`,
+      });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to add card", variant: "destructive" });
+    } finally {
+      setBatchSingleAdding(false);
+    }
   };
 
   const handleBatchAddAll = async () => {
@@ -2895,7 +2957,31 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                     {card.confidence === "high" ? "High" : card.confidence === "medium" ? "Med" : "Low"}
                   </Badge>
                 )}
-                {card.status === "done" && (
+                {card.status === "done" && !batchProcessing && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => handleBatchCardAnalyze(card)}
+                      data-testid={`batch-card-analyze-${idx}`}
+                    >
+                      <Sparkles className="h-3 w-3 mr-1" />
+                      Analyze
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setBatchSingleAddCard(card)}
+                      data-testid={`batch-card-add-${idx}`}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add
+                    </Button>
+                  </div>
+                )}
+                {card.status === "done" && batchProcessing && (
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
                 )}
                 {card.status === "failed" && (
@@ -3062,6 +3148,76 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   </>
                 ) : (
                   `Add ${batchScannedCards.filter(c => c.status === "done" && c.scanHistoryId).length} Cards`
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!batchSingleAddCard} onOpenChange={(open) => { if (!open) { setBatchSingleAddCard(null); setBatchSingleAddCaseId(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add to Display Case</DialogTitle>
+            <DialogDescription>
+              Choose which display case to add "{batchSingleAddCard?.playerName}" to.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            {batchSingleAddCard && (
+              <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                {batchSingleAddCard.imageUrl && (
+                  <img src={batchSingleAddCard.imageUrl} alt="Card" className="w-12 h-16 object-contain rounded" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate">{batchSingleAddCard.playerName}</p>
+                  <p className="text-sm text-muted-foreground truncate">
+                    {[batchSingleAddCard.year, batchSingleAddCard.set, batchSingleAddCard.variation].filter(Boolean).join(" · ")}
+                  </p>
+                  {batchSingleAddCard.grade && (
+                    <p className="text-sm text-muted-foreground">
+                      {batchSingleAddCard.grader === "raw" ? "Raw" : `${batchSingleAddCard.grader || ""} ${batchSingleAddCard.grade}`}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Select Display Case</Label>
+              <Select value={batchSingleAddCaseId} onValueChange={setBatchSingleAddCaseId}>
+                <SelectTrigger data-testid="select-batch-single-display-case">
+                  <SelectValue placeholder="Choose a display case" />
+                </SelectTrigger>
+                <SelectContent>
+                  {userCases.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {userCases.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                You don't have any display cases yet. Create one first from your dashboard.
+              </p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setBatchSingleAddCard(null); setBatchSingleAddCaseId(""); }}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBatchSingleAdd}
+                disabled={!batchSingleAddCaseId || batchSingleAdding}
+                data-testid="button-confirm-batch-single-add"
+              >
+                {batchSingleAdding ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Card"
                 )}
               </Button>
             </div>

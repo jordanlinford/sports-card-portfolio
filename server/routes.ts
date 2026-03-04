@@ -9564,7 +9564,18 @@ RULES:
 
       const visibleTotal = isPro ? total : Math.min(total, FREE_SCAN_HISTORY_LIMIT);
 
-      res.json({ items, total: visibleTotal, limit, offset: effectiveOffset, isPro, totalAll: total });
+      const objService = new ObjectStorageService();
+      const itemsWithUrls = await Promise.all(
+        items.map(async (item) => {
+          if (item.imagePath) {
+            const signedUrl = await objService.getSignedReadUrl(item.imagePath);
+            return { ...item, imageUrl: signedUrl };
+          }
+          return { ...item, imageUrl: null };
+        })
+      );
+
+      res.json({ items: itemsWithUrls, total: visibleTotal, limit, offset: effectiveOffset, isPro, totalAll: total });
     } catch (error) {
       console.error("Error fetching scan history:", error);
       res.status(500).json({ message: "Failed to fetch scan history" });

@@ -147,20 +147,16 @@ function ScanHistoryItem({
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0 w-14 h-[72px] rounded-md bg-muted flex items-center justify-center overflow-hidden">
-              {scan.imagePath ? (
+              {(scan as any).imageUrl ? (
                 <img
-                  src={scan.imagePath}
+                  src={(scan as any).imageUrl}
                   alt=""
                   className="w-full h-full object-cover"
                   loading="lazy"
                   onError={(e) => {
                     e.currentTarget.style.display = "none";
-                    const parent = e.currentTarget.parentElement;
-                    if (parent && !parent.querySelector("svg")) {
-                      const fallback = document.createElement("div");
-                      fallback.className = "flex items-center justify-center w-full h-full";
-                      fallback.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>';
-                      parent.appendChild(fallback);
+                    if (e.currentTarget.parentElement) {
+                      e.currentTarget.parentElement.classList.add("image-failed");
                     }
                   }}
                 />

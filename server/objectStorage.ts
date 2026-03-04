@@ -221,6 +221,22 @@ export class ObjectStorageService {
     return `/objects/uploads/${objectId}${ext}`;
   }
 
+  async getSignedReadUrl(objectEntityPath: string): Promise<string | null> {
+    try {
+      if (!objectEntityPath || !objectEntityPath.startsWith("/objects/")) return null;
+      const parts = objectEntityPath.slice(1).split("/");
+      if (parts.length < 2) return null;
+      const entityId = parts.slice(1).join("/");
+      let entityDir = this.getPrivateObjectDir();
+      if (!entityDir.endsWith("/")) entityDir = `${entityDir}/`;
+      const fullPath = `${entityDir}${entityId}`;
+      const { bucketName, objectName } = parseObjectPath(fullPath);
+      return signObjectURL({ bucketName, objectName, method: "GET", ttlSec: 3600 });
+    } catch {
+      return null;
+    }
+  }
+
   async canAccessObjectEntity({
     userId,
     objectFile,
