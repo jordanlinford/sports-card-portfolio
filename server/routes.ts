@@ -9568,8 +9568,12 @@ RULES:
       const itemsWithUrls = await Promise.all(
         items.map(async (item) => {
           if (item.imagePath) {
-            const signedUrl = await objService.getSignedReadUrl(item.imagePath);
-            return { ...item, imageUrl: signedUrl };
+            try {
+              const signedUrl = await objService.getSignedReadUrl(item.imagePath);
+              return { ...item, imageUrl: signedUrl };
+            } catch {
+              return { ...item, imageUrl: null };
+            }
           }
           return { ...item, imageUrl: null };
         })

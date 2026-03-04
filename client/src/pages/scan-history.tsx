@@ -119,6 +119,7 @@ function ScanHistoryItem({
   onAddToCollection: (scan: ScanHistory) => void;
 }) {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const cardTitle = [
     scan.year,
@@ -147,18 +148,13 @@ function ScanHistoryItem({
         <CardContent className="p-4">
           <div className="flex items-start gap-4">
             <div className="flex-shrink-0 w-14 h-[72px] rounded-md bg-muted flex items-center justify-center overflow-hidden">
-              {(scan as any).imageUrl ? (
+              {(scan as any).imageUrl && !imgFailed ? (
                 <img
                   src={(scan as any).imageUrl}
                   alt=""
                   className="w-full h-full object-cover"
                   loading="lazy"
-                  onError={(e) => {
-                    e.currentTarget.style.display = "none";
-                    if (e.currentTarget.parentElement) {
-                      e.currentTarget.parentElement.classList.add("image-failed");
-                    }
-                  }}
+                  onError={() => setImgFailed(true)}
                 />
               ) : (
                 <Camera className="h-5 w-5 text-muted-foreground" />
