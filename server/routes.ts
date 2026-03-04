@@ -3121,10 +3121,18 @@ Sitemap: ${origin}/sitemap.xml
       let compCount = priceData.salesFound;
       
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
-        if (unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop) {
+        const hasRealComps = unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop;
+        // Also accept unified price when soldCount=0 IF it's lower than legacy (more conservative = more likely accurate)
+        const unifiedIsMoreConservative = !hasRealComps && marketValue && unifiedResult.market.avgPrice < marketValue;
+        
+        if (hasRealComps || unifiedIsMoreConservative) {
           let unifiedAvg = unifiedResult.market.avgPrice;
           const unifiedMin = unifiedResult.market.minPrice;
           const unifiedMax = unifiedResult.market.maxPrice;
+          
+          if (unifiedIsMoreConservative) {
+            console.log(`[Quick Analyze] Unified price $${unifiedAvg} is lower than legacy $${marketValue} — using unified (more conservative)`);
+          }
           
           // OUTLIER PROTECTION: If max is 3x+ the min with sparse comps, the average is likely inflated by outliers/BIN prices
           if (unifiedMin > 0 && unifiedMax > 0 && unifiedMax / unifiedMin >= 3 && unifiedResult.market.soldCount <= 10) {
@@ -3136,8 +3144,8 @@ Sitemap: ${origin}/sitemap.xml
           }
           
           marketValue = unifiedAvg;
-          priceMin = unifiedMin;
-          priceMax = unifiedMax;
+          priceMin = unifiedMin || marketValue * 0.7;
+          priceMax = unifiedMax || marketValue * 1.5;
           compCount = unifiedResult.market.soldCount;
         }
       }
