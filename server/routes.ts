@@ -3638,6 +3638,16 @@ Sitemap: ${origin}/sitemap.xml
       let scanHistoryId: number | undefined;
       try {
         const cardId = scanResult.cardIdentification;
+
+        let uploadedImagePath: string | null = null;
+        try {
+          const imageBuffer = Buffer.from(imageData, "base64");
+          const objService = new ObjectStorageService();
+          uploadedImagePath = await objService.uploadBuffer(imageBuffer, mimeType || "image/jpeg", userId);
+        } catch (uploadErr) {
+          console.error("[Card Scan] Image upload failed (non-fatal):", uploadErr);
+        }
+
         const historyRecord = await storage.createScanHistory({
           userId,
           playerName: cardId?.playerName || null,
@@ -3648,7 +3658,7 @@ Sitemap: ${origin}/sitemap.xml
           grader: (cardId as any)?.grader || null,
           sport: cardId?.sport || null,
           cardNumber: cardId?.cardNumber || null,
-          imagePath: null,
+          imagePath: uploadedImagePath,
           scanConfidence: scanResult.confidence || null,
           marketValue: null,
           action: null,
