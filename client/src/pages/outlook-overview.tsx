@@ -571,13 +571,17 @@ function ComparisonVerdict({
 type BatchScannedCard = {
   playerName: string;
   imageUrl: string | null;
-  marketValue: number | null;
-  action: string | null;
   year: string | null;
   set: string | null;
+  variation: string | null;
+  grade: string | null;
+  confidence: number | null;
+  status: "pending" | "processing" | "done" | "failed";
+  error?: string;
+  scanHistoryId?: number;
 };
 
-function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; userCases: DisplayCase[] }) {
+function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boolean; userCases: DisplayCase[]; isPro: boolean }) {
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [inputMode, setInputMode] = useState<"manual" | "scan">("manual");
@@ -633,7 +637,22 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
   // Batch scan mode state
   const [batchMode, setBatchMode] = useState(false);
   const [batchScannedCards, setBatchScannedCards] = useState<BatchScannedCard[]>([]);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+  const [batchCurrentIndex, setBatchCurrentIndex] = useState(0);
+  const batchFileInputRef = useRef<HTMLInputElement>(null);
+  const batchObjectUrlsRef = useRef<string[]>([]);
+  const batchCancelledRef = useRef(false);
   const [, navigateTo] = useLocation();
+
+  const MAX_BATCH_SIZE = 20;
+
+  useEffect(() => {
+    return () => {
+      batchObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      batchObjectUrlsRef.current = [];
+      batchCancelledRef.current = true;
+    };
+  }, []);
   
   // Recent searches state
   const RECENT_SEARCHES_KEY = "sports-card-recent-searches";
@@ -1170,69 +1189,160 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
     setFirstCardResult(null);
     setFirstCardPreviewUrl(null);
     // Exit batch mode on full reset
+    batchCancelledRef.current = true;
+    batchObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    batchObjectUrlsRef.current = [];
     setBatchMode(false);
     setBatchScannedCards([]);
+    setBatchProcessing(false);
+    setBatchCurrentIndex(0);
   };
 
-  const handleBatchScanNext = () => {
-    const currentCard: BatchScannedCard = {
-      playerName: title || scanIdentifyResult?.scan?.cardIdentification?.playerName || "Unknown",
-      imageUrl: scanPreviewUrl || previewUrl || null,
-      marketValue: result?.market?.value ?? null,
-      action: result?.action ?? null,
-      year: year || null,
-      set: set || null,
-    };
-    setBatchScannedCards(prev => [...prev, currentCard]);
+  const handleBatchFilesSelected = async (files: FileList) => {
+    let fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
 
-    setTitle("");
-    setYear("");
-    setSet("");
-    setCardNumber("");
-    setVariation("");
-    setGrade("");
-    setGrader("");
-    setImagePath(null);
-    setPreviewUrl(null);
-    setResult(null);
-    setScanResult(null);
-    setScanPreviewUrl(null);
-    setSelectedCaseId("");
-    setInputMode("scan");
-    setScanIdentifyResult(null);
-    setIsConfirmed(false);
-    setAnalysisInvalidated(false);
-    if (pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
+    if (fileArray.length > MAX_BATCH_SIZE) {
+      toast({
+        title: "Too many files",
+        description: `Maximum ${MAX_BATCH_SIZE} cards per batch. Only the first ${MAX_BATCH_SIZE} will be scanned.`,
+      });
+      fileArray = fileArray.slice(0, MAX_BATCH_SIZE);
     }
-    setIsPollingComps(false);
+
+    batchCancelledRef.current = false;
+    batchObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    batchObjectUrlsRef.current = [];
+
+    const initialCards: BatchScannedCard[] = fileArray.map((f) => {
+      const url = URL.createObjectURL(f);
+      batchObjectUrlsRef.current.push(url);
+      return {
+        playerName: f.name.replace(/\.[^.]+$/, ""),
+        imageUrl: url,
+        year: null,
+        set: null,
+        variation: null,
+        grade: null,
+        confidence: null,
+        status: "pending" as const,
+      };
+    });
+
+    setBatchScannedCards(initialCards);
+    setBatchProcessing(true);
+    setBatchCurrentIndex(0);
+    setShowForm(false);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < fileArray.length; i++) {
+      if (batchCancelledRef.current) break;
+
+      setBatchCurrentIndex(i);
+      setBatchScannedCards(prev => prev.map((c, idx) => idx === i ? { ...c, status: "processing" } : c));
+
+      try {
+        const { blob, base64 } = await compressImage(fileArray[i]);
+        if (batchCancelledRef.current) break;
+
+        const formData = new FormData();
+        formData.append("image", new File([blob], fileArray[i].name, { type: "image/jpeg" }));
+
+        const uploadRes = await fetch("/api/cards/upload-image", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+
+        if (!uploadRes.ok) throw new Error("Image upload failed");
+        const uploadData = await uploadRes.json();
+        const uploadedImagePath = uploadData.path || uploadData.url;
+
+        if (batchCancelledRef.current) break;
+
+        const scanRes = await fetch("/api/cards/scan-identify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ imageData: base64, imagePath: uploadedImagePath }),
+        });
+
+        if (!scanRes.ok) throw new Error("Scan failed");
+        const scanData = await scanRes.json();
+
+        if (batchCancelledRef.current) break;
+
+        if (scanData.scan?.success) {
+          const card = scanData.scan.cardIdentification;
+          const gradeInfo = scanData.scan.gradeEstimate;
+          setBatchScannedCards(prev => prev.map((c, idx) => idx === i ? {
+            ...c,
+            playerName: card.playerName || "Unknown",
+            year: card.year || null,
+            set: card.set || null,
+            variation: card.variation || null,
+            grade: gradeInfo?.grade || null,
+            confidence: scanData.scan.confidence ?? null,
+            status: "done",
+            scanHistoryId: scanData.scanHistoryId,
+          } : c));
+          successCount++;
+        } else {
+          setBatchScannedCards(prev => prev.map((c, idx) => idx === i ? {
+            ...c,
+            status: "failed",
+            error: "Could not identify card",
+          } : c));
+          failCount++;
+        }
+      } catch (err: any) {
+        if (batchCancelledRef.current) break;
+        setBatchScannedCards(prev => prev.map((c, idx) => idx === i ? {
+          ...c,
+          status: "failed",
+          error: err.message || "Scan failed",
+        } : c));
+        failCount++;
+      }
+    }
+
+    if (!batchCancelledRef.current) {
+      setBatchProcessing(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/scan-history'] });
+      toast({
+        title: "Batch scan complete",
+        description: `${successCount} identified${failCount > 0 ? `, ${failCount} failed` : ""}`,
+      });
+    }
   };
 
   const handleBatchDone = () => {
-    if (title || scanIdentifyResult) {
-      const currentCard: BatchScannedCard = {
-        playerName: title || scanIdentifyResult?.scan?.cardIdentification?.playerName || "Unknown",
-        imageUrl: scanPreviewUrl || previewUrl || null,
-        marketValue: result?.market?.value ?? null,
-        action: result?.action ?? null,
-        year: year || null,
-        set: set || null,
-      };
-      setBatchScannedCards(prev => [...prev, currentCard]);
-    }
+    batchCancelledRef.current = true;
+    batchObjectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    batchObjectUrlsRef.current = [];
     setBatchMode(false);
     setBatchScannedCards([]);
-    resetForm();
+    setBatchProcessing(false);
+    setBatchCurrentIndex(0);
     navigateTo("/scan-history");
   };
 
   const startBatchMode = () => {
+    if (!isPro) {
+      toast({
+        title: "Pro Feature",
+        description: "Batch scanning is available for Pro members. Upgrade to scan multiple cards at once.",
+        variant: "destructive",
+      });
+      return;
+    }
     setBatchMode(true);
     setBatchScannedCards([]);
-    setShowForm(true);
-    setInputMode("scan");
-    resetForm();
+    setBatchProcessing(false);
+    setBatchCurrentIndex(0);
+    batchFileInputRef.current?.click();
   };
 
   const compressImage = (file: File, maxWidth = 1200, quality = 0.8): Promise<{ blob: Blob; base64: string }> => {
@@ -1499,60 +1609,70 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
           <div className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
             <CardTitle className="text-lg">Card Analysis</CardTitle>
-            {batchMode && (
-              <Badge variant="secondary" className="bg-primary/10 text-primary" data-testid="badge-batch-mode">
-                <Layers className="h-3 w-3 mr-1" />
-                Batch Mode
-              </Badge>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {!showForm && (
+            {!batchMode && !batchProcessing && (
+              <>
+                <input
+                  ref={batchFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      setBatchMode(true);
+                      handleBatchFilesSelected(e.target.files);
+                    }
+                    e.target.value = "";
+                  }}
+                  data-testid="input-batch-files"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={startBatchMode}
+                  data-testid="button-start-batch-scan"
+                >
+                  {isPro ? (
+                    <Layers className="h-4 w-4 mr-2" />
+                  ) : (
+                    <Crown className="h-4 w-4 mr-2 text-yellow-500" />
+                  )}
+                  Batch Scan
+                </Button>
+              </>
+            )}
+            {!batchMode && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={startBatchMode}
-                data-testid="button-start-batch-scan"
+                onClick={() => {
+                  if (showForm) {
+                    resetForm();
+                  } else {
+                    setShowForm(true);
+                  }
+                }}
+                data-testid="button-toggle-quick-analyze"
               >
-                <Layers className="h-4 w-4 mr-2" />
-                Batch Scan
+                {showForm ? (
+                  <>
+                    <X className="h-4 w-4 mr-2" />
+                    Close
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4 mr-2" />
+                    Analyze Any Card
+                  </>
+                )}
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (showForm) {
-                  if (batchMode) {
-                    handleBatchDone();
-                  } else {
-                    resetForm();
-                  }
-                } else {
-                  setShowForm(true);
-                }
-              }}
-              data-testid="button-toggle-quick-analyze"
-            >
-              {showForm ? (
-                <>
-                  <X className="h-4 w-4 mr-2" />
-                  Close
-                </>
-              ) : (
-                <>
-                  <Search className="h-4 w-4 mr-2" />
-                  Analyze Any Card
-                </>
-              )}
-            </Button>
           </div>
         </div>
         <CardDescription>
-          {batchMode 
-            ? `Batch scanning — Card ${batchScannedCards.length + 1} of this session`
-            : "Check a card before buying or get an outlook without adding to your collection"
-          }
+          {"Check a card before buying or get an outlook without adding to your collection"}
         </CardDescription>
       </CardHeader>
 
@@ -1745,17 +1865,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                   <Plus className="h-4 w-4 mr-2" />
                   Add to Portfolio
                 </Button>
-                {batchMode && (
-                  <Button
-                    variant="outline"
-                    onClick={handleBatchScanNext}
-                    className="flex-1 sm:flex-none"
-                    data-testid="button-batch-scan-next-confirmed"
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Scan Next Card
-                  </Button>
-                )}
               </div>
               
               {!canAnalyze && (
@@ -2319,43 +2428,21 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                     </>
                   )}
                 </Button>
-                {batchMode ? (
-                  <>
-                    <Button 
-                      onClick={handleBatchScanNext}
-                      data-testid="button-batch-scan-next-scan"
-                    >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Scan Next Card
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={handleBatchDone}
-                      data-testid="button-batch-done-scan"
-                    >
-                      <Check className="h-4 w-4 mr-2" />
-                      Done ({batchScannedCards.length + 1} scanned)
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        setScanResult(null);
-                        setScanPreviewUrl(null);
-                      }}
-                      data-testid="button-scan-another"
-                    >
-                      <Search className="h-4 w-4 mr-2" />
-                      Scan Another
-                    </Button>
-                    <Button variant="ghost" onClick={resetForm} data-testid="button-scan-reset">
-                      <X className="h-4 w-4 mr-2" />
-                      Close
-                    </Button>
-                  </>
-                )}
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setScanResult(null);
+                    setScanPreviewUrl(null);
+                  }}
+                  data-testid="button-scan-another"
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Scan Another
+                </Button>
+                <Button variant="ghost" onClick={resetForm} data-testid="button-scan-reset">
+                  <X className="h-4 w-4 mr-2" />
+                  Close
+                </Button>
               </div>
             </div>
           ) : result ? (
@@ -2481,27 +2568,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
                       <GitCompareArrows className="h-4 w-4 mr-1" />
                       Compare
                     </Button>
-                    {batchMode && (
-                      <Button
-                        size="sm"
-                        onClick={handleBatchScanNext}
-                        data-testid="button-batch-scan-next-result"
-                      >
-                        <Camera className="h-4 w-4 mr-1" />
-                        Scan Next Card
-                      </Button>
-                    )}
-                    {batchMode && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleBatchDone}
-                        data-testid="button-batch-done-result"
-                      >
-                        <Check className="h-4 w-4 mr-1" />
-                        Done ({batchScannedCards.length + 1} scanned)
-                      </Button>
-                    )}
                   </div>
                 </DialogHeader>
                 
@@ -2654,61 +2720,138 @@ function QuickAnalyzeSection({ canAnalyze, userCases }: { canAnalyze: boolean; u
             </div>
           ) : null}
           
-          {/* Batch Scan Session Summary */}
-          {batchMode && batchScannedCards.length > 0 && (
-            <div className="mt-6 border-t pt-4 space-y-3" data-testid="batch-scan-summary">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-primary" />
-                  <span className="font-medium text-sm">Scanned this session ({batchScannedCards.length})</span>
-                </div>
+        </CardContent>
+      )}
+
+      {/* Batch Scan Results — rendered outside the single-card form */}
+      {batchMode && batchScannedCards.length > 0 && (
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm">
+                {batchProcessing 
+                  ? `Processing card ${batchCurrentIndex + 1} of ${batchScannedCards.length}...`
+                  : `Batch complete — ${batchScannedCards.filter(c => c.status === "done").length} of ${batchScannedCards.length} identified`
+                }
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {!batchProcessing && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleBatchDone}
                   data-testid="button-batch-done"
                 >
-                  <Check className="h-4 w-4 mr-2" />
-                  Done — View History
+                  <History className="h-4 w-4 mr-2" />
+                  View in Scan History
                 </Button>
-              </div>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {batchScannedCards.map((card, idx) => (
-                  <div 
-                    key={idx} 
-                    className="flex-shrink-0 flex items-center gap-2 p-2 rounded-lg border bg-muted/30 min-w-[180px] max-w-[220px]"
-                    data-testid={`batch-card-${idx}`}
-                  >
-                    {card.imageUrl ? (
-                      <img 
-                        src={card.imageUrl} 
-                        alt={card.playerName} 
-                        className="w-10 h-14 object-contain rounded-md border flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-10 h-14 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                        <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate" data-testid={`batch-card-name-${idx}`}>{card.playerName}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {[card.year, card.set].filter(Boolean).join(" ")}
-                      </p>
-                      {card.marketValue != null && (
-                        <p className="text-xs font-medium text-green-600 dark:text-green-400">
-                          ${card.marketValue.toFixed(2)}
-                        </p>
-                      )}
-                      {card.action && (
-                        <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 mt-0.5 ${getActionColor(card.action)}`}>
-                          {getActionLabel(card.action)}
-                        </Badge>
-                      )}
-                    </div>
+              )}
+              {batchProcessing && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    batchCancelledRef.current = true;
+                    setBatchProcessing(false);
+                    toast({ title: "Batch scan cancelled", description: "Remaining cards were skipped." });
+                  }}
+                  data-testid="button-batch-cancel"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {batchProcessing && (
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div 
+                className="bg-primary h-2 rounded-full transition-all duration-500"
+                style={{ width: `${((batchCurrentIndex + 1) / batchScannedCards.length) * 100}%` }}
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {batchScannedCards.map((card, idx) => (
+              <div 
+                key={idx} 
+                className={`flex items-center gap-3 p-3 rounded-lg border ${
+                  card.status === "processing" ? "border-primary/50 bg-primary/5" :
+                  card.status === "failed" ? "border-red-500/30 bg-red-500/5" :
+                  card.status === "done" ? "border-border bg-card" :
+                  "border-border/50 bg-muted/20 opacity-60"
+                }`}
+                data-testid={`batch-card-${idx}`}
+              >
+                {card.imageUrl ? (
+                  <img 
+                    src={card.imageUrl} 
+                    alt={card.playerName} 
+                    className="w-12 h-16 object-contain rounded-md border flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-16 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
                   </div>
-                ))}
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate" data-testid={`batch-card-name-${idx}`}>
+                    {card.status === "done" ? card.playerName : card.status === "failed" ? "Scan Failed" : `Card ${idx + 1}`}
+                  </p>
+                  {card.status === "done" && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {[card.year, card.set, card.variation].filter(Boolean).join(" · ")}
+                      {card.grade && ` — ${card.grade}`}
+                    </p>
+                  )}
+                  {card.status === "failed" && card.error && (
+                    <p className="text-xs text-red-500">{card.error}</p>
+                  )}
+                  {card.status === "processing" && (
+                    <p className="text-xs text-primary flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Identifying...
+                    </p>
+                  )}
+                  {card.status === "pending" && (
+                    <p className="text-xs text-muted-foreground">Waiting...</p>
+                  )}
+                </div>
+                {card.status === "done" && card.confidence != null && (
+                  <Badge 
+                    variant="secondary" 
+                    className={`shrink-0 text-xs ${
+                      card.confidence >= 0.8 ? "bg-green-500/10 text-green-600 dark:text-green-400" :
+                      card.confidence >= 0.5 ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
+                      "bg-red-500/10 text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {Math.round(card.confidence * 100)}%
+                  </Badge>
+                )}
+                {card.status === "done" && (
+                  <Check className="h-4 w-4 text-green-500 shrink-0" />
+                )}
+                {card.status === "failed" && (
+                  <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                )}
+                {card.status === "processing" && (
+                  <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
+                )}
               </div>
+            ))}
+          </div>
+
+          {!batchProcessing && (
+            <div className="flex justify-center pt-2">
+              <Button onClick={handleBatchDone} data-testid="button-batch-view-history">
+                <History className="h-4 w-4 mr-2" />
+                View All in Scan History
+              </Button>
             </div>
           )}
         </CardContent>
@@ -3138,6 +3281,7 @@ export default function OutlookOverviewPage() {
       <QuickAnalyzeSection 
         canAnalyze={isPro || (usage?.remaining != null && usage.remaining > 0)} 
         userCases={cases?.map(c => ({ id: c.id, name: c.name, createdAt: c.createdAt, updatedAt: c.updatedAt, userId: c.userId, description: c.description, isPublic: c.isPublic, theme: c.theme, layout: c.layout, showCardCount: c.showCardCount, showTotalValue: c.showTotalValue, viewCount: c.viewCount })) || []}
+        isPro={isPro}
       />
 
       {isLoading ? (
