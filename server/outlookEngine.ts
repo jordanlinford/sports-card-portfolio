@@ -474,11 +474,28 @@ export async function fetchUnifiedCardAnalysis(card: {
   const searchDescription = parts.join(" ") || card.title;
 
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
+  const variationLower = (card.variation || "").toLowerCase().trim();
+  const isBaseOrCommonParallel = !isNumbered && (
+    !card.variation ||
+    variationLower === "base" ||
+    /^(certified\s+)?rookie\s*(card|rc)?\s*(silver|base|prizm|holo|disco)?$/i.test(variationLower) ||
+    /^(silver|base|disco)\s*(prizm|holo)?$/i.test(variationLower) ||
+    /^(prizm|holo|disco\s*prizm)$/i.test(variationLower)
+  );
   const variationContext = isNumbered
     ? `\nCRITICAL: This is a NUMBERED parallel (${card.variation}). It is significantly rarer and more valuable than base cards. Search specifically for "${searchDescription}" — do NOT return base card prices for a numbered parallel.`
-    : (card.variation && card.variation.toLowerCase() !== "base"
-      ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
-      : "");
+    : isBaseOrCommonParallel
+      ? `\nCRITICAL: This appears to be a BASE or COMMON unnumbered parallel (${card.variation || "base"}). These are typically the CHEAPEST version of the card.
+- "Certified Rookie" / "RC" is just a rookie designation — it does NOT make the card premium
+- An unnumbered "silver" or "holo" or "prizm" is the base parallel, NOT a rare insert
+- For most non-superstar players, base/silver/holo raw cards sell for $1-10
+- Do NOT confuse with numbered parallels (/25, /49, /99), SSPs, or premium insert sets
+- For Panini Select: Concourse Silver is the cheapest tier — do NOT price as Premier or Field Level
+- For Panini Prizm: base Silver Prizm is the cheapest parallel
+- Search specifically for the UNNUMBERED version and report those prices`
+      : (card.variation
+        ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
+        : "");
 
   const hasMissingDetails = !card.set || !card.variation;
   const specificityWarning = hasMissingDetails
