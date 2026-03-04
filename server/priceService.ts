@@ -1914,7 +1914,32 @@ function filterExtremeOutliers(
   return { filtered, removed, mean };
 }
 
+interface PriceLookupCache {
+  data: EnhancedPriceLookupResult;
+  cachedAt: number;
+}
+const enhancedPriceCache = new Map<string, PriceLookupCache>();
+const PRICE_CACHE_TTL_MS = 4 * 60 * 60 * 1000;
+
+function getPriceCacheKey(card: CardInfo): string {
+  return [
+    card.title.toLowerCase().trim(),
+    card.year?.toString() || "",
+    (card.set || "").toLowerCase().trim(),
+    (card.variation || "").toLowerCase().trim(),
+    (card.grade || "").toLowerCase().trim(),
+    (card.grader || "").toLowerCase().trim(),
+  ].join("|");
+}
+
 export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedPriceLookupResult> {
+  const cacheKey = getPriceCacheKey(card);
+  const cached = enhancedPriceCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < PRICE_CACHE_TTL_MS) {
+    console.log(`[Enhanced Price] Cache hit for: ${card.title} (${Math.round((Date.now() - cached.cachedAt) / 1000 / 60)}min old)`);
+    return cached.data;
+  }
+
   const queries = buildSearchQueries(card);
   const strictPricePoints: PricePoint[] = [];
   const loosePricePoints: PricePoint[] = [];
@@ -2024,7 +2049,7 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       const baseline = getBaselinePrice(card);
       if (baseline) {
         console.log(`[BASELINE] No comps found, using baseline estimate: $${baseline.low}-$${baseline.high} (mid: $${baseline.mid})`);
-        return {
+        const baselineResult: EnhancedPriceLookupResult = {
           estimatedValue: baseline.mid,
           pricePoints: [{
             date: new Date().toISOString().split('T')[0],
@@ -2044,6 +2069,8 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
             samples: [],
           },
         };
+        enhancedPriceCache.set(cacheKey, { data: baselineResult, cachedAt: Date.now() });
+        return baselineResult;
       }
     }
 
@@ -2092,15 +2119,17 @@ export async function lookupEnhancedCardPrice(card: CardInfo): Promise<EnhancedP
       confidenceReason = `${confidenceReason}. Match confidence: ${matchConfidence.reason}`;
     }
 
-    return {
+    const finalResult: EnhancedPriceLookupResult = {
       estimatedValue,
-      pricePoints: filteredPricePoints.slice(0, 20), // Cap at 20
+      pricePoints: filteredPricePoints.slice(0, 20),
       salesFound,
       confidence,
       confidenceReason,
       rawSearchResults: allRawResults.slice(0, 15),
       matchConfidence,
     };
+    enhancedPriceCache.set(cacheKey, { data: finalResult, cachedAt: Date.now() });
+    return finalResult;
   } catch (error) {
     console.error("Enhanced price lookup error:", error);
     return {
