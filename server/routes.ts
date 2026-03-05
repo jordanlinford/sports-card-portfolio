@@ -2529,17 +2529,21 @@ Sitemap: ${origin}/sitemap.xml
 
         if (recentAvg > 0 && marketValue && marketValue > 0) {
           const ratio = marketValue / recentAvg;
-          if (ratio < 0.25 || ratio > 4) {
-            console.warn(`[Outlook 2.0] PRICE CROSS-VALIDATION: Market value $${marketValue} diverges wildly from price trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Using price trend data.`);
+          if (ratio < 0.33 || ratio > 3) {
+            console.warn(`[Outlook 2.0] PRICE-TREND GUARD: Market value $${marketValue} wildly off from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Overriding with trend.`);
             marketValue = Math.round(recentAvg * 100) / 100;
             const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
             if (allPrices.length > 0) {
               priceMin = Math.min(...allPrices);
               priceMax = Math.max(...allPrices);
             }
+          } else if (ratio < 0.5 || ratio > 2) {
+            const blended = Math.round(((marketValue + recentAvg) / 2) * 100) / 100;
+            console.warn(`[Outlook 2.0] PRICE-TREND GUARD: Market value $${marketValue} moderately off from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Blending to $${blended}.`);
+            marketValue = blended;
           }
         } else if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
-          console.warn(`[Outlook 2.0] PRICE CROSS-VALIDATION: No market value found, using price trend avg $${recentAvg.toFixed(2)}`);
+          console.warn(`[Outlook 2.0] PRICE-TREND GUARD: No market value, using trend avg $${recentAvg.toFixed(2)}`);
           marketValue = Math.round(recentAvg * 100) / 100;
           const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
           if (allPrices.length > 0) {
@@ -3293,18 +3297,27 @@ Sitemap: ${origin}/sitemap.xml
         if (recentAvg > 0) {
           if (marketValue && marketValue > 0) {
             const ratio = marketValue / recentAvg;
-            if (ratio < 0.8 || ratio > 1.25) {
-              console.warn(`[Quick Analyze] PRICE-TREND SYNC: Market value $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Aligning to trend.`);
+            if (ratio < 0.33 || ratio > 3) {
+              console.warn(`[Quick Analyze] PRICE-TREND GUARD: Market value $${marketValue} wildly off from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Overriding with trend.`);
               marketValue = Math.round(recentAvg * 100) / 100;
+              const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+              if (allPrices.length > 0) {
+                priceMin = Math.min(...allPrices);
+                priceMax = Math.max(...allPrices);
+              }
+            } else if (ratio < 0.5 || ratio > 2) {
+              const blended = Math.round(((marketValue + recentAvg) / 2) * 100) / 100;
+              console.warn(`[Quick Analyze] PRICE-TREND GUARD: Market value $${marketValue} moderately off from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Blending to $${blended}.`);
+              marketValue = blended;
             }
           } else {
-            console.warn(`[Quick Analyze] PRICE-TREND SYNC: No market value, using trend avg $${recentAvg.toFixed(2)}`);
+            console.warn(`[Quick Analyze] PRICE-TREND GUARD: No market value, using trend avg $${recentAvg.toFixed(2)}`);
             marketValue = Math.round(recentAvg * 100) / 100;
-          }
-          const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-          if (allPrices.length > 0) {
-            priceMin = Math.min(...allPrices);
-            priceMax = Math.max(...allPrices);
+            const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+            if (allPrices.length > 0) {
+              priceMin = Math.min(...allPrices);
+              priceMax = Math.max(...allPrices);
+            }
           }
         }
       }
