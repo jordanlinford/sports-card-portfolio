@@ -245,20 +245,28 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
     : "";
 
   const is1of1 = card.variation ? /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(card.variation) : false;
-  const isLowPop = card.variation ? /\/\s*[1-5]\b/.test(card.variation) : false;
+  const lowPopMatchStandalone = card.variation ? card.variation.match(/\/\s*(\d+)\b/) : null;
+  const popNumberStandalone = lowPopMatchStandalone ? parseInt(lowPopMatchStandalone[1]) : null;
+  const isLowPop = popNumberStandalone !== null && popNumberStandalone <= 25 && !is1of1;
   const needsTriangulation = is1of1 || isLowPop;
 
+  const playerSearchStandalone = card.playerName || card.title;
+  const yearStrStandalone = card.year || "";
+  const setStrStandalone = card.set || "";
+  const pn = popNumberStandalone;
+
   const triangulationInstructions = needsTriangulation
-    ? `\n1/1 OR LOW-POP CARD — TRIANGULATION REQUIRED:
-This is a ${is1of1 ? "1/1 (one-of-one)" : "low-pop numbered parallel"} card. Direct comps are rare or nonexistent. You MUST use triangulation:
+    ? `\nLOW-POP / RARE CARD — TRIANGULATION REQUIRED:
+This is a ${is1of1 ? "1/1 (one-of-one)" : `/${pn} (low-pop numbered parallel)`} card. Direct comps are rare or nonexistent. You MUST use triangulation:
 
-STEP 1 — Search for this player's higher-numbered parallels from the SAME set (/5, /10, /25) on eBay sold listings.
-STEP 2 — Apply a multiplier: /5→1.5-2.5x, /10→2-3.5x, /25→3-5x, /49 or /99→5-10x. Use higher end for autographs, lower for non-auto.
-STEP 3 — Sanity check against other similar-tier player 1/1s from the same set.
-STEP 4 — Adjust for brand tier (National Treasures/Prizm = premium, Pro Set/Leaf = budget).
+STEP 1 — Search for this player's OTHER numbered parallels from the SAME set on eBay sold listings:
+${is1of1 || (pn && pn <= 5) ? `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /10 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /25 sold eBay"` : pn && pn <= 10 ? `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /25 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"` : `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"`}
+STEP 2 — Apply multiplier from the closest parallel found to estimate /${pn || 1} value.
+STEP 3 — Sanity check against similar-tier player cards from the same set.
+STEP 4 — Adjust for brand tier (National Treasures/Flawless = premium, Pro Set/Leaf = budget).
 
-YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return 0 for a 1/1 card.
-Cite the parallel comps used in notes: e.g. "/5 sold for $310 → applied 2x = $620 estimate"`
+YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return 0 for a low-pop card.
+Cite the parallel comps used in notes: e.g. "/25 sold for $150 → applied 2x for /${pn || 1} = $300 estimate"`
     : "";
 
   const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
@@ -532,39 +540,67 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
     : "";
 
   const is1of1 = card.variation ? /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(card.variation) : false;
-  const isLowPop = card.variation ? /\/\s*[1-5]\b/.test(card.variation) : false;
+  const lowPopMatch = card.variation ? card.variation.match(/\/\s*(\d+)\b/) : null;
+  const popNumber = lowPopMatch ? parseInt(lowPopMatch[1]) : null;
+  const isLowPop = popNumber !== null && popNumber <= 25 && !is1of1;
   const needsTriangulation = is1of1 || isLowPop;
 
-  const triangulationInstructions = needsTriangulation
-    ? `\n1/1 OR LOW-POP CARD — TRIANGULATION REQUIRED:
-This is a ${is1of1 ? "1/1 (one-of-one)" : "low-pop numbered parallel"} card. Direct comps are rare or nonexistent. You MUST use triangulation to estimate value:
+  const playerSearch = card.playerName || card.title;
+  const yearStr = card.year || "";
+  const setStr = card.set || "";
 
-STEP 1 — VERTICAL COMPS: Search for this same player's higher-numbered parallels from the SAME set:
-- Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} /5 sold eBay"
-- Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} /10 sold eBay"
-- Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} /25 sold eBay"
+  function buildTriangulationInstructions(): string {
+    if (!needsTriangulation) return "";
+
+    const verticalSearches: string[] = [];
+    if (is1of1 || (popNumber && popNumber <= 5)) {
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /10 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /25 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /49 sold eBay"`);
+    } else if (popNumber && popNumber <= 10) {
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /25 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /49 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /99 sold eBay"`);
+    } else {
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /49 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /99 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} base sold eBay"`);
+    }
+
+    const cardLabel = is1of1 ? "1/1 (one-of-one)" : `/${popNumber} (low-pop numbered parallel)`;
+
+    return `\nLOW-POP / RARE CARD — TRIANGULATION REQUIRED:
+This is a ${cardLabel} card. Direct comps are rare or nonexistent. You MUST use triangulation to estimate value:
+
+STEP 1 — VERTICAL COMPS: Search for this same player's OTHER numbered parallels from the SAME set:
+${verticalSearches.join("\n")}
+Also search: "${playerSearch} ${yearStr} ${setStr} auto sold eBay" for broader reference.
 Report whatever parallel comps you find in your notes.
 
-STEP 2 — APPLY MULTIPLIER: Use the closest parallel found:
-- If /5 sold for $X → 1/1 is approximately 1.5x-2.5x that price
-- If /10 sold for $X → 1/1 is approximately 2x-3.5x that price
-- If /25 sold for $X → 1/1 is approximately 3x-5x that price
-- If /49 or /99 sold for $X → 1/1 is approximately 5x-10x that price
-For autograph 1/1s, use the higher end of multipliers. For non-auto 1/1s, use the lower end.
+STEP 2 — APPLY MULTIPLIER from the closest parallel found:
+Multiplier table (relative to the comp parallel you found):
+  /99 comp → /${popNumber || 1} value ≈ ${is1of1 ? "10-15x" : popNumber && popNumber <= 5 ? "6-10x" : popNumber && popNumber <= 10 ? "3-6x" : "2-3x"}
+  /49 comp → /${popNumber || 1} value ≈ ${is1of1 ? "6-10x" : popNumber && popNumber <= 5 ? "4-6x" : popNumber && popNumber <= 10 ? "2-3.5x" : "1.5-2x"}
+  /25 comp → /${popNumber || 1} value ≈ ${is1of1 ? "3-5x" : popNumber && popNumber <= 5 ? "2-3x" : "1.3-2x"}
+  /10 comp → /${popNumber || 1} value ≈ ${is1of1 ? "2-3.5x" : popNumber && popNumber <= 5 ? "1.5-2x" : "same tier"}
+  /5 comp  → /${popNumber || 1} value ≈ ${is1of1 ? "1.5-2.5x" : "0.7-1x (similar scarcity)"}
+For autographs/memorabilia, use the higher end of multipliers. For non-auto cards, use the lower end.
 
-STEP 3 — HORIZONTAL COMPS: Search for other 1/1 cards of similar-tier players from the same set.
-- If this is a top rookie, what do other top rookie 1/1s from this set sell for?
-- Use this as a sanity check on your multiplier estimate.
+STEP 3 — HORIZONTAL COMPS: Search for other ${cardLabel} cards of similar-tier players from the same set or product.
+Use this as a sanity check on your multiplier estimate.
 
 STEP 4 — BRAND CONTEXT: Consider the brand/product tier:
-- Premium products (Prizm, National Treasures, Flawless) command higher 1/1 premiums
+- Premium products (Prizm, National Treasures, Flawless, Immaculate) command higher premiums
+- Mid-tier products (Select, Mosaic, Optic) are moderate
 - Budget/unlicensed products (Pro Set, Leaf, Wild Card) have lower premiums
-- Adjust your estimate based on the product's market positioning
+Adjust your estimate based on the product's market positioning.
 
-YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return null or 0 for a 1/1 card.
+YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return null or 0 for a low-pop card.
 Set confidence to "LOW" or "MEDIUM" and explain your triangulation logic in notes.
-In your notes, cite the specific parallel comps used: e.g. "/5 sold for $310 on Mar 1 → applied 2x multiplier = $620 estimate"`
-    : "";
+In your notes, cite the specific parallel comps used: e.g. "/25 sold for $150 → applied 2x multiplier for /${popNumber || 1} = $300 estimate"`;
+  }
+
+  const triangulationInstructions = buildTriangulationInstructions();
 
   const currentYear = new Date().getFullYear();
 
