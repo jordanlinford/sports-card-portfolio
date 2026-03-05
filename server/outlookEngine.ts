@@ -244,10 +244,28 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
 - Raw cards typically sell for much less than PSA 9/10 graded copies`
     : "";
 
+  const is1of1 = card.variation ? /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(card.variation) : false;
+  const isLowPop = card.variation ? /\/\s*[1-5]\b/.test(card.variation) : false;
+  const needsTriangulation = is1of1 || isLowPop;
+
+  const triangulationInstructions = needsTriangulation
+    ? `\n1/1 OR LOW-POP CARD — TRIANGULATION REQUIRED:
+This is a ${is1of1 ? "1/1 (one-of-one)" : "low-pop numbered parallel"} card. Direct comps are rare or nonexistent. You MUST use triangulation:
+
+STEP 1 — Search for this player's higher-numbered parallels from the SAME set (/5, /10, /25) on eBay sold listings.
+STEP 2 — Apply a multiplier: /5→1.5-2.5x, /10→2-3.5x, /25→3-5x, /49 or /99→5-10x. Use higher end for autographs, lower for non-auto.
+STEP 3 — Sanity check against other similar-tier player 1/1s from the same set.
+STEP 4 — Adjust for brand tier (National Treasures/Prizm = premium, Pro Set/Leaf = budget).
+
+YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return 0 for a 1/1 card.
+Cite the parallel comps used in notes: e.g. "/5 sold for $310 → applied 2x = $620 estimate"`
+    : "";
+
   const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
 ${variationContext}
 ${specificityWarning}
 ${rawGradeWarning}
+${triangulationInstructions}
 
 Search eBay completed/sold listings for this EXACT card. What does it ACTUALLY sell for RIGHT NOW?
 Try multiple search queries if needed:
@@ -513,6 +531,41 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
 - Raw cards typically sell for much less than PSA 9/10 graded copies`
     : "";
 
+  const is1of1 = card.variation ? /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(card.variation) : false;
+  const isLowPop = card.variation ? /\/\s*[1-5]\b/.test(card.variation) : false;
+  const needsTriangulation = is1of1 || isLowPop;
+
+  const triangulationInstructions = needsTriangulation
+    ? `\n1/1 OR LOW-POP CARD — TRIANGULATION REQUIRED:
+This is a ${is1of1 ? "1/1 (one-of-one)" : "low-pop numbered parallel"} card. Direct comps are rare or nonexistent. You MUST use triangulation to estimate value:
+
+STEP 1 — VERTICAL COMPS: Search for this same player's higher-numbered parallels from the SAME set:
+- Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} /5 sold eBay"
+- Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} /10 sold eBay"
+- Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} /25 sold eBay"
+Report whatever parallel comps you find in your notes.
+
+STEP 2 — APPLY MULTIPLIER: Use the closest parallel found:
+- If /5 sold for $X → 1/1 is approximately 1.5x-2.5x that price
+- If /10 sold for $X → 1/1 is approximately 2x-3.5x that price
+- If /25 sold for $X → 1/1 is approximately 3x-5x that price
+- If /49 or /99 sold for $X → 1/1 is approximately 5x-10x that price
+For autograph 1/1s, use the higher end of multipliers. For non-auto 1/1s, use the lower end.
+
+STEP 3 — HORIZONTAL COMPS: Search for other 1/1 cards of similar-tier players from the same set.
+- If this is a top rookie, what do other top rookie 1/1s from this set sell for?
+- Use this as a sanity check on your multiplier estimate.
+
+STEP 4 — BRAND CONTEXT: Consider the brand/product tier:
+- Premium products (Prizm, National Treasures, Flawless) command higher 1/1 premiums
+- Budget/unlicensed products (Pro Set, Leaf, Wild Card) have lower premiums
+- Adjust your estimate based on the product's market positioning
+
+YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return null or 0 for a 1/1 card.
+Set confidence to "LOW" or "MEDIUM" and explain your triangulation logic in notes.
+In your notes, cite the specific parallel comps used: e.g. "/5 sold for $310 on Mar 1 → applied 2x multiplier = $620 estimate"`
+    : "";
+
   const currentYear = new Date().getFullYear();
 
   const prompt = `You are a sports card market analyst. Search for this card and provide a COMPLETE analysis in ONE response.
@@ -524,6 +577,7 @@ Grade: ${isRaw ? "RAW (ungraded)" : (card.grade || "Unknown")}${card.grader ? ` 
 ${variationContext}
 ${specificityWarning}
 ${rawGradeWarning}
+${triangulationInstructions}
 
 Do ALL of the following in this single search:
 
@@ -604,7 +658,13 @@ Price stability: STABLE = within 20%, VOLATILE = varies 40%+.
 
 ALWAYS provide psa9Price and psa10Price estimates. If no graded sales found, estimate from raw price multipliers. Never return null for both.
 If player is injured or lost starting role, reflect this in momentum and verdict.
-Be specific with numbers — if you find 19 sold listings, say 19.`;
+Be specific with numbers — if you find 19 sold listings, say 19.
+${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
+- avgPrice MUST be your best triangulated estimate, even with 0 direct comps
+- Do NOT default to null/0 — use parallel comp multipliers to estimate
+- In notes, explain your triangulation: which parallel comps you found, what multiplier you applied
+- Confidence should be "LOW" if based entirely on multipliers, "MEDIUM" if you found nearby parallel sales
+- The analysis and verdict should still be given based on the estimated value — treat the triangulated price as real for investment analysis` : ""}`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
