@@ -3031,10 +3031,11 @@ Sitemap: ${origin}/sitemap.xml
       const { computeAllSignals, fetchUnifiedCardAnalysis, computeAction } = await import("./outlookEngine");
       const { lookupEnhancedCardPrice, filterPriceOutliers, isOneOfOneCard, isRawCard: isRawCardCheck } = await import("./priceService");
 
-      // UNIFIED APPROACH: One Gemini call for pricing + news + verdict, parallel with legacy price lookup
+      // UNIFIED APPROACH: One Gemini call for pricing + news + verdict, parallel with legacy price lookup + price history
       console.log(`[Quick Analyze] Starting unified analysis for: ${title}`);
       const startTime = Date.now();
-      const [unifiedResult, priceData] = await Promise.all([
+      const { fetchMonthlyPriceHistory } = await import("./outlookEngine");
+      const [unifiedResult, priceData, qaMonthlyPriceHistory] = await Promise.all([
         fetchUnifiedCardAnalysis({
           title,
           playerName: title,
@@ -3052,6 +3053,15 @@ Sitemap: ${origin}/sitemap.xml
           grade: grade || undefined,
           grader: grader || undefined,
         }),
+        isPro ? fetchMonthlyPriceHistory({
+          playerName: title,
+          sport: "football",
+          year: year ? parseInt(year) : undefined,
+          setName: set || undefined,
+          variation: variation || undefined,
+          grade: grade || undefined,
+          grader: grader || undefined,
+        }).catch(() => null) : Promise.resolve(null),
       ]);
       console.log(`[Quick Analyze] Parallel fetch completed in ${Date.now() - startTime}ms`);
 
@@ -3275,6 +3285,37 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
       
+      // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
+      if (qaMonthlyPriceHistory && qaMonthlyPriceHistory.dataPoints && qaMonthlyPriceHistory.dataPoints.length > 0) {
+        const recentPoints = qaMonthlyPriceHistory.dataPoints.slice(-3);
+        const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
+
+        if (recentAvg > 0 && marketValue && marketValue > 0) {
+          const ratio = marketValue / recentAvg;
+          if (ratio < 0.25 || ratio > 4) {
+            console.warn(`[Quick Analyze] PRICE-TREND CROSS-VALIDATION: Market value $${marketValue} diverges wildly from price trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Using price trend data.`);
+            marketValue = Math.round(recentAvg * 100) / 100;
+            const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+            if (allPrices.length > 0) {
+              priceMin = Math.min(...allPrices);
+              priceMax = Math.max(...allPrices);
+            }
+          } else if (ratio > 1.5 || ratio < 0.67) {
+            const blendedValue = Math.round(((marketValue + recentAvg) / 2) * 100) / 100;
+            console.warn(`[Quick Analyze] PRICE-TREND CROSS-VALIDATION: Market value $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Blending to $${blendedValue}.`);
+            marketValue = blendedValue;
+          }
+        } else if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
+          console.warn(`[Quick Analyze] PRICE-TREND CROSS-VALIDATION: No market value found, using trend avg $${recentAvg.toFixed(2)}`);
+          marketValue = Math.round(recentAvg * 100) / 100;
+          const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+          if (allPrices.length > 0) {
+            priceMin = Math.min(...allPrices);
+            priceMax = Math.max(...allPrices);
+          }
+        }
+      }
+
       // SPECIFICITY GUARD
       const hasMissingDetails = !set || !variation;
       if (hasMissingDetails && marketValue && marketValue > 5) {
@@ -3472,7 +3513,7 @@ Sitemap: ${origin}/sitemap.xml
             ? "Updating in background..."
             : undefined,
         },
-        priceHistory: null,
+        priceHistory: qaMonthlyPriceHistory || null,
         generatedAt: new Date().toISOString(),
         isPro,
       });
