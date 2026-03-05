@@ -3290,24 +3290,17 @@ Sitemap: ${origin}/sitemap.xml
         const recentPoints = qaMonthlyPriceHistory.dataPoints.slice(-3);
         const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
 
-        if (recentAvg > 0 && marketValue && marketValue > 0) {
-          const ratio = marketValue / recentAvg;
-          if (ratio < 0.25 || ratio > 4) {
-            console.warn(`[Quick Analyze] PRICE-TREND CROSS-VALIDATION: Market value $${marketValue} diverges wildly from price trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Using price trend data.`);
-            marketValue = Math.round(recentAvg * 100) / 100;
-            const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-            if (allPrices.length > 0) {
-              priceMin = Math.min(...allPrices);
-              priceMax = Math.max(...allPrices);
+        if (recentAvg > 0) {
+          if (marketValue && marketValue > 0) {
+            const ratio = marketValue / recentAvg;
+            if (ratio < 0.8 || ratio > 1.25) {
+              console.warn(`[Quick Analyze] PRICE-TREND SYNC: Market value $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Aligning to trend.`);
+              marketValue = Math.round(recentAvg * 100) / 100;
             }
-          } else if (ratio > 1.5 || ratio < 0.67) {
-            const blendedValue = Math.round(((marketValue + recentAvg) / 2) * 100) / 100;
-            console.warn(`[Quick Analyze] PRICE-TREND CROSS-VALIDATION: Market value $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Blending to $${blendedValue}.`);
-            marketValue = blendedValue;
+          } else {
+            console.warn(`[Quick Analyze] PRICE-TREND SYNC: No market value, using trend avg $${recentAvg.toFixed(2)}`);
+            marketValue = Math.round(recentAvg * 100) / 100;
           }
-        } else if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
-          console.warn(`[Quick Analyze] PRICE-TREND CROSS-VALIDATION: No market value found, using trend avg $${recentAvg.toFixed(2)}`);
-          marketValue = Math.round(recentAvg * 100) / 100;
           const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
           if (allPrices.length > 0) {
             priceMin = Math.min(...allPrices);
