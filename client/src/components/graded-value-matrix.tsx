@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Award, TrendingUp, DollarSign, ArrowRight } from "lucide-react";
+import { Award, TrendingUp, DollarSign, ArrowRight, Search, Calculator } from "lucide-react";
 
 interface GradedValueMatrixProps {
   rawValue: number;
@@ -88,9 +88,6 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated }
         <CardTitle className="text-sm font-semibold flex items-center gap-2">
           <Award className="h-4 w-4 text-primary" />
           Should You Grade This Card?
-          {estimated && (
-            <Badge variant="outline" className="text-[10px] font-normal ml-auto">Estimated</Badge>
-          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -104,12 +101,18 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated }
             <p className="text-base font-bold mt-0.5 text-blue-700 dark:text-blue-300" data-testid="text-psa9-value">
               {psa9Price ? formatCurrency(psa9Price) : "—"}
             </p>
+            {psa9Price && (
+              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{estimated ? "est." : "avg"}</p>
+            )}
           </div>
           <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-2.5">
             <p className="text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400 font-medium">PSA 10</p>
             <p className="text-base font-bold mt-0.5 text-purple-700 dark:text-purple-300" data-testid="text-psa10-value">
               {psa10Price ? formatCurrency(psa10Price) : "—"}
             </p>
+            {psa10Price && (
+              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{estimated ? "est." : "avg"}</p>
+            )}
           </div>
         </div>
 
@@ -137,9 +140,19 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated }
           </p>
         </div>
 
-        <p className="text-[10px] text-muted-foreground/60 leading-tight">
-          Based on PSA standard grading (~${GRADING_COST.regular}/card). Actual values vary by card condition, market timing, and grading outcome. Not guaranteed.
-        </p>
+        <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground/60 leading-tight">
+          {estimated ? (
+            <>
+              <Calculator className="h-3 w-3 shrink-0 mt-0.5" />
+              <span>Graded values estimated using typical raw-to-graded multipliers (no graded sold data found). Based on PSA standard grading (~${GRADING_COST.regular}/card). Actual values vary by card condition, market timing, and grading outcome. Not guaranteed.</span>
+            </>
+          ) : (
+            <>
+              <Search className="h-3 w-3 shrink-0 mt-0.5" />
+              <span>Graded values based on recent eBay sold listings for PSA 9/10 copies. Based on PSA standard grading (~${GRADING_COST.regular}/card). Actual values vary by card condition, market timing, and grading outcome. Not guaranteed.</span>
+            </>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
