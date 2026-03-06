@@ -244,6 +244,20 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
 - Raw cards typically sell for much less than PSA 9/10 graded copies`
     : "";
 
+  const isAutoCardStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
+  const autoCardWarningStandalone = isAutoCardStandalone && card.set
+    ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING REQUIRED:
+This is an autograph card from "${card.set}". Autograph values vary ENORMOUSLY by product line:
+- National Treasures / Flawless / Immaculate autos → premium ($500-$10,000+)
+- Prizm / Select / Optic autos → mid-high ($100-$2,000)
+- Mosaic / Donruss / Score autos → mid-tier ($20-$500)
+- Chronicles / Prestige / Classics autos → budget ($10-$200)
+- Leaf / Pro Set / Wild Card autos → low ($5-$100)
+YOU MUST search for autographs specifically from "${card.set}" — do NOT pull prices from a different product line.
+A Joe Namath auto from Mosaic ($100-200) is NOT the same as a Namath auto from National Treasures ($2,000+).
+Include the SET NAME in every search query: "${card.playerName || card.title} ${card.year || ""} ${card.set} auto sold eBay"`
+    : "";
+
   const is1of1 = card.variation ? /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(card.variation) : false;
   const lowPopMatchStandalone = card.variation ? card.variation.match(/\/\s*(\d+)\b/) : null;
   const popNumberStandalone = lowPopMatchStandalone ? parseInt(lowPopMatchStandalone[1]) : null;
@@ -273,6 +287,7 @@ Cite the parallel comps used in notes: e.g. "/25 sold for $150 → applied 2x fo
 ${variationContext}
 ${specificityWarning}
 ${rawGradeWarning}
+${autoCardWarningStandalone}
 ${triangulationInstructions}
 
 Search eBay completed/sold listings for this EXACT card. What does it ACTUALLY sell for RIGHT NOW?
@@ -539,6 +554,20 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
 - Raw cards typically sell for much less than PSA 9/10 graded copies`
     : "";
 
+  const isAutoCard = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
+  const autoCardWarning = isAutoCard && card.set
+    ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING REQUIRED:
+This is an autograph card from "${card.set}". Autograph values vary ENORMOUSLY by product line:
+- National Treasures / Flawless / Immaculate autos → premium ($500-$10,000+)
+- Prizm / Select / Optic autos → mid-high ($100-$2,000)
+- Mosaic / Donruss / Score autos → mid-tier ($20-$500)
+- Chronicles / Prestige / Classics autos → budget ($10-$200)
+- Leaf / Pro Set / Wild Card autos → low ($5-$100)
+YOU MUST search for autographs specifically from "${card.set}" — do NOT pull prices from a different product line.
+A Joe Namath auto from Mosaic ($100-200) is NOT the same as a Namath auto from National Treasures ($2,000+).
+Include the SET NAME in every search query: "${card.playerName || card.title} ${card.year || ""} ${card.set} auto sold eBay"`
+    : "";
+
   const is1of1 = card.variation ? /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(card.variation) : false;
   const lowPopMatch = card.variation ? card.variation.match(/\/\s*(\d+)\b/) : null;
   const popNumber = lowPopMatch ? parseInt(lowPopMatch[1]) : null;
@@ -613,6 +642,7 @@ Grade: ${isRaw ? "RAW (ungraded)" : (card.grade || "Unknown")}${card.grader ? ` 
 ${variationContext}
 ${specificityWarning}
 ${rawGradeWarning}
+${autoCardWarning}
 ${triangulationInstructions}
 
 Do ALL of the following in this single search:
@@ -894,10 +924,15 @@ export async function fetchMonthlyPriceHistory(params: {
     const rawTrendNote = isRawTrend 
       ? `\nIMPORTANT: This card is RAW/UNGRADED. Only report prices for raw, ungraded copies. EXCLUDE all PSA, BGS, SGC, and other graded card prices — graded copies sell for significantly more and will distort the trend data.`
       : "";
+    const isAutoTrend = /auto(graph)?/i.test(params.variation || "") || /auto(graph)?/i.test(params.setName || "") || /auto(graph)?/i.test(params.playerName || "");
+    const autoTrendNote = isAutoTrend && params.setName
+      ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING: This is an autograph from "${params.setName}". Autograph values vary enormously by product line. A Mosaic auto ($20-$500) is NOT a National Treasures auto ($500-$10,000+). ONLY report prices for autos from "${params.setName}" — include the set name in your searches.`
+      : "";
     const researchPrompt = `Search eBay for recent sold listings of this sports card and tell me what prices it has been selling for:
 
 ${searchDescription}${isRawTrend ? " raw" : ""}
 ${rawTrendNote}
+${autoTrendNote}
 
 Look up eBay sold/completed listings prices${isRawTrend ? " for RAW/UNGRADED copies only" : ""}, 130point.com, and any other price references you can find.
 
