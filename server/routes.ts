@@ -2505,6 +2505,7 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       // CROSS-VALIDATION: Reconcile market value against actual price points from comps
+      // Only pull value DOWN if legacy median is lower — never inflate Gemini's price upward
       // Skip for 1/1 cards where price points may be from parallel comp projections
       if (pricePointsForSchema.length > 0 && !is1of1) {
         const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
@@ -2512,8 +2513,8 @@ Sitemap: ${origin}/sitemap.xml
           const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
           const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
           const ratio = marketValue / ppMedian;
-          if (ratio < 0.33 || ratio > 3) {
-            console.warn(`[Outlook 2.0] PRICE-POINTS CROSS-VALIDATION: marketValue $${marketValue} diverges from pricePoints median $${ppMedian.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
+          if (ratio > 3) {
+            console.warn(`[Outlook 2.0] PRICE-POINTS CROSS-VALIDATION: marketValue $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Pulling down.`);
             marketValue = Math.round(ppMedian * 100) / 100;
             priceMin = sortedPrices[0];
             priceMax = sortedPrices[sortedPrices.length - 1];
@@ -2737,8 +2738,8 @@ Sitemap: ${origin}/sitemap.xml
             const sortedPrices = [...validPrices].sort((a: number, b: number) => a - b);
             const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
             const ratio = marketValue / ppMedian;
-            if (ratio < 0.33 || ratio > 3) {
-              console.warn(`[Outlook GET] PRICE CROSS-VALIDATION: marketValue $${marketValue} diverges from pricePoints median $${ppMedian.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
+            if (ratio > 3) {
+              console.warn(`[Outlook GET] PRICE CROSS-VALIDATION: marketValue $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Pulling down.`);
               marketValue = Math.round(ppMedian * 100) / 100;
               priceMin = sortedPrices[0];
               priceMax = sortedPrices[sortedPrices.length - 1];
@@ -3254,13 +3255,13 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       // CROSS-VALIDATION against legacy price points
+      // Only pull value DOWN if legacy median is lower — never inflate Gemini's price upward
       const ppForValidation = priceData.pricePoints || [];
       if (ppForValidation.length > 0 && !qaIs1of1) {
         const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
         if (ppPrices.length > 0 && marketValue && marketValue > 0) {
           let sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
           
-          // Remove outlier price points: if highest is 3x+ the next-highest, drop it
           if (sortedPrices.length >= 2) {
             const highest = sortedPrices[sortedPrices.length - 1];
             const nextHighest = sortedPrices[sortedPrices.length - 2];
@@ -3270,7 +3271,6 @@ Sitemap: ${origin}/sitemap.xml
             }
           }
           
-          // Proper median: average middle two values for even-length arrays
           let ppMedian: number;
           const mid = Math.floor(sortedPrices.length / 2);
           if (sortedPrices.length % 2 === 0) {
@@ -3280,8 +3280,8 @@ Sitemap: ${origin}/sitemap.xml
           }
           
           const ratio = marketValue / ppMedian;
-          if (ratio < 0.33 || ratio > 2.5) {
-            console.warn(`[Quick Analyze] CROSS-VALIDATION: $${marketValue} diverges from median $${ppMedian.toFixed(2)} (ratio ${ratio.toFixed(2)}). Correcting.`);
+          if (ratio > 2.5) {
+            console.warn(`[Quick Analyze] CROSS-VALIDATION: $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Pulling down.`);
             marketValue = Math.round(ppMedian * 100) / 100;
             priceMin = sortedPrices[0];
             priceMax = sortedPrices[sortedPrices.length - 1];
