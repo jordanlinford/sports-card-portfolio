@@ -51,6 +51,7 @@ import ComparePage from "@/pages/compare";
 import AdminFeedbackPage from "@/pages/admin-feedback";
 import PodcastLanding from "@/pages/podcast";
 import ScanHistoryPage from "@/pages/scan-history";
+import LeaderboardsPage from "@/pages/leaderboards";
 import { TrialBanner } from "@/components/trial-banner";
 
 function Router() {
@@ -78,6 +79,7 @@ function Router() {
       <Route path="/compare" component={ComparePage} />
       <Route path="/podcast" component={PodcastLanding} />
       <Route path="/hidden-gems" component={HiddenGemsPage} />
+      <Route path="/leaderboards" component={LeaderboardsPage} />
       <Route path="/outlook" component={OutlookOverviewPage} />
       <Route path="/watchlist" component={WatchlistPage} />
       {/* Show loading only for auth-dependent routes */}

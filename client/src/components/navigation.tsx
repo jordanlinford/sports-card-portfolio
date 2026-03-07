@@ -58,7 +58,8 @@ import {
   Newspaper,
   Menu,
   GitCompareArrows,
-  History
+  History,
+  Trophy
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -299,6 +300,19 @@ export function Navigation() {
                 >
                   <Compass className="h-4 w-4" />
                   Explore
+                </Button>
+              </Link>
+
+              {/* Leaderboards */}
+              <Link href="/leaderboards">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className={cn("gap-2", isActive("/leaderboards") && "bg-accent")}
+                  data-testid="nav-leaderboards"
+                >
+                  <Trophy className="h-4 w-4" />
+                  Leaderboards
                 </Button>
               </Link>
 
@@ -621,6 +635,12 @@ export function Navigation() {
                   <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/explore") && "bg-accent")}>
                     <Compass className="h-4 w-4" />
                     Explore
+                  </Button>
+                </Link>
+                <Link href="/leaderboards" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/leaderboards") && "bg-accent")} data-testid="nav-leaderboards-mobile">
+                    <Trophy className="h-4 w-4" />
+                    Leaderboards
                   </Button>
                 </Link>
                 <Link href="/blog" onClick={() => setMobileMenuOpen(false)}>

@@ -871,6 +871,20 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  app.get("/api/leaderboards", async (req, res) => {
+    try {
+      const [topLikes, topValue, mostViewed] = await Promise.all([
+        storage.getTopLikedDisplayCases(5),
+        storage.getTopValueDisplayCases(5),
+        storage.getMostViewedDisplayCases(5),
+      ]);
+      res.json({ topLikes, topValue, mostViewed });
+    } catch (error) {
+      console.error("Error fetching leaderboards:", error);
+      res.status(500).json({ message: "Failed to fetch leaderboards" });
+    }
+  });
+
   app.get("/api/explore/search", async (req, res) => {
     try {
       const query = (req.query.q as string) || "";

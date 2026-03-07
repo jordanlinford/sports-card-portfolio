@@ -30,6 +30,7 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Display Customization**: Multiple layout styles and premium themes for display cases.
 - **Collection Organization**: Card tagging, automatic case generation, and duplicate detection.
 - **Social Features**: Liking, commenting, prestige system, and bookmarking.
+- **Leaderboards**: Public page showing top 5 display cases ranked by likes, total value, and views. Accessible from main navigation.
 - **Trading & Communication**: Offers system for cards and direct messaging.
 - **Analytics & Sharing**: Portfolio analytics and viral sharing features.
 - **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts.
