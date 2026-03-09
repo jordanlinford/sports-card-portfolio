@@ -352,6 +352,7 @@ export default function CaseEdit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
       toast({
         title: "Display case updated",
         description: "Your changes have been saved.",
@@ -390,6 +391,7 @@ export default function CaseEdit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       setShowSuccessAnimation(true);
     },
@@ -436,6 +438,7 @@ export default function CaseEdit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       toast({
         title: "Card deleted",
@@ -503,6 +506,7 @@ export default function CaseEdit() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
       
       const updatedCount = data.results?.filter((r: any) => r.oldValue !== r.newValue).length || 0;
       toast({
@@ -525,6 +529,7 @@ export default function CaseEdit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
     },
   });
 
@@ -534,6 +539,7 @@ export default function CaseEdit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
       toast({
         title: "Cards Reordered",
         description: "Cards have been automatically sorted.",
