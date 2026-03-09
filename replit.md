@@ -36,7 +36,7 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts.
 - **Monthly Price Trend Charts**: 18-month lookback price charts using Gemini AI with Google Search grounding for eBay sold data, available on player and card outlook pages.
 - **Graded Value Matrix**: For raw cards, shows estimated PSA 9 and PSA 10 values with a "Grade It?" recommendation based on cost vs. value increase.
-- **Raw Card Price Accuracy**: Multi-layer system preventing graded card prices from inflating raw card valuations, using Gemini prompts for separate raw and graded prices.
+- **Raw Card Price Accuracy**: Multi-layer system preventing graded card prices from inflating raw card valuations, using Gemini prompts for separate raw and graded prices. Price-trend guard only trusts monthly history data backed by real sales (salesCount > 0); trend data with all-zero sales is flagged as fabricated and skipped to prevent hallucinated price fallbacks.
 - **Liquidity Scoring UI**: Visual badges indicating market health and exit risk for cards, with Pro users seeing divergence warnings.
 - **Portfolio-Specific Next Buys (Pro)**: AI-powered recommendations tailored to display case themes, suggesting complementary cards with pricing and investment rationale.
 - **Next Buys Recommendation Engine**: Balanced, investment-focused recommendation system using diverse sources like watchlists, breakout players, team themes, hidden gems, and market outlook, with intelligent source selection and scoring.

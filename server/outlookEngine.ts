@@ -883,6 +883,7 @@ export interface MonthlyPriceHistory {
   dataPoints: MonthlyPricePoint[];
   confidence: "HIGH" | "MEDIUM" | "LOW";
   notes: string;
+  hasAnySales?: boolean;
 }
 
 const monthlyPriceCache = new Map<string, { data: MonthlyPriceHistory; cachedAt: number }>();
@@ -1125,13 +1126,21 @@ Rules:
     if (realDataMonths < 4) computedConfidence = "LOW";
     else if (realDataMonths < 8 && computedConfidence === "HIGH") computedConfidence = "MEDIUM";
 
+    const totalSalesCount = rawPoints.reduce((sum: number, p: MonthlyPricePoint) => sum + (p.salesCount || 0), 0);
+    const hasAnySales = totalSalesCount > 0;
+    if (!hasAnySales) {
+      console.log(`[MonthlyPrice] WARNING: All ${rawPoints.length} data points have 0 sales — prices are estimated/hallucinated`);
+      computedConfidence = "LOW";
+    }
+
     const result: MonthlyPriceHistory = {
       playerName: params.playerName,
       sport: params.sport,
       cardDescription: searchDescription,
       dataPoints: filledPoints,
       confidence: computedConfidence as "HIGH" | "MEDIUM" | "LOW",
-      notes: parsed.notes || (realDataMonths < 6 ? `Based on ${realDataMonths} months of data with interpolation.` : ""),
+      notes: parsed.notes || (!hasAnySales ? "No actual sales data found — prices are estimates only." : (realDataMonths < 6 ? `Based on ${realDataMonths} months of data with interpolation.` : "")),
+      hasAnySales,
     };
 
     monthlyPriceCache.set(cacheKey, { data: result, cachedAt: Date.now() });

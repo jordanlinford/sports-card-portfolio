@@ -2538,7 +2538,9 @@ Sitemap: ${origin}/sitemap.xml
 
       // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
       // The price trend chart and displayed value should never wildly disagree
-      if (monthlyPriceHistory && monthlyPriceHistory.dataPoints && monthlyPriceHistory.dataPoints.length > 0) {
+      // Only trust trend data that has real sales backing it (salesCount > 0 for at least some months)
+      const outlookTrendHasRealSales = monthlyPriceHistory?.hasAnySales === true;
+      if (monthlyPriceHistory && monthlyPriceHistory.dataPoints && monthlyPriceHistory.dataPoints.length > 0 && outlookTrendHasRealSales) {
         const recentPoints = monthlyPriceHistory.dataPoints.slice(-3);
         const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
 
@@ -2566,6 +2568,8 @@ Sitemap: ${origin}/sitemap.xml
             priceMax = Math.max(...allPrices);
           }
         }
+      } else if (monthlyPriceHistory && !outlookTrendHasRealSales) {
+        console.warn(`[Outlook 2.0] PRICE-TREND GUARD: Skipping — trend data has NO real sales (all salesCount=0), prices are fabricated`);
       }
       
       // Determine final action - use matchConfidence safeguard when Gemini data unavailable
@@ -3304,7 +3308,9 @@ Sitemap: ${origin}/sitemap.xml
       }
       
       // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
-      if (qaMonthlyPriceHistory && qaMonthlyPriceHistory.dataPoints && qaMonthlyPriceHistory.dataPoints.length > 0) {
+      // Only trust trend data that has real sales backing it (salesCount > 0 for at least some months)
+      const trendHasRealSales = qaMonthlyPriceHistory?.hasAnySales === true;
+      if (qaMonthlyPriceHistory && qaMonthlyPriceHistory.dataPoints && qaMonthlyPriceHistory.dataPoints.length > 0 && trendHasRealSales) {
         const recentPoints = qaMonthlyPriceHistory.dataPoints.slice(-3);
         const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
 
@@ -3334,6 +3340,8 @@ Sitemap: ${origin}/sitemap.xml
             }
           }
         }
+      } else if (qaMonthlyPriceHistory && !trendHasRealSales) {
+        console.warn(`[Quick Analyze] PRICE-TREND GUARD: Skipping — trend data has NO real sales (all salesCount=0), prices are fabricated`);
       }
 
       // SPECIFICITY GUARD
