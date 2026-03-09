@@ -48,6 +48,8 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Build Process**: Vite for client bundling and esbuild for server bundling.
 - **Session Management**: Secure, HttpOnly cookies with a 7-day TTL, storing session data in PostgreSQL.
 - **Unified Card Analysis**: Single Gemini 2.5 Flash call for market pricing, player news, and investment verdict, reducing analysis time.
+- **SSP/Case Hit Parallel Detection**: Premium unnumbered parallels (Zebra, Tiger Stripe, Color Blast, Shock, Downtown, Kaboom, Mojo, Shimmer, etc.) are explicitly detected and priced separately from base/silver parallels. Search broadening protects SSP keywords from being dropped.
+- **Player Outlook Parallelization**: News signals and market data fetched via `Promise.all` in parallel, reducing outlook generation time by ~4-8 seconds.
 - **eBay Comps Caching**: Stale-while-revalidate (SWR) pattern with extended TTLs and query broadening.
 - **Player News Caching**: 4-hour in-memory cache for `fetchPlayerNews` results.
 - **VPS Worker Architecture**: Dedicated-IP VPS for eBay scraper for improved reliability.

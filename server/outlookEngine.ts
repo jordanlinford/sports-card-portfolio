@@ -221,8 +221,12 @@ export async function fetchGeminiMarketData(card: {
   const searchDescription = parts.join(" ") || card.title;
   
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
+  const variationLowerStandalone = (card.variation || "").toLowerCase().trim();
+  const isPremiumUnnumberedStandalone = !isNumbered && /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i.test(variationLowerStandalone);
   const variationContext = isNumbered 
     ? `\nCRITICAL: This is a NUMBERED parallel (${card.variation}). It is significantly rarer and more valuable than base cards. Search specifically for "${searchDescription}" — do NOT return base card prices for a numbered parallel.`
+    : isPremiumUnnumberedStandalone
+      ? `\nCRITICAL: This is a PREMIUM SSP/Case Hit parallel — "${card.variation}". It is SIGNIFICANTLY more valuable than base/silver cards. Search specifically for "${card.variation}" — do NOT return base card prices. Include the exact parallel name in every search.`
     : (card.variation && card.variation.toLowerCase() !== "base"
       ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
       : "");
@@ -338,7 +342,11 @@ Price stability:
 
 Be specific with numbers. If you find 19 sold listings, say 19, not "approximately 20".
 
-SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries — drop words like "holo", "prizm", "insert" and search just the player name, year, set name, and card number. A comp from a similar parallel is better than 0 results.
+SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
+- Drop ONLY generic words like "holo", "insert" from the search
+- NEVER drop SSP/Case Hit parallel names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer, etc.) — these define the card's rarity and price tier
+- Try: "[year] [set] [player name] [variation] sold"
+- For SSP/premium parallels, ALWAYS keep the parallel name — a Zebra is NOT a Silver
 
 ZERO COMPS: If you STILL find NO completed sales after broadening, set soldCount to 0 and avgPrice to null. Note any active listings in "notes".`;
 
@@ -516,7 +524,8 @@ export async function fetchUnifiedCardAnalysis(card: {
 
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLower = (card.variation || "").toLowerCase().trim();
-  const isBaseOrCommonParallel = !isNumbered && (
+  const isPremiumUnnumberedParallel = !isNumbered && /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i.test(variationLower);
+  const isBaseOrCommonParallel = !isNumbered && !isPremiumUnnumberedParallel && (
     !card.variation ||
     variationLower === "base" ||
     /^(certified\s+)?rookie\s*(card|rc)?\s*(silver|base|prizm|holo|disco)?$/i.test(variationLower) ||
@@ -525,6 +534,15 @@ export async function fetchUnifiedCardAnalysis(card: {
   );
   const variationContext = isNumbered
     ? `\nCRITICAL: This is a NUMBERED parallel (${card.variation}). It is significantly rarer and more valuable than base cards. Search specifically for "${searchDescription}" — do NOT return base card prices for a numbered parallel.`
+    : isPremiumUnnumberedParallel
+      ? `\nCRITICAL: This is a PREMIUM UNNUMBERED PARALLEL — "${card.variation}". This is an SSP (Super Short Print) or Case Hit parallel that is SIGNIFICANTLY more valuable than base/silver cards, even though it is unnumbered.
+- SSP/Case Hit parallels like Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer etc. are RARE and command PREMIUM prices
+- Do NOT confuse with base, silver, or common parallels — these are in a completely different price tier
+- For Panini Select: Zebra/Tiger Stripe Concourse parallels are SSP Case Hits worth 10-50x more than base Concourse Silver
+- For Panini Prizm: Color Blast, Shimmer, Mojo are premium SSPs worth far more than base Silver Prizm
+- Search specifically for "${card.variation}" in your eBay queries — this variation name is CRITICAL to the price
+- Include the EXACT parallel name in every search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation} sold eBay"
+- These cards typically sell for $20-$200+ for non-stars, and $100-$1000+ for stars`
     : isBaseOrCommonParallel
       ? `\nCRITICAL: This appears to be a BASE or COMMON unnumbered parallel (${card.variation || "base"}). These are typically the CHEAPEST version of the card.
 - "Certified Rookie" / "RC" is just a rookie designation — it does NOT make the card premium
@@ -669,11 +687,14 @@ PRICING RULES:
 - When in doubt, ask yourself: "If I searched eBay sold listings for this exact card right now, what would the typical recent sale price be?" — that is your avgPrice
 
 SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
-- Drop descriptive words like "holo", "prizm", "insert" from the search
-- Try just: "[year] [brand] Select [player name] [card number] sold"  
-- Try: "[year] Panini Select [player name] Certified sold"
-- Look for the same card number/player from the same set — base and silver prizm versions often share pricing
-Report whatever comps you find from these broader searches. A $5 comp from a slightly different parallel is better than $0.
+- Drop ONLY generic descriptive words like "holo", "insert" from the search
+- NEVER drop SSP/Case Hit parallel names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer, Scope, Velocity, Hyper, Wave, Ice, Crystal, Cracked Ice, Laser, FOTL) — these define the card's rarity tier and price
+- NEVER drop "prizm" if the set name is "Prizm" — it's the brand name, not a descriptor
+- Try just: "[year] [brand] [player name] [variation] sold"  
+- Try: "[year] [set] [player name] [variation] sold"
+- For SSP/premium parallels, ALWAYS keep the parallel name in broadened searches — a Zebra is NOT interchangeable with a Silver
+- Only fall back to base/silver pricing if the card IS actually a base/silver parallel
+Report whatever comps you find from these broader searches.
 
 ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and avgPrice to null. Note any active listings in "notes" for reference.
 

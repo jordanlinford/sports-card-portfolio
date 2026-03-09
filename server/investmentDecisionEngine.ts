@@ -1304,6 +1304,7 @@ function generateWhyBullets(verdict: InvestmentVerdict, scores: InvestmentScores
   const bullets: string[] = [];
   const { stage, temperature, position } = input;
   const { mispricingScore, downsideRiskScore, narrativeHeatScore, liquidityScore } = scores;
+  const isEarlyCareer = stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3" || stage === "YEAR_4";
   
   // Position-aware stage labels for pattern language
   const stageLabel = stage === "ROOKIE" ? "Rookie" : 
