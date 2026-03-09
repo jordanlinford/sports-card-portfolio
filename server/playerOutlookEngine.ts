@@ -1307,12 +1307,11 @@ async function generateFreshOutlook(
   sport: string,
   playerKey: string
 ): Promise<PlayerOutlookResponse> {
-  // Step 1: Fetch news signals and market data IN PARALLEL (both only need playerName + sport)
-  const [newsSignals, marketData] = await Promise.all([
-    getPlayerNewsSignals(playerName, sport),
-    fetchPlayerMarketData(playerName, sport),
-  ]);
-  const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus, aiCareerStage, aiRookieYear, aiPosition } = newsSignals;
+  // Step 1: Start market data fetch in background (does NOT block next steps)
+  const marketDataPromise = fetchPlayerMarketData(playerName, sport);
+  
+  // Step 1b: Fetch news signals (blocks until complete — classification + narrative depend on this)
+  const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus, aiCareerStage, aiRookieYear, aiPosition } = await getPlayerNewsSignals(playerName, sport);
   
   // Step 2: Run classification engine (depends on news signals)
   // Priority for career stage: detectedStage (BUST/RETIRED/HOF from careerStatus) > aiCareerStage (from Gemini) > inferCareerStage
@@ -1494,7 +1493,8 @@ async function generateFreshOutlook(
   // Step 6: Calculate valuation using heuristic model
   const valuation = calculateValuation(sport, finalClassification, verdict.modifier);
   
-  // Step 6.5: Market data already fetched in parallel (Step 1)
+  // Step 6.5: Await market data (started in Step 1, has been fetching in background while we did classification + narrative)
+  const marketData = await marketDataPromise;
   
   // Step 7: Build evidence with real market data when available, fallback to modeled
   const useRealMarketData = marketData.available && marketData.totalAvgPrice !== undefined;
