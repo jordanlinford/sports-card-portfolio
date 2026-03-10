@@ -3541,7 +3541,7 @@ Sitemap: ${origin}/sitemap.xml
             ? "Updating in background..."
             : undefined,
         },
-        priceHistory: qaMonthlyPriceHistory || null,
+        priceHistory: (qaMonthlyPriceHistory?.hasAnySales === true) ? qaMonthlyPriceHistory : null,
         generatedAt: new Date().toISOString(),
         isPro,
       });
@@ -4108,6 +4108,11 @@ Sitemap: ${origin}/sitemap.xml
 
       if (!history) {
         return res.status(404).json({ message: "Could not retrieve price history data" });
+      }
+
+      if (history.hasAnySales === false) {
+        console.log(`[PriceHistory] Suppressing chart for ${playerName} — all data points have 0 sales (fabricated)`);
+        return res.status(404).json({ message: "No real sales data available for price history chart" });
       }
 
       res.json(history);
