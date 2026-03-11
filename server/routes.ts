@@ -3300,12 +3300,13 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      // ZERO-DATA DISCOUNT: When unified has 0 sold comps AND legacy has 0 price points,
+      // ZERO-DATA DISCOUNT: When unified has 0 sold comps AND legacy has insufficient data,
       // the estimate is pure AI guesswork with no market data backing it — discount heavily
+      // A single AI-generated price point doesn't count as real data (it's just another Gemini guess)
       const legacyPricePoints = priceData.pricePoints || [];
-      const legacyHasData = legacyPricePoints.length > 0;
+      const legacyHasRealData = legacyPricePoints.length >= 2;
       const unifiedHasData = compCount > 0;
-      if (!unifiedHasData && !legacyHasData && marketValue && !qaIs1of1 && !qaIsVeryLowPop) {
+      if (!unifiedHasData && !legacyHasRealData && marketValue && !qaIs1of1 && !qaIsVeryLowPop) {
         const originalValue = marketValue;
         const discountFactor = 0.5;
         marketValue = Math.round(marketValue * discountFactor * 100) / 100;
