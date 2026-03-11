@@ -868,6 +868,105 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
 }
 
 // ============================================================
+// LOW-POP FALLBACK PRICING — triggered when unified analysis fails for /1-/5 cards
+// Uses a simplified Gemini + Google Search call focused on triangulation
+// ============================================================
+export async function fetchLowPopFallbackPrice(card: {
+  title: string;
+  playerName?: string;
+  year?: string | number;
+  set?: string;
+  variation?: string;
+  grade?: string;
+  grader?: string;
+}): Promise<{ avgPrice: number; minPrice: number; maxPrice: number; notes: string } | null> {
+  const playerName = card.playerName || card.title;
+  const year = card.year || "";
+  const set = card.set || "";
+  const variation = card.variation || "";
+  const gradeStr = card.grade ? ` ${card.grade}` : "";
+  const graderStr = card.grader && card.grader.toLowerCase() !== "raw" ? ` ${card.grader}` : "";
+  const isRaw = !card.grade || card.grade.toLowerCase() === "raw" || (card.grader && card.grader.toLowerCase() === "raw");
+
+  const popMatch = variation.match(/\/\s*(\d+)\b/);
+  const popNumber = popMatch ? parseInt(popMatch[1]) : 5;
+  const is1of1 = /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(variation);
+  const cardLabel = is1of1 ? "1/1" : `/${popNumber}`;
+
+  const searchDesc = `${year} ${set} ${playerName} ${variation}${gradeStr}${graderStr}`.trim();
+
+  const prompt = `You are a sports card pricing expert. I need a fair market value estimate for this EXTREMELY RARE card:
+
+CARD: "${searchDesc}"
+Print Run: ${cardLabel} (only ${is1of1 ? 1 : popNumber} copies exist)
+Condition: ${isRaw ? "RAW (ungraded)" : (card.grade || "Unknown")}
+
+Because this is a ${cardLabel} card, direct sold comps are very rare. Use this TRIANGULATION approach:
+
+1. Search for recent eBay sold listings of MORE COMMON parallels of this SAME player from the SAME set:
+   - Search: "${playerName} ${year} ${set} /25 sold eBay"
+   - Search: "${playerName} ${year} ${set} /49 sold eBay"  
+   - Search: "${playerName} ${year} ${set} /99 sold eBay"
+   - Search: "${playerName} ${year} ${set} base sold eBay"
+
+2. Apply standard hobby multipliers based on the closest parallel you find:
+   - /99 comp → ${cardLabel} value = ${is1of1 ? "10-15x" : popNumber <= 5 ? "6-10x" : "3-6x"}
+   - /49 comp → ${cardLabel} value = ${is1of1 ? "6-10x" : popNumber <= 5 ? "4-6x" : "2-3.5x"}
+   - /25 comp → ${cardLabel} value = ${is1of1 ? "3-5x" : popNumber <= 5 ? "2-3x" : "1.3-2x"}
+   - /10 comp → ${cardLabel} value = ${is1of1 ? "2-3.5x" : popNumber <= 5 ? "1.5-2x" : "same tier"}
+   For autographs, use the higher end. For non-auto cards, use the lower end.
+
+3. Also search for: "${playerName} ${cardLabel} sold eBay" to check if any direct comps exist
+
+4. Consider the brand tier — ${set} is what tier? Premium (Prizm, National Treasures, Finest, Flawless) gets higher multipliers.
+
+Return ONLY this JSON:
+{
+  "avgPrice": <your best triangulated estimate for ${isRaw ? "raw/ungraded" : "this grade"}>,
+  "minPrice": <conservative low estimate>,
+  "maxPrice": <aggressive high estimate>,
+  "notes": "<explain your triangulation: which parallel sold for how much, what multiplier you applied>"
+}`;
+
+  try {
+    console.log(`[LowPop Fallback] Starting triangulation for: ${searchDesc}`);
+    const startTime = Date.now();
+
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const elapsed = Date.now() - startTime;
+    let responseText = response.text || "";
+    console.log(`[LowPop Fallback] Response in ${elapsed}ms (${responseText.length} chars)`);
+
+    responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.avgPrice && typeof parsed.avgPrice === "number" && parsed.avgPrice > 0) {
+        console.log(`[LowPop Fallback] Triangulated: $${parsed.avgPrice} (range $${parsed.minPrice}-$${parsed.maxPrice}) | ${parsed.notes?.substring(0, 100)}`);
+        return {
+          avgPrice: parsed.avgPrice,
+          minPrice: parsed.minPrice || parsed.avgPrice * 0.7,
+          maxPrice: parsed.maxPrice || parsed.avgPrice * 1.5,
+          notes: parsed.notes || "Triangulated from parallel comps",
+        };
+      }
+    }
+    console.warn(`[LowPop Fallback] Could not parse valid price from response`);
+    return null;
+  } catch (error: any) {
+    console.error(`[LowPop Fallback] Error:`, error.message);
+    return null;
+  }
+}
+
+// ============================================================
 // MONTHLY PRICE HISTORY - 18-month lookback via Gemini + Google Search
 // ============================================================
 export interface MonthlyPricePoint {

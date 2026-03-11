@@ -2521,7 +2521,7 @@ Sitemap: ${origin}/sitemap.xml
       // CROSS-VALIDATION: Reconcile market value against actual price points from comps
       // Only pull value DOWN if legacy median is lower — never inflate Gemini's price upward
       // Skip for 1/1 cards where price points may be from parallel comp projections
-      if (pricePointsForSchema.length > 0 && !is1of1) {
+      if (pricePointsForSchema.length > 0 && !is1of1 && !isLowPop) {
         const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
         if (ppPrices.length > 0 && marketValue && marketValue > 0) {
           const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
@@ -3057,7 +3057,7 @@ Sitemap: ${origin}/sitemap.xml
       // UNIFIED APPROACH: One Gemini call for pricing + news + verdict, parallel with legacy price lookup + price history
       console.log(`[Quick Analyze] Starting unified analysis for: ${title}`);
       const startTime = Date.now();
-      const { fetchMonthlyPriceHistory } = await import("./outlookEngine");
+      const { fetchMonthlyPriceHistory, fetchLowPopFallbackPrice } = await import("./outlookEngine");
       const [unifiedResult, priceData, qaMonthlyPriceHistory] = await Promise.all([
         fetchUnifiedCardAnalysis({
           title,
@@ -3223,6 +3223,7 @@ Sitemap: ${origin}/sitemap.xml
       const qaSerialNumber = req.body.serialNumber || null;
       const qaIs1of1 = isOneOfOneCard({ title: title, variation: qaVariation, serialNumber: qaSerialNumber });
       const qaIsLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(qaVariation);
+      const qaIsVeryLowPop = /\/\s*[1-5]\b/.test(qaVariation) && !qaIs1of1;
       
       // Determine market value: prefer unified Gemini data, fall back to legacy
       let marketValue = priceData.estimatedValue;
@@ -3260,6 +3261,42 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // LOW-POP FALLBACK: When unified analysis fails for /1-/5 cards, use dedicated triangulation
+      let lowPopFallbackAttempted = false;
+      let lowPopFallbackSelected = false;
+      let lowPopFallbackPrice: number | null = null;
+      if ((qaIs1of1 || qaIsVeryLowPop) && (!unifiedResult || !unifiedResult.market.avgPrice)) {
+        const legacyPrice = marketValue;
+        lowPopFallbackAttempted = true;
+        console.log(`[Quick Analyze] LOW-POP FALLBACK: Unified failed for ${qaIs1of1 ? "1/1" : "low-pop /1-/5"} card. Legacy price: $${legacyPrice}. Attempting triangulation...`);
+        try {
+          const fallbackResult = await fetchLowPopFallbackPrice({
+            title,
+            playerName: title,
+            year: year || undefined,
+            set: set || undefined,
+            variation: variation || undefined,
+            grade: grade || undefined,
+            grader: grader || undefined,
+          });
+          if (fallbackResult && fallbackResult.avgPrice > 0) {
+            lowPopFallbackPrice = fallbackResult.avgPrice;
+            const usesFallback = !marketValue || fallbackResult.avgPrice > marketValue;
+            if (usesFallback) {
+              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} (range $${fallbackResult.minPrice}-$${fallbackResult.maxPrice}) > legacy $${legacyPrice}. Using fallback.`);
+              marketValue = fallbackResult.avgPrice;
+              priceMin = fallbackResult.minPrice;
+              priceMax = fallbackResult.maxPrice;
+              lowPopFallbackSelected = true;
+            } else {
+              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} <= legacy $${legacyPrice}. Keeping legacy.`);
+            }
+          }
+        } catch (fallbackError: any) {
+          console.warn(`[Quick Analyze] LOW-POP FALLBACK: Error: ${fallbackError.message}`);
+        }
+      }
+
       // RAW CARD PRICE CORRECTION
       const qaIsRaw = isRawCardCheck(grade, grader);
       if (qaIsRaw && marketValue && priceMin && priceMin > 0 && !qaIs1of1 && !qaIsLowPop) {
@@ -3275,7 +3312,7 @@ Sitemap: ${origin}/sitemap.xml
       // CROSS-VALIDATION against legacy price points
       // Only pull value DOWN if legacy median is lower — never inflate Gemini's price upward
       const ppForValidation = priceData.pricePoints || [];
-      if (ppForValidation.length > 0 && !qaIs1of1) {
+      if (ppForValidation.length > 0 && !qaIs1of1 && !qaIsLowPop) {
         const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
         if (ppPrices.length > 0 && marketValue && marketValue > 0) {
           let sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
@@ -3542,6 +3579,16 @@ Sitemap: ${origin}/sitemap.xml
             : undefined,
         },
         priceHistory: (qaMonthlyPriceHistory?.hasAnySales === true) ? qaMonthlyPriceHistory : null,
+        pricingDebug: signals.dataConfidence === "LOW" ? {
+          unifiedStatus: unifiedResult ? (unifiedResult.market.avgPrice > 0 ? "success" : "no_price") : "failed",
+          unifiedPrice: unifiedResult?.market?.avgPrice || null,
+          legacyPrice: priceData.estimatedValue || null,
+          legacyComps: priceData.salesFound || 0,
+          lowPopFallbackAttempted,
+          lowPopFallbackPrice,
+          lowPopFallbackSelected,
+          finalSource: unifiedResult?.market?.avgPrice > 0 ? "unified" : (lowPopFallbackSelected ? "lowpop_fallback" : "legacy"),
+        } : undefined,
         generatedAt: new Date().toISOString(),
         isPro,
       });
