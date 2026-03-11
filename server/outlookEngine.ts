@@ -291,8 +291,12 @@ STEP 2 — Use the HIGHEST-VALUE parallel comp as your primary anchor, then appl
 For premium brands (Prizm, National Treasures, Finest, Flawless, Immaculate, Select), use the HIGHER end.
 For hot rookies, #1 picks, or generational talents, use the HIGHER end.
 
-STEP 3 — Sanity check against similar-tier player cards from the same set.
-STEP 4 — Adjust for brand tier (National Treasures/Flawless = premium, Pro Set/Leaf = budget).
+STEP 3 — CROSS-SET COMPS: If vertical comps from the same set are scarce, search for this same player's cards from DIFFERENT sets of the same year:
+- "${playerSearchStandalone} ${yearStrStandalone} auto /${pn || ""} sold eBay" (any set, same numbering)
+- "${playerSearchStandalone} ${yearStrStandalone} rookie auto sold eBay" (broader)
+These "sister" comps are more reliable than guessing. Premium sets (Noir, National Treasures, Flawless) should be at or above mid-tier sister comps.
+STEP 4 — Sanity check against similar-tier player cards from the same set.
+STEP 5 — Adjust for brand tier (National Treasures/Flawless/Noir = premium, Select/Mosaic = mid, Pro Set/Leaf = budget).
 
 YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return 0 for a low-pop card.
 If you find multiple parallel comps, triangulate from EACH one and use the highest result.
@@ -652,12 +656,19 @@ For premium brands (Prizm, National Treasures, Finest, Flawless, Immaculate, Sel
 For hot rookies, #1 draft picks, or generational talents, use the HIGHER end.
 For autographs/memorabilia, use the higher end. For non-auto base parallels from budget products, use the lower end.
 
-STEP 3 — HORIZONTAL COMPS: Search for other ${cardLabel} cards of similar-tier players from the same set or product.
+STEP 3 — CROSS-SET COMPS: If you cannot find enough vertical comps from the SAME set, search for this SAME player's cards from DIFFERENT premium sets of the same year:
+- Search: "${playerSearch} ${yearStr} auto /${popNumber || ""} sold eBay" (any set, same numbering)
+- Search: "${playerSearch} ${yearStr} rookie auto sold eBay" (broader search)
+These "sister" comps from other sets (e.g. Prizm, Select, Spectra, Immaculate) of the same player/year are more reliable than pure guesswork.
+If the card's set is premium (Noir, National Treasures, Flawless), its value should be at or above sister comps from mid-tier sets.
+If the card's set is mid-tier, sister comps from premium sets should be treated as a ceiling.
+
+STEP 4 — HORIZONTAL COMPS: Search for other ${cardLabel} cards of similar-tier players from the same set or product.
 Use this as a sanity check on your multiplier estimate.
 
-STEP 4 — BRAND CONTEXT: Consider the brand/product tier:
-- Premium products (Prizm, National Treasures, Flawless, Immaculate) command higher premiums
-- Mid-tier products (Select, Mosaic, Optic) are moderate
+STEP 5 — BRAND CONTEXT: Consider the brand/product tier:
+- Premium products (Prizm, National Treasures, Flawless, Immaculate, Noir) command higher premiums
+- Mid-tier products (Select, Mosaic, Optic, Finest) are moderate
 - Budget/unlicensed products (Pro Set, Leaf, Wild Card) have lower premiums
 Adjust your estimate based on the product's market positioning.
 
@@ -945,7 +956,12 @@ Because this is a ${cardLabel} card, direct sold comps are very rare. Use this T
 
 3. Also search for: "${playerName} ${cardLabel} sold eBay" to check if any direct comps exist
 
-4. Cross-check: If you find multiple parallel comps, triangulate from each one separately and average the results. The final estimate should be at LEAST as high as the highest individual triangulation.
+4. CROSS-SET COMPS: If you cannot find enough comps from the SAME set, search for this player's cards from DIFFERENT sets of the same year:
+   - Search: "${playerName} ${year} auto /${popNumber} sold eBay" (any set, same numbering)
+   - Search: "${playerName} ${year} rookie auto sold eBay" (broader search)
+   These "sister" comps from other sets are more reliable than guessing. Premium sets (Noir, National Treasures, Flawless) should be at or above mid-tier sister comps. Mid-tier sets should use premium set comps as a ceiling.
+
+5. Cross-check: If you find multiple parallel comps (vertical or cross-set), triangulate from each one separately. Weight cross-set comps of the SAME numbering most heavily — they are the most direct comparison.
 
 Return ONLY this JSON:
 {
