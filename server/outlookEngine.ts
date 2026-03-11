@@ -281,15 +281,12 @@ STEP 1 — Search for this player's OTHER numbered parallels from the SAME set o
 ${is1of1 || (pn && pn <= 5) ? `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /10 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /25 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /50 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /75 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"` : pn && pn <= 10 ? `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /25 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"` : `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"`}
 Find as many different numbered parallel sold prices as possible.
 
-STEP 2 — Use the HIGHEST-VALUE parallel comp as your primary anchor, then apply multiplier:
-  /99 comp → /${pn || 1} value ≈ ${is1of1 ? "15-25x" : pn && pn <= 5 ? "8-15x" : pn && pn <= 10 ? "4-8x" : "2-4x"}
-  /75 comp → /${pn || 1} value ≈ ${is1of1 ? "10-20x" : pn && pn <= 5 ? "6-12x" : pn && pn <= 10 ? "3-6x" : "2-3x"}
-  /50 comp → /${pn || 1} value ≈ ${is1of1 ? "8-15x" : pn && pn <= 5 ? "5-10x" : pn && pn <= 10 ? "3-5x" : "1.5-3x"}
-  /49 comp → /${pn || 1} value ≈ ${is1of1 ? "8-15x" : pn && pn <= 5 ? "5-10x" : pn && pn <= 10 ? "3-5x" : "1.5-3x"}
-  /25 comp → /${pn || 1} value ≈ ${is1of1 ? "4-8x" : pn && pn <= 5 ? "3-5x" : "1.5-3x"}
-  /10 comp → /${pn || 1} value ≈ ${is1of1 ? "3-5x" : pn && pn <= 5 ? "2-3.5x" : "same tier"}
-For premium brands (Prizm, National Treasures, Finest, Flawless, Immaculate, Select), use the HIGHER end.
-For hot rookies, #1 picks, or generational talents, use the HIGHER end.
+STEP 2 — Apply multiplier from the closest parallel found to estimate /${pn || 1} value:
+  /99 comp → /${pn || 1} value ≈ ${is1of1 ? "10-15x" : pn && pn <= 5 ? "6-10x" : pn && pn <= 10 ? "3-6x" : "2-3x"}
+  /49 comp → /${pn || 1} value ≈ ${is1of1 ? "6-10x" : pn && pn <= 5 ? "4-6x" : pn && pn <= 10 ? "2-3.5x" : "1.5-2x"}
+  /25 comp → /${pn || 1} value ≈ ${is1of1 ? "3-5x" : pn && pn <= 5 ? "2-3x" : "1.3-2x"}
+  /10 comp → /${pn || 1} value ≈ ${is1of1 ? "2-3.5x" : pn && pn <= 5 ? "1.5-2x" : "same tier"}
+For autographs/memorabilia, use the higher end. For non-auto cards, use the lower end.
 
 STEP 3 — CROSS-SET COMPS: If vertical comps from the same set are scarce, search for this same player's cards from DIFFERENT sets of the same year:
 - "${playerSearchStandalone} ${yearStrStandalone} auto /${pn || ""} sold eBay" (any set, same numbering)
@@ -644,17 +641,13 @@ Also search: "${playerSearch} ${yearStr} ${setStr} auto sold eBay" for broader r
 Report whatever parallel comps you find in your notes.
 
 STEP 2 — APPLY MULTIPLIER from the closest parallel found:
-IMPORTANT: Find ALL available parallel comps, then use the HIGHEST-VALUE comp as your primary anchor.
 Multiplier table (relative to the comp parallel you found):
-  /99 comp → /${popNumber || 1} value ≈ ${is1of1 ? "15-25x" : popNumber && popNumber <= 5 ? "8-15x" : popNumber && popNumber <= 10 ? "4-8x" : "2-4x"}
-  /50 comp → /${popNumber || 1} value ≈ ${is1of1 ? "8-15x" : popNumber && popNumber <= 5 ? "5-10x" : popNumber && popNumber <= 10 ? "3-5x" : "1.5-3x"}
-  /49 comp → /${popNumber || 1} value ≈ ${is1of1 ? "8-15x" : popNumber && popNumber <= 5 ? "5-10x" : popNumber && popNumber <= 10 ? "3-5x" : "1.5-3x"}
-  /25 comp → /${popNumber || 1} value ≈ ${is1of1 ? "4-8x" : popNumber && popNumber <= 5 ? "3-5x" : "1.5-3x"}
-  /10 comp → /${popNumber || 1} value ≈ ${is1of1 ? "3-5x" : popNumber && popNumber <= 5 ? "2-3.5x" : "same tier"}
-  /5 comp  → /${popNumber || 1} value ≈ ${is1of1 ? "2-3x" : "0.8-1.2x (similar scarcity)"}
-For premium brands (Prizm, National Treasures, Finest, Flawless, Immaculate, Select), use the HIGHER end of multipliers.
-For hot rookies, #1 draft picks, or generational talents, use the HIGHER end.
-For autographs/memorabilia, use the higher end. For non-auto base parallels from budget products, use the lower end.
+  /99 comp → /${popNumber || 1} value ≈ ${is1of1 ? "10-15x" : popNumber && popNumber <= 5 ? "6-10x" : popNumber && popNumber <= 10 ? "3-6x" : "2-3x"}
+  /49 comp → /${popNumber || 1} value ≈ ${is1of1 ? "6-10x" : popNumber && popNumber <= 5 ? "4-6x" : popNumber && popNumber <= 10 ? "2-3.5x" : "1.5-2x"}
+  /25 comp → /${popNumber || 1} value ≈ ${is1of1 ? "3-5x" : popNumber && popNumber <= 5 ? "2-3x" : "1.3-2x"}
+  /10 comp → /${popNumber || 1} value ≈ ${is1of1 ? "2-3.5x" : popNumber && popNumber <= 5 ? "1.5-2x" : "same tier"}
+  /5 comp  → /${popNumber || 1} value ≈ ${is1of1 ? "1.5-2.5x" : "0.7-1x (similar scarcity)"}
+For autographs/memorabilia, use the higher end. For non-auto cards, use the lower end.
 
 STEP 3 — CROSS-SET COMPS: If you cannot find enough vertical comps from the SAME set, search for this SAME player's cards from DIFFERENT premium sets of the same year:
 - Search: "${playerSearch} ${yearStr} auto /${popNumber || ""} sold eBay" (any set, same numbering)

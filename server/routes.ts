@@ -3300,6 +3300,20 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // ZERO-DATA DISCOUNT: When unified has 0 sold comps AND legacy has 0 price points,
+      // the estimate is pure AI guesswork with no market data backing it — discount heavily
+      const legacyPricePoints = priceData.pricePoints || [];
+      const legacyHasData = legacyPricePoints.length > 0;
+      const unifiedHasData = compCount > 0;
+      if (!unifiedHasData && !legacyHasData && marketValue && !qaIs1of1 && !qaIsVeryLowPop) {
+        const originalValue = marketValue;
+        const discountFactor = 0.5;
+        marketValue = Math.round(marketValue * discountFactor * 100) / 100;
+        priceMin = Math.round((priceMin || marketValue * 0.7) * discountFactor * 100) / 100;
+        priceMax = Math.round((priceMax || marketValue * 1.5) * discountFactor * 100) / 100;
+        console.warn(`[Quick Analyze] ZERO-DATA DISCOUNT: No comps from unified (0 sold) or legacy (0 price points). Estimate $${originalValue} is pure guesswork — discounted 50% to $${marketValue}`);
+      }
+
       // RAW CARD PRICE CORRECTION
       const qaIsRaw = isRawCardCheck(grade, grader);
       if (qaIsRaw && marketValue && priceMin && priceMin > 0 && !qaIs1of1 && !qaIsLowPop) {
