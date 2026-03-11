@@ -3261,14 +3261,17 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      // LOW-POP FALLBACK: When unified analysis fails for /1-/5 cards, use dedicated triangulation
+      // LOW-POP FALLBACK: For /1-/5 cards, always run triangulation when we have 0 direct sold comps
+      // This catches cases where unified analysis returns a guess without real data backing it
       let lowPopFallbackAttempted = false;
       let lowPopFallbackSelected = false;
       let lowPopFallbackPrice: number | null = null;
-      if ((qaIs1of1 || qaIsVeryLowPop) && (!unifiedResult || !unifiedResult.market.avgPrice)) {
-        const legacyPrice = marketValue;
+      const unifiedHasNoComps = !unifiedResult || !unifiedResult.market.avgPrice || unifiedResult.market.soldCount === 0;
+      if ((qaIs1of1 || qaIsVeryLowPop) && unifiedHasNoComps) {
+        const currentPrice = marketValue;
         lowPopFallbackAttempted = true;
-        console.log(`[Quick Analyze] LOW-POP FALLBACK: Unified failed for ${qaIs1of1 ? "1/1" : "low-pop /1-/5"} card. Legacy price: $${legacyPrice}. Attempting triangulation...`);
+        const reason = !unifiedResult ? "unified failed" : !unifiedResult.market.avgPrice ? "unified returned no price" : "unified has 0 sold comps";
+        console.log(`[Quick Analyze] LOW-POP FALLBACK: ${reason} for ${qaIs1of1 ? "1/1" : "low-pop /1-/5"} card. Current price: $${currentPrice}. Attempting triangulation...`);
         try {
           const fallbackResult = await fetchLowPopFallbackPrice({
             title,
@@ -3283,13 +3286,13 @@ Sitemap: ${origin}/sitemap.xml
             lowPopFallbackPrice = fallbackResult.avgPrice;
             const usesFallback = !marketValue || fallbackResult.avgPrice > marketValue;
             if (usesFallback) {
-              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} (range $${fallbackResult.minPrice}-$${fallbackResult.maxPrice}) > legacy $${legacyPrice}. Using fallback.`);
+              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} (range $${fallbackResult.minPrice}-$${fallbackResult.maxPrice}) > current $${currentPrice}. Using fallback.`);
               marketValue = fallbackResult.avgPrice;
               priceMin = fallbackResult.minPrice;
               priceMax = fallbackResult.maxPrice;
               lowPopFallbackSelected = true;
             } else {
-              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} <= legacy $${legacyPrice}. Keeping legacy.`);
+              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} <= current $${currentPrice}. Keeping current.`);
             }
           }
         } catch (fallbackError: any) {
