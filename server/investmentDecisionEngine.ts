@@ -1036,11 +1036,23 @@ function decideVerdict(
   }
 
   // ============================================================
-  // PRECEDENCE 3: TRADE_THE_HYPE (rare - requires reliable comps)
-  // Only fires when we have live comps data showing actual price spikes
+  // PRECEDENCE 3: TRADE_THE_HYPE
+  // Fires when scores show overheating AND either:
+  //   (a) we have reliable comps confirming real price spike, OR
+  //   (b) the classification itself says HOT (the classification IS the evidence)
+  // HOT temperature is set by the AI engine analyzing news/market context —
+  // it IS reliable evidence of a hype cycle even without live eBay comps.
+  //
+  // GUARDRAIL: Undisputed franchise-core PRIME players (Mahomes, Jokic, LeBron)
+  // should NOT get TRADE_THE_HYPE just because they're always HOT.
+  // They fall through to PRECEDENCE 5 (ESTABLISHED) for ACCUMULATE/HOLD_CORE.
+  // Gate: only apply HOT-classification path for early-career players OR
+  // players below FRANCHISE_CORE stability tier (roleStabilityScore < 75).
   // ============================================================
-  if (overheated && compsReliable) {
-    return { verdict: "TRADE_THE_HYPE", reason: "Overheated with reliable comps - sell into spikes" };
+  const classificationIsHot = input.temperature === "HOT";
+  const canHypeByClassification = classificationIsHot && (earlyCareer || roleStabilityScore < 75);
+  if (overheated && (compsReliable || canHypeByClassification)) {
+    return { verdict: "TRADE_THE_HYPE", reason: canHypeByClassification && !compsReliable ? "HOT classification + overheated scores - sell into hype spike" : "Overheated with reliable comps - sell into spikes" };
   }
 
   // ============================================================

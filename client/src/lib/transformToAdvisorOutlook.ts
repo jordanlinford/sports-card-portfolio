@@ -18,7 +18,7 @@ function mapVerdictToAdvisor(
       case "HOLD_CORE":
         return { verdict: "HOLD_CORE", label: "Hold, don't chase" };
       case "TRADE_THE_HYPE":
-        return { verdict: "SELL", label: "Sell into strength" };
+        return { verdict: "TRADE_THE_HYPE", label: "Take profits now" };
       case "AVOID_NEW_MONEY":
         return { verdict: "AVOID", label: "Avoid new positions" };
       case "SPECULATIVE_FLYER":

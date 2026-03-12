@@ -37,6 +37,13 @@ function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
         text: "text-yellow-700 dark:text-yellow-400",
         icon: <Minus className="h-5 w-5" />,
       };
+    case "TRADE_THE_HYPE":
+      return {
+        bg: "bg-orange-500/10",
+        border: "border-orange-500/30",
+        text: "text-orange-700 dark:text-orange-400",
+        icon: <TrendingDown className="h-5 w-5" />,
+      };
     case "SELL":
       return {
         bg: "bg-orange-500/10",
@@ -79,7 +86,7 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
             </div>
             <div>
               <h2 className={`text-2xl font-bold ${verdictStyles.text}`} data-testid="text-advisor-verdict">
-                {advisor.verdict.replace("_", " ")}
+                {advisor.verdict === "TRADE_THE_HYPE" ? "TRADE THE HYPE" : advisor.verdict.replace(/_/g, " ")}
               </h2>
               <p className="text-sm text-muted-foreground">{advisor.verdictLabel}</p>
             </div>

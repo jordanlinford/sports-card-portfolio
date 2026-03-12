@@ -1404,7 +1404,7 @@ export type PlayerOutlookRequest = {
 // ============ ADVISOR OUTLOOK - Trusted Advisor Format ============
 // Compact, opinionated summary for the above-the-fold view
 
-export type AdvisorVerdict = "BUY" | "HOLD_CORE" | "HOLD" | "SELL" | "AVOID";
+export type AdvisorVerdict = "BUY" | "HOLD_CORE" | "HOLD" | "SELL" | "AVOID" | "TRADE_THE_HYPE";
 export type AdvisorConfidence = "LOW" | "MED" | "HIGH";
 export type AdvisorHorizon = "1-3m" | "3-12m" | "12m+";
 
