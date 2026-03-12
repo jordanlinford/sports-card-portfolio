@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { useAuth } from "@/hooks/useAuth";
 import { initGA } from "./lib/analytics";
 import { useAnalytics } from "./hooks/use-analytics";
@@ -149,7 +150,9 @@ function App() {
             <Navigation />
             <TrialBanner />
             <main className="flex-1">
-              <Router />
+              <ErrorBoundary>
+                <Router />
+              </ErrorBoundary>
             </main>
             <Footer />
           </div>

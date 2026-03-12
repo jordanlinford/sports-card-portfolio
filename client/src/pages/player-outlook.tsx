@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Component, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -345,11 +345,9 @@ function PeakTimingCard({ peakTiming, teamContext }: { peakTiming?: PeakTimingAs
           <div className="pt-3 border-t">
             <p className="text-xs font-medium text-muted-foreground mb-2">Team Context</p>
             <div className="flex flex-wrap gap-2">
-              {teamContext.playoffOutlook !== "UNKNOWN" && (
-                <Badge variant="outline" className="text-xs">
-                  Playoff: {teamContext.playoffOutlook}
-                </Badge>
-              )}
+              <Badge variant="outline" className="text-xs">
+                Playoff: {teamContext.playoffOutlook}
+              </Badge>
               {teamContext.teamMomentum !== "UNKNOWN" && (
                 <Badge variant="outline" className="text-xs">
                   Team: {teamContext.teamMomentum}
@@ -1031,6 +1029,28 @@ function EvidencePanel({ evidence, cacheStatus }: { evidence: PlayerOutlookRespo
   );
 }
 
+class PlayerResultErrorBoundary extends Component<{ children: ReactNode; onReset: () => void }, { hasError: boolean; error: Error | null }> {
+  state = { hasError: false, error: null };
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  componentDidCatch(error: Error) { console.error("[PlayerOutlook] Result render error:", error); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Card className="border-destructive/30">
+          <CardContent className="py-8 text-center space-y-3">
+            <p className="text-sm font-medium text-destructive">Failed to display player analysis</p>
+            <p className="text-xs text-muted-foreground">The analysis completed but ran into a display error. Try analyzing again.</p>
+            <Button variant="outline" size="sm" onClick={() => { this.setState({ hasError: false, error: null }); this.props.onReset(); }}>
+              Try again
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function PlayerOutlookPage() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
@@ -1434,7 +1454,9 @@ export default function PlayerOutlookPage() {
 
       {outlookMutation.isPending && <PlayerOutlookSkeleton />}
 
-      {outlookData && !outlookMutation.isPending && (() => {
+      {outlookData && !outlookMutation.isPending && (
+        <PlayerResultErrorBoundary onReset={() => setOutlookData(null)}>
+        {(() => {
         const advisorOutlook = applyVerdictGuardrails(transformToAdvisorOutlook(outlookData));
         return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -1586,6 +1608,8 @@ export default function PlayerOutlookPage() {
         </div>
         );
       })()}
+        </PlayerResultErrorBoundary>
+      )}
 
       {!outlookData && !outlookMutation.isPending && (
         <Card className="border-dashed">

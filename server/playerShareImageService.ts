@@ -23,6 +23,10 @@ const VERDICT_COLORS: Record<InvestmentVerdict, { bg: string; text: string; acce
   TRADE_THE_HYPE: { bg: "#C2410C", text: "#FFFFFF", accent: "#F97316" },
   AVOID_NEW_MONEY: { bg: "#991B1B", text: "#FFFFFF", accent: "#EF4444" },
   SPECULATIVE_FLYER: { bg: "#7C3AED", text: "#FFFFFF", accent: "#A855F7" },
+  HOLD_ROLE_RISK: { bg: "#1E40AF", text: "#FFFFFF", accent: "#60A5FA" },
+  HOLD_INJURY_CONTINGENT: { bg: "#1E40AF", text: "#FFFFFF", accent: "#FCD34D" },
+  SPECULATIVE_SUPPRESSED: { bg: "#4B5563", text: "#FFFFFF", accent: "#9CA3AF" },
+  AVOID_STRUCTURAL: { bg: "#991B1B", text: "#FFFFFF", accent: "#F87171" },
 };
 
 const VERDICT_LABELS: Record<InvestmentVerdict, string> = {
@@ -31,6 +35,10 @@ const VERDICT_LABELS: Record<InvestmentVerdict, string> = {
   TRADE_THE_HYPE: "TRADE THE HYPE",
   AVOID_NEW_MONEY: "AVOID",
   SPECULATIVE_FLYER: "SPECULATIVE",
+  HOLD_ROLE_RISK: "HOLD (ROLE RISK)",
+  HOLD_INJURY_CONTINGENT: "HOLD (INJURY)",
+  SPECULATIVE_SUPPRESSED: "SPECULATIVE",
+  AVOID_STRUCTURAL: "AVOID",
 };
 
 const CONFIDENCE_LABELS: Record<DataConfidence, string> = {
