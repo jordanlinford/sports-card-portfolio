@@ -589,6 +589,18 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [showForm, setShowForm] = useState(false);
   const [inputMode, setInputMode] = useState<"manual" | "scan">("manual");
   const [result, setResult] = useState<QuickAnalyzeResult | null>(null);
+  const [trendCorrectedValue, setTrendCorrectedValue] = useState<number | null>(null);
+  const handleTrendPriceLoaded = useCallback((trendAvg: number) => {
+    const currentValue = result?.market?.value;
+    if (currentValue && currentValue > 0 && trendAvg > 0) {
+      const ratio = currentValue / trendAvg;
+      if (ratio < 0.5 || ratio > 2) {
+        setTrendCorrectedValue(trendAvg);
+      }
+    } else if ((!currentValue || currentValue === 0) && trendAvg > 0) {
+      setTrendCorrectedValue(trendAvg);
+    }
+  }, [result?.market?.value]);
   const [scanResult, setScanResult] = useState<CardScanResult | null>(null);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState("");
@@ -986,6 +998,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     },
     onSuccess: (data) => {
       setResult(data);
+      setTrendCorrectedValue(null);
       queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
       setShowAnalysisSuccess(true);
       addRecentSearch(title);
@@ -1196,6 +1209,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     setImagePath(null);
     setPreviewUrl(null);
     setResult(null);
+    setTrendCorrectedValue(null);
     setScanResult(null);
     setScanPreviewUrl(null);
     setSelectedCaseId("");
@@ -2726,9 +2740,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                       imagePath: previewUrl || result.tempCard.imagePath,
                     },
                     market: {
-                      value: result.market.value,
-                      min: result.market.min,
-                      max: result.market.max,
+                      value: trendCorrectedValue ?? result.market.value,
+                      min: trendCorrectedValue ? Math.round(trendCorrectedValue * 0.75) : result.market.min,
+                      max: trendCorrectedValue ? Math.round(trendCorrectedValue * 1.35) : result.market.max,
                       compCount: result.matchConfidence?.totalComps ?? result.comps?.soldCount ?? result.market.compCount,
                       modeledEstimate: result.market.modeledEstimate,
                       pricePoints: result.market.pricePoints ?? undefined,
@@ -2748,7 +2762,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
 
                 {result.market.isRaw && result.market.gradedEstimates && (result.market.gradedEstimates.psa9 || result.market.gradedEstimates.psa10) && result.market.value && (
                   <GradedValueMatrix
-                    rawValue={result.market.value}
+                    rawValue={trendCorrectedValue ?? result.market.value}
                     psa9Price={result.market.gradedEstimates.psa9}
                     psa10Price={result.market.gradedEstimates.psa10}
                     estimated={result.market.gradedEstimates.estimated}
@@ -2769,7 +2783,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                         grade: result.tempCard.grade,
                         grader: result.tempCard.grader,
                       } : undefined}
+                      onPriceLoaded={handleTrendPriceLoaded}
                     />
+                    {trendCorrectedValue && result.market.value && Math.abs(trendCorrectedValue - result.market.value) / result.market.value > 0.3 && (
+                      <p className="text-xs text-muted-foreground mt-1.5 px-1">
+                        Fair value updated to <span className="font-medium">${trendCorrectedValue.toLocaleString()}</span> based on recent sales data from the price trend.
+                      </p>
+                    )}
                   </div>
                 )}
 
