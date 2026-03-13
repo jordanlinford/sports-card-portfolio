@@ -2443,7 +2443,12 @@ Sitemap: ${origin}/sitemap.xml
         } else if (geminiMarketData.soldCount >= 2) {
           signals.liquidityScore = 3;
         } else {
-          signals.liquidityScore = 1;
+          // soldCount = 0 or 1 — fall back to Gemini's qualitative liquidity field.
+          // Gemini knows the card category's typical market depth even without exact comps.
+          if (geminiMarketData.liquidity === "HIGH") signals.liquidityScore = 7;
+          else if (geminiMarketData.liquidity === "MEDIUM") signals.liquidityScore = 4;
+          else if (geminiMarketData.liquidity === "LOW") signals.liquidityScore = 2;
+          else signals.liquidityScore = 1;
         }
         
         // Update data confidence based on Gemini data quality
@@ -3174,7 +3179,15 @@ Sitemap: ${origin}/sitemap.xml
         else if (uMarket.soldCount >= 10) signals.liquidityScore = 7;
         else if (uMarket.soldCount >= 5) signals.liquidityScore = 5;
         else if (uMarket.soldCount >= 2) signals.liquidityScore = 3;
-        else signals.liquidityScore = 1;
+        else {
+          // soldCount = 0 or 1 — Gemini couldn't find exact comps but still knows
+          // the card category's typical market depth from its training. Use the
+          // qualitative liquidity field as the fallback (same logic the Gemini app uses).
+          if (uMarket.liquidity === "HIGH") signals.liquidityScore = 7;
+          else if (uMarket.liquidity === "MEDIUM") signals.liquidityScore = 4;
+          else if (uMarket.liquidity === "LOW") signals.liquidityScore = 2;
+          else signals.liquidityScore = 1;
+        }
         
         if (uMarket.soldCount >= 10) {
           signals.dataConfidence = "HIGH";
