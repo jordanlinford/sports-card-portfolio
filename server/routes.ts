@@ -3468,6 +3468,17 @@ Sitemap: ${origin}/sitemap.xml
         finalActionReasons = [`Incomplete card details — add set and variation for accurate pricing`, ...finalActionReasons];
       }
 
+      // LITTLE_VALUE FLOOR: When the verdict is LITTLE_VALUE but price is null,
+      // the verdict definition itself tells us the card is worth under $2-3.
+      // Showing N/A alongside "Low Value" is contradictory — set a low default.
+      // The LOW confidence badge + LITTLE_VALUE verdict together communicate the uncertainty.
+      if (finalAction === "LITTLE_VALUE" && !marketValue) {
+        marketValue = 1;
+        priceMin = 0.25;
+        priceMax = 3;
+        console.log(`[Quick Analyze] LITTLE_VALUE floor applied: no price data — defaulting to ~$1 estimate`);
+      }
+
       // Use unified explanation directly (no separate AI call needed!)
       const explanation = unifiedResult ? {
         short: unifiedResult.analysis.shortSummary,
