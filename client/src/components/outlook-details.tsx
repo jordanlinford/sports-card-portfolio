@@ -352,8 +352,12 @@ export function OutlookDetails({
           <div className="text-center sm:text-right">
             {data.market?.value != null && (
               <>
-                <div className="text-sm opacity-90">Fair Value</div>
-                <div className="text-2xl sm:text-3xl font-bold">{formatCurrency(data.market.value)}</div>
+                <div className="text-sm opacity-90">
+                  {data.market.compCount === 0 ? "AI Estimate (no sales)" : "Fair Value"}
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold">
+                  {data.market.compCount === 0 ? "~" : ""}{formatCurrency(data.market.value)}
+                </div>
               </>
             )}
           </div>
@@ -435,13 +439,20 @@ export function OutlookDetails({
             <div className="text-right">
               {data.market?.value != null ? (
                 <>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Est. Fair Value</div>
-                  <div className="text-3xl font-bold" data-testid="text-market-value">
-                    {formatCurrency(data.market.value)}
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                    {data.market.compCount === 0 ? "AI Estimate" : "Est. Fair Value"}
+                  </div>
+                  <div className={`text-3xl font-bold ${data.market.compCount === 0 ? "text-muted-foreground" : ""}`} data-testid="text-market-value">
+                    {data.market.compCount === 0 ? "~" : ""}{formatCurrency(data.market.value)}
                   </div>
                   {data.market?.min != null && data.market?.max != null && (
                     <div className="text-sm text-muted-foreground">
                       Range: {formatCurrency(data.market.min)} - {formatCurrency(data.market.max)}
+                    </div>
+                  )}
+                  {data.market.compCount === 0 && (
+                    <div className="mt-1 text-xs text-yellow-600 dark:text-yellow-400 font-medium">
+                      No sales found — verify on eBay
                     </div>
                   )}
                 </>
