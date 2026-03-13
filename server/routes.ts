@@ -3305,14 +3305,17 @@ Sitemap: ${origin}/sitemap.xml
       // A single AI-generated price point doesn't count as real data (it's just another Gemini guess)
       const legacyPricePoints = priceData.pricePoints || [];
       const legacyHasRealData = legacyPricePoints.length >= 2;
-      const unifiedHasData = compCount > 0;
+      // unifiedHasData is true if we have actual sold comps OR if Gemini provided a market estimate
+      // (even with soldCount=0). Gemini estimates are intentional market intelligence, not wild guesses —
+      // the 50% discount only fires when Gemini couldn't return ANY price at all.
+      const unifiedHasData = compCount > 0 || (unifiedResult?.market?.avgPrice != null && unifiedResult.market.avgPrice > 0);
       if (!unifiedHasData && !legacyHasRealData && marketValue && !qaIs1of1 && !qaIsVeryLowPop) {
         const originalValue = marketValue;
         const discountFactor = 0.5;
         marketValue = Math.round(marketValue * discountFactor * 100) / 100;
         priceMin = Math.round((priceMin || marketValue * 0.7) * discountFactor * 100) / 100;
         priceMax = Math.round((priceMax || marketValue * 1.5) * discountFactor * 100) / 100;
-        console.warn(`[Quick Analyze] ZERO-DATA DISCOUNT: No comps from unified (0 sold) or legacy (0 price points). Estimate $${originalValue} is pure guesswork — discounted 50% to $${marketValue}`);
+        console.warn(`[Quick Analyze] ZERO-DATA DISCOUNT: Gemini returned no price AND no legacy comps. Estimate $${originalValue} discounted 50% to $${marketValue}`);
       }
 
       // RAW CARD PRICE CORRECTION

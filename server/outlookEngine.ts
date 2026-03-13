@@ -363,7 +363,7 @@ SEARCH BROADENING: If your first search finds 0 completed sales, try broader que
 - Try: "[year] [set] [player name] [variation] sold"
 - For SSP/premium parallels, ALWAYS keep the parallel name — a Zebra is NOT a Silver
 
-ZERO COMPS: If you STILL find NO completed sales after broadening, set soldCount to 0 and avgPrice to null. Note any active listings in "notes".`;
+ZERO COMPS: If you STILL find NO completed sales after broadening, set soldCount to 0 and confidence to "LOW". However, STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — do NOT return null for these fields. Base your estimate on: the card's set/brand premium, the player's current market tier, comparable cards from similar players in the same set, and general hobby market knowledge. Example: a Zach Werenski 2016-17 Upper Deck The Cup RPA /36 with no direct comps can be estimated from known Cup RPA tiers for similar-era Blue Jackets players. A calibrated estimate with LOW confidence is far more useful than returning null — it lets the user see a ballpark value. Note your estimation methodology and any active listings in "notes".`;
 
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -721,7 +721,7 @@ SEARCH BROADENING: If your first search finds 0 completed sales, try broader que
 - Only fall back to base/silver pricing if the card IS actually a base/silver parallel
 Report whatever comps you find from these broader searches.
 
-ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and avgPrice to null. Note any active listings in "notes" for reference.
+ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and confidence to "LOW". However, STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — do NOT return null. Use the card's set premium, player tier, serial number scarcity, and comparable sales from similar players/cards to estimate a realistic range. A thoughtful estimate with LOW confidence is far more useful to the user than returning null. Note your estimation methodology in "notes".
 
 Return ONLY a JSON object with this EXACT structure:
 {
