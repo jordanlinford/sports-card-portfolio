@@ -2080,34 +2080,57 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                     {/* Front box */}
                     <div className="space-y-1.5">
                       <Label className="text-xs font-medium">Front</Label>
-                      <div className="relative aspect-[3/4] border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+                      <div className="relative aspect-[3/4] border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center">
                         {scanPreviewUrl ? (
-                          <img src={scanPreviewUrl} alt="Card front" className="w-full h-full object-contain" />
+                          <>
+                            <img src={scanPreviewUrl} alt="Card front" className="w-full h-full object-contain" />
+                            <button
+                              onClick={() => { setScanPreviewUrl(null); setFrontImageData(null); frontFileRef.current = null; }}
+                              className="absolute top-1 right-1 bg-background/80 rounded-full w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground text-xs z-10"
+                            >×</button>
+                            {/* Replace buttons when image loaded */}
+                            <div className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-1.5 z-10">
+                              <div className="relative">
+                                <button className="bg-background/80 rounded px-1.5 py-0.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                                  <Camera className="h-3 w-3" />Camera
+                                </button>
+                                <input type="file" accept="image/*" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFrontImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-front-camera-replace" />
+                              </div>
+                              <div className="relative">
+                                <button className="bg-background/80 rounded px-1.5 py-0.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                                  <Upload className="h-3 w-3" />Upload
+                                </button>
+                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFrontImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-front-upload-replace" />
+                              </div>
+                            </div>
+                          </>
                         ) : (
-                          <div className="text-center p-3 pointer-events-none">
-                            <Camera className="h-8 w-8 mx-auto text-muted-foreground mb-1.5" />
-                            <span className="text-xs text-muted-foreground">Tap to add</span>
+                          <div className="flex flex-col items-center gap-3 p-3 w-full">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                            <div className="flex gap-2 w-full justify-center">
+                              <div className="relative flex-1 max-w-[80px]">
+                                <button className="w-full border rounded-md py-1.5 flex flex-col items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors bg-background/50">
+                                  <Camera className="h-4 w-4" />
+                                  <span>Camera</span>
+                                </button>
+                                <input type="file" accept="image/*" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFrontImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-front-camera" />
+                              </div>
+                              <div className="relative flex-1 max-w-[80px]">
+                                <button className="w-full border rounded-md py-1.5 flex flex-col items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors bg-background/50">
+                                  <Upload className="h-4 w-4" />
+                                  <span>Upload</span>
+                                </button>
+                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFrontImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-front-upload" />
+                              </div>
+                            </div>
                           </div>
                         )}
                         {scanning && (
-                          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center">
+                          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-20">
                             <Loader2 className="h-6 w-6 animate-spin text-primary mb-1" />
                             <span className="text-xs font-medium">Scanning...</span>
                           </div>
                         )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleFrontImageSelect(file);
-                            e.target.value = "";
-                          }}
-                          disabled={scanning}
-                          data-testid="input-scan-front"
-                        />
                       </div>
                     </div>
 
@@ -2116,33 +2139,50 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                       <Label className="text-xs font-medium">
                         Back <span className="text-muted-foreground font-normal">(optional)</span>
                       </Label>
-                      <div className="relative aspect-[3/4] border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+                      <div className="relative aspect-[3/4] border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center">
                         {backPreviewUrl ? (
                           <>
                             <img src={backPreviewUrl} alt="Card back" className="w-full h-full object-contain" />
                             <button
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBackPreviewUrl(null); setBackImageData(null); }}
+                              onClick={() => { setBackPreviewUrl(null); setBackImageData(null); }}
                               className="absolute top-1 right-1 bg-background/80 rounded-full w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground text-xs z-10"
                             >×</button>
+                            <div className="absolute bottom-1.5 left-0 right-0 flex justify-center gap-1.5 z-10">
+                              <div className="relative">
+                                <button className="bg-background/80 rounded px-1.5 py-0.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                                  <Camera className="h-3 w-3" />Camera
+                                </button>
+                                <input type="file" accept="image/*" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBackImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-back-camera-replace" />
+                              </div>
+                              <div className="relative">
+                                <button className="bg-background/80 rounded px-1.5 py-0.5 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+                                  <Upload className="h-3 w-3" />Upload
+                                </button>
+                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBackImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-back-upload-replace" />
+                              </div>
+                            </div>
                           </>
                         ) : (
-                          <div className="text-center p-3 pointer-events-none">
-                            <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-1.5" />
-                            <span className="text-xs text-muted-foreground">Tap to add</span>
+                          <div className="flex flex-col items-center gap-3 p-3 w-full">
+                            <ImageIcon className="h-8 w-8 text-muted-foreground" />
+                            <div className="flex gap-2 w-full justify-center">
+                              <div className="relative flex-1 max-w-[80px]">
+                                <button className="w-full border rounded-md py-1.5 flex flex-col items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors bg-background/50">
+                                  <Camera className="h-4 w-4" />
+                                  <span>Camera</span>
+                                </button>
+                                <input type="file" accept="image/*" capture="environment" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBackImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-back-camera" />
+                              </div>
+                              <div className="relative flex-1 max-w-[80px]">
+                                <button className="w-full border rounded-md py-1.5 flex flex-col items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors bg-background/50">
+                                  <Upload className="h-4 w-4" />
+                                  <span>Upload</span>
+                                </button>
+                                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBackImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-back-upload" />
+                              </div>
+                            </div>
                           </div>
                         )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleBackImageSelect(file);
-                            e.target.value = "";
-                          }}
-                          disabled={scanning}
-                          data-testid="input-scan-back"
-                        />
                       </div>
                     </div>
                   </div>
