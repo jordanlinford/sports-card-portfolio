@@ -50,9 +50,12 @@ CRITICAL: Look at the PHYSICAL CARD carefully:
 
 PARALLEL IDENTIFICATION GUIDE (look at border color/pattern):
 - Prizm parallels: Base (no color), Silver (silver shimmer), Red (/299), Blue (/199), Green, Pink, Orange (/49), Gold (/10), Black (/1), Gold Vinyl (/5), Mojo, Hyper, Camo, Snakeskin, Disco, Tiger, Marble, Nebula, Cosmic
-- Topps Chrome parallels: Base, Refractor, Pink Refractor, Gold Refractor (/50), Superfractor (/1)
+- Topps Chrome parallels: Base, Refractor, Pink Refractor, Gold Refractor, Superfractor (Chrome Superfractors are /1, but other sets like Stadium Club label their top parallels "Superfractor" with different print runs — always read the actual stamp)
 - Donruss parallels: Base, Rated Rookie, Press Proof, Holo, Elite Series
 - Select parallels: Base, Silver, Concourse, Premier Level, Tie-Dye, Zebra, Disco, Gold (/10)
+
+SERIAL NUMBER RULE — CRITICAL:
+The physical stamp printed ON THE CARD (e.g., "377/350", "23/50", "1/1") is ALWAYS authoritative. NEVER infer or assume a print run from the variation label alone. "Superfractor" does not always mean 1/1 — it means the top parallel of that product, which may be /25, /50, /99, etc. depending on the set. Read the stamped number from the physical card (usually on the back) and use it EXACTLY. If you can see it stamped, that number wins over any assumption.
 
 Return a JSON object with EXACTLY this structure (no markdown, just pure JSON):
 {
@@ -132,7 +135,7 @@ export async function scanCardImage(
     // Update prompt when both sides are provided — tells Gemini to use the back for exact numbers
     const hasBackImage = imageParts.length > 1;
     const promptText = hasBackImage
-      ? `IMAGE 1 is the FRONT of the card. IMAGE 2 is the BACK of the card.\n\nThe back of the card contains the most reliable identification data: exact card number, serial numbering (e.g. "230/25"), set name, copyright year, and player stats. Prioritize information from the back image for card number, serial number, year, and set name. Use the front image for player name, parallel/border identification, and condition.\n\n${CARD_SCAN_PROMPT}`
+      ? `IMAGE 1 is the FRONT of the card. IMAGE 2 is the BACK of the card.\n\nThe back of the card contains the most reliable identification data: exact card number, PHYSICAL SERIAL NUMBER STAMP (e.g. "23/50", "377/350", "1/1"), set name, copyright year, and player stats.\n\nCRITICAL SERIAL NUMBER RULE: Read the ACTUAL stamped number visible on IMAGE 2. This stamped number is ALWAYS correct — do not override it with assumptions about the variation name. For example, if IMAGE 2 shows a stamp of "23/50", the variation is "/50" regardless of whether the variation label says "Superfractor", "Gold", or anything else. The physical stamp wins every time.\n\nPrioritize information from IMAGE 2 for card number, serial number, year, and set name. Use IMAGE 1 for player name, parallel/border color identification, and condition.\n\n${CARD_SCAN_PROMPT}`
       : CARD_SCAN_PROMPT;
 
     const response = await gemini.models.generateContent({
