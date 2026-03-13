@@ -616,6 +616,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
+  const [frontImageData, setFrontImageData] = useState<string | null>(null);
+  const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
+  const [backImageData, setBackImageData] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [showScanAddDialog, setShowScanAddDialog] = useState(false);
   const [showConfirmedAddDialog, setShowConfirmedAddDialog] = useState(false);
@@ -1212,6 +1215,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     setTrendCorrectedValue(null);
     setScanResult(null);
     setScanPreviewUrl(null);
+    setFrontImageData(null);
+    setBackPreviewUrl(null);
+    setBackImageData(null);
     setSelectedCaseId("");
     setInputMode("manual");
     setShowScanAddDialog(false);
@@ -1500,8 +1506,20 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     });
   };
 
+  // Handle optional back-of-card image selection (no auto-scan — stored for next scan)
+  const handleBackImageSelect = async (file: File) => {
+    try {
+      const { blob, base64: base64Data } = await compressImage(file, 1200, 0.85);
+      const previewDataUrl = URL.createObjectURL(blob);
+      setBackPreviewUrl(previewDataUrl);
+      setBackImageData(base64Data);
+    } catch (err) {
+      console.error("Failed to process back image:", err);
+    }
+  };
+
   // Handle photo scan - NEW: Uses scan-identify endpoint (faster, no pricing)
-  const handlePhotoScan = async (file: File) => {
+  const handlePhotoScan = async (file: File, currentBackImageData?: string | null) => {
     setScanning(true);
     setScanResult(null);
     setScanIdentifyResult(null);
@@ -1513,14 +1531,21 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
       // Compress image to reduce payload size
       const { blob, base64: base64Data } = await compressImage(file, 1200, 0.85);
       
+      // Store front image data so we can re-scan with back image later
+      setFrontImageData(base64Data);
+      
       // Create preview URL from compressed image
       const previewDataUrl = URL.createObjectURL(blob);
       setScanPreviewUrl(previewDataUrl);
       
+      // Use back image data passed in (for rescan) or existing state
+      const effectiveBackData = currentBackImageData !== undefined ? currentBackImageData : backImageData;
+
       // Call the NEW scan-identify API (faster, no pricing)
       const response = await apiRequest("POST", "/api/cards/scan-identify", {
         imageData: base64Data,
         mimeType: "image/jpeg",
+        ...(effectiveBackData ? { imageDataBack: effectiveBackData, mimeTypeBack: "image/jpeg" } : {}),
       });
       
       // Handle service unavailable errors
@@ -2111,6 +2136,65 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                       </p>
                     )}
                   </div>
+
+                  {/* Back of card — optional, shown once front image is loaded */}
+                  {scanPreviewUrl && !scanning && (
+                    <div className="flex items-center gap-3 px-1">
+                      {backPreviewUrl ? (
+                        <div className="relative w-16 h-22 flex-shrink-0">
+                          <img
+                            src={backPreviewUrl}
+                            alt="Card back"
+                            className="w-16 h-22 object-contain rounded border"
+                          />
+                          <button
+                            onClick={() => { setBackPreviewUrl(null); setBackImageData(null); }}
+                            className="absolute -top-1 -right-1 bg-background border rounded-full w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground text-xs leading-none"
+                            title="Remove back image"
+                          >×</button>
+                        </div>
+                      ) : null}
+                      <div className="flex-1 min-w-0">
+                        <div className="relative inline-block">
+                          <Button variant="ghost" size="sm" className="text-xs h-8" data-testid="button-add-back-image">
+                            <Upload className="h-3 w-3 mr-1.5" />
+                            {backPreviewUrl ? "Change back image" : "+ Add back of card (optional)"}
+                          </Button>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleBackImageSelect(file);
+                            }}
+                            data-testid="input-scan-back"
+                          />
+                        </div>
+                        {backPreviewUrl && frontImageData && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="h-8 text-xs ml-2"
+                            onClick={async () => {
+                              if (!frontImageData) return;
+                              const blob = await fetch(scanPreviewUrl).then(r => r.blob());
+                              const file = new File([blob], "front.jpg", { type: "image/jpeg" });
+                              handlePhotoScan(file, backImageData);
+                            }}
+                            data-testid="button-rescan-with-back"
+                          >
+                            Rescan with back ✓
+                          </Button>
+                        )}
+                        {!backPreviewUrl && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Improves accuracy for serial numbers &amp; card numbers
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 /* Manual Entry Mode */

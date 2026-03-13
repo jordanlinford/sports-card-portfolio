@@ -80,32 +80,60 @@ IMPORTANT:
 - If you see serial numbering (like "5/10" or "23/99"), include it in the variation field.
 - Search the web to verify the exact set name and year — newer products (2024, 2025) may not be in training data.`;
 
-export async function scanCardImage(imageData: string, mimeType: string = "image/jpeg"): Promise<CardScanResult> {
-  try {
-    const isBase64 = imageData.startsWith("data:") || !imageData.startsWith("http");
-    
-    let base64Data: string;
-    let actualMimeType: string = mimeType;
-    
-    if (imageData.startsWith("data:")) {
-      const matches = imageData.match(/^data:(.+);base64,(.+)$/);
-      if (matches) {
-        actualMimeType = matches[1];
-        base64Data = matches[2];
-      } else {
-        throw new Error("Invalid data URL format");
-      }
-    } else if (isBase64) {
-      base64Data = imageData;
+async function processImageData(imageData: string, mimeType: string): Promise<{ base64Data: string; actualMimeType: string }> {
+  const isBase64 = imageData.startsWith("data:") || !imageData.startsWith("http");
+  let base64Data: string;
+  let actualMimeType: string = mimeType;
+
+  if (imageData.startsWith("data:")) {
+    const matches = imageData.match(/^data:(.+);base64,(.+)$/);
+    if (matches) {
+      actualMimeType = matches[1];
+      base64Data = matches[2];
     } else {
-      const response = await fetch(imageData);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.statusText}`);
-      }
-      const arrayBuffer = await response.arrayBuffer();
-      base64Data = Buffer.from(arrayBuffer).toString("base64");
-      actualMimeType = response.headers.get("content-type") || mimeType;
+      throw new Error("Invalid data URL format");
     }
+  } else if (isBase64) {
+    base64Data = imageData;
+  } else {
+    const response = await fetch(imageData);
+    if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
+    const arrayBuffer = await response.arrayBuffer();
+    base64Data = Buffer.from(arrayBuffer).toString("base64");
+    actualMimeType = response.headers.get("content-type") || mimeType;
+  }
+  return { base64Data, actualMimeType };
+}
+
+export async function scanCardImage(
+  imageData: string,
+  mimeType: string = "image/jpeg",
+  imageDataBack?: string,
+  mimeTypeBack: string = "image/jpeg"
+): Promise<CardScanResult> {
+  try {
+    const { base64Data, actualMimeType } = await processImageData(imageData, mimeType);
+
+    // Build parts array — front image always first, back image optional second
+    const imageParts: any[] = [
+      { inlineData: { mimeType: actualMimeType, data: base64Data } },
+    ];
+
+    if (imageDataBack) {
+      try {
+        const { base64Data: base64Back, actualMimeType: mimeBack } = await processImageData(imageDataBack, mimeTypeBack);
+        imageParts.push({ inlineData: { mimeType: mimeBack, data: base64Back } });
+        console.log("[CardScanner] Back-of-card image included in scan");
+      } catch (backErr) {
+        console.warn("[CardScanner] Failed to process back image, scanning front only:", backErr);
+      }
+    }
+
+    // Update prompt when both sides are provided — tells Gemini to use the back for exact numbers
+    const hasBackImage = imageParts.length > 1;
+    const promptText = hasBackImage
+      ? `IMAGE 1 is the FRONT of the card. IMAGE 2 is the BACK of the card.\n\nThe back of the card contains the most reliable identification data: exact card number, serial numbering (e.g. "230/25"), set name, copyright year, and player stats. Prioritize information from the back image for card number, serial number, year, and set name. Use the front image for player name, parallel/border identification, and condition.\n\n${CARD_SCAN_PROMPT}`
+      : CARD_SCAN_PROMPT;
 
     const response = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
@@ -113,15 +141,8 @@ export async function scanCardImage(imageData: string, mimeType: string = "image
         {
           role: "user",
           parts: [
-            {
-              inlineData: {
-                mimeType: actualMimeType,
-                data: base64Data,
-              },
-            },
-            {
-              text: CARD_SCAN_PROMPT,
-            },
+            ...imageParts,
+            { text: promptText },
           ],
         },
       ],

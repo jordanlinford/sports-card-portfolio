@@ -3734,7 +3734,7 @@ Sitemap: ${origin}/sitemap.xml
   app.post("/api/cards/scan-identify", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { imageData, mimeType } = req.body;
+      const { imageData, mimeType, imageDataBack, mimeTypeBack } = req.body;
 
       if (!imageData) {
         return res.status(400).json({ message: "Image data is required" });
@@ -3791,7 +3791,7 @@ Sitemap: ${origin}/sitemap.xml
       // Perform the scan - identification ONLY (no pricing)
       let scanResult;
       try {
-        scanResult = await scanCardImage(imageData, mimeType || "image/jpeg");
+        scanResult = await scanCardImage(imageData, mimeType || "image/jpeg", imageDataBack, mimeTypeBack || "image/jpeg");
       } catch (scanError) {
         console.error("[Card Scan] Scan failed:", scanError);
         return res.status(500).json({
