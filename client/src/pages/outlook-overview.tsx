@@ -660,6 +660,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const batchFileInputRef = useRef<HTMLInputElement>(null);
   const batchObjectUrlsRef = useRef<string[]>([]);
   const batchCancelledRef = useRef(false);
+  const frontFileRef = useRef<File | null>(null);
   const [showBatchAddDialog, setShowBatchAddDialog] = useState(false);
   const [batchAddCaseId, setBatchAddCaseId] = useState<string>("");
   const [batchAdding, setBatchAdding] = useState(false);
@@ -1518,6 +1519,24 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     }
   };
 
+  // Store front image without scanning (used by new two-box UI)
+  const handleFrontImageSelect = async (file: File) => {
+    frontFileRef.current = file;
+    setScanResult(null);
+    setScanIdentifyResult(null);
+    setIsConfirmed(false);
+    setResult(null);
+    setAnalysisInvalidated(false);
+    try {
+      const { blob, base64: base64Data } = await compressImage(file, 1200, 0.85);
+      const previewDataUrl = URL.createObjectURL(blob);
+      setScanPreviewUrl(previewDataUrl);
+      setFrontImageData(base64Data);
+    } catch (err) {
+      console.error("Failed to process front image:", err);
+    }
+  };
+
   // Handle photo scan - NEW: Uses scan-identify endpoint (faster, no pricing)
   const handlePhotoScan = async (file: File, currentBackImageData?: string | null) => {
     setScanning(true);
@@ -2055,45 +2074,27 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
               </div>
 
               {inputMode === "scan" ? (
-                /* Photo Scan Mode */
+                /* Photo Scan Mode — two side-by-side image boxes */
                 <div className="space-y-4">
-                  <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg bg-muted/30">
-                    {scanPreviewUrl ? (
-                      <div className="relative w-48 h-64 mb-4">
-                        <img 
-                          src={scanPreviewUrl} 
-                          alt="Card to scan" 
-                          className="w-full h-full object-contain rounded-lg"
-                        />
-                        {scanning && (
-                          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center rounded-lg">
-                            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-                            <span className="text-sm font-medium">Identifying card...</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Front box */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">Front</Label>
+                      <div className="relative aspect-[3/4] border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+                        {scanPreviewUrl ? (
+                          <img src={scanPreviewUrl} alt="Card front" className="w-full h-full object-contain" />
+                        ) : (
+                          <div className="text-center p-3 pointer-events-none">
+                            <Camera className="h-8 w-8 mx-auto text-muted-foreground mb-1.5" />
+                            <span className="text-xs text-muted-foreground">Tap to add</span>
                           </div>
                         )}
-                      </div>
-                    ) : (
-                      <div className="text-center">
-                        <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Sparkles className="h-10 w-10 text-primary" />
-                        </div>
-                        <h3 className="font-semibold text-lg mb-2">AI Card Scanner</h3>
-                        <p className="text-muted-foreground text-sm mb-4 max-w-sm">
-                          Upload a photo of any sports card and our AI will identify it and look up current market prices
-                        </p>
-                      </div>
-                    )}
-                    
-                    <div className="flex flex-wrap gap-3 justify-center">
-                      <div className="relative">
-                        <Button 
-                          variant="default" 
-                          disabled={scanning}
-                          data-testid="button-scan-camera"
-                        >
-                          <Camera className="h-4 w-4 mr-2" />
-                          Take Photo
-                        </Button>
+                        {scanning && (
+                          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center">
+                            <Loader2 className="h-6 w-6 animate-spin text-primary mb-1" />
+                            <span className="text-xs font-medium">Scanning...</span>
+                          </div>
+                        )}
                         <input
                           type="file"
                           accept="image/*"
@@ -2101,99 +2102,69 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                           className="absolute inset-0 opacity-0 cursor-pointer"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) handlePhotoScan(file);
+                            if (file) handleFrontImageSelect(file);
+                            e.target.value = "";
                           }}
                           disabled={scanning}
-                          data-testid="input-scan-camera"
+                          data-testid="input-scan-front"
                         />
                       </div>
-                      <div className="relative">
-                        <Button 
-                          variant={scanPreviewUrl ? "default" : "outline"} 
-                          disabled={scanning}
-                          data-testid="button-scan-upload"
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          {scanPreviewUrl ? "Try Different Photo" : "Upload Photo"}
-                        </Button>
+                    </div>
+
+                    {/* Back box */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">
+                        Back <span className="text-muted-foreground font-normal">(optional)</span>
+                      </Label>
+                      <div className="relative aspect-[3/4] border-2 border-dashed rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center cursor-pointer hover:border-primary/50 transition-colors">
+                        {backPreviewUrl ? (
+                          <>
+                            <img src={backPreviewUrl} alt="Card back" className="w-full h-full object-contain" />
+                            <button
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setBackPreviewUrl(null); setBackImageData(null); }}
+                              className="absolute top-1 right-1 bg-background/80 rounded-full w-5 h-5 flex items-center justify-center text-muted-foreground hover:text-foreground text-xs z-10"
+                            >×</button>
+                          </>
+                        ) : (
+                          <div className="text-center p-3 pointer-events-none">
+                            <ImageIcon className="h-8 w-8 mx-auto text-muted-foreground mb-1.5" />
+                            <span className="text-xs text-muted-foreground">Tap to add</span>
+                          </div>
+                        )}
                         <input
                           type="file"
                           accept="image/*"
                           className="absolute inset-0 opacity-0 cursor-pointer"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
-                            if (file) handlePhotoScan(file);
+                            if (file) handleBackImageSelect(file);
+                            e.target.value = "";
                           }}
                           disabled={scanning}
-                          data-testid="input-scan-photo"
+                          data-testid="input-scan-back"
                         />
                       </div>
                     </div>
-                    
-                    {!scanning && (
-                      <p className="text-xs text-muted-foreground mt-4 text-center">
-                        Works best with clear, well-lit photos of the card front
-                      </p>
-                    )}
                   </div>
 
-                  {/* Back of card — optional, shown once front image is loaded */}
-                  {scanPreviewUrl && !scanning && (
-                    <div className="flex items-center gap-3 px-1">
-                      {backPreviewUrl ? (
-                        <div className="relative w-16 h-22 flex-shrink-0">
-                          <img
-                            src={backPreviewUrl}
-                            alt="Card back"
-                            className="w-16 h-22 object-contain rounded border"
-                          />
-                          <button
-                            onClick={() => { setBackPreviewUrl(null); setBackImageData(null); }}
-                            className="absolute -top-1 -right-1 bg-background border rounded-full w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground text-xs leading-none"
-                            title="Remove back image"
-                          >×</button>
-                        </div>
-                      ) : null}
-                      <div className="flex-1 min-w-0">
-                        <div className="relative inline-block">
-                          <Button variant="ghost" size="sm" className="text-xs h-8" data-testid="button-add-back-image">
-                            <Upload className="h-3 w-3 mr-1.5" />
-                            {backPreviewUrl ? "Change back image" : "+ Add back of card (optional)"}
-                          </Button>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleBackImageSelect(file);
-                            }}
-                            data-testid="input-scan-back"
-                          />
-                        </div>
-                        {backPreviewUrl && frontImageData && (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-8 text-xs ml-2"
-                            onClick={async () => {
-                              if (!frontImageData) return;
-                              const blob = await fetch(scanPreviewUrl).then(r => r.blob());
-                              const file = new File([blob], "front.jpg", { type: "image/jpeg" });
-                              handlePhotoScan(file, backImageData);
-                            }}
-                            data-testid="button-rescan-with-back"
-                          >
-                            Rescan with back ✓
-                          </Button>
-                        )}
-                        {!backPreviewUrl && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Improves accuracy for serial numbers &amp; card numbers
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                  {/* Scan button */}
+                  <Button
+                    className="w-full"
+                    disabled={!scanPreviewUrl || scanning}
+                    onClick={() => { if (frontFileRef.current) handlePhotoScan(frontFileRef.current); }}
+                    data-testid="button-scan-card"
+                  >
+                    {scanning ? (
+                      <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Identifying card...</>
+                    ) : (
+                      <><Sparkles className="h-4 w-4 mr-2" />{backPreviewUrl ? "Scan Both Sides" : "Scan Card"}</>
+                    )}
+                  </Button>
+
+                  {!scanPreviewUrl && !scanning && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Add a back image to improve accuracy for serial numbers &amp; card numbers
+                    </p>
                   )}
                 </div>
               ) : (
