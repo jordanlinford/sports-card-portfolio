@@ -3095,78 +3095,6 @@ Sitemap: ${origin}/sitemap.xml
 
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
-      // Check for eBay comps data with stale-while-revalidate pattern (non-blocking cache check)
-      const { normalizeEbayQuery, getCachedCompsWithSWR, getCacheEntry, enqueueFetchJob, calculateQuerySpecificity, calculateLiquidityAssessment, fetchStatusToScrapeHealth } = await import("./ebayCompsService");
-      
-      const compsQueryParts = [title];
-      if (year) compsQueryParts.unshift(String(year));
-      if (set) compsQueryParts.push(set);
-      if (variation) compsQueryParts.push(variation);
-      if (grade && grader) compsQueryParts.push(`${grader} ${grade}`);
-      
-      const compsQueryInput = compsQueryParts.join(" ");
-      const normalized = normalizeEbayQuery(compsQueryInput);
-      
-      let ebayComps: any = null;
-      let ebayCompsStatus: "hit" | "stale" | "complete" | "queued" | "fetching" | "failed" | "blocked" = "queued";
-      let ebayCompsSource: "EBAY_SOLD" | "SERPER" | "MIXED" = "SERPER";
-      
-      try {
-        const swrResult = await getCachedCompsWithSWR(
-          normalized.queryHash, 
-          normalized.canonicalQuery, 
-          normalized.filters
-        );
-        
-        if (swrResult.data && (swrResult.data.fetchStatus === "complete" || swrResult.data.compsJson)) {
-          ebayCompsStatus = swrResult.isStale ? "stale" : "hit";
-          ebayCompsSource = "EBAY_SOLD";
-          
-          const querySpecificity = calculateQuerySpecificity(normalized.filters);
-          const scrapeHealth = fetchStatusToScrapeHealth(swrResult.data.fetchStatus, swrResult.data.failureCount);
-          const summary = swrResult.data.summaryJson;
-          const liquidityAssessment = calculateLiquidityAssessment(
-            swrResult.data.soldCount,
-            summary?.cappedAtMax ?? false,
-            summary?.dateCoverageDays ?? 30,
-            swrResult.data.avgMatchScore ?? 0.5,
-            querySpecificity,
-            scrapeHealth
-          );
-          
-          ebayComps = {
-            queryHash: swrResult.data.queryHash,
-            confidence: swrResult.data.confidence,
-            soldCount: swrResult.data.soldCount,
-            summary: swrResult.data.summaryJson,
-            lastFetchedAt: swrResult.data.lastFetchedAt,
-            pagesScraped: swrResult.data.pagesScraped,
-            itemsFound: swrResult.data.itemsFound,
-            itemsKept: swrResult.data.itemsKept,
-            isStale: swrResult.isStale,
-            refreshing: swrResult.needsRefresh,
-            liquidityAssessment,
-          };
-        } else {
-          const entry = await getCacheEntry(normalized.queryHash);
-          if (entry?.fetchStatus === "fetching") {
-            ebayCompsStatus = "fetching";
-          } else if (entry?.fetchStatus === "blocked") {
-            ebayCompsStatus = "blocked";
-            ebayCompsSource = "SERPER";
-          } else if (entry?.fetchStatus === "failed") {
-            ebayCompsStatus = "failed";
-            ebayCompsSource = "SERPER";
-          } else {
-            await enqueueFetchJob(normalized.canonicalQuery, normalized.queryHash, normalized.filters);
-            ebayCompsStatus = "queued";
-          }
-        }
-      } catch (err) {
-        console.error("[Quick Analyze] Error checking eBay comps:", err);
-        ebayCompsStatus = "failed";
-      }
-
       // Compute deterministic signals from legacy price data
       const signals = computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
       
@@ -3609,43 +3537,16 @@ Sitemap: ${origin}/sitemap.xml
           reason: isPro ? signals.bigMoverReason : null,
         },
         comps: {
-          status: ebayCompsStatus,
-          source: ebayCompsSource,
-          soldCount: Math.max(ebayComps?.soldCount ?? 0, priceData.salesFound ?? 0, unifiedResult?.market?.soldCount ?? 0),
-          confidence: ebayComps?.confidence ?? (priceData.matchConfidence?.tier || "LOW"),
-          summary: isPro && ebayComps?.summary ? {
-            medianPrice: ebayComps.summary.medianPrice,
-            meanPrice: ebayComps.summary.meanPrice,
-            minPrice: ebayComps.summary.minPrice,
-            maxPrice: ebayComps.summary.maxPrice,
-            trendSeries: ebayComps.summary.trendSeries || [],
-            trendSlope: ebayComps.summary.trendSlope || 0,
-            volatility: ebayComps.summary.volatility,
-            liquidity: ebayComps.summary.liquidity,
-          } : {
-            medianPrice: ebayComps?.summary?.medianPrice ?? priceData.estimatedValue,
-            soldCount: ebayComps?.soldCount ?? priceData.salesFound ?? 0,
+          status: "complete" as const,
+          source: "SERPER" as const,
+          soldCount: unifiedResult?.market?.soldCount ?? 0,
+          confidence: signals.dataConfidence || "LOW",
+          summary: {
+            medianPrice: marketValue,
+            soldCount: unifiedResult?.market?.soldCount ?? 0,
             trendSeries: [],
           },
-          queryHash: normalized.queryHash,
-          debug: isPro ? {
-            canonicalQuery: normalized.canonicalQuery,
-            pagesScraped: ebayComps?.pagesScraped ?? 0,
-            itemsFound: ebayComps?.itemsFound ?? 0,
-            itemsKept: ebayComps?.itemsKept ?? 0,
-            lastFetchedAt: ebayComps?.lastFetchedAt ?? null,
-          } : undefined,
-          message: ebayCompsStatus === "queued" || ebayCompsStatus === "fetching"
-            ? "Gathering more sold comps in the background..."
-            : ebayCompsStatus === "blocked"
-            ? "Using fallback comps (eBay limited right now)"
-            : ebayCompsStatus === "failed"
-            ? "Using fallback comps"
-            : ebayCompsStatus === "hit"
-            ? "Up to date"
-            : ebayCompsStatus === "stale"
-            ? "Updating in background..."
-            : undefined,
+          message: "Analysis complete",
         },
         priceHistory: (qaMonthlyPriceHistory?.hasAnySales === true) ? qaMonthlyPriceHistory : null,
         pricingDebug: signals.dataConfidence === "LOW" ? {

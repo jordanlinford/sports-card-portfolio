@@ -113,13 +113,9 @@ function OutlookSkeleton() {
 // Comps & Confidence Panel Component - simplified to hide technical details
 function CompsConfidencePanel({ 
   comps, 
-  onRefresh, 
-  isPolling,
   showDebug = false 
 }: { 
   comps: CompsData; 
-  onRefresh?: () => void;
-  isPolling?: boolean;
   showDebug?: boolean;
 }) {
   const isLoading = comps.status === "queued" || comps.status === "fetching";
@@ -637,11 +633,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [analysisInvalidated, setAnalysisInvalidated] = useState(false);
   
-  // Polling state for comps
-  const [isPollingComps, setIsPollingComps] = useState(false);
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const pollStartTimeRef = useRef<number>(0);
-  
   // Rotating loading messages
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
   const loadingMessages = [
@@ -729,235 +720,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     }
   }, []);
 
-  // Cleanup polling on unmount or result clear
-  useEffect(() => {
-    return () => {
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    };
-  }, []);
-  
-  // Stop polling when result is cleared
-  useEffect(() => {
-    if (!result && pollIntervalRef.current) {
-      clearInterval(pollIntervalRef.current);
-      pollIntervalRef.current = null;
-      setIsPollingComps(false);
-    }
-  }, [result]);
-
-  // Poll for comps status when queued/fetching
-  const pollCompsStatus = async (queryHash: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/comps/ebay/status?queryHash=${queryHash}`, {
-        credentials: "include"
-      });
-      if (!response.ok) return false;
-      
-      const data = await response.json();
-      
-      // Update the result with new comps data - build fresh object from backend response
-      if (data.status === "complete" || data.fetchStatus === "complete") {
-        setResult(prev => prev ? {
-          ...prev,
-          comps: {
-            status: "hit",
-            soldCount: Math.max(data.soldCount ?? 0, prev.comps?.soldCount ?? 0),
-            confidence: data.confidence ?? "LOW",
-            source: "EBAY_SOLD" as const,
-            summary: data.summaryJson ?? data.summary ?? {},
-            queryHash: data.queryHash ?? prev.comps?.queryHash ?? "",
-            debug: {
-              canonicalQuery: data.canonicalQuery ?? prev.comps?.debug?.canonicalQuery ?? "",
-              pagesScraped: data.pagesScraped ?? prev.comps?.debug?.pagesScraped ?? 0,
-              itemsFound: data.itemsFound ?? prev.comps?.debug?.itemsFound ?? 0,
-              itemsKept: data.itemsKept ?? prev.comps?.debug?.itemsKept ?? 0,
-              lastFetchedAt: data.lastFetchedAt ?? prev.comps?.debug?.lastFetchedAt ?? null,
-            },
-            message: "Up to date",
-          }
-        } : null);
-        return true; // Stop polling
-      } else if (data.status === "blocked" || data.fetchStatus === "blocked") {
-        setResult(prev => prev ? {
-          ...prev,
-          comps: {
-            status: "blocked",
-            source: "SERPER" as const,
-            soldCount: Math.max(data.soldCount ?? 0, prev.comps?.soldCount ?? 0),
-            confidence: data.confidence ?? "LOW",
-            summary: data.summaryJson ?? data.summary ?? prev.comps?.summary ?? {},
-            queryHash: data.queryHash ?? prev.comps?.queryHash ?? "",
-            debug: {
-              canonicalQuery: data.canonicalQuery ?? prev.comps?.debug?.canonicalQuery ?? "",
-              pagesScraped: data.pagesScraped ?? prev.comps?.debug?.pagesScraped ?? 0,
-              itemsFound: data.itemsFound ?? prev.comps?.debug?.itemsFound ?? 0,
-              itemsKept: data.itemsKept ?? prev.comps?.debug?.itemsKept ?? 0,
-              lastFetchedAt: data.lastFetchedAt ?? prev.comps?.debug?.lastFetchedAt ?? null,
-            },
-            message: "Market data loaded",
-          }
-        } : null);
-        return true; // Stop polling
-      } else if (data.status === "failed" || data.fetchStatus === "failed") {
-        setResult(prev => prev ? {
-          ...prev,
-          comps: {
-            status: "failed",
-            source: "SERPER" as const,
-            soldCount: Math.max(data.soldCount ?? 0, prev.comps?.soldCount ?? 0),
-            confidence: data.confidence ?? "LOW",
-            summary: data.summaryJson ?? data.summary ?? prev.comps?.summary ?? {},
-            queryHash: data.queryHash ?? prev.comps?.queryHash ?? "",
-            debug: {
-              canonicalQuery: data.canonicalQuery ?? prev.comps?.debug?.canonicalQuery ?? "",
-              pagesScraped: data.pagesScraped ?? prev.comps?.debug?.pagesScraped ?? 0,
-              itemsFound: data.itemsFound ?? prev.comps?.debug?.itemsFound ?? 0,
-              itemsKept: data.itemsKept ?? prev.comps?.debug?.itemsKept ?? 0,
-              lastFetchedAt: data.lastFetchedAt ?? prev.comps?.debug?.lastFetchedAt ?? null,
-            },
-            message: "Market data loaded",
-          }
-        } : null);
-        return true; // Stop polling
-      }
-    } catch (err) {
-      console.error("Error polling comps status:", err);
-    }
-    return false; // Continue polling
-  };
-  
-  // Start polling when result has queued/fetching comps
-  const startPolling = (queryHash: string) => {
-    // Don't start if already polling
-    if (pollIntervalRef.current) return;
-    
-    setIsPollingComps(true);
-    pollStartTimeRef.current = Date.now();
-    
-    pollIntervalRef.current = setInterval(async () => {
-      const elapsed = Date.now() - pollStartTimeRef.current;
-      
-      // Stop after 20 seconds
-      if (elapsed > 20000) {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-        setIsPollingComps(false);
-        toast({
-          title: "Still gathering data",
-          description: "Check back in a moment for updated insights.",
-        });
-        return;
-      }
-      
-      const shouldStop = await pollCompsStatus(queryHash);
-      if (shouldStop) {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-        setIsPollingComps(false);
-      }
-    }, 2000);
-  };
-
-  // Poll for scan result comps and update scanResult state
-  const pollScanCompsStatus = async (queryHash: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/comps/ebay/status?queryHash=${queryHash}`, {
-        credentials: "include"
-      });
-      if (!response.ok) return false;
-      
-      const data = await response.json();
-      
-      if (data.status === "complete" || data.fetchStatus === "complete") {
-        // Update scanResult with pricing data
-        setScanResult(prev => {
-          if (!prev) return null;
-          const recentSales = data.comps?.slice(0, 5).map((c: { title: string; totalPrice?: number; soldPrice?: number; soldDate?: string | null; itemUrl?: string }) => ({
-            title: c.title,
-            price: c.totalPrice ?? c.soldPrice ?? 0,
-            soldDate: c.soldDate ?? null,
-            url: c.itemUrl ?? "",
-          })) || [];
-          
-          return {
-            ...prev,
-            pricing: {
-              ...prev.pricing,
-              available: true,
-              isFetching: false,
-              soldCount: data.soldCount ?? recentSales.length,
-              medianPrice: data.summaryJson?.medianPrice ?? data.summary?.medianPrice ?? prev.pricing.medianPrice,
-              minPrice: data.summaryJson?.minPrice ?? data.summary?.minPrice ?? prev.pricing.minPrice,
-              maxPrice: data.summaryJson?.maxPrice ?? data.summary?.maxPrice ?? prev.pricing.maxPrice,
-              priceRange: data.summaryJson?.minPrice && data.summaryJson?.maxPrice
-                ? `$${data.summaryJson.minPrice.toFixed(2)} - $${data.summaryJson.maxPrice.toFixed(2)}`
-                : prev.pricing.priceRange,
-              marketAssessment: prev.pricing.marketAssessment,
-              recentSales,
-            }
-          };
-        });
-        return true; // Stop polling
-      } else if (data.status === "failed" || data.fetchStatus === "failed") {
-        setScanResult(prev => prev ? {
-          ...prev,
-          pricing: {
-            ...prev.pricing,
-            isFetching: false,
-          }
-        } : null);
-        return true; // Stop polling
-      }
-    } catch (err) {
-      console.error("Error polling scan comps status:", err);
-    }
-    return false; // Continue polling
-  };
-
-  // Start polling for scan result market data
-  const startScanPolling = (queryHash: string) => {
-    // Don't start if already polling
-    if (pollIntervalRef.current) return;
-    
-    setIsPollingComps(true);
-    pollStartTimeRef.current = Date.now();
-    
-    pollIntervalRef.current = setInterval(async () => {
-      const elapsed = Date.now() - pollStartTimeRef.current;
-      
-      // Stop after 20 seconds
-      if (elapsed > 20000) {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-        setIsPollingComps(false);
-        // Mark as not fetching anymore
-        setScanResult(prev => prev ? {
-          ...prev,
-          pricing: { ...prev.pricing, isFetching: false }
-        } : null);
-        return;
-      }
-      
-      const shouldStop = await pollScanCompsStatus(queryHash);
-      if (shouldStop) {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-        setIsPollingComps(false);
-      }
-    }, 2000);
-  };
-
   const handleImageUpload = async (file: File) => {
     if (!file.type.startsWith("image/")) {
       toast({ title: "Invalid file", description: "Please upload an image file", variant: "destructive" });
@@ -1015,11 +777,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
       queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
       setShowAnalysisSuccess(true);
       addRecentSearch(title);
-      
-      // Start polling if comps are being fetched
-      if (data.comps && (data.comps.status === "queued" || data.comps.status === "fetching")) {
-        startPolling(data.comps.queryHash);
-      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -2788,12 +2545,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                         setScanResult(null);
                         setScanPreviewUrl(null);
                         setInputMode("manual");
-                        // Stop any ongoing polling
-                        if (pollIntervalRef.current) {
-                          clearInterval(pollIntervalRef.current);
-                          pollIntervalRef.current = null;
-                        }
-                        setIsPollingComps(false);
                       }}
                       data-testid="button-compare-card"
                     >
@@ -2822,13 +2573,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   <div className="mb-4">
                     <CompsConfidencePanel 
                       comps={result.comps}
-                      isPolling={isPollingComps}
                       showDebug={showDebug}
-                      onRefresh={() => {
-                        if (result.comps?.queryHash) {
-                          startPolling(result.comps.queryHash);
-                        }
-                      }}
                     />
                   </div>
                 )}
