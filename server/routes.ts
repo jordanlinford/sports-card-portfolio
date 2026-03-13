@@ -3611,7 +3611,7 @@ Sitemap: ${origin}/sitemap.xml
         comps: {
           status: ebayCompsStatus,
           source: ebayCompsSource,
-          soldCount: ebayComps?.soldCount ?? priceData.salesFound ?? 0,
+          soldCount: Math.max(ebayComps?.soldCount ?? 0, priceData.salesFound ?? 0, unifiedResult?.market?.soldCount ?? 0),
           confidence: ebayComps?.confidence ?? (priceData.matchConfidence?.tier || "LOW"),
           summary: isPro && ebayComps?.summary ? {
             medianPrice: ebayComps.summary.medianPrice,

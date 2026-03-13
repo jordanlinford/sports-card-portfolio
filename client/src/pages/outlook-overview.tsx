@@ -764,7 +764,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
           ...prev,
           comps: {
             status: "hit",
-            soldCount: data.soldCount ?? 0,
+            soldCount: Math.max(data.soldCount ?? 0, prev.comps?.soldCount ?? 0),
             confidence: data.confidence ?? "LOW",
             source: "EBAY_SOLD" as const,
             summary: data.summaryJson ?? data.summary ?? {},
@@ -786,7 +786,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
           comps: {
             status: "blocked",
             source: "SERPER" as const,
-            soldCount: data.soldCount ?? 0,
+            soldCount: Math.max(data.soldCount ?? 0, prev.comps?.soldCount ?? 0),
             confidence: data.confidence ?? "LOW",
             summary: data.summaryJson ?? data.summary ?? prev.comps?.summary ?? {},
             queryHash: data.queryHash ?? prev.comps?.queryHash ?? "",
@@ -807,7 +807,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
           comps: {
             status: "failed",
             source: "SERPER" as const,
-            soldCount: data.soldCount ?? 0,
+            soldCount: Math.max(data.soldCount ?? 0, prev.comps?.soldCount ?? 0),
             confidence: data.confidence ?? "LOW",
             summary: data.summaryJson ?? data.summary ?? prev.comps?.summary ?? {},
             queryHash: data.queryHash ?? prev.comps?.queryHash ?? "",
