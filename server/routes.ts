@@ -3511,11 +3511,35 @@ Sitemap: ${origin}/sitemap.xml
             dataSource: "gemini_unified",
           } : null,
           gradedEstimates: qaIsRaw && marketValue ? (() => {
-            const psa9 = unifiedResult?.market.psa9Price ?? null;
-            const psa10 = unifiedResult?.market.psa10Price ?? null;
+            // Cross-validation: PSA graded prices MUST be >= raw value.
+            // If Gemini returns graded prices lower than raw, it found comps
+            // for a completely different (cheaper) version of the card.
+            // This is especially common for low-pop numbered cards (/1-/5)
+            // where no graded comps exist and Gemini confuses the search.
+            let psa9 = unifiedResult?.market.psa9Price ?? null;
+            let psa10 = unifiedResult?.market.psa10Price ?? null;
+
+            if (psa9 !== null && psa9 < marketValue) {
+              console.warn(`[GradedMatrix] PSA 9 (${psa9}) < raw (${marketValue}) — wrong card comps detected. Clearing.`);
+              psa9 = null;
+            }
+            if (psa10 !== null && psa10 < marketValue) {
+              console.warn(`[GradedMatrix] PSA 10 (${psa10}) < raw (${marketValue}) — wrong card comps detected. Clearing.`);
+              psa10 = null;
+            }
+
             if (psa9 || psa10) {
               return { psa9, psa10 };
             }
+
+            // For very low-pop numbered cards (/1 through /5), graded comps
+            // virtually never exist — nobody grades these. Hide the matrix.
+            const isVeryLowPop = variation && /\/[1-5](?:\s|$|[^0-9])/.test(variation);
+            if (isVeryLowPop) {
+              console.log(`[GradedMatrix] Suppressing graded matrix for very low-pop card: ${variation}`);
+              return null;
+            }
+
             const estPsa9 = Math.round(marketValue * 2);
             const estPsa10 = Math.round(marketValue * 4);
             return { psa9: estPsa9, psa10: estPsa10, estimated: true };

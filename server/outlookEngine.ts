@@ -343,6 +343,8 @@ Return ONLY a JSON object with these exact fields:
 
 IMPORTANT: rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions. psa9Price and psa10Price should reflect what this card would sell for if professionally graded by PSA. ALWAYS provide psa9Price and psa10Price estimates — search for graded sold listings, and if none are found, estimate based on typical raw-to-graded multipliers for this card type (PSA 9 is typically 1.5-3x raw, PSA 10 is typically 3-8x raw depending on player popularity and card scarcity). Never return null for both.
 
+CRITICAL GRADED PRICE RULE: psa9Price and psa10Price must ALWAYS be HIGHER than rawPrice/avgPrice. Grading a card cannot reduce its value. If you find graded sold listings that are lower than the raw price, those listings are for a DIFFERENT, CHEAPER version of this card (e.g., a base auto vs. a numbered relic auto). Discard those comps and estimate from the multiplier formula instead (psa9 = rawPrice × 1.5, psa10 = rawPrice × 3). For very rare numbered cards (/1-/5) where no graded comps exist, use the multiplier only.
+
 Liquidity guidelines:
 - HIGH: 15+ sales per month, sells almost daily
 - MEDIUM: 5-15 sales per month, sells weekly
@@ -766,7 +768,8 @@ VERDICT GUIDELINES:
 Liquidity: HIGH = 15+ sales/month, MEDIUM = 5-15, LOW = under 5.
 Price stability: STABLE = within 20%, VOLATILE = varies 40%+.
 
-ALWAYS provide psa9Price and psa10Price estimates. If no graded sales found, estimate from raw price multipliers. Never return null for both.
+ALWAYS provide psa9Price and psa10Price estimates. If no graded sales found, estimate from raw price multipliers (psa9 = rawPrice × 1.5, psa10 = rawPrice × 3). Never return null for both.
+CRITICAL: psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps you find are lower than the raw price, those are for a different cheaper card — use the multiplier formula instead.
 If player is injured or lost starting role, reflect this in momentum and verdict.
 Be specific with numbers — if you find 19 sold listings, say 19.
 ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
