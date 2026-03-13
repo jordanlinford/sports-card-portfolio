@@ -249,17 +249,20 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
     : "";
 
   const isAutoCardStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
+  const hasPatch = /patch|mem|memorabilia|relic|jersey/i.test(card.variation || "") || /patch|mem|memorabilia|relic|jersey/i.test(card.title || "");
   const autoCardWarningStandalone = isAutoCardStandalone && card.set
     ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING REQUIRED:
-This is an autograph card from "${card.set}". Autograph values vary ENORMOUSLY by product line:
+This is an autograph card from "${card.set}"${hasPatch ? " with a MEMORABILIA PATCH embedded" : ""}. Autograph values vary ENORMOUSLY by product line:
 - National Treasures / Flawless / Immaculate autos → premium ($500-$10,000+)
 - Prizm / Select / Optic autos → mid-high ($100-$2,000)
 - Mosaic / Donruss / Score autos → mid-tier ($20-$500)
 - Chronicles / Prestige / Classics autos → budget ($10-$200)
 - Leaf / Pro Set / Wild Card autos → low ($5-$100)
-YOU MUST search for autographs specifically from "${card.set}" — do NOT pull prices from a different product line.
-A Joe Namath auto from Mosaic ($100-200) is NOT the same as a Namath auto from National Treasures ($2,000+).
-Include the SET NAME in every search query: "${card.playerName || card.title} ${card.year || ""} ${card.set} auto sold eBay"`
+YOU MUST search for this EXACT card — do NOT pull prices from a different product line or variation.
+${hasPatch ? `This is an AUTO PATCH — it includes a game-used memorabilia swatch. An auto PATCH is MORE valuable than a base auto from the same set but less liquid. Search specifically for the auto patch version.` : ""}
+Use the FULL card description in every search query: "${searchDescription} sold eBay"
+Also try: "${card.playerName || card.title} ${card.year || ""} ${card.set}${card.variation ? ` ${card.variation}` : " auto"} sold eBay"
+CRITICAL: If you find a real sold listing for this specific card, use that price. Do NOT substitute a higher-priced card from a different product line just because this card seems "underpriced" for a star player.`
     : "";
 
   const is1of1 = card.variation ? /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(card.variation) : false;
@@ -588,17 +591,21 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
     : "";
 
   const isAutoCard = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
+  const hasPatchUnified = /patch|mem|memorabilia|relic|jersey/i.test(card.variation || "") || /patch|mem|memorabilia|relic|jersey/i.test(card.title || "");
+  const unifiedSearchDescription = [card.year, card.set, card.playerName || card.title, card.variation].filter(Boolean).join(" ");
   const autoCardWarning = isAutoCard && card.set
     ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING REQUIRED:
-This is an autograph card from "${card.set}". Autograph values vary ENORMOUSLY by product line:
+This is an autograph card from "${card.set}"${hasPatchUnified ? " with a MEMORABILIA PATCH embedded" : ""}. Autograph values vary ENORMOUSLY by product line:
 - National Treasures / Flawless / Immaculate autos → premium ($500-$10,000+)
 - Prizm / Select / Optic autos → mid-high ($100-$2,000)
 - Mosaic / Donruss / Score autos → mid-tier ($20-$500)
 - Chronicles / Prestige / Classics autos → budget ($10-$200)
 - Leaf / Pro Set / Wild Card autos → low ($5-$100)
-YOU MUST search for autographs specifically from "${card.set}" — do NOT pull prices from a different product line.
-A Joe Namath auto from Mosaic ($100-200) is NOT the same as a Namath auto from National Treasures ($2,000+).
-Include the SET NAME in every search query: "${card.playerName || card.title} ${card.year || ""} ${card.set} auto sold eBay"`
+YOU MUST search for this EXACT card — do NOT pull prices from a different product line or variation.
+${hasPatchUnified ? `This is an AUTO PATCH — it includes a game-used memorabilia swatch. An auto PATCH is MORE valuable than a base auto from the same set but less liquid. Search specifically for the auto patch version.` : ""}
+Use the FULL card description in every search query: "${unifiedSearchDescription} sold eBay"
+Also try: "${card.playerName || card.title} ${card.year || ""} ${card.set}${card.variation ? ` ${card.variation}` : " auto"} sold eBay"
+CRITICAL: If you find a real sold listing for this specific card, use that price. Do NOT substitute a higher-priced card from a different product line just because this card seems "underpriced" for a star player.`
     : "";
 
   const is1of1 = card.variation ? /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(card.variation) : false;
