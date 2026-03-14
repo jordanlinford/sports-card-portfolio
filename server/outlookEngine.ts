@@ -728,7 +728,12 @@ SEARCH BROADENING: If your first search finds 0 completed sales, try broader que
 - Only fall back to base/silver pricing if the card IS actually a base/silver parallel
 Report whatever comps you find from these broader searches.
 
-ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and confidence to "LOW". However, STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — do NOT return null. Use the card's set premium, player tier, serial number scarcity, and comparable sales from similar players/cards to estimate a realistic range. A thoughtful estimate with LOW confidence is far more useful to the user than returning null. Note your estimation methodology in "notes".
+ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and confidence to "LOW". However, you MUST STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — NEVER return 0 or null for avgPrice. This is mandatory. Here is exactly how to estimate when no direct sales exist:
+- Search for the SAME player's other cards from ANY product (e.g. "${card.playerName || card.title} 2025 football card sold eBay")
+- Search for COMPARABLE players at the same tier in similar products (e.g. rookie WRs, mid-tier prospects, similar draft slot) — look at what their base autos or parallels sell for
+- Search for the SAME product with different players (e.g. "${card.set || "this set"} auto sold eBay") to understand the product's price floor
+- Apply any scarcity premium for numbered parallels (/49 = 2-3x base, /25 = 3-5x base, etc.)
+- A thoughtful cross-player estimate with LOW confidence is far more useful than returning 0. Note your methodology in "notes".
 
 Return ONLY a JSON object with this EXACT structure:
 {

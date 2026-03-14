@@ -3259,6 +3259,32 @@ Sitemap: ${origin}/sitemap.xml
         console.warn(`[Quick Analyze] ZERO-DATA DISCOUNT: Gemini returned no price AND no legacy comps. Estimate $${originalValue} discounted 50% to $${marketValue}`);
       }
 
+      // LAST RESORT: If marketValue is still null/0 after all processing, run a broad
+      // cross-product search using just the player name + year. This guarantees we always
+      // return some price rather than showing nothing to the user.
+      if ((!marketValue || marketValue <= 0) && title) {
+        console.log(`[Quick Analyze] LAST RESORT: No price after all processing for "${title}". Running broad cross-product search...`);
+        try {
+          const { fetchGeminiMarketData: fetchBroadMarketData } = await import("./outlookEngine");
+          const playerName = title.split(" ").slice(0, 3).join(" "); // first 3 words as player name
+          const broadResult = await fetchBroadMarketData({
+            title: playerName,
+            playerName,
+            year: year || undefined,
+            // deliberately omit set and variation so Gemini searches broadly across all products
+          });
+          if (broadResult && broadResult.avgPrice > 0) {
+            marketValue = broadResult.avgPrice;
+            priceMin = broadResult.minPrice || Math.round(marketValue * 0.6);
+            priceMax = broadResult.maxPrice || Math.round(marketValue * 1.8);
+            compCount = 0;
+            console.log(`[Quick Analyze] LAST RESORT: Broad cross-product estimate $${marketValue} for "${playerName}"`);
+          }
+        } catch (lastResortErr: any) {
+          console.warn(`[Quick Analyze] LAST RESORT: Failed — ${lastResortErr.message}`);
+        }
+      }
+
       // RAW CARD PRICE CORRECTION
       const qaIsRaw = isRawCardCheck(grade, grader);
       if (qaIsRaw && marketValue && priceMin && priceMin > 0 && !qaIs1of1 && !qaIsLowPop) {
