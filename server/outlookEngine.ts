@@ -1018,6 +1018,119 @@ Return ONLY this JSON:
 }
 
 // ============================================================
+// CROSS-PRODUCT FALLBACK PRICE — for cards with no direct eBay comps
+// Searches comparable players / products to find a realistic floor price
+// ============================================================
+export async function fetchCrossProductFallbackPrice(card: {
+  playerName: string;
+  year?: string | number;
+  set?: string;
+  variation?: string;
+  grade?: string;
+  grader?: string;
+  sport?: string;
+}): Promise<{ avgPrice: number; minPrice: number; maxPrice: number; notes: string } | null> {
+  const player = card.playerName;
+  const year = card.year ? String(card.year) : "";
+  const set = card.set || "";
+  const variation = card.variation || "";
+  const sport = card.sport || "football";
+  const isRaw = !card.grade || card.grade.toLowerCase() === "raw" || (card.grader && card.grader.toLowerCase() === "raw");
+  const isAuto = /auto(graph)?/i.test(variation) || /auto(graph)?/i.test(set);
+  const serialMatch = variation.match(/\/\s*(\d+)\b/);
+  const serialNumber = serialMatch ? parseInt(serialMatch[1]) : null;
+
+  const gradeLabel = isRaw ? "raw/ungraded" : `${card.grader || ""} ${card.grade || ""}`.trim();
+  const cardTypeLabel = isAuto ? "autograph" : "card";
+  const serialLabel = serialNumber ? `numbered /${serialNumber}` : "unnumbered";
+  const cardDesc = `${year} ${set} ${player} ${variation} ${gradeLabel}`.trim();
+
+  // Build serial number context for premium
+  let serialPremium = "";
+  if (serialNumber) {
+    if (serialNumber <= 10) serialPremium = "This is a VERY rare low-numbered parallel. Apply a significant premium (5-15x) over the base auto price.";
+    else if (serialNumber <= 25) serialPremium = "This is a rare low-numbered parallel. Apply a premium (3-6x) over the base auto price.";
+    else if (serialNumber <= 50) serialPremium = "This is a numbered parallel /50. Apply a premium (2-4x) over the base auto price.";
+    else if (serialNumber <= 99) serialPremium = "This is a numbered parallel /99. Apply a premium (1.5-2.5x) over the base auto price.";
+    else if (serialNumber <= 299) serialPremium = "This is a numbered parallel /299. Apply a modest premium (1.2-1.8x) over the base auto price.";
+    else serialPremium = "This is a numbered parallel but highly numbered. Price similarly to a base auto.";
+  }
+
+  const prompt = `You are a sports card pricing expert. I need a realistic market value estimate for a ${sport} card:
+
+CARD: "${cardDesc}"
+Card Type: ${serialLabel} ${cardTypeLabel}
+
+This card has NO direct eBay sold comps available yet. You need to estimate its value using cross-product comparables. Here is exactly how to do it:
+
+STEP 1 — Find this PLAYER'S comparable cards in any product:
+- Search: "${player} ${year} ${sport} card sold eBay"
+- Search: "${player} ${year} rookie auto sold eBay"
+- Search: "${player} ${year} autograph sold eBay"
+- Search: "${player} ${year} Donruss auto sold eBay"
+- Search: "${player} ${year} Illusions auto sold eBay"  
+- Search: "${player} ${year} Select auto sold eBay"
+- Search: "${player} ${year} Prizm auto sold eBay"
+- Search: "${player} ${year} Chronicles auto sold eBay"
+
+STEP 2 — If the player has no sales yet, find COMPARABLE PLAYERS at the same tier:
+- Search for rookies drafted in the same round, same position, same year
+- Search for rookies with similar hype/draft stock from ${year} ${sport}
+- Look at what their comparable autos sell for (Donruss, Illusions, Score, Chronicles)
+${serialPremium ? `\nSTEP 3 — APPLY SERIAL NUMBER PREMIUM:\n${serialPremium}\n` : ""}
+IMPORTANT RULES:
+- NEVER return 0 or null for avgPrice. A thoughtful estimate is always required.
+- If the player is a rookie, search specifically for ${year} rookie autos in budget-to-mid products
+- Return the REALISTIC current market value, not the ceiling potential
+- For ${sport} rookies in products like Donruss, Score, Chronicles, Illusions: base autos typically range $5-$30 depending on player tier; premium numbered parallels go higher
+
+Return ONLY this JSON:
+{
+  "avgPrice": <best realistic estimate in dollars>,
+  "minPrice": <conservative low end>,
+  "maxPrice": <aggressive high end>,
+  "notes": "<explain: which comps or comparable players you found, what they sell for, how you arrived at this estimate>"
+}`;
+
+  try {
+    console.log(`[CrossProduct Fallback] Estimating price for: ${cardDesc}`);
+    const startTime = Date.now();
+
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const elapsed = Date.now() - startTime;
+    let responseText = response.text || "";
+    console.log(`[CrossProduct Fallback] Response in ${elapsed}ms (${responseText.length} chars)`);
+
+    responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.avgPrice && typeof parsed.avgPrice === "number" && parsed.avgPrice > 0) {
+        console.log(`[CrossProduct Fallback] Estimate: $${parsed.avgPrice} (range $${parsed.minPrice}-$${parsed.maxPrice}) | ${(parsed.notes || "").substring(0, 120)}`);
+        return {
+          avgPrice: parsed.avgPrice,
+          minPrice: parsed.minPrice || Math.round(parsed.avgPrice * 0.6),
+          maxPrice: parsed.maxPrice || Math.round(parsed.avgPrice * 1.8),
+          notes: parsed.notes || "Estimated from comparable player/product comps",
+        };
+      }
+    }
+    console.warn(`[CrossProduct Fallback] Could not parse valid price from response`);
+    return null;
+  } catch (error: any) {
+    console.error(`[CrossProduct Fallback] Error:`, error.message);
+    return null;
+  }
+}
+
+// ============================================================
 // MONTHLY PRICE HISTORY - 18-month lookback via Gemini + Google Search
 // ============================================================
 export interface MonthlyPricePoint {

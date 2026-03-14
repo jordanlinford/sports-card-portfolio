@@ -3062,7 +3062,7 @@ Sitemap: ${origin}/sitemap.xml
       // UNIFIED APPROACH: One Gemini call for pricing + news + verdict, parallel with legacy price lookup + price history
       console.log(`[Quick Analyze] Starting unified analysis for: ${title}`);
       const startTime = Date.now();
-      const { fetchMonthlyPriceHistory, fetchLowPopFallbackPrice } = await import("./outlookEngine");
+      const { fetchMonthlyPriceHistory, fetchLowPopFallbackPrice, fetchCrossProductFallbackPrice } = await import("./outlookEngine");
       const [unifiedResult, priceData, qaMonthlyPriceHistory] = await Promise.all([
         fetchUnifiedCardAnalysis({
           title,
@@ -3241,47 +3241,41 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      // ZERO-DATA DISCOUNT: When unified has 0 sold comps AND legacy has insufficient data,
-      // the estimate is pure AI guesswork with no market data backing it — discount heavily
-      // A single AI-generated price point doesn't count as real data (it's just another Gemini guess)
+      // CROSS-PRODUCT FALLBACK: When there are NO real comps from any source (unified soldCount=0
+      // AND legacy has insufficient data), run a dedicated cross-product search.
+      // This fires even when unified returned a low estimate — the cross-product search is more
+      // targeted (explicit searches across Donruss, Illusions, Elite, etc.) and we take the HIGHER
+      // of unified's estimate vs the cross-product result to avoid undervaluing the card.
       const legacyPricePoints = priceData.pricePoints || [];
       const legacyHasRealData = legacyPricePoints.length >= 2;
-      // unifiedHasData is true if we have actual sold comps OR if Gemini provided a market estimate
-      // (even with soldCount=0). Gemini estimates are intentional market intelligence, not wild guesses —
-      // the 50% discount only fires when Gemini couldn't return ANY price at all.
-      const unifiedHasData = compCount > 0 || (unifiedResult?.market?.avgPrice != null && unifiedResult.market.avgPrice > 0);
-      if (!unifiedHasData && !legacyHasRealData && marketValue && !qaIs1of1 && !qaIsVeryLowPop) {
-        const originalValue = marketValue;
-        const discountFactor = 0.5;
-        marketValue = Math.round(marketValue * discountFactor * 100) / 100;
-        priceMin = Math.round((priceMin || marketValue * 0.7) * discountFactor * 100) / 100;
-        priceMax = Math.round((priceMax || marketValue * 1.5) * discountFactor * 100) / 100;
-        console.warn(`[Quick Analyze] ZERO-DATA DISCOUNT: Gemini returned no price AND no legacy comps. Estimate $${originalValue} discounted 50% to $${marketValue}`);
-      }
-
-      // LAST RESORT: If marketValue is still null/0 after all processing, run a broad
-      // cross-product search using just the player name + year. This guarantees we always
-      // return some price rather than showing nothing to the user.
-      if ((!marketValue || marketValue <= 0) && title) {
-        console.log(`[Quick Analyze] LAST RESORT: No price after all processing for "${title}". Running broad cross-product search...`);
+      const hasAnyRealComps = compCount > 0 || legacyHasRealData;
+      if (!hasAnyRealComps && !qaIs1of1 && !qaIsVeryLowPop) {
+        const playerName = (title || "").split(/\s+/).slice(0, 3).join(" ");
+        const preExisting = marketValue || 0;
+        console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: soldCount=0, no legacy data for "${title}" (current est: $${preExisting}). Searching comparable products...`);
         try {
-          const { fetchGeminiMarketData: fetchBroadMarketData } = await import("./outlookEngine");
-          const playerName = title.split(" ").slice(0, 3).join(" "); // first 3 words as player name
-          const broadResult = await fetchBroadMarketData({
-            title: playerName,
+          const cpResult = await fetchCrossProductFallbackPrice({
             playerName,
             year: year || undefined,
-            // deliberately omit set and variation so Gemini searches broadly across all products
+            set: set || undefined,
+            variation: variation || undefined,
+            grade: grade || undefined,
+            grader: grader || undefined,
           });
-          if (broadResult && broadResult.avgPrice > 0) {
-            marketValue = broadResult.avgPrice;
-            priceMin = broadResult.minPrice || Math.round(marketValue * 0.6);
-            priceMax = broadResult.maxPrice || Math.round(marketValue * 1.8);
-            compCount = 0;
-            console.log(`[Quick Analyze] LAST RESORT: Broad cross-product estimate $${marketValue} for "${playerName}"`);
+          if (cpResult && cpResult.avgPrice > 0) {
+            // Take the HIGHER value: cross-product is more targeted, unified may underestimate new cards
+            if (cpResult.avgPrice > preExisting) {
+              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} > pre-existing $${preExisting}. Using cross-product estimate. | ${cpResult.notes.substring(0, 100)}`);
+              marketValue = cpResult.avgPrice;
+              priceMin = cpResult.minPrice;
+              priceMax = cpResult.maxPrice;
+              compCount = 0;
+            } else {
+              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} <= pre-existing $${preExisting}. Keeping higher value.`);
+            }
           }
-        } catch (lastResortErr: any) {
-          console.warn(`[Quick Analyze] LAST RESORT: Failed — ${lastResortErr.message}`);
+        } catch (cpErr: any) {
+          console.warn(`[Quick Analyze] CROSS-PRODUCT FALLBACK: Failed — ${cpErr.message}`);
         }
       }
 
