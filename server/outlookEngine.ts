@@ -311,11 +311,18 @@ ${rawGradeWarning}
 ${autoCardWarningStandalone}
 ${triangulationInstructions}
 
-Search eBay completed/sold listings for this EXACT card. What does it ACTUALLY sell for RIGHT NOW?
-Try multiple search queries if needed:
+Search eBay completed/sold listings for this EXACT card. You must complete BOTH searches below:
+
+SEARCH A — RAW/UNGRADED prices:
 - "${searchDescription}" sold
 - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold"
 ${isNumbered ? `- "${card.playerName || card.title} ${card.variation} sold eBay"\n- Include the numbering (e.g., /10, /25) in your search to find the correct parallel` : ""}
+
+SEARCH B — GRADED prices (do this SEPARATELY, do not skip):
+- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} PSA 10 sold eBay"
+- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} PSA 9 sold eBay"
+- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} PSA 10 sold"
+Record any actual PSA 10 and PSA 9 completed sold prices you find. These are your psa10Price and psa9Price — use the REAL sold prices, not calculations.
 
 PRICING RULES — RECENCY IS KING:
 - Prioritize the MOST RECENT completed sales (last 14 days > last 30 days > last 60 days)
@@ -336,8 +343,8 @@ Return ONLY a JSON object with these exact fields:
   "rawPrice": <average price for RAW/UNGRADED copies specifically, or null if unknown>,
   "rawMinPrice": <lowest raw/ungraded sale price, or null if unknown>,
   "rawMaxPrice": <highest raw/ungraded sale price, or null if unknown>,
-  "psa9Price": <estimated value if graded PSA 9 (Mint) — search for PSA 9 sold listings or estimate from raw price>,
-  "psa10Price": <estimated value if graded PSA 10 (Gem Mint) — search for PSA 10 sold listings or estimate from raw price>,
+  "psa9Price": <REAL PSA 9 sold price from SEARCH B above — use actual completed sale price; only estimate from raw if zero PSA 9 sales exist>,
+  "psa10Price": <REAL PSA 10 sold price from SEARCH B above — use actual completed sale price; only estimate from raw if zero PSA 10 sales exist>,
   "activeListing": <number of current active listings>,
   "liquidity": "HIGH" | "MEDIUM" | "LOW",
   "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
@@ -345,9 +352,12 @@ Return ONLY a JSON object with these exact fields:
   "notes": "<brief note citing specific sold listings with prices when possible>"
 }
 
-IMPORTANT: rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions. psa9Price and psa10Price should reflect what this card would sell for if professionally graded by PSA. ALWAYS provide psa9Price and psa10Price estimates — search for graded sold listings, and if none are found, estimate based on typical raw-to-graded multipliers for this card type (PSA 9 is typically 1.5-3x raw, PSA 10 is typically 3-8x raw depending on player popularity and card scarcity). Never return null for both.
-
-CRITICAL GRADED PRICE RULE: psa9Price and psa10Price must ALWAYS be HIGHER than rawPrice/avgPrice. Grading a card cannot reduce its value. If you find graded sold listings that are lower than the raw price, those listings are for a DIFFERENT, CHEAPER version of this card (e.g., a base auto vs. a numbered relic auto). Discard those comps and estimate from the multiplier formula instead (psa9 = rawPrice × 1.5, psa10 = rawPrice × 3). For very rare numbered cards (/1-/5) where no graded comps exist, use the multiplier only.
+GRADED PRICE PRIORITY RULES:
+1. ALWAYS use REAL sold prices from SEARCH B first. If you found PSA 10 sold listings, that IS psa10Price — do not recalculate it.
+2. Only fall back to raw-price multipliers if you found ZERO PSA 10 or PSA 9 sold listings after genuinely searching. Multipliers are a last resort, not a default.
+3. Fallback multipliers (use ONLY when no real data exists): PSA 9 ≈ 2-5x raw, PSA 10 ≈ 5-15x raw. Note that graded premiums on popular cards can be 20-50x the raw price — do not cap at 8x.
+4. psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps you found are lower, they're for a different card — use the multiplier fallback instead.
+5. rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions.
 
 Liquidity guidelines:
 - HIGH: 15+ sales per month, sells almost daily
@@ -701,12 +711,19 @@ ${triangulationInstructions}
 Do ALL of the following in this single search:
 
 1. MARKET PRICING (MOST IMPORTANT — get this right):
-   Search eBay completed/sold listings for this EXACT card. What does it ACTUALLY sell for RIGHT NOW?
+   Search eBay completed/sold listings for this EXACT card. Run BOTH sub-searches:
+
+   1a. RAW/UNGRADED prices:
+   - "${unifiedSearchDescription} sold eBay"
+   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} sold eBay"
    - Prioritize the MOST RECENT sales (last 14 days > last 30 days > last 60 days)
-   - The avgPrice should reflect what a buyer would realistically pay TODAY based on recent completed sales
-   - If recent sales (last 14 days) show lower prices than older sales, use the recent prices — the market has moved down
-   - If recent sales show higher prices, use the recent prices — the market has moved up
-   - RECENCY MATTERS MOST: 3 sales from last week are more valuable than 20 sales from 2 months ago
+   - avgPrice = what it realistically sells for TODAY based on recent completed sales
+
+   1b. GRADED prices — search these SEPARATELY, do not skip:
+   - "${unifiedSearchDescription} PSA 10 sold eBay"
+   - "${unifiedSearchDescription} PSA 9 sold eBay"
+   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} PSA 10 sold"
+   Use real completed PSA 10 and PSA 9 sale prices directly — do NOT recalculate from raw if you found actual graded sold data.
 
 2. PLAYER NEWS: Search for ${card.playerName || card.title} latest news in ${currentYear} — current team, injuries, performance, trades, roster status.
 
@@ -746,8 +763,8 @@ Return ONLY a JSON object with this EXACT structure:
     "minPrice": <lowest recent completed sale price>,
     "maxPrice": <highest recent non-outlier sale price>,
     "rawPrice": <average raw/ungraded price, or null>,
-    "psa9Price": <PSA 9 value — search for graded sales or estimate at 1.5-3x raw>,
-    "psa10Price": <PSA 10 value — search for graded sales or estimate at 3-8x raw>,
+    "psa9Price": <REAL PSA 9 sold price from sub-search 1b — use actual sale price; only fall back to estimate if zero PSA 9 sales found>,
+    "psa10Price": <REAL PSA 10 sold price from sub-search 1b — use actual sale price; only fall back to estimate if zero PSA 10 sales found>,
     "activeListing": <current active listings count>,
     "liquidity": "HIGH" | "MEDIUM" | "LOW",
     "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
@@ -783,8 +800,12 @@ VERDICT GUIDELINES:
 Liquidity: HIGH = 15+ sales/month, MEDIUM = 5-15, LOW = under 5.
 Price stability: STABLE = within 20%, VOLATILE = varies 40%+.
 
-ALWAYS provide psa9Price and psa10Price estimates. If no graded sales found, estimate from raw price multipliers (psa9 = rawPrice × 1.5, psa10 = rawPrice × 3). Never return null for both.
-CRITICAL: psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps you find are lower than the raw price, those are for a different cheaper card — use the multiplier formula instead.
+GRADED PRICE PRIORITY RULES:
+1. Use REAL sold prices from sub-search 1b first. If you found PSA 10 sold listings, that number IS psa10Price — do not recalculate it from raw.
+2. Only fall back to multipliers if you found ZERO PSA 10 or PSA 9 sold listings after genuinely searching. Multipliers are a last resort, not a default.
+3. Fallback multipliers (use ONLY when no real data exists): PSA 9 ≈ 2-5x raw, PSA 10 ≈ 5-15x raw. Popular base cards of hot players can have 20-50x graded premiums — do not artificially cap it.
+4. psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps are lower than raw, those are a different cheaper card — use multiplier fallback.
+5. Never return null for both psa9Price and psa10Price.
 If player is injured or lost starting role, reflect this in momentum and verdict.
 Be specific with numbers — if you find 19 sold listings, say 19.
 ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
