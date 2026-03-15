@@ -28,7 +28,7 @@ function CaseCard({ displayCase }: { displayCase: ExploreCase }) {
 
   return (
     <Link href={`/case/${displayCase.id}`}>
-      <Card className="group hover-elevate cursor-pointer h-full">
+      <Card className="group hover-elevate cursor-pointer h-full overflow-hidden">
         <CardContent className="p-4">
           <div className="aspect-[4/3] bg-muted rounded-lg mb-3 overflow-hidden relative">
             {previewCards.length > 0 ? (

@@ -91,11 +91,11 @@ function DisplayCaseCard({ displayCase }: { displayCase: DisplayCaseWithCards })
   const previewImages = displayCase.cards?.slice(0, 4) || [];
 
   return (
-    <Card className="group hover-elevate" data-testid={`card-display-case-${displayCase.id}`}>
+    <Card className="group hover-elevate overflow-hidden" data-testid={`card-display-case-${displayCase.id}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <CardTitle className="truncate" data-testid={`text-case-name-${displayCase.id}`}>
+            <CardTitle className="truncate text-base" data-testid={`text-case-name-${displayCase.id}`}>
               {displayCase.name}
             </CardTitle>
             <CardDescription className="flex items-center gap-2 mt-1">
