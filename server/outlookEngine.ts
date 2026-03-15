@@ -285,11 +285,12 @@ ${is1of1 || (pn && pn <= 5) ? `- "${playerSearchStandalone} ${yearStrStandalone}
 Find as many different numbered parallel sold prices as possible.
 
 STEP 2 — Apply multiplier from the closest parallel found to estimate /${pn || 1} value:
-  /99 comp → /${pn || 1} value ≈ ${is1of1 ? "10-15x" : pn && pn <= 5 ? "6-10x" : pn && pn <= 10 ? "3-6x" : "2-3x"}
-  /49 comp → /${pn || 1} value ≈ ${is1of1 ? "6-10x" : pn && pn <= 5 ? "4-6x" : pn && pn <= 10 ? "2-3.5x" : "1.5-2x"}
-  /25 comp → /${pn || 1} value ≈ ${is1of1 ? "3-5x" : pn && pn <= 5 ? "2-3x" : "1.3-2x"}
-  /10 comp → /${pn || 1} value ≈ ${is1of1 ? "2-3.5x" : pn && pn <= 5 ? "1.5-2x" : "same tier"}
-For autographs/memorabilia, use the higher end. For non-auto cards, use the lower end.
+  /99 comp → /${pn || 1} value ≈ ${is1of1 ? "4-8x" : pn && pn <= 5 ? "3-6x" : pn && pn <= 10 ? "2-4x" : "1.5-2.5x"}
+  /49 comp → /${pn || 1} value ≈ ${is1of1 ? "3-6x" : pn && pn <= 5 ? "2-4x" : pn && pn <= 10 ? "1.5-3x" : "1.2-2x"}
+  /25 comp → /${pn || 1} value ≈ ${is1of1 ? "2-4x" : pn && pn <= 5 ? "1.5-2.5x" : "1.1-1.8x"}
+  /10 comp → /${pn || 1} value ≈ ${is1of1 ? "1.5-2.5x" : pn && pn <= 5 ? "1.2-2x" : "same tier"}
+IMPORTANT: The upper end (8x from /99) is ONLY for all-time icons (Trout, Ohtani, LeBron, Mahomes, Mantle). For Cy Young winners, top receivers, All-Stars — use 4-6x from /99. Most real 1/1 autos of established stars sell for $1,500-$5,000, not $10,000+.
+For autographs/memorabilia, lean toward the mid range. For non-auto cards, use the lower end.
 
 STEP 3 — CROSS-SET COMPS: If vertical comps from the same set are scarce, search for this same player's cards from DIFFERENT sets of the same year:
 - "${playerSearchStandalone} ${yearStrStandalone} auto /${pn || ""} sold eBay" (any set, same numbering)
@@ -299,7 +300,7 @@ STEP 4 — Sanity check against similar-tier player cards from the same set.
 STEP 5 — Adjust for brand tier (National Treasures/Flawless/Noir = premium, Select/Mosaic = mid, Pro Set/Leaf = budget).
 
 YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return 0 for a low-pop card.
-If you find multiple parallel comps, triangulate from EACH one and use the highest result.
+If you find multiple parallel comps, triangulate from EACH one and use the MEDIAN (middle) result — not the highest. If you have 3 estimates, take the middle one. If you have 2, take the average. Never pick the highest estimate — that produces inflated values.
 Cite the parallel comps used in notes: e.g. "/25 sold for $150 → applied 3x for /${pn || 1} = $450 estimate"`
     : "";
 
@@ -651,12 +652,14 @@ Report whatever parallel comps you find in your notes.
 
 STEP 2 — APPLY MULTIPLIER from the closest parallel found:
 Multiplier table (relative to the comp parallel you found):
-  /99 comp → /${popNumber || 1} value ≈ ${is1of1 ? "10-15x" : popNumber && popNumber <= 5 ? "6-10x" : popNumber && popNumber <= 10 ? "3-6x" : "2-3x"}
-  /49 comp → /${popNumber || 1} value ≈ ${is1of1 ? "6-10x" : popNumber && popNumber <= 5 ? "4-6x" : popNumber && popNumber <= 10 ? "2-3.5x" : "1.5-2x"}
-  /25 comp → /${popNumber || 1} value ≈ ${is1of1 ? "3-5x" : popNumber && popNumber <= 5 ? "2-3x" : "1.3-2x"}
-  /10 comp → /${popNumber || 1} value ≈ ${is1of1 ? "2-3.5x" : popNumber && popNumber <= 5 ? "1.5-2x" : "same tier"}
-  /5 comp  → /${popNumber || 1} value ≈ ${is1of1 ? "1.5-2.5x" : "0.7-1x (similar scarcity)"}
-For autographs/memorabilia, use the higher end. For non-auto cards, use the lower end.
+  /99 comp → /${popNumber || 1} value ≈ ${is1of1 ? "4-8x" : popNumber && popNumber <= 5 ? "3-6x" : popNumber && popNumber <= 10 ? "2-4x" : "1.5-2.5x"}
+  /49 comp → /${popNumber || 1} value ≈ ${is1of1 ? "3-6x" : popNumber && popNumber <= 5 ? "2-4x" : popNumber && popNumber <= 10 ? "1.5-3x" : "1.2-2x"}
+  /25 comp → /${popNumber || 1} value ≈ ${is1of1 ? "2-4x" : popNumber && popNumber <= 5 ? "1.5-2.5x" : "1.1-1.8x"}
+  /10 comp → /${popNumber || 1} value ≈ ${is1of1 ? "1.5-2.5x" : popNumber && popNumber <= 5 ? "1.2-2x" : "same tier"}
+  /5 comp  → /${popNumber || 1} value ≈ ${is1of1 ? "1.3-2x" : "0.7-1x (similar scarcity)"}
+IMPORTANT: The upper end (8x from /99) is ONLY for transcendent all-time icons (Trout, Ohtani, LeBron, Mahomes, Mantle, Jordan). For Cy Young winners, Pro Bowl receivers, All-Stars — use 4-6x from /99. Most 1/1 autos of established stars realistically sell for $1,500-$5,000 at auction.
+For autographs/memorabilia, lean toward the mid range. For non-auto cards, use the lower end.
+If you find multiple parallel comps giving different estimates, use the MEDIAN (middle value) — not the highest.
 
 STEP 3 — CROSS-SET COMPS: If you cannot find enough vertical comps from the SAME set, search for this SAME player's cards from DIFFERENT premium sets of the same year:
 - Search: "${playerSearch} ${yearStr} auto /${popNumber || ""} sold eBay" (any set, same numbering)
@@ -952,15 +955,16 @@ Because this is a ${cardLabel} card, direct sold comps are very rare. Use this T
 
 2. IMPORTANT: Apply the multiplier table below, then apply the REALITY CHECK in step 5.
    Multiplier table (initial estimate before corrections):
-   - /99 comp → ${cardLabel} value = ${is1of1 ? "10-20x" : popNumber <= 5 ? "6-12x" : "4-8x"}
-   - /75 comp → ${cardLabel} value = ${is1of1 ? "8-15x" : popNumber <= 5 ? "5-10x" : "3-6x"}
-   - /50 comp → ${cardLabel} value = ${is1of1 ? "6-12x" : popNumber <= 5 ? "4-8x" : "3-5x"}
-   - /49 comp → ${cardLabel} value = ${is1of1 ? "6-12x" : popNumber <= 5 ? "4-8x" : "3-5x"}
-   - /25 comp → ${cardLabel} value = ${is1of1 ? "3-6x" : popNumber <= 5 ? "2.5-4x" : "1.5-3x"}
-   - /10 comp → ${cardLabel} value = ${is1of1 ? "2-4x" : popNumber <= 5 ? "1.5-3x" : "same tier"}
-   For current stars and rookies with high collector demand, use the HIGHER end.
-   For autographs from premium brands, use the mid-to-high range — NOT automatically the ceiling.
+   - /99 comp → ${cardLabel} value = ${is1of1 ? "4-8x" : popNumber <= 5 ? "3-6x" : "2-4x"}
+   - /75 comp → ${cardLabel} value = ${is1of1 ? "3-7x" : popNumber <= 5 ? "2.5-5x" : "2-3.5x"}
+   - /50 comp → ${cardLabel} value = ${is1of1 ? "3-6x" : popNumber <= 5 ? "2-4x" : "1.5-3x"}
+   - /49 comp → ${cardLabel} value = ${is1of1 ? "3-6x" : popNumber <= 5 ? "2-4x" : "1.5-3x"}
+   - /25 comp → ${cardLabel} value = ${is1of1 ? "2-4x" : popNumber <= 5 ? "1.5-2.5x" : "1.1-1.8x"}
+   - /10 comp → ${cardLabel} value = ${is1of1 ? "1.5-2.5x" : popNumber <= 5 ? "1.2-2x" : "same tier"}
+   CRITICAL: The upper end (8x from /99) is ONLY for all-time transcendent icons (Trout, Ohtani, LeBron, Mahomes, Mantle, Jordan). For Cy Young winners, Pro Bowlers, All-Stars — use 4-5x from /99. Most 1/1 autos of established stars sell for $1,500-$5,000 in real auctions, not $10,000+.
+   For autographs from premium brands, use the MID range — not the ceiling.
    For retired legends or players with stable but capped collector bases, use the LOWER end.
+   If multiple comps produce different estimates, use the MEDIAN — never the highest.
 
 3. Also search for: "${playerName} ${cardLabel} sold eBay" to check if any direct comps exist
 
