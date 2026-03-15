@@ -950,26 +950,43 @@ Because this is a ${cardLabel} card, direct sold comps are very rare. Use this T
    - Search: "${playerName} ${year} ${set} /99 sold eBay"
    Find as many different numbered parallel sold prices as possible for this player and set.
 
-2. IMPORTANT: Use the HIGHEST-VALUE parallel comp you find as your primary anchor, then apply the multiplier.
-   Multiplier table:
-   - /99 comp → ${cardLabel} value = ${is1of1 ? "15-25x" : popNumber <= 5 ? "8-15x" : "4-8x"}
-   - /75 comp → ${cardLabel} value = ${is1of1 ? "10-20x" : popNumber <= 5 ? "6-12x" : "3-6x"}
-   - /50 comp → ${cardLabel} value = ${is1of1 ? "8-15x" : popNumber <= 5 ? "5-10x" : "3-5x"}
-   - /49 comp → ${cardLabel} value = ${is1of1 ? "8-15x" : popNumber <= 5 ? "5-10x" : "3-5x"}
-   - /25 comp → ${cardLabel} value = ${is1of1 ? "4-8x" : popNumber <= 5 ? "3-5x" : "1.5-3x"}
-   - /10 comp → ${cardLabel} value = ${is1of1 ? "3-5x" : popNumber <= 5 ? "2-3.5x" : "same tier"}
-   For premium brands (Prizm, National Treasures, Finest, Flawless, Immaculate, Select), use the HIGHER end.
-   For hot rookies, #1 picks, or generational talents, use the HIGHER end.
-   For autographs, use the higher end. For non-auto budget products, use the lower end.
+2. IMPORTANT: Apply the multiplier table below, then apply the REALITY CHECK in step 5.
+   Multiplier table (initial estimate before corrections):
+   - /99 comp → ${cardLabel} value = ${is1of1 ? "10-20x" : popNumber <= 5 ? "6-12x" : "4-8x"}
+   - /75 comp → ${cardLabel} value = ${is1of1 ? "8-15x" : popNumber <= 5 ? "5-10x" : "3-6x"}
+   - /50 comp → ${cardLabel} value = ${is1of1 ? "6-12x" : popNumber <= 5 ? "4-8x" : "3-5x"}
+   - /49 comp → ${cardLabel} value = ${is1of1 ? "6-12x" : popNumber <= 5 ? "4-8x" : "3-5x"}
+   - /25 comp → ${cardLabel} value = ${is1of1 ? "3-6x" : popNumber <= 5 ? "2.5-4x" : "1.5-3x"}
+   - /10 comp → ${cardLabel} value = ${is1of1 ? "2-4x" : popNumber <= 5 ? "1.5-3x" : "same tier"}
+   For current stars and rookies with high collector demand, use the HIGHER end.
+   For autographs from premium brands, use the mid-to-high range — NOT automatically the ceiling.
+   For retired legends or players with stable but capped collector bases, use the LOWER end.
 
 3. Also search for: "${playerName} ${cardLabel} sold eBay" to check if any direct comps exist
 
 4. CROSS-SET COMPS: If you cannot find enough comps from the SAME set, search for this player's cards from DIFFERENT sets of the same year:
-   - Search: "${playerName} ${year} auto /${popNumber} sold eBay" (any set, same numbering)
+   - Search: "${playerName} ${year} auto /${popNumber || ""} sold eBay" (any set, same numbering)
    - Search: "${playerName} ${year} rookie auto sold eBay" (broader search)
    These "sister" comps from other sets are more reliable than guessing. Premium sets (Noir, National Treasures, Flawless) should be at or above mid-tier sister comps. Mid-tier sets should use premium set comps as a ceiling.
 
 5. Cross-check: If you find multiple parallel comps (vertical or cross-set), triangulate from each one separately. Weight cross-set comps of the SAME numbering most heavily — they are the most direct comparison.
+
+6. CRITICAL REALITY CHECK — Apply ALL of these corrections to your multiplier estimate:
+
+   a) PLAYER MARKET CAP: Search: "${playerName} autograph sold eBay" to understand this player's true market ceiling.
+      - For RETIRED LEGENDS (players no longer active): The collector base is fixed. Even a 1/1 rarely exceeds 3x what a /10 of the same player sells for. Use the LOWER multiplier range.
+      - For CURRENT STARS / HOT ROOKIES: Demand grows — use standard multipliers.
+      - If you find a higher-numbered parallel (like /10) sold for $X, your ${cardLabel} estimate should NOT exceed 4x that amount for current stars, or 2.5x for retired legends.
+
+   b) UNLICENSED PRODUCT DISCOUNT: Check if this card is from Panini.
+      - Panini products (Prizm, Select, Donruss, Illusions, Absolute, Chronicles, Mosaic, etc.) do NOT have official MLB/NFL/NBA/NHL licenses. Cards show blank jerseys, no team logos on helmets. This makes them worth 30–50% LESS than an equivalent card from Topps, Bowman, Upper Deck, or Leaf with official licensing.
+      - If the set is Panini and NOT from a licensed league product, apply a 35% discount to your estimate.
+      - Exception: For NBA cards, Panini HAS the official license, so no discount applies.
+
+   c) FINAL SANITY CHECK: After applying the above corrections, verify your estimate makes sense:
+      - Search: "${playerName} card sold eBay" to confirm the overall market for this player
+      - If your estimate is more than 5x what a typical ${playerName} card sells for, it is too high
+      - Apply the corrections and report your final adjusted estimate.
 
 Return ONLY this JSON:
 {
