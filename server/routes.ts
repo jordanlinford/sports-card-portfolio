@@ -4961,6 +4961,58 @@ RULES:
   });
 
   // Stripe routes
+  // Cache the resolved Pro price ID so we only look it up once per server boot
+  let resolvedProPriceId: string | null = null;
+
+  async function getProPriceId(stripe: any): Promise<string> {
+    // 1. Use cached value if already resolved this session
+    if (resolvedProPriceId) return resolvedProPriceId;
+
+    // 2. Try env var — but validate it actually exists in Stripe before trusting it
+    const envPriceId = process.env.STRIPE_PRICE_ID;
+    if (envPriceId) {
+      try {
+        const price = await stripe.prices.retrieve(envPriceId);
+        if (price && price.active) {
+          resolvedProPriceId = envPriceId;
+          console.log(`[Checkout] Using env STRIPE_PRICE_ID: ${envPriceId}`);
+          return resolvedProPriceId;
+        }
+      } catch {
+        console.warn(`[Checkout] STRIPE_PRICE_ID ${envPriceId} not found in this Stripe account — falling back to dynamic lookup`);
+      }
+    }
+
+    // 3. Dynamic fallback: search for the active monthly Pro subscription price
+    const prices = await stripe.prices.list({
+      active: true,
+      type: "recurring",
+      expand: ["data.product"],
+      limit: 50,
+    });
+
+    // Match by product name containing "Pro" and monthly interval, lowest unit_amount wins (most conservative pick)
+    const proMonthly = prices.data
+      .filter((p: any) => {
+        const name = (typeof p.product === "object" ? p.product?.name : "") || "";
+        return (
+          p.recurring?.interval === "month" &&
+          /pro/i.test(name) &&
+          p.unit_amount > 0
+        );
+      })
+      .sort((a: any, b: any) => a.unit_amount - b.unit_amount);
+
+    if (proMonthly.length === 0) {
+      throw new Error("No active monthly Pro subscription price found in Stripe. Please create one or set STRIPE_PRICE_ID.");
+    }
+
+    resolvedProPriceId = proMonthly[0].id;
+    const prodName = typeof proMonthly[0].product === "object" ? proMonthly[0].product?.name : proMonthly[0].product;
+    console.log(`[Checkout] Dynamically resolved Pro price: ${resolvedProPriceId} (${prodName} $${proMonthly[0].unit_amount / 100}/mo)`);
+    return resolvedProPriceId;
+  }
+
   app.post("/api/create-checkout-session", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -4970,12 +5022,11 @@ RULES:
         return res.status(404).json({ message: "User not found" });
       }
 
-      if (!process.env.STRIPE_PRICE_ID) {
-        return res.status(500).json({ message: "Stripe price not configured. Please add STRIPE_PRICE_ID." });
-      }
-
       const stripe = await getUncachableStripeClient();
       const baseUrl = process.env.BASE_URL || `https://${req.hostname}`;
+
+      // Resolve the correct Pro price ID — validates env var or falls back to dynamic lookup
+      const priceId = await getProPriceId(stripe);
 
       // Create or retrieve customer
       let customerId = user.stripeCustomerId;
@@ -4993,7 +5044,7 @@ RULES:
         customer: customerId,
         line_items: [
           {
-            price: process.env.STRIPE_PRICE_ID,
+            price: priceId,
             quantity: 1,
           },
         ],
