@@ -41,6 +41,7 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Portfolio-Specific Next Buys (Pro)**: AI-powered recommendations tailored to display case themes, suggesting complementary cards with pricing and investment rationale.
 - **Next Buys Recommendation Engine**: Balanced, investment-focused recommendation system using diverse sources like watchlists, breakout players, team themes, hidden gems, and market outlook, with intelligent source selection and scoring.
 - **Podcast Landing Page & Pro Trial**: Public landing page offering a 7-day Pro trial on signup, with trial status tracking and an app-wide trial banner.
+- **Dual-Source Hidden Gems**: Hidden Gems page combines two discovery methods — AI-driven market intelligence (Gemini scans all 4 sports for undervalued players) and community signals (players recently searched in the outlook cache with bullish verdicts + players collected by 2+ distinct users). Each gem is tagged with its source: "AI", "COMMUNITY", or "BOTH". Community picks display a blue badge; AI+Community picks display a purple badge. Source is stored in the `hidden_gems.source` column and set during each refresh.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM.

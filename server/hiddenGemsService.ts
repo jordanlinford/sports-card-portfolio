@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { hiddenGems, playerOutlookCache, cards, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
+import { hiddenGems, playerOutlookCache, cards, displayCases, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
 import { eq, desc, and, isNotNull, sql } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { getPlayerOutlook } from "./playerOutlookEngine";
@@ -470,8 +470,117 @@ export function startRefreshInBackground(targetCount: number = 25): { batchId: s
   return { batchId, alreadyRunning: false };
 }
 
+async function discoverGemsFromUserSignals(existingPlayerKeys: Set<string>): Promise<AiDiscoveredGem[]> {
+  console.log("[HiddenGems] Discovering community gems from user signals...");
+  const candidates: AiDiscoveredGem[] = [];
+  const seenKeys = new Set<string>();
+
+  try {
+    // 1. Players searched in player_outlook_cache with bullish verdicts (last 90 days)
+    const cachedPlayers = await db
+      .select({
+        playerName: playerOutlookCache.playerName,
+        sport: playerOutlookCache.sport,
+        outlookJson: playerOutlookCache.outlookJson,
+        lastFetchedAt: playerOutlookCache.lastFetchedAt,
+      })
+      .from(playerOutlookCache)
+      .where(
+        and(
+          isNotNull(playerOutlookCache.outlookJson),
+          isNotNull(playerOutlookCache.lastFetchedAt),
+          sql`${playerOutlookCache.lastFetchedAt} > NOW() - INTERVAL '90 days'`
+        )
+      )
+      .orderBy(desc(playerOutlookCache.lastFetchedAt))
+      .limit(100);
+
+    for (const cached of cachedPlayers) {
+      if (!cached.playerName || !cached.sport || !cached.outlookJson) continue;
+      const normalizedName = normalizePlayerName(cached.playerName);
+      const normalizedSport = normalizeSport(cached.sport);
+      const key = normalizePlayerKey(normalizedName, normalizedSport);
+      if (existingPlayerKeys.has(key) || seenKeys.has(key)) continue;
+
+      const outlook = cached.outlookJson as PlayerOutlookResponse;
+      const verdict = outlook?.investmentCall?.verdict;
+      if (!verdict || !BULLISH_VERDICTS.has(verdict)) continue;
+
+      seenKeys.add(key);
+      const scores = outlook.investmentCall?.scores;
+      const temp = (outlook.snapshot?.temperature as string) || "NEUTRAL";
+
+      candidates.push({
+        playerName: normalizedName,
+        sport: normalizedSport,
+        position: (outlook.snapshot?.position as string) || "",
+        team: (outlook.snapshot?.team as string) || "",
+        verdict,
+        temperature: temp,
+        tier: "GROWTH",
+        riskLevel: (scores?.downsideRiskScore ?? 50) > 65 ? "HIGH" : (scores?.downsideRiskScore ?? 50) > 40 ? "MEDIUM" : "LOW",
+        thesis: outlook.investmentCall?.oneLineRationale || `${normalizedName} is showing favorable investment signals.`,
+        whyDiscounted: (outlook.investmentCall?.whyBullets || ["Undervalued relative to talent level."]).slice(0, 3),
+        repricingCatalysts: (outlook.investmentCall?.actionPlan ? [outlook.investmentCall.actionPlan.entryRule] : ["Performance improvement could shift market sentiment."]),
+        trapRisks: (outlook.investmentCall?.thesisBreakers || ["Situation could remain unchanged."]).slice(0, 2),
+        upsideScore: scores?.upsideScore ?? 65,
+        confidenceScore: scores?.overallScore ?? 60,
+        discountScore: Math.min(90, Math.max(35, (scores?.upsideScore ?? 65) - 5)),
+        isAvoid: false,
+      });
+    }
+
+    // 2. Players collected by 2+ distinct users (community skin in the game)
+    const frequentlyCollected = await db
+      .select({
+        playerName: cards.playerName,
+        sport: cards.sport,
+        userCount: sql<number>`COUNT(DISTINCT ${displayCases.userId})`.as("user_count"),
+      })
+      .from(cards)
+      .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+      .where(and(isNotNull(cards.playerName), isNotNull(cards.sport)))
+      .groupBy(cards.playerName, cards.sport)
+      .having(sql`COUNT(DISTINCT ${displayCases.userId}) >= 2`);
+
+    for (const fp of frequentlyCollected) {
+      if (!fp.playerName || !fp.sport) continue;
+      const normalizedName = normalizePlayerName(fp.playerName);
+      const normalizedSport = normalizeSport(fp.sport);
+      const key = normalizePlayerKey(normalizedName, normalizedSport);
+      if (existingPlayerKeys.has(key) || seenKeys.has(key)) continue;
+      seenKeys.add(key);
+
+      candidates.push({
+        playerName: normalizedName,
+        sport: normalizedSport,
+        position: "",
+        team: "",
+        verdict: "ACCUMULATE",
+        temperature: "NEUTRAL",
+        tier: "CORE",
+        riskLevel: "MEDIUM",
+        thesis: `${normalizedName} is actively collected by multiple users in this community — market may not have caught up.`,
+        whyDiscounted: ["Collector demand exceeds current market awareness.", "Community interest ahead of mainstream pricing."],
+        repricingCatalysts: ["Broader market recognition of this player's value.", "Continued strong community accumulation."],
+        trapRisks: ["Popularity doesn't always translate to card appreciation."],
+        upsideScore: 60,
+        confidenceScore: 55,
+        discountScore: 55,
+        isAvoid: false,
+      });
+    }
+
+    console.log(`[HiddenGems] Community signals: ${candidates.length} candidates (${cachedPlayers.length} from search cache, ${frequentlyCollected.length} multi-user collections)`);
+  } catch (err) {
+    console.error("[HiddenGems] Community discovery error:", err);
+  }
+
+  return candidates;
+}
+
 async function refreshHiddenGemsInternal(targetCount: number, batchId: string): Promise<void> {
-  console.log(`[HiddenGems] Starting fresh AI-powered refresh, batchId: ${batchId}, target: ${targetCount}`);
+  console.log(`[HiddenGems] Starting combined AI + community refresh, batchId: ${batchId}, target: ${targetCount}`);
 
   try {
     const sports = ["NFL", "NBA", "MLB", "NHL"];
@@ -506,9 +615,9 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
       updateRefreshStatus({
         sportsDone: si + 1,
         gemsFound: allGems.length,
-        progress: si < sports.length - 1 
+        progress: si < sports.length - 1
           ? `Completed ${sport} (${discovered.length} found). Moving to ${sports[si + 1]}...`
-          : `All sports scanned. Saving ${allGems.length} gems...`,
+          : `All sports scanned. Adding community signals...`,
       });
 
       if (si < sports.length - 1) {
@@ -516,7 +625,24 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
       }
     }
 
-    console.log(`[HiddenGems] Total unique gems discovered: ${allGems.length}`);
+    // Track which keys came from AI
+    const aiPlayerKeys = new Set(allGems.map(g => normalizePlayerKey(g.playerName, g.sport)));
+
+    // Merge community signals
+    updateRefreshStatus({ progress: "Scanning community search and collection data..." });
+    const communityGems = await discoverGemsFromUserSignals(aiPlayerKeys);
+    const communityPlayerKeys = new Set<string>();
+
+    for (const gem of communityGems) {
+      const key = normalizePlayerKey(gem.playerName, gem.sport);
+      if (seenPlayerKeys.has(key)) continue;
+      seenPlayerKeys.add(key);
+      communityPlayerKeys.add(key);
+      allGems.push(gem);
+    }
+
+    console.log(`[HiddenGems] Total unique gems (AI + community): ${allGems.length} (${aiPlayerKeys.size} AI, ${communityGems.length} community)`);
+    updateRefreshStatus({ gemsFound: allGems.length, progress: `Found ${allGems.length} total gems. Saving...` });
 
     if (allGems.length === 0) {
       updateRefreshStatus({
@@ -580,6 +706,10 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         const validRisks = ["LOW", "MEDIUM", "HIGH"];
         const riskLevel = validRisks.includes(gem.riskLevel) ? gem.riskLevel : "MEDIUM";
 
+        const gemIsFromAI = aiPlayerKeys.has(playerKey);
+        const gemIsFromCommunity = communityPlayerKeys.has(playerKey);
+        const gemSource = gemIsFromAI && gemIsFromCommunity ? "BOTH" : gemIsFromCommunity ? "COMMUNITY" : "AI";
+
         const gemData: InsertHiddenGem = {
           playerKey,
           playerName: normalizedName,
@@ -598,6 +728,7 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
           upsideScore: gem.isAvoid ? null : Math.min(95, Math.max(30, gem.upsideScore || 65)),
           confidenceScore: Math.min(95, Math.max(30, gem.confidenceScore || 65)),
           discountScore: Math.min(95, Math.max(30, gem.discountScore || 60)),
+          source: gemSource,
           batchId,
           sortOrder: i,
           isActive: true,
@@ -607,7 +738,7 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         await db.insert(hiddenGems).values(gemData);
         gemsCreated++;
         updateRefreshStatus({ gemsCreated });
-        console.log(`[HiddenGems] Created gem ${gemsCreated}: ${normalizedName} (${verdict})`);
+        console.log(`[HiddenGems] Created gem ${gemsCreated}: ${normalizedName} (${verdict}, source: ${gemSource})`);
       } catch (err) {
         console.error(`[HiddenGems] Failed to create gem for ${gem.playerName}:`, err);
       }

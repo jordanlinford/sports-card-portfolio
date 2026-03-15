@@ -30,6 +30,9 @@ import {
   Gem,
   RefreshCw,
   Database,
+  Bot,
+  Users,
+  Star,
 } from "lucide-react";
 import type { PlayerVerdict, StockTier, MarketTemperature, HiddenGem } from "@shared/schema";
 import { PageShareButton } from "@/components/page-share-button";
@@ -50,6 +53,7 @@ interface GemCandidate {
   whyDiscounted: string[];
   repricingCatalysts: string[];
   trapRisks: string[];
+  source?: string; // "AI" | "COMMUNITY" | "BOTH"
 }
 
 function getVerdictIcon(verdict: string) {
@@ -209,6 +213,18 @@ function GemCard({ gem }: { gem: GemCandidate }) {
           <Badge variant="outline" className="text-xs">
             {gem.modifier}
           </Badge>
+          {gem.source === "COMMUNITY" && (
+            <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700 flex items-center gap-1">
+              <Users className="h-3 w-3" />
+              Community Pick
+            </Badge>
+          )}
+          {gem.source === "BOTH" && (
+            <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700 flex items-center gap-1">
+              <Star className="h-3 w-3" />
+              AI + Community
+            </Badge>
+          )}
         </div>
       </CardHeader>
       
@@ -272,6 +288,7 @@ function mapHiddenGemToCandidate(gem: HiddenGem): GemCandidate {
     whyDiscounted: gem.whyDiscounted || [],
     repricingCatalysts: gem.repricingCatalysts || [],
     trapRisks: gem.trapRisks || [],
+    source: (gem as any).source || "AI",
   };
 }
 

@@ -1856,6 +1856,9 @@ export const hiddenGems = pgTable("hidden_gems", {
   confidenceScore: integer("confidence_score"),
   discountScore: integer("discount_score"), // How undervalued (higher = more undervalued)
   
+  // Discovery source
+  source: varchar("source", { length: 20 }).default("AI").notNull(), // "AI" | "COMMUNITY" | "BOTH"
+
   // Batch management
   batchId: varchar("batch_id", { length: 64 }).notNull(), // Groups gems from same refresh
   sortOrder: integer("sort_order").default(0).notNull(),
