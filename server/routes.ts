@@ -719,7 +719,7 @@ Sitemap: ${origin}/sitemap.xml
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json(user);
+      res.json({ ...user, authProvider: req.user.authProvider ?? "replit" });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });

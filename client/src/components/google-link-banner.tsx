@@ -17,6 +17,7 @@ export function GoogleLinkBanner() {
   });
 
   if (!user) return null;
+  if ((user as any).authProvider === "google") return null;
   if (user.googleId) return null;
   if (dismissed) return null;
 
