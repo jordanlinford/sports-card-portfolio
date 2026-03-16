@@ -2671,6 +2671,7 @@ Sitemap: ${origin}/sitemap.xml
           min: priceMin,
           max: priceMax,
           compCount: compCount,
+          activeListing: geminiMarketData?.activeListing || 0,
           pricePoints: priceData.pricePoints,
           geminiData: geminiMarketData ? {
             soldCount: geminiMarketData.soldCount,
@@ -3487,6 +3488,7 @@ Sitemap: ${origin}/sitemap.xml
           min: priceMin,
           max: priceMax,
           compCount: compCount,
+          activeListing: unifiedResult?.market?.activeListing || 0,
           pricePoints: isPro ? priceData.pricePoints : null,
           modeledEstimate: null,
           geminiData: unifiedResult ? {

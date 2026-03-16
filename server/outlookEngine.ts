@@ -398,7 +398,13 @@ SEARCH BROADENING: If your first search finds 0 completed sales, try broader que
 - Try: "[year] [set] [player name] [variation] sold"
 - For SSP/premium parallels, ALWAYS keep the parallel name — a Zebra is NOT a Silver
 
-ZERO COMPS: If you STILL find NO completed sales after broadening, set soldCount to 0 and confidence to "LOW". However, STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — do NOT return null for these fields. Base your estimate on: the card's set/brand premium, the player's current market tier, comparable cards from similar players in the same set, and general hobby market knowledge. Example: a Zach Werenski 2016-17 Upper Deck The Cup RPA /36 with no direct comps can be estimated from known Cup RPA tiers for similar-era Blue Jackets players. A calibrated estimate with LOW confidence is far more useful than returning null — it lets the user see a ballpark value. Note your estimation methodology and any active listings in "notes".`;
+ZERO COMPS: If you STILL find NO completed sales after broadening, set soldCount to 0 and confidence to "LOW". However, STILL provide your best market estimate — NEVER return null for avgPrice. Use this hierarchy:
+
+STEP 1 — ACTIVE LISTINGS FIRST: Search eBay for CURRENT active listings of this exact card. Active BIN prices from real sellers are the most accurate signal when no completed sales exist. If sellers are listing at $X, that IS the market price — use it as your primary estimate.
+
+STEP 2 — If no active listings: Use the player's current market tier + this card's scarcity (numbering, variation) to estimate from comparable sold cards of this player or similar players.
+
+The "completed sales only" rule applies when completed sales EXIST. When soldCount=0, active listing prices ARE valid and should be used. A price from real active listings beats a cross-player estimate. Note your methodology in "notes".`
 
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -754,12 +760,15 @@ SEARCH BROADENING: If your first search finds 0 completed sales, try broader que
 - Only fall back to base/silver pricing if the card IS actually a base/silver parallel
 Report whatever comps you find from these broader searches.
 
-ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and confidence to "LOW". However, you MUST STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — NEVER return 0 or null for avgPrice. This is mandatory. Here is exactly how to estimate when no direct sales exist:
-- Search for the SAME player's other cards from ANY product (e.g. "${card.playerName || card.title} 2025 football card sold eBay")
-- Search for COMPARABLE players at the same tier in similar products (e.g. rookie WRs, mid-tier prospects, similar draft slot) — look at what their base autos or parallels sell for
-- Search for the SAME product with different players (e.g. "${card.set || "this set"} auto sold eBay") to understand the product's price floor
-- Apply any scarcity premium for numbered parallels using your market knowledge — not fixed formulas
-- A thoughtful cross-player estimate with LOW confidence is far more useful than returning 0. Note your methodology in "notes".
+ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and confidence to "LOW". However, you MUST STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — NEVER return 0 or null for avgPrice. This is mandatory. Use this hierarchy:
+
+STEP 1 — ACTIVE LISTINGS (do this first): Search eBay for CURRENT active listings of this exact card. Active BIN prices from real sellers are the best available market signal when no sales exist. If you find active listings at $X, that IS the market price floor — use it as your primary estimate. Record the count in activeListing.
+
+STEP 2 — If no active listings either: Search for the SAME player's recently sold cards in any product to understand their market tier (e.g. "${card.playerName || card.title} 2025 baseball card sold eBay"). Apply a scarcity premium for the specific variation/numbering based on your market knowledge.
+
+STEP 3 — Last resort: Search for COMPARABLE players at the same tier in similar products, or the same product with different players, to understand the product price floor. Apply scarcity premium.
+
+NOTE: The "completed sales only" rule above applies when completed sales EXIST. When soldCount=0, active listing prices ARE valid — use them aggressively. A price based on real active listings at $X beats a cross-player estimate every time. Note your methodology in "notes".
 
 Return ONLY a JSON object with this EXACT structure:
 {

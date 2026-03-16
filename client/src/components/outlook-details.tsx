@@ -50,6 +50,7 @@ export type OutlookDisplayData = {
     min: number | null;
     max: number | null;
     compCount: number | null;
+    activeListing?: number | null;
     pricePoints?: Array<{
       date: string;
       price: number;
@@ -353,7 +354,9 @@ export function OutlookDetails({
             {data.market?.value != null && (
               <>
                 <div className="text-sm opacity-90">
-                  {data.market.compCount === 0 ? "Est. from comparables" : "Fair Value"}
+                  {data.market.compCount === 0
+                    ? (data.market.activeListing && data.market.activeListing > 0 ? "Est. from active listings" : "Est. from comparables")
+                    : "Fair Value"}
                 </div>
                 <div className="text-2xl sm:text-3xl font-bold">
                   {data.market.compCount === 0 ? "~" : ""}{formatCurrency(data.market.value)}
@@ -440,7 +443,9 @@ export function OutlookDetails({
               {data.market?.value != null ? (
                 <>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
-                    {data.market.compCount === 0 ? "Est. from comparables" : "Est. Fair Value"}
+                    {data.market.compCount === 0
+                      ? (data.market.activeListing && data.market.activeListing > 0 ? "EST. FROM ACTIVE LISTINGS" : "EST. FROM COMPARABLES")
+                      : "EST. FAIR VALUE"}
                   </div>
                   <div className={`text-3xl font-bold ${data.market.compCount === 0 ? "text-muted-foreground" : ""}`} data-testid="text-market-value">
                     {data.market.compCount === 0 ? "~" : ""}{formatCurrency(data.market.value)}
@@ -452,7 +457,9 @@ export function OutlookDetails({
                   )}
                   {data.market.compCount === 0 && (
                     <div className="mt-1 text-xs text-yellow-600 dark:text-yellow-400 font-medium">
-                      No direct sales — priced from comparable cards
+                      {data.market.activeListing && data.market.activeListing > 0
+                        ? `No completed sales — priced from ${data.market.activeListing} active listing${data.market.activeListing > 1 ? "s" : ""}`
+                        : "No direct sales — priced from comparable cards"}
                     </div>
                   )}
                 </>
