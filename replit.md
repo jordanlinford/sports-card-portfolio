@@ -12,12 +12,12 @@ Preferred communication style: Simple, everyday language.
 The frontend uses React 18 with TypeScript, Wouter for routing, and shadcn/ui components built on Radix UI and Tailwind CSS. The design system features card-focused layouts, clean spacing, DM Sans typography, and a HSL-based color system with CSS variables for theming.
 
 ### Technical Implementations
-The application is a full-stack TypeScript project. The frontend uses TanStack Query for server state, React Hook Form with Zod for form handling, and React Context for theme management. The backend is built with Express.js, handling authentication via Replit Auth (OpenID Connect) and session management with `express-session` backed by PostgreSQL. Google Cloud Storage, accessed via Replit Object Storage, manages file uploads.
+The application is a full-stack TypeScript project. The frontend uses TanStack Query for server state, React Hook Form with Zod for form handling, and React Context for theme management. The backend is built with Express.js, handling authentication via dual-provider Passport.js (Google OAuth as primary, Replit OpenID Connect as legacy fallback) with session management via `express-session` backed by PostgreSQL. Google Cloud Storage, accessed via Replit Object Storage, manages file uploads.
 
 ### Feature Specifications
 - **Card and Display Case Management**: CRUD operations for cards and display cases, including visibility settings.
 - **Subscription Model**: Free and Pro tiers managed via Stripe.
-- **Authentication**: Secure user authentication and authorization using Replit Auth.
+- **Authentication**: Dual-provider auth via Passport.js — "Continue with Google" (OAuth 2.0) is the primary login method; "Sign in with Replit" remains as a legacy fallback. Email-based account merging safely links Google logins to existing Replit accounts. Session fixation protection via `session.regenerate()` on Google login. Logged-in Replit users see a dismissible banner prompting them to link their Google account. Required secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL` (set to production domain callback URL).
 - **Image Handling**: Integration with Google Cloud Storage for card image uploads.
 - **Value Tracking & AI**: Tracks estimated card values with historical data and offers AI-powered price lookups and card outlook analysis (buy/watch/sell recommendations) for Pro users. Includes Card Analysis for analyzing cards before purchase.
 - **Card Image Scanner**: Gemini 2.5 Flash vision-based card identification from photos, identifying player, year, set, variation, grade, and grading company. It supports a Card Analysis Workflow (scan, confirm, action) and an Add Card Scan Workflow (scan, auto-fill, review, add to collection). Scanned images persist throughout workflows. Daily scan limits apply (3 for free, 100 for Pro).
