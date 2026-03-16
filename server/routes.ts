@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupGoogleAuth } from "./googleAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { logActivity, getRecentActivity, getActivityStats } from "./activityLogger";
@@ -231,6 +232,7 @@ async function initStripe(app: Express) {
 export async function registerRoutes(httpServer: Server, app: Express): Promise<void> {
   // Auth middleware
   await setupAuth(app);
+  setupGoogleAuth(app);
 
   // Initialize Stripe webhooks and sync
   await initStripe(app);

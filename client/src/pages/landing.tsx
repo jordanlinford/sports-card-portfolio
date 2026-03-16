@@ -19,8 +19,10 @@ import {
   Shield,
   Eye,
   Lock,
-  Sparkles
+  Sparkles,
+  LogIn
 } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 
 import portfolioOutlookImg from "@assets/sportscardportfolio.io_portfolio_outlook_1766201421163.png";
 import nextBuysImg from "@assets/sportscardportfolio.io_portfolio_next-buys_1766201421162.png";
@@ -29,6 +31,47 @@ import cardOutlookImg from "@assets/sportscardportfolio.io_card_161_outlook_1766
 import myPortfoliosImg from "@assets/sportscardportfolio.io__1766201421155.png";
 import analyticsImg from "@assets/sportscardportfolio.io_analytics_1766201421156.png";
 import exposureBreakdownImg from "@assets/Screenshot_2025-12-18_235051_1766201421153.png";
+
+function AuthButtons({ 
+  primaryVariant = "default",
+  primaryLabel = "Continue with Google",
+  primaryClassName = "",
+  showReplit = true,
+  fullWidth = false 
+}: {
+  primaryVariant?: "default" | "outline";
+  primaryLabel?: string;
+  primaryClassName?: string;
+  showReplit?: boolean;
+  fullWidth?: boolean;
+}) {
+  return (
+    <div className={fullWidth ? "w-full" : ""}>
+      <a href="/api/auth/google" data-testid="button-google-login">
+        <Button 
+          size="lg" 
+          variant={primaryVariant}
+          className={`gap-2 ${fullWidth ? "w-full" : ""} ${primaryClassName}`}
+        >
+          <SiGoogle className="h-4 w-4" />
+          {primaryLabel}
+        </Button>
+      </a>
+      {showReplit && (
+        <div className="mt-2 text-center">
+          <a 
+            href="/api/login" 
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="link-replit-login"
+          >
+            <LogIn className="h-3 w-3 inline mr-1" />
+            Or sign in with Replit
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Landing() {
   return (
@@ -46,13 +89,8 @@ export default function Landing() {
             </p>
             
             {/* Primary CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-              <a href="/api/login">
-                <Button size="lg" className="w-full sm:w-auto gap-2" data-testid="button-hero-cta">
-                  <Search className="h-5 w-5" />
-                  Analyze a Card
-                </Button>
-              </a>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
+              <AuthButtons primaryLabel="Get Started with Google" primaryClassName="w-full sm:w-auto" />
               <Link href="/explore">
                 <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2" data-testid="button-view-portfolio">
                   <Eye className="h-5 w-5" />
@@ -152,8 +190,8 @@ export default function Landing() {
                   Recommended next steps
                 </li>
               </ul>
-              <a href="/api/login">
-                <Button className="gap-2" data-testid="button-portfolio-outlook-cta">
+              <a href="/api/auth/google" data-testid="button-portfolio-outlook-cta">
+                <Button className="gap-2">
                   View Portfolio Outlook
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -206,8 +244,8 @@ export default function Landing() {
                   Gap and exposure analysis
                 </li>
               </ul>
-              <a href="/api/login">
-                <Button className="gap-2" data-testid="button-next-buys-cta">
+              <a href="/api/auth/google" data-testid="button-next-buys-cta">
+                <Button className="gap-2">
                   See Next Buys
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -240,8 +278,8 @@ export default function Landing() {
                   Real-time market context
                 </li>
               </ul>
-              <a href="/api/login">
-                <Button variant="outline" className="gap-2" data-testid="button-quick-check-cta">
+              <a href="/api/auth/google" data-testid="button-quick-check-cta">
+                <Button variant="outline" className="gap-2">
                   Analyze a Player
                   <ArrowRight className="h-4 w-4" />
                 </Button>
@@ -480,8 +518,8 @@ export default function Landing() {
                   Recent value changes and updates
                 </li>
               </ul>
-              <a href="/api/login">
-                <Button className="gap-2">
+              <a href="/api/auth/google">
+                <Button className="gap-2" data-testid="button-analytics-cta">
                   <BarChart3 className="h-4 w-4" />
                   View Your Analytics
                 </Button>
@@ -547,11 +585,9 @@ export default function Landing() {
                     <span>Market lookups</span>
                   </li>
                 </ul>
-                <a href="/api/login" className="block mt-6">
-                  <Button variant="outline" className="w-full" data-testid="button-free-plan">
-                    Get Started Free
-                  </Button>
-                </a>
+                <div className="mt-6">
+                  <AuthButtons primaryVariant="outline" primaryLabel="Get Started Free" fullWidth showReplit={false} />
+                </div>
               </CardContent>
             </Card>
 

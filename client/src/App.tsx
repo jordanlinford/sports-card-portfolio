@@ -54,6 +54,7 @@ import PodcastLanding from "@/pages/podcast";
 import ScanHistoryPage from "@/pages/scan-history";
 import LeaderboardsPage from "@/pages/leaderboards";
 import { TrialBanner } from "@/components/trial-banner";
+import { GoogleLinkBanner } from "@/components/google-link-banner";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -149,6 +150,7 @@ function App() {
           <div className="min-h-screen bg-background flex flex-col">
             <Navigation />
             <TrialBanner />
+            <GoogleLinkBanner />
             <main className="flex-1">
               <ErrorBoundary>
                 <Router />

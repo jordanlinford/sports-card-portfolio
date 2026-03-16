@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { SiGoogle } from "react-icons/si";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
@@ -494,8 +495,11 @@ export function Navigation() {
                     Log in
                   </Button>
                 </a>
-                <a href="/api/login">
-                  <Button data-testid="button-signup">Get Started</Button>
+                <a href="/api/auth/google">
+                  <Button className="gap-1.5" data-testid="button-signup">
+                    <SiGoogle className="h-3.5 w-3.5" />
+                    Get Started
+                  </Button>
                 </a>
               </div>
             )}

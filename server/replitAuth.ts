@@ -155,13 +155,20 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/logout", (req, res) => {
+    const user = req.user as any;
+    const isGoogleUser = user?.authProvider === "google";
+
     req.logout(() => {
-      res.redirect(
-        client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
-          post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
-        }).href
-      );
+      if (isGoogleUser) {
+        res.redirect("/");
+      } else {
+        res.redirect(
+          client.buildEndSessionUrl(config, {
+            client_id: process.env.REPL_ID!,
+            post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
+          }).href
+        );
+      }
     });
   });
 }
@@ -169,8 +176,16 @@ export async function setupAuth(app: Express) {
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const user = req.user as any;
 
-  if (!req.isAuthenticated() || !user?.expires_at) {
-    console.log("[Auth] Unauthorized - isAuthenticated:", req.isAuthenticated(), "user:", !!user, "expires_at:", user?.expires_at);
+  if (!req.isAuthenticated() || !user?.claims?.sub) {
+    console.log("[Auth] Unauthorized - isAuthenticated:", req.isAuthenticated(), "user:", !!user);
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  if (user.authProvider === "google") {
+    return next();
+  }
+
+  if (!user.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

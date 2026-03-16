@@ -64,6 +64,7 @@ export const users = pgTable("users", {
   subscriptionStatus: varchar("subscription_status").default("FREE").notNull(),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
+  googleId: varchar("google_id").unique(),
   isAdmin: boolean("is_admin").default(false).notNull(),
   collectorScore: integer("collector_score").default(0).notNull(),
   collectorTier: varchar("collector_tier", { length: 50 }).default("bronze").notNull(),
