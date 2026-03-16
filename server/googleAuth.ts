@@ -5,6 +5,12 @@ import { storage } from "./storage";
 import { sendWelcomeEmail } from "./email";
 
 export function setupGoogleAuth(app: Express) {
+  // To enable Google login:
+  // 1. Create an OAuth 2.0 Client ID in Google Cloud Console (APIs & Services → Credentials)
+  // 2. Application type: Web application
+  // 3. Add Authorized redirect URI: https://<your-production-domain>/api/auth/google/callback
+  // 4. Set secrets in Replit: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET
+  // 5. Set env: GOOGLE_CALLBACK_URL=https://<your-production-domain>/api/auth/google/callback
   const clientID = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 

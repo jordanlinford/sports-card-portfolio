@@ -19,8 +19,7 @@ import {
   Shield,
   Eye,
   Lock,
-  Sparkles,
-  LogIn
+  Sparkles
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 
@@ -66,8 +65,7 @@ function AuthButtons({
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
             data-testid="link-replit-login"
           >
-            <LogIn className="h-3 w-3 inline mr-1" />
-            Or sign in with Replit
+            Or sign in with Replit →
           </a>
         </div>
       )}
