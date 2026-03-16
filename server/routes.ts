@@ -3207,11 +3207,13 @@ Sitemap: ${origin}/sitemap.xml
       let lowPopFallbackAttempted = false;
       let lowPopFallbackSelected = false;
       let lowPopFallbackPrice: number | null = null;
-      const unifiedHasNoComps = !unifiedResult || !unifiedResult.market.avgPrice || unifiedResult.market.soldCount === 0;
-      if ((qaIs1of1 || qaIsVeryLowPop) && unifiedHasNoComps) {
+      // Only run the fallback when unified truly returned no price — 0 sold comps is normal for rare cards
+      // and does NOT mean the estimate is invalid. Never inflate by choosing the higher of two estimates.
+      const unifiedHasNoPrice = !unifiedResult || !unifiedResult.market.avgPrice || unifiedResult.market.avgPrice <= 0;
+      if ((qaIs1of1 || qaIsVeryLowPop) && unifiedHasNoPrice) {
         const currentPrice = marketValue;
         lowPopFallbackAttempted = true;
-        const reason = !unifiedResult ? "unified failed" : !unifiedResult.market.avgPrice ? "unified returned no price" : "unified has 0 sold comps";
+        const reason = !unifiedResult ? "unified failed" : "unified returned no price";
         console.log(`[Quick Analyze] LOW-POP FALLBACK: ${reason} for ${qaIs1of1 ? "1/1" : "low-pop /1-/5"} card. Current price: $${currentPrice}. Attempting triangulation...`);
         try {
           const fallbackResult = await fetchLowPopFallbackPrice({
@@ -3225,15 +3227,16 @@ Sitemap: ${origin}/sitemap.xml
           });
           if (fallbackResult && fallbackResult.avgPrice > 0) {
             lowPopFallbackPrice = fallbackResult.avgPrice;
-            const usesFallback = !marketValue || fallbackResult.avgPrice > marketValue;
+            // Use fallback only when we have no current price; if we do have one, take the lower (more conservative)
+            const usesFallback = !marketValue || marketValue <= 0 || fallbackResult.avgPrice < marketValue;
             if (usesFallback) {
-              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} (range $${fallbackResult.minPrice}-$${fallbackResult.maxPrice}) > current $${currentPrice}. Using fallback.`);
+              console.log(`[Quick Analyze] LOW-POP FALLBACK: Using $${fallbackResult.avgPrice} (range $${fallbackResult.minPrice}-$${fallbackResult.maxPrice}), was $${currentPrice}.`);
               marketValue = fallbackResult.avgPrice;
               priceMin = fallbackResult.minPrice;
               priceMax = fallbackResult.maxPrice;
               lowPopFallbackSelected = true;
             } else {
-              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} <= current $${currentPrice}. Keeping current.`);
+              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} >= current $${currentPrice}. Keeping current (more conservative).`);
             }
           }
         } catch (fallbackError: any) {
@@ -3263,15 +3266,22 @@ Sitemap: ${origin}/sitemap.xml
             grader: grader || undefined,
           });
           if (cpResult && cpResult.avgPrice > 0) {
-            // Take the HIGHER value: cross-product is more targeted, unified may underestimate new cards
-            if (cpResult.avgPrice > preExisting) {
-              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} > pre-existing $${preExisting}. Using cross-product estimate. | ${cpResult.notes.substring(0, 100)}`);
+            // If we have no current price, use the cross-product result
+            // If we do have a price, only use cross-product if it's more conservative (lower)
+            if (!preExisting || preExisting <= 0) {
+              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: No prior estimate — using $${cpResult.avgPrice}. | ${cpResult.notes.substring(0, 100)}`);
+              marketValue = cpResult.avgPrice;
+              priceMin = cpResult.minPrice;
+              priceMax = cpResult.maxPrice;
+              compCount = 0;
+            } else if (cpResult.avgPrice < preExisting) {
+              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} < pre-existing $${preExisting}. Using lower (more conservative). | ${cpResult.notes.substring(0, 100)}`);
               marketValue = cpResult.avgPrice;
               priceMin = cpResult.minPrice;
               priceMax = cpResult.maxPrice;
               compCount = 0;
             } else {
-              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} <= pre-existing $${preExisting}. Keeping higher value.`);
+              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} >= pre-existing $${preExisting}. Keeping current estimate.`);
             }
           }
         } catch (cpErr: any) {
