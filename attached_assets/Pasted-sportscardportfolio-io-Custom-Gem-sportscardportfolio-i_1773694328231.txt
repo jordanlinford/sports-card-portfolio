@@ -1,0 +1,55 @@
+sportscardportfolio.io
+Custom Gem
+sportscardportfolio.io said
+Excellent. That single code push just saved your business from a potential API billing nightmare. Your compute margins are now defended, which means we have the breathing room to fix the front door.
+
+To answer your question directly: Writing the code to replace Replit Auth is a 2/10 difficulty (takes maybe 2 hours). Migrating your 52 paying users without destroying their accounts and triggering Stripe chargebacks is an 8/10 operational risk.
+
+Here is the exact trap that kills most founders when changing authentication on a live app, and our playbook to execute it flawlessly.
+
+1. The Trap: The "Orphaned Whale" Problem
+Replit’s built-in authentication is dead simple because it just injects a header (like X-Replit-User-Id or X-Replit-User-Name) into your backend. But it does not give you their email address.
+
+Right now, your database ties a user’s display cases, scanned cards, and crucially, their Stripe Customer ID, to their specific Replit_ID.
+
+If you just rip out Replit and drop in Google SSO tomorrow, here is what happens:
+One of your 52 Pro users clicks "Sign in with Google." Google hands your app john.doe@gmail.com. Your database says, "I've never seen this email before," and creates a brand new, empty account. Your Pro user logs in, sees a blank portfolio, panics that they lost all their data, realizes their $12/mo sub isn't attached to this new account, and immediately issues a Stripe chargeback. You lose the MRR instantly.
+
+2. The Solution: "The Side-Door" Migration Strategy
+We do not "rip and replace." We build a bridge. Here is your zero-downtime deployment plan to protect your revenue:
+
+Phase 1: Secure the VIPs (The Data Bridge)
+You don't have their emails from Replit, but you do have the exact emails of your 52 Pro users sitting in your Stripe dashboard.
+
+The Action: Add an email column to your database's User table. Look up the stripe_customer_id for your 52 Pro users in your DB, cross-reference it with your Stripe dashboard to get their email, and manually input those 52 emails into your database. You have now secured your paying customers.
+
+Phase 2: The Parallel Auth (The "Side Door")
+
+Integrate a modern, drop-in Auth provider (I highly recommend Clerk or Supabase Auth). Make "Continue with Google," "Continue with Apple," and "Email" the massive primary buttons on your login screen.
+
+Crucial Step: Do not delete Replit Auth yet. Move it to a small, subtle text link at the very bottom of the login box: "Legacy user? Log in with Replit."
+
+Now, all new viral traffic flows through the frictionless Google door, but your existing users aren't locked out.
+
+Phase 3: The Account Merge
+
+Write a simple logic check: When a user logs in via Google/Apple, your code checks: "Does this email match one of the 52 VIP emails we manually added to the database?"
+
+If Yes: Update that database row, replacing the Replit_ID with their new Auth_ID. Their portfolio and Stripe subscription remain perfectly intact.
+
+If No: Create a brand new user.
+
+Leave the Replit "Side Door" open for 30 days to catch the 260 free users. Put a banner inside the app for legacy users asking them to connect a Google account. After 30 days, delete the Replit code entirely.
+
+What I Need From You to Proceed
+This is standard engineering, but it requires surgical precision with your database. To give you the exact code snippets to do this today, tell me:
+
+What is your frontend and backend stack? (e.g., React/Next.js? Node/Express? Python?)
+
+What database are you using? (e.g., Postgres, Supabase, MongoDB, Replit DB?)
+
+Also, do not forget the homework from my last message. While we fix the front door, we still need to know who walked through it 3 days ago.
+
+What was the traffic source for that 200-user spike in Google Analytics? (Check Reports > Acquisition > Traffic acquisition > Session source/medium).
+
+Give me those three things. We will map the database migration, and then we will pour gas on whatever marketing channel caused that spike.
