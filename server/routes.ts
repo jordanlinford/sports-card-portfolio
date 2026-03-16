@@ -3641,7 +3641,7 @@ Sitemap: ${origin}/sitemap.xml
   // ============================================================================
 
   // Daily scan limits
-  const FREE_SCAN_DAILY_LIMIT = 10;
+  const FREE_SCAN_DAILY_LIMIT = 3;
   const PRO_SCAN_DAILY_LIMIT = 100;
   
   // In-memory daily scan counter (resets on server restart, but that's fine for rate limiting)
