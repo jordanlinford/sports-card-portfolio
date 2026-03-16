@@ -2621,6 +2621,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                 {result.tempCard.title && (
                   <div className="mt-4">
                     <PriceTrendChart
+                      autoLoad={true}
                       preloadedData={result.priceHistory || undefined}
                       subtitle={result.priceHistory?.cardDescription}
                       playerRequest={!result.priceHistory ? {

@@ -1497,6 +1497,7 @@ export default function PlayerOutlookPage() {
           )}
 
           <PriceTrendChart
+            autoLoad={true}
             playerRequest={{
               playerName: outlookData.player.name,
               sport: outlookData.player.sport || sport,
