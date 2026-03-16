@@ -18,6 +18,30 @@ const gemini = new GoogleGenAI({
 const playerNewsCache = new Map<string, { data: { snippets: string[]; momentum: "up" | "flat" | "down"; newsCount: number; roleStatus?: string; injuryStatus?: string }; cachedAt: number }>();
 const NEWS_CACHE_TTL_MS = 4 * 60 * 60 * 1000;
 
+/**
+ * Robustly parses a price value from Gemini output.
+ * Handles: number, string number, string range ("80-150" → lower bound), null, undefined.
+ * Returns null only when no usable number can be extracted.
+ */
+function parsePrice(val: unknown): number | null {
+  if (typeof val === "number" && val > 0) return val;
+  if (typeof val === "string") {
+    // Strip currency symbols and whitespace
+    const clean = val.replace(/[$,\s]/g, "");
+    // Range like "80-150" or "125-250" → take the lower bound (conservative)
+    const rangeMatch = clean.match(/^(\d+(?:\.\d+)?)[–\-](\d+(?:\.\d+)?)$/);
+    if (rangeMatch) {
+      const lo = parseFloat(rangeMatch[1]);
+      const hi = parseFloat(rangeMatch[2]);
+      if (!isNaN(lo) && !isNaN(hi) && lo > 0) return Math.round((lo + hi) / 2); // midpoint
+    }
+    // Single number as string
+    const num = parseFloat(clean);
+    if (!isNaN(num) && num > 0) return num;
+  }
+  return null;
+}
+
 // Fetch real-time news about a player using Gemini with Google Search grounding
 // This ensures AI explanations use current information, not outdated training data
 export async function fetchPlayerNews(playerName: string | null | undefined, sport: string | null | undefined): Promise<{
@@ -437,8 +461,8 @@ ZERO COMPS: If you STILL find NO completed sales after broadening, set soldCount
               avgPrice: correctedAvg,
               minPrice: correctedMin,
               maxPrice: correctedMax,
-              psa9Price: (typeof parsed.psa9Price === "number" && parsed.psa9Price > 0) ? parsed.psa9Price : null,
-              psa10Price: (typeof parsed.psa10Price === "number" && parsed.psa10Price > 0) ? parsed.psa10Price : null,
+              psa9Price: parsePrice(parsed.psa9Price),
+              psa10Price: parsePrice(parsed.psa10Price),
               activeListing: parsed.activeListing || 0,
               liquidity: parsed.liquidity || "MEDIUM",
               priceStability: parsed.priceStability || "UNKNOWN",
@@ -878,8 +902,8 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
                 minPrice: correctedMin,
                 maxPrice: correctedMax,
                 rawPrice: parsed.market.rawPrice || null,
-                psa9Price: (typeof parsed.market.psa9Price === "number" && parsed.market.psa9Price > 0) ? parsed.market.psa9Price : null,
-                psa10Price: (typeof parsed.market.psa10Price === "number" && parsed.market.psa10Price > 0) ? parsed.market.psa10Price : null,
+                psa9Price: parsePrice(parsed.market.psa9Price),
+                psa10Price: parsePrice(parsed.market.psa10Price),
                 activeListing: parsed.market.activeListing || 0,
                 liquidity: parsed.market.liquidity || "MEDIUM",
                 priceStability: parsed.market.priceStability || "UNKNOWN",

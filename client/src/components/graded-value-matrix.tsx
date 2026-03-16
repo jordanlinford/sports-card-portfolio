@@ -79,7 +79,12 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated }
   if (!psa9Price && !psa10Price) return null;
   if (rawValue <= 0) return null;
 
-  const recommendation = getGradeRecommendation(rawValue, psa9Price, psa10Price);
+  // If PSA 10 is missing but PSA 9 exists, estimate PSA 10 as ~1.5x PSA 9
+  const psa10Estimated = !psa10Price && psa9Price ? Math.round(psa9Price * 1.5) : null;
+  const effectivePsa10 = psa10Price ?? psa10Estimated;
+  const isPsa10Estimated = !psa10Price && !!psa10Estimated;
+
+  const recommendation = getGradeRecommendation(rawValue, psa9Price, effectivePsa10);
   const styles = VERDICT_STYLES[recommendation.verdict];
 
   return (
@@ -108,19 +113,19 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated }
           <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-2.5">
             <p className="text-[10px] uppercase tracking-wider text-purple-600 dark:text-purple-400 font-medium">PSA 10</p>
             <p className="text-base font-bold mt-0.5 text-purple-700 dark:text-purple-300" data-testid="text-psa10-value">
-              {psa10Price ? formatCurrency(psa10Price) : "—"}
+              {effectivePsa10 ? formatCurrency(effectivePsa10) : "—"}
             </p>
-            {psa10Price && (
-              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{estimated ? "est." : "avg"}</p>
+            {effectivePsa10 && (
+              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{(estimated || isPsa10Estimated) ? "est." : "avg"}</p>
             )}
           </div>
         </div>
 
-        {psa10Price && psa10Price > rawValue && (
+        {effectivePsa10 && effectivePsa10 > rawValue && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
             <TrendingUp className="h-3 w-3 shrink-0" />
             <span>
-              PSA 10 is <span className="font-semibold text-foreground">{((psa10Price / rawValue - 1) * 100).toFixed(0)}% more</span> than raw
+              PSA 10 is <span className="font-semibold text-foreground">{((effectivePsa10 / rawValue - 1) * 100).toFixed(0)}% more</span> than raw
             </span>
           </div>
         )}
