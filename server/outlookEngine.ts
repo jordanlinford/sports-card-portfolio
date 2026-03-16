@@ -247,8 +247,16 @@ export async function fetchGeminiMarketData(card: {
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLowerStandalone = (card.variation || "").toLowerCase().trim();
   const isPremiumUnnumberedStandalone = !isNumbered && /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i.test(variationLowerStandalone);
+  const isAutoStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
+  const isHatSwatch = /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.variation || "") || /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.title || "");
+  const isMemOnly = !isAutoStandalone && /mem|memorabilia|relic|jersey|patch|cap|hat|swatch/i.test(card.variation || "");
+  const memTypeNote = isHatSwatch
+    ? `\nMEMORABILIA NOTE: "Player Caps" means a HAT/CAP swatch (piece of game-worn cap/hat), NOT a jersey or patch. Hat swatches are among the LEAST valuable memorabilia types — they sell for 30-60% LESS than game-used jersey/patch cards of the same player and numbering. Do NOT compare with patch or jersey memorabilia comps. Search specifically for "Player Caps" versions.`
+    : isMemOnly
+    ? `\nMEMORABILIA NOTE: This is a memorabilia-only card (no autograph). Non-auto memorabilia cards sell for significantly less than autograph versions. Search specifically for NON-AUTO memorabilia comps — do NOT use autograph card prices as comps.`
+    : "";
   const variationContext = isNumbered 
-    ? `\nCRITICAL: This is a NUMBERED parallel (${card.variation}). It is significantly rarer and more valuable than base cards. Search specifically for "${searchDescription}" — do NOT return base card prices for a numbered parallel.`
+    ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnly ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}`
     : isPremiumUnnumberedStandalone
       ? `\nCRITICAL: This is a PREMIUM SSP/Case Hit parallel — "${card.variation}". It is SIGNIFICANTLY more valuable than base/silver cards. Search specifically for "${card.variation}" — do NOT return base card prices. Include the exact parallel name in every search.`
     : (card.variation && card.variation.toLowerCase() !== "base"
@@ -321,6 +329,7 @@ ${variationContext}
 ${specificityWarning}
 ${rawGradeWarning}
 ${autoCardWarningStandalone}
+${memTypeNote}
 ${triangulationInstructions}
 
 Search eBay completed/sold listings for this EXACT card. You must complete BOTH searches below:
@@ -573,8 +582,16 @@ export async function fetchUnifiedCardAnalysis(card: {
     /^(silver|base|disco)\s*(prizm|holo)?$/i.test(variationLower) ||
     /^(prizm|holo|disco\s*prizm)$/i.test(variationLower)
   );
+  const isAutoCardU = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
+  const isHatSwatchU = /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.variation || "") || /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.title || "");
+  const isMemOnlyU = !isAutoCardU && /mem|memorabilia|relic|jersey|patch|cap|hat|swatch/i.test(card.variation || "");
+  const memTypeNoteU = isHatSwatchU
+    ? `\nMEMORABILIA NOTE: "Player Caps" means a HAT/CAP swatch (piece of game-worn cap/hat), NOT a jersey or patch. Hat swatches are among the LEAST valuable memorabilia types — they sell for 30-60% LESS than game-used jersey/patch cards of the same player and numbering. Do NOT compare with patch or jersey memorabilia comps. Search specifically for "Player Caps" versions.`
+    : isMemOnlyU
+    ? `\nMEMORABILIA NOTE: This is a memorabilia-only card (no autograph). Non-auto memorabilia cards sell for significantly less than autograph versions. Search specifically for NON-AUTO memorabilia comps — do NOT use autograph card prices as comps.`
+    : "";
   const variationContext = isNumbered
-    ? `\nCRITICAL: This is a NUMBERED parallel (${card.variation}). It is significantly rarer and more valuable than base cards. Search specifically for "${searchDescription}" — do NOT return base card prices for a numbered parallel.`
+    ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnlyU ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}`
     : isPremiumUnnumberedParallel
       ? `\nCRITICAL: This is a PREMIUM UNNUMBERED PARALLEL — "${card.variation}". This is an SSP (Super Short Print) or Case Hit parallel that is SIGNIFICANTLY more valuable than base/silver cards, even though it is unnumbered.
 - SSP/Case Hit parallels like Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer etc. are RARE and command PREMIUM prices
@@ -693,6 +710,7 @@ ${variationContext}
 ${specificityWarning}
 ${rawGradeWarning}
 ${autoCardWarning}
+${memTypeNoteU}
 ${triangulationInstructions}
 
 Do ALL of the following in this single search:
