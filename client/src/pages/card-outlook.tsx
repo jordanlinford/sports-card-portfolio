@@ -512,7 +512,8 @@ export default function CardOutlookPage() {
                 <div className="text-3xl font-bold" data-testid="text-market-value">
                   {formatCurrency(displayPrice)}
                 </div>
-                {outlook.market?.min != null && outlook.market?.max != null && (
+                {outlook.market?.min != null && outlook.market?.max != null &&
+                 displayPrice != null && outlook.market.min >= displayPrice * 0.1 && (
                   <div className="text-sm text-muted-foreground">
                     Range: {formatCurrency(outlook.market.min)} - {formatCurrency(outlook.market.max)}
                   </div>

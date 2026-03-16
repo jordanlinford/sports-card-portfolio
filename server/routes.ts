@@ -2520,6 +2520,10 @@ Sitemap: ${origin}/sitemap.xml
           priceMin = geminiMarketData.minPrice;
           priceMax = geminiMarketData.maxPrice;
           compCount = geminiMarketData.soldCount;
+          // Clamp bogus min prices — Gemini sometimes returns $1 as a theoretical floor
+          if (marketValue && priceMin != null && priceMin < marketValue * 0.15) {
+            priceMin = Math.round(marketValue * 0.6);
+          }
         }
       }
 

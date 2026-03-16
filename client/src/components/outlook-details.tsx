@@ -450,7 +450,8 @@ export function OutlookDetails({
                   <div className={`text-3xl font-bold ${data.market.compCount === 0 ? "text-muted-foreground" : ""}`} data-testid="text-market-value">
                     {data.market.compCount === 0 ? "~" : ""}{formatCurrency(data.market.value)}
                   </div>
-                  {data.market?.min != null && data.market?.max != null && (
+                  {data.market?.min != null && data.market?.max != null &&
+                   data.market.value != null && data.market.min >= data.market.value * 0.1 && (
                     <div className="text-sm text-muted-foreground">
                       Range: {formatCurrency(data.market.min)} - {formatCurrency(data.market.max)}
                     </div>
