@@ -304,28 +304,31 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
     ? `\nLOW-POP / RARE CARD — TRIANGULATION REQUIRED:
 This is a ${is1of1 ? "1/1 (one-of-one)" : `/${pn} (low-pop numbered parallel)`} card. Direct comps are rare or nonexistent. You MUST use triangulation:
 
+STEP 0 — PLAYER MARKET ANCHOR (do this first):
+Search: "${playerSearchStandalone} sold eBay" — find the cheapest recent sold cards for this player to understand the floor. If this player's common cards sell for $5-$15, a /5 rarely exceeds $100-$200. If common cards sell for $50-$100, a /5 might be $200-$500.
+
 STEP 1 — Search for this player's OTHER numbered parallels from the SAME set on eBay sold listings. Search for ALL of these:
 ${is1of1 || (pn && pn <= 5) ? `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /10 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /25 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /50 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /75 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"` : pn && pn <= 10 ? `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /25 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"` : `- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"\n- "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"`}
+CRITICAL: Only use comps for THIS SAME PLAYER — do NOT use a different player's card as a baseline.
 Find as many different numbered parallel sold prices as possible.
 
 STEP 2 — Apply multiplier from the closest parallel found to estimate /${pn || 1} value:
-  /99 comp → /${pn || 1} value ≈ ${is1of1 ? "4-8x" : pn && pn <= 5 ? "3-6x" : pn && pn <= 10 ? "2-4x" : "1.5-2.5x"}
-  /49 comp → /${pn || 1} value ≈ ${is1of1 ? "3-6x" : pn && pn <= 5 ? "2-4x" : pn && pn <= 10 ? "1.5-3x" : "1.2-2x"}
-  /25 comp → /${pn || 1} value ≈ ${is1of1 ? "2-4x" : pn && pn <= 5 ? "1.5-2.5x" : "1.1-1.8x"}
-  /10 comp → /${pn || 1} value ≈ ${is1of1 ? "1.5-2.5x" : pn && pn <= 5 ? "1.2-2x" : "same tier"}
-IMPORTANT: The upper end (8x from /99) is ONLY for all-time icons (Trout, Ohtani, LeBron, Mahomes, Mantle). For Cy Young winners, top receivers, All-Stars — use 4-6x from /99. Most real 1/1 autos of established stars sell for $1,500-$5,000, not $10,000+.
-For autographs/memorabilia, lean toward the mid range. For non-auto cards, use the lower end.
+  /99 comp → /${pn || 1} value ≈ ${is1of1 ? "4-8x" : pn && pn <= 5 ? "1.5-3x" : pn && pn <= 10 ? "1.5-2.5x" : "1.2-2x"}
+  /49 comp → /${pn || 1} value ≈ ${is1of1 ? "3-6x" : pn && pn <= 5 ? "1.2-2x" : pn && pn <= 10 ? "1.2-2x" : "1.1-1.5x"}
+  /25 comp → /${pn || 1} value ≈ ${is1of1 ? "2-4x" : pn && pn <= 5 ? "1.1-1.8x" : "1.0-1.5x"}
+  /10 comp → /${pn || 1} value ≈ ${is1of1 ? "1.5-2.5x" : pn && pn <= 5 ? "1.0-1.5x" : "same tier"}
+POSITION/DEMAND CALIBRATION: Use the LOWER end of the multiplier range for non-QB, non-elite positions (TEs, RBs, role WRs, non-ace pitchers) and rookies not yet proven. Use mid range for confirmed stars. Upper end ONLY for elite QBs, top WRs, superstars.
+MEMORABILIA TYPE: "Player Caps" (hat swatches), coins, stickers are worth 30-50% LESS than game-used jersey/patch memorabilia of the same player and numbering.
+For autographs, use the mid range. For non-auto memorabilia, use the lower end.
 
-STEP 3 — CROSS-SET COMPS: If vertical comps from the same set are scarce, search for this same player's cards from DIFFERENT sets of the same year:
-- "${playerSearchStandalone} ${yearStrStandalone} auto /${pn || ""} sold eBay" (any set, same numbering)
-- "${playerSearchStandalone} ${yearStrStandalone} rookie auto sold eBay" (broader)
-These "sister" comps are more reliable than guessing. Premium sets (Noir, National Treasures, Flawless) should be at or above mid-tier sister comps.
-STEP 4 — Sanity check against similar-tier player cards from the same set.
-STEP 5 — Adjust for brand tier (National Treasures/Flawless/Noir = premium, Select/Mosaic = mid, Pro Set/Leaf = budget).
+STEP 3 — CROSS-SET COMPS (only if same-set same-player comps are unavailable):
+- "${playerSearchStandalone} ${yearStrStandalone} auto /${pn || ""} sold eBay" (any set, same player, same numbering)
+These "sister" comps must be for the SAME PLAYER only. Never use a different player's /5 as a baseline.
+STEP 4 — Adjust for brand tier (National Treasures/Flawless/Noir = premium; Select/Mosaic = mid; budget = lower).
 
 YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return 0 for a low-pop card.
-If you find multiple parallel comps, triangulate from EACH one and use the MEDIAN (middle) result — not the highest. If you have 3 estimates, take the middle one. If you have 2, take the average. Never pick the highest estimate — that produces inflated values.
-Cite the parallel comps used in notes: e.g. "/25 sold for $150 → applied 3x for /${pn || 1} = $450 estimate"`
+If you find multiple parallel comps, triangulate from EACH one and use the MEDIAN (middle) result — not the highest. If you have 3 estimates, take the middle one. If you have 2, take the average. Never pick the highest.
+Cite the parallel comps used in notes: e.g. "/25 sold for $150 → applied 1.5x for /${pn || 1} = $225 estimate"`
     : "";
 
   const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
@@ -679,41 +682,36 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
     return `\nLOW-POP / RARE CARD — TRIANGULATION REQUIRED:
 This is a ${cardLabel} card. Direct comps are rare or nonexistent. You MUST use triangulation to estimate value:
 
+STEP 0 — PLAYER MARKET ANCHOR (do this first):
+Search: "${playerSearch} sold eBay" — find the cheapest recent sold cards for this player to understand the market floor. This anchors your estimate: if common cards for this player sell for $5-$15, a /5 rarely exceeds $100-$200; if $50-$100, a /5 might be $200-$500.
+
 STEP 1 — VERTICAL COMPS: Search for this same player's OTHER numbered parallels from the SAME set:
 ${verticalSearches.join("\n")}
-Also search: "${playerSearch} ${yearStr} ${setStr} auto sold eBay" for broader reference.
+CRITICAL: Only use comps for THIS SAME PLAYER — do NOT use a different player's card as your baseline.
 Report whatever parallel comps you find in your notes.
 
 STEP 2 — APPLY MULTIPLIER from the closest parallel found:
 Multiplier table (relative to the comp parallel you found):
-  /99 comp → /${popNumber || 1} value ≈ ${is1of1 ? "4-8x" : popNumber && popNumber <= 5 ? "3-6x" : popNumber && popNumber <= 10 ? "2-4x" : "1.5-2.5x"}
-  /49 comp → /${popNumber || 1} value ≈ ${is1of1 ? "3-6x" : popNumber && popNumber <= 5 ? "2-4x" : popNumber && popNumber <= 10 ? "1.5-3x" : "1.2-2x"}
-  /25 comp → /${popNumber || 1} value ≈ ${is1of1 ? "2-4x" : popNumber && popNumber <= 5 ? "1.5-2.5x" : "1.1-1.8x"}
-  /10 comp → /${popNumber || 1} value ≈ ${is1of1 ? "1.5-2.5x" : popNumber && popNumber <= 5 ? "1.2-2x" : "same tier"}
+  /99 comp → /${popNumber || 1} value ≈ ${is1of1 ? "4-8x" : popNumber && popNumber <= 5 ? "1.5-3x" : popNumber && popNumber <= 10 ? "1.5-2.5x" : "1.2-2x"}
+  /49 comp → /${popNumber || 1} value ≈ ${is1of1 ? "3-6x" : popNumber && popNumber <= 5 ? "1.2-2x" : popNumber && popNumber <= 10 ? "1.2-2x" : "1.1-1.5x"}
+  /25 comp → /${popNumber || 1} value ≈ ${is1of1 ? "2-4x" : popNumber && popNumber <= 5 ? "1.1-1.8x" : "1.0-1.5x"}
+  /10 comp → /${popNumber || 1} value ≈ ${is1of1 ? "1.5-2.5x" : popNumber && popNumber <= 5 ? "1.0-1.5x" : "same tier"}
   /5 comp  → /${popNumber || 1} value ≈ ${is1of1 ? "1.3-2x" : "0.7-1x (similar scarcity)"}
-IMPORTANT: The upper end (8x from /99) is ONLY for transcendent all-time icons (Trout, Ohtani, LeBron, Mahomes, Mantle, Jordan). For Cy Young winners, Pro Bowl receivers, All-Stars — use 4-6x from /99. Most 1/1 autos of established stars realistically sell for $1,500-$5,000 at auction.
-For autographs/memorabilia, lean toward the mid range. For non-auto cards, use the lower end.
-If you find multiple parallel comps giving different estimates, use the MEDIAN (middle value) — not the highest.
+POSITION/DEMAND CALIBRATION: Use the LOWER end for non-QB, non-elite positions (TEs, RBs, role WRs, non-ace pitchers) and unproven rookies. Use mid range for confirmed stars. Upper end ONLY for elite QBs, top WRs, superstars, icons.
+MEMORABILIA TYPE: "Player Caps" (hat swatches), coins, stickers are worth 30-50% LESS than game-used jersey/patch memorabilia. If this is a hat or cap swatch, apply the lower end of every multiplier.
+For autographs, use mid range. For non-auto memorabilia only, use the lower end.
+If you find multiple parallel comps giving different estimates, use the MEDIAN — not the highest.
 
-STEP 3 — CROSS-SET COMPS: If you cannot find enough vertical comps from the SAME set, search for this SAME player's cards from DIFFERENT premium sets of the same year:
-- Search: "${playerSearch} ${yearStr} auto /${popNumber || ""} sold eBay" (any set, same numbering)
-- Search: "${playerSearch} ${yearStr} rookie auto sold eBay" (broader search)
-These "sister" comps from other sets (e.g. Prizm, Select, Spectra, Immaculate) of the same player/year are more reliable than pure guesswork.
-If the card's set is premium (Noir, National Treasures, Flawless), its value should be at or above sister comps from mid-tier sets.
-If the card's set is mid-tier, sister comps from premium sets should be treated as a ceiling.
+STEP 3 — CROSS-SET COMPS (only if same-set same-player comps are unavailable):
+- Search: "${playerSearch} ${yearStr} auto /${popNumber || ""} sold eBay" (any set, same PLAYER, same numbering)
+These must be for the SAME PLAYER only. Never use a different player's /5 or /10 as your primary baseline.
+If the card's set is premium (Noir, National Treasures, Flawless, Immaculate), its value should be at or above mid-tier sister comps.
 
-STEP 4 — HORIZONTAL COMPS: Search for other ${cardLabel} cards of similar-tier players from the same set or product.
-Use this as a sanity check on your multiplier estimate.
-
-STEP 5 — BRAND CONTEXT: Consider the brand/product tier:
-- Premium products (Prizm, National Treasures, Flawless, Immaculate, Noir) command higher premiums
-- Mid-tier products (Select, Mosaic, Optic, Finest) are moderate
-- Budget/unlicensed products (Pro Set, Leaf, Wild Card) have lower premiums
-Adjust your estimate based on the product's market positioning.
+STEP 4 — BRAND CONTEXT: Premium (National Treasures, Flawless, Noir, Immaculate) = higher; Mid-tier (Select, Mosaic, Optic, Finest) = moderate; Budget (Pro Set, Leaf) = lower.
 
 YOUR avgPrice MUST reflect your best triangulated estimate — NEVER return null or 0 for a low-pop card.
 Set confidence to "LOW" or "MEDIUM" and explain your triangulation logic in notes.
-In your notes, cite the specific parallel comps used: e.g. "/25 sold for $150 → applied 2x multiplier for /${popNumber || 1} = $300 estimate"`;
+In your notes, cite the specific parallel comps used: e.g. "/25 sold for $150 → applied 1.5x for /${popNumber || 1} = $225 estimate"`;
   }
 
   const triangulationInstructions = buildTriangulationInstructions();
@@ -989,6 +987,9 @@ Condition: ${isRaw ? "RAW (ungraded)" : (card.grade || "Unknown")}
 
 Because this is a ${cardLabel} card, direct sold comps are very rare. Use this TRIANGULATION approach:
 
+0. PLAYER MARKET ANCHOR (do this first):
+   Search: "${playerName} sold eBay" — find the cheapest recent sold cards for this player to understand their market floor. This anchors your estimate: if common cards sell for $5-$15, a /5 rarely exceeds $100-$200; if $50-$100, a /5 might be $200-$500.
+
 1. Search for recent eBay sold listings of MORE COMMON parallels of this SAME player from the SAME set. Search for ALL of these:
    - Search: "${playerName} ${year} ${set} /10 sold eBay"
    - Search: "${playerName} ${year} ${set} /25 sold eBay"
@@ -996,29 +997,26 @@ Because this is a ${cardLabel} card, direct sold comps are very rare. Use this T
    - Search: "${playerName} ${year} ${set} /49 sold eBay"
    - Search: "${playerName} ${year} ${set} /75 sold eBay"
    - Search: "${playerName} ${year} ${set} /99 sold eBay"
+   CRITICAL: Only use comps for THIS SAME PLAYER — never use a different player's card as a baseline.
    Find as many different numbered parallel sold prices as possible for this player and set.
 
-2. IMPORTANT: Apply the multiplier table below, then apply the REALITY CHECK in step 5.
+2. IMPORTANT: Apply the multiplier table below, then apply the REALITY CHECK at the end.
    Multiplier table (initial estimate before corrections):
-   - /99 comp → ${cardLabel} value = ${is1of1 ? "4-8x" : popNumber <= 5 ? "3-6x" : "2-4x"}
-   - /75 comp → ${cardLabel} value = ${is1of1 ? "3-7x" : popNumber <= 5 ? "2.5-5x" : "2-3.5x"}
-   - /50 comp → ${cardLabel} value = ${is1of1 ? "3-6x" : popNumber <= 5 ? "2-4x" : "1.5-3x"}
-   - /49 comp → ${cardLabel} value = ${is1of1 ? "3-6x" : popNumber <= 5 ? "2-4x" : "1.5-3x"}
-   - /25 comp → ${cardLabel} value = ${is1of1 ? "2-4x" : popNumber <= 5 ? "1.5-2.5x" : "1.1-1.8x"}
-   - /10 comp → ${cardLabel} value = ${is1of1 ? "1.5-2.5x" : popNumber <= 5 ? "1.2-2x" : "same tier"}
-   CRITICAL: The upper end (8x from /99) is ONLY for all-time transcendent icons (Trout, Ohtani, LeBron, Mahomes, Mantle, Jordan). For Cy Young winners, Pro Bowlers, All-Stars — use 4-5x from /99. Most 1/1 autos of established stars sell for $1,500-$5,000 in real auctions, not $10,000+.
-   For autographs from premium brands, use the MID range — not the ceiling.
-   For retired legends or players with stable but capped collector bases, use the LOWER end.
-   If multiple comps produce different estimates, use the MEDIAN — never the highest.
+   - /99 comp → ${cardLabel} value = ${is1of1 ? "4-8x" : popNumber <= 5 ? "1.5-3x" : "1.5-2.5x"}
+   - /75 comp → ${cardLabel} value = ${is1of1 ? "3-7x" : popNumber <= 5 ? "1.3-2.5x" : "1.3-2x"}
+   - /50 comp → ${cardLabel} value = ${is1of1 ? "3-6x" : popNumber <= 5 ? "1.2-2x" : "1.2-1.8x"}
+   - /49 comp → ${cardLabel} value = ${is1of1 ? "3-6x" : popNumber <= 5 ? "1.2-2x" : "1.2-1.8x"}
+   - /25 comp → ${cardLabel} value = ${is1of1 ? "2-4x" : popNumber <= 5 ? "1.1-1.8x" : "1.0-1.5x"}
+   - /10 comp → ${cardLabel} value = ${is1of1 ? "1.5-2.5x" : popNumber <= 5 ? "1.0-1.5x" : "same tier"}
+   POSITION/DEMAND CALIBRATION: Use the LOWER end for non-QB, non-elite positions (TEs, RBs, role WRs, non-ace pitchers) and unproven rookies. Use mid range for confirmed stars. Upper end ONLY for elite QBs, top WRs, superstars.
+   MEMORABILIA TYPE: "Player Caps" (hat swatches), coins, stickers are worth 30-50% LESS than game-used jersey/patch cards. If this is a hat/cap swatch, apply the lower end of every multiplier.
+   For non-auto memorabilia, use the lower end. If multiple comps produce different estimates, use the MEDIAN — never the highest.
 
 3. Also search for: "${playerName} ${cardLabel} sold eBay" to check if any direct comps exist
 
-4. CROSS-SET COMPS: If you cannot find enough comps from the SAME set, search for this player's cards from DIFFERENT sets of the same year:
-   - Search: "${playerName} ${year} auto /${popNumber || ""} sold eBay" (any set, same numbering)
-   - Search: "${playerName} ${year} rookie auto sold eBay" (broader search)
-   These "sister" comps from other sets are more reliable than guessing. Premium sets (Noir, National Treasures, Flawless) should be at or above mid-tier sister comps. Mid-tier sets should use premium set comps as a ceiling.
-
-5. Cross-check: If you find multiple parallel comps (vertical or cross-set), triangulate from each one separately. Weight cross-set comps of the SAME numbering most heavily — they are the most direct comparison.
+4. CROSS-SET COMPS (only if same-set comps for THIS PLAYER are unavailable):
+   - Search: "${playerName} ${year} auto /${popNumber || ""} sold eBay" (any set, same PLAYER)
+   These must be for the SAME PLAYER. Never use a different player's /5 as your baseline.
 
 6. CRITICAL REALITY CHECK — Apply ALL of these corrections to your multiplier estimate:
 
