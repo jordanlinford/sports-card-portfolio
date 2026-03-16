@@ -34,7 +34,9 @@ export function setupGoogleAuth(app: Express) {
       done: (error: any, user?: any) => void
     ) => {
       try {
-        const email = profile.emails?.[0]?.value;
+        const emailObj = profile.emails?.[0];
+        const email = emailObj?.value;
+        const emailVerified = (emailObj as any)?.verified !== false;
         const googleId = profile.id;
         const firstName = profile.name?.givenName || "";
         const lastName = profile.name?.familyName || "";
@@ -44,9 +46,21 @@ export function setupGoogleAuth(app: Express) {
           return done(new Error("No email returned from Google"));
         }
 
-        let existingUser = await storage.getUserByEmail(email);
+        if (!emailVerified) {
+          console.warn(`[GoogleAuth] Unverified email attempted login: ${email}`);
+          return done(new Error("Google email address is not verified"));
+        }
+
+        const existingUser = await storage.getUserByEmail(email);
 
         if (existingUser) {
+          if (existingUser.googleId && existingUser.googleId !== googleId) {
+            console.warn(
+              `[GoogleAuth] googleId mismatch for email ${email}: stored=${existingUser.googleId} incoming=${googleId}`
+            );
+            return done(new Error("This email is already linked to a different Google account"));
+          }
+
           if (!existingUser.googleId) {
             await storage.updateGoogleId(existingUser.id, googleId);
           }
@@ -115,15 +129,33 @@ export function setupGoogleAuth(app: Express) {
         return res.redirect("/?auth_error=google_failed");
       }
 
-      if ((req.session as any).rememberMe) {
-        const EXTENDED_SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
-        req.session.cookie.maxAge = EXTENDED_SESSION_TTL;
-        delete (req.session as any).rememberMe;
-      }
-
+      const rememberMe = (req.session as any).rememberMe;
       const returnTo = (req.session as any).returnTo || "/";
-      delete (req.session as any).returnTo;
-      res.redirect(returnTo);
+      const user = req.user;
+
+      req.session.regenerate((regenerateErr) => {
+        if (regenerateErr) {
+          console.error("[GoogleAuth] Session regeneration error:", regenerateErr);
+          return res.redirect("/?auth_error=session_error");
+        }
+
+        req.session.passport = { user };
+        (req.session as any).returnTo = undefined;
+        (req.session as any).rememberMe = undefined;
+
+        if (rememberMe) {
+          const EXTENDED_SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
+          req.session.cookie.maxAge = EXTENDED_SESSION_TTL;
+        }
+
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            console.error("[GoogleAuth] Session save error:", saveErr);
+            return res.redirect("/?auth_error=session_error");
+          }
+          res.redirect(returnTo);
+        });
+      });
     });
   });
 

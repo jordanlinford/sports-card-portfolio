@@ -37,17 +37,19 @@ function AuthButtons({
   primaryLabel = "Continue with Google",
   primaryClassName = "",
   showReplit = true,
-  fullWidth = false 
+  fullWidth = false,
+  testId = "button-google-login",
 }: {
   primaryVariant?: "default" | "outline";
   primaryLabel?: string;
   primaryClassName?: string;
   showReplit?: boolean;
   fullWidth?: boolean;
+  testId?: string;
 }) {
   return (
     <div className={fullWidth ? "w-full" : ""}>
-      <a href="/api/auth/google" data-testid="button-google-login">
+      <a href="/api/auth/google" data-testid={testId}>
         <Button 
           size="lg" 
           variant={primaryVariant}
@@ -586,7 +588,7 @@ export default function Landing() {
                   </li>
                 </ul>
                 <div className="mt-6">
-                  <AuthButtons primaryVariant="outline" primaryLabel="Get Started Free" fullWidth showReplit={false} />
+                  <AuthButtons primaryVariant="outline" primaryLabel="Get Started Free" fullWidth showReplit={false} testId="button-free-plan" />
                 </div>
               </CardContent>
             </Card>
