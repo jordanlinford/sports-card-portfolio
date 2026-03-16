@@ -41,7 +41,7 @@ export function setupGoogleAuth(app: Express) {
     ) => {
       try {
         const emailObj = profile.emails?.[0];
-        const email = emailObj?.value;
+        const email = emailObj?.value?.toLowerCase();
         const emailVerified = (emailObj as any)?.verified !== false;
         const googleId = profile.id;
         const firstName = profile.name?.givenName || "";
