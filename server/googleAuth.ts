@@ -13,11 +13,12 @@ export function setupGoogleAuth(app: Express) {
     return;
   }
 
-  const callbackURL = process.env.REPLIT_DEPLOYMENT
-    ? `https://${process.env.REPLIT_DEPLOYMENT_URL}/api/auth/google/callback`
-    : `https://${process.env.REPL_SLUG}.${process.env.REPL_OWNER}.repl.co/api/auth/google/callback`;
+  const domain = (process.env.REPLIT_DOMAINS || "").split(",")[0].trim();
+  const fallbackCallbackURL = domain
+    ? `https://${domain}/api/auth/google/callback`
+    : "http://localhost:5000/api/auth/google/callback";
 
-  const productionCallbackURL = process.env.GOOGLE_CALLBACK_URL || callbackURL;
+  const productionCallbackURL = process.env.GOOGLE_CALLBACK_URL || fallbackCallbackURL;
 
   const strategy = new GoogleStrategy(
     {
