@@ -375,9 +375,9 @@ Return ONLY a JSON object with these exact fields:
 
 GRADED PRICE PRIORITY RULES:
 1. ALWAYS use REAL sold prices from SEARCH B first. If you found PSA 10 sold listings, that IS psa10Price — do not recalculate it.
-2. Only fall back to raw-price multipliers if you found ZERO PSA 10 or PSA 9 sold listings after genuinely searching. Multipliers are a last resort, not a default.
-3. Fallback multipliers (use ONLY when no real data exists): PSA 9 ≈ 2-5x raw, PSA 10 ≈ 5-15x raw. Note that graded premiums on popular cards can be 20-50x the raw price — do not cap at 8x.
-4. psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps you found are lower, they're for a different card — use the multiplier fallback instead.
+2. Only estimate graded prices if you found ZERO PSA 10 or PSA 9 sold listings after genuinely searching. When estimating, use your market knowledge of THIS SPECIFIC CARD — not generic multipliers.
+3. If you must estimate graded value with no real data: Search for what this EXACT card (same player, same variation, same set) sells for graded on eBay. Use that market knowledge, not a formula.
+4. psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps you found seem lower than raw, they may be for a different card variation — find better comps.
 5. rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions.
 
 Liquidity guidelines:
@@ -718,11 +718,12 @@ Do ALL of the following in this single search:
 1. MARKET PRICING (MOST IMPORTANT — get this right):
    Search eBay completed/sold listings for this EXACT card. Run BOTH sub-searches:
 
-   1a. RAW/UNGRADED prices:
+   1a. RAW/UNGRADED prices — ALWAYS include the specific variation in your search:
    - "${unifiedSearchDescription} sold eBay"
-   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} sold eBay"
+   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold eBay"
    - Prioritize the MOST RECENT sales (last 14 days > last 30 days > last 60 days)
    - avgPrice = what it realistically sells for TODAY based on recent completed sales
+   - CRITICAL: rawPrice must be for THIS EXACT variation, not a base/silver version
 
    1b. GRADED prices — search these SEPARATELY, do not skip:
    - "${unifiedSearchDescription} PSA 10 sold eBay"
