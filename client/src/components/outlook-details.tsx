@@ -457,10 +457,10 @@ export function OutlookDetails({
                     </div>
                   )}
                   {data.market.compCount === 0 && (
-                    <div className="mt-1 text-xs text-yellow-600 dark:text-yellow-400 font-medium">
+                    <div className="mt-1 text-xs text-muted-foreground">
                       {data.market.activeListing && data.market.activeListing > 0
-                        ? `No completed sales — priced from ${data.market.activeListing} active listing${data.market.activeListing > 1 ? "s" : ""}`
-                        : "No direct sales — priced from comparable cards"}
+                        ? `Priced from ${data.market.activeListing} active listing${data.market.activeListing > 1 ? "s" : ""}`
+                        : "Est. from market comparables"}
                     </div>
                   )}
                 </>

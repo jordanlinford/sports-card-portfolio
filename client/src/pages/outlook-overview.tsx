@@ -154,10 +154,10 @@ function CompsConfidencePanel({
       )}
 
       {!isLoading && comps.soldCount === 0 && (
-        <div className="flex gap-2 rounded-md bg-yellow-500/10 border border-yellow-500/20 p-2.5 text-xs text-yellow-700 dark:text-yellow-400" data-testid="notice-no-exact-comps">
+        <div className="flex gap-2 rounded-md bg-muted/40 border p-2.5 text-xs text-muted-foreground" data-testid="notice-no-exact-comps">
           <Info className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
           <span>
-            No exact sales found for this card. Price estimate is drawn from comparable players, similar card types, and parallel variations — treat as a directional range, not a confirmed market price.
+            Price estimated from comparable market data — treat as a directional range.
           </span>
         </div>
       )}
