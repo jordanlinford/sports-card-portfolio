@@ -7,7 +7,7 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
-import { sendWelcomeEmail } from "./email";
+import { sendWelcomeEmail, sendNewSignupNotification } from "./email";
 
 
 const getOidcConfig = memoize(
@@ -72,6 +72,7 @@ async function upsertUser(claims: any) {
     sendWelcomeEmail(user.email, userName).catch((err) => 
       console.error("Failed to send welcome email:", err)
     );
+    sendNewSignupNotification(userName, user.email, "replit").catch(() => {});
   }
 }
 

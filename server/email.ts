@@ -44,6 +44,40 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
   }
 }
 
+export async function sendNewSignupNotification(
+  newUserName: string,
+  newUserEmail: string | null | undefined,
+  authMethod: "google" | "replit"
+): Promise<void> {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) return;
+
+  const displayName = newUserName || "Unknown";
+  const displayEmail = newUserEmail || "No email";
+  const method = authMethod === "google" ? "Google OAuth" : "Replit Auth";
+  const time = new Date().toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "medium", timeStyle: "short" });
+
+  try {
+    await transporter.sendMail({
+      from: `"Sports Card Portfolio" <${process.env.ZOHO_EMAIL}>`,
+      to: "info@sportscardportfolio.io",
+      subject: `New signup: ${displayName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #f59e0b; margin-bottom: 4px;">New User Signed Up</h2>
+          <p style="color: #6b7280; margin-top: 0;">${time} ET</p>
+          <div style="background: #f3f4f6; padding: 16px; border-radius: 8px;">
+            <p style="margin: 0 0 8px 0;"><strong>Name:</strong> ${displayName}</p>
+            <p style="margin: 0 0 8px 0;"><strong>Email:</strong> ${displayEmail}</p>
+            <p style="margin: 0;"><strong>Auth method:</strong> ${method}</p>
+          </div>
+        </div>
+      `,
+    });
+  } catch (err) {
+    console.error("[Email] Failed to send signup notification:", err);
+  }
+}
+
 export async function sendPaymentConfirmationEmail(
   userEmail: string,
   userName: string

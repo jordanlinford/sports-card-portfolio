@@ -2,7 +2,7 @@ import passport from "passport";
 import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20";
 import type { Express } from "express";
 import { storage } from "./storage";
-import { sendWelcomeEmail } from "./email";
+import { sendWelcomeEmail, sendNewSignupNotification } from "./email";
 
 export function setupGoogleAuth(app: Express) {
   // To enable Google login:
@@ -93,6 +93,7 @@ export function setupGoogleAuth(app: Express) {
           sendWelcomeEmail(newUser.email, userName).catch((err) =>
             console.error("Failed to send welcome email:", err)
           );
+          sendNewSignupNotification(userName, newUser.email, "google").catch(() => {});
         }
 
         const sessionUser = {
