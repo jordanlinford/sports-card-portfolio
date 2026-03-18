@@ -2732,7 +2732,7 @@ Sitemap: ${origin}/sitemap.xml
       
       const allCards: any[] = [];
       for (const dc of userCases) {
-        const dcCards = await storage.getCardsByDisplayCase(dc.id);
+        const dcCards = await storage.getCards(dc.id);
         allCards.push(...dcCards);
       }
       
