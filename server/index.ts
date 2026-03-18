@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startPrewarmJob } from "./prewarmJob";
 import { startCareerStageJob } from "./careerStageJob";
+import { startHiddenGemsRefreshJob } from "./hiddenGemsService";
 
 const app = express();
 const httpServer = createServer(app);
@@ -112,6 +113,9 @@ app.use((req, res, next) => {
         
         // Start the career stage advancement scheduler
         startCareerStageJob();
+        
+        // Start the weekly Hidden Gems auto-refresh (every Monday 5 AM UTC)
+        startHiddenGemsRefreshJob();
         
         log("All routes registered successfully");
       } catch (err) {

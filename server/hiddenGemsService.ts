@@ -489,7 +489,7 @@ async function discoverGemsFromUserSignals(existingPlayerKeys: Set<string>): Pro
         and(
           isNotNull(playerOutlookCache.outlookJson),
           isNotNull(playerOutlookCache.lastFetchedAt),
-          sql`${playerOutlookCache.lastFetchedAt} > NOW() - INTERVAL '90 days'`
+          sql`${playerOutlookCache.lastFetchedAt} > NOW() - INTERVAL '30 days'`
         )
       )
       .orderBy(desc(playerOutlookCache.lastFetchedAt))
@@ -1001,6 +1001,55 @@ const FALLBACK_FEATURED_PLAYERS: Array<{
     trapRisks: ["Team context limits value appreciation timeline"],
   },
 ];
+
+let gemsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+const GEMS_REFRESH_DAY = 1; // Monday (0=Sun, 1=Mon, ..., 6=Sat)
+const GEMS_REFRESH_HOUR_UTC = 5; // 5 AM UTC (midnight EST)
+
+function getDelayUntilNextGemsRefresh(): number {
+  const now = new Date();
+  const next = new Date(now);
+  next.setUTCHours(GEMS_REFRESH_HOUR_UTC, 0, 0, 0);
+
+  const currentDay = now.getUTCDay();
+  let daysUntil = (GEMS_REFRESH_DAY - currentDay + 7) % 7;
+  if (daysUntil === 0 && now >= next) {
+    daysUntil = 7;
+  }
+  next.setUTCDate(next.getUTCDate() + daysUntil);
+
+  return next.getTime() - now.getTime();
+}
+
+export function startHiddenGemsRefreshJob(): void {
+  if (gemsRefreshTimer) {
+    console.log("[HiddenGems] Auto-refresh job already scheduled");
+    return;
+  }
+
+  const scheduleNextRun = () => {
+    const delay = getDelayUntilNextGemsRefresh();
+    const nextRunTime = new Date(Date.now() + delay);
+    console.log(`[HiddenGems] Next auto-refresh scheduled for ${nextRunTime.toISOString()}`);
+
+    gemsRefreshTimer = setTimeout(() => {
+      console.log("[HiddenGems] Auto-refresh triggered");
+      startRefreshInBackground(25);
+      scheduleNextRun();
+    }, delay);
+  };
+
+  scheduleNextRun();
+  console.log("[HiddenGems] Auto-refresh job scheduler started (every Monday 5 AM UTC)");
+}
+
+export function stopHiddenGemsRefreshJob(): void {
+  if (gemsRefreshTimer) {
+    clearTimeout(gemsRefreshTimer);
+    gemsRefreshTimer = null;
+    console.log("[HiddenGems] Auto-refresh job scheduler stopped");
+  }
+}
 
 export function getFallbackFeaturedGems(): HiddenGem[] {
   return FALLBACK_FEATURED_PLAYERS.map((player, index) => ({

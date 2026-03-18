@@ -56,6 +56,7 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **eBay Comps Caching**: Stale-while-revalidate (SWR) pattern with extended TTLs and query broadening.
 - **Player News Caching**: 4-hour in-memory cache for `fetchPlayerNews` results.
 - **VPS Worker Architecture**: Dedicated-IP VPS for eBay scraper for improved reliability.
+- **Hidden Gems Auto-Refresh**: Weekly scheduled job (Monday 5 AM UTC) automatically refreshes Hidden Gems using dual-source discovery (AI + community signals). Community signal window is 30 days. Admin can still trigger manual refreshes. Fallback featured players shown when no gems exist.
 
 ## External Dependencies
 
