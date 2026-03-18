@@ -2632,13 +2632,18 @@ Sitemap: ${origin}/sitemap.xml
       // Record usage for free tier tracking
       await storage.recordOutlookUsage(userId, 'collection', cardId, card.title);
 
-      // Also update the card's estimated value and Big Mover status
+      // Also update the card's estimated value, Big Mover status, and outlook action
       const cardUpdate: any = {
         outlookBigMover: signals.bigMoverFlag,
         outlookBigMoverReason: signals.bigMoverReason,
+        outlookAction: finalAction,
+        outlookUpsideScore: signals.upsideScore,
+        outlookRiskScore: signals.downsideRisk,
       };
       if (marketValue) {
+        cardUpdate.previousValue = card.estimatedValue || null;
         cardUpdate.estimatedValue = marketValue;
+        cardUpdate.valueUpdatedAt = new Date();
       }
       await storage.updateCard(cardId, cardUpdate);
 
@@ -2709,11 +2714,295 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // Batch analyze all unanalyzed cards (Pro only, SSE streaming progress)
+  app.post("/api/cards/batch-outlook", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const isPro = hasProAccess(user);
+      
+      if (!isPro) {
+        return res.status(403).json({ message: "Batch analysis is a Pro feature" });
+      }
+      
+      const userCases = await storage.getDisplayCases(userId);
+      if (userCases.length === 0) {
+        return res.status(400).json({ message: "No display cases found" });
+      }
+      
+      const allCards: any[] = [];
+      for (const dc of userCases) {
+        const dcCards = await storage.getCardsByDisplayCase(dc.id);
+        allCards.push(...dcCards);
+      }
+      
+      const unanalyzedCards = allCards.filter(c => c.outlookAction === null || c.outlookAction === undefined);
+      
+      if (unanalyzedCards.length === 0) {
+        return res.json({ message: "All cards already analyzed", completed: 0, total: 0 });
+      }
+      
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      res.flushHeaders();
+      
+      let clientDisconnected = false;
+      req.on("close", () => { clientDisconnected = true; });
+      
+      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData, fetchMonthlyPriceHistory } = await import("./outlookEngine");
+      const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
+      
+      const total = unanalyzedCards.length;
+      let completed = 0;
+      let failed = 0;
+      
+      const sendEvent = (data: any) => {
+        if (!res.destroyed && !clientDisconnected) {
+          res.write(`data: ${JSON.stringify(data)}\n\n`);
+        }
+      };
+      
+      sendEvent({ type: "start", total });
+      
+      for (const card of unanalyzedCards) {
+        if (res.destroyed || clientDisconnected) break;
+        
+        try {
+          const [geminiMarketData, priceData, monthlyPriceHistory] = await Promise.all([
+            fetchGeminiMarketData({
+              title: card.title,
+              playerName: card.playerName,
+              year: card.year,
+              set: card.set,
+              variation: card.variation,
+              grade: card.grade,
+              grader: card.grader,
+            }),
+            lookupEnhancedCardPrice({
+              title: card.title,
+              set: card.set,
+              year: card.year,
+              variation: card.variation,
+              grade: card.grade,
+              grader: card.grader,
+            }),
+            card.playerName ? fetchMonthlyPriceHistory({
+              playerName: card.playerName,
+              sport: card.sport || "football",
+              year: card.year?.toString(),
+              setName: card.set || undefined,
+              variation: card.variation || undefined,
+              grade: card.grade || undefined,
+              grader: card.grader || undefined,
+            }).catch(() => null) : Promise.resolve(null),
+          ]);
+          
+          const pricePointsForSchema = priceData.pricePoints.map((pp: any) => ({
+            date: pp.date,
+            price: pp.price,
+            source: pp.source,
+            url: pp.url,
+          }));
+          
+          const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
+          
+          if (geminiMarketData) {
+            if (geminiMarketData.soldCount >= 25) signals.liquidityScore = 10;
+            else if (geminiMarketData.soldCount >= 15) signals.liquidityScore = 8;
+            else if (geminiMarketData.soldCount >= 10) signals.liquidityScore = 7;
+            else if (geminiMarketData.soldCount >= 5) signals.liquidityScore = 5;
+            else if (geminiMarketData.soldCount >= 2) signals.liquidityScore = 3;
+            else {
+              if (geminiMarketData.liquidity === "HIGH") signals.liquidityScore = 7;
+              else if (geminiMarketData.liquidity === "MEDIUM") signals.liquidityScore = 4;
+              else if (geminiMarketData.liquidity === "LOW") signals.liquidityScore = 2;
+              else signals.liquidityScore = 1;
+            }
+            
+            if (geminiMarketData.soldCount >= 10) {
+              signals.dataConfidence = "HIGH";
+              signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found on eBay`;
+            } else if (geminiMarketData.soldCount >= 5) {
+              signals.dataConfidence = "MEDIUM";
+              signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
+            }
+            
+            if (geminiMarketData.liquidity === "HIGH") {
+              signals.marketFriction = Math.min(signals.marketFriction, 30);
+            } else if (geminiMarketData.liquidity === "MEDIUM") {
+              signals.marketFriction = Math.min(signals.marketFriction, 50);
+            }
+            
+            signals.demandScore = Math.round(
+              (signals.liquidityScore * 0.4) + 
+              (signals.sportScore * 0.3) + 
+              (signals.positionScore * 0.3)
+            ) * 10;
+            
+            const { computeAction } = await import("./outlookEngine");
+            const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
+              signals.qualityScore,
+              signals.demandScore,
+              signals.momentumScore,
+              signals.trendScore,
+              signals.volatilityScore,
+              signals.liquidityScore,
+              geminiMarketData.avgPrice,
+              signals.careerStageAuto,
+              card.year ?? undefined
+            );
+            signals.action = recomputedAction;
+            signals.actionReasons = recomputedReasons;
+          }
+          
+          const { isOneOfOneCard } = await import("./priceService");
+          const cardVariation = card.variation || "";
+          const is1of1 = isOneOfOneCard({ title: card.title, variation: cardVariation, serialNumber: (card as any).serialNumber });
+          const isLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(cardVariation);
+          
+          let marketValue = priceData.estimatedValue;
+          let priceMin = priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map((p: any) => p.price)) : null;
+          let priceMax = priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map((p: any) => p.price)) : null;
+          let compCount = priceData.pricePoints.length;
+          
+          if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+            if (geminiMarketData.soldCount > 0 || is1of1 || isLowPop) {
+              marketValue = geminiMarketData.avgPrice;
+              compCount = geminiMarketData.soldCount;
+              if (geminiMarketData.lowPrice) priceMin = geminiMarketData.lowPrice;
+              if (geminiMarketData.highPrice) priceMax = geminiMarketData.highPrice;
+            }
+          }
+          
+          let finalAction = signals.action;
+          let finalActionReasons = [...signals.actionReasons];
+          
+          if (!geminiMarketData) {
+            const matchConfidence = priceData.matchConfidence;
+            if (matchConfidence && matchConfidence.tier === "LOW") {
+              finalAction = "MONITOR";
+              finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+            }
+          }
+          
+          if (clientDisconnected) break;
+          
+          let newsSnippets: string[] = [];
+          if (card.cardCategory === "sports" && card.playerName) {
+            const newsData = await fetchPlayerNews(card.playerName, card.sport);
+            newsSnippets = newsData.snippets;
+          }
+          
+          if (clientDisconnected) break;
+          
+          const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
+          const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
+          
+          const outlookData = {
+            cardId: card.id,
+            pricePoints: pricePointsForSchema,
+            marketValue: marketValue ? Math.round(marketValue * 100) : null,
+            priceMin: priceMin ? Math.round(priceMin * 100) : null,
+            priceMax: priceMax ? Math.round(priceMax * 100) : null,
+            compCount,
+            trendScore: signals.trendScore,
+            liquidityScore: signals.liquidityScore,
+            volatilityScore: signals.volatilityScore,
+            sportScore: signals.sportScore,
+            positionScore: signals.positionScore,
+            cardTypeScore: signals.cardTypeScore,
+            demandScore: signals.demandScore,
+            momentumScore: signals.momentumScore,
+            qualityScore: signals.qualityScore,
+            upsideScore: signals.upsideScore,
+            downsideRisk: signals.downsideRisk,
+            marketFriction: signals.marketFriction,
+            action: finalAction,
+            actionReasons: finalActionReasons,
+            careerStageAuto: signals.careerStageAuto,
+            dataConfidence: signals.dataConfidence,
+            confidenceReason: signals.confidenceReason,
+            explanationShort: explanation.short,
+            explanationLong: explanation.long,
+            explanationBullets: explanation.bullets,
+            bigMoverFlag: signals.bigMoverFlag,
+            bigMoverReason: signals.bigMoverReason,
+          };
+          
+          await storage.upsertCardOutlook(card.id, outlookData);
+          await storage.recordOutlookUsage(userId, 'collection', card.id, card.title);
+          
+          const cardUpdate: any = {
+            outlookBigMover: signals.bigMoverFlag,
+            outlookBigMoverReason: signals.bigMoverReason,
+            outlookAction: finalAction,
+            outlookUpsideScore: signals.upsideScore,
+            outlookRiskScore: signals.downsideRisk,
+          };
+          if (marketValue) {
+            cardUpdate.previousValue = card.estimatedValue || null;
+            cardUpdate.estimatedValue = marketValue;
+            cardUpdate.valueUpdatedAt = new Date();
+          }
+          await storage.updateCard(card.id, cardUpdate);
+          
+          completed++;
+          sendEvent({
+            type: "progress",
+            completed,
+            failed,
+            total,
+            card: {
+              id: card.id,
+              title: card.title,
+              action: finalAction,
+              bigMover: signals.bigMoverFlag,
+              marketValue,
+            },
+          });
+          
+          console.log(`[Batch Outlook] ${completed}/${total} - ${card.title}: ${finalAction}`);
+        } catch (cardError: any) {
+          failed++;
+          completed++;
+          console.error(`[Batch Outlook] Failed ${card.title}:`, cardError.message);
+          sendEvent({
+            type: "progress",
+            completed,
+            failed,
+            total,
+            card: {
+              id: card.id,
+              title: card.title,
+              error: cardError.message,
+            },
+          });
+        }
+        
+        if (completed < total) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      sendEvent({ type: "complete", completed, failed, total });
+      res.end();
+      
+    } catch (error: any) {
+      console.error("[Batch Outlook] Error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Failed to start batch analysis" });
+      } else {
+        res.end();
+      }
+    }
+  });
+
   // Get cached AI 2.0 outlook for a card
-  app.get("/api/cards/:cardId/outlook-v2", async (req: any, res) => {
+  app.get("/api/cards/:cardId/outlook-v2", isAuthenticated, async (req: any, res) => {
     try {
       const cardId = parseInt(req.params.cardId);
-      const userId = req.user?.claims?.sub;
+      const userId = req.user.claims.sub;
 
       if (isNaN(cardId)) {
         return res.status(400).json({ message: "Invalid card ID" });
@@ -2724,12 +3013,15 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(404).json({ message: "Card not found" });
       }
 
-      // Check if user is Pro for full explanation
-      let isPro = false;
-      if (userId) {
-        const user = await storage.getUser(userId);
-        isPro = hasProAccess(user);
+      // Verify user owns this card
+      const displayCase = await storage.getDisplayCaseByIdAndUser(card.displayCaseId, userId);
+      if (!displayCase) {
+        return res.status(403).json({ message: "You don't have permission to view this card's outlook" });
       }
+
+      // Check if user is Pro for full explanation
+      const user = await storage.getUser(userId);
+      const isPro = hasProAccess(user);
 
       // Get cached outlook from card_outlooks table
       const outlook = await storage.getCardOutlook(cardId);
