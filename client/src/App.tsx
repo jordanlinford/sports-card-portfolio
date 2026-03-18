@@ -55,6 +55,7 @@ import ScanHistoryPage from "@/pages/scan-history";
 import LeaderboardsPage from "@/pages/leaderboards";
 import { TrialBanner } from "@/components/trial-banner";
 import { GoogleLinkBanner } from "@/components/google-link-banner";
+import { BatchAnalysisBanner } from "@/components/batch-analysis-banner";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -158,6 +159,7 @@ function App() {
             </main>
             <Footer />
           </div>
+          <BatchAnalysisBanner />
           <Toaster />
           <FeedbackWidget />
         </TooltipProvider>

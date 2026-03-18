@@ -48,6 +48,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { hasProAccess } from "@shared/schema";
 import type { Card as CardType, DisplayCase } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useBatchStatus } from "@/components/batch-analysis-banner";
 import { useToast } from "@/hooks/use-toast";
 import { OutlookDetails, type OutlookDisplayData } from "@/components/outlook-details";
 import { PriceTrendChart } from "@/components/price-trend-chart";
@@ -3339,14 +3340,6 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
   );
 }
 
-interface BatchProgress {
-  total: number;
-  completed: number;
-  failed: number;
-  isRunning: boolean;
-  results: Array<{ id: number; title: string; action?: string; bigMover?: boolean; error?: string }>;
-}
-
 export default function OutlookOverviewPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const isPro = hasProAccess(user);
@@ -3361,102 +3354,18 @@ export default function OutlookOverviewPage() {
     enabled: isAuthenticated,
   });
 
-  const [batchProgress, setBatchProgress] = useState<BatchProgress | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const { data: batchStatus } = useBatchStatus();
+  const batchIsRunning = batchStatus?.status === "running";
 
-  const startBatchAnalysis = useCallback(async () => {
-    if (batchProgress?.isRunning) return;
-    
-    const controller = new AbortController();
-    abortRef.current = controller;
-    
-    setBatchProgress({ total: 0, completed: 0, failed: 0, isRunning: true, results: [] });
-    
-    try {
-      const response = await fetch("/api/cards/batch-outlook", {
-        method: "POST",
-        credentials: "include",
-        signal: controller.signal,
-      });
-      
-      if (!response.ok) {
-        setBatchProgress(null);
-        return;
-      }
-      
-      if (response.headers.get("content-type")?.includes("application/json")) {
-        setBatchProgress(null);
-        queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
-        return;
-      }
-      
-      const reader = response.body?.getReader();
-      if (!reader) {
-        setBatchProgress(null);
-        return;
-      }
-      
-      const decoder = new TextDecoder();
-      let buffer = "";
-      
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const event = JSON.parse(line.slice(6));
-              
-              if (event.type === "start") {
-                setBatchProgress(prev => prev ? { ...prev, total: event.total } : null);
-              } else if (event.type === "progress") {
-                setBatchProgress(prev => prev ? {
-                  ...prev,
-                  completed: event.completed,
-                  failed: event.failed,
-                  total: event.total,
-                  results: [...prev.results, {
-                    id: event.card.id,
-                    title: event.card.title,
-                    action: event.card.action,
-                    bigMover: event.card.bigMover,
-                    error: event.card.error,
-                  }],
-                } : null);
-              } else if (event.type === "complete") {
-                setBatchProgress(prev => prev ? { ...prev, isRunning: false } : null);
-                queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
-                queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
-              }
-            } catch (e) {
-              console.warn("[BatchAnalysis] Failed to parse SSE message:", e);
-            }
-          }
-        }
-      }
-      
-      setBatchProgress(prev => prev?.isRunning ? { ...prev, isRunning: false } : prev);
-      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
-    } catch (err: any) {
-      if (err.name === "AbortError") {
-        setBatchProgress(prev => prev ? { ...prev, isRunning: false } : null);
-      } else {
-        setBatchProgress(prev => prev ? { ...prev, isRunning: false } : null);
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
-    }
-  }, [batchProgress?.isRunning]);
-
-  const stopBatchAnalysis = useCallback(() => {
-    abortRef.current?.abort();
-    setBatchProgress(prev => prev ? { ...prev, isRunning: false } : null);
-    queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
-  }, []);
+  const startBatchMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/cards/batch-outlook"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cards/batch-outlook/status"] });
+    },
+    onError: (err: any) => {
+      console.warn("[BatchAnalysis] Failed to start:", err.message);
+    },
+  });
 
   const canAnalyze = isPro || (usage?.remaining != null && usage.remaining > 0);
 
@@ -3747,100 +3656,7 @@ export default function OutlookOverviewPage() {
             </div>
           )}
 
-          {batchProgress && (
-            <div className="mb-8">
-              <Card className="border-primary/30 bg-primary/5">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {batchProgress.isRunning ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                      ) : (
-                        <Check className="h-5 w-5 text-green-500" />
-                      )}
-                      <CardTitle className="text-lg">
-                        {batchProgress.isRunning ? "Analyzing Cards..." : "Batch Analysis Complete"}
-                      </CardTitle>
-                    </div>
-                    {batchProgress.isRunning && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={stopBatchAnalysis}
-                        data-testid="button-stop-batch"
-                      >
-                        <X className="h-4 w-4 mr-1" />
-                        Stop
-                      </Button>
-                    )}
-                    {!batchProgress.isRunning && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setBatchProgress(null)}
-                        data-testid="button-dismiss-batch"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>{batchProgress.completed} of {batchProgress.total} cards</span>
-                      <span className="text-muted-foreground">
-                        {batchProgress.failed > 0 && `${batchProgress.failed} failed`}
-                      </span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-2.5">
-                      <div
-                        className="bg-primary h-2.5 rounded-full transition-all duration-300"
-                        style={{ width: `${batchProgress.total > 0 ? (batchProgress.completed / batchProgress.total) * 100 : 0}%` }}
-                      />
-                    </div>
-                    {batchProgress.results.length > 0 && (
-                      <div className="max-h-40 overflow-y-auto space-y-1 mt-2">
-                        {batchProgress.results.slice(-5).map((r) => (
-                          <div key={r.id} className="flex items-center justify-between text-xs py-1 px-2 rounded bg-background/50">
-                            <span className="truncate flex-1 mr-2">{r.title}</span>
-                            {r.error ? (
-                              <Badge variant="destructive" className="text-[10px] shrink-0">Failed</Badge>
-                            ) : (
-                              <div className="flex items-center gap-1 shrink-0">
-                                {r.bigMover && <Zap className="h-3 w-3 text-purple-500" />}
-                                <Badge variant={r.action === "BUY" ? "default" : r.action === "SELL" ? "destructive" : "secondary"} className="text-[10px]">
-                                  {r.action}
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {!batchProgress.isRunning && batchProgress.completed > 0 && (
-                      <div className="flex gap-2 flex-wrap text-xs mt-2">
-                        {(() => {
-                          const buys = batchProgress.results.filter(r => r.action === "BUY").length;
-                          const sells = batchProgress.results.filter(r => r.action === "SELL").length;
-                          const movers = batchProgress.results.filter(r => r.bigMover).length;
-                          return (
-                            <>
-                              {buys > 0 && <Badge variant="default">{buys} Buy</Badge>}
-                              {sells > 0 && <Badge variant="destructive">{sells} Sell</Badge>}
-                              {movers > 0 && <Badge className="bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/20">{movers} Big Mover</Badge>}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {cardsWithoutOutlook.length > 0 && isPro && !batchProgress?.isRunning && (
+          {cardsWithoutOutlook.length > 0 && isPro && (
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -3851,16 +3667,28 @@ export default function OutlookOverviewPage() {
                   </Badge>
                 </div>
                 <Button
-                  onClick={startBatchAnalysis}
+                  onClick={() => startBatchMutation.mutate()}
+                  disabled={batchIsRunning || startBatchMutation.isPending}
                   size="sm"
                   data-testid="button-analyze-all"
                 >
-                  <Sparkles className="h-4 w-4 mr-1" />
-                  Analyze All ({cardsWithoutOutlook.length})
+                  {batchIsRunning ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-1" />
+                      Analyze All ({cardsWithoutOutlook.length})
+                    </>
+                  )}
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                These cards haven't been analyzed yet. Use "Analyze All" to run analysis on every card, or click individual cards below.
+                {batchIsRunning
+                  ? "Analysis is running in the background — you can navigate away and it will continue."
+                  : `These cards haven't been analyzed yet. Use "Analyze All" to run analysis on every card, or click individual cards below.`}
               </p>
               <div className="space-y-2">
                 {cardsWithoutOutlook.slice(0, 10).map(card => (

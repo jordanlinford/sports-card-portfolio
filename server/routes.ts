@@ -2714,287 +2714,264 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
-  // Batch analyze all unanalyzed cards (Pro only, SSE streaming progress)
+  // ── Background batch analysis job store ─────────────────────────────────
+  interface BatchJob {
+    status: "running" | "complete" | "stopped";
+    total: number;
+    completed: number;
+    failed: number;
+    shouldStop: boolean;
+    startedAt: number;
+    results: Array<{ id: number; title: string; action?: string; bigMover?: boolean; marketValue?: number; error?: string }>;
+  }
+  const batchJobs = new Map<string, BatchJob>();
+
+  async function runBatchAnalysisJob(userId: string, cards: any[]): Promise<void> {
+    const job = batchJobs.get(userId);
+    if (!job) return;
+
+    const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData, fetchMonthlyPriceHistory, computeAction } = await import("./outlookEngine");
+    const { lookupEnhancedCardPrice, isOneOfOneCard } = await import("./priceService");
+
+    for (const card of cards) {
+      if (job.shouldStop) break;
+
+      try {
+        const [geminiMarketData, priceData] = await Promise.all([
+          fetchGeminiMarketData({
+            title: card.title,
+            playerName: card.playerName,
+            year: card.year,
+            set: card.set,
+            variation: card.variation,
+            grade: card.grade,
+            grader: card.grader,
+          }),
+          lookupEnhancedCardPrice({
+            title: card.title,
+            set: card.set,
+            year: card.year,
+            variation: card.variation,
+            grade: card.grade,
+            grader: card.grader,
+          }),
+        ]);
+
+        if (job.shouldStop) break;
+
+        const pricePointsForSchema = priceData.pricePoints.map((pp: any) => ({
+          date: pp.date, price: pp.price, source: pp.source, url: pp.url,
+        }));
+
+        const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
+
+        if (geminiMarketData) {
+          if (geminiMarketData.soldCount >= 25) signals.liquidityScore = 10;
+          else if (geminiMarketData.soldCount >= 15) signals.liquidityScore = 8;
+          else if (geminiMarketData.soldCount >= 10) signals.liquidityScore = 7;
+          else if (geminiMarketData.soldCount >= 5) signals.liquidityScore = 5;
+          else if (geminiMarketData.soldCount >= 2) signals.liquidityScore = 3;
+          else {
+            if (geminiMarketData.liquidity === "HIGH") signals.liquidityScore = 7;
+            else if (geminiMarketData.liquidity === "MEDIUM") signals.liquidityScore = 4;
+            else if (geminiMarketData.liquidity === "LOW") signals.liquidityScore = 2;
+            else signals.liquidityScore = 1;
+          }
+          if (geminiMarketData.soldCount >= 10) {
+            signals.dataConfidence = "HIGH";
+            signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found on eBay`;
+          } else if (geminiMarketData.soldCount >= 5) {
+            signals.dataConfidence = "MEDIUM";
+            signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
+          }
+          if (geminiMarketData.liquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
+          else if (geminiMarketData.liquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
+          signals.demandScore = Math.round((signals.liquidityScore * 0.4) + (signals.sportScore * 0.3) + (signals.positionScore * 0.3)) * 10;
+          const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
+            signals.qualityScore, signals.demandScore, signals.momentumScore, signals.trendScore,
+            signals.volatilityScore, signals.liquidityScore, geminiMarketData.avgPrice,
+            signals.careerStageAuto, card.year ?? undefined
+          );
+          signals.action = recomputedAction;
+          signals.actionReasons = recomputedReasons;
+        }
+
+        const cardVariation = card.variation || "";
+        const is1of1 = isOneOfOneCard({ title: card.title, variation: cardVariation, serialNumber: (card as any).serialNumber });
+        const isLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(cardVariation);
+
+        let marketValue = priceData.estimatedValue;
+        let priceMin = priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map((p: any) => p.price)) : null;
+        let priceMax = priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map((p: any) => p.price)) : null;
+        let compCount = priceData.pricePoints.length;
+
+        if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+          if (geminiMarketData.soldCount > 0 || is1of1 || isLowPop) {
+            marketValue = geminiMarketData.avgPrice;
+            compCount = geminiMarketData.soldCount;
+            if (geminiMarketData.lowPrice) priceMin = geminiMarketData.lowPrice;
+            if (geminiMarketData.highPrice) priceMax = geminiMarketData.highPrice;
+          }
+        }
+
+        let finalAction = signals.action;
+        let finalActionReasons = [...signals.actionReasons];
+        if (!geminiMarketData) {
+          const matchConfidence = priceData.matchConfidence;
+          if (matchConfidence && matchConfidence.tier === "LOW") {
+            finalAction = "MONITOR";
+            finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+          }
+        }
+
+        if (job.shouldStop) break;
+
+        let newsSnippets: string[] = [];
+        if (card.cardCategory === "sports" && card.playerName) {
+          const newsData = await fetchPlayerNews(card.playerName, card.sport);
+          newsSnippets = newsData.snippets;
+        }
+
+        if (job.shouldStop) break;
+
+        const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
+        const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
+
+        const outlookData = {
+          cardId: card.id, pricePoints: pricePointsForSchema,
+          marketValue: marketValue ? Math.round(marketValue * 100) : null,
+          priceMin: priceMin ? Math.round(priceMin * 100) : null,
+          priceMax: priceMax ? Math.round(priceMax * 100) : null,
+          compCount, trendScore: signals.trendScore, liquidityScore: signals.liquidityScore,
+          volatilityScore: signals.volatilityScore, sportScore: signals.sportScore,
+          positionScore: signals.positionScore, cardTypeScore: signals.cardTypeScore,
+          demandScore: signals.demandScore, momentumScore: signals.momentumScore,
+          qualityScore: signals.qualityScore, upsideScore: signals.upsideScore,
+          downsideRisk: signals.downsideRisk, marketFriction: signals.marketFriction,
+          action: finalAction, actionReasons: finalActionReasons,
+          careerStageAuto: signals.careerStageAuto, dataConfidence: signals.dataConfidence,
+          confidenceReason: signals.confidenceReason,
+          explanationShort: explanation.short, explanationLong: explanation.long,
+          explanationBullets: explanation.bullets,
+          bigMoverFlag: signals.bigMoverFlag, bigMoverReason: signals.bigMoverReason,
+        };
+
+        await storage.upsertCardOutlook(card.id, outlookData);
+        await storage.recordOutlookUsage(userId, 'collection', card.id, card.title);
+
+        const cardUpdate: any = {
+          outlookBigMover: signals.bigMoverFlag, outlookBigMoverReason: signals.bigMoverReason,
+          outlookAction: finalAction, outlookUpsideScore: signals.upsideScore, outlookRiskScore: signals.downsideRisk,
+        };
+        if (marketValue) {
+          cardUpdate.previousValue = card.estimatedValue || null;
+          cardUpdate.estimatedValue = marketValue;
+          cardUpdate.valueUpdatedAt = new Date();
+        }
+        await storage.updateCard(card.id, cardUpdate);
+
+        job.completed++;
+        job.results.push({ id: card.id, title: card.title, action: finalAction, bigMover: signals.bigMoverFlag, marketValue });
+        if (job.results.length > 20) job.results = job.results.slice(-20);
+        console.log(`[Batch Outlook] ${job.completed}/${job.total} - ${card.title}: ${finalAction}`);
+      } catch (cardError: any) {
+        job.failed++;
+        job.completed++;
+        job.results.push({ id: card.id, title: card.title, error: cardError.message });
+        if (job.results.length > 20) job.results = job.results.slice(-20);
+        console.error(`[Batch Outlook] Failed ${card.title}:`, cardError.message);
+      }
+
+      if (job.completed < job.total) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    job.status = job.shouldStop ? "stopped" : "complete";
+    console.log(`[Batch Outlook] Job for ${userId} ${job.status}: ${job.completed}/${job.total}`);
+  }
+
   app.post("/api/cards/batch-outlook", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       const isPro = hasProAccess(user);
-      
+
       if (!isPro) {
         return res.status(403).json({ message: "Batch analysis is a Pro feature" });
       }
-      
+
+      const existing = batchJobs.get(userId);
+      if (existing && existing.status === "running") {
+        return res.status(409).json({ message: "A batch analysis is already running", total: existing.total, completed: existing.completed });
+      }
+
       const userCases = await storage.getDisplayCases(userId);
       if (userCases.length === 0) {
         return res.status(400).json({ message: "No display cases found" });
       }
-      
+
       const allCards: any[] = [];
       for (const dc of userCases) {
         const dcCards = await storage.getCards(dc.id);
         allCards.push(...dcCards);
       }
-      
+
       const unanalyzedCards = allCards.filter(c => c.outlookAction === null || c.outlookAction === undefined);
-      
+
       if (unanalyzedCards.length === 0) {
-        return res.json({ message: "All cards already analyzed", completed: 0, total: 0 });
+        return res.json({ message: "All cards already analyzed", completed: 0, total: 0, status: "complete" });
       }
-      
-      res.setHeader("Content-Type", "text/event-stream");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-      res.flushHeaders();
-      
-      let clientDisconnected = false;
-      req.on("close", () => { clientDisconnected = true; });
-      
-      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData, fetchMonthlyPriceHistory } = await import("./outlookEngine");
-      const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
-      
-      const total = unanalyzedCards.length;
-      let completed = 0;
-      let failed = 0;
-      
-      const sendEvent = (data: any) => {
-        if (!res.destroyed && !clientDisconnected) {
-          res.write(`data: ${JSON.stringify(data)}\n\n`);
-        }
+
+      const job: BatchJob = {
+        status: "running",
+        total: unanalyzedCards.length,
+        completed: 0,
+        failed: 0,
+        shouldStop: false,
+        startedAt: Date.now(),
+        results: [],
       };
-      
-      sendEvent({ type: "start", total });
-      
-      for (const card of unanalyzedCards) {
-        if (res.destroyed || clientDisconnected) break;
-        
-        try {
-          const [geminiMarketData, priceData, monthlyPriceHistory] = await Promise.all([
-            fetchGeminiMarketData({
-              title: card.title,
-              playerName: card.playerName,
-              year: card.year,
-              set: card.set,
-              variation: card.variation,
-              grade: card.grade,
-              grader: card.grader,
-            }),
-            lookupEnhancedCardPrice({
-              title: card.title,
-              set: card.set,
-              year: card.year,
-              variation: card.variation,
-              grade: card.grade,
-              grader: card.grader,
-            }),
-            card.playerName ? fetchMonthlyPriceHistory({
-              playerName: card.playerName,
-              sport: card.sport || "football",
-              year: card.year?.toString(),
-              setName: card.set || undefined,
-              variation: card.variation || undefined,
-              grade: card.grade || undefined,
-              grader: card.grader || undefined,
-            }).catch(() => null) : Promise.resolve(null),
-          ]);
-          
-          const pricePointsForSchema = priceData.pricePoints.map((pp: any) => ({
-            date: pp.date,
-            price: pp.price,
-            source: pp.source,
-            url: pp.url,
-          }));
-          
-          const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
-          
-          if (geminiMarketData) {
-            if (geminiMarketData.soldCount >= 25) signals.liquidityScore = 10;
-            else if (geminiMarketData.soldCount >= 15) signals.liquidityScore = 8;
-            else if (geminiMarketData.soldCount >= 10) signals.liquidityScore = 7;
-            else if (geminiMarketData.soldCount >= 5) signals.liquidityScore = 5;
-            else if (geminiMarketData.soldCount >= 2) signals.liquidityScore = 3;
-            else {
-              if (geminiMarketData.liquidity === "HIGH") signals.liquidityScore = 7;
-              else if (geminiMarketData.liquidity === "MEDIUM") signals.liquidityScore = 4;
-              else if (geminiMarketData.liquidity === "LOW") signals.liquidityScore = 2;
-              else signals.liquidityScore = 1;
-            }
-            
-            if (geminiMarketData.soldCount >= 10) {
-              signals.dataConfidence = "HIGH";
-              signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found on eBay`;
-            } else if (geminiMarketData.soldCount >= 5) {
-              signals.dataConfidence = "MEDIUM";
-              signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
-            }
-            
-            if (geminiMarketData.liquidity === "HIGH") {
-              signals.marketFriction = Math.min(signals.marketFriction, 30);
-            } else if (geminiMarketData.liquidity === "MEDIUM") {
-              signals.marketFriction = Math.min(signals.marketFriction, 50);
-            }
-            
-            signals.demandScore = Math.round(
-              (signals.liquidityScore * 0.4) + 
-              (signals.sportScore * 0.3) + 
-              (signals.positionScore * 0.3)
-            ) * 10;
-            
-            const { computeAction } = await import("./outlookEngine");
-            const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
-              signals.qualityScore,
-              signals.demandScore,
-              signals.momentumScore,
-              signals.trendScore,
-              signals.volatilityScore,
-              signals.liquidityScore,
-              geminiMarketData.avgPrice,
-              signals.careerStageAuto,
-              card.year ?? undefined
-            );
-            signals.action = recomputedAction;
-            signals.actionReasons = recomputedReasons;
-          }
-          
-          const { isOneOfOneCard } = await import("./priceService");
-          const cardVariation = card.variation || "";
-          const is1of1 = isOneOfOneCard({ title: card.title, variation: cardVariation, serialNumber: (card as any).serialNumber });
-          const isLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(cardVariation);
-          
-          let marketValue = priceData.estimatedValue;
-          let priceMin = priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map((p: any) => p.price)) : null;
-          let priceMax = priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map((p: any) => p.price)) : null;
-          let compCount = priceData.pricePoints.length;
-          
-          if (geminiMarketData && geminiMarketData.avgPrice > 0) {
-            if (geminiMarketData.soldCount > 0 || is1of1 || isLowPop) {
-              marketValue = geminiMarketData.avgPrice;
-              compCount = geminiMarketData.soldCount;
-              if (geminiMarketData.lowPrice) priceMin = geminiMarketData.lowPrice;
-              if (geminiMarketData.highPrice) priceMax = geminiMarketData.highPrice;
-            }
-          }
-          
-          let finalAction = signals.action;
-          let finalActionReasons = [...signals.actionReasons];
-          
-          if (!geminiMarketData) {
-            const matchConfidence = priceData.matchConfidence;
-            if (matchConfidence && matchConfidence.tier === "LOW") {
-              finalAction = "MONITOR";
-              finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
-            }
-          }
-          
-          if (clientDisconnected) break;
-          
-          let newsSnippets: string[] = [];
-          if (card.cardCategory === "sports" && card.playerName) {
-            const newsData = await fetchPlayerNews(card.playerName, card.sport);
-            newsSnippets = newsData.snippets;
-          }
-          
-          if (clientDisconnected) break;
-          
-          const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
-          const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
-          
-          const outlookData = {
-            cardId: card.id,
-            pricePoints: pricePointsForSchema,
-            marketValue: marketValue ? Math.round(marketValue * 100) : null,
-            priceMin: priceMin ? Math.round(priceMin * 100) : null,
-            priceMax: priceMax ? Math.round(priceMax * 100) : null,
-            compCount,
-            trendScore: signals.trendScore,
-            liquidityScore: signals.liquidityScore,
-            volatilityScore: signals.volatilityScore,
-            sportScore: signals.sportScore,
-            positionScore: signals.positionScore,
-            cardTypeScore: signals.cardTypeScore,
-            demandScore: signals.demandScore,
-            momentumScore: signals.momentumScore,
-            qualityScore: signals.qualityScore,
-            upsideScore: signals.upsideScore,
-            downsideRisk: signals.downsideRisk,
-            marketFriction: signals.marketFriction,
-            action: finalAction,
-            actionReasons: finalActionReasons,
-            careerStageAuto: signals.careerStageAuto,
-            dataConfidence: signals.dataConfidence,
-            confidenceReason: signals.confidenceReason,
-            explanationShort: explanation.short,
-            explanationLong: explanation.long,
-            explanationBullets: explanation.bullets,
-            bigMoverFlag: signals.bigMoverFlag,
-            bigMoverReason: signals.bigMoverReason,
-          };
-          
-          await storage.upsertCardOutlook(card.id, outlookData);
-          await storage.recordOutlookUsage(userId, 'collection', card.id, card.title);
-          
-          const cardUpdate: any = {
-            outlookBigMover: signals.bigMoverFlag,
-            outlookBigMoverReason: signals.bigMoverReason,
-            outlookAction: finalAction,
-            outlookUpsideScore: signals.upsideScore,
-            outlookRiskScore: signals.downsideRisk,
-          };
-          if (marketValue) {
-            cardUpdate.previousValue = card.estimatedValue || null;
-            cardUpdate.estimatedValue = marketValue;
-            cardUpdate.valueUpdatedAt = new Date();
-          }
-          await storage.updateCard(card.id, cardUpdate);
-          
-          completed++;
-          sendEvent({
-            type: "progress",
-            completed,
-            failed,
-            total,
-            card: {
-              id: card.id,
-              title: card.title,
-              action: finalAction,
-              bigMover: signals.bigMoverFlag,
-              marketValue,
-            },
-          });
-          
-          console.log(`[Batch Outlook] ${completed}/${total} - ${card.title}: ${finalAction}`);
-        } catch (cardError: any) {
-          failed++;
-          completed++;
-          console.error(`[Batch Outlook] Failed ${card.title}:`, cardError.message);
-          sendEvent({
-            type: "progress",
-            completed,
-            failed,
-            total,
-            card: {
-              id: card.id,
-              title: card.title,
-              error: cardError.message,
-            },
-          });
-        }
-        
-        if (completed < total) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      }
-      
-      sendEvent({ type: "complete", completed, failed, total });
-      res.end();
-      
+      batchJobs.set(userId, job);
+
+      // Fire and forget — runs entirely in the background
+      runBatchAnalysisJob(userId, unanalyzedCards).catch(err => {
+        console.error("[Batch Outlook] Unhandled job error:", err);
+        const j = batchJobs.get(userId);
+        if (j) j.status = "complete";
+      });
+
+      res.json({ message: "Batch analysis started", total: unanalyzedCards.length, status: "running" });
     } catch (error: any) {
       console.error("[Batch Outlook] Error:", error);
-      if (!res.headersSent) {
-        res.status(500).json({ message: "Failed to start batch analysis" });
-      } else {
-        res.end();
-      }
+      res.status(500).json({ message: "Failed to start batch analysis" });
+    }
+  });
+
+  app.get("/api/cards/batch-outlook/status", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const job = batchJobs.get(userId);
+    if (!job) {
+      return res.json({ status: "idle", total: 0, completed: 0, failed: 0, results: [] });
+    }
+    res.json({
+      status: job.status,
+      total: job.total,
+      completed: job.completed,
+      failed: job.failed,
+      results: job.results.slice(-10),
+      startedAt: job.startedAt,
+    });
+  });
+
+  app.post("/api/cards/batch-outlook/stop", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const job = batchJobs.get(userId);
+    if (job && job.status === "running") {
+      job.shouldStop = true;
+      res.json({ message: "Stop requested" });
+    } else {
+      res.json({ message: "No active job to stop" });
     }
   });
 
