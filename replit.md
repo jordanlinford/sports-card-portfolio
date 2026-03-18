@@ -36,7 +36,7 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts.
 - **Monthly Price Trend Charts**: 18-month lookback price charts using Gemini AI with Google Search grounding for eBay sold data, available on player and card outlook pages.
 - **Graded Value Matrix**: For raw cards, shows estimated PSA 9 and PSA 10 values with a "Grade It?" recommendation based on cost vs. value increase.
-- **Raw Card Price Accuracy**: Multi-layer system preventing graded card prices from inflating raw card valuations, using Gemini prompts for separate raw and graded prices. Price-trend guard only trusts monthly history data backed by real sales (salesCount > 0); trend data with all-zero sales is flagged as fabricated and skipped to prevent hallucinated price fallbacks.
+- **Raw Card Price Accuracy**: Gemini prompts request separate raw and graded prices. Gemini's rawPrice field is trusted directly without post-processing correction (previous double-correction removed as it systematically undervalued raw cards).
 - **Liquidity Scoring UI**: Visual badges indicating market health and exit risk for cards, with Pro users seeing divergence warnings.
 - **Portfolio-Specific Next Buys (Pro)**: AI-powered recommendations tailored to display case themes, suggesting complementary cards with pricing and investment rationale.
 - **Next Buys Recommendation Engine**: Balanced, investment-focused recommendation system using diverse sources like watchlists, breakout players, team themes, hidden gems, and market outlook, with intelligent source selection and scoring.
@@ -49,7 +49,8 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Build Process**: Vite for client bundling and esbuild for server bundling.
 - **Session Management**: Secure, HttpOnly cookies with a 7-day TTL, storing session data in PostgreSQL.
 - **Unified Card Analysis**: Single Gemini 2.5 Flash call for market pricing, player news, and investment verdict, reducing analysis time.
-- **SSP/Case Hit Parallel Detection**: Premium unnumbered parallels (Zebra, Tiger Stripe, Color Blast, Shock, Downtown, Kaboom, Mojo, Shimmer, etc.) are explicitly detected and priced separately from base/silver parallels. Search broadening protects SSP keywords from being dropped.
+- **SSP/Case Hit Parallel Detection**: Premium unnumbered parallels (Zebra, Tiger Stripe, Color Blast, Shock, Downtown, Kaboom, Mojo, Shimmer, etc.) are explicitly detected and priced separately from base/silver parallels. Search broadening protects SSP keywords from being dropped. SSP cards are exempted from outlier protection and cross-validation guards since wide price ranges are expected. Optic SSP inserts have enhanced Gemini prompts to prevent confusion with base Donruss pricing.
+- **Gemini-First Pricing Philosophy**: The unified Gemini analysis (with Google Search grounding) is the primary pricing source. Legacy price lookups and monthly trend data serve as fallbacks only when Gemini returns no price. Cross-validation guards are log-only (no longer override Gemini). This prevents legacy comps from systematically undervaluing cards.
 - **Player Outlook Parallelization**: News signals and market data fetched via `Promise.all` in parallel, reducing outlook generation time by ~4-8 seconds.
 - **eBay Comps Caching**: Stale-while-revalidate (SWR) pattern with extended TTLs and query broadening.
 - **Player News Caching**: 4-hour in-memory cache for `fetchPlayerNews` results.

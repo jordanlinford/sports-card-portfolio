@@ -2529,9 +2529,7 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      // CROSS-VALIDATION: Reconcile market value against actual price points from comps
-      // Only pull value DOWN if legacy median is lower — never inflate Gemini's price upward
-      // Skip for 1/1 cards where price points may be from parallel comp projections
+      // CROSS-VALIDATION: Log discrepancies between Gemini and legacy for debugging (no longer overrides)
       if (pricePointsForSchema.length > 0 && !is1of1 && !isLowPop) {
         const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
         if (ppPrices.length > 0 && marketValue && marketValue > 0) {
@@ -2539,48 +2537,35 @@ Sitemap: ${origin}/sitemap.xml
           const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
           const ratio = marketValue / ppMedian;
           if (ratio > 3) {
-            console.warn(`[Outlook 2.0] PRICE-POINTS CROSS-VALIDATION: marketValue $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Pulling down.`);
-            marketValue = Math.round(ppMedian * 100) / 100;
-            priceMin = sortedPrices[0];
-            priceMax = sortedPrices[sortedPrices.length - 1];
+            console.log(`[Outlook 2.0] CROSS-VALIDATION (info only): Gemini $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Trusting Gemini.`);
           }
         }
       }
 
-      // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
-      // The price trend chart and displayed value should never wildly disagree
-      // Only trust trend data that has real sales backing it (salesCount > 0 for at least some months)
+      // PRICE-TREND COMPARISON (LOG ONLY — no longer overrides Gemini)
+      // Trend data is itself Gemini-generated and shouldn't override a fresh Gemini analysis.
+      // Only used as fallback when no market value exists.
       const outlookTrendHasRealSales = monthlyPriceHistory?.hasAnySales === true;
       if (monthlyPriceHistory && monthlyPriceHistory.dataPoints && monthlyPriceHistory.dataPoints.length > 0 && outlookTrendHasRealSales) {
         const recentPoints = monthlyPriceHistory.dataPoints.slice(-3);
         const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
 
-        if (recentAvg > 0 && marketValue && marketValue > 0) {
-          const ratio = marketValue / recentAvg;
-          if (ratio < 0.33 || ratio > 3) {
-            console.warn(`[Outlook 2.0] PRICE-TREND GUARD: Market value $${marketValue} wildly off from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Overriding with trend.`);
-            marketValue = Math.round(recentAvg * 100) / 100;
-            const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-            if (allPrices.length > 0) {
-              priceMin = Math.min(...allPrices);
-              priceMax = Math.max(...allPrices);
-            }
-          } else if (ratio < 0.5 || ratio > 2) {
-            const blended = Math.round(((marketValue + recentAvg) / 2) * 100) / 100;
-            console.warn(`[Outlook 2.0] PRICE-TREND GUARD: Market value $${marketValue} moderately off from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Blending to $${blended}.`);
-            marketValue = blended;
-          }
-        } else if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
-          console.warn(`[Outlook 2.0] PRICE-TREND GUARD: No market value, using trend avg $${recentAvg.toFixed(2)}`);
+        if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
+          console.log(`[Outlook 2.0] PRICE-TREND FALLBACK: No market value, using trend avg $${recentAvg.toFixed(2)}`);
           marketValue = Math.round(recentAvg * 100) / 100;
           const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
           if (allPrices.length > 0) {
             priceMin = Math.min(...allPrices);
             priceMax = Math.max(...allPrices);
           }
+        } else if (recentAvg > 0 && marketValue && marketValue > 0) {
+          const ratio = marketValue / recentAvg;
+          if (ratio < 0.33 || ratio > 3) {
+            console.log(`[Outlook 2.0] PRICE-TREND INFO: Gemini $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Trusting Gemini.`);
+          }
         }
       } else if (monthlyPriceHistory && !outlookTrendHasRealSales) {
-        console.warn(`[Outlook 2.0] PRICE-TREND GUARD: Skipping — trend data has NO real sales (all salesCount=0), prices are fabricated`);
+        console.log(`[Outlook 2.0] PRICE-TREND: Skipping — trend data has NO real sales (all salesCount=0)`);
       }
       
       // Determine final action - use matchConfidence safeguard when Gemini data unavailable
@@ -2754,28 +2739,9 @@ Sitemap: ${origin}/sitemap.xml
           ? (Date.now() - new Date(outlook.updatedAt).getTime()) / (1000 * 60 * 60)
           : 999;
         
-        // CROSS-VALIDATION: Reconcile marketValue against stored pricePoints
         let marketValue = outlook.marketValue ? outlook.marketValue / 100 : null;
         let priceMin = outlook.priceMin ? outlook.priceMin / 100 : null;
         let priceMax = outlook.priceMax ? outlook.priceMax / 100 : null;
-        
-        if (marketValue && outlook.pricePoints && Array.isArray(outlook.pricePoints) && outlook.pricePoints.length > 0) {
-          const validPrices = (outlook.pricePoints as any[])
-            .map((pp: any) => pp.price)
-            .filter((p: number) => typeof p === 'number' && p > 0);
-          
-          if (validPrices.length > 0) {
-            const sortedPrices = [...validPrices].sort((a: number, b: number) => a - b);
-            const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
-            const ratio = marketValue / ppMedian;
-            if (ratio > 3) {
-              console.warn(`[Outlook GET] PRICE CROSS-VALIDATION: marketValue $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Pulling down.`);
-              marketValue = Math.round(ppMedian * 100) / 100;
-              priceMin = sortedPrices[0];
-              priceMax = sortedPrices[sortedPrices.length - 1];
-            }
-          }
-        }
         
         return res.json({
           cardId,
@@ -3248,8 +3214,8 @@ Sitemap: ${origin}/sitemap.xml
           });
           if (fallbackResult && fallbackResult.avgPrice > 0) {
             lowPopFallbackPrice = fallbackResult.avgPrice;
-            // Use fallback only when we have no current price; if we do have one, take the lower (more conservative)
-            const usesFallback = !marketValue || marketValue <= 0 || fallbackResult.avgPrice < marketValue;
+            // Use fallback when we have no current price, or when unified failed to return a price
+            const usesFallback = !marketValue || marketValue <= 0;
             if (usesFallback) {
               console.log(`[Quick Analyze] LOW-POP FALLBACK: Using $${fallbackResult.avgPrice} (range $${fallbackResult.minPrice}-$${fallbackResult.maxPrice}), was $${currentPrice}.`);
               marketValue = fallbackResult.avgPrice;
@@ -3257,7 +3223,7 @@ Sitemap: ${origin}/sitemap.xml
               priceMax = fallbackResult.maxPrice;
               lowPopFallbackSelected = true;
             } else {
-              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} >= current $${currentPrice}. Keeping current (more conservative).`);
+              console.log(`[Quick Analyze] LOW-POP FALLBACK: Triangulated $${fallbackResult.avgPrice} vs current $${currentPrice}. Keeping unified Gemini result.`);
             }
           }
         } catch (fallbackError: any) {
@@ -3287,22 +3253,15 @@ Sitemap: ${origin}/sitemap.xml
             grader: grader || undefined,
           });
           if (cpResult && cpResult.avgPrice > 0) {
-            // If we have no current price, use the cross-product result
-            // If we do have a price, only use cross-product if it's more conservative (lower)
+            // Use cross-product fallback only when unified returned no usable price
             if (!preExisting || preExisting <= 0) {
               console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: No prior estimate — using $${cpResult.avgPrice}. | ${cpResult.notes.substring(0, 100)}`);
               marketValue = cpResult.avgPrice;
               priceMin = cpResult.minPrice;
               priceMax = cpResult.maxPrice;
               compCount = 0;
-            } else if (cpResult.avgPrice < preExisting) {
-              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} < pre-existing $${preExisting}. Using lower (more conservative). | ${cpResult.notes.substring(0, 100)}`);
-              marketValue = cpResult.avgPrice;
-              priceMin = cpResult.minPrice;
-              priceMax = cpResult.maxPrice;
-              compCount = 0;
             } else {
-              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} >= pre-existing $${preExisting}. Keeping current estimate.`);
+              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} vs Gemini $${preExisting}. Keeping Gemini result. | ${cpResult.notes.substring(0, 100)}`);
             }
           }
         } catch (cpErr: any) {
@@ -3310,88 +3269,57 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      // RAW CARD PRICE CORRECTION
+      // RAW CARD PRICE CORRECTION — REMOVED (Gemini already returns raw-specific prices via rawPrice field)
+      // Double-correcting on top of Gemini's raw price was systematically undervaluing raw cards
       const qaIsRaw = isRawCardCheck(grade, grader);
-      if (qaIsRaw && marketValue && priceMin && priceMin > 0 && !qaIs1of1 && !qaIsLowPop) {
-        const rawAvgToMinRatio = marketValue / priceMin;
-        if (rawAvgToMinRatio > 2) {
-          const correctedValue = Math.round(priceMin * 1.3 * 100) / 100;
-          console.warn(`[Quick Analyze] RAW CARD CORRECTION: $${marketValue} → $${correctedValue}`);
-          marketValue = correctedValue;
-          priceMax = Math.round(priceMin * 2 * 100) / 100;
-        }
-      }
 
-      // CROSS-VALIDATION against legacy price points
-      // Only pull value DOWN if legacy median is lower — never inflate Gemini's price upward
+      // CROSS-VALIDATION against legacy price points (LOG ONLY — no longer overrides Gemini)
+      // Legacy lookups often find wrong comps (wrong product, wrong variation), so they should
+      // never silently override the unified Gemini analysis. Log discrepancies for debugging only.
       const ppForValidation = priceData.pricePoints || [];
-      if (ppForValidation.length > 0 && !qaIs1of1 && !qaIsLowPop) {
+      if (ppForValidation.length > 0 && !qaIs1of1 && !qaIsLowPop && !qaIsSSP) {
         const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
         if (ppPrices.length > 0 && marketValue && marketValue > 0) {
-          let sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
-          
-          if (sortedPrices.length >= 2) {
-            const highest = sortedPrices[sortedPrices.length - 1];
-            const nextHighest = sortedPrices[sortedPrices.length - 2];
-            if (highest > nextHighest * 3) {
-              console.warn(`[Quick Analyze] PRICE POINT OUTLIER: Dropping $${highest} (${(highest/nextHighest).toFixed(1)}x next-highest $${nextHighest})`);
-              sortedPrices = sortedPrices.slice(0, -1);
-            }
-          }
-          
-          let ppMedian: number;
+          const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
           const mid = Math.floor(sortedPrices.length / 2);
-          if (sortedPrices.length % 2 === 0) {
-            ppMedian = (sortedPrices[mid - 1] + sortedPrices[mid]) / 2;
-          } else {
-            ppMedian = sortedPrices[mid];
-          }
+          const ppMedian = sortedPrices.length % 2 === 0
+            ? (sortedPrices[mid - 1] + sortedPrices[mid]) / 2
+            : sortedPrices[mid];
           
           const ratio = marketValue / ppMedian;
           if (ratio > 2.5) {
-            console.warn(`[Quick Analyze] CROSS-VALIDATION: $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Pulling down.`);
-            marketValue = Math.round(ppMedian * 100) / 100;
-            priceMin = sortedPrices[0];
-            priceMax = sortedPrices[sortedPrices.length - 1];
+            console.log(`[Quick Analyze] CROSS-VALIDATION (info only): Gemini $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Trusting Gemini — legacy may have wrong comps.`);
           }
         }
       }
       
-      // CROSS-VALIDATION: Compare market value against monthly price history to catch wild inaccuracies
-      // Only trust trend data that has real sales backing it (salesCount > 0 for at least some months)
+      // PRICE-TREND COMPARISON (LOG ONLY — no longer overrides Gemini)
+      // Monthly price history is itself Gemini-generated and often inaccurate for new/rare cards.
+      // Using stale trend data to override a fresh Gemini analysis was causing systematic undervaluation.
+      // Now only used as a fallback when Gemini returns no price at all.
       const trendHasRealSales = qaMonthlyPriceHistory?.hasAnySales === true;
       if (qaMonthlyPriceHistory && qaMonthlyPriceHistory.dataPoints && qaMonthlyPriceHistory.dataPoints.length > 0 && trendHasRealSales) {
         const recentPoints = qaMonthlyPriceHistory.dataPoints.slice(-3);
         const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
 
         if (recentAvg > 0) {
-          if (marketValue && marketValue > 0) {
-            const ratio = marketValue / recentAvg;
-            if (ratio < 0.33 || ratio > 3) {
-              console.warn(`[Quick Analyze] PRICE-TREND GUARD: Market value $${marketValue} wildly off from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Overriding with trend.`);
-              marketValue = Math.round(recentAvg * 100) / 100;
-              const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-              if (allPrices.length > 0) {
-                priceMin = Math.min(...allPrices);
-                priceMax = Math.max(...allPrices);
-              }
-            } else if (ratio < 0.5 || ratio > 2) {
-              const blended = Math.round(((marketValue + recentAvg) / 2) * 100) / 100;
-              console.warn(`[Quick Analyze] PRICE-TREND GUARD: Market value $${marketValue} moderately off from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Blending to $${blended}.`);
-              marketValue = blended;
-            }
-          } else {
-            console.warn(`[Quick Analyze] PRICE-TREND GUARD: No market value, using trend avg $${recentAvg.toFixed(2)}`);
+          if (!marketValue || marketValue <= 0) {
+            console.log(`[Quick Analyze] PRICE-TREND FALLBACK: No market value from Gemini, using trend avg $${recentAvg.toFixed(2)}`);
             marketValue = Math.round(recentAvg * 100) / 100;
             const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
             if (allPrices.length > 0) {
               priceMin = Math.min(...allPrices);
               priceMax = Math.max(...allPrices);
             }
+          } else {
+            const ratio = marketValue / recentAvg;
+            if (ratio < 0.33 || ratio > 3) {
+              console.log(`[Quick Analyze] PRICE-TREND INFO: Gemini $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Trusting Gemini's fresh analysis.`);
+            }
           }
         }
       } else if (qaMonthlyPriceHistory && !trendHasRealSales) {
-        console.warn(`[Quick Analyze] PRICE-TREND GUARD: Skipping — trend data has NO real sales (all salesCount=0), prices are fabricated`);
+        console.log(`[Quick Analyze] PRICE-TREND: Skipping — trend data has NO real sales (all salesCount=0)`);
       }
 
       // SPECIFICITY GUARD
