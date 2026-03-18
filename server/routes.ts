@@ -3186,7 +3186,10 @@ Sitemap: ${origin}/sitemap.xml
       let compCount = priceData.salesFound;
       
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
-        const hasRealComps = unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop;
+        // Trust unified Gemini result when: real comps found, rare cards (1/1, low-pop), OR SSP/premium inserts
+        // SSP cards (Downtown, Kaboom, Color Blast, etc.) are specialty inserts where legacy lookups
+        // often return wrong comps (e.g., base Donruss prices for an Optic Downtown)
+        const hasRealComps = unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop || qaIsSSP;
         // Also accept unified price when soldCount=0 IF it's lower than legacy (more conservative = more likely accurate)
         const unifiedIsMoreConservative = !hasRealComps && marketValue && unifiedResult.market.avgPrice < marketValue;
         
@@ -3195,7 +3198,9 @@ Sitemap: ${origin}/sitemap.xml
           const unifiedMin = unifiedResult.market.minPrice;
           const unifiedMax = unifiedResult.market.maxPrice;
           
-          if (unifiedIsMoreConservative) {
+          if (qaIsSSP && unifiedResult.market.soldCount === 0) {
+            console.log(`[Quick Analyze] SSP card detected (${qaVariation || set}) — trusting unified Gemini price $${unifiedAvg} over legacy $${marketValue} (legacy likely found wrong comps)`);
+          } else if (unifiedIsMoreConservative) {
             console.log(`[Quick Analyze] Unified price $${unifiedAvg} is lower than legacy $${marketValue} — using unified (more conservative)`);
           }
           
