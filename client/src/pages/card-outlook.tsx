@@ -270,6 +270,10 @@ export default function CardOutlookPage() {
   const { data: outlook, isLoading, error } = useQuery<OutlookData>({
     queryKey: ["/api/cards", cardId, "outlook-v2"],
     enabled: !!cardId,
+    refetchInterval: (query) => {
+      const data = query.state.data as any;
+      return data?.isPending === true ? 3000 : false;
+    },
   });
 
   const { data: displayCases } = useQuery<DisplayCase[]>({
@@ -325,8 +329,8 @@ export default function CardOutlookPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cards", cardId, "outlook-v2"] });
       toast({
-        title: "Outlook Generated",
-        description: "Market analysis complete. View the results below.",
+        title: "Analysis started",
+        description: "Running in the background — results will appear here automatically.",
       });
     },
     onError: (error: Error) => {
@@ -337,6 +341,8 @@ export default function CardOutlookPage() {
       });
     },
   });
+
+  const isAnalyzing = (outlook as any)?.isPending === true || generateMutation.isPending;
 
   const displayPrice = useMemo(() => {
     if (reconciledPrice) return reconciledPrice;
@@ -377,7 +383,7 @@ export default function CardOutlookPage() {
     );
   }
 
-  const needsGeneration = outlook?.needsGeneration || (!outlook?.action && !outlook?.cached);
+  const needsGeneration = !isAnalyzing && (outlook?.needsGeneration || (!outlook?.action && !outlook?.cached && !(outlook as any)?.isPending));
   const isPro = hasProAccess(user);
   
   const actionStyle = ACTION_STYLES[outlook?.action || "MONITOR"] || ACTION_STYLES.MONITOR;
@@ -402,6 +408,20 @@ export default function CardOutlookPage() {
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back
       </Button>
+
+      {isAnalyzing && (
+        <Card className="mb-6 border-primary/30 bg-primary/5" data-testid="card-analyzing">
+          <CardContent className="py-8">
+            <div className="text-center">
+              <Loader2 className="h-10 w-10 mx-auto text-primary mb-4 animate-spin" />
+              <h3 className="text-lg font-semibold mb-2">Analyzing Your Card</h3>
+              <p className="text-muted-foreground text-sm max-w-sm mx-auto">
+                AI is searching eBay, fetching player news, and computing investment signals. This takes about 20–30 seconds — feel free to navigate away.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {needsGeneration && isPro && (
         <Card className="mb-6">

@@ -2313,6 +2313,208 @@ Sitemap: ${origin}/sitemap.xml
   // ============================================
 
   // Generate full AI 2.0 outlook for a card (Pro feature)
+  // ── Per-card background analysis job store ──────────────────────────────
+  // Key: `${userId}:${cardId}`, Value: job status
+  const cardAnalysisJobs = new Map<string, "pending" | "complete" | "failed">();
+
+  async function runCardAnalysisJob(userId: string, cardId: number, card: any): Promise<void> {
+    const jobKey = `${userId}:${cardId}`;
+    try {
+      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData, fetchMonthlyPriceHistory } = await import("./outlookEngine");
+      const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
+
+      console.log(`[Outlook 2.0] Fetching market data in parallel for card ${cardId}`);
+      const [geminiMarketData, priceData, monthlyPriceHistory] = await Promise.all([
+        fetchGeminiMarketData({
+          title: card.title, playerName: card.playerName, year: card.year,
+          set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
+        }),
+        lookupEnhancedCardPrice({
+          title: card.title, set: card.set, year: card.year,
+          variation: card.variation, grade: card.grade, grader: card.grader,
+        }),
+        card.playerName ? fetchMonthlyPriceHistory({
+          playerName: card.playerName, sport: card.sport || "football",
+          year: card.year?.toString(), setName: card.set || undefined,
+          variation: card.variation || undefined, grade: card.grade || undefined, grader: card.grader || undefined,
+        }).catch((err: any) => {
+          console.warn(`[Outlook 2.0] Monthly price history fetch failed (non-critical): ${err.message}`);
+          return null;
+        }) : Promise.resolve(null),
+      ]);
+
+      const pricePointsForSchema = priceData.pricePoints.map((pp: any) => ({
+        date: pp.date, price: pp.price, source: pp.source, url: pp.url,
+      }));
+      const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
+      console.log(`[Outlook 2.0] Computing signals for card ${cardId}`);
+      const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
+
+      if (geminiMarketData) {
+        console.log(`[Outlook 2.0] Enhancing signals with Gemini market data: ${geminiMarketData.soldCount} sold, avg $${geminiMarketData.avgPrice}`);
+        if (geminiMarketData.soldCount >= 25) signals.liquidityScore = 10;
+        else if (geminiMarketData.soldCount >= 15) signals.liquidityScore = 8;
+        else if (geminiMarketData.soldCount >= 10) signals.liquidityScore = 7;
+        else if (geminiMarketData.soldCount >= 5) signals.liquidityScore = 5;
+        else if (geminiMarketData.soldCount >= 2) signals.liquidityScore = 3;
+        else {
+          if (geminiMarketData.liquidity === "HIGH") signals.liquidityScore = 7;
+          else if (geminiMarketData.liquidity === "MEDIUM") signals.liquidityScore = 4;
+          else if (geminiMarketData.liquidity === "LOW") signals.liquidityScore = 2;
+          else signals.liquidityScore = 1;
+        }
+        if (geminiMarketData.soldCount >= 10) {
+          signals.dataConfidence = "HIGH";
+          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found on eBay`;
+        } else if (geminiMarketData.soldCount >= 5) {
+          signals.dataConfidence = "MEDIUM";
+          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
+        }
+        if (geminiMarketData.liquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
+        else if (geminiMarketData.liquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
+        signals.demandScore = Math.round((signals.liquidityScore * 0.4) + (signals.sportScore * 0.3) + (signals.positionScore * 0.3)) * 10;
+        const { computeAction } = await import("./outlookEngine");
+        const originalAction = signals.action;
+        const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
+          signals.qualityScore, signals.demandScore, signals.momentumScore, signals.trendScore,
+          signals.volatilityScore, signals.liquidityScore, geminiMarketData.avgPrice,
+          signals.careerStageAuto, card.year ?? undefined
+        );
+        signals.action = recomputedAction;
+        signals.actionReasons = recomputedReasons;
+        console.log(`[Outlook 2.0] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
+      }
+
+      const { isOneOfOneCard } = await import("./priceService");
+      const cardVariation = card.variation || "";
+      const is1of1 = isOneOfOneCard({ title: card.title, variation: cardVariation, serialNumber: (card as any).serialNumber });
+      const isLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(cardVariation);
+
+      let marketValue = priceData.estimatedValue;
+      let priceMin = filteredPriceData.min;
+      let priceMax = filteredPriceData.max;
+      let compCount = priceData.salesFound;
+
+      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
+        if (geminiMarketData.soldCount > 0 || is1of1 || isLowPop) {
+          if (is1of1 || isLowPop) console.log(`[Outlook 2.0] 1/1 or low-pop card detected — trusting Gemini valuation: $${geminiMarketData.avgPrice}`);
+          if ((is1of1 || isLowPop) && marketValue && marketValue > geminiMarketData.avgPrice * 2) {
+            console.warn(`[Outlook 2.0] Price service value ($${marketValue}) is >2x Gemini ($${geminiMarketData.avgPrice}) for 1/1 card — using Gemini`);
+          }
+          marketValue = geminiMarketData.avgPrice;
+          priceMin = geminiMarketData.minPrice;
+          priceMax = geminiMarketData.maxPrice;
+          compCount = geminiMarketData.soldCount;
+          if (marketValue && priceMin != null && priceMin < marketValue * 0.15) {
+            priceMin = Math.round(marketValue * 0.6);
+          }
+        }
+      }
+
+      if (pricePointsForSchema.length > 0 && !is1of1 && !isLowPop) {
+        const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
+        if (ppPrices.length > 0 && marketValue && marketValue > 0) {
+          const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
+          const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
+          const ratio = marketValue / ppMedian;
+          if (ratio > 3) console.log(`[Outlook 2.0] CROSS-VALIDATION (info only): Gemini $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Trusting Gemini.`);
+        }
+      }
+
+      const outlookTrendHasRealSales = monthlyPriceHistory?.hasAnySales === true;
+      if (monthlyPriceHistory && monthlyPriceHistory.dataPoints && monthlyPriceHistory.dataPoints.length > 0 && outlookTrendHasRealSales) {
+        const recentPoints = monthlyPriceHistory.dataPoints.slice(-3);
+        const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
+        if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
+          console.log(`[Outlook 2.0] PRICE-TREND FALLBACK: No market value, using trend avg $${recentAvg.toFixed(2)}`);
+          marketValue = Math.round(recentAvg * 100) / 100;
+          const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+          if (allPrices.length > 0) { priceMin = Math.min(...allPrices); priceMax = Math.max(...allPrices); }
+        } else if (recentAvg > 0 && marketValue && marketValue > 0) {
+          const ratio = marketValue / recentAvg;
+          if (ratio < 0.33 || ratio > 3) console.log(`[Outlook 2.0] PRICE-TREND INFO: Gemini $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Trusting Gemini.`);
+        }
+      } else if (monthlyPriceHistory && !outlookTrendHasRealSales) {
+        console.log(`[Outlook 2.0] PRICE-TREND: Skipping — trend data has NO real sales (all salesCount=0)`);
+      }
+
+      let finalAction = signals.action;
+      let finalActionReasons = [...signals.actionReasons];
+      if (!geminiMarketData) {
+        const matchConfidence = priceData.matchConfidence;
+        if (matchConfidence && matchConfidence.tier === "LOW") {
+          finalAction = "MONITOR";
+          finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
+        }
+      }
+
+      let newsSnippets: string[] = [];
+      if (card.cardCategory === "sports" && card.playerName) {
+        console.log(`[Outlook 2.0] Fetching real-time news for ${card.playerName}`);
+        const newsData = await fetchPlayerNews(card.playerName, card.sport);
+        newsSnippets = newsData.snippets;
+      }
+
+      console.log(`[Outlook 2.0] Generating AI explanation for ${finalAction}`);
+      const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
+      const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
+
+      const outlookData = {
+        cardId,
+        pricePoints: pricePointsForSchema,
+        marketValue: marketValue ? Math.round(marketValue * 100) : null,
+        priceMin: priceMin ? Math.round(priceMin * 100) : null,
+        priceMax: priceMax ? Math.round(priceMax * 100) : null,
+        compCount,
+        trendScore: signals.trendScore,
+        liquidityScore: signals.liquidityScore,
+        volatilityScore: signals.volatilityScore,
+        sportScore: signals.sportScore,
+        positionScore: signals.positionScore,
+        cardTypeScore: signals.cardTypeScore,
+        demandScore: signals.demandScore,
+        momentumScore: signals.momentumScore,
+        qualityScore: signals.qualityScore,
+        upsideScore: signals.upsideScore,
+        downsideRisk: signals.downsideRisk,
+        marketFriction: signals.marketFriction,
+        action: finalAction,
+        actionReasons: finalActionReasons,
+        careerStageAuto: signals.careerStageAuto,
+        dataConfidence: signals.dataConfidence,
+        confidenceReason: signals.confidenceReason,
+        explanationShort: explanation.short,
+        explanationLong: explanation.long,
+        explanationBullets: explanation.bullets,
+        bigMoverFlag: signals.bigMoverFlag,
+        bigMoverReason: signals.bigMoverReason,
+      };
+
+      await storage.upsertCardOutlook(cardId, outlookData);
+      await storage.recordOutlookUsage(userId, 'collection', cardId, card.title);
+
+      const cardUpdate: any = {
+        outlookBigMover: signals.bigMoverFlag,
+        outlookBigMoverReason: signals.bigMoverReason,
+        outlookAction: finalAction,
+        outlookUpsideScore: signals.upsideScore,
+        outlookRiskScore: signals.downsideRisk,
+      };
+      if (marketValue) {
+        cardUpdate.previousValue = card.estimatedValue || null;
+        cardUpdate.estimatedValue = marketValue;
+        cardUpdate.valueUpdatedAt = new Date();
+      }
+      await storage.updateCard(cardId, cardUpdate);
+
+      cardAnalysisJobs.set(jobKey, "complete");
+      console.log(`[Outlook 2.0] Background analysis complete for card ${cardId}: ${finalAction}`);
+    } catch (err: any) {
+      console.error(`[Outlook 2.0] Background analysis failed for card ${cardId}:`, err.message);
+      cardAnalysisJobs.set(jobKey, "failed");
+    }
+  }
+
   app.post("/api/cards/:cardId/outlook-v2", isAuthenticated, async (req: any, res) => {
     try {
       const cardId = parseInt(req.params.cardId);
@@ -2373,347 +2575,29 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(403).json({ message: "You don't have permission to analyze this card" });
       }
 
-      // Import the outlook engine dynamically to avoid circular dependencies
-      const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData, fetchMonthlyPriceHistory } = await import("./outlookEngine");
-      const { lookupEnhancedCardPrice, filterPriceOutliers } = await import("./priceService");
-
-      // Fetch Gemini grounded market data, legacy price data, AND monthly price history in PARALLEL for speed
-      console.log(`[Outlook 2.0] Fetching market data in parallel for card ${cardId}`);
-      const [geminiMarketData, priceData, monthlyPriceHistory] = await Promise.all([
-        fetchGeminiMarketData({
-          title: card.title,
-          playerName: card.playerName,
-          year: card.year,
-          set: card.set,
-          variation: card.variation,
-          grade: card.grade,
-          grader: card.grader,
-        }),
-        lookupEnhancedCardPrice({
-          title: card.title,
-          set: card.set,
-          year: card.year,
-          variation: card.variation,
-          grade: card.grade,
-          grader: card.grader,
-        }),
-        card.playerName ? fetchMonthlyPriceHistory({
-          playerName: card.playerName,
-          sport: card.sport || "football",
-          year: card.year?.toString(),
-          setName: card.set || undefined,
-          variation: card.variation || undefined,
-          grade: card.grade || undefined,
-          grader: card.grader || undefined,
-        }).catch((err: any) => {
-          console.warn(`[Outlook 2.0] Monthly price history fetch failed (non-critical): ${err.message}`);
-          return null;
-        }) : Promise.resolve(null),
-      ]);
-
-      // Convert price points to the schema format
-      const pricePointsForSchema = priceData.pricePoints.map(pp => ({
-        date: pp.date,
-        price: pp.price,
-        source: pp.source,
-        url: pp.url,
-      }));
-
-      // Filter outliers to get tighter price range
-      const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
-
-      // Compute all signals using deterministic engine
-      console.log(`[Outlook 2.0] Computing signals for card ${cardId}`);
-      const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
-      
-      // Override signals with Gemini market data if available (more accurate)
-      if (geminiMarketData) {
-        console.log(`[Outlook 2.0] Enhancing signals with Gemini market data: ${geminiMarketData.soldCount} sold, avg $${geminiMarketData.avgPrice}`);
-        
-        // Map Gemini soldCount to liquidity score (1-10)
-        // HIGH liquidity: 15+ sales = 8-10 score
-        // MEDIUM liquidity: 5-14 sales = 5-7 score  
-        // LOW liquidity: 0-4 sales = 1-4 score
-        if (geminiMarketData.soldCount >= 25) {
-          signals.liquidityScore = 10;
-        } else if (geminiMarketData.soldCount >= 15) {
-          signals.liquidityScore = 8;
-        } else if (geminiMarketData.soldCount >= 10) {
-          signals.liquidityScore = 7;
-        } else if (geminiMarketData.soldCount >= 5) {
-          signals.liquidityScore = 5;
-        } else if (geminiMarketData.soldCount >= 2) {
-          signals.liquidityScore = 3;
-        } else {
-          // soldCount = 0 or 1 — fall back to Gemini's qualitative liquidity field.
-          // Gemini knows the card category's typical market depth even without exact comps.
-          if (geminiMarketData.liquidity === "HIGH") signals.liquidityScore = 7;
-          else if (geminiMarketData.liquidity === "MEDIUM") signals.liquidityScore = 4;
-          else if (geminiMarketData.liquidity === "LOW") signals.liquidityScore = 2;
-          else signals.liquidityScore = 1;
-        }
-        
-        // Update data confidence based on Gemini data quality
-        if (geminiMarketData.soldCount >= 10) {
-          signals.dataConfidence = "HIGH";
-          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found on eBay`;
-        } else if (geminiMarketData.soldCount >= 5) {
-          signals.dataConfidence = "MEDIUM";
-          signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
-        }
-        
-        // Update market friction based on liquidity
-        if (geminiMarketData.liquidity === "HIGH") {
-          signals.marketFriction = Math.min(signals.marketFriction, 30);
-        } else if (geminiMarketData.liquidity === "MEDIUM") {
-          signals.marketFriction = Math.min(signals.marketFriction, 50);
-        }
-        
-        // Recalculate demand score with updated liquidity
-        signals.demandScore = Math.round(
-          (signals.liquidityScore * 0.4) + 
-          (signals.sportScore * 0.3) + 
-          (signals.positionScore * 0.3)
-        ) * 10;
-        
-        // CRITICAL: Recompute action with updated liquidity to fix verdict/explanation mismatch
-        // Without this, the action/reasons reflect old low-liquidity even when Gemini found plenty of sales
-        const { computeAction } = await import("./outlookEngine");
-        const originalAction = signals.action;
-        const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
-          signals.qualityScore,
-          signals.demandScore,
-          signals.momentumScore,
-          signals.trendScore,
-          signals.volatilityScore,
-          signals.liquidityScore,
-          geminiMarketData.avgPrice,
-          signals.careerStageAuto,
-          card.year ?? undefined
-        );
-        signals.action = recomputedAction;
-        signals.actionReasons = recomputedReasons;
-        console.log(`[Outlook 2.0] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
-      }
-      
-      // Detect 1/1 and low-pop cards
-      const { isOneOfOneCard } = await import("./priceService");
-      const cardVariation = card.variation || "";
-      const is1of1 = isOneOfOneCard({ title: card.title, variation: cardVariation, serialNumber: (card as any).serialNumber });
-      const isLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(cardVariation); // /1 through /49
-      
-      // Use Gemini's price data if available and reliable
-      // For 1/1 and low-pop cards: trust Gemini even with soldCount 0 (these cards rarely have comps)
-      let marketValue = priceData.estimatedValue;
-      let priceMin = filteredPriceData.min;
-      let priceMax = filteredPriceData.max;
-      let compCount = priceData.salesFound;
-      
-      if (geminiMarketData && geminiMarketData.avgPrice > 0) {
-        if (geminiMarketData.soldCount > 0 || is1of1 || isLowPop) {
-          if (is1of1 || isLowPop) {
-            console.log(`[Outlook 2.0] 1/1 or low-pop card detected — trusting Gemini valuation: $${geminiMarketData.avgPrice}`);
-          }
-          // For 1/1 cards: prefer Gemini, especially if the price service returned a much higher multiplied value
-          if ((is1of1 || isLowPop) && marketValue && marketValue > geminiMarketData.avgPrice * 2) {
-            console.warn(`[Outlook 2.0] Price service value ($${marketValue}) is >2x Gemini ($${geminiMarketData.avgPrice}) for 1/1 card — using Gemini`);
-          }
-          marketValue = geminiMarketData.avgPrice;
-          priceMin = geminiMarketData.minPrice;
-          priceMax = geminiMarketData.maxPrice;
-          compCount = geminiMarketData.soldCount;
-          // Clamp bogus min prices — Gemini sometimes returns $1 as a theoretical floor
-          if (marketValue && priceMin != null && priceMin < marketValue * 0.15) {
-            priceMin = Math.round(marketValue * 0.6);
-          }
-        }
+      // Return immediately and run analysis in the background
+      const jobKey = `${userId}:${cardId}`;
+      const existingJob = cardAnalysisJobs.get(jobKey);
+      if (existingJob === "pending") {
+        return res.json({ status: "pending", message: "Analysis already in progress" });
       }
 
-      // CROSS-VALIDATION: Log discrepancies between Gemini and legacy for debugging (no longer overrides)
-      if (pricePointsForSchema.length > 0 && !is1of1 && !isLowPop) {
-        const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
-        if (ppPrices.length > 0 && marketValue && marketValue > 0) {
-          const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
-          const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
-          const ratio = marketValue / ppMedian;
-          if (ratio > 3) {
-            console.log(`[Outlook 2.0] CROSS-VALIDATION (info only): Gemini $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Trusting Gemini.`);
-          }
-        }
-      }
-
-      // PRICE-TREND COMPARISON (LOG ONLY — no longer overrides Gemini)
-      // Trend data is itself Gemini-generated and shouldn't override a fresh Gemini analysis.
-      // Only used as fallback when no market value exists.
-      const outlookTrendHasRealSales = monthlyPriceHistory?.hasAnySales === true;
-      if (monthlyPriceHistory && monthlyPriceHistory.dataPoints && monthlyPriceHistory.dataPoints.length > 0 && outlookTrendHasRealSales) {
-        const recentPoints = monthlyPriceHistory.dataPoints.slice(-3);
-        const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
-
-        if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
-          console.log(`[Outlook 2.0] PRICE-TREND FALLBACK: No market value, using trend avg $${recentAvg.toFixed(2)}`);
-          marketValue = Math.round(recentAvg * 100) / 100;
-          const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-          if (allPrices.length > 0) {
-            priceMin = Math.min(...allPrices);
-            priceMax = Math.max(...allPrices);
-          }
-        } else if (recentAvg > 0 && marketValue && marketValue > 0) {
-          const ratio = marketValue / recentAvg;
-          if (ratio < 0.33 || ratio > 3) {
-            console.log(`[Outlook 2.0] PRICE-TREND INFO: Gemini $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Trusting Gemini.`);
-          }
-        }
-      } else if (monthlyPriceHistory && !outlookTrendHasRealSales) {
-        console.log(`[Outlook 2.0] PRICE-TREND: Skipping — trend data has NO real sales (all salesCount=0)`);
-      }
-      
-      // Determine final action - use matchConfidence safeguard when Gemini data unavailable
-      let finalAction = signals.action;
-      let finalActionReasons = [...signals.actionReasons];
-      
-      // If no Gemini data, fall back to legacy matchConfidence check
-      if (!geminiMarketData) {
-        const matchConfidence = priceData.matchConfidence;
-        if (matchConfidence && matchConfidence.tier === "LOW") {
-          finalAction = "MONITOR";
-          finalActionReasons = [`Low data confidence: ${matchConfidence.reason}`, ...finalActionReasons];
-        }
-      }
-
-      // Fetch real-time player news for current context (sports cards only)
-      let newsSnippets: string[] = [];
-      if (card.cardCategory === "sports" && card.playerName) {
-        console.log(`[Outlook 2.0] Fetching real-time news for ${card.playerName}`);
-        const newsData = await fetchPlayerNews(card.playerName, card.sport);
-        newsSnippets = newsData.snippets;
-      }
-
-      // Generate AI explanation (AI explains, doesn't decide)
-      // Use the selected marketValue (Gemini or legacy) for consistent explanation
-      console.log(`[Outlook 2.0] Generating AI explanation for ${finalAction}`);
-      const signalsForExplanation = { ...signals, action: finalAction, actionReasons: finalActionReasons };
-      const explanation = await generateOutlookExplanation(card, signalsForExplanation, priceData.pricePoints, marketValue, newsSnippets);
-
-      // Store outlook in the new card_outlooks table (use Gemini data if available)
-      const outlookData = {
-        cardId,
-        pricePoints: pricePointsForSchema,
-        marketValue: marketValue ? Math.round(marketValue * 100) : null, // Store in cents
-        priceMin: priceMin ? Math.round(priceMin * 100) : null,
-        priceMax: priceMax ? Math.round(priceMax * 100) : null,
-        compCount: compCount,
-        trendScore: signals.trendScore,
-        liquidityScore: signals.liquidityScore,
-        volatilityScore: signals.volatilityScore,
-        sportScore: signals.sportScore,
-        positionScore: signals.positionScore,
-        cardTypeScore: signals.cardTypeScore,
-        demandScore: signals.demandScore,
-        momentumScore: signals.momentumScore,
-        qualityScore: signals.qualityScore,
-        upsideScore: signals.upsideScore,
-        downsideRisk: signals.downsideRisk,
-        marketFriction: signals.marketFriction,
-        action: finalAction,
-        actionReasons: finalActionReasons,
-        careerStageAuto: signals.careerStageAuto,
-        dataConfidence: signals.dataConfidence,
-        confidenceReason: signals.confidenceReason,
-        explanationShort: explanation.short,
-        explanationLong: explanation.long,
-        explanationBullets: explanation.bullets,
-        bigMoverFlag: signals.bigMoverFlag,
-        bigMoverReason: signals.bigMoverReason,
-      };
-
-      await storage.upsertCardOutlook(cardId, outlookData);
-
-      // Record usage for free tier tracking
-      await storage.recordOutlookUsage(userId, 'collection', cardId, card.title);
-
-      // Also update the card's estimated value, Big Mover status, and outlook action
-      const cardUpdate: any = {
-        outlookBigMover: signals.bigMoverFlag,
-        outlookBigMoverReason: signals.bigMoverReason,
-        outlookAction: finalAction,
-        outlookUpsideScore: signals.upsideScore,
-        outlookRiskScore: signals.downsideRisk,
-      };
-      if (marketValue) {
-        cardUpdate.previousValue = card.estimatedValue || null;
-        cardUpdate.estimatedValue = marketValue;
-        cardUpdate.valueUpdatedAt = new Date();
-      }
-      await storage.updateCard(cardId, cardUpdate);
-
-      // Return the full outlook
-      res.json({
-        cardId,
-        card: {
-          id: card.id,
-          title: card.title,
-          playerName: card.playerName,
-          sport: card.sport,
-          position: card.position,
-          grade: card.grade,
-          year: card.year,
-          set: card.set,
-          variation: card.variation,
-          imagePath: card.imagePath,
-        },
-        market: {
-          value: marketValue,
-          min: priceMin,
-          max: priceMax,
-          compCount: compCount,
-          activeListing: geminiMarketData?.activeListing || 0,
-          pricePoints: priceData.pricePoints,
-          geminiData: geminiMarketData ? {
-            soldCount: geminiMarketData.soldCount,
-            liquidity: geminiMarketData.liquidity,
-            priceStability: geminiMarketData.priceStability,
-            dataSource: geminiMarketData.dataSource,
-          } : null,
-        },
-        signals: {
-          trend: signals.trendScore,
-          liquidity: signals.liquidityScore,
-          volatility: signals.volatilityScore,
-          sport: signals.sportScore,
-          position: signals.positionScore,
-          cardType: signals.cardTypeScore,
-          demand: signals.demandScore,
-          momentum: signals.momentumScore,
-          quality: signals.qualityScore,
-          upside: signals.upsideScore,
-          downsideRisk: signals.downsideRisk,
-          marketFriction: signals.marketFriction,
-        },
-        action: finalAction,
-        actionReasons: finalActionReasons,
-        careerStage: signals.careerStageAuto,
-        confidence: {
-          level: signals.dataConfidence,
-          reason: signals.confidenceReason,
-        },
-        explanation: {
-          short: explanation.short,
-          long: explanation.long,
-          bullets: explanation.bullets,
-        },
-        bigMover: {
-          flag: signals.bigMoverFlag,
-          reason: signals.bigMoverReason,
-        },
-        generatedAt: new Date().toISOString(),
+      cardAnalysisJobs.set(jobKey, "pending");
+      runCardAnalysisJob(userId, cardId, card).catch(err => {
+        console.error(`[Outlook 2.0] Unhandled job error for card ${cardId}:`, err);
+        cardAnalysisJobs.set(jobKey, "failed");
       });
+
+      return res.json({ status: "pending", cardId, message: "Analysis started in background" });
     } catch (error) {
-      console.error("Error generating outlook v2:", error);
-      res.status(500).json({ message: "Failed to generate card outlook" });
+      console.error("Error starting outlook v2:", error);
+      res.status(500).json({ message: "Failed to start card analysis" });
     }
   });
 
+  // NOTE: The old synchronous analysis body was removed — see runCardAnalysisJob above.
+  // Intentionally keeping this placeholder to confirm the edit was applied.
+  // PLACEHOLDER_TO_REMOVE - begin dead code that needs deletion
   // ── Background batch analysis job store ─────────────────────────────────
   interface BatchJob {
     status: "running" | "complete" | "stopped";
@@ -3000,6 +2884,11 @@ Sitemap: ${origin}/sitemap.xml
       const user = await storage.getUser(userId);
       const isPro = hasProAccess(user);
 
+      // Check if a background analysis job is in progress for this card
+      const jobKey = `${userId}:${cardId}`;
+      const jobStatus = cardAnalysisJobs.get(jobKey);
+      const isPending = jobStatus === "pending";
+
       // Get cached outlook from card_outlooks table
       const outlook = await storage.getCardOutlook(cardId);
       
@@ -3075,12 +2964,19 @@ Sitemap: ${origin}/sitemap.xml
           cached: true,
           stale: hoursSinceGenerated > 168, // Stale after 7 days
           proRequired: !isPro,
+          isPending,
         });
+      }
+
+      // No cached data yet — if a job is running, tell the client to poll
+      if (isPending) {
+        return res.json({ cardId, isPending: true, card: { id: card.id, title: card.title } });
       }
 
       // No cached data - return minimal info
       res.json({
         cardId,
+        isPending: false,
         card: {
           id: card.id,
           title: card.title,
