@@ -33,7 +33,7 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Leaderboards**: Public page showing top 5 display cases ranked by likes, total value, and views. Accessible from main navigation.
 - **Trading & Communication**: Offers system for cards and direct messaging.
 - **Analytics & Sharing**: Portfolio analytics and viral sharing features.
-- **Growth Projections (Pro)**: AI-powered personalized collection growth forecasts.
+- **Growth Projections (Pro)**: AI-powered collection growth forecasts using conservative base rates, additive (not multiplicative) modifiers, and real card value history as an anchor when available. Career stage caps prevent unrealistic projections. Methodology text dynamically reports how many cards have historical data anchoring their projections.
 - **Monthly Price Trend Charts**: 18-month lookback price charts using Gemini AI with Google Search grounding for eBay sold data, available on player and card outlook pages.
 - **Graded Value Matrix**: For raw cards, shows estimated PSA 9 and PSA 10 values with a "Grade It?" recommendation based on cost vs. value increase.
 - **Raw Card Price Accuracy**: Gemini prompts request separate raw and graded prices. Gemini's rawPrice field is trusted directly without post-processing correction (previous double-correction removed as it systematically undervalued raw cards).

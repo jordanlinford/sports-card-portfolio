@@ -2,9 +2,12 @@
  * Growth Projections Service
  * 
  * Generates personalized collection growth projections based on:
+ * - Actual card value history (previousValue → estimatedValue)
  * - Card outlook data (upside scores, risk scores, market temperature)
  * - Market trends from the player outlook cache
- * - Historical value changes
+ * - Career stage and player trajectory
+ * 
+ * Philosophy: Use real data as the anchor. Heuristics fill gaps, not replace data.
  */
 
 import { db } from "./db";
@@ -86,23 +89,24 @@ export interface PortfolioGrowthResponse {
   generatedAt: string;
 }
 
-const TEMPERATURE_GROWTH_FACTORS: Record<MarketTemperature, { bear: number; base: number; bull: number }> = {
-  HOT: { bear: -5, base: 15, bull: 40 },
-  WARM: { bear: -8, base: 8, bull: 25 },
-  NEUTRAL: { bear: -10, base: 3, bull: 15 },
-  COOLING: { bear: -20, base: -5, bull: 5 },
+const TEMPERATURE_BASE_RATES: Record<MarketTemperature, { bear: number; base: number; bull: number }> = {
+  HOT: { bear: -5, base: 8, bull: 25 },
+  WARM: { bear: -8, base: 4, bull: 15 },
+  NEUTRAL: { bear: -10, base: 0, bull: 8 },
+  COOLING: { bear: -18, base: -5, bull: 3 },
 };
 
-const VERDICT_GROWTH_MODIFIERS: Record<string, number> = {
-  ACCUMULATE: 1.3,
-  HOLD_CORE: 1.0,
-  TRADE_THE_HYPE: 0.7,
-  AVOID_NEW_MONEY: 0.5,
-  SPECULATIVE_FLYER: 1.1,
-  MONITOR: 0.9,
-  BUY: 1.2,
-  SELL: 0.6,
-  HOLD: 0.95,
+const VERDICT_ADJUSTMENTS: Record<string, number> = {
+  ACCUMULATE: 4,
+  BUY: 3,
+  SPECULATIVE_FLYER: 2,
+  HOLD_CORE: 0,
+  HOLD: 0,
+  MONITOR: -1,
+  TRADE_THE_HYPE: -3,
+  SELL: -5,
+  AVOID_NEW_MONEY: -6,
+  AVOID: -8,
 };
 
 const RISK_LEVEL_MAP: Record<string, "low" | "medium" | "high"> = {
@@ -111,25 +115,36 @@ const RISK_LEVEL_MAP: Record<string, "low" | "medium" | "high"> = {
   HIGH: "high",
 };
 
-// Career stage modifiers - retired and aging players have limited/no growth potential
-const CAREER_STAGE_MODIFIERS: Record<string, { multiplier: number; maxGrowth: number; minGrowth: number }> = {
-  // Retired players: stable market, minimal movement
-  RETIRED: { multiplier: 0.0, maxGrowth: 1, minGrowth: -2 },
-  RETIRED_HOF: { multiplier: 0.1, maxGrowth: 3, minGrowth: -1 },
-  // Aging vets: declining value trajectory
-  AGING_VET: { multiplier: 0.2, maxGrowth: 2, minGrowth: -5 },
-  // Prime players: solid but not explosive
-  PRIME: { multiplier: 0.9, maxGrowth: 25, minGrowth: -15 },
-  SUPERSTAR: { multiplier: 1.1, maxGrowth: 35, minGrowth: -12 },
-  // Rising stars: highest upside potential
-  RISING_STAR: { multiplier: 1.2, maxGrowth: 50, minGrowth: -20 },
-  RISING: { multiplier: 1.2, maxGrowth: 50, minGrowth: -20 },
-  BREAKOUT: { multiplier: 1.3, maxGrowth: 60, minGrowth: -25 },
-  // Franchise core (established stars)
-  FRANCHISE_CORE: { multiplier: 1.0, maxGrowth: 30, minGrowth: -10 },
+const CAREER_STAGE_CAPS: Record<string, { maxGrowth: number; minGrowth: number; dampener: number }> = {
+  RETIRED: { maxGrowth: 1, minGrowth: -3, dampener: 0.05 },
+  RETIRED_HOF: { maxGrowth: 3, minGrowth: -2, dampener: 0.15 },
+  AGING_VET: { maxGrowth: 5, minGrowth: -8, dampener: 0.3 },
+  PRIME: { maxGrowth: 20, minGrowth: -15, dampener: 0.85 },
+  SUPERSTAR: { maxGrowth: 25, minGrowth: -12, dampener: 1.0 },
+  RISING_STAR: { maxGrowth: 35, minGrowth: -20, dampener: 1.1 },
+  RISING: { maxGrowth: 35, minGrowth: -20, dampener: 1.1 },
+  BREAKOUT: { maxGrowth: 40, minGrowth: -25, dampener: 1.15 },
+  FRANCHISE_CORE: { maxGrowth: 22, minGrowth: -10, dampener: 0.95 },
 };
 
-const DEFAULT_CAREER_STAGE = { multiplier: 0.8, maxGrowth: 15, minGrowth: -10 };
+const DEFAULT_CAREER_STAGE = { maxGrowth: 12, minGrowth: -10, dampener: 0.7 };
+
+function getHistoricalAnchor(card: Card): { hasRecentAnchor: boolean; annualizedGrowth: number | null } {
+  if (!card.previousValue || !card.estimatedValue || card.previousValue <= 0 || !card.valueUpdatedAt) {
+    return { hasRecentAnchor: false, annualizedGrowth: null };
+  }
+  const daysSinceUpdate = (Date.now() - new Date(card.valueUpdatedAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (daysSinceUpdate >= 90) {
+    return { hasRecentAnchor: false, annualizedGrowth: null };
+  }
+  const changePct = ((card.estimatedValue - card.previousValue) / card.previousValue) * 100;
+  const annualized = daysSinceUpdate > 7 ? (changePct / daysSinceUpdate) * 365 : changePct * 4;
+  return { hasRecentAnchor: true, annualizedGrowth: Math.max(-50, Math.min(50, annualized)) };
+}
+
+function getCardValue(card: Card): number {
+  return card.manualValue || card.estimatedValue || 0;
+}
 
 function calculateCardGrowth(
   card: Card,
@@ -137,33 +152,47 @@ function calculateCardGrowth(
   upsideScore: number | null,
   riskScore: number | null,
   verdict: string | null,
-  monthsAhead: number
+  monthsAhead: number,
+  historicalAnchor: number | null
 ): { bear: number; base: number; bull: number } {
   const temp = temperature || "NEUTRAL";
-  const baseFactor = TEMPERATURE_GROWTH_FACTORS[temp];
+  const baseRates = TEMPERATURE_BASE_RATES[temp];
   
-  // Get career stage modifier
   const legacyTier = card.legacyTier?.toUpperCase() || "";
-  const careerMod = CAREER_STAGE_MODIFIERS[legacyTier] || DEFAULT_CAREER_STAGE;
+  const careerCaps = CAREER_STAGE_CAPS[legacyTier] || DEFAULT_CAREER_STAGE;
   
-  const upsideMod = upsideScore ? (upsideScore - 50) / 100 : 0;
-  const riskMod = riskScore ? (riskScore - 50) / 100 : 0;
-  const verdictMod = verdict ? (VERDICT_GROWTH_MODIFIERS[verdict] || 1.0) : 1.0;
+  const verdictAdj = verdict ? (VERDICT_ADJUSTMENTS[verdict] ?? 0) : 0;
+  
+  const upsideAdj = upsideScore ? (upsideScore - 50) / 25 : 0;
+  const riskAdj = riskScore ? (riskScore - 50) / 25 : 0;
   
   const timeScale = monthsAhead / 12;
   
-  // Apply career stage multiplier to dampen growth for retired/aging players
-  const baseGrowth = {
-    bear: (baseFactor.bear - riskMod * 10) * timeScale * verdictMod * careerMod.multiplier,
-    base: (baseFactor.base + upsideMod * 5) * timeScale * verdictMod * careerMod.multiplier,
-    bull: (baseFactor.bull + upsideMod * 15) * timeScale * verdictMod * careerMod.multiplier,
+  let rawBear = baseRates.bear - riskAdj * 3 + verdictAdj * 0.5;
+  let rawBase = baseRates.base + upsideAdj * 2 + verdictAdj;
+  let rawBull = baseRates.bull + upsideAdj * 4 + verdictAdj * 1.5;
+  
+  if (historicalAnchor !== null) {
+    const histWeight = 0.4;
+    rawBase = rawBase * (1 - histWeight) + historicalAnchor * histWeight;
+    rawBear = Math.min(rawBear, rawBase - 5);
+    rawBull = Math.max(rawBull, rawBase + 5);
+  }
+  
+  rawBear *= careerCaps.dampener;
+  rawBase *= careerCaps.dampener;
+  rawBull *= careerCaps.dampener;
+  
+  const scaled = {
+    bear: rawBear * timeScale,
+    base: rawBase * timeScale,
+    bull: rawBull * timeScale,
   };
   
-  // Clamp growth to career stage limits
   return {
-    bear: Math.round(Math.max(careerMod.minGrowth, Math.min(careerMod.maxGrowth, baseGrowth.bear)) * 10) / 10,
-    base: Math.round(Math.max(careerMod.minGrowth, Math.min(careerMod.maxGrowth, baseGrowth.base)) * 10) / 10,
-    bull: Math.round(Math.max(careerMod.minGrowth, Math.min(careerMod.maxGrowth, baseGrowth.bull)) * 10) / 10,
+    bear: Math.round(Math.max(careerCaps.minGrowth * timeScale, Math.min(careerCaps.maxGrowth * timeScale, scaled.bear)) * 10) / 10,
+    base: Math.round(Math.max(careerCaps.minGrowth * timeScale, Math.min(careerCaps.maxGrowth * timeScale, scaled.base)) * 10) / 10,
+    bull: Math.round(Math.max(careerCaps.minGrowth * timeScale, Math.min(careerCaps.maxGrowth * timeScale, scaled.bull)) * 10) / 10,
   };
 }
 
@@ -172,11 +201,11 @@ function determineGrowthDriver(
   verdict: string | null,
   upsideScore: number | null,
   sport: string | null,
-  legacyTier: string | null
+  legacyTier: string | null,
+  hasHistoricalData: boolean
 ): string {
   const tier = legacyTier?.toUpperCase() || "";
   
-  // Career stage takes priority for retired/aging players
   if (tier === "RETIRED") {
     return "Retired - stable pricing";
   }
@@ -185,6 +214,12 @@ function determineGrowthDriver(
   }
   if (tier === "AGING_VET") {
     return "Aging veteran - limited upside";
+  }
+  
+  if (hasHistoricalData) {
+    if (temperature === "HOT") return "Recent value gains + high demand";
+    if (temperature === "COOLING") return "Recent value decline + cooling market";
+    return "Based on recent value trend";
   }
   
   if (!temperature && !verdict) {
@@ -210,7 +245,6 @@ function determineGrowthDriver(
     return "Market correction phase";
   }
   
-  // Career stage messaging for active players
   if (tier === "RISING_STAR" || tier === "RISING" || tier === "BREAKOUT") {
     return "Rising star potential";
   }
@@ -269,7 +303,7 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
   for (const card of userCards) {
     const key = card.imagePath || `card-${card.id}`;
     const existing = uniqueCardsMap.get(key);
-    if (!existing || (card.estimatedValue || 0) > (existing.estimatedValue || 0)) {
+    if (!existing || getCardValue(card) > getCardValue(existing)) {
       uniqueCardsMap.set(key, card);
     }
   }
@@ -296,18 +330,33 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
     }
   }
   
-  const currentValue = uniqueCards.reduce((sum, c) => sum + (c.estimatedValue || 0), 0);
+  const currentValue = uniqueCards.reduce((sum, c) => sum + getCardValue(c), 0);
+  
+  if (currentValue <= 0) {
+    return {
+      currentValue: 0,
+      projections: [],
+      topGrowers: [],
+      riskCards: [],
+      insights: [],
+      sportBreakdown: [],
+      temperatureBreakdown: [],
+      methodology: "No valued cards in collection to project. Update card values to see projections.",
+      generatedAt: new Date().toISOString(),
+    };
+  }
   
   const cardProjections: CardProjectionDetail[] = [];
   const sportStats: Record<string, { value: number; growth12m: number; count: number }> = {};
   const tempStats: Record<string, { value: number; count: number }> = {};
+  let cardsWithHistory = 0;
   
   let totalBear3m = 0, totalBase3m = 0, totalBull3m = 0;
   let totalBear6m = 0, totalBase6m = 0, totalBull6m = 0;
   let totalBear12m = 0, totalBase12m = 0, totalBull12m = 0;
   
   for (const card of uniqueCards) {
-    const cardValue = card.estimatedValue || 0;
+    const cardValue = getCardValue(card);
     if (cardValue === 0) continue;
     
     let temperature: MarketTemperature | null = null;
@@ -328,9 +377,12 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
       }
     }
     
-    const growth3m = calculateCardGrowth(card, temperature, upsideScore || null, riskScore || null, verdict, 3);
-    const growth6m = calculateCardGrowth(card, temperature, upsideScore || null, riskScore || null, verdict, 6);
-    const growth12m = calculateCardGrowth(card, temperature, upsideScore || null, riskScore || null, verdict, 12);
+    const anchorInfo = getHistoricalAnchor(card);
+    if (anchorInfo.hasRecentAnchor) cardsWithHistory++;
+    
+    const growth3m = calculateCardGrowth(card, temperature, upsideScore || null, riskScore || null, verdict, 3, anchorInfo.annualizedGrowth);
+    const growth6m = calculateCardGrowth(card, temperature, upsideScore || null, riskScore || null, verdict, 6, anchorInfo.annualizedGrowth);
+    const growth12m = calculateCardGrowth(card, temperature, upsideScore || null, riskScore || null, verdict, 12, anchorInfo.annualizedGrowth);
     
     totalBear3m += cardValue * (1 + growth3m.bear / 100);
     totalBase3m += cardValue * (1 + growth3m.base / 100);
@@ -369,7 +421,7 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
         "6m": growth6m.base,
         "12m": growth12m.base,
       },
-      growthDriver: determineGrowthDriver(temperature, verdict, upsideScore || null, card.sport, card.legacyTier),
+      growthDriver: determineGrowthDriver(temperature, verdict, upsideScore || null, card.sport, card.legacyTier, anchorInfo.hasRecentAnchor),
       riskLevel: riskScore ? (riskScore > 65 ? "high" : riskScore > 40 ? "medium" : "low") : "medium",
       temperature,
       verdict,
@@ -441,23 +493,16 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
     .sort((a, b) => b.projectedGrowth["12m"] - a.projectedGrowth["12m"])
     .slice(0, 5);
   
-  // More comprehensive risk detection - every collection has some risk profile
   const riskCards = [...cardProjections]
     .filter(c => {
-      // Explicit high risk
       if (c.riskLevel === "high") return true;
-      // Negative projected growth
       if (c.projectedGrowth["12m"] < 0) return true;
-      // Near-flat growth indicates stagnant value (retired/aging players)
       if (c.projectedGrowth["12m"] <= 1 && c.currentValue >= 20) return true;
-      // Negative verdicts
       if (c.verdict === "AVOID") return true;
-      // Cooling markets with meaningful value
       if (c.temperature === "COOLING" && c.currentValue >= 30) return true;
       return false;
     })
     .sort((a, b) => {
-      // Sort by risk priority: negative growth first, then flat growth, then by value at risk
       const aScore = a.projectedGrowth["12m"] - (a.riskLevel === "high" ? 10 : 0);
       const bScore = b.projectedGrowth["12m"] - (b.riskLevel === "high" ? 10 : 0);
       return aScore - bScore;
@@ -484,6 +529,15 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
     }))
     .sort((a, b) => b.value - a.value);
   
+  const historyPct = uniqueCards.length > 0 ? Math.round((cardsWithHistory / uniqueCards.length) * 100) : 0;
+  const methodologyParts = [
+    "Projections combine market signals (temperature, investment verdicts, upside/risk scores) with player career stage analysis.",
+  ];
+  if (cardsWithHistory > 0) {
+    methodologyParts.push(`${cardsWithHistory} cards (${historyPct}%) have recent value history anchoring their projections to actual market movement.`);
+  }
+  methodologyParts.push("Bear/base/bull cases represent pessimistic, expected, and optimistic scenarios. These are directional estimates, not guarantees.");
+  
   return {
     currentValue: Math.round(currentValue),
     projections,
@@ -492,7 +546,7 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
     insights,
     sportBreakdown,
     temperatureBreakdown,
-    methodology: "Projections based on market temperature, investment verdicts, and upside/risk scores from AI analysis. Bear/base/bull cases represent pessimistic, expected, and optimistic scenarios.",
+    methodology: methodologyParts.join(" "),
     generatedAt: new Date().toISOString(),
   };
 }
@@ -542,7 +596,6 @@ function generateInsights(
     });
   }
   
-  // Stagnant value cards (retired/aging players with near-flat growth)
   const stagnantCards = cardProjections.filter(c => 
     c.projectedGrowth["12m"] <= 1 && c.currentValue >= 20
   );
@@ -570,14 +623,26 @@ function generateInsights(
     });
   }
   
-  const highGrowthCards = cardProjections.filter(c => c.projectedGrowth["12m"] > 15);
+  const highGrowthCards = cardProjections.filter(c => c.projectedGrowth["12m"] > 10);
   if (highGrowthCards.length > 0) {
     insights.push({
       type: "opportunity",
       title: "High Growth Potential",
-      description: `${highGrowthCards.length} cards are projected to grow 15%+ in the next 12 months.`,
+      description: `${highGrowthCards.length} cards are projected to grow 10%+ in the next 12 months.`,
       impactLevel: highGrowthCards.length > 3 ? "high" : "medium",
       affectedCards: highGrowthCards.length,
+    });
+  }
+  
+  const negativeCards = cardProjections.filter(c => c.projectedGrowth["12m"] < -5);
+  if (negativeCards.length > 0) {
+    const negValue = negativeCards.reduce((sum, c) => sum + c.currentValue, 0);
+    insights.push({
+      type: "risk",
+      title: "Declining Value Cards",
+      description: `${negativeCards.length} cards ($${Math.round(negValue)} total) are projected to lose 5%+ value. Review for potential sells.`,
+      impactLevel: negativeCards.length > 3 ? "high" : "medium",
+      affectedCards: negativeCards.length,
     });
   }
   
@@ -590,14 +655,15 @@ export async function generateAIGrowthSummary(projections: PortfolioGrowthRespon
   }
   
   try {
-    const systemPrompt = "You are a sports card investment analyst. Provide a concise 2-3 sentence summary of the portfolio growth outlook. Be specific about opportunities and risks. Do not use emojis.";
-    const userPrompt = `Analyze this portfolio:
-Current Value: $${projections.currentValue}
-12-Month Base Case Growth: ${projections.projections.find(p => p.timeframe === "12m")?.baseCase.valuePct || 0}%
-Top Growth Drivers: ${projections.topGrowers.slice(0, 3).map(c => c.playerName).join(", ")}
-Risk Cards: ${projections.riskCards.slice(0, 2).map(c => c.playerName).join(", ")}
-Sport Mix: ${projections.sportBreakdown.map(s => `${s.sport} (${s.cardCount} cards)`).join(", ")}
-Market Temperature: ${projections.temperatureBreakdown.map(t => `${t.temperature} (${t.cardCount})`).join(", ")}`;
+    const proj12m = projections.projections.find(p => p.timeframe === "12m");
+    const systemPrompt = `You are a sports card investment analyst providing a portfolio outlook. Be direct and honest — acknowledge uncertainty where data is limited. Keep it to 2-3 sentences. Do not use emojis. Mention specific players or risks when relevant.`;
+    const userPrompt = `Portfolio: $${projections.currentValue}
+12-Month Scenarios: Bear ${proj12m?.bearCase.valuePct || 0}%, Base ${proj12m?.baseCase.valuePct || 0}%, Bull ${proj12m?.bullCase.valuePct || 0}%
+Top Growers: ${projections.topGrowers.slice(0, 3).map(c => `${c.playerName} (+${c.projectedGrowth["12m"]}%)`).join(", ")}
+Risk Cards: ${projections.riskCards.slice(0, 3).map(c => `${c.playerName} (${c.projectedGrowth["12m"]}%)`).join(", ")}
+Sports: ${projections.sportBreakdown.map(s => `${s.sport} (${s.cardCount} cards, ${s.projectedGrowth12m}%)`).join(", ")}
+Market Heat: ${projections.temperatureBreakdown.map(t => `${t.temperature} (${t.cardCount})`).join(", ") || "No temperature data"}
+Insights: ${projections.insights.map(i => i.title).join(", ")}`;
 
     const response = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
@@ -607,6 +673,7 @@ Market Temperature: ${projections.temperatureBreakdown.map(t => `${t.temperature
     return response.text || "Unable to generate summary.";
   } catch (error) {
     console.error("[GrowthProjections] AI summary error:", error);
-    return `Your $${projections.currentValue.toLocaleString()} portfolio is projected to grow ${projections.projections.find(p => p.timeframe === "12m")?.baseCase.valuePct || 0}% over the next 12 months in the base case scenario.`;
+    const proj12m = projections.projections.find(p => p.timeframe === "12m");
+    return `Your $${projections.currentValue.toLocaleString()} portfolio has a base case projection of ${proj12m?.baseCase.valuePct || 0}% over the next 12 months, with a range of ${proj12m?.bearCase.valuePct || 0}% to ${proj12m?.bullCase.valuePct || 0}% depending on market conditions.`;
   }
 }
