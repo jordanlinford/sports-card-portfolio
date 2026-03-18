@@ -3433,7 +3433,9 @@ export default function OutlookOverviewPage() {
                 queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/user/outlook-usage"] });
               }
-            } catch (e) {}
+            } catch (e) {
+              console.warn("[BatchAnalysis] Failed to parse SSE message:", e);
+            }
           }
         }
       }

@@ -5179,6 +5179,10 @@ RULES:
         return res.status(404).json({ error: "Display case not found" });
       }
 
+      if (userId && displayCase.userId === userId) {
+        return res.status(400).json({ error: "Cannot like your own display case" });
+      }
+
       const likeUserId = userId || `visitor_${visitorId}`;
       const hasLiked = await storage.toggleLike(id, likeUserId);
       const count = await storage.getLikeCount(id);

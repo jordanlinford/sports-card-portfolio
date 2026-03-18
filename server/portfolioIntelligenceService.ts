@@ -334,7 +334,7 @@ async function lookupPlayerTeam(playerName: string): Promise<string | null> {
       return canonicalTeam;
     }
   } catch (error) {
-    // Ignore lookup errors
+    console.warn(`[PortfolioIntelligence] Team lookup failed for ${playerName}:`, error);
   }
   
   return null;

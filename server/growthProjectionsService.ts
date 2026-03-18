@@ -327,6 +327,7 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
         outlook
       });
     } catch (e) {
+      console.warn(`[GrowthProjections] Failed to parse outlook cache for playerKey ${cache.playerKey}:`, e);
     }
   }
   
