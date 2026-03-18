@@ -1128,6 +1128,7 @@ function normalizeGradeForSearch(grade: string | undefined | null, grader: strin
 // Infer card type from free-form variation text and build appropriate search terms
 function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms: string[] } {
   const variation = (card.variation || "").toLowerCase().trim();
+  const setLower = (card.set || "").toLowerCase().trim();
   
   // Default exclusions for base/insert cards - removes premium variants from results
   const premiumExclusions = ["-auto", "-autograph", "-patch", "-relic", "-jersey", "-memorabilia", "-/10", "-/25", "-/50", "-ssp", "-case"];
@@ -1155,8 +1156,9 @@ function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms:
     return { term: card.variation || "", excludeTerms: [] };
   }
   
-  // Detect case hits (Downtown, Kaboom, etc.)
-  const isCaseHit = /\b(downtown|kaboom|disco|stained.?glass|color.?blast|genesis|case.?hit|ssp)\b/.test(variation);
+  // Detect case hits (Downtown, Kaboom, etc.) — check both variation AND set name
+  const caseHitPattern = /\b(downtown|kaboom|disco|stained.?glass|color.?blast|genesis|case.?hit|ssp)\b/;
+  const isCaseHit = caseHitPattern.test(variation) || caseHitPattern.test(setLower);
   if (isCaseHit) {
     return { term: card.variation || "", excludeTerms: [] };
   }

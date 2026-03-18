@@ -246,7 +246,10 @@ export async function fetchGeminiMarketData(card: {
   
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLowerStandalone = (card.variation || "").toLowerCase().trim();
-  const isPremiumUnnumberedStandalone = !isNumbered && /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i.test(variationLowerStandalone);
+  const setLowerStandalone = (card.set || "").toLowerCase();
+  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i;
+  const isPremiumUnnumberedStandalone = !isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
+  const isOpticSetStandalone = /\boptic\b/i.test(card.set || "");
   const isAutoStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
   const isHatSwatch = /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.variation || "") || /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.title || "");
   const isMemOnly = !isAutoStandalone && /mem|memorabilia|relic|jersey|patch|cap|hat|swatch/i.test(card.variation || "");
@@ -258,7 +261,7 @@ export async function fetchGeminiMarketData(card: {
   const variationContext = isNumbered 
     ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnly ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}`
     : isPremiumUnnumberedStandalone
-      ? `\nCRITICAL: This is a PREMIUM SSP/Case Hit parallel — "${card.variation}". It is SIGNIFICANTLY more valuable than base/silver cards. Search specifically for "${card.variation}" — do NOT return base card prices. Include the exact parallel name in every search.`
+      ? `\nCRITICAL: This is a PREMIUM SSP/Case Hit insert — "${card.variation || card.set}". It is SIGNIFICANTLY more valuable than base/silver cards. Search specifically for "${searchDescription}" — do NOT return base card prices. Include the exact insert/parallel name in every search.${isOpticSetStandalone ? `\nOPTIC PRODUCT DISTINCTION: The SET is "${card.set}" which is a Donruss OPTIC (holographic/prismatic) product. Donruss Optic inserts are COMPLETELY DIFFERENT from base Donruss inserts of the same name — they are holographic and typically sell for 3-10x more. NEVER use base Donruss (non-Optic) prices as comps. Always include "Optic" in your eBay search queries.` : ""}`
     : (card.variation && card.variation.toLowerCase() !== "base"
       ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
       : "");
@@ -580,7 +583,10 @@ export async function fetchUnifiedCardAnalysis(card: {
 
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLower = (card.variation || "").toLowerCase().trim();
-  const isPremiumUnnumberedParallel = !isNumbered && /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i.test(variationLower);
+  const setLower = (card.set || "").toLowerCase();
+  const sspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i;
+  const isPremiumUnnumberedParallel = !isNumbered && (sspPattern.test(variationLower) || sspPattern.test(setLower));
+  const isOpticSet = /\boptic\b/i.test(card.set || "");
   const isBaseOrCommonParallel = !isNumbered && !isPremiumUnnumberedParallel && (
     !card.variation ||
     variationLower === "base" ||
@@ -599,14 +605,14 @@ export async function fetchUnifiedCardAnalysis(card: {
   const variationContext = isNumbered
     ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnlyU ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}`
     : isPremiumUnnumberedParallel
-      ? `\nCRITICAL: This is a PREMIUM UNNUMBERED PARALLEL — "${card.variation}". This is an SSP (Super Short Print) or Case Hit parallel that is SIGNIFICANTLY more valuable than base/silver cards, even though it is unnumbered.
-- SSP/Case Hit parallels like Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer etc. are RARE and command PREMIUM prices
+      ? `\nCRITICAL: This is a PREMIUM UNNUMBERED SSP/Case Hit insert — "${card.variation || card.set}". It is SIGNIFICANTLY more valuable than base/silver cards, even though it is unnumbered.
+- SSP/Case Hit inserts like Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer etc. are RARE and command PREMIUM prices
 - Do NOT confuse with base, silver, or common parallels — these are in a completely different price tier
 - For Panini Select: Zebra/Tiger Stripe Concourse parallels are SSP Case Hits worth 10-50x more than base Concourse Silver
 - For Panini Prizm: Color Blast, Shimmer, Mojo are premium SSPs worth far more than base Silver Prizm
-- Search specifically for "${card.variation}" in your eBay queries — this variation name is CRITICAL to the price
-- Include the EXACT parallel name in every search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation} sold eBay"
-- These cards typically sell for $20-$200+ for non-stars, and $100-$1000+ for stars`
+- Search specifically for "${card.variation || ""} ${card.set || ""}" in your eBay queries — this insert/parallel name is CRITICAL to the price
+- Include the EXACT insert name in every search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold eBay"
+- These cards typically sell for $20-$200+ for non-stars, and $100-$1000+ for stars${isOpticSet ? `\nOPTIC PRODUCT DISTINCTION: The SET is "${card.set}" which is a Donruss OPTIC (holographic/prismatic) product. Donruss Optic inserts are COMPLETELY DIFFERENT from base Donruss inserts of the same name — they are holographic and typically sell for 3-10x more. NEVER use base Donruss (non-Optic) prices as comps for this card. Always include "Optic" in every eBay search query.` : ""}`
     : isBaseOrCommonParallel
       ? `\nCRITICAL: This appears to be a BASE or COMMON unnumbered parallel (${card.variation || "base"}). These are typically the CHEAPEST version of the card.
 - "Certified Rookie" / "RC" is just a rookie designation — it does NOT make the card premium
