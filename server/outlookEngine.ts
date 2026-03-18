@@ -258,8 +258,10 @@ export async function fetchGeminiMarketData(card: {
     : isMemOnly
     ? `\nMEMORABILIA NOTE: This is a memorabilia-only card (no autograph). Non-auto memorabilia cards sell for significantly less than autograph versions. Search specifically for NON-AUTO memorabilia comps — do NOT use autograph card prices as comps.`
     : "";
+  const numberedPrintRunStandalone = isNumbered && card.variation ? card.variation.match(/\/\s*(\d+)/)?.[1] : null;
   const variationContext = isNumbered 
-    ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnly ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}`
+    ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnly ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}
+CRITICAL PARALLEL MATCHING: Only use comps from the SAME parallel type with the SAME print run (/${numberedPrintRunStandalone || "?"}). Different numbered parallels of the same card (e.g., /50 Gold vs /399 Yellow Holo) are COMPLETELY DIFFERENT cards at DIFFERENT price tiers. A /50 card is much rarer and more valuable than a /399 card. Do NOT mix comps from different parallel types or print runs. If a listing says "/${numberedPrintRunStandalone}" it must match — reject any comp that shows a different print run number.`
     : isPremiumUnnumberedStandalone
       ? `\nCRITICAL: This is a PREMIUM SSP/Case Hit insert — "${card.variation || card.set}". It is SIGNIFICANTLY more valuable than base/silver cards. Search specifically for "${searchDescription}" — do NOT return base card prices. Include the exact insert/parallel name in every search.${isOpticSetStandalone ? `\nOPTIC PRODUCT DISTINCTION: The SET is "${card.set}" which is a Donruss OPTIC (holographic/prismatic) product. Donruss Optic inserts are COMPLETELY DIFFERENT from base Donruss inserts of the same name — they are holographic and typically sell for 3-10x more. NEVER use base Donruss (non-Optic) prices as comps. Always include "Optic" in your eBay search queries.` : ""}`
     : (card.variation && card.variation.toLowerCase() !== "base"
@@ -356,6 +358,7 @@ PRICING RULES — RECENCY IS KING:
 - Exclude sales that are obviously a different card, lot, bundle, or error
 - For numbered parallels of top rookies/stars, prices can be $500-$5000+ — do not default to low values
 - CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values.
+- CRITICAL: For numbered cards, ONLY use comps with the SAME print run. A /50 Gold and a /399 Yellow Holo are DIFFERENT parallels at DIFFERENT price points — never mix them.
 - When in doubt: "What would this card sell for if I listed it on eBay today?" — that is your avgPrice
 
 Return ONLY a JSON object with these exact fields:
@@ -602,8 +605,10 @@ export async function fetchUnifiedCardAnalysis(card: {
     : isMemOnlyU
     ? `\nMEMORABILIA NOTE: This is a memorabilia-only card (no autograph). Non-auto memorabilia cards sell for significantly less than autograph versions. Search specifically for NON-AUTO memorabilia comps — do NOT use autograph card prices as comps.`
     : "";
+  const numberedPrintRun = isNumbered && card.variation ? card.variation.match(/\/\s*(\d+)/)?.[1] : null;
   const variationContext = isNumbered
-    ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnlyU ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}`
+    ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnlyU ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}
+CRITICAL PARALLEL MATCHING: Only use comps from the SAME parallel type with the SAME print run (/${numberedPrintRun || "?"}). Different numbered parallels of the same card (e.g., /50 Gold vs /399 Yellow Holo) are COMPLETELY DIFFERENT cards at DIFFERENT price tiers. A /50 card is much rarer and more valuable than a /399 card. Do NOT mix comps from different parallel types or print runs. If a listing says "/${numberedPrintRun}" it must match — reject any comp that shows a different print run number.`
     : isPremiumUnnumberedParallel
       ? `\nCRITICAL: This is a PREMIUM UNNUMBERED SSP/Case Hit insert — "${card.variation || card.set}". It is SIGNIFICANTLY more valuable than base/silver cards, even though it is unnumbered.
 - SSP/Case Hit inserts like Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer etc. are RARE and command PREMIUM prices
@@ -767,6 +772,7 @@ PRICING RULES:
 - Do NOT include "Best Offer accepted" sales where the actual price is hidden
 - For numbered parallels (/25, /10, etc.) of stars, prices CAN be much higher — search specifically
 - CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values
+- CRITICAL: For numbered cards, ONLY use comps with the SAME print run. A /50 Gold and a /399 Yellow Holo are DIFFERENT parallels at DIFFERENT price points — never mix them
 - When in doubt, ask yourself: "If I searched eBay sold listings for this exact card right now, what would the typical recent sale price be?" — that is your avgPrice
 
 SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
