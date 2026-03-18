@@ -612,7 +612,17 @@ export async function fetchUnifiedCardAnalysis(card: {
 - For Panini Prizm: Color Blast, Shimmer, Mojo are premium SSPs worth far more than base Silver Prizm
 - Search specifically for "${card.variation || ""} ${card.set || ""}" in your eBay queries — this insert/parallel name is CRITICAL to the price
 - Include the EXACT insert name in every search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold eBay"
-- These cards typically sell for $20-$200+ for non-stars, and $100-$1000+ for stars${isOpticSet ? `\nOPTIC PRODUCT DISTINCTION: The SET is "${card.set}" which is a Donruss OPTIC (holographic/prismatic) product. Donruss Optic inserts are COMPLETELY DIFFERENT from base Donruss inserts of the same name — they are holographic and typically sell for 3-10x more. NEVER use base Donruss (non-Optic) prices as comps for this card. Always include "Optic" in every eBay search query.` : ""}`
+- These cards typically sell for $20-$200+ for non-stars, and $100-$1000+ for stars${isOpticSet ? `
+⚠️ CRITICAL OPTIC WARNING — READ THIS FIRST ⚠️
+The SET is "${card.set}" — this is Donruss OPTIC, a PREMIUM holographic/prismatic product.
+"${card.set} ${card.variation || ""}" is a COMPLETELY DIFFERENT card from "Donruss ${card.variation || ""}" (base/non-Optic).
+- Donruss Optic SSP inserts sell for 3-10x MORE than base Donruss SSP inserts of the same name
+- A base Donruss Downtown might sell for $200-$500 but the OPTIC Downtown sells for $800-$2,000+ for star players
+- You MUST verify that every comp you find contains "Optic" in the listing title
+- If your comps do NOT include "Optic" in the listing, you are pricing the WRONG card
+- Search queries MUST include "Optic": "${card.playerName || card.title} ${card.year || ""} Optic ${card.variation || ""} sold eBay"
+- Also try: "Donruss Optic ${card.variation || ""} ${card.playerName || card.title} ${card.year || ""} sold"
+- NEVER report base Donruss prices for an Optic card — they are different products at different price tiers` : ""}`
     : isBaseOrCommonParallel
       ? `\nCRITICAL: This appears to be a BASE or COMMON unnumbered parallel (${card.variation || "base"}). These are typically the CHEAPEST version of the card.
 - "Certified Rookie" / "RC" is just a rookie designation — it does NOT make the card premium
@@ -732,7 +742,10 @@ Do ALL of the following in this single search:
 
    1a. RAW/UNGRADED prices — ALWAYS include the specific variation in your search:
    - "${unifiedSearchDescription} sold eBay"
-   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold eBay"
+   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold eBay"${isOpticSet ? `
+   - OPTIC-SPECIFIC SEARCH (mandatory): "${card.playerName || card.title} ${card.year || ""} Optic ${card.variation || ""} sold eBay"
+   - Also try: "Donruss Optic ${card.variation || ""} ${card.playerName || card.title} sold"
+   - VERIFY every comp has "Optic" in the listing — base Donruss is a different, cheaper product` : ""}
    - Prioritize the MOST RECENT sales (last 14 days > last 30 days > last 60 days)
    - avgPrice = what it realistically sells for TODAY based on recent completed sales
    - CRITICAL: rawPrice must be for THIS EXACT variation, not a base/silver version
