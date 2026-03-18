@@ -3173,6 +3173,12 @@ Sitemap: ${origin}/sitemap.xml
       const qaIsLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(qaVariation);
       const qaIsVeryLowPop = /\/\s*[1-5]\b/.test(qaVariation) && !qaIs1of1;
       
+      // Detect SSP/premium unnumbered parallels (wide price ranges are EXPECTED for these)
+      const qaVariationLower = qaVariation.toLowerCase().trim();
+      const qaSetLower = (set || "").toLowerCase();
+      const qaSspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i;
+      const qaIsSSP = qaSspPattern.test(qaVariationLower) || qaSspPattern.test(qaSetLower);
+      
       // Determine market value: prefer unified Gemini data, fall back to legacy
       let marketValue = priceData.estimatedValue;
       let priceMin = filteredPriceData.min;
@@ -3194,12 +3200,15 @@ Sitemap: ${origin}/sitemap.xml
           }
           
           // OUTLIER PROTECTION: If max is 3x+ the min with sparse comps, the average is likely inflated by outliers/BIN prices
-          if (unifiedMin > 0 && unifiedMax > 0 && unifiedMax / unifiedMin >= 3 && unifiedResult.market.soldCount <= 10) {
+          // SKIP for SSP/premium inserts — wide price ranges are EXPECTED for Downtown, Kaboom, Color Blast, etc.
+          if (!qaIsSSP && unifiedMin > 0 && unifiedMax > 0 && unifiedMax / unifiedMin >= 3 && unifiedResult.market.soldCount <= 10) {
             const spread = unifiedMax / unifiedMin;
             const weight = spread >= 5 ? 0.15 : 0.3;
             const correctedAvg = Math.round((unifiedMin + (unifiedAvg - unifiedMin) * weight) * 100) / 100;
             console.warn(`[Quick Analyze] OUTLIER PROTECTION: Unified avg $${unifiedAvg} with range $${unifiedMin}-$${unifiedMax} (${spread.toFixed(1)}x spread). Corrected to $${correctedAvg} (weight=${weight})`);
             unifiedAvg = correctedAvg;
+          } else if (qaIsSSP && unifiedMin > 0 && unifiedMax > 0 && unifiedMax / unifiedMin >= 3) {
+            console.log(`[Quick Analyze] SSP detected (${qaVariation || set}) — skipping outlier protection. Trusting Gemini avg $${unifiedAvg} (range $${unifiedMin}-$${unifiedMax})`);
           }
           
           marketValue = unifiedAvg;
