@@ -3351,6 +3351,23 @@ Sitemap: ${origin}/sitemap.xml
           priceMin = unifiedMin || marketValue * 0.7;
           priceMax = unifiedMax || marketValue * 1.5;
           compCount = unifiedResult.market.soldCount;
+
+          // RAW LOW-POP CONTAMINATION CHECK: For raw numbered cards (/6-/49), real raw sales are
+          // extremely rare, so Gemini often returns PSA10/PSA9 prices as "raw" prices.
+          // A raw card CANNOT cost more than its PSA 9 grade — if it does, the price is contaminated.
+          // Not applied to 1/1 cards since those are unique and may be priced above PSA9.
+          if (qaIsRaw && qaIsLowPop && !qaIs1of1) {
+            const psa9Price = unifiedResult.market.psa9Price ?? null;
+            if (psa9Price && psa9Price > 0 && marketValue >= psa9Price * 0.85) {
+              const contaminatedRaw = marketValue;
+              // Raw value is typically 40-50% of PSA9 for rare numbered cards
+              const correctedRaw = Math.round(psa9Price * 0.45 * 100) / 100;
+              console.warn(`[Quick Analyze] RAW LOW-POP CONTAMINATION: rawPrice $${contaminatedRaw} >= psa9 $${psa9Price} * 0.85 — Gemini used graded prices as raw. Correcting to $${correctedRaw} (45% of PSA9).`);
+              marketValue = correctedRaw;
+              priceMin = Math.round(correctedRaw * 0.7 * 100) / 100;
+              priceMax = Math.round(psa9Price * 0.75 * 100) / 100;
+            }
+          }
         } else {
           // UNIFIED ESTIMATE RESCUE: soldCount=0 so we can't fully trust unified, but its rawPrice/avgPrice
           // (from Gemini + Google Search grounding) is still more specific than the cross-product fallback's
