@@ -981,7 +981,8 @@ This card is RAW (ungraded). Follow these rules EXACTLY:
 1. Only use raw/ungraded completed eBay sales for estimatedValue, minPrice, maxPrice, and rawPrice.
 2. NEVER include PSA 9 or PSA 10 graded sale prices in estimatedValue/minPrice/maxPrice.
 3. SSP/SHORT PRINT EXCLUSION: If a listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, more valuable variation — EXCLUDE it. Do not use SSP sales as comps.
-4. If you cannot find raw non-SSP sales, set estimatedValue to null rather than guessing from graded or SSP prices.
+4. Use the MEDIAN of the raw non-SSP sales you find — do NOT skew low or high. Report it accurately.
+5. If you cannot find raw non-SSP sales, set estimatedValue to null and soldCount to 0.
 VIOLATION: Using graded or SSP sale prices as estimatedValue/minPrice is WRONG.`
     : "";
 
