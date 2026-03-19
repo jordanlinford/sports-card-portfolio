@@ -512,16 +512,14 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
                 correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
                 correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
               } else {
-                // No explicit rawPrice field — check if avgPrice is contaminated by graded sales.
-                // If avgPrice >= 80% of psa9Price, it almost certainly includes graded comps.
+                // No explicit rawPrice — check if avgPrice is contaminated by graded sales.
+                // Only trigger if avgPrice is suspiciously close to PSA 9 price (>= 80% of it).
+                // Do NOT use a ratio check — raw cards legitimately have wide min/max spreads.
                 const isContaminatedByPSA9 = psa9 && psa9 > 0 && correctedAvg >= psa9 * 0.8;
-                // Also catch the ratio check (avgPrice way above min suggests outlier graded sales)
-                const ratioSuspect = correctedMin > 0 && correctedAvg > 0 && correctedAvg / correctedMin > 1.8;
 
-                if (isContaminatedByPSA9 || ratioSuspect) {
-                  // Use the minimum price as a better raw proxy (buyers pay close to min for raw)
+                if (isContaminatedByPSA9) {
                   const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
-                  console.warn(`[OutlookEngine] RAW CONTAMINATION DETECTED: avg $${correctedAvg}${psa9 ? ` (psa9 $${psa9})` : ""} → using min-based raw estimate $${newAvg}`);
+                  console.warn(`[OutlookEngine] RAW CONTAMINATION DETECTED: avg $${correctedAvg} is ≥80% of psa9 $${psa9} → using min-based raw estimate $${newAvg}`);
                   correctedAvg = newAvg;
                   correctedMax = Math.round(correctedMin * 1.8 * 100) / 100;
                 }
@@ -987,12 +985,13 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
                 correctedMin = parsed.market.rawMinPrice || parsed.market.rawPrice * 0.7;
                 correctedMax = parsed.market.rawMaxPrice || parsed.market.rawPrice * 1.5;
               } else {
-                // Check if avgPrice is contaminated by graded sales
+                // Check if avgPrice is contaminated by graded sales.
+                // Only trigger if avgPrice is suspiciously close to PSA 9 price (>= 80% of it).
+                // Do NOT use a ratio check — raw cards legitimately have wide min/max spreads.
                 const isContaminatedByPSA9 = psa9 && psa9 > 0 && correctedAvg >= psa9 * 0.8;
-                const ratioSuspect = correctedMin > 0 && correctedAvg > 0 && correctedAvg / correctedMin > 1.8;
-                if (isContaminatedByPSA9 || ratioSuspect) {
+                if (isContaminatedByPSA9) {
                   const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
-                  console.warn(`[Unified Analysis] RAW CONTAMINATION DETECTED: avg $${correctedAvg}${psa9 ? ` (psa9 $${psa9})` : ""} → using min-based raw estimate $${newAvg}`);
+                  console.warn(`[Unified Analysis] RAW CONTAMINATION DETECTED: avg $${correctedAvg} is ≥80% of psa9 $${psa9} → using min-based raw estimate $${newAvg}`);
                   correctedAvg = newAvg;
                   correctedMax = Math.round(correctedMin * 1.8 * 100) / 100;
                 }
