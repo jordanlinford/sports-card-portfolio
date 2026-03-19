@@ -3315,6 +3315,7 @@ Sitemap: ${origin}/sitemap.xml
       let priceMin = filteredPriceData.min;
       let priceMax = filteredPriceData.max;
       let compCount = priceData.salesFound;
+      const qaIsRaw = isRawCardCheck(grade, grader);
       
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
         // Trust unified Gemini result when: real comps found, rare cards (1/1, low-pop), OR SSP/premium inserts
@@ -3350,6 +3351,21 @@ Sitemap: ${origin}/sitemap.xml
           priceMin = unifiedMin || marketValue * 0.7;
           priceMax = unifiedMax || marketValue * 1.5;
           compCount = unifiedResult.market.soldCount;
+        } else {
+          // UNIFIED ESTIMATE RESCUE: soldCount=0 so we can't fully trust unified, but its rawPrice/avgPrice
+          // (from Gemini + Google Search grounding) is still more specific than the cross-product fallback's
+          // generic estimate. Capture it as a floor so the fallback doesn't override with a worse guess.
+          // Minimum $10 threshold to avoid using hallucinated $1-$5 guesses.
+          const unifiedEstimate = (qaIsRaw ? unifiedResult.market.rawPrice : null) ?? unifiedResult.market.avgPrice;
+          if (unifiedEstimate && unifiedEstimate > 10 && marketValue <= 0) {
+            const unifiedMin = unifiedResult.market.minPrice;
+            const unifiedMax = unifiedResult.market.maxPrice;
+            console.log(`[Quick Analyze] UNIFIED ESTIMATE RESCUE: soldCount=0 but unified has rawPrice/avgPrice=$${unifiedEstimate}. Using as starting estimate (more specific than cross-product fallback).`);
+            marketValue = unifiedEstimate;
+            priceMin = unifiedMin || marketValue * 0.7;
+            priceMax = unifiedMax || marketValue * 1.5;
+            compCount = 0;
+          }
         }
       }
 
@@ -3433,9 +3449,7 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      // RAW CARD PRICE CORRECTION — REMOVED (Gemini already returns raw-specific prices via rawPrice field)
-      // Double-correcting on top of Gemini's raw price was systematically undervaluing raw cards
-      const qaIsRaw = isRawCardCheck(grade, grader);
+      // qaIsRaw defined earlier (before unified result block)
 
       // CROSS-VALIDATION against legacy price points (LOG ONLY — no longer overrides Gemini)
       // Legacy lookups often find wrong comps (wrong product, wrong variation), so they should
