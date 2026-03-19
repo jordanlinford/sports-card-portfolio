@@ -3394,14 +3394,16 @@ Sitemap: ${origin}/sitemap.xml
       let lowPopFallbackPrice: number | null = null;
       const unifiedHasNoPrice = !unifiedResult || !unifiedResult.market.avgPrice || unifiedResult.market.avgPrice <= 0;
       const unifiedSoldCount = unifiedResult?.market.soldCount ?? 0;
-      // Trigger triangulation for: 1/1 and /1-/5 (when no price at all), OR any low-pop (/6-/49) when soldCount=0
-      const shouldTriangulate = (qaIs1of1 || qaIsVeryLowPop) && unifiedHasNoPrice
-        || (qaIsLowPop && !qaIs1of1 && unifiedSoldCount === 0);
+      // Triangulation only for /1-/5 and 1/1 cards — NOT for /6-/49.
+      // For /6-/49 low-pop cards in premium sets (National Treasures, etc.) the triangulation
+      // incorrectly finds auto/patch comps worth 10x the base parallel. The contamination check
+      // (psa9Price * 0.45) handles those cases more safely.
+      const shouldTriangulate = (qaIs1of1 || qaIsVeryLowPop) && unifiedHasNoPrice;
       if (shouldTriangulate) {
         const currentPrice = marketValue;
         lowPopFallbackAttempted = true;
-        const reason = qaIsLowPop && !qaIsVeryLowPop ? `no real comps (soldCount=0) for low-pop card` : (!unifiedResult ? "unified failed" : "unified returned no price");
-        console.log(`[Quick Analyze] LOW-POP FALLBACK: ${reason} for ${qaIs1of1 ? "1/1" : `low-pop ${qaVariation}`} card. Current price: $${currentPrice}. Attempting triangulation...`);
+        const reason = !unifiedResult ? "unified failed" : "unified returned no price";
+        console.log(`[Quick Analyze] LOW-POP FALLBACK: ${reason} for ${qaIs1of1 ? "1/1" : "low-pop /1-/5"} card. Current price: $${currentPrice}. Attempting triangulation...`);
         try {
           const fallbackResult = await fetchLowPopFallbackPrice({
             title,
@@ -3414,11 +3416,8 @@ Sitemap: ${origin}/sitemap.xml
           });
           if (fallbackResult && fallbackResult.avgPrice > 0) {
             lowPopFallbackPrice = fallbackResult.avgPrice;
-            // For low-pop cards with soldCount=0, triangulation is more targeted than Gemini's estimate
-            // (it explicitly searches adjacent parallels with scarcity multipliers).
-            // Always prefer triangulation result for this case; otherwise only use it when we have no price.
-            const isLowPopNoComps = qaIsLowPop && !qaIs1of1 && unifiedSoldCount === 0;
-            const usesFallback = !marketValue || marketValue <= 0 || isLowPopNoComps;
+            // Use fallback when we have no current price, or when unified failed to return a price.
+            const usesFallback = !marketValue || marketValue <= 0;
             if (usesFallback) {
               console.log(`[Quick Analyze] LOW-POP FALLBACK: Using triangulated $${fallbackResult.avgPrice} (range $${fallbackResult.minPrice}-$${fallbackResult.maxPrice}), was $${currentPrice}.`);
               marketValue = fallbackResult.avgPrice;
