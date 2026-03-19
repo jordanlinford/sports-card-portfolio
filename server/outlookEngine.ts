@@ -279,10 +279,15 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
     : "";
 
   const rawGradeWarning = isRaw
-    ? `\nGRADE NOTE: This card is RAW (ungraded). When reporting prices:
-- Prioritize raw/ungraded sold prices over graded ones
-- If you find both raw and graded sales, report the RAW prices for avgPrice/minPrice and note graded prices separately in notes
-- Raw cards typically sell for much less than PSA 9/10 graded copies`
+    ? `\nRAW CARD — CRITICAL PRICING RULES:
+This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and graded prices:
+1. SEARCH A (raw) must find ONLY raw/ungraded sales. Search: "${searchDescription} raw sold eBay" and "${searchDescription} ungraded sold eBay"
+2. avgPrice, minPrice, maxPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA-graded sale prices in these fields.
+3. rawPrice should be the same as avgPrice (it is a confirmation field for raw cards).
+4. rawMinPrice = same as minPrice, rawMaxPrice = same as maxPrice.
+5. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER influence avgPrice for a raw card.
+6. If you find raw sales at $25-$40 and PSA 9 sales at $60, avgPrice = $32 (raw average), NOT some average of both.
+VIOLATION: Returning an avgPrice that blends raw + graded sales is WRONG and will mislead collectors.`
     : "";
 
   const isAutoCardStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
@@ -434,7 +439,7 @@ GRADED PRICE PRIORITY RULES:
 2. Only estimate graded prices if you found ZERO PSA 10 or PSA 9 sold listings after genuinely searching. When estimating, use your market knowledge of THIS SPECIFIC CARD — not generic multipliers.
 3. If you must estimate graded value with no real data: Search for what this EXACT card (same player, same variation, same set) sells for graded on eBay. Use that market knowledge, not a formula.
 4. psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps you found seem lower than raw, they may be for a different card variation — find better comps.
-5. rawPrice should reflect ONLY ungraded/raw copies. avgPrice can include all conditions.
+5. rawPrice should reflect ONLY ungraded/raw copies. For RAW cards, avgPrice must also be raw-only — never blend graded sales into avgPrice when the card being valued is raw.
 
 Liquidity guidelines:
 - HIGH: 15+ sales per month, sells almost daily
@@ -497,20 +502,28 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
             
             // RAW CARD CORRECTION: Use raw-specific prices when available for raw cards
             if (isRaw) {
+              const psa9 = parsePrice(parsed.psa9Price);
+              const psa10 = parsePrice(parsed.psa10Price);
+
               if (parsed.rawPrice && parsed.rawPrice > 0) {
                 // Gemini provided explicit raw pricing — use it directly
                 console.log(`[OutlookEngine] RAW CARD: Using Gemini rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg})`);
                 correctedAvg = parsed.rawPrice;
                 correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
                 correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
-              } else if (correctedMin > 0 && correctedAvg > 0) {
-                // No explicit raw price — fall back to ratio check
-                const ratio = correctedAvg / correctedMin;
-                if (ratio > 2) {
-                  const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
-                  console.warn(`[OutlookEngine] RAW CORRECTION: avg $${correctedAvg} is ${ratio.toFixed(1)}x min $${correctedMin}. Using min-based estimate $${newAvg}`);
+              } else {
+                // No explicit rawPrice field — check if avgPrice is contaminated by graded sales.
+                // If avgPrice >= 80% of psa9Price, it almost certainly includes graded comps.
+                const isContaminatedByPSA9 = psa9 && psa9 > 0 && correctedAvg >= psa9 * 0.8;
+                // Also catch the ratio check (avgPrice way above min suggests outlier graded sales)
+                const ratioSuspect = correctedMin > 0 && correctedAvg > 0 && correctedAvg / correctedMin > 1.8;
+
+                if (isContaminatedByPSA9 || ratioSuspect) {
+                  // Use the minimum price as a better raw proxy (buyers pay close to min for raw)
+                  const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
+                  console.warn(`[OutlookEngine] RAW CONTAMINATION DETECTED: avg $${correctedAvg}${psa9 ? ` (psa9 $${psa9})` : ""} → using min-based raw estimate $${newAvg}`);
                   correctedAvg = newAvg;
-                  correctedMax = Math.round(correctedMin * 2 * 100) / 100;
+                  correctedMax = Math.round(correctedMin * 1.8 * 100) / 100;
                 }
               }
             }
@@ -700,16 +713,19 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
 - Set market.confidence to "LOW" since the card identity is incomplete.`
     : "";
 
-  const rawGradeWarning = isRaw
-    ? `\nGRADE NOTE: This card is RAW (ungraded). When reporting prices:
-- Prioritize raw/ungraded sold prices over graded ones for market pricing
-- Report graded PSA 9/10 values separately in psa9Price/psa10Price
-- Raw cards typically sell for much less than PSA 9/10 graded copies`
-    : "";
-
   const isAutoCard = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
   const hasPatchUnified = /patch|mem|memorabilia|relic|jersey/i.test(card.variation || "") || /patch|mem|memorabilia|relic|jersey/i.test(card.title || "");
   const unifiedSearchDescription = [card.year, card.set, card.playerName || card.title, card.variation].filter(Boolean).join(" ");
+
+  const rawGradeWarning = isRaw
+    ? `\nRAW CARD — CRITICAL PRICING RULES:
+This card is RAW (ungraded). Follow these rules EXACTLY:
+1. market.value, market.minPrice, market.maxPrice MUST reflect ONLY raw/ungraded completed eBay sales. NEVER include PSA-graded sale prices in these fields.
+2. Search specifically for raw copies: "${unifiedSearchDescription} raw sold eBay" and "${unifiedSearchDescription} ungraded sold eBay"
+3. PSA 9 and PSA 10 prices go ONLY in psa9Price / psa10Price — they must NEVER influence the market.value for a raw card.
+4. If raw sales are $25-$40 and PSA 9 sales are $60, market.value = $32 (raw avg), NOT a blend of the two.
+VIOLATION: Returning a market.value that blends raw + graded sales is WRONG and misleads collectors.`
+    : "";
   const autoCardWarning = isAutoCard && card.set
     ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING REQUIRED:
 This is an autograph card from "${card.set}"${hasPatchUnified ? " with a MEMORABILIA PATCH embedded" : ""}. Autograph values vary ENORMOUSLY by product line:
@@ -964,18 +980,21 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
             let correctedMax = parsed.market.maxPrice || correctedAvg * 1.2;
 
             if (isRaw) {
+              const psa9 = parsePrice(parsed.market.psa9Price);
               if (parsed.market.rawPrice && parsed.market.rawPrice > 0) {
                 console.log(`[Unified Analysis] RAW CARD: Using rawPrice $${parsed.market.rawPrice} (overall avg was $${correctedAvg})`);
                 correctedAvg = parsed.market.rawPrice;
                 correctedMin = parsed.market.rawMinPrice || parsed.market.rawPrice * 0.7;
                 correctedMax = parsed.market.rawMaxPrice || parsed.market.rawPrice * 1.5;
-              } else if (correctedMin > 0 && correctedAvg > 0) {
-                const ratio = correctedAvg / correctedMin;
-                if (ratio > 2) {
-                  const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
-                  console.warn(`[Unified Analysis] RAW CORRECTION: avg $${correctedAvg} is ${ratio.toFixed(1)}x min $${correctedMin}. Using $${newAvg}`);
+              } else {
+                // Check if avgPrice is contaminated by graded sales
+                const isContaminatedByPSA9 = psa9 && psa9 > 0 && correctedAvg >= psa9 * 0.8;
+                const ratioSuspect = correctedMin > 0 && correctedAvg > 0 && correctedAvg / correctedMin > 1.8;
+                if (isContaminatedByPSA9 || ratioSuspect) {
+                  const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
+                  console.warn(`[Unified Analysis] RAW CONTAMINATION DETECTED: avg $${correctedAvg}${psa9 ? ` (psa9 $${psa9})` : ""} → using min-based raw estimate $${newAvg}`);
                   correctedAvg = newAvg;
-                  correctedMax = Math.round(correctedMin * 2 * 100) / 100;
+                  correctedMax = Math.round(correctedMin * 1.8 * 100) / 100;
                 }
               }
             }

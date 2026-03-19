@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { hasProAccess } from "@/lib/auth-utils";
+import { hasProAccess } from "@/lib/authUtils";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Loader2, X, CheckCircle } from "lucide-react";
 import { useEffect, useRef } from "react";
