@@ -3358,14 +3358,20 @@ Sitemap: ${origin}/sitemap.xml
           // Not applied to 1/1 cards since those are unique and may be priced above PSA9.
           if (qaIsRaw && qaIsLowPop && !qaIs1of1) {
             const psa9Price = unifiedResult.market.psa9Price ?? null;
-            if (psa9Price && psa9Price > 0 && marketValue >= psa9Price * 0.85) {
+            const psa10Price = unifiedResult.market.psa10Price ?? null;
+            // Use PSA9 as primary anchor, PSA10 as fallback (raw is ~30% of PSA10 for premium numbered cards)
+            const gradeAnchor = psa9Price && psa9Price > 0 ? { price: psa9Price, ratio: 0.45, label: "PSA9" }
+              : psa10Price && psa10Price > 0 ? { price: psa10Price, ratio: 0.30, label: "PSA10" }
+              : null;
+            if (gradeAnchor && marketValue >= gradeAnchor.price * 0.85) {
               const contaminatedRaw = marketValue;
-              // Raw value is typically 40-50% of PSA9 for rare numbered cards
-              const correctedRaw = Math.round(psa9Price * 0.45 * 100) / 100;
-              console.warn(`[Quick Analyze] RAW LOW-POP CONTAMINATION: rawPrice $${contaminatedRaw} >= psa9 $${psa9Price} * 0.85 — Gemini used graded prices as raw. Correcting to $${correctedRaw} (45% of PSA9).`);
+              const correctedRaw = Math.round(gradeAnchor.price * gradeAnchor.ratio * 100) / 100;
+              console.warn(`[Quick Analyze] RAW LOW-POP CONTAMINATION: rawPrice $${contaminatedRaw} >= ${gradeAnchor.label} $${gradeAnchor.price} * 0.85 — Gemini used graded prices as raw. Correcting to $${correctedRaw} (${gradeAnchor.ratio * 100}% of ${gradeAnchor.label}).`);
               marketValue = correctedRaw;
               priceMin = Math.round(correctedRaw * 0.7 * 100) / 100;
-              priceMax = Math.round(psa9Price * 0.75 * 100) / 100;
+              priceMax = psa9Price
+                ? Math.round(psa9Price * 0.75 * 100) / 100
+                : Math.round(correctedRaw * 1.5 * 100) / 100;
             }
           }
         } else {
