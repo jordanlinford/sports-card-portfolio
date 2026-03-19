@@ -3321,18 +3321,17 @@ Sitemap: ${origin}/sitemap.xml
         // SSP cards (Downtown, Kaboom, Color Blast, etc.) are specialty inserts where legacy lookups
         // often return wrong comps (e.g., base Donruss prices for an Optic Downtown)
         const hasRealComps = unifiedResult.market.soldCount > 0 || qaIs1of1 || qaIsLowPop || qaIsSSP;
-        // Also accept unified price when soldCount=0 IF it's lower than legacy (more conservative = more likely accurate)
-        const unifiedIsMoreConservative = !hasRealComps && marketValue && unifiedResult.market.avgPrice < marketValue;
+        // NOTE: Do NOT use unified when soldCount=0 just because it's lower than legacy.
+        // 0 sold comps means Gemini is estimating with no data — a low guess is NOT more conservative,
+        // it's just wrong. Legacy data (even imperfect) is more reliable than a zero-comp Gemini estimate.
         
-        if (hasRealComps || unifiedIsMoreConservative) {
+        if (hasRealComps) {
           let unifiedAvg = unifiedResult.market.avgPrice;
           const unifiedMin = unifiedResult.market.minPrice;
           const unifiedMax = unifiedResult.market.maxPrice;
           
           if (qaIsSSP && unifiedResult.market.soldCount === 0) {
             console.log(`[Quick Analyze] SSP card detected (${qaVariation || set}) — trusting unified Gemini price $${unifiedAvg} over legacy $${marketValue} (legacy likely found wrong comps)`);
-          } else if (unifiedIsMoreConservative) {
-            console.log(`[Quick Analyze] Unified price $${unifiedAvg} is lower than legacy $${marketValue} — using unified (more conservative)`);
           }
           
           // OUTLIER PROTECTION: If max is 3x+ the min with sparse comps, the average is likely inflated by outliers/BIN prices
@@ -3458,11 +3457,13 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
       
-      // PRICE-TREND COMPARISON (LOG ONLY — no longer overrides Gemini)
+      // PRICE-TREND COMPARISON
       // Monthly price history is itself Gemini-generated and often inaccurate for new/rare cards.
       // Using stale trend data to override a fresh Gemini analysis was causing systematic undervaluation.
-      // Now only used as a fallback when Gemini returns no price at all.
+      // Used as a fallback when: (a) Gemini returns no price, or (b) raw card with 0 unified comps
+      // where legacy price is likely contaminated by graded comps.
       const trendHasRealSales = qaMonthlyPriceHistory?.hasAnySales === true;
+      const unifiedHasNoRealComps = !unifiedResult || unifiedResult.market.soldCount === 0;
       if (qaMonthlyPriceHistory && qaMonthlyPriceHistory.dataPoints && qaMonthlyPriceHistory.dataPoints.length > 0 && trendHasRealSales) {
         const recentPoints = qaMonthlyPriceHistory.dataPoints.slice(-3);
         const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
@@ -3478,8 +3479,21 @@ Sitemap: ${origin}/sitemap.xml
             }
           } else {
             const ratio = marketValue / recentAvg;
-            if (ratio < 0.33 || ratio > 3) {
-              console.log(`[Quick Analyze] PRICE-TREND INFO: Gemini $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Trusting Gemini's fresh analysis.`);
+            // Special case: raw card with 0 unified comps + legacy price way above trend.
+            // Legacy eBay/Serper finds graded comps for raw cards when raw-specific comps are scarce.
+            // If the trend has real raw sales and the current price is >3x trend avg, trust the trend.
+            const isRawNoCompsHighLegacy = qaIsRaw && unifiedHasNoRealComps && ratio > 3;
+            if (isRawNoCompsHighLegacy) {
+              console.log(`[Quick Analyze] RAW TREND RESCUE: legacy $${marketValue} is ${ratio.toFixed(1)}x trend avg $${recentAvg.toFixed(2)} with 0 unified comps — legacy likely has graded comps. Using trend avg.`);
+              marketValue = Math.round(recentAvg * 100) / 100;
+              const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
+              if (allPrices.length > 0) {
+                priceMin = Math.min(...allPrices);
+                priceMax = Math.max(...allPrices);
+              }
+              compCount = 0;
+            } else if (ratio < 0.33 || ratio > 3) {
+              console.log(`[Quick Analyze] PRICE-TREND INFO: current $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Trusting current analysis.`);
             }
           }
         }
