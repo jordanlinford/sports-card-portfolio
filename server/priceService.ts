@@ -976,10 +976,13 @@ When card identity is incomplete:
     : "";
 
   const rawGradeWarning = isRaw
-    ? `\nGRADE NOTE: This card is RAW (ungraded). When reporting prices:
-- Prioritize raw/ungraded sold prices over graded ones
-- If you find both raw and graded sales, use the RAW prices for estimatedValue/minPrice
-- Raw cards typically sell for much less than PSA 9/10 graded copies`
+    ? `\nRAW CARD — CRITICAL PRICING RULES:
+This card is RAW (ungraded). Follow these rules EXACTLY:
+1. Only use raw/ungraded completed eBay sales for estimatedValue, minPrice, maxPrice, and rawPrice.
+2. NEVER include PSA 9 or PSA 10 graded sale prices in estimatedValue/minPrice/maxPrice.
+3. SSP/SHORT PRINT EXCLUSION: If a listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, more valuable variation — EXCLUDE it. Do not use SSP sales as comps.
+4. If you cannot find raw non-SSP sales, set estimatedValue to null rather than guessing from graded or SSP prices.
+VIOLATION: Using graded or SSP sale prices as estimatedValue/minPrice is WRONG.`
     : "";
 
   const searchPrompt = `Search for recent sold listings and current market value for this sports card:

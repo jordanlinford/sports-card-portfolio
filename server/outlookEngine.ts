@@ -284,9 +284,10 @@ This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and g
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${searchDescription} raw sold eBay" and "${searchDescription} ungraded sold eBay"
 2. avgPrice, minPrice, maxPrice and rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
 3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into avgPrice or rawPrice.
-4. Example: raw sales $25-$40, PSA 9 sales $60 → avgPrice = $32, rawPrice = $32, psa9Price = $60. NOT $50.
-5. If you cannot find raw sales, set rawPrice to null and estimate avgPrice from raw listings only (not graded).
-VIOLATION: An avgPrice or rawPrice that includes graded sale prices is WRONG and misleads collectors.`
+4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.
+5. Example: raw sales $25-$40, PSA 9 sales $60 → avgPrice = $32, rawPrice = $32, psa9Price = $60. NOT $50.
+6. If you cannot find raw sales, set rawPrice to null and estimate avgPrice conservatively from what you know (lean toward the lower end of any range you find).
+VIOLATION: An avgPrice or rawPrice that includes graded or SSP sale prices is WRONG and misleads collectors.`
     : "";
 
   const isAutoCardStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
@@ -721,9 +722,10 @@ This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and g
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${unifiedSearchDescription} raw sold eBay" and "${unifiedSearchDescription} ungraded sold eBay"
 2. market.avgPrice, market.minPrice, market.maxPrice and market.rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
 3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into market.avgPrice or market.rawPrice.
-4. Example: raw sales $25-$40, PSA 9 sales $60 → market.avgPrice = $32, market.rawPrice = $32, psa9Price = $60. NOT $50.
-5. If you cannot find raw sales, set market.rawPrice to null and estimate market.avgPrice from raw listings only (not graded).
-VIOLATION: A market.avgPrice or market.rawPrice that includes graded sale prices is WRONG and misleads collectors.`
+4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.
+5. Example: raw sales $25-$40, PSA 9 sales $60 → market.avgPrice = $32, market.rawPrice = $32, psa9Price = $60. NOT $50.
+6. If you cannot find raw sales, set market.rawPrice to null and estimate market.avgPrice conservatively (lean toward the lower end of any range you find).
+VIOLATION: A market.avgPrice or market.rawPrice that includes graded or SSP sale prices is WRONG and misleads collectors.`
     : "";
   const autoCardWarning = isAutoCard && card.set
     ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING REQUIRED:
