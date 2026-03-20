@@ -3685,9 +3685,10 @@ Sitemap: ${origin}/sitemap.xml
             }
             // Upper-bound sanity check: when raw price was rescued/overridden by trend rescue
             // or other corrections, the unified PSA estimates may be from a completely different
-            // card/price level. PSA 9 rarely exceeds 20x raw, PSA 10 rarely exceeds 40x raw.
-            const psa9MaxRatio = 25;
-            const psa10MaxRatio = 50;
+            // card/price level. Also catches cases where Gemini found PSA comps from a different
+            // card entirely (e.g., finding 1986 Fleer PSA 10 prices for a 1997 Fleer Zone insert).
+            const psa9MaxRatio = 12;
+            const psa10MaxRatio = 25;
             if (psa9 !== null && psa9 > marketValue * psa9MaxRatio) {
               console.warn(`[GradedMatrix] PSA 9 (${psa9}) is ${Math.round(psa9/marketValue)}x raw ($${marketValue}) — unrealistic ratio, likely wrong card comps. Clearing.`);
               psa9 = null;

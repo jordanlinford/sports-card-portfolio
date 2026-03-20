@@ -290,6 +290,18 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
 - If you cannot determine the specific card, return soldCount: 0 rather than guessing.`
     : "";
 
+  const setWordsStandalone = (card.set || "").trim().split(/\s+/);
+  const hasSubsetInSetNameStandalone = setWordsStandalone.length >= 2 && !/^\d+$/.test(setWordsStandalone[setWordsStandalone.length - 1]);
+  const productNameWarningStandalone = hasSubsetInSetNameStandalone
+    ? `\nPRODUCT NAME PRECISION — CRITICAL:
+The FULL set name is "${card.set}". Every word matters — each word identifies a DIFFERENT product:
+- "${card.set}" and "${setWordsStandalone[0]}" are COMPLETELY DIFFERENT products at COMPLETELY DIFFERENT price tiers.
+- Example: "Fleer Zone" ≠ "Fleer", "Metal Universe" ≠ "Metal", "Topps Finest" ≠ "Topps Chrome", "Topps Stadium Club" ≠ "Topps"
+- You MUST include the FULL set name "${card.set}" in EVERY search query. NEVER drop words from the set name.
+- If you find comps that don't include "${card.set}" in the listing title, they are for a DIFFERENT product — EXCLUDE them.
+- ALL price fields (raw, PSA 9, PSA 10) must come from "${card.set}" comps ONLY — never mix comps from the base brand.`
+    : "";
+
   const rawGradeWarning = isRaw
     ? `\nRAW CARD — CRITICAL PRICING RULES:
 This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and graded prices:
@@ -400,6 +412,7 @@ Cite which comps you used and how you arrived at your estimate in the notes fiel
 
   const searchPrompt = `Search eBay for recently SOLD listings of this sports card: "${searchDescription}"
 ${variationContext}
+${productNameWarningStandalone}
 ${specificityWarning}
 ${rawGradeWarning}
 ${autoCardWarningStandalone}
@@ -738,6 +751,19 @@ DO NOT guess or assume it is the player's most popular/valuable card. The card c
 - Set market.confidence to "LOW" since the card identity is incomplete.`
     : "";
 
+  // Detect multi-word set names that include subset/insert identifiers
+  const setWords = (card.set || "").trim().split(/\s+/);
+  const hasSubsetInSetName = setWords.length >= 2 && !/^\d+$/.test(setWords[setWords.length - 1]);
+  const productNameWarning = hasSubsetInSetName
+    ? `\nPRODUCT NAME PRECISION — CRITICAL:
+The FULL set name is "${card.set}". Every word matters — each word identifies a DIFFERENT product:
+- "${card.set}" and "${setWords[0]}" are COMPLETELY DIFFERENT products at COMPLETELY DIFFERENT price tiers.
+- Example: "Fleer Zone" ≠ "Fleer", "Metal Universe" ≠ "Metal", "Topps Finest" ≠ "Topps Chrome", "Topps Stadium Club" ≠ "Topps"
+- You MUST include the FULL set name "${card.set}" in EVERY search query. NEVER drop words from the set name.
+- If you find comps that don't include "${card.set}" in the listing title, they are for a DIFFERENT product — EXCLUDE them.
+- ALL price fields (raw, PSA 9, PSA 10) must come from "${card.set}" comps ONLY — never mix comps from the base brand.`
+    : "";
+
   const isAutoCard = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
   const hasPatchUnified = /patch|mem|memorabilia|relic|jersey/i.test(card.variation || "") || /patch|mem|memorabilia|relic|jersey/i.test(card.title || "");
   const unifiedSearchDescription = [card.year, card.set, card.playerName || card.title, card.variation].filter(Boolean).join(" ");
@@ -858,6 +884,7 @@ Player: ${card.playerName || card.title}
 Year: ${card.year || "Unknown"} | Set: ${card.set || "Unknown"} | Variation: ${card.variation || "Base"}
 Grade: ${isRaw ? "RAW (ungraded)" : (card.grade || "Unknown")}${card.grader ? ` by ${card.grader}` : ""}
 ${variationContext}
+${productNameWarning}
 ${specificityWarning}
 ${rawGradeWarning}
 ${autoCardWarning}
