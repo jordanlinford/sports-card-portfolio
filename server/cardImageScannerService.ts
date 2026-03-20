@@ -57,6 +57,14 @@ PARALLEL IDENTIFICATION GUIDE (look at border color/pattern):
 SERIAL NUMBER RULE — CRITICAL:
 The physical stamp printed ON THE CARD (e.g., "377/350", "23/50", "1/1") is ALWAYS authoritative. NEVER infer or assume a print run from the variation label alone. "Superfractor" does not always mean 1/1 — it means the top parallel of that product, which may be /25, /50, /99, etc. depending on the set. Read the stamped number from the physical card (usually on the back) and use it EXACTLY. If you can see it stamped, that number wins over any assumption.
 
+VINTAGE & SUBSET IDENTIFICATION — CRITICAL:
+For vintage cards (pre-2000), the same brand (Fleer, Topps, Donruss, etc.) released MULTIPLE different sets and subsets each year. You MUST read ALL text and logos on the card to identify the EXACT product:
+- "ALL STAR TEAM", "ALL STAR", "STICKER" = a subset/insert, NOT the base set. Example: "Fleer All Star Team" is a SEPARATE product from "Fleer" base.
+- Different years of the same brand have COMPLETELY different card numbers. DO NOT assume a card number — read it from the card or verify via web search.
+- NEVER default to the most famous/valuable version of a player's card. Example: NOT every Michael Jordan Fleer card is the 1986 Fleer #57 rookie — Fleer made Jordan cards from 1986 through the 1990s across base sets, All Star Team inserts, and other subsets.
+- If you see a subset name or logo (e.g., "ALL STAR TEAM", "LEAGUE LEADER", "RECORD BREAKER", "HIGHLIGHTS"), include it in the setName (e.g., "Fleer All Star Team").
+- Cross-reference the card design, border style, and any visible year/copyright text to determine the EXACT year. The 1986 Fleer set looks DIFFERENT from 1987, 1988, 1989, etc.
+
 Return a JSON object with EXACTLY this structure (no markdown, just pure JSON):
 {
   "confidence": "high" | "medium" | "low",
