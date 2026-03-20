@@ -250,6 +250,8 @@ export async function fetchGeminiMarketData(card: {
   const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i;
   const isPremiumUnnumberedStandalone = !isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
   const isOpticSetStandalone = /\boptic\b/i.test(card.set || "");
+  const isPrizmFamilySetStandalone = /\bprizm\b|\bprisma\b/i.test(card.set || "");
+  const isStrictBaseVariationStandalone = !card.variation || variationLowerStandalone === "base" || variationLowerStandalone === "base prizm";
   const isAutoStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
   const isHatSwatch = /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.variation || "") || /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.title || "");
   const isMemOnly = !isAutoStandalone && /mem|memorabilia|relic|jersey|patch|cap|hat|swatch/i.test(card.variation || "");
@@ -264,9 +266,19 @@ export async function fetchGeminiMarketData(card: {
 CRITICAL PARALLEL MATCHING: Only use comps from the SAME parallel type with the SAME print run (/${numberedPrintRunStandalone || "?"}). Different numbered parallels of the same card (e.g., /50 Gold vs /399 Yellow Holo) are COMPLETELY DIFFERENT cards at DIFFERENT price tiers. A /50 card is much rarer and more valuable than a /399 card. Do NOT mix comps from different parallel types or print runs. If a listing says "/${numberedPrintRunStandalone}" it must match — reject any comp that shows a different print run number.`
     : isPremiumUnnumberedStandalone
       ? `\nCRITICAL: This is a PREMIUM SSP/Case Hit insert — "${card.variation || card.set}". It is SIGNIFICANTLY more valuable than base/silver cards. Search specifically for "${searchDescription}" — do NOT return base card prices. Include the exact insert/parallel name in every search.${isOpticSetStandalone ? `\nOPTIC PRODUCT DISTINCTION: The SET is "${card.set}" which is a Donruss OPTIC (holographic/prismatic) product. Donruss Optic inserts are COMPLETELY DIFFERENT from base Donruss inserts of the same name — they are holographic and typically sell for 3-10x more. NEVER use base Donruss (non-Optic) prices as comps. Always include "Optic" in your eBay search queries.` : ""}`
-    : (card.variation && card.variation.toLowerCase() !== "base"
-      ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
-      : "");
+    : (isPrizmFamilySetStandalone && isStrictBaseVariationStandalone
+      ? `\n⚠️ PRIZM BASE (NON-REFRACTOR) — CRITICAL PARALLEL SEPARATION:
+This card is the PAPER BASE version of a Prizm card — it is NON-REFRACTOR, NON-CHROME.
+In Panini Prizm sets, there are TWO completely different "base" products:
+  1. Paper Base (this card): standard paper stock, no chrome/refractor finish — sells for $1–$5 for most players
+  2. Silver Prizm: chrome refractor finish, the most iconic Prizm parallel — sells for $5–$30+ for the same player
+These are DIFFERENT cards at DIFFERENT price tiers. You MUST exclude Silver Prizm comps.
+REFRACTOR EXCLUSION RULE: ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Hyper", "Gold", "Red", "Blue Wave", "Green", "Purple", "Orange", "Pink" in the title is a PARALLEL, not the paper base — EXCLUDE it completely.
+Search specifically: "${card.playerName || card.title} ${card.year || ""} Prizm base" — the paper base sells at a MUCH LOWER price than any chrome/refractor version.
+For common players and bench players, the Prizm paper base sells for under $5.`
+      : card.variation && card.variation.toLowerCase() !== "base"
+        ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
+        : "");
 
   const hasMissingDetails = !card.set || !card.variation;
   const specificityWarning = hasMissingDetails
@@ -284,7 +296,8 @@ This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and g
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${searchDescription} raw sold eBay" and "${searchDescription} ungraded sold eBay"
 2. avgPrice, minPrice, maxPrice and rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
 3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into avgPrice or rawPrice.
-4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.
+4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.${isPrizmFamilySetStandalone && isStrictBaseVariationStandalone ? `
+4b. PRIZM BASE REFRACTOR EXCLUSION: This is a PAPER BASE Prizm card (NON-REFRACTOR). ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Gold", "Red", "Blue", "Green", "Purple", "Orange", "Pink" in the title is a DIFFERENT, MORE EXPENSIVE parallel — EXCLUDE it completely. Only use listings that are clearly the paper base version.` : ""}
 5. Example: raw sales $25, $32, $40 → avgPrice = $32 (median), rawPrice = $32, psa9Price (separate) = $60.
 6. Use the MEDIAN of the raw non-SSP sales you find — do NOT skew low or high. Report it accurately.
 7. If you cannot find raw non-SSP sales, set rawPrice to null and soldCount to 0.
@@ -652,6 +665,9 @@ export async function fetchUnifiedCardAnalysis(card: {
   const setLower = (card.set || "").toLowerCase();
   const sspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i;
   const isPremiumUnnumberedParallel = !isNumbered && (sspPattern.test(variationLower) || sspPattern.test(setLower));
+  // Prizm-family sets: base paper card is non-refractor; Silver Prizm/Silver/Refractor are DIFFERENT parallels
+  const isPrizmFamilySet = /\bprizm\b|\bprisma\b/i.test(card.set || "");
+  const isStrictBaseVariation = !card.variation || variationLower === "base" || variationLower === "base prizm";
   const isOpticSet = /\boptic\b/i.test(card.set || "");
   const isBaseOrCommonParallel = !isNumbered && !isPremiumUnnumberedParallel && (
     !card.variation ||
@@ -699,7 +715,16 @@ The SET is "${card.set}" — this is Donruss OPTIC, a PREMIUM holographic/prisma
 - Do NOT confuse with numbered parallels (/25, /49, /99), SSPs, or premium insert sets
 - For Panini Select: Concourse Silver is the cheapest tier — do NOT price as Premier or Field Level
 - For Panini Prizm: base Silver Prizm is the cheapest parallel
-- Search specifically for the UNNUMBERED version and report those prices`
+- Search specifically for the UNNUMBERED version and report those prices${isPrizmFamilySet && isStrictBaseVariation ? `
+⚠️ PRIZM BASE (NON-REFRACTOR) — CRITICAL PARALLEL SEPARATION:
+This card is the PAPER BASE version of a Prizm card — it is NON-REFRACTOR, NON-CHROME.
+In Panini Prizm sets, there are TWO completely different "base" products:
+  1. Paper Base (this card): standard paper stock, no chrome/refractor finish — sells for $1–$5 for most players
+  2. Silver Prizm: chrome refractor finish, the most iconic Prizm parallel — sells for $5–$30+ for the same player
+These are DIFFERENT cards at DIFFERENT price tiers. You MUST exclude Silver Prizm comps.
+REFRACTOR EXCLUSION RULE: ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Hyper", "Gold", "Red", "Blue Wave", "Green", "Purple", "Orange", "Pink" in the title is a PARALLEL, not the paper base — EXCLUDE it completely.
+Search specifically: "${card.playerName || card.title} ${card.year || ""} Prizm base" or "${card.playerName || card.title} ${card.year || ""} Prizm rookie card" — the paper base sells at a MUCH LOWER price than any chrome/refractor version.
+For common players and bench players, the Prizm paper base sells for under $5. Do not exceed the true paper base comp range.` : ""}`
       : (card.variation
         ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
         : "");
@@ -723,7 +748,8 @@ This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and g
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${unifiedSearchDescription} raw sold eBay" and "${unifiedSearchDescription} ungraded sold eBay"
 2. market.avgPrice, market.minPrice, market.maxPrice and market.rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
 3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into market.avgPrice or market.rawPrice.
-4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.
+4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.${isPrizmFamilySet && isStrictBaseVariation ? `
+4b. PRIZM BASE REFRACTOR EXCLUSION: This is a PAPER BASE Prizm card (NON-REFRACTOR). ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Gold", "Red", "Blue", "Green", "Purple", "Orange", "Pink" in the title is a DIFFERENT, MORE EXPENSIVE parallel — EXCLUDE it completely. Only use listings that are clearly the paper base version.` : ""}
 5. Example: raw sales $25, $32, $40 → market.avgPrice = $32 (median), market.rawPrice = $32, psa9Price (separate) = $60.
 6. Use the MEDIAN of the raw non-SSP sales you find — do NOT skew low or high. Report it accurately.
 7. If you cannot find raw non-SSP sales, set market.rawPrice to null and market.soldCount to 0.
