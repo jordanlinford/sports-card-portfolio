@@ -3683,6 +3683,19 @@ Sitemap: ${origin}/sitemap.xml
               console.warn(`[GradedMatrix] PSA 10 (${psa10}) < raw (${marketValue}) — wrong card comps detected. Clearing.`);
               psa10 = null;
             }
+            // Upper-bound sanity check: when raw price was rescued/overridden by trend rescue
+            // or other corrections, the unified PSA estimates may be from a completely different
+            // card/price level. PSA 9 rarely exceeds 20x raw, PSA 10 rarely exceeds 40x raw.
+            const psa9MaxRatio = 25;
+            const psa10MaxRatio = 50;
+            if (psa9 !== null && psa9 > marketValue * psa9MaxRatio) {
+              console.warn(`[GradedMatrix] PSA 9 (${psa9}) is ${Math.round(psa9/marketValue)}x raw ($${marketValue}) — unrealistic ratio, likely wrong card comps. Clearing.`);
+              psa9 = null;
+            }
+            if (psa10 !== null && psa10 > marketValue * psa10MaxRatio) {
+              console.warn(`[GradedMatrix] PSA 10 (${psa10}) is ${Math.round(psa10/marketValue)}x raw ($${marketValue}) — unrealistic ratio, likely wrong card comps. Clearing.`);
+              psa10 = null;
+            }
 
             if (psa9 || psa10) {
               return { psa9, psa10 };
