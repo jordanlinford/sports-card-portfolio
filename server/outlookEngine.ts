@@ -247,7 +247,7 @@ export async function fetchGeminiMarketData(card: {
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLowerStandalone = (card.variation || "").toLowerCase().trim();
   const setLowerStandalone = (card.set || "").toLowerCase();
-  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i;
+  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension)\b/i;
   const isPremiumUnnumberedStandalone = !isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
   const isOpticSetStandalone = /\boptic\b/i.test(card.set || "");
   const isPrizmFamilySetStandalone = /\bprizm\b|\bprisma\b/i.test(card.set || "");
@@ -308,12 +308,12 @@ This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and g
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${searchDescription} raw sold eBay" and "${searchDescription} ungraded sold eBay"
 2. avgPrice, minPrice, maxPrice and rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
 3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into avgPrice or rawPrice.
-4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.${isPrizmFamilySetStandalone && isStrictBaseVariationStandalone ? `
+${isPremiumUnnumberedStandalone ? `4. SSP/CASE HIT INCLUSION: This card IS a premium SSP/Case Hit insert. Listings tagged "SSP", "Short Print", "Case Hit" ARE this card — INCLUDE them as valid comps. Do NOT exclude SSP-tagged listings.` : `4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.`}${isPrizmFamilySetStandalone && isStrictBaseVariationStandalone ? `
 4b. PRIZM BASE REFRACTOR EXCLUSION: This is a PAPER BASE Prizm card (NON-REFRACTOR). ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Gold", "Red", "Blue", "Green", "Purple", "Orange", "Pink" in the title is a DIFFERENT, MORE EXPENSIVE parallel — EXCLUDE it completely. Only use listings that are clearly the paper base version.` : ""}
 5. Example: raw sales $25, $32, $40 → avgPrice = $32 (median), rawPrice = $32, psa9Price (separate) = $60.
-6. Use the MEDIAN of the raw non-SSP sales you find — do NOT skew low or high. Report it accurately.
-7. If you cannot find raw non-SSP sales, set rawPrice to null and soldCount to 0.
-VIOLATION: An avgPrice or rawPrice that includes graded or SSP sale prices is WRONG and misleads collectors.`
+6. Use the MEDIAN of the raw sales you find — do NOT skew low or high. Report it accurately.
+7. If you cannot find raw sales, set rawPrice to null and soldCount to 0.
+VIOLATION: An avgPrice or rawPrice that includes graded sale prices is WRONG and misleads collectors.`
     : "";
 
   const isAutoCardStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
@@ -676,7 +676,7 @@ export async function fetchUnifiedCardAnalysis(card: {
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLower = (card.variation || "").toLowerCase().trim();
   const setLower = (card.set || "").toLowerCase();
-  const sspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i;
+  const sspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension)\b/i;
   const isPremiumUnnumberedParallel = !isNumbered && (sspPattern.test(variationLower) || sspPattern.test(setLower));
   // Prizm-family sets: base paper card is non-refractor; Silver Prizm/Silver/Refractor are DIFFERENT parallels
   const isPrizmFamilySet = /\bprizm\b|\bprisma\b/i.test(card.set || "");
@@ -773,13 +773,14 @@ The FULL set name is "${card.set}". Every word matters — each word identifies 
 This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and graded prices:
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${unifiedSearchDescription} raw sold eBay" and "${unifiedSearchDescription} ungraded sold eBay"
 2. market.avgPrice, market.minPrice, market.maxPrice and market.rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
-3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into market.avgPrice or market.rawPrice.
-4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.${isPrizmFamilySet && isStrictBaseVariation ? `
+3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into market.avgPrice or market.rawPrice.${isPremiumUnnumberedParallel ? `
+4. SSP/CASE HIT INCLUSION: This card IS a premium SSP/Case Hit insert. Listings tagged "SSP", "Short Print", "Case Hit" ARE this card — INCLUDE them as valid comps. Do NOT exclude SSP-tagged listings.` : `
+4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.`}${isPrizmFamilySet && isStrictBaseVariation ? `
 4b. PRIZM BASE REFRACTOR EXCLUSION: This is a PAPER BASE Prizm card (NON-REFRACTOR). ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Gold", "Red", "Blue", "Green", "Purple", "Orange", "Pink" in the title is a DIFFERENT, MORE EXPENSIVE parallel — EXCLUDE it completely. Only use listings that are clearly the paper base version.` : ""}
 5. Example: raw sales $25, $32, $40 → market.avgPrice = $32 (median), market.rawPrice = $32, psa9Price (separate) = $60.
-6. Use the MEDIAN of the raw non-SSP sales you find — do NOT skew low or high. Report it accurately.
-7. If you cannot find raw non-SSP sales, set market.rawPrice to null and market.soldCount to 0.
-VIOLATION: A market.avgPrice or market.rawPrice that includes graded or SSP sale prices is WRONG and misleads collectors.`
+6. Use the MEDIAN of the raw sales you find — do NOT skew low or high. Report it accurately.
+7. If you cannot find raw sales, set market.rawPrice to null and market.soldCount to 0.
+VIOLATION: A market.avgPrice or market.rawPrice that includes graded sale prices is WRONG and misleads collectors.`
     : "";
   const autoCardWarning = isAutoCard && card.set
     ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING REQUIRED:
