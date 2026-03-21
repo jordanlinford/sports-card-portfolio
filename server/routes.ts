@@ -4997,11 +4997,20 @@ RULES:
     }
   });
 
-  app.post("/api/display-cases/:id/comments", isAuthenticated, async (req: any, res) => {
+  app.post("/api/display-cases/:id/comments", async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
-      const userId = req.user.claims.sub;
-      const { content } = req.body;
+      const { content, guestName } = req.body;
+
+      const userId = req.isAuthenticated?.() ? req.user?.claims?.sub : null;
+
+      if (!userId && (!guestName || typeof guestName !== "string" || guestName.trim().length === 0)) {
+        return res.status(400).json({ error: "Name is required for guest comments" });
+      }
+
+      if (guestName && guestName.length > 100) {
+        return res.status(400).json({ error: "Name too long (max 100 characters)" });
+      }
 
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid display case ID" });
@@ -5020,19 +5029,23 @@ RULES:
         return res.status(404).json({ error: "Display case not found" });
       }
 
-      const comment = await storage.createComment(id, userId, content.trim());
+      const comment = await storage.createComment(id, userId, content.trim(), userId ? undefined : guestName?.trim());
       
-      // Notify the display case owner about the new comment (if not self-commenting)
       if (displayCase.userId !== userId) {
-        const commenter = await storage.getUser(userId);
-        const commenterName = commenter?.handle 
-          ? `@${commenter.handle}` 
-          : commenter ? `${commenter.firstName || ''} ${commenter.lastName || ''}`.trim() || 'Someone' : 'Someone';
+        let commenterName = 'Someone';
+        if (userId) {
+          const commenter = await storage.getUser(userId);
+          commenterName = commenter?.handle 
+            ? `@${commenter.handle}` 
+            : commenter ? `${commenter.firstName || ''} ${commenter.lastName || ''}`.trim() || 'Someone' : 'Someone';
+        } else if (guestName) {
+          commenterName = guestName.trim();
+        }
         
         await storage.createNotification(displayCase.userId, "comment_received", {
           displayCaseId: id,
           caseName: displayCase.name,
-          commenterId: userId,
+          commenterId: userId || 'guest',
           commenterName,
           commentPreview: content.trim().substring(0, 100),
         });

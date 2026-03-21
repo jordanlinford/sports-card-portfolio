@@ -184,7 +184,7 @@ export interface IStorage {
 
   // Comment operations
   getComments(displayCaseId: number): Promise<CommentWithUser[]>;
-  createComment(displayCaseId: number, userId: string, content: string): Promise<Comment>;
+  createComment(displayCaseId: number, userId: string | null, content: string, guestName?: string): Promise<Comment>;
   deleteComment(id: number, userId: string): Promise<void>;
 
   // Like operations
@@ -1127,32 +1127,40 @@ export class DatabaseStorage implements IStorage {
 
     const commentsWithUsers: CommentWithUser[] = [];
     for (const comment of commentsData) {
-      const [user] = await db
-        .select({
-          id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          handle: users.handle,
-          profileImageUrl: users.profileImageUrl,
-        })
-        .from(users)
-        .where(eq(users.id, comment.userId));
+      if (comment.userId) {
+        const [user] = await db
+          .select({
+            id: users.id,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            handle: users.handle,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(users)
+          .where(eq(users.id, comment.userId));
 
-      commentsWithUsers.push({
-        ...comment,
-        user: user || { id: comment.userId, firstName: null, lastName: null, handle: null, profileImageUrl: null },
-      });
+        commentsWithUsers.push({
+          ...comment,
+          user: user || { id: comment.userId, firstName: null, lastName: null, handle: null, profileImageUrl: null },
+        });
+      } else {
+        commentsWithUsers.push({
+          ...comment,
+          user: null,
+        });
+      }
     }
 
     return commentsWithUsers;
   }
 
-  async createComment(displayCaseId: number, userId: string, content: string): Promise<Comment> {
+  async createComment(displayCaseId: number, userId: string | null, content: string, guestName?: string): Promise<Comment> {
     const [comment] = await db
       .insert(comments)
       .values({
         displayCaseId,
         userId,
+        guestName: guestName || null,
         content,
       })
       .returning();

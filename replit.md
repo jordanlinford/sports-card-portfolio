@@ -30,7 +30,7 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Unified Usage Tracking**: Tracks collection and quick analyses for consistent free tier enforcement.
 - **Display Customization**: Multiple layout styles and premium themes for display cases.
 - **Collection Organization**: Card tagging, automatic case generation, and duplicate detection.
-- **Social Features**: Liking, commenting, prestige system, and bookmarking.
+- **Social Features**: Liking, commenting (including guest comments without login), prestige system, and bookmarking. Display case share links include OG meta tags with dynamic images for rich previews on social media.
 - **Leaderboards**: Public page showing top 5 display cases ranked by likes, total value, and views. Accessible from main navigation.
 - **Trading & Communication**: Offers system for cards and direct messaging.
 - **Analytics & Sharing**: Portfolio analytics and viral sharing features.

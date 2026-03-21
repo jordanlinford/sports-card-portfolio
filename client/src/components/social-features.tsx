@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Heart, MessageCircle, Trash2, Send, Share2, Link2, Check } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Heart, MessageCircle, Trash2, Send, Share2, Link2, Check, UserCircle } from "lucide-react";
 import { SiX, SiFacebook } from "react-icons/si";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -170,6 +171,12 @@ interface CommentsProps {
 
 export function Comments({ displayCaseId, user }: CommentsProps) {
   const [newComment, setNewComment] = useState("");
+  const [guestName, setGuestName] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("mydisplaycase_guest_name") || "";
+    }
+    return "";
+  });
   const { toast } = useToast();
 
   const { data: comments, isLoading } = useQuery<CommentWithUser[]>({
@@ -177,11 +184,16 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: async (content: string) => {
-      await apiRequest("POST", `/api/display-cases/${displayCaseId}/comments`, { content });
+    mutationFn: async ({ content, guestName: gn }: { content: string; guestName?: string }) => {
+      const body: any = { content };
+      if (gn) body.guestName = gn;
+      await apiRequest("POST", `/api/display-cases/${displayCaseId}/comments`, body);
     },
     onSuccess: () => {
       setNewComment("");
+      if (!user && guestName) {
+        localStorage.setItem("mydisplaycase_guest_name", guestName);
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases", displayCaseId, "comments"] });
       toast({
         title: "Comment added",
@@ -219,35 +231,53 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      window.location.href = "/api/login";
+    if (!newComment.trim()) return;
+    if (!user && !guestName.trim()) {
+      toast({
+        title: "Name required",
+        description: "Please enter your name to comment.",
+        variant: "destructive",
+      });
       return;
     }
-    if (newComment.trim()) {
-      addCommentMutation.mutate(newComment.trim());
-    }
+    addCommentMutation.mutate({
+      content: newComment.trim(),
+      guestName: !user ? guestName.trim() : undefined,
+    });
   };
 
   const getUserName = (comment: CommentWithUser) => {
-    if (comment.user.handle) {
-      return `@${comment.user.handle}`;
+    if (comment.user) {
+      if (comment.user.handle) {
+        return `@${comment.user.handle}`;
+      }
+      if (comment.user.firstName && comment.user.lastName) {
+        return `${comment.user.firstName} ${comment.user.lastName}`;
+      }
+      if (comment.user.firstName) {
+        return comment.user.firstName;
+      }
     }
-    if (comment.user.firstName && comment.user.lastName) {
-      return `${comment.user.firstName} ${comment.user.lastName}`;
-    }
-    if (comment.user.firstName) {
-      return comment.user.firstName;
+    if (comment.guestName) {
+      return comment.guestName;
     }
     return "Anonymous";
   };
 
   const getInitials = (comment: CommentWithUser) => {
-    if (comment.user.handle) {
+    if (comment.user?.handle) {
       return comment.user.handle.slice(0, 2).toUpperCase();
     }
-    const name = comment.user.firstName || "?";
-    return name.slice(0, 2).toUpperCase();
+    if (comment.user?.firstName) {
+      return comment.user.firstName.slice(0, 2).toUpperCase();
+    }
+    if (comment.guestName) {
+      return comment.guestName.slice(0, 2).toUpperCase();
+    }
+    return "?";
   };
+
+  const isGuestComment = (comment: CommentWithUser) => !comment.userId;
 
   return (
     <div className="space-y-6">
@@ -259,10 +289,23 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-3">
+        {!user && (
+          <div className="flex items-center gap-2">
+            <UserCircle className="h-5 w-5 text-muted-foreground shrink-0" />
+            <Input
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              placeholder="Your name"
+              maxLength={100}
+              className="max-w-[200px]"
+              data-testid="input-guest-name"
+            />
+          </div>
+        )}
         <Textarea
           value={newComment}
           onChange={(e) => setNewComment(e.target.value)}
-          placeholder={user ? "Write a comment..." : "Sign in to comment..."}
+          placeholder="Write a comment..."
           className="resize-none"
           maxLength={1000}
           data-testid="input-comment"
@@ -270,7 +313,7 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
         <div className="flex justify-end">
           <Button
             type="submit"
-            disabled={!newComment.trim() || addCommentMutation.isPending}
+            disabled={!newComment.trim() || addCommentMutation.isPending || (!user && !guestName.trim())}
             className="gap-2"
             data-testid="button-submit-comment"
           >
@@ -301,7 +344,7 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
               data-testid={`comment-${comment.id}`}
             >
               <Avatar className="h-10 w-10">
-                <AvatarImage src={comment.user.profileImageUrl || undefined} />
+                <AvatarImage src={comment.user?.profileImageUrl || undefined} />
                 <AvatarFallback>{getInitials(comment)}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
@@ -310,6 +353,11 @@ export function Comments({ displayCaseId, user }: CommentsProps) {
                     <span className="font-medium text-sm" data-testid={`comment-author-${comment.id}`}>
                       {getUserName(comment)}
                     </span>
+                    {isGuestComment(comment) && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
+                        Guest
+                      </span>
+                    )}
                     <span className="text-xs text-muted-foreground">
                       {comment.createdAt && formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
                     </span>

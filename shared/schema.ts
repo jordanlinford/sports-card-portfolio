@@ -176,7 +176,8 @@ export const cardsRelations = relations(cards, ({ one }) => ({
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
   displayCaseId: integer("display_case_id").notNull().references(() => displayCases.id, { onDelete: "cascade" }),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").references(() => users.id),
+  guestName: varchar("guest_name", { length: 100 }),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -617,7 +618,7 @@ export type UserBadgeWithBadge = UserBadge & { badge: Badge };
 // Extended types with relations
 export type DisplayCaseWithCards = DisplayCase & { cards: Card[] };
 export type DisplayCaseWithUser = DisplayCase & { user: User };
-export type CommentWithUser = Comment & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> };
+export type CommentWithUser = Comment & { user: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'> | null };
 export type BookmarkWithCard = Bookmark & { card: Card };
 export type OfferWithUsers = Offer & { fromUser: Pick<User, 'id' | 'firstName' | 'lastName' | 'handle' | 'profileImageUrl'>; card: Card };
 export type TradeOfferWithDetails = TradeOffer & { 
