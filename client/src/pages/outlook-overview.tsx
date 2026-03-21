@@ -715,6 +715,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
       if (sp.get("grade")) setGrade(sp.get("grade")!);
       if (sp.get("grader")) setGrader(sp.get("grader")!);
       if (sp.get("cardNumber")) setCardNumber(sp.get("cardNumber")!);
+      if (sp.get("imagePath")) {
+        const path = sp.get("imagePath")!;
+        setImagePath(path);
+        setPreviewUrl(path);
+      }
       setShowForm(true);
       setInputMode("manual");
       window.history.replaceState({}, "", window.location.pathname);
