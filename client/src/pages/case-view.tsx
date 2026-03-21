@@ -479,10 +479,14 @@ export default function CaseView() {
     <div className="min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4">
+          <button
+            onClick={() => window.history.length > 1 ? window.history.back() : window.location.href = "/"}
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4 bg-transparent border-none cursor-pointer p-0"
+            data-testid="button-back"
+          >
             <ArrowLeft className="h-4 w-4" />
             Back
-          </Link>
+          </button>
 
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
