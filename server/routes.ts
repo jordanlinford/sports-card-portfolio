@@ -2476,11 +2476,21 @@ Sitemap: ${origin}/sitemap.xml
 
       if (pricePointsForSchema.length > 0 && !is1of1 && !isLowPop) {
         const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
-        if (ppPrices.length > 0 && marketValue && marketValue > 0) {
+        if (ppPrices.length >= 2 && marketValue && marketValue > 0) {
           const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
           const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
           const ratio = marketValue / ppMedian;
-          if (ratio > 3) console.log(`[Outlook 2.0] CROSS-VALIDATION (info only): Gemini $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Trusting Gemini.`);
+          const geminiSoldCount = geminiMarketData?.soldCount ?? 0;
+          
+          if (geminiSoldCount <= 3 && ratio > 2.5 && ppPrices.length >= 2) {
+            const ceiling = Math.round(ppMedian * 2 * 100) / 100;
+            console.warn(`[Outlook 2.0] LOW-COMP CROSS-VALIDATION: Gemini $${marketValue} (${geminiSoldCount} comps) is ${ratio.toFixed(1)}x legacy median $${ppMedian.toFixed(2)} (${ppPrices.length} legacy comps). Capping at $${ceiling} (2x legacy median).`);
+            marketValue = ceiling;
+            priceMin = Math.round(ppMedian * 0.8 * 100) / 100;
+            priceMax = Math.round(ppMedian * 2.5 * 100) / 100;
+          } else if (ratio > 3) {
+            console.log(`[Outlook 2.0] CROSS-VALIDATION (info only): Gemini $${marketValue} (${geminiSoldCount} comps) is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Trusting Gemini — has ${geminiSoldCount} comps.`);
+          }
         }
       }
 
@@ -2758,6 +2768,23 @@ Sitemap: ${origin}/sitemap.xml
             compCount = geminiMarketData.soldCount;
             if (geminiMarketData.lowPrice) priceMin = geminiMarketData.lowPrice;
             if (geminiMarketData.highPrice) priceMax = geminiMarketData.highPrice;
+          }
+        }
+
+        if (priceData.pricePoints.length > 0 && !is1of1 && !isLowPop) {
+          const ppPrices = priceData.pricePoints.map((p: any) => p.price).filter((p: number) => typeof p === 'number' && p > 0);
+          if (ppPrices.length >= 2 && marketValue && marketValue > 0) {
+            const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
+            const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
+            const batchRatio = marketValue / ppMedian;
+            const batchGeminiComps = geminiMarketData?.soldCount ?? 0;
+            if (batchGeminiComps <= 3 && batchRatio > 2.5) {
+              const batchCeiling = Math.round(ppMedian * 2 * 100) / 100;
+              console.warn(`[Batch Outlook] LOW-COMP CROSS-VALIDATION: Gemini $${marketValue} (${batchGeminiComps} comps) is ${batchRatio.toFixed(1)}x legacy median $${ppMedian.toFixed(2)}. Capping at $${batchCeiling}.`);
+              marketValue = batchCeiling;
+              priceMin = Math.round(ppMedian * 0.8 * 100) / 100;
+              priceMax = Math.round(ppMedian * 2.5 * 100) / 100;
+            }
           }
         }
 
@@ -3542,13 +3569,14 @@ Sitemap: ${origin}/sitemap.xml
 
       // qaIsRaw defined earlier (before unified result block)
 
-      // CROSS-VALIDATION against legacy price points (LOG ONLY — no longer overrides Gemini)
-      // Legacy lookups often find wrong comps (wrong product, wrong variation), so they should
-      // never silently override the unified Gemini analysis. Log discrepancies for debugging only.
+      // CROSS-VALIDATION against legacy price points
+      // For HIGH comp counts (4+), this is LOG ONLY — Gemini has enough data to be trusted.
+      // For LOW comp counts (0-3), Gemini is most likely to have found wrong/mixed comps,
+      // so we apply a ceiling when legacy data strongly disagrees.
       const ppForValidation = priceData.pricePoints || [];
       if (ppForValidation.length > 0 && !qaIs1of1 && !qaIsLowPop && !qaIsSSP) {
         const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
-        if (ppPrices.length > 0 && marketValue && marketValue > 0) {
+        if (ppPrices.length >= 2 && marketValue && marketValue > 0) {
           const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
           const mid = Math.floor(sortedPrices.length / 2);
           const ppMedian = sortedPrices.length % 2 === 0
@@ -3556,8 +3584,16 @@ Sitemap: ${origin}/sitemap.xml
             : sortedPrices[mid];
           
           const ratio = marketValue / ppMedian;
-          if (ratio > 2.5) {
-            console.log(`[Quick Analyze] CROSS-VALIDATION (info only): Gemini $${marketValue} is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Trusting Gemini — legacy may have wrong comps.`);
+          const geminiCompCount = unifiedResult?.market.soldCount ?? 0;
+          
+          if (geminiCompCount <= 3 && ratio > 2.5 && ppPrices.length >= 2) {
+            const ceiling = Math.round(ppMedian * 2 * 100) / 100;
+            console.warn(`[Quick Analyze] LOW-COMP CROSS-VALIDATION: Gemini $${marketValue} (${geminiCompCount} comps) is ${ratio.toFixed(1)}x legacy median $${ppMedian.toFixed(2)} (${ppPrices.length} legacy comps). Capping at $${ceiling} (2x legacy median).`);
+            marketValue = ceiling;
+            priceMin = Math.round(ppMedian * 0.8 * 100) / 100;
+            priceMax = Math.round(ppMedian * 2.5 * 100) / 100;
+          } else if (ratio > 2.5) {
+            console.log(`[Quick Analyze] CROSS-VALIDATION (info only): Gemini $${marketValue} (${geminiCompCount} comps) is ${ratio.toFixed(1)}x higher than legacy median $${ppMedian.toFixed(2)}. Trusting Gemini — has ${geminiCompCount} comps.`);
           }
         }
       }
