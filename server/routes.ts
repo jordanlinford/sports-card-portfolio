@@ -3311,7 +3311,7 @@ Sitemap: ${origin}/sitemap.xml
         }),
         isPro ? fetchMonthlyPriceHistory({
           playerName: title,
-          sport: "football",
+          sport: sport || "football",
           year: year ? parseInt(year) : undefined,
           setName: set || undefined,
           variation: variation || undefined,
@@ -3465,19 +3465,12 @@ Sitemap: ${origin}/sitemap.xml
             }
           }
         } else {
-          // UNIFIED ESTIMATE RESCUE: soldCount=0 so we can't fully trust unified, but its rawPrice/avgPrice
-          // (from Gemini + Google Search grounding) is still more specific than the cross-product fallback's
-          // generic estimate. Capture it as a floor so the fallback doesn't override with a worse guess.
-          // Minimum $10 threshold to avoid using hallucinated $1-$5 guesses.
+          // soldCount=0 — Gemini is estimating with NO actual sales data.
+          // Do NOT use as a reliable price. Save it as a last-resort fallback only,
+          // to be used after cross-product and all other sources have also failed.
           const unifiedEstimate = (qaIsRaw ? unifiedResult.market.rawPrice : null) ?? unifiedResult.market.avgPrice;
-          if (unifiedEstimate && unifiedEstimate > 10 && marketValue <= 0) {
-            const unifiedMin = unifiedResult.market.minPrice;
-            const unifiedMax = unifiedResult.market.maxPrice;
-            console.log(`[Quick Analyze] UNIFIED ESTIMATE RESCUE: soldCount=0 but unified has rawPrice/avgPrice=$${unifiedEstimate}. Using as starting estimate (more specific than cross-product fallback).`);
-            marketValue = unifiedEstimate;
-            priceMin = unifiedMin || marketValue * 0.7;
-            priceMax = unifiedMax || marketValue * 1.5;
-            compCount = 0;
+          if (unifiedEstimate && unifiedEstimate > 0) {
+            console.log(`[Quick Analyze] ZERO-COMP GEMINI ESTIMATE: $${unifiedEstimate} (0 sold comps — saved as last-resort fallback, NOT used as market value)`);
           }
         }
       }
@@ -3531,16 +3524,23 @@ Sitemap: ${origin}/sitemap.xml
 
       // CROSS-PRODUCT FALLBACK: When there are NO real comps from any source (unified soldCount=0
       // AND legacy has insufficient data), run a dedicated cross-product search.
-      // This fires even when unified returned a low estimate — the cross-product search is more
-      // targeted (explicit searches across Donruss, Illusions, Elite, etc.) and we take the HIGHER
-      // of unified's estimate vs the cross-product result to avoid undervaluing the card.
+      // Auto-detect sport from set name or player context when not provided
+      const detectedSport = sport || (
+        /\b(prizm|select|mosaic|donruss|hoops|court kings|flux|illusions|recon|contenders)\b/i.test(set || "")
+          ? "basketball"
+          : /\b(topps|bowman|gypsy queen|heritage|stadium club|chrome|sapphire)\b/i.test(set || "")
+            ? "baseball"
+            : /\b(score|gridiron|absolute|certified|limited|luminance|zenith|elite|prestige|wild card)\b/i.test(set || "")
+              ? "football"
+              : undefined
+      );
       const legacyPricePoints = priceData.pricePoints || [];
       const legacyHasRealData = legacyPricePoints.length >= 2;
       const hasAnyRealComps = compCount > 0 || legacyHasRealData;
       if (!hasAnyRealComps && !qaIs1of1 && !qaIsVeryLowPop) {
         const playerName = (title || "").split(/\s+/).slice(0, 3).join(" ");
         const preExisting = marketValue || 0;
-        console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: soldCount=0, no legacy data for "${title}" (current est: $${preExisting}). Searching comparable products...`);
+        console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: soldCount=0, no legacy data for "${title}" (current est: $${preExisting}, sport: ${detectedSport || "unknown"}). Searching comparable products...`);
         try {
           const cpResult = await fetchCrossProductFallbackPrice({
             playerName,
@@ -3549,18 +3549,14 @@ Sitemap: ${origin}/sitemap.xml
             variation: variation || undefined,
             grade: grade || undefined,
             grader: grader || undefined,
+            sport: detectedSport || undefined,
           });
           if (cpResult && cpResult.avgPrice > 0) {
-            // Use cross-product fallback only when unified returned no usable price
-            if (!preExisting || preExisting <= 0) {
-              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: No prior estimate — using $${cpResult.avgPrice}. | ${cpResult.notes.substring(0, 100)}`);
-              marketValue = cpResult.avgPrice;
-              priceMin = cpResult.minPrice;
-              priceMax = cpResult.maxPrice;
-              compCount = 0;
-            } else {
-              console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: $${cpResult.avgPrice} vs Gemini $${preExisting}. Keeping Gemini result. | ${cpResult.notes.substring(0, 100)}`);
-            }
+            console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: Using $${cpResult.avgPrice} (range $${cpResult.minPrice}-$${cpResult.maxPrice}). | ${cpResult.notes.substring(0, 100)}`);
+            marketValue = cpResult.avgPrice;
+            priceMin = cpResult.minPrice;
+            priceMax = cpResult.maxPrice;
+            compCount = 0;
           }
         } catch (cpErr: any) {
           console.warn(`[Quick Analyze] CROSS-PRODUCT FALLBACK: Failed — ${cpErr.message}`);
@@ -3640,6 +3636,21 @@ Sitemap: ${origin}/sitemap.xml
         }
       } else if (qaMonthlyPriceHistory && !trendHasRealSales) {
         console.log(`[Quick Analyze] PRICE-TREND: Skipping — trend data has NO real sales (all salesCount=0)`);
+      }
+
+      // LAST-RESORT GEMINI FALLBACK: If after all sources we STILL have no price,
+      // use Gemini's 0-comp estimate but heavily discounted (30% of its guess).
+      // This is the absolute last option — Gemini is guessing without sales data.
+      if ((!marketValue || marketValue <= 0) && unifiedResult && unifiedResult.market.avgPrice > 0) {
+        const geminiGuess = unifiedResult.market.avgPrice;
+        const discountedGuess = Math.round(geminiGuess * 0.3 * 100) / 100;
+        console.log(`[Quick Analyze] LAST-RESORT GEMINI FALLBACK: No data from any source. Using discounted Gemini guess: $${discountedGuess} (30% of $${geminiGuess})`);
+        marketValue = discountedGuess;
+        priceMin = Math.round(discountedGuess * 0.5 * 100) / 100;
+        priceMax = Math.round(discountedGuess * 2 * 100) / 100;
+        compCount = 0;
+        signals.dataConfidence = "LOW";
+        signals.confidenceReason = "No recent sold comps found — price is a rough estimate based on comparable market data.";
       }
 
       // SPECIFICITY GUARD

@@ -739,15 +739,11 @@ REFRACTOR EXCLUSION RULE: ANY listing with "Silver", "Prizm Prizm", "Refractor",
 Search specifically: "${card.playerName || card.title} ${card.year || ""} Prizm base" or "${card.playerName || card.title} ${card.year || ""} Prizm rookie card" — the paper base sells at a MUCH LOWER price than any chrome/refractor version.
 For common players and bench players, the Prizm paper base sells for under $5. Do not exceed the true paper base comp range.` : ""}`
       : (card.variation
-        ? `\nEXACT PARALLEL MATCHING — CRITICAL:
-This is a "${card.variation}" parallel. Different parallels of the same card vary ENORMOUSLY in price (often 5-50x).
-- ONLY use sold comps that explicitly match "${card.variation}" in the listing title or description
-- Do NOT substitute comps from other parallels (Silver, Gold, Base, etc.) even from the same card set
-- Do NOT average in prices from higher-tier or lower-tier parallels — they are COMPLETELY DIFFERENT cards
-- Search specifically: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation} sold eBay"
-- Also try: "${card.playerName || card.title} ${card.set || ""} ${card.variation} sold"
-- If you cannot find ANY sold comps with "${card.variation}" in the listing, set market.soldCount to 0
-- When soldCount is 0, provide your best conservative estimate but flag market.confidence as "LOW"`
+        ? `\nPARALLEL MATCHING: This is a "${card.variation}" parallel — search for this SPECIFIC variation, not the base version.
+- Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation} sold eBay"
+- Only use comps that match "${card.variation}" — do NOT mix in prices from other parallels (Silver, Gold, Base, etc.)
+- If you cannot find sold comps for this exact parallel, set market.soldCount to 0 and market.confidence to "LOW"
+- With soldCount=0, estimate CONSERVATIVELY — lean toward the LOWER end of what comparable parallels sell for`
         : "");
 
   const hasMissingDetails = !card.set || !card.variation;
