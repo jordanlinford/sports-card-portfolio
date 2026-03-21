@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -499,20 +499,60 @@ export default function CaseEdit() {
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const [refreshStatus, setRefreshStatus] = useState<{ status: string; total: number; completed: number; failed: number } | null>(null);
+  const refreshPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const refreshAllPricesMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", `/api/display-cases/${id}/refresh-prices`);
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
-      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
-      
-      const updatedCount = data.results?.filter((r: any) => r.oldValue !== r.newValue).length || 0;
-      toast({
-        title: "Values Refreshed",
-        description: `Processed ${data.cardsProcessed} cards. ${updatedCount} values updated.`,
-      });
+      if (data.status === "running") {
+        setRefreshStatus({ status: "running", total: data.total, completed: 0, failed: 0 });
+        if (refreshPollRef.current) clearInterval(refreshPollRef.current);
+        let pollFailCount = 0;
+        refreshPollRef.current = setInterval(async () => {
+          try {
+            const res = await fetch(`/api/display-cases/${id}/refresh-prices/status`, { credentials: "include" });
+            if (!res.ok) {
+              pollFailCount++;
+              if (pollFailCount > 5) {
+                if (refreshPollRef.current) clearInterval(refreshPollRef.current);
+                refreshPollRef.current = null;
+                setRefreshStatus(null);
+              }
+              return;
+            }
+            pollFailCount = 0;
+            const status = await res.json();
+            if (status.status === "complete" || status.status === "idle") {
+              if (refreshPollRef.current) clearInterval(refreshPollRef.current);
+              refreshPollRef.current = null;
+              if (status.status === "complete") {
+                setRefreshStatus(status);
+                queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+                queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}`] });
+                queryClient.invalidateQueries({ queryKey: [`/api/display-cases/${id}/public`] });
+                const updatedCount = status.results?.filter((r: any) => r.oldValue !== r.newValue).length || 0;
+                toast({
+                  title: "Values Refreshed",
+                  description: `Processed ${status.total} cards. ${updatedCount} values updated.`,
+                });
+              }
+              setTimeout(() => setRefreshStatus(null), 3000);
+            } else {
+              setRefreshStatus(status);
+            }
+          } catch (e) {
+            pollFailCount++;
+            if (pollFailCount > 5) {
+              if (refreshPollRef.current) clearInterval(refreshPollRef.current);
+              refreshPollRef.current = null;
+              setRefreshStatus(null);
+            }
+          }
+        }, 2000);
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -522,6 +562,12 @@ export default function CaseEdit() {
       });
     },
   });
+
+  useEffect(() => {
+    return () => {
+      if (refreshPollRef.current) clearInterval(refreshPollRef.current);
+    };
+  }, []);
 
   const reorderMutation = useMutation({
     mutationFn: async (cardIds: number[]) => {
@@ -1129,15 +1175,21 @@ export default function CaseEdit() {
                     variant="outline"
                     className="gap-2"
                     onClick={() => refreshAllPricesMutation.mutate()}
-                    disabled={refreshAllPricesMutation.isPending}
+                    disabled={refreshAllPricesMutation.isPending || refreshStatus?.status === "running"}
                     data-testid="button-refresh-all-prices"
                   >
-                    {refreshAllPricesMutation.isPending ? (
+                    {refreshStatus?.status === "running" ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : refreshAllPricesMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <RefreshCw className="h-4 w-4" />
                     )}
-                    {refreshAllPricesMutation.isPending ? "Refreshing..." : "Refresh All Values"}
+                    {refreshStatus?.status === "running"
+                      ? `Refreshing ${refreshStatus.completed}/${refreshStatus.total}...`
+                      : refreshAllPricesMutation.isPending
+                        ? "Starting..."
+                        : "Refresh All Values"}
                   </Button>
                 )}
                 {displayCase.cards && displayCase.cards.length > 1 && (

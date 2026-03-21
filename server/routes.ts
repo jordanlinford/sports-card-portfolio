@@ -1879,12 +1879,84 @@ Sitemap: ${origin}/sitemap.xml
   });
 
   // Bulk price lookup for all cards in a display case (Pro feature)
+  interface RefreshJob {
+    status: "running" | "complete";
+    displayCaseId: number;
+    total: number;
+    completed: number;
+    failed: number;
+    startedAt: number;
+    results: Array<{ cardId: number; title: string; oldValue: number | null; newValue: number | null; confidence: string; details?: string }>;
+  }
+  const refreshJobs = new Map<string, RefreshJob>();
+
+  async function runRefreshJob(jobKey: string, cardsToProcess: any[]): Promise<void> {
+    const job = refreshJobs.get(jobKey);
+    if (!job) return;
+
+    for (const card of cardsToProcess) {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        let bulkVariation = card.variation;
+        if (card.serialNumber === 1 && !(card.variation || "").toLowerCase().includes("1/1")) {
+          bulkVariation = ((card.variation || "") + " 1/1").trim();
+        }
+
+        const result = await lookupCardPrice({
+          title: card.title,
+          set: card.set,
+          year: card.year,
+          variation: bulkVariation,
+          grade: card.grade,
+          grader: card.grader,
+        });
+
+        const oldValue = card.manualValue ?? card.estimatedValue;
+        let newValue = oldValue;
+
+        if (result.estimatedValue !== null) {
+          await storage.updateCard(card.id, {
+            estimatedValue: result.estimatedValue,
+            manualValue: null,
+          });
+          newValue = result.estimatedValue;
+        }
+
+        job.completed++;
+        job.results.push({
+          cardId: card.id,
+          title: card.title,
+          oldValue,
+          newValue,
+          confidence: result.confidence,
+          details: result.details,
+        });
+        console.log(`[Refresh Prices] ${job.completed}/${job.total} - ${card.title}: $${oldValue} → $${newValue}`);
+      } catch (cardError: any) {
+        console.error(`[Refresh Prices] Failed for card ${card.id}:`, cardError.message);
+        job.failed++;
+        job.completed++;
+        job.results.push({
+          cardId: card.id,
+          title: card.title,
+          oldValue: card.estimatedValue,
+          newValue: card.estimatedValue,
+          confidence: "low",
+          details: "Lookup failed",
+        });
+      }
+    }
+
+    job.status = "complete";
+    console.log(`[Refresh Prices] Job ${jobKey} complete: ${job.completed}/${job.total} (${job.failed} failed)`);
+  }
+
   app.post("/api/display-cases/:id/refresh-prices", isAuthenticated, async (req: any, res) => {
     try {
       const displayCaseId = parseInt(req.params.id);
       const userId = req.user.claims.sub;
 
-      // Check if user has Pro subscription
       const user = await storage.getUser(userId);
       if (!hasProAccess(user)) {
         return res.status(403).json({ 
@@ -1906,67 +1978,58 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(400).json({ message: "No cards in this display case" });
       }
 
-      const results: Array<{ cardId: number; title: string; oldValue: number | null; newValue: number | null; confidence: string; details?: string }> = [];
-
-      for (const card of fullCase.cards) {
-        try {
-          // Add delay between requests to avoid rate limiting
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-
-          let bulkVariation = card.variation;
-          if (card.serialNumber === 1 && !(card.variation || "").toLowerCase().includes("1/1")) {
-            bulkVariation = ((card.variation || "") + " 1/1").trim();
-          }
-          
-          const result = await lookupCardPrice({
-            title: card.title,
-            set: card.set,
-            year: card.year,
-            variation: bulkVariation,
-            grade: card.grade,
-            grader: card.grader,
-          });
-
-          const oldValue = card.manualValue ?? card.estimatedValue;
-          let newValue = oldValue;
-
-          if (result.estimatedValue !== null) {
-            await storage.updateCard(card.id, { 
-              estimatedValue: result.estimatedValue,
-              manualValue: null, // Clear manual override when refreshing
-            });
-            newValue = result.estimatedValue;
-          }
-
-          results.push({
-            cardId: card.id,
-            title: card.title,
-            oldValue,
-            newValue,
-            confidence: result.confidence,
-            details: result.details,
-          });
-        } catch (cardError) {
-          console.error(`Failed to lookup price for card ${card.id}:`, cardError);
-          results.push({
-            cardId: card.id,
-            title: card.title,
-            oldValue: card.estimatedValue,
-            newValue: card.estimatedValue,
-            confidence: "low",
-            details: "Lookup failed",
-          });
-        }
+      const jobKey = `${userId}:${displayCaseId}`;
+      const existing = refreshJobs.get(jobKey);
+      if (existing && existing.status === "running") {
+        return res.json({ status: "running", total: existing.total, completed: existing.completed, displayCaseId });
       }
 
-      res.json({
+      const job: RefreshJob = {
+        status: "running",
         displayCaseId,
-        cardsProcessed: results.length,
-        results,
+        total: fullCase.cards.length,
+        completed: 0,
+        failed: 0,
+        startedAt: Date.now(),
+        results: [],
+      };
+      refreshJobs.set(jobKey, job);
+
+      runRefreshJob(jobKey, fullCase.cards).catch(err => {
+        console.error("[Refresh Prices] Unhandled job error:", err);
+        const j = refreshJobs.get(jobKey);
+        if (j) j.status = "complete";
       });
+
+      res.json({ status: "running", total: fullCase.cards.length, completed: 0, displayCaseId });
     } catch (error) {
       console.error("Error refreshing prices:", error);
       res.status(500).json({ message: "Failed to refresh prices" });
+    }
+  });
+
+  app.get("/api/display-cases/:id/refresh-prices/status", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    const displayCaseId = parseInt(req.params.id);
+    const jobKey = `${userId}:${displayCaseId}`;
+    const job = refreshJobs.get(jobKey);
+
+    if (!job) {
+      return res.json({ status: "idle", total: 0, completed: 0, failed: 0, results: [] });
+    }
+
+    res.json({
+      status: job.status,
+      displayCaseId: job.displayCaseId,
+      total: job.total,
+      completed: job.completed,
+      failed: job.failed,
+      results: job.results,
+      startedAt: job.startedAt,
+    });
+
+    if (job.status === "complete" && (Date.now() - job.startedAt > 10000)) {
+      refreshJobs.delete(jobKey);
     }
   });
 
