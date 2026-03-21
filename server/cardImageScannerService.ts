@@ -54,6 +54,15 @@ PARALLEL IDENTIFICATION GUIDE (look at border color/pattern):
 - Donruss parallels: Base, Rated Rookie, Press Proof, Holo, Elite Series
 - Select parallels: Base, Silver, Concourse, Premier Level, Tie-Dye, Zebra, Disco, Gold (/10)
 
+CHROME/REFLECTIVE INSERT IDENTIFICATION — CRITICAL:
+Many insert subsets are INHERENTLY chrome/reflective/shiny by design. Their BASE version already looks like a refractor or Silver Prizm. Do NOT assume "Silver Prizm" just because the card is shiny/reflective. Examples of inherently chrome/reflective inserts:
+- Prizm inserts: Deep Space, Warp Speed, Interstellar, Instant Impact, Fireworks, Emergent, Sensational — these are ALL chrome/shiny in their BASE form
+- Topps Finest: ALL cards are chrome by default. The base version is already shiny.
+- Topps Chrome: ALL cards are chrome by default.
+- Select: Concourse/Premier Level/Club Level base cards are already chrome
+For these cards, the variation should be the INSERT NAME ONLY (e.g., "Deep Space", "Warp Speed") — NOT "Deep Space Silver Prizm" unless you can confirm a SEPARATE Silver Prizm parallel exists for that insert AND you see clear visual differences from the base insert (different border treatment, additional refractor pattern on top of the existing chrome design).
+When in doubt, label it as the base insert (e.g., "Deep Space") rather than adding "Silver Prizm" — the base version is FAR more common and adding "Silver Prizm" creates a massive pricing error.
+
 SERIAL NUMBER RULE — CRITICAL:
 The physical stamp printed ON THE CARD (e.g., "377/350", "23/50", "1/1") is ALWAYS authoritative. NEVER infer or assume a print run from the variation label alone. "Superfractor" does not always mean 1/1 — it means the top parallel of that product, which may be /25, /50, /99, etc. depending on the set. Read the stamped number from the physical card (usually on the back) and use it EXACTLY. If you can see it stamped, that number wins over any assumption.
 
@@ -89,7 +98,8 @@ IMPORTANT:
 - The "variation" field should contain the COMPLETE parallel name as a collector would search it on eBay. Do NOT split parallel info between variation and a separate field.
 - For Prizm cards: ALWAYS identify the exact parallel by border color. A gold-bordered Prizm is "Gold Prizm /10", not just "Gold".
 - If you see serial numbering (like "5/10" or "23/99"), include it in the variation field.
-- Search the web to verify the exact set name and year — newer products (2024, 2025) may not be in training data.`;
+- Search the web to verify the exact set name and year — newer products (2024, 2025) may not be in training data.
+- YEAR VERIFICATION: Use the card number and web search to confirm the year. The same player can appear in the SAME insert set across multiple years with DIFFERENT card numbers and DIFFERENT values. Example: Wembanyama Deep Space is #1 in 2023-24 Prizm but #2 in 2024-25 Prizm. Getting the year wrong leads to wildly incorrect pricing. Cross-reference the card number you read with online checklists to confirm the correct year.`;
 
 async function processImageData(imageData: string, mimeType: string): Promise<{ base64Data: string; actualMimeType: string }> {
   const isBase64 = imageData.startsWith("data:") || !imageData.startsWith("http");

@@ -1180,8 +1180,8 @@ function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms:
     return { term: card.variation || "base", excludeTerms: premiumExclusions };
   }
   
-  // Detect base inserts (Rookie Wave, Laser, etc. - common cheap inserts)
-  const isBaseInsert = /\b(insert|rookie wave|laser|my house|velocity|hyper|fast break)\b/.test(variation);
+  // Detect base inserts (common inserts from standard products - NOT premium SSPs)
+  const isBaseInsert = /\b(insert|rookie wave|laser|my house|velocity|hyper|fast break|deep space|warp speed|instant impact|fireworks|emergent|sensational|freshman phenoms|rookie revolution)\b/.test(variation);
   if (isBaseInsert) {
     // Use insert name but exclude premium variants
     return { term: card.variation || "", excludeTerms: premiumExclusions };
