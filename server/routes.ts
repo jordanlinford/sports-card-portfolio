@@ -6884,6 +6884,152 @@ RULES:
     }
   });
 
+  // API endpoint for Topps Takeover page live player signals
+  app.get("/api/market/topps-takeover-signals", async (req, res) => {
+    try {
+      const keyPlayers = [
+        "Patrick Mahomes",
+        "Josh Allen",
+        "Lamar Jackson",
+        "Ja'Marr Chase",
+        "CeeDee Lamb",
+        "Caleb Williams",
+      ];
+
+      const signals: Record<string, any> = {};
+      
+      await Promise.all(
+        keyPlayers.map(async (name) => {
+          try {
+            const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+            const outlook = await storage.getPublicPlayerOutlookBySlug("football", slug);
+            if (outlook?.outlookJson) {
+              const json = typeof outlook.outlookJson === "string" ? JSON.parse(outlook.outlookJson) : outlook.outlookJson;
+              signals[name] = {
+                verdict: json.verdict?.action || json.advisorVerdict || "MONITOR",
+                temperature: json.snapshot?.temperature || json.temperature || "NEUTRAL",
+                summary: json.verdict?.summary || json.oneLineRationale || `AI-powered investment outlook for ${name}.`,
+              };
+            }
+          } catch (e) {
+            // Skip failed lookups silently
+          }
+        })
+      );
+
+      res.json(signals);
+    } catch (error) {
+      console.error("Error fetching topps takeover signals:", error);
+      res.status(500).json({});
+    }
+  });
+
+  // SSR route for /market/topps-takeover (for search engine crawlers)
+  app.get("/market/topps-takeover", async (req, res, next) => {
+    const userAgent = req.headers["user-agent"] || "";
+    if (!isSearchCrawler(userAgent)) {
+      return next();
+    }
+
+    try {
+      const origin = escapeHtml(getOriginUrl(req));
+      const url = escapeHtml(`${getOriginUrl(req)}/market/topps-takeover`);
+      const rawOrigin = getOriginUrl(req);
+      const title = "Topps NFL Takeover 2026: What It Means for Card Values";
+      const description = "On April 1, 2026 Topps takes over the NFL card license from Panini. Independent, data-driven analysis on how this affects your sports card portfolio.";
+
+      const faqItems = [
+        { q: "Will Panini NFL cards lose value after the Topps takeover?", a: "It depends on the player and card type. Key Panini rookie cards from stars like Patrick Mahomes may retain collector value as the definitive rookie cards. Future unlicensed Panini products will likely trade at a discount." },
+        { q: "When does Topps take over the NFL license from Panini?", a: "Fanatics (which owns Topps) officially holds the exclusive NFL trading card license starting April 1, 2026." },
+        { q: "Should I buy Topps NFL cards now or wait?", a: "Early Topps NFL products will likely carry a premium due to novelty. Consider waiting for the initial hype to cool before buying base products." },
+        { q: "What happens to Panini Prizm and Select NFL value?", a: "Existing Prizm and Select rookie cards remain the recognized rookies for those players. Long-term premiums may shift toward Topps Chrome." },
+        { q: "How does the license change affect graded Panini cards?", a: "Already graded Panini cards retain their established market value. The license change primarily affects new product releases." },
+        { q: "Will Topps Chrome replace Panini Prizm as the top NFL product?", a: "Topps Chrome is positioned to become the flagship NFL chromium product, similar to its dominance in baseball." },
+      ];
+
+      const faqJsonLd = safeJsonLd({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": faqItems.map(f => ({
+          "@type": "Question",
+          "name": f.q,
+          "acceptedAnswer": { "@type": "Answer", "text": f.a },
+        })),
+      });
+
+      const articleJsonLd = safeJsonLd({
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": title,
+        "description": description,
+        "datePublished": "2026-03-01T00:00:00Z",
+        "dateModified": new Date().toISOString(),
+        "author": { "@type": "Organization", "name": "Sports Card Portfolio", "url": rawOrigin },
+        "publisher": { "@type": "Organization", "name": "Sports Card Portfolio", "url": rawOrigin },
+        "mainEntityOfPage": { "@type": "WebPage", "@id": `${rawOrigin}/market/topps-takeover` },
+      });
+
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)} | Sports Card Portfolio</title>
+  <meta name="description" content="${escapeHtml(description)}" />
+  <meta name="robots" content="index, follow" />
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="${url}" />
+  <meta property="og:site_name" content="Sports Card Portfolio" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <link rel="canonical" href="${url}" />
+  <script type="application/ld+json">${faqJsonLd}</script>
+  <script type="application/ld+json">${articleJsonLd}</script>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    h2 { font-size: 1.5rem; margin-top: 2rem; }
+    .faq { margin-top: 2rem; }
+    .faq h3 { font-size: 1.1rem; margin-bottom: 0.3rem; }
+    .faq p { color: #555; }
+    a { color: #F59E0B; }
+  </style>
+</head>
+<body>
+  <article>
+    <h1>${escapeHtml(title)}</h1>
+    <p>${escapeHtml(description)}</p>
+    <h2>What's Happening</h2>
+    <p>After more than a decade of Panini dominance, the NFL trading card landscape is undergoing its most significant shift since the junk wax era. Fanatics — which acquired Topps in 2022 — is activating its exclusive NFL license on April 1, 2026, making Topps the sole producer of officially licensed NFL trading cards.</p>
+    <h2>How This Impacts Card Values</h2>
+    <p>Existing Panini rookie cards for star players remain irreplaceable — they are the definitive rookie cards. Future unlicensed Panini products will trade at discounts. Early Topps NFL releases carry historical significance but may have novelty premiums.</p>
+    <h2>What Collectors Should Do</h2>
+    <ul>
+      <li>Hold established Panini rookie cards for star players</li>
+      <li>Avoid overpaying for the first Topps NFL products out of FOMO</li>
+      <li>Diversify across both Panini and Topps eras for downside protection</li>
+    </ul>
+    <div class="faq">
+      <h2>Frequently Asked Questions</h2>
+      ${faqItems.map(f => `<h3>${escapeHtml(f.q)}</h3><p>${escapeHtml(f.a)}</p>`).join("\n      ")}
+    </div>
+    <footer>
+      <p><a href="${origin}/player-outlook">Player Outlooks</a> | <a href="${origin}/hidden-gems">Hidden Gems</a> | <a href="${origin}">Sports Card Portfolio</a></p>
+    </footer>
+  </article>
+</body>
+</html>`;
+
+      res.type("text/html").send(html);
+    } catch (error) {
+      console.error("[SSR] Error generating topps-takeover HTML:", error);
+      next();
+    }
+  });
+
   // SSR route for public player outlook pages (for crawlers)
   app.get("/outlook/:sport/:slug", async (req, res, next) => {
     const userAgent = req.headers["user-agent"] || "";
@@ -7015,6 +7161,11 @@ RULES:
     <loc>${baseUrl}/explore</loc>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>${baseUrl}/market/topps-takeover</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
   </url>`;
       
       // Add blog posts

@@ -65,6 +65,7 @@ The application uses a full-stack TypeScript architecture. The frontend manages 
 - **Hidden Gems Auto-Refresh**: Weekly scheduled job for refreshing Hidden Gems.
 - **Unified Analysis DB Cache**: Persistent caching of Gemini analysis results in PostgreSQL.
 - **Premium Numbered Parallel Detection**: Specific detection and handling for premium numbered parallels.
+- **Topps Takeover SEO Page**: Public `/market/topps-takeover` landing page covering the Panini-to-Topps NFL license transition. SSR for crawlers with FAQ JSON-LD + Article JSON-LD. Live player signals API at `/api/market/topps-takeover-signals`. Added to sitemap and Market nav dropdown.
 
 ## External Dependencies
 

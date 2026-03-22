@@ -60,7 +60,8 @@ import {
   Menu,
   GitCompareArrows,
   History,
-  Trophy
+  Trophy,
+  Layers
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -204,7 +205,7 @@ export function Navigation() {
                     size="sm" 
                     className={cn(
                       "gap-1",
-                      isActiveSection(["/outlook", "/hidden-gems", "/scan-history"]) && "bg-accent"
+                      isActiveSection(["/outlook", "/hidden-gems", "/scan-history", "/market"]) && "bg-accent"
                     )}
                     data-testid="nav-market"
                   >
@@ -234,6 +235,12 @@ export function Navigation() {
                     <Link href="/outlook" className="flex items-center gap-2 cursor-pointer">
                       <Lightbulb className="h-4 w-4" />
                       Card Analysis
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/market/topps-takeover" className="flex items-center gap-2 cursor-pointer" data-testid="nav-topps-takeover">
+                      <Layers className="h-4 w-4" />
+                      Topps NFL Takeover
                     </Link>
                   </DropdownMenuItem>
                   {isAuthenticated && user && (
@@ -596,6 +603,12 @@ export function Navigation() {
                   <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/hidden-gems") && "bg-accent")}>
                     <Gem className="h-4 w-4" />
                     Hidden Gems
+                  </Button>
+                </Link>
+                <Link href="/market/topps-takeover" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/market/topps-takeover") && "bg-accent")} data-testid="nav-topps-takeover-mobile">
+                    <Layers className="h-4 w-4" />
+                    Topps NFL Takeover
                   </Button>
                 </Link>
                 {isAuthenticated && user && (

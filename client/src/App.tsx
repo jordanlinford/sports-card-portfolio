@@ -54,6 +54,7 @@ import AdminFeedbackPage from "@/pages/admin-feedback";
 import PodcastLanding from "@/pages/podcast";
 import ScanHistoryPage from "@/pages/scan-history";
 import LeaderboardsPage from "@/pages/leaderboards";
+import ToppsTakeoverPage from "@/pages/topps-takeover";
 import { TrialBanner } from "@/components/trial-banner";
 import { GoogleLinkBanner } from "@/components/google-link-banner";
 import { BatchAnalysisBanner } from "@/components/batch-analysis-banner";
@@ -84,6 +85,7 @@ function Router() {
       <Route path="/podcast" component={PodcastLanding} />
       <Route path="/hidden-gems" component={HiddenGemsPage} />
       <Route path="/leaderboards" component={LeaderboardsPage} />
+      <Route path="/market/topps-takeover" component={ToppsTakeoverPage} />
       <Route path="/outlook" component={OutlookOverviewPage} />
       <Route path="/watchlist" component={WatchlistPage} />
       {/* Show loading only for auth-dependent routes */}
