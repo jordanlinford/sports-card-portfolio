@@ -5678,8 +5678,9 @@ RULES:
   // Agent Mode: SSE streaming endpoint for AI portfolio auditor (Pro-only)
   app.get("/api/agent/stream", isAuthenticated, async (req: any, res) => {
     try {
-      const user = req.user;
-      if (!hasProAccess(user)) {
+      const userId = req.user.claims.sub;
+      const dbUser = await storage.getUser(userId);
+      if (!dbUser || !hasProAccess(dbUser)) {
         res.status(403).json({ message: "Agent Mode is a Pro feature" });
         return;
       }
@@ -5691,7 +5692,7 @@ RULES:
       }
 
       const { runAgentStream } = await import("./agentService");
-      await runAgentStream(query.trim(), String(user.id), res);
+      await runAgentStream(query.trim(), String(userId), res);
     } catch (error) {
       console.error("Error in agent stream:", error);
       if (!res.headersSent) {
