@@ -412,7 +412,7 @@ export interface IStorage {
 
   // Pop Report History operations
   insertPopSnapshots(snapshots: InsertPopHistory[]): Promise<PopHistory[]>;
-  getPopTrends(playerName: string, grader?: string, grade?: string, cardFilters?: { year?: number; setName?: string; variation?: string }): Promise<PopTrend[]>;
+  getPopTrends(playerName: string, grader?: string, grade?: string, cardFilters?: { year?: number; setName?: string; variation?: string; cardNumber?: string }): Promise<PopTrend[]>;
   getPopHistory(playerName: string, options?: { year?: number; setName?: string; grader?: string; grade?: string; limit?: number }): Promise<PopHistory[]>;
   getLatestPopSnapshot(playerName: string, grader: string, grade: string): Promise<PopHistory | undefined>;
 }
@@ -3454,13 +3454,14 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  async getPopTrends(playerName: string, grader?: string, grade?: string, cardFilters?: { year?: number; setName?: string; variation?: string }): Promise<PopTrend[]> {
+  async getPopTrends(playerName: string, grader?: string, grade?: string, cardFilters?: { year?: number; setName?: string; variation?: string; cardNumber?: string }): Promise<PopTrend[]> {
     const conditions = [sql`LOWER(${popHistory.playerName}) = LOWER(${playerName})`];
     if (grader) conditions.push(eq(popHistory.grader, grader));
     if (grade) conditions.push(eq(popHistory.grade, grade));
     if (cardFilters?.year) conditions.push(eq(popHistory.year, cardFilters.year));
     if (cardFilters?.setName) conditions.push(sql`LOWER(${popHistory.setName}) = LOWER(${cardFilters.setName})`);
     if (cardFilters?.variation) conditions.push(sql`LOWER(${popHistory.variation}) = LOWER(${cardFilters.variation})`);
+    if (cardFilters?.cardNumber) conditions.push(eq(popHistory.cardNumber, cardFilters.cardNumber));
 
     const rows = await db
       .select()

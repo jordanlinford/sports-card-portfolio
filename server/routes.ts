@@ -3068,7 +3068,7 @@ Sitemap: ${origin}/sitemap.xml
                   card.playerName,
                   card.grader,
                   card.grade || undefined,
-                  { year: card.year || undefined, setName: card.set || undefined, variation: card.variation || undefined },
+                  { year: card.year || undefined, setName: card.set || undefined, variation: card.variation || undefined, cardNumber: card.cardNumber || undefined },
                 );
                 if (trends.length > 0) {
                   const trend = trends[0];
