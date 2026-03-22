@@ -1071,7 +1071,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         if (batchCancelledRef.current) break;
 
         const batchAbort = new AbortController();
-        const batchTimeout = setTimeout(() => batchAbort.abort(), 60000);
+        const batchTimeout = setTimeout(() => batchAbort.abort(), 120000);
         const scanRes = await fetch("/api/cards/scan-identify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1348,7 +1348,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
       
       const effectiveBackData = currentBackImageData !== undefined ? currentBackImageData : backImageData;
 
-      const timeoutId = setTimeout(() => abortController.abort(), 60000);
+      const timeoutId = setTimeout(() => abortController.abort(), 120000);
 
       const res = await fetch("/api/cards/scan-identify", {
         method: "POST",

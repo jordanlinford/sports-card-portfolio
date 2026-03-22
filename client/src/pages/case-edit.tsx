@@ -696,7 +696,7 @@ export default function CaseEdit() {
       setSelectedFile(new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" }));
       
       const scanAbort = new AbortController();
-      const scanTimeout = setTimeout(() => scanAbort.abort(), 60000);
+      const scanTimeout = setTimeout(() => scanAbort.abort(), 120000);
       const scanRes = await fetch("/api/cards/scan-identify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
