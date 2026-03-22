@@ -368,8 +368,6 @@ export default function HiddenGemsPage() {
   
   const isAdmin = adminCheck?.isAdmin || false;
   
-  const isPro = hasProAccess(user);
-
   const { data: gemsData, isLoading: gemsLoading } = useQuery<{
     gems: HiddenGem[];
     stats: {
@@ -475,6 +473,7 @@ export default function HiddenGemsPage() {
     },
   });
   
+  const isPro = gemsData?.userIsPro ?? hasProAccess(user);
   const allGems: GemCandidate[] = gemsData?.gems?.map(mapHiddenGemToCandidate) || [];
   const lastRefresh = gemsData?.stats?.lastRefresh;
   const isFallback = gemsData?.isFallback || false;
