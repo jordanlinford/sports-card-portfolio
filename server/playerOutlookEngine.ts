@@ -1264,7 +1264,8 @@ TONE ENFORCEMENT:
 
 // Main function to get player outlook
 export async function getPlayerOutlook(
-  request: PlayerOutlookRequest
+  request: PlayerOutlookRequest,
+  options?: { forceRefresh?: boolean }
 ): Promise<PlayerOutlookResponse> {
   const { playerName, sport = "football", contextCard } = request;
   const playerKey = normalizePlayerKey(sport, playerName);
@@ -1276,6 +1277,13 @@ export async function getPlayerOutlook(
   
   // Check cache first
   const { outlook: cachedOutlook, isStale, cacheRecord } = await getCachedOutlook(playerKey);
+  
+  // Force refresh mode: always generate fresh (used by prewarm job)
+  if (options?.forceRefresh) {
+    console.log(`[PlayerOutlook] Force refresh requested for ${playerName}`);
+    const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
+    return { ...freshOutlook, cacheStatus: "miss" };
+  }
   
   // Return cached if fresh
   if (cachedOutlook && !isStale) {

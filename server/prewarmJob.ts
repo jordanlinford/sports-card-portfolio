@@ -1,8 +1,9 @@
 /**
- * Nightly Prewarm Job for eBay Comps Cache
+ * Nightly Prewarm Job for eBay Comps Cache + Player Outlook Refresh
  * 
- * This job runs in the background to refresh cached comps for frequently searched cards.
- * It uses a single worker with long delays to avoid rate limiting.
+ * This job runs in the background to:
+ * 1. Refresh cached comps for frequently searched cards (75 cards)
+ * 2. Refresh public player outlook pages for SEO freshness (up to 50 players)
  * 
  * Usage:
  * - Call startPrewarmJob() once on server startup
@@ -11,8 +12,8 @@
  */
 
 import { db } from "./db";
-import { marketCompsCache, cards, bookmarks, users, displayCases } from "@shared/schema";
-import { desc, isNotNull, sql, and, lt, gt, eq } from "drizzle-orm";
+import { marketCompsCache, cards, bookmarks, users, displayCases, playerOutlookCache } from "@shared/schema";
+import { desc, isNotNull, sql, and, lt, gt, eq, or } from "drizzle-orm";
 import { enqueueFetchJob, normalizeEbayQuery, getActiveJobCount } from "./ebayCompsService";
 
 // Configuration
@@ -21,6 +22,11 @@ const PREWARM_HOUR_UTC = 3; // 3 AM UTC
 const MAX_CARDS_PER_RUN = 75; // Increased to accommodate priority tiers
 const DELAY_BETWEEN_JOBS_MS = 60 * 1000; // 1 minute between each card
 const MIN_HOURS_BEFORE_EXPIRY = 12; // Only prewarm if expiring within 12 hours
+
+// Player Outlook Refresh Configuration
+const MAX_PLAYER_OUTLOOKS_PER_RUN = 50;
+const OUTLOOK_DELAY_BETWEEN_MS = 60 * 1000; // 60 seconds between refreshes (Gemini rate limiting)
+const OUTLOOK_STALENESS_DAYS = 7; // Auto-queue if not refreshed in 7+ days
 
 // Priority allocation (how many slots per category)
 // Keys match the priority values used in PrewarmCard
@@ -34,6 +40,15 @@ const PRIORITY_SLOTS: Record<PrewarmCard['priority'], number> = {
 
 let prewarmTimer: NodeJS.Timeout | null = null;
 let isRunning = false;
+
+// Player outlook refresh stats (persisted across runs for admin visibility)
+let lastOutlookRefreshStats: {
+  refreshed: number;
+  errors: number;
+  durationSeconds: number;
+  completedAt: string;
+  players: string[];
+} | null = null;
 
 interface PrewarmCard {
   // For cards from cache, use these directly
@@ -285,8 +300,217 @@ function buildSearchQuery(card: { title: string; playerName: string | null; year
   return parts.length > 0 ? parts.join(" ") : card.title;
 }
 
+interface PlayerOutlookRefreshEntry {
+  playerName: string;
+  sport: string;
+  playerKey: string;
+  priority: 'big-mover' | 'stale' | 'expiring';
+  lastFetchedAt: Date | null;
+  temperature: string | null;
+}
+
 /**
- * Run the prewarm job
+ * Get public player outlook pages to refresh, prioritized by:
+ * 1. Big Mover flag (HOT temperature or high-demand verdicts)
+ * 2. Staleness (not refreshed in 7+ days)
+ * 3. Expiring soon
+ */
+async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshEntry[]> {
+  const results: PlayerOutlookRefreshEntry[] = [];
+  const seenKeys = new Set<string>();
+
+  const addIfUnique = (entry: PlayerOutlookRefreshEntry): boolean => {
+    if (results.length >= MAX_PLAYER_OUTLOOKS_PER_RUN) return false;
+    if (seenKeys.has(entry.playerKey)) return false;
+    seenKeys.add(entry.playerKey);
+    results.push(entry);
+    return true;
+  };
+
+  try {
+    // Tier 1: Big Mover / HOT players (highest SEO value — trending searches)
+    const hotPlayers = await db
+      .select({
+        playerKey: playerOutlookCache.playerKey,
+        sport: playerOutlookCache.sport,
+        playerName: playerOutlookCache.playerName,
+        lastFetchedAt: playerOutlookCache.lastFetchedAt,
+        temperature: playerOutlookCache.temperature,
+      })
+      .from(playerOutlookCache)
+      .where(
+        and(
+          eq(playerOutlookCache.isPublic, true),
+          eq(playerOutlookCache.temperature, "HOT")
+        )
+      )
+      .orderBy(playerOutlookCache.lastFetchedAt) // Oldest first
+      .limit(25);
+
+    let added = 0;
+    for (const p of hotPlayers) {
+      if (addIfUnique({
+        playerName: p.playerName,
+        sport: p.sport,
+        playerKey: p.playerKey,
+        priority: 'big-mover',
+        lastFetchedAt: p.lastFetchedAt,
+        temperature: p.temperature,
+      })) {
+        added++;
+      }
+    }
+    console.log(`[Prewarm:Outlook] Added ${added} HOT/big-mover players`);
+
+    // Tier 2: Stale pages (not refreshed in 7+ days — auto-queue for freshness)
+    const stalenessCutoff = new Date(Date.now() - OUTLOOK_STALENESS_DAYS * 24 * 60 * 60 * 1000);
+    const stalePlayers = await db
+      .select({
+        playerKey: playerOutlookCache.playerKey,
+        sport: playerOutlookCache.sport,
+        playerName: playerOutlookCache.playerName,
+        lastFetchedAt: playerOutlookCache.lastFetchedAt,
+        temperature: playerOutlookCache.temperature,
+      })
+      .from(playerOutlookCache)
+      .where(
+        and(
+          eq(playerOutlookCache.isPublic, true),
+          or(
+            lt(playerOutlookCache.lastFetchedAt, stalenessCutoff),
+            sql`${playerOutlookCache.lastFetchedAt} IS NULL`
+          )
+        )
+      )
+      .orderBy(playerOutlookCache.lastFetchedAt) // Most stale first
+      .limit(50);
+
+    added = 0;
+    for (const p of stalePlayers) {
+      if (addIfUnique({
+        playerName: p.playerName,
+        sport: p.sport,
+        playerKey: p.playerKey,
+        priority: 'stale',
+        lastFetchedAt: p.lastFetchedAt,
+        temperature: p.temperature,
+      })) {
+        added++;
+      }
+    }
+    console.log(`[Prewarm:Outlook] Added ${added} stale players (7+ days old)`);
+
+    // Tier 3: Expiring soon (cache TTL approaching)
+    const expiringPlayers = await db
+      .select({
+        playerKey: playerOutlookCache.playerKey,
+        sport: playerOutlookCache.sport,
+        playerName: playerOutlookCache.playerName,
+        lastFetchedAt: playerOutlookCache.lastFetchedAt,
+        temperature: playerOutlookCache.temperature,
+      })
+      .from(playerOutlookCache)
+      .where(
+        and(
+          eq(playerOutlookCache.isPublic, true),
+          lt(playerOutlookCache.expiresAt, new Date(Date.now() + 12 * 60 * 60 * 1000)) // Expiring within 12 hours
+        )
+      )
+      .orderBy(playerOutlookCache.expiresAt)
+      .limit(30);
+
+    added = 0;
+    for (const p of expiringPlayers) {
+      if (addIfUnique({
+        playerName: p.playerName,
+        sport: p.sport,
+        playerKey: p.playerKey,
+        priority: 'expiring',
+        lastFetchedAt: p.lastFetchedAt,
+        temperature: p.temperature,
+      })) {
+        added++;
+      }
+    }
+    console.log(`[Prewarm:Outlook] Added ${added} expiring players`);
+
+    console.log(`[Prewarm:Outlook] Total player outlooks to refresh: ${results.length}`);
+    return results;
+  } catch (error) {
+    console.error("[Prewarm:Outlook] Error fetching player outlooks to refresh:", error);
+    return [];
+  }
+}
+
+/**
+ * Refresh public player outlook pages
+ */
+async function runPlayerOutlookRefresh(): Promise<void> {
+  const startTime = Date.now();
+  let refreshed = 0;
+  let errors = 0;
+  const refreshedPlayers: string[] = [];
+
+  console.log("[Prewarm:Outlook] Starting player outlook refresh");
+
+  try {
+    const playersToRefresh = await getPublicPlayerOutlooksToRefresh();
+
+    if (playersToRefresh.length === 0) {
+      console.log("[Prewarm:Outlook] No player outlooks need refreshing");
+      lastOutlookRefreshStats = {
+        refreshed: 0,
+        errors: 0,
+        durationSeconds: 0,
+        completedAt: new Date().toISOString(),
+        players: [],
+      };
+      return;
+    }
+
+    const { getPlayerOutlook } = await import("./playerOutlookEngine");
+
+    for (let i = 0; i < playersToRefresh.length; i++) {
+      const entry = playersToRefresh[i];
+
+      console.log(`[Prewarm:Outlook] Refreshing ${i + 1}/${playersToRefresh.length} [${entry.priority}]: ${entry.playerName} (${entry.sport})`);
+
+      try {
+        await getPlayerOutlook(
+          { playerName: entry.playerName, sport: entry.sport },
+          { forceRefresh: true }
+        );
+        refreshed++;
+        refreshedPlayers.push(entry.playerName);
+        console.log(`[Prewarm:Outlook] Refreshed [${entry.priority}]: ${entry.playerName}`);
+      } catch (err: any) {
+        errors++;
+        console.error(`[Prewarm:Outlook] Failed to refresh ${entry.playerName}:`, err.message);
+      }
+
+      // Rate limit between refreshes to avoid Gemini quota issues
+      if (i < playersToRefresh.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, OUTLOOK_DELAY_BETWEEN_MS));
+      }
+    }
+  } catch (error) {
+    console.error("[Prewarm:Outlook] Player outlook refresh failed:", error);
+  }
+
+  const durationSeconds = Math.round((Date.now() - startTime) / 1000);
+  lastOutlookRefreshStats = {
+    refreshed,
+    errors,
+    durationSeconds,
+    completedAt: new Date().toISOString(),
+    players: refreshedPlayers,
+  };
+
+  console.log(`[Prewarm:Outlook] Complete: ${refreshed} refreshed, ${errors} errors, ${durationSeconds}s`);
+}
+
+/**
+ * Run the prewarm job (eBay comps + player outlook refresh)
  */
 async function runPrewarmJob(): Promise<void> {
   if (isRunning) {
@@ -312,66 +536,76 @@ async function runPrewarmJob(): Promise<void> {
   console.log("[Prewarm] Starting nightly prewarm job with priority tiers");
   
   try {
-    const cardsToWarm = await getTopCardsToPrewarm();
-    console.log(`[Prewarm] Found ${cardsToWarm.length} cards to prewarm`);
-    
-    for (const card of cardsToWarm) {
-      processed++;
+    // Phase 1: eBay comps prewarm (existing behavior)
+    try {
+      const cardsToWarm = await getTopCardsToPrewarm();
+      console.log(`[Prewarm] Found ${cardsToWarm.length} cards to prewarm`);
       
-      // Check if there's already a job running
-      if (getActiveJobCount() >= 1) {
-        console.log(`[Prewarm] Waiting for active job to complete...`);
-        await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30s
+      for (const card of cardsToWarm) {
+        processed++;
+        
+        if (getActiveJobCount() >= 1) {
+          console.log(`[Prewarm] Waiting for active job to complete...`);
+          await new Promise(resolve => setTimeout(resolve, 30000));
+        }
+        
+        let canonicalQuery: string;
+        let queryHash: string;
+        let filters: Record<string, unknown>;
+        
+        if (card.queryHash && card.canonicalQuery) {
+          canonicalQuery = card.canonicalQuery;
+          queryHash = card.queryHash;
+          filters = card.filters || {};
+        } else {
+          const query = buildSearchQuery({
+            title: card.title || '',
+            playerName: card.playerName || null,
+            year: card.year || null,
+            set: card.set || null,
+            grade: card.grade || null
+          });
+          const normalized = normalizeEbayQuery(query);
+          canonicalQuery = normalized.canonicalQuery;
+          queryHash = normalized.queryHash;
+          filters = normalized.filters;
+        }
+        
+        console.log(`[Prewarm] Processing ${processed}/${cardsToWarm.length} [${card.priority}]: ${canonicalQuery}`);
+        
+        const result = await enqueueFetchJob(canonicalQuery, queryHash, filters as any);
+        
+        if (result.queued) {
+          queued++;
+          tierStats[card.priority].queued++;
+          console.log(`[Prewarm] Queued [${card.priority}]: ${canonicalQuery}`);
+        } else {
+          skipped++;
+          tierStats[card.priority].skipped++;
+          console.log(`[Prewarm] Skipped (${result.reason}) [${card.priority}]: ${canonicalQuery}`);
+        }
+        
+        if (processed < cardsToWarm.length) {
+          await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_JOBS_MS));
+        }
       }
       
-      // Use pre-computed values from cache tiers, or compute for card-based tiers
-      let canonicalQuery: string;
-      let queryHash: string;
-      let filters: Record<string, unknown>;
-      
-      if (card.queryHash && card.canonicalQuery) {
-        // Cache-based tier: use pre-computed values directly
-        canonicalQuery = card.canonicalQuery;
-        queryHash = card.queryHash;
-        filters = card.filters || {};
-      } else {
-        // Card-based tier: build and normalize query
-        const query = buildSearchQuery({
-          title: card.title || '',
-          playerName: card.playerName || null,
-          year: card.year || null,
-          set: card.set || null,
-          grade: card.grade || null
-        });
-        const normalized = normalizeEbayQuery(query);
-        canonicalQuery = normalized.canonicalQuery;
-        queryHash = normalized.queryHash;
-        filters = normalized.filters;
-      }
-      
-      console.log(`[Prewarm] Processing ${processed}/${cardsToWarm.length} [${card.priority}]: ${canonicalQuery}`);
-      
-      const result = await enqueueFetchJob(canonicalQuery, queryHash, filters as any);
-      
-      if (result.queued) {
-        queued++;
-        tierStats[card.priority].queued++;
-        console.log(`[Prewarm] Queued [${card.priority}]: ${canonicalQuery}`);
-      } else {
-        skipped++;
-        tierStats[card.priority].skipped++;
-        console.log(`[Prewarm] Skipped (${result.reason}) [${card.priority}]: ${canonicalQuery}`);
-      }
-      
-      // Long delay between jobs to avoid rate limiting
-      if (processed < cardsToWarm.length) {
-        await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_JOBS_MS));
-      }
+      const ebayDuration = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[Prewarm] eBay comps phase complete: ${queued} queued, ${skipped} skipped, ${ebayDuration}s`);
+      console.log(`[Prewarm] Tier breakdown:`, JSON.stringify(tierStats));
+    } catch (ebayError) {
+      console.error("[Prewarm] eBay comps phase failed (continuing to outlook refresh):", ebayError);
+    }
+
+    // Phase 2: Player outlook refresh (independent of Phase 1 success)
+    try {
+      await runPlayerOutlookRefresh();
+    } catch (outlookError) {
+      console.error("[Prewarm] Player outlook refresh phase failed:", outlookError);
     }
     
-    const duration = Math.round((Date.now() - startTime) / 1000);
-    console.log(`[Prewarm] Complete: ${queued} queued, ${skipped} skipped, ${duration}s`);
-    console.log(`[Prewarm] Tier breakdown:`, JSON.stringify(tierStats));
+    const totalDuration = Math.round((Date.now() - startTime) / 1000);
+    console.log(`[Prewarm] Full job complete in ${totalDuration}s`);
     
   } catch (error) {
     console.error("[Prewarm] Job failed:", error);
@@ -448,16 +682,22 @@ export async function triggerPrewarm(): Promise<{ success: boolean; message: str
     console.error("[Prewarm] Manual trigger failed:", err);
   });
   
-  return { success: true, message: "Prewarm job started" };
+  return { success: true, message: "Prewarm job started (eBay comps + player outlook refresh)" };
 }
 
 /**
- * Get prewarm job status
+ * Get prewarm job status (includes player outlook refresh stats)
  */
-export function getPrewarmStatus(): { isRunning: boolean; isScheduled: boolean; nextRunAt: Date | null } {
+export function getPrewarmStatus(): {
+  isRunning: boolean;
+  isScheduled: boolean;
+  nextRunAt: Date | null;
+  outlookRefresh: typeof lastOutlookRefreshStats;
+} {
   return {
     isRunning,
     isScheduled: prewarmTimer !== null,
-    nextRunAt: prewarmTimer ? new Date(Date.now() + getDelayUntilNextRun()) : null
+    nextRunAt: prewarmTimer ? new Date(Date.now() + getDelayUntilNextRun()) : null,
+    outlookRefresh: lastOutlookRefreshStats,
   };
 }
