@@ -429,7 +429,7 @@ export default function GrowthProjectionsPage() {
             </CardContent>
           </Card>
 
-          {benchmarkData && (benchmarkData.benchmarks.sp500.length > 0 || benchmarkData.benchmarks.bitcoin.length > 0) && benchmarkData.portfolioPerformance.length > 0 && (() => {
+          {benchmarkData && benchmarkData.portfolioPerformance.length > 0 && (() => {
             const portfolio = benchmarkData.portfolioPerformance;
             const sp500 = benchmarkData.benchmarks.sp500;
             const btc = benchmarkData.benchmarks.bitcoin;
@@ -468,7 +468,9 @@ export default function GrowthProjectionsPage() {
                     Market Comparison
                   </CardTitle>
                   <CardDescription>
-                    Your portfolio performance vs traditional assets (trailing 12 months)
+                    {sp500.length > 0 || btc.length > 0
+                      ? "Your portfolio performance vs traditional assets (trailing 12 months)"
+                      : "Your portfolio performance over the trailing 12 months"}
                   </CardDescription>
                   
                   {sp500.length > 0 && (

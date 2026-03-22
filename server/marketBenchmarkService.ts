@@ -106,10 +106,8 @@ export async function getMarketBenchmarks(): Promise<BenchmarkData> {
     fetchedAt: new Date().toISOString(),
   };
 
-  if (sp500.length > 0 || bitcoin.length > 0) {
-    cachedBenchmarkData = data;
-    cacheExpiresAt = Date.now() + CACHE_TTL_MS;
-  }
+  cachedBenchmarkData = data;
+  cacheExpiresAt = Date.now() + (sp500.length > 0 || bitcoin.length > 0 ? CACHE_TTL_MS : 5 * 60 * 1000);
 
   return data;
 }
