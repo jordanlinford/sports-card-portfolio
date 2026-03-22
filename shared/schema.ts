@@ -2356,3 +2356,11 @@ export const insertScanHistorySchema = createInsertSchema(scanHistory).omit({
 });
 export type InsertScanHistory = z.infer<typeof insertScanHistorySchema>;
 export type ScanHistory = typeof scanHistory.$inferSelect;
+
+export const unifiedAnalysisDbCache = pgTable("unified_analysis_cache", {
+  cacheKey: varchar("cache_key", { length: 512 }).primaryKey(),
+  resultJson: jsonb("result_json").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type UnifiedAnalysisDbCache = typeof unifiedAnalysisDbCache.$inferSelect;

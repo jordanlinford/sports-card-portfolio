@@ -59,6 +59,8 @@ The application is a full-stack TypeScript project. The frontend uses TanStack Q
 - **Player News Caching**: 4-hour in-memory cache for `fetchPlayerNews` results.
 - **VPS Worker Architecture**: Dedicated-IP VPS for eBay scraper for improved reliability.
 - **Hidden Gems Auto-Refresh**: Weekly scheduled job (Monday 5 AM UTC) automatically refreshes Hidden Gems using dual-source discovery (AI + community signals). Community signal window is 30 days. Admin can still trigger manual refreshes. Fallback featured players shown when no gems exist.
+- **Unified Analysis DB Cache**: `unified_analysis_cache` table persists Gemini analysis results to PostgreSQL with 6-hour TTL. In-memory cache (24hr TTL) checked first, then DB, then fresh Gemini call. Prevents price inconsistency across server restarts. Expired entries cleaned up hourly during writes.
+- **Premium Numbered Parallel Detection**: `isPremiumNumberedParallel` flag in outlook engine detects cards that are both numbered AND have SSP-class material names (Wood, Silk, Sapphire, Platinum, Vintage Stock, Clear, Superfractor). These get premium material prompts, SSP comp inclusion, and are protected from search broadening term drops.
 
 ## External Dependencies
 

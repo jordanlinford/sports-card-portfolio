@@ -641,6 +641,54 @@ interface UnifiedAnalysisCache {
 }
 const unifiedAnalysisCache = new Map<string, UnifiedAnalysisCache>();
 const UNIFIED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const DB_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+async function getDbCachedAnalysis(cacheKey: string): Promise<UnifiedCardAnalysis | null> {
+  try {
+    const { db } = await import("./db");
+    const { unifiedAnalysisDbCache } = await import("@shared/schema");
+    const { eq } = await import("drizzle-orm");
+    const rows = await db.select().from(unifiedAnalysisDbCache).where(eq(unifiedAnalysisDbCache.cacheKey, cacheKey));
+    if (rows.length > 0) {
+      const row = rows[0];
+      const age = Date.now() - new Date(row.createdAt).getTime();
+      if (age < DB_CACHE_TTL_MS) {
+        console.log(`[Unified Analysis] DB cache hit for key (${Math.round(age / 1000 / 60)}min old)`);
+        return row.resultJson as unknown as UnifiedCardAnalysis;
+      }
+    }
+  } catch (e) {
+    console.warn(`[Unified Analysis] DB cache read error:`, (e as Error).message);
+  }
+  return null;
+}
+
+let lastDbCacheCleanup = 0;
+async function setDbCachedAnalysis(cacheKey: string, data: UnifiedCardAnalysis): Promise<void> {
+  try {
+    const { db } = await import("./db");
+    const { unifiedAnalysisDbCache } = await import("@shared/schema");
+    await db.insert(unifiedAnalysisDbCache).values({
+      cacheKey,
+      resultJson: data as any,
+      createdAt: new Date(),
+    }).onConflictDoUpdate({
+      target: unifiedAnalysisDbCache.cacheKey,
+      set: {
+        resultJson: data as any,
+        createdAt: new Date(),
+      },
+    });
+    if (Date.now() - lastDbCacheCleanup > 60 * 60 * 1000) {
+      lastDbCacheCleanup = Date.now();
+      const { lt } = await import("drizzle-orm");
+      const cutoff = new Date(Date.now() - DB_CACHE_TTL_MS);
+      await db.delete(unifiedAnalysisDbCache).where(lt(unifiedAnalysisDbCache.createdAt, cutoff));
+    }
+  } catch (e) {
+    console.warn(`[Unified Analysis] DB cache write error:`, (e as Error).message);
+  }
+}
 
 export async function fetchUnifiedCardAnalysis(card: {
   title: string;
@@ -656,6 +704,12 @@ export async function fetchUnifiedCardAnalysis(card: {
   if (cached && Date.now() - cached.cachedAt < UNIFIED_CACHE_TTL_MS) {
     console.log(`[Unified Analysis] Cache hit for: ${card.title} (${Math.round((Date.now() - cached.cachedAt) / 1000 / 60)}min old)`);
     return cached.data;
+  }
+
+  const dbCached = await getDbCachedAnalysis(cacheKey);
+  if (dbCached) {
+    unifiedAnalysisCache.set(cacheKey, { data: dbCached, cachedAt: Date.now() });
+    return dbCached;
   }
 
   const maxRetries = 2;
@@ -1110,7 +1164,8 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
             };
 
             unifiedAnalysisCache.set(cacheKey, { data: result, cachedAt: Date.now() });
-            console.log(`[Unified Analysis] Cached: ${card.title} | verdict=${result.analysis.verdict} | avg=$${correctedAvg} | ${result.market.soldCount} sold | ${elapsed}ms`);
+            setDbCachedAnalysis(cacheKey, result);
+            console.log(`[Unified Analysis] Cached (memory+DB): ${card.title} | verdict=${result.analysis.verdict} | avg=$${correctedAvg} | ${result.market.soldCount} sold | ${elapsed}ms`);
 
             return result;
           } else {
