@@ -12,7 +12,6 @@ import {
   Crown,
   Brain,
   BarChart3,
-  Frame,
   Share2,
   Star,
   Users,
@@ -81,11 +80,14 @@ export default function Landing() {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/10" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-4xl mx-auto text-center">
+            <Badge variant="outline" className="mb-4 text-xs font-medium tracking-wide uppercase px-3 py-1">
+              Independent. Data-Driven. Conflict-Free.
+            </Badge>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6" data-testid="text-hero-title">
-              The first sports card tracker that tells you Why to buy, not just what it's worth.
+              The only card auditor that doesn't sell you cards.
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-subtitle">
-              Sports Card Portfolio helps collectors reduce regret by understanding when to buy, hold, sell, or wait across their entire collection.
+              In a market dominated by Fanatics, Topps exclusives, and marketplace hype, Sports Card Portfolio gives you unbiased investment analysis with zero conflicts of interest.
             </p>
             
             {/* Primary CTAs */}
@@ -102,29 +104,43 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Hobby Box Splits Banner */}
-      <section className="py-10 bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border-y">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="text-center md:text-left">
-              <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
-                <Users className="h-5 w-5 text-primary" />
-                <span className="text-sm font-medium text-primary uppercase tracking-wide">New Feature</span>
-              </div>
-              <h2 className="text-2xl md:text-3xl font-bold mb-2" data-testid="text-splits-title">
-                Split the Box, Share the Hits
-              </h2>
-              <p className="text-muted-foreground max-w-xl" data-testid="text-splits-tagline">
-                Join hobby box breaks with fellow collectors. Pick your division, pay your share, and get your cards shipped directly to you.
-              </p>
+      {/* Independence Manifesto */}
+      <section className="py-12 md:py-16 bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 border-y" data-testid="section-manifesto">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <Shield className="h-5 w-5 text-primary" />
+              <span className="text-sm font-medium text-primary uppercase tracking-wide">Why It Matters</span>
             </div>
-            <Link href="/portfolio-builder">
-              <Button size="lg" className="gap-2 whitespace-nowrap" data-testid="button-join-splits">
-                <LayoutGrid className="h-5 w-5" />
-                Browse Open Splits
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            <h2 className="text-2xl md:text-3xl font-bold mb-3" data-testid="text-manifesto-title">
+              Your auditor shouldn't also be your dealer.
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto text-base md:text-lg">
+              In 2026, Fanatics controls the licenses. Marketplaces profit when you buy. Grading companies profit when you submit. Everyone in the hobby has an angle — except us.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-6">
+            <div className="text-center p-4">
+              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Shield className="h-5 w-5 text-primary" />
+              </div>
+              <h4 className="font-semibold mb-1">No Marketplace</h4>
+              <p className="text-sm text-muted-foreground">We don't sell cards, host auctions, or take commissions. Our only incentive is giving you the truth.</p>
+            </div>
+            <div className="text-center p-4">
+              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Eye className="h-5 w-5 text-primary" />
+              </div>
+              <h4 className="font-semibold mb-1">No License Bias</h4>
+              <p className="text-sm text-muted-foreground">Topps or Panini, licensed or unlicensed — we analyze what the data says, not what manufacturers want you to believe.</p>
+            </div>
+            <div className="text-center p-4">
+              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <BarChart3 className="h-5 w-5 text-primary" />
+              </div>
+              <h4 className="font-semibold mb-1">Real Data Only</h4>
+              <p className="text-sm text-muted-foreground">Every verdict is backed by actual eBay sales, grading populations, and AI market analysis — not sponsored content or paid placements.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -135,19 +151,19 @@ export default function Landing() {
           <div className="flex flex-wrap justify-center gap-6 md:gap-12 text-sm font-medium text-muted-foreground">
             <span className="flex items-center gap-2">
               <Check className="h-4 w-4 text-primary" />
-              Real eBay sold comps
+              Zero marketplace commissions
             </span>
             <span className="flex items-center gap-2">
               <Check className="h-4 w-4 text-primary" />
-              Player-based investment analysis
+              Real eBay sold comps — not estimates
             </span>
             <span className="flex items-center gap-2">
               <Check className="h-4 w-4 text-primary" />
-              Public & private portfolios
+              No sponsored cards or paid placements
             </span>
             <span className="flex items-center gap-2">
               <Check className="h-4 w-4 text-primary" />
-              Trusted by serious collectors
+              Trusted by 300+ serious collectors
             </span>
           </div>
         </div>
@@ -303,68 +319,68 @@ export default function Landing() {
       <section className="py-16 md:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
-            {/* Build Your Portfolio */}
+            {/* Audit Your Collection */}
             <div className="text-center">
               <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                <Frame className="h-7 w-7 text-primary" />
+                <Shield className="h-7 w-7 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Build Your Portfolio</h3>
+              <h3 className="text-xl font-semibold mb-3">Audit Your Collection</h3>
               <ul className="text-muted-foreground space-y-2 text-left max-w-xs mx-auto">
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  Track cards with or without images
+                  Unbiased valuations from real sales data
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  Organize by tags or themes
+                  Risk signals and concentration warnings
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  Public or private portfolios
+                  No marketplace to push you to sell
                 </li>
               </ul>
             </div>
 
-            {/* Understand the Market */}
+            {/* Cut Through the Hype */}
             <div className="text-center">
               <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <BarChart3 className="h-7 w-7 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Understand the Market</h3>
+              <h3 className="text-xl font-semibold mb-3">Cut Through the Hype</h3>
               <ul className="text-muted-foreground space-y-2 text-left max-w-xs mx-auto">
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  AI-powered BUY / WATCH / AVOID signals
+                  AI verdicts backed by eBay comps
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  Upside, risk, and confidence scores
+                  Supply saturation and grading alerts
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  Real comps from eBay and collectors
+                  S&P 500 and Bitcoin benchmarking
                 </li>
               </ul>
             </div>
 
-            {/* Invest Player-First */}
+            {/* Invest with Clarity */}
             <div className="text-center">
               <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
                 <TrendingUp className="h-7 w-7 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Invest Player-First</h3>
+              <h3 className="text-xl font-semibold mb-3">Invest with Clarity</h3>
               <ul className="text-muted-foreground space-y-2 text-left max-w-xs mx-auto">
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  Treat players like stocks
+                  Player-first analysis across all licenses
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  Career trajectory & legacy analysis
+                  Hidden gems from AI + community signals
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-1 flex-shrink-0" />
-                  Watchlists and long-term outlooks
+                  Agent Mode: autonomous portfolio auditor
                 </li>
               </ul>
             </div>
@@ -378,10 +394,10 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold mb-4">
-                Not Just Prices — Explanations
+                Analysis Without an Agenda
               </h2>
               <p className="text-muted-foreground text-lg mb-6">
-                Every analysis tells you why, not just what. Get market signals, AI-generated insights, and actionable recommendations for every card.
+                Every verdict tells you why — backed by real eBay sales, not marketplace hype or sponsored recommendations. No card company, auction house, or marketplace influences our analysis.
               </p>
               <ul className="space-y-3 text-muted-foreground mb-6">
                 <li className="flex items-center gap-2">
@@ -390,19 +406,19 @@ export default function Landing() {
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  Trend, liquidity, volatility, and card quality metrics
+                  Liquidity scoring and supply saturation alerts
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  AI-generated analysis with real market context
+                  AI analysis grounded in actual sold comps
                 </li>
                 <li className="flex items-center gap-2">
                   <Check className="h-4 w-4 text-primary" />
-                  Data confidence indicators
+                  Independent — we profit from your success, not your trades
                 </li>
               </ul>
               <p className="text-sm text-muted-foreground italic">
-                We don't just tell you what to do — we tell you why.
+                When everyone else in the hobby has an angle, objectivity is the product.
               </p>
             </div>
             <div>
@@ -555,7 +571,7 @@ export default function Landing() {
               Start Free. Upgrade When You're Ready.
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              No pressure. Just powerful tools for collectors who want more.
+              No pressure, no upsells from a marketplace. Just independent tools for collectors who want the truth.
             </p>
           </div>
 
@@ -644,7 +660,7 @@ export default function Landing() {
               <span className="text-lg font-semibold">Sports Card Portfolio</span>
             </div>
             <p className="text-muted-foreground text-sm max-w-md mb-6">
-              The long-term home for serious collectors who treat cards like assets.
+              The independent, conflict-free auditor for collectors who treat cards like assets.
             </p>
             <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
               <Link href="/terms" className="hover:text-foreground transition-colors">
