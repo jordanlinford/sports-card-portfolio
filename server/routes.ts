@@ -6977,6 +6977,32 @@ RULES:
     }
   });
 
+  app.get("/api/analytics/market-benchmarks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      const user = await storage.getUser(userId);
+      if (!hasProAccess(user)) {
+        return res.status(403).json({ message: "Market benchmarks is a Pro feature." });
+      }
+      
+      const { getMarketBenchmarks, getPortfolioPerformanceOverTime } = await import("./marketBenchmarkService");
+      
+      const [benchmarks, portfolioPerformance] = await Promise.all([
+        getMarketBenchmarks(),
+        getPortfolioPerformanceOverTime(userId),
+      ]);
+      
+      res.json({
+        benchmarks,
+        portfolioPerformance,
+      });
+    } catch (error) {
+      console.error("Error fetching market benchmarks:", error);
+      res.status(500).json({ message: "Failed to fetch market benchmarks" });
+    }
+  });
+
   // Bookmark routes
   app.get("/api/bookmarks", isAuthenticated, async (req: any, res) => {
     try {

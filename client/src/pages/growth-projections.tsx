@@ -30,6 +30,9 @@ import {
   BarChart,
   Bar,
   Cell,
+  LineChart as RechartsLineChart,
+  Line,
+  Legend,
 } from "recharts";
 
 type MarketTemperature = "HOT" | "WARM" | "NEUTRAL" | "COOLING";
@@ -98,6 +101,21 @@ interface GrowthProjectionsData {
   methodology: string;
   generatedAt: string;
   aiSummary: string;
+}
+
+interface BenchmarkDataPoint {
+  date: string;
+  value: number;
+  changePct: number;
+}
+
+interface MarketBenchmarksData {
+  benchmarks: {
+    sp500: BenchmarkDataPoint[];
+    bitcoin: BenchmarkDataPoint[];
+    fetchedAt: string;
+  };
+  portfolioPerformance: BenchmarkDataPoint[];
 }
 
 const TEMP_COLORS: Record<MarketTemperature, string> = {
@@ -187,6 +205,13 @@ export default function GrowthProjectionsPage() {
     queryKey: ["/api/analytics/growth-projections"],
     enabled: isAuthenticated && isPro,
     retry: false,
+  });
+
+  const { data: benchmarkData } = useQuery<MarketBenchmarksData>({
+    queryKey: ["/api/analytics/market-benchmarks"],
+    enabled: isAuthenticated && isPro && !!data && data.currentValue > 0,
+    retry: false,
+    staleTime: 24 * 60 * 60 * 1000,
   });
 
   if (!isAuthenticated && !authLoading) {
@@ -403,6 +428,176 @@ export default function GrowthProjectionsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {benchmarkData && (benchmarkData.benchmarks.sp500.length > 0 || benchmarkData.benchmarks.bitcoin.length > 0) && benchmarkData.portfolioPerformance.length > 0 && (() => {
+            const portfolio = benchmarkData.portfolioPerformance;
+            const sp500 = benchmarkData.benchmarks.sp500;
+            const btc = benchmarkData.benchmarks.bitcoin;
+            
+            const portfolioReturn = portfolio.length > 0 ? portfolio[portfolio.length - 1].changePct : 0;
+            const sp500Return = sp500.length > 0 ? sp500[sp500.length - 1].changePct : 0;
+            const btcReturn = btc.length > 0 ? btc[btc.length - 1].changePct : 0;
+            
+            const sp500Alpha = Math.round((portfolioReturn - sp500Return) * 100) / 100;
+            
+            const allDates = new Set<string>();
+            portfolio.forEach(p => allDates.add(p.date));
+            sp500.forEach(p => allDates.add(p.date));
+            btc.forEach(p => allDates.add(p.date));
+            
+            const sortedDates = Array.from(allDates).sort();
+            
+            const sp500Map = new Map(sp500.map(p => [p.date, p.changePct]));
+            const btcMap = new Map(btc.map(p => [p.date, p.changePct]));
+            const portfolioMap = new Map(portfolio.map(p => [p.date, p.changePct]));
+            
+            const comparisonData = sortedDates.map(date => ({
+              date,
+              portfolio: portfolioMap.get(date) ?? null,
+              sp500: sp500Map.get(date) ?? null,
+              bitcoin: btcMap.get(date) ?? null,
+            }));
+            
+            const beatingMarket = sp500.length > 0 && portfolioReturn > sp500Return;
+            
+            return (
+              <Card data-testid="card-market-comparison">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5" />
+                    Market Comparison
+                  </CardTitle>
+                  <CardDescription>
+                    Your portfolio performance vs traditional assets (trailing 12 months)
+                  </CardDescription>
+                  
+                  {sp500.length > 0 && (
+                    <div className={`mt-3 p-3 rounded-md ${beatingMarket ? "bg-green-500/10 border border-green-500/20" : "bg-amber-500/10 border border-amber-500/20"}`}>
+                      <p className={`text-sm font-medium ${beatingMarket ? "text-green-700 dark:text-green-400" : "text-amber-700 dark:text-amber-400"}`} data-testid="text-alpha-headline">
+                        {beatingMarket ? (
+                          <>Your portfolio is outperforming the S&P 500 by {Math.abs(sp500Alpha)}%</>
+                        ) : sp500Alpha === 0 ? (
+                          <>Your portfolio is matching the S&P 500</>
+                        ) : (
+                          <>Your portfolio is underperforming the S&P 500 by {Math.abs(sp500Alpha)}%</>
+                        )}
+                      </p>
+                    </div>
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="text-center p-3 rounded-md bg-muted/50" data-testid="stat-portfolio-return">
+                      <p className="text-xs text-muted-foreground mb-1">Your Portfolio</p>
+                      <p className={`text-lg font-bold ${portfolioReturn >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                        {formatPercent(portfolioReturn)}
+                      </p>
+                    </div>
+                    {sp500.length > 0 && (
+                      <div className="text-center p-3 rounded-md bg-muted/50" data-testid="stat-sp500-return">
+                        <p className="text-xs text-muted-foreground mb-1">S&P 500</p>
+                        <p className={`text-lg font-bold ${sp500Return >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          {formatPercent(sp500Return)}
+                        </p>
+                      </div>
+                    )}
+                    {btc.length > 0 && (
+                      <div className="text-center p-3 rounded-md bg-muted/50" data-testid="stat-btc-return">
+                        <p className="text-xs text-muted-foreground mb-1">Bitcoin</p>
+                        <p className={`text-lg font-bold ${btcReturn >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          {formatPercent(btcReturn)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <ResponsiveContainer width="100%" height={300}>
+                    <RechartsLineChart data={comparisonData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis 
+                        dataKey="date" 
+                        className="text-muted-foreground text-xs"
+                        tickFormatter={(v) => {
+                          const [year, month] = v.split("-");
+                          return `${["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][parseInt(month) - 1]} '${year.slice(2)}`;
+                        }}
+                      />
+                      <YAxis 
+                        tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}%`}
+                        className="text-muted-foreground text-xs"
+                      />
+                      <Tooltip 
+                        formatter={(value: number | null, name: string) => {
+                          if (value === null) return ["-", name];
+                          const label = name === "portfolio" ? "Your Portfolio" : name === "sp500" ? "S&P 500" : "Bitcoin";
+                          return [`${value > 0 ? "+" : ""}${value}%`, label];
+                        }}
+                        contentStyle={{ 
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "6px"
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="portfolio" 
+                        stroke="hsl(var(--primary))" 
+                        strokeWidth={3}
+                        dot={false}
+                        connectNulls
+                        name="portfolio"
+                      />
+                      {sp500.length > 0 && (
+                        <Line 
+                          type="monotone" 
+                          dataKey="sp500" 
+                          stroke="hsl(var(--chart-2))" 
+                          strokeWidth={2}
+                          strokeDasharray="5 5"
+                          dot={false}
+                          connectNulls
+                          name="sp500"
+                        />
+                      )}
+                      {btc.length > 0 && (
+                        <Line 
+                          type="monotone" 
+                          dataKey="bitcoin" 
+                          stroke="hsl(var(--chart-4))" 
+                          strokeWidth={2}
+                          strokeDasharray="3 3"
+                          dot={false}
+                          connectNulls
+                          name="bitcoin"
+                        />
+                      )}
+                    </RechartsLineChart>
+                  </ResponsiveContainer>
+                  <div className="flex items-center justify-center gap-6 mt-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-0.5 rounded" style={{ backgroundColor: "hsl(var(--primary))" }} />
+                      <span className="text-sm text-muted-foreground">Your Portfolio</span>
+                    </div>
+                    {sp500.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-0.5 rounded border-dashed" style={{ backgroundColor: "hsl(var(--chart-2))", borderTop: "2px dashed hsl(var(--chart-2))" }} />
+                        <span className="text-sm text-muted-foreground">S&P 500</span>
+                      </div>
+                    )}
+                    {btc.length > 0 && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-0.5 rounded" style={{ backgroundColor: "hsl(var(--chart-4))", borderTop: "2px dotted hsl(var(--chart-4))" }} />
+                        <span className="text-sm text-muted-foreground">Bitcoin</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    Market data refreshed daily. Portfolio value based on current card values at each month.
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {data.insights.length > 0 && (
             <Card>
