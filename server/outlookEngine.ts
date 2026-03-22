@@ -309,7 +309,11 @@ This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and g
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${searchDescription} raw sold eBay" and "${searchDescription} ungraded sold eBay"
 2. avgPrice, minPrice, maxPrice and rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
 3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into avgPrice or rawPrice.
-${(isPremiumUnnumberedStandalone || isPremiumNumberedStandalone) ? `4. SSP/CASE HIT INCLUSION: This card IS a premium SSP/Case Hit parallel. Listings tagged "SSP", "Short Print", "Case Hit" ARE this card — INCLUDE them as valid comps. Do NOT exclude SSP-tagged listings.` : `4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.`}${isPrizmFamilySetStandalone && isStrictBaseVariationStandalone ? `
+4. SSP/CASE HIT COMP MATCHING — USE YOUR HOBBY KNOWLEDGE:
+Determine whether this card's variation "${card.variation || "base"}" is a premium insert, case hit, or SSP (examples: Downtown, Uptown, Kaboom, Color Blast, Disco, Stained Glass, Zebra, Tiger Stripe, Mojo, The Man, Warp Speed, Aurora, Street Art, and similar premium inserts).
+- If this card IS a premium insert/case hit/SSP: Listings tagged "SSP", "Short Print", or "Case Hit" ARE this card — INCLUDE them as valid comps. These tags confirm the listing matches.
+- If this card is a STANDARD variation (base, silver, numbered color parallels, etc.): Listings tagged "SSP", "Short Print", "SP", or "Case Hit" are a DIFFERENT, more valuable variation — EXCLUDE them completely.
+Use your knowledge of the sports card hobby to make this determination. Do NOT rely solely on keyword matching — understand what the variation actually is.${isPrizmFamilySetStandalone && isStrictBaseVariationStandalone ? `
 4b. PRIZM BASE REFRACTOR EXCLUSION: This is a PAPER BASE Prizm card (NON-REFRACTOR). ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Gold", "Red", "Blue", "Green", "Purple", "Orange", "Pink" in the title is a DIFFERENT, MORE EXPENSIVE parallel — EXCLUDE it completely. Only use listings that are clearly the paper base version.` : ""}
 5. Example: raw sales $25, $32, $40 → avgPrice = $32 (median), rawPrice = $32, psa9Price (separate) = $60.
 6. Use the MEDIAN of the raw sales you find — do NOT skew low or high. Report it accurately.
@@ -833,9 +837,12 @@ The FULL set name is "${card.set}". Every word matters — each word identifies 
 This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and graded prices:
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${unifiedSearchDescription} raw sold eBay" and "${unifiedSearchDescription} ungraded sold eBay"
 2. market.avgPrice, market.minPrice, market.maxPrice and market.rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
-3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into market.avgPrice or market.rawPrice.${(isPremiumUnnumberedParallel || isPremiumNumberedParallel) ? `
-4. SSP/CASE HIT INCLUSION: This card IS a premium SSP/Case Hit parallel. Listings tagged "SSP", "Short Print", "Case Hit" ARE this card — INCLUDE them as valid comps. Do NOT exclude SSP-tagged listings.` : `
-4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.`}${isPrizmFamilySet && isStrictBaseVariation ? `
+3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into market.avgPrice or market.rawPrice.
+4. SSP/CASE HIT COMP MATCHING — USE YOUR HOBBY KNOWLEDGE:
+Determine whether this card's variation "${card.variation || "base"}" is a premium insert, case hit, or SSP (examples: Downtown, Uptown, Kaboom, Color Blast, Disco, Stained Glass, Zebra, Tiger Stripe, Mojo, The Man, Warp Speed, Aurora, Street Art, and similar premium inserts).
+- If this card IS a premium insert/case hit/SSP: Listings tagged "SSP", "Short Print", or "Case Hit" ARE this card — INCLUDE them as valid comps. These tags confirm the listing matches.
+- If this card is a STANDARD variation (base, silver, numbered color parallels, etc.): Listings tagged "SSP", "Short Print", "SP", or "Case Hit" are a DIFFERENT, more valuable variation — EXCLUDE them completely.
+Use your knowledge of the sports card hobby to make this determination. Do NOT rely solely on keyword matching — understand what the variation actually is.${isPrizmFamilySet && isStrictBaseVariation ? `
 4b. PRIZM BASE REFRACTOR EXCLUSION: This is a PAPER BASE Prizm card (NON-REFRACTOR). ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Gold", "Red", "Blue", "Green", "Purple", "Orange", "Pink" in the title is a DIFFERENT, MORE EXPENSIVE parallel — EXCLUDE it completely. Only use listings that are clearly the paper base version.` : ""}
 5. Example: raw sales $25, $32, $40 → market.avgPrice = $32 (median), market.rawPrice = $32, psa9Price (separate) = $60.
 6. Use the MEDIAN of the raw sales you find — do NOT skew low or high. Report it accurately.
