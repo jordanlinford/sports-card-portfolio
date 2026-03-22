@@ -310,19 +310,31 @@ interface PlayerOutlookRefreshEntry {
 }
 
 /**
- * Get top 50 public player outlook pages to refresh daily, prioritized by:
- * 1. Big Mover flag (HOT temperature) — highest SEO value
- * 2. Page view count desc (most-viewed pages matter most for SEO)
- * 3. Staleness (oldest-refreshed first, ensures 7+ day stale pages bubble up)
+ * Get top 50 public player outlook pages to refresh daily.
  *
- * Always selects up to MAX_PLAYER_OUTLOOKS_PER_RUN public pages per run,
- * regardless of current staleness. The ranking naturally ensures stale
- * high-value pages are refreshed first, while fresh low-value pages
- * fill remaining slots.
+ * Slot policy:
+ * - Pages not refreshed in 7+ days (or never refreshed) are ALWAYS included
+ *   first, up to the cap. Within this group, sorted by Big Mover → viewCount → staleness.
+ * - Remaining slots (up to 50 total) are filled with non-stale public pages,
+ *   ranked by Big Mover → viewCount → staleness.
+ *
+ * This guarantees stale pages are never skipped while still refreshing
+ * high-value fresh pages when capacity allows.
  */
 async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshEntry[]> {
   try {
-    const rows = await db
+    const stalenessCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const results: PlayerOutlookRefreshEntry[] = [];
+    const seenKeys = new Set<string>();
+
+    const rankOrder = [
+      sql`CASE WHEN ${playerOutlookCache.temperature} = 'HOT' THEN 0 ELSE 1 END`,
+      desc(playerOutlookCache.viewCount),
+      sql`COALESCE(${playerOutlookCache.lastFetchedAt}, '1970-01-01'::timestamp)`,
+    ];
+
+    // Step 1: Guarantee stale pages (7+ days or never refreshed)
+    const staleRows = await db
       .select({
         playerKey: playerOutlookCache.playerKey,
         sport: playerOutlookCache.sport,
@@ -332,26 +344,76 @@ async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshE
         viewCount: playerOutlookCache.viewCount,
       })
       .from(playerOutlookCache)
-      .where(eq(playerOutlookCache.isPublic, true))
-      .orderBy(
-        sql`CASE WHEN ${playerOutlookCache.temperature} = 'HOT' THEN 0 ELSE 1 END`,
-        desc(playerOutlookCache.viewCount),
-        playerOutlookCache.lastFetchedAt
+      .where(
+        and(
+          eq(playerOutlookCache.isPublic, true),
+          sql`(${playerOutlookCache.lastFetchedAt} IS NULL OR ${playerOutlookCache.lastFetchedAt} < ${stalenessCutoff})`
+        )
       )
+      .orderBy(...rankOrder)
       .limit(MAX_PLAYER_OUTLOOKS_PER_RUN);
 
-    const results: PlayerOutlookRefreshEntry[] = rows.map(r => ({
-      playerName: r.playerName,
-      sport: r.sport,
-      playerKey: r.playerKey,
-      isBigMover: r.temperature === "HOT",
-      viewCount: r.viewCount,
-      lastFetchedAt: r.lastFetchedAt,
-      temperature: r.temperature,
-    }));
+    for (const r of staleRows) {
+      if (results.length >= MAX_PLAYER_OUTLOOKS_PER_RUN) break;
+      if (seenKeys.has(r.playerKey)) continue;
+      seenKeys.add(r.playerKey);
+      results.push({
+        playerName: r.playerName,
+        sport: r.sport,
+        playerKey: r.playerKey,
+        isBigMover: r.temperature === "HOT",
+        viewCount: r.viewCount,
+        lastFetchedAt: r.lastFetchedAt,
+        temperature: r.temperature,
+      });
+    }
+
+    const staleCount = results.length;
+    console.log(`[Prewarm:Outlook] Guaranteed ${staleCount} stale pages (7+ days or never refreshed)`);
+
+    // Step 2: Fill remaining slots with non-stale public pages
+    if (results.length < MAX_PLAYER_OUTLOOKS_PER_RUN) {
+      const remaining = MAX_PLAYER_OUTLOOKS_PER_RUN - results.length;
+
+      const freshRows = await db
+        .select({
+          playerKey: playerOutlookCache.playerKey,
+          sport: playerOutlookCache.sport,
+          playerName: playerOutlookCache.playerName,
+          lastFetchedAt: playerOutlookCache.lastFetchedAt,
+          temperature: playerOutlookCache.temperature,
+          viewCount: playerOutlookCache.viewCount,
+        })
+        .from(playerOutlookCache)
+        .where(
+          and(
+            eq(playerOutlookCache.isPublic, true),
+            sql`${playerOutlookCache.lastFetchedAt} IS NOT NULL AND ${playerOutlookCache.lastFetchedAt} >= ${stalenessCutoff}`
+          )
+        )
+        .orderBy(...rankOrder)
+        .limit(remaining);
+
+      for (const r of freshRows) {
+        if (results.length >= MAX_PLAYER_OUTLOOKS_PER_RUN) break;
+        if (seenKeys.has(r.playerKey)) continue;
+        seenKeys.add(r.playerKey);
+        results.push({
+          playerName: r.playerName,
+          sport: r.sport,
+          playerKey: r.playerKey,
+          isBigMover: r.temperature === "HOT",
+          viewCount: r.viewCount,
+          lastFetchedAt: r.lastFetchedAt,
+          temperature: r.temperature,
+        });
+      }
+
+      console.log(`[Prewarm:Outlook] Filled ${results.length - staleCount} remaining slots with fresh high-value pages`);
+    }
 
     const bigMoverCount = results.filter(r => r.isBigMover).length;
-    console.log(`[Prewarm:Outlook] Found ${results.length} player outlooks to refresh (${bigMoverCount} big movers)`);
+    console.log(`[Prewarm:Outlook] Total: ${results.length} player outlooks to refresh (${bigMoverCount} big movers)`);
     return results;
   } catch (error) {
     console.error("[Prewarm:Outlook] Error fetching player outlooks to refresh:", error);
