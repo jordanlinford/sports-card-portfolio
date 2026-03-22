@@ -192,7 +192,7 @@ const geminiMarketCache = new Map<string, GeminiMarketCache>();
 const GEMINI_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Generate cache key from card attributes
-function getGeminiCacheKey(card: {
+export function getGeminiCacheKey(card: {
   title: string;
   playerName?: string | null;
   year?: number | null;
@@ -689,7 +689,7 @@ const unifiedAnalysisCache = new Map<string, UnifiedAnalysisCache>();
 const UNIFIED_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DB_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
-async function getDbCachedAnalysis(cacheKey: string): Promise<UnifiedCardAnalysis | null> {
+export async function getDbCachedAnalysis(cacheKey: string): Promise<UnifiedCardAnalysis | null> {
   try {
     const { db } = await import("./db");
     const { unifiedAnalysisDbCache } = await import("@shared/schema");

@@ -29,6 +29,7 @@ import {
   X,
   Target,
   AlertCircle,
+  AlertTriangle,
   Check
 } from "lucide-react";
 import {
@@ -259,6 +260,15 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
                   data-testid={`badge-big-mover-${card.id}`}
                 >
                   <Zap className="h-3 w-3 text-white" />
+                </div>
+              )}
+              {card.outlookSupplyGrowth === "surging" && (
+                <div 
+                  className="bg-yellow-500/90 p-1 rounded"
+                  title="Supply Saturation Alert"
+                  data-testid={`badge-supply-alert-${card.id}`}
+                >
+                  <AlertTriangle className="h-3 w-3 text-white" />
                 </div>
               )}
             </div>

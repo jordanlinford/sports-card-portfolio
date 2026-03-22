@@ -163,6 +163,7 @@ export const cards = pgTable("cards", {
   outlookGeneratedAt: timestamp("outlook_generated_at"),
   outlookBigMover: boolean("outlook_big_mover").default(false),
   outlookBigMoverReason: text("outlook_big_mover_reason"),
+  outlookSupplyGrowth: varchar("outlook_supply_growth", { length: 20 }),
 }, (table) => [
   index("idx_cards_display_case_id").on(table.displayCaseId),
   index("idx_cards_player_name").on(table.playerName),

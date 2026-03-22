@@ -2566,12 +2566,14 @@ Sitemap: ${origin}/sitemap.xml
       await storage.upsertCardOutlook(cardId, outlookData);
       await storage.recordOutlookUsage(userId, 'collection', cardId, card.title);
 
+      const supplyGrowth = geminiMarketData?.supply?.supplyGrowth || null;
       const cardUpdate: any = {
         outlookBigMover: signals.bigMoverFlag,
         outlookBigMoverReason: signals.bigMoverReason,
         outlookAction: finalAction,
         outlookUpsideScore: signals.upsideScore,
         outlookRiskScore: signals.downsideRisk,
+        outlookSupplyGrowth: supplyGrowth,
       };
       if (marketValue) {
         cardUpdate.previousValue = card.estimatedValue || null;
@@ -2833,9 +2835,11 @@ Sitemap: ${origin}/sitemap.xml
         await storage.upsertCardOutlook(card.id, outlookData);
         await storage.recordOutlookUsage(userId, 'collection', card.id, card.title);
 
+        const batchSupplyGrowth = geminiMarketData?.supply?.supplyGrowth || null;
         const cardUpdate: any = {
           outlookBigMover: signals.bigMoverFlag, outlookBigMoverReason: signals.bigMoverReason,
           outlookAction: finalAction, outlookUpsideScore: signals.upsideScore, outlookRiskScore: signals.downsideRisk,
+          outlookSupplyGrowth: batchSupplyGrowth,
         };
         if (marketValue) {
           cardUpdate.previousValue = card.estimatedValue || null;
@@ -3052,7 +3056,7 @@ Sitemap: ${origin}/sitemap.xml
           },
           supply: await (async () => {
             try {
-              const { getGeminiMarketCacheEntry } = await import("./outlookEngine");
+              const { getGeminiMarketCacheEntry, getDbCachedAnalysis, getGeminiCacheKey } = await import("./outlookEngine");
               const supplyData = getGeminiMarketCacheEntry({
                 title: card.title, playerName: card.playerName, year: card.year,
                 set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
@@ -3062,6 +3066,18 @@ Sitemap: ${origin}/sitemap.xml
                   supplyGrowth: supplyData.supply.supplyGrowth,
                   supplyNote: isPro ? supplyData.supply.supplyNote : undefined,
                   estimatedPopulation: isPro ? supplyData.supply.estimatedPopulation : undefined,
+                };
+              }
+              const unifiedCacheKey = "unified|" + getGeminiCacheKey({
+                title: card.title, playerName: card.playerName, year: card.year,
+                set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
+              });
+              const dbCached = await getDbCachedAnalysis(unifiedCacheKey);
+              if (dbCached?.supply) {
+                return {
+                  supplyGrowth: dbCached.supply.supplyGrowth,
+                  supplyNote: isPro ? dbCached.supply.supplyNote : undefined,
+                  estimatedPopulation: isPro ? dbCached.supply.estimatedPopulation : undefined,
                 };
               }
             } catch (e) {}
