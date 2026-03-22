@@ -677,8 +677,12 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
 
     let gemsCreated = 0;
     const currentMonth = new Date().getMonth() + 1;
+    const sportToConfigKey: Record<string, string> = {
+      nfl: "football", nba: "basketball", mlb: "baseball", nhl: "hockey", soccer: "soccer",
+      football: "football", basketball: "basketball", baseball: "baseball", hockey: "hockey",
+    };
     for (const gem of allGems) {
-      const sportKey = normalizeSport(gem.sport).toLowerCase();
+      const sportKey = sportToConfigKey[normalizeSport(gem.sport).toLowerCase()] || normalizeSport(gem.sport).toLowerCase();
       const seasonalConfig = SEASONAL_CONFIGS[sportKey];
       if (seasonalConfig && seasonalConfig.playoffMonths.includes(currentMonth)) {
         const boostPoints = Math.round((seasonalConfig.playoffMultiplier - 1) * 40);
