@@ -163,7 +163,11 @@ export const cards = pgTable("cards", {
   outlookGeneratedAt: timestamp("outlook_generated_at"),
   outlookBigMover: boolean("outlook_big_mover").default(false),
   outlookBigMoverReason: text("outlook_big_mover_reason"),
-});
+}, (table) => [
+  index("idx_cards_display_case_id").on(table.displayCaseId),
+  index("idx_cards_player_name").on(table.playerName),
+  index("idx_cards_sport").on(table.sport),
+]);
 
 export const cardsRelations = relations(cards, ({ one }) => ({
   displayCase: one(displayCases, {
@@ -2361,6 +2365,8 @@ export const unifiedAnalysisDbCache = pgTable("unified_analysis_cache", {
   cacheKey: varchar("cache_key", { length: 512 }).primaryKey(),
   resultJson: jsonb("result_json").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_unified_cache_created_at").on(table.createdAt),
+]);
 
 export type UnifiedAnalysisDbCache = typeof unifiedAnalysisDbCache.$inferSelect;
