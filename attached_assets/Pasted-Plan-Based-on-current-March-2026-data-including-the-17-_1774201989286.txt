@@ -1,0 +1,37 @@
+Plan.
+Based on current March 2026 data—including the 17% YoY supply surge in Topps Series 1 and the upcoming April 1st NFL License pivot—here is your copy-and-paste roadmap for Replit.
+Phase 1: Revenue & Engagement (Next 30 Days)
+Objective: Convert free users to Pro and validate "Asset" status.
+• [Task 1] The "Hidden Gems" Paywall (Frontend Change)
+• Action: Modify the HiddenGems component to blur player names and card details for non-Pro users.
+• Logic: If !user.isPro, apply filter: blur(8px) to the card titles.
+• CTA: Add an overlay button: "Reveal this 2026 World Cup breakout prospect—Upgrade to Pro."
+• [Task 2] Portfolio Alpha (S&P 500 & BTC Comparison)
+• Action: Add a "Comparison" row to the ProDashboard.
+• Logic: Fetch current prices ($6,509 for S&P 500 / $68,740 for BTC) and show YoY % growth vs. the user's portfolio.
+• The Hook: "Your 2025 Panini Prizm case is outperforming the S&P 500 by 12%."
+Phase 2: The "Monopoly Auditor" Moat (60 Days)
+Objective: Protect users from "Junk Wax 2.0" overproduction.
+• [Task 3] Supply Saturation Alert (The "Pop" Tracker)
+• Action: Create a pop_history table in Drizzle.
+• Logic: Modify the prewarmJob to capture the PSA/BGS pop count every 7 days.
+• The Feature: If Pop Growth > 10% month-over-month (as seen in 2026 Topps Flagship), trigger a "Supply Alert" badge on that card.
+• [Task 4] The "Topps Takeover" Alert (April 1st Event)
+• Action: Set up a push/email notification for users holding Panini NFL cards.
+• Logic: As Panini's license expires on March 31, 2026, provide a "Market Shift" analysis: "Panini licenses expire in 10 days. Historical data suggests a 15% volatility spike for legacy licensed slabs."
+Phase 3: Traffic & SEO Dominance (90 Days)
+Objective: Dominate search for "Big Movers" and the 2026 World Cup.
+• [Task 5] Daily "Big Mover" SEO Expansion
+• Action: Scale the Daily Refresh task from top 10 to top 50 players.
+• Real-time Trigger: If a player has a "Bam Adebayo 83-point" level outlier game, Gemini automatically updates the /outlook/:slug page.
+• [Task 6] World Cup 2026 Prospecting Engine
+• Action: Add a "World Cup 2026" filter to the Hidden Gems logic.
+• Logic: Prioritize players like Lamine Yamal and Bukayo Saka, whose 1/1 Superfractors are already breaking records ($396k+) ahead of the June tournament.
+Technical Infrastructure (The "Boring but Vital")
+• [Maint 1] Indexing: Run a migration to add B-Tree indexes on cards.playerName and unified_analysis_cache.cache_key.
+• [Maint 2] Proxy Reliability: Move your eBay scraper to a dedicated Rotating Proxy service to bypass the aggressive 2026 anti-botting measures on marketplaces.
+Why this works:
+1. Direct ROI: The Hidden Gems blur is a proven conversion lever.
+2. Psychology: Comparing cards to Bitcoin validates the user as an "Investor," not just a "Collector."
+3. Scarcity: By alerting users to Supply Saturation, you are the only app actually telling them when to sell, building massive trust.
+Should I start by writing the Drizzle migration for the pop_history table so we can start tracking those supply surges immediately?

@@ -1,0 +1,37 @@
+This is your 2026 Master Execution Roadmap. We are pivoting sportscardportfolio.io from a "hobby tracker" to a Strategic Asset Terminal.
+The context is critical: It is March 22, 2026. Panini’s NFL license expires in 9 days (March 31). The "Junk Wax 2.0" supply glut is at an all-time high, and the World Cup 2026 hype is beginning to peak. We are moving fast to capture the "Flight to Quality" investor.
+The "Kill" List: Sunsetting Dead Weight
+To scale as a "lean" agent-led platform, we are removing high-friction features that distract from our core value of Information Alpha.
+• REMOVED: Portfolio Builder (Box Breaks & Splits): We are killing the internal "Break" hosting and Stripe-integrated splits. Why: In 2026, regulatory scrutiny on "unlicensed gambling" is too high. Instead, we pivot this logic into the "Break Value Auditor"—a tool that tells users if a box is statistically worth the price, without you taking the house risk.
+• FROZEN: Social Feed & Messaging: We are keeping "Likes" and "Guest Comments" for SEO but stopping all new dev on "Social" features. Collectors use Discord/X for chat; they use us for data.
+Phase 1: Revenue & Conversion (Next 30 Days)
+Goal: Direct monetization of your 45 Pro users and aggressive acquisition.
+1. Hidden Gems "Paywall" (Conversion): * The Build: Use a CSS blur(12px) on the playerName and cardDetails for non-Pro users.
+• The Hook: Display a "Confidence Score" (e.g., 88% Bullish) and a CTA: "4 Whales are currently accumulating this player. Unlock for $19/mo."
+2. Portfolio Alpha (The "Investor" Flex):
+• The Build: Integrate a real-time financial API.
+• The Feature: Show a "Benchmark row" on the dashboard.
+• 2026 Data: Compare the user's portfolio growth against the S&P 500 (current: 7,840) and Bitcoin (current: $94,200).
+• Impact: Validates the user’s "hobby" as a legitimate high-yield asset.
+Phase 2: The "Agent Mode" & Monopoly Auditor (Days 30–60)
+Goal: Use AI to bypass the "Fanatics Monopoly" noise.
+1. The "Auditor" Agent Mode (UI/UX):
+• Interface: A ⌘+K Command Bar and a sidebar "Agent" that can be toggled on.
+• The Skillset: Program Gemini 2.5 Flash to call your existing 40 features as "Tools" (e.g., getScarcityIndex, getLiquidityScore).
+• Action: Instead of clicking 5 pages, a user asks: "Which cards in my 'NFL' case are most at risk during the April 1st Panini-to-Topps license pivot?"
+2. The Supply Saturation Alert (Anti-Junk Wax):
+• The Build: A new pop_history table in Drizzle.
+• Logic: Every time a card is scanned or "Prewarmed" (#51), store the PSA/BGS pop count.
+• The Alert: Trigger a "Supply Warning" badge if the Pop growth exceeds 12% MoM. In 2026, overproduction is the #1 price killer; you are the only app flagging it.
+Phase 3: Global Scale & SEO (Days 60–90)
+Goal: Capitalize on the 2026 World Cup and the "Topps Takeover."
+1. World Cup "Quick-Strike" Discovery:
+• Logic: Use Gemini with Google Search grounding to scan international soccer performance.
+• The Feature: A dedicated "World Cup '26" Hidden Gems section. Focus on "Low-Pop" stickers and early rookie parallels that Fanatics' retail machine might miss.
+2. The "Topps Takeover" Landing Pages:
+• SEO: Build dynamic landing pages for the return of Topps NFL Football on April 1.
+• The Alpha: Compare 2025 Panini "Last Licensed" values vs. 2026 Topps "First Licensed" values. This is high-intent search traffic you can own.
+Technical Implementation (Replit Optimized)
+Bypassing the 120s Timeout Firewall
+To run a complex "Agent Mode" without Replit's gateway killing the connection, you must use Server-Sent Events (SSE).
+The Replit/Express Skeleton:
