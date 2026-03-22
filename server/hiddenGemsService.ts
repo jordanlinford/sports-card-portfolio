@@ -29,7 +29,7 @@ let currentRefreshStatus: RefreshStatus = {
   status: "idle",
   progress: "",
   sportsDone: 0,
-  sportsTotal: 4,
+  sportsTotal: 5,
   gemsFound: 0,
   gemsCreated: 0,
   batchId: null,
@@ -103,12 +103,20 @@ function calculateDiscountScore(outlook: PlayerOutlookResponse): number {
     temp === "NEUTRAL" ? 10 :
     temp === "WARM" ? 5 : 0;
   
+  const sport = outlook.player?.sport?.toLowerCase() || "";
+  const currentMonth = new Date().getMonth() + 1;
+  let eventBonus = 0;
+  if (sport === "soccer" && [3, 4, 5, 6, 7].includes(currentMonth)) {
+    eventBonus = 10;
+  }
+
   return Math.min(100, Math.max(0, 
     upsideScore * 0.4 + 
     (100 - riskScore) * 0.2 + 
     confidenceScore * 0.2 +
     discountBonus + 
-    tempBonus
+    tempBonus +
+    eventBonus
   ));
 }
 
@@ -363,10 +371,26 @@ async function discoverGemsFromAI(sport: string, count: number, existingNames: S
     ? `\nDO NOT include any of these players (already selected): ${Array.from(existingNames).join(", ")}`
     : "";
 
+  const soccerWorldCupContext = sport.toUpperCase() === "SOCCER" ? `
+
+WORLD CUP 2026 CONTEXT (CRITICAL):
+The 2026 FIFA World Cup is being held in the United States, Mexico, and Canada in June-July 2026. This is the biggest catalyst for soccer card values.
+Focus your analysis heavily on World Cup implications:
+- Players confirmed for World Cup rosters or likely to be called up
+- Young breakout candidates from qualifying who could become household names during the tournament
+- Host country players (USA, Mexico, Canada) who will get extra media attention
+- Players from tournament favorites (Brazil, Argentina, France, England, Germany, Spain) whose cards are still underpriced
+- Players whose club form suggests World Cup breakout potential
+- Cards from previous World Cup stars whose values might spike with renewed tournament interest
+- The World Cup boost typically adds 20-30% to soccer card values during and after the tournament
+- Panini Prizm World Cup and Topps Chrome UCL are the flagship soccer card products
+- Consider the "World Cup effect" on card demand — even role players on deep tournament runs can see massive price spikes
+` : "";
+
   const prompt = `You are a sports card market analyst. Today is ${currentDate}.
 
 Search the internet for current ${sport} player news, injuries, trades, performances, and card market trends.
-
+${soccerWorldCupContext}
 Based on CURRENT real-time information, identify ${count} players whose sports cards represent interesting investment opportunities RIGHT NOW. Mix of:
 - ~70% undervalued/buy opportunities (players whose cards are cheaper than they should be)
 - ~30% overvalued/avoid warnings (players whose cards are overpriced relative to current situation)
@@ -449,7 +473,7 @@ export function startRefreshInBackground(targetCount: number = 25): { batchId: s
     status: "running",
     progress: "Starting AI discovery...",
     sportsDone: 0,
-    sportsTotal: 4,
+    sportsTotal: 5,
     gemsFound: 0,
     gemsCreated: 0,
     batchId,
@@ -583,7 +607,7 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
   console.log(`[HiddenGems] Starting combined AI + community refresh, batchId: ${batchId}, target: ${targetCount}`);
 
   try {
-    const sports = ["NFL", "NBA", "MLB", "NHL"];
+    const sports = ["NFL", "NBA", "MLB", "NHL", "Soccer"];
     const perSport = Math.ceil(targetCount / sports.length);
     const allGems: AiDiscoveredGem[] = [];
     const seenPlayerKeys = new Set<string>();
@@ -710,6 +734,12 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         const gemIsFromCommunity = communityPlayerKeys.has(playerKey);
         const gemSource = gemIsFromAI && gemIsFromCommunity ? "BOTH" : gemIsFromCommunity ? "COMMUNITY" : "AI";
 
+        let adjustedDiscountScore = gem.discountScore || 60;
+        const currentMonth = new Date().getMonth() + 1;
+        if (normalizedSport.toLowerCase() === "soccer" && [3, 4, 5, 6, 7].includes(currentMonth)) {
+          adjustedDiscountScore = Math.min(95, adjustedDiscountScore + 10);
+        }
+
         const gemData: InsertHiddenGem = {
           playerKey,
           playerName: normalizedName,
@@ -727,7 +757,7 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
           trapRisks: (gem.trapRisks || []).slice(0, 2),
           upsideScore: gem.isAvoid ? null : Math.min(95, Math.max(30, gem.upsideScore || 65)),
           confidenceScore: Math.min(95, Math.max(30, gem.confidenceScore || 65)),
-          discountScore: Math.min(95, Math.max(30, gem.discountScore || 60)),
+          discountScore: Math.min(95, Math.max(30, adjustedDiscountScore)),
           source: gemSource,
           batchId,
           sortOrder: i,

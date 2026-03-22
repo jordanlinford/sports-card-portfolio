@@ -266,7 +266,7 @@ function GemCard({ gem, isPro }: { gem: GemCandidate; isPro: boolean }) {
             
             <div className="mt-auto pt-4">
               <Button variant="outline" className="w-full" asChild>
-                <Link href={`/player-outlook?player=${encodeURIComponent(gem.playerName)}&sport=${{ NFL: "football", NBA: "basketball", MLB: "baseball", NHL: "hockey" }[gem.sport.toUpperCase()] || gem.sport.toLowerCase()}&from=hidden-gems`}>
+                <Link href={`/player-outlook?player=${encodeURIComponent(gem.playerName)}&sport=${{ NFL: "football", NBA: "basketball", MLB: "baseball", NHL: "hockey", SOCCER: "soccer" }[gem.sport.toUpperCase()] || gem.sport.toLowerCase()}&from=hidden-gems`}>
                   View Full Analysis
                   <ArrowRight className="h-4 w-4 ml-2" />
                 </Link>
@@ -439,7 +439,7 @@ export default function HiddenGemsPage() {
         status: "running",
         progress: "Starting AI discovery...",
         sportsDone: 0,
-        sportsTotal: 4,
+        sportsTotal: 5,
         gemsFound: 0,
         gemsCreated: 0,
       });
@@ -614,6 +614,7 @@ export default function HiddenGemsPage() {
                   <SelectItem value="NBA">NBA (Basketball)</SelectItem>
                   <SelectItem value="MLB">MLB (Baseball)</SelectItem>
                   <SelectItem value="NHL">NHL (Hockey)</SelectItem>
+                  <SelectItem value="Soccer">Soccer (World Cup 2026)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
