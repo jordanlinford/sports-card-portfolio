@@ -10,9 +10,10 @@ interface BenchmarkData {
   fetchedAt: string;
 }
 
-let cachedBenchmarkData: BenchmarkData | null = null;
-let cacheExpiresAt = 0;
+let cachedSP500: { data: BenchmarkDataPoint[]; expiresAt: number } = { data: [], expiresAt: 0 };
+let cachedBTC: { data: BenchmarkDataPoint[]; expiresAt: number } = { data: [], expiresAt: 0 };
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const RETRY_TTL_MS = 5 * 60 * 1000;
 
 async function fetchSP500Data(): Promise<BenchmarkDataPoint[]> {
   try {
@@ -91,25 +92,29 @@ async function fetchBitcoinData(): Promise<BenchmarkDataPoint[]> {
 }
 
 export async function getMarketBenchmarks(): Promise<BenchmarkData> {
-  if (cachedBenchmarkData && Date.now() < cacheExpiresAt) {
-    return cachedBenchmarkData;
-  }
+  const now = Date.now();
 
-  const [sp500, bitcoin] = await Promise.all([
-    fetchSP500Data(),
-    fetchBitcoinData(),
-  ]);
+  const sp500Promise = now < cachedSP500.expiresAt
+    ? Promise.resolve(cachedSP500.data)
+    : fetchSP500Data().then(data => {
+        cachedSP500 = { data, expiresAt: now + (data.length > 0 ? CACHE_TTL_MS : RETRY_TTL_MS) };
+        return data;
+      });
 
-  const data: BenchmarkData = {
+  const btcPromise = now < cachedBTC.expiresAt
+    ? Promise.resolve(cachedBTC.data)
+    : fetchBitcoinData().then(data => {
+        cachedBTC = { data, expiresAt: now + (data.length > 0 ? CACHE_TTL_MS : RETRY_TTL_MS) };
+        return data;
+      });
+
+  const [sp500, bitcoin] = await Promise.all([sp500Promise, btcPromise]);
+
+  return {
     sp500,
     bitcoin,
     fetchedAt: new Date().toISOString(),
   };
-
-  cachedBenchmarkData = data;
-  cacheExpiresAt = Date.now() + (sp500.length > 0 || bitcoin.length > 0 ? CACHE_TTL_MS : 5 * 60 * 1000);
-
-  return data;
 }
 
 export interface PortfolioPerformancePoint {

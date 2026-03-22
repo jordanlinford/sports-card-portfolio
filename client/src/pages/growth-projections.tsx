@@ -32,7 +32,6 @@ import {
   Cell,
   LineChart as RechartsLineChart,
   Line,
-  Legend,
 } from "recharts";
 
 type MarketTemperature = "HOT" | "WARM" | "NEUTRAL" | "COOLING";
