@@ -6938,6 +6938,23 @@ RULES:
       const title = "Topps NFL Takeover 2026: What It Means for Card Values";
       const description = "On April 1, 2026 Topps takes over the NFL card license from Panini. Independent, data-driven analysis on how this affects your sports card portfolio.";
 
+      const ssrPlayers = ["Patrick Mahomes", "Josh Allen", "Lamar Jackson", "Ja'Marr Chase", "CeeDee Lamb", "Caleb Williams"];
+      const playerSignals: { name: string; verdict: string; summary: string }[] = [];
+      await Promise.all(ssrPlayers.map(async (name) => {
+        try {
+          const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+          const outlook = await storage.getPublicPlayerOutlookBySlug("football", slug);
+          if (outlook?.outlookJson) {
+            const json = typeof outlook.outlookJson === "string" ? JSON.parse(outlook.outlookJson) : outlook.outlookJson;
+            playerSignals.push({
+              name,
+              verdict: json.verdict?.action || json.advisorVerdict || "MONITOR",
+              summary: json.verdict?.summary || json.oneLineRationale || `Investment outlook for ${name}.`,
+            });
+          }
+        } catch (_) {}
+      }));
+
       const faqItems = [
         { q: "Will Panini NFL cards lose value after the Topps takeover?", a: "It depends on the player and card type. Key Panini rookie cards from stars like Patrick Mahomes may retain collector value as the definitive rookie cards. Future unlicensed Panini products will likely trade at a discount." },
         { q: "When does Topps take over the NFL license from Panini?", a: "Fanatics (which owns Topps) officially holds the exclusive NFL trading card license starting April 1, 2026." },
@@ -7012,6 +7029,10 @@ RULES:
       <li>Avoid overpaying for the first Topps NFL products out of FOMO</li>
       <li>Diversify across both Panini and Topps eras for downside protection</li>
     </ul>
+    ${playerSignals.length > 0 ? `<h2>Live Player Signals</h2>
+    <ul>
+      ${playerSignals.map(p => `<li><strong>${escapeHtml(p.name)}</strong> — ${escapeHtml(p.verdict)}: ${escapeHtml(p.summary)}</li>`).join("\n      ")}
+    </ul>` : ''}
     <div class="faq">
       <h2>Frequently Asked Questions</h2>
       ${faqItems.map(f => `<h3>${escapeHtml(f.q)}</h3><p>${escapeHtml(f.a)}</p>`).join("\n      ")}
