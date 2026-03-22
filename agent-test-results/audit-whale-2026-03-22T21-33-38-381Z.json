@@ -1,0 +1,73 @@
+{
+  "runId": "audit-whale-2026-03-22T21-33-38-381Z",
+  "persona": "whale",
+  "appUrl": "https://6e57605c-ab35-4d08-9a9a-f1ca05db35c1-00-mk3ufchqie8q.worf.replit.dev",
+  "totalFeatures": 5,
+  "passed": 0,
+  "warnings": 0,
+  "failed": 5,
+  "allBugs": [
+    "[api-endpoints] User API (/api/user): Unexpected status 200",
+    "[hidden-gems] AI analysis failed: {\"error\":{\"code\":\"INVALID_ENDPOINT\",\"message\":\"Endpoint: 'POST /v1beta/models/gemini-2.5-flash:generateContent' is not supported.\"}}",
+    "[leaderboards] AI analysis failed: {\"error\":{\"code\":\"INVALID_ENDPOINT\",\"message\":\"Endpoint: 'POST /v1beta/models/gemini-2.5-flash:generateContent' is not supported.\"}}",
+    "[explore] AI analysis failed: {\"error\":{\"code\":\"INVALID_ENDPOINT\",\"message\":\"Endpoint: 'POST /v1beta/models/gemini-2.5-flash:generateContent' is not supported.\"}}",
+    "[home] AI analysis failed: {\"error\":{\"code\":\"INVALID_ENDPOINT\",\"message\":\"Endpoint: 'POST /v1beta/models/gemini-2.5-flash:generateContent' is not supported.\"}}"
+  ],
+  "results": [
+    {
+      "feature": "api-endpoints",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "User API (/api/user): Unexpected status 200"
+      ],
+      "observations": [
+        "Hidden Gems API: HTTP 200 ✓",
+        "Leaderboard API: HTTP 200 ✓",
+        "Agent Stream API: HTTP 401 ✓"
+      ],
+      "timestamp": "2026-03-22T21:33:38.786Z"
+    },
+    {
+      "feature": "hidden-gems",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":\"INVALID_ENDPOINT\",\"message\":\"Endpoint: 'POST /v1beta/models/gemini-2.5-flash:generateContent' is not supported.\"}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:33:39.251Z"
+    },
+    {
+      "feature": "leaderboards",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":\"INVALID_ENDPOINT\",\"message\":\"Endpoint: 'POST /v1beta/models/gemini-2.5-flash:generateContent' is not supported.\"}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:33:42.561Z"
+    },
+    {
+      "feature": "explore",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":\"INVALID_ENDPOINT\",\"message\":\"Endpoint: 'POST /v1beta/models/gemini-2.5-flash:generateContent' is not supported.\"}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:33:43.651Z"
+    },
+    {
+      "feature": "home",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":\"INVALID_ENDPOINT\",\"message\":\"Endpoint: 'POST /v1beta/models/gemini-2.5-flash:generateContent' is not supported.\"}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:33:44.695Z"
+    }
+  ],
+  "completedAt": "2026-03-22T21:33:45.696Z"
+}

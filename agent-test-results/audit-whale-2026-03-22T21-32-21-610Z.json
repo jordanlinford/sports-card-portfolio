@@ -1,0 +1,73 @@
+{
+  "runId": "audit-whale-2026-03-22T21-32-21-610Z",
+  "persona": "whale",
+  "appUrl": "https://6e57605c-ab35-4d08-9a9a-f1ca05db35c1-00-mk3ufchqie8q.worf.replit.dev",
+  "totalFeatures": 5,
+  "passed": 0,
+  "warnings": 0,
+  "failed": 5,
+  "allBugs": [
+    "[api-endpoints] User API (/api/user): Unexpected status 200",
+    "[hidden-gems] AI analysis failed: {\"error\":{\"code\":400,\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]}}",
+    "[leaderboards] AI analysis failed: {\"error\":{\"code\":400,\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]}}",
+    "[explore] AI analysis failed: {\"error\":{\"code\":400,\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]}}",
+    "[home] AI analysis failed: {\"error\":{\"code\":400,\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]}}"
+  ],
+  "results": [
+    {
+      "feature": "api-endpoints",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "User API (/api/user): Unexpected status 200"
+      ],
+      "observations": [
+        "Hidden Gems API: HTTP 200 ✓",
+        "Leaderboard API: HTTP 200 ✓",
+        "Agent Stream API: HTTP 401 ✓"
+      ],
+      "timestamp": "2026-03-22T21:32:22.022Z"
+    },
+    {
+      "feature": "hidden-gems",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":400,\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:32:22.276Z"
+    },
+    {
+      "feature": "leaderboards",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":400,\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:32:25.614Z"
+    },
+    {
+      "feature": "explore",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":400,\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:32:26.701Z"
+    },
+    {
+      "feature": "home",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":400,\"message\":\"API key not valid. Please pass a valid API key.\",\"status\":\"INVALID_ARGUMENT\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"API_KEY_INVALID\",\"domain\":\"googleapis.com\",\"metadata\":{\"service\":\"generativelanguage.googleapis.com\"}},{\"@type\":\"type.googleapis.com/google.rpc.LocalizedMessage\",\"locale\":\"en-US\",\"message\":\"API key not valid. Please pass a valid API key.\"}]}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:32:27.757Z"
+    }
+  ],
+  "completedAt": "2026-03-22T21:32:28.757Z"
+}

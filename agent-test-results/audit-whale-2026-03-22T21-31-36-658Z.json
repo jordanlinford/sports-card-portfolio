@@ -1,0 +1,73 @@
+{
+  "runId": "audit-whale-2026-03-22T21-31-36-658Z",
+  "persona": "whale",
+  "appUrl": "https://6e57605c-ab35-4d08-9a9a-f1ca05db35c1-00-mk3ufchqie8q.worf.replit.dev",
+  "totalFeatures": 5,
+  "passed": 0,
+  "warnings": 0,
+  "failed": 5,
+  "allBugs": [
+    "[api-endpoints] User API (/api/user): Unexpected status 200",
+    "[hidden-gems] AI analysis failed: {\"error\":{\"code\":403,\"message\":\"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.\",\"status\":\"PERMISSION_DENIED\"}}",
+    "[leaderboards] AI analysis failed: {\"error\":{\"code\":403,\"message\":\"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.\",\"status\":\"PERMISSION_DENIED\"}}",
+    "[explore] AI analysis failed: {\"error\":{\"code\":403,\"message\":\"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.\",\"status\":\"PERMISSION_DENIED\"}}",
+    "[home] AI analysis failed: {\"error\":{\"code\":403,\"message\":\"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.\",\"status\":\"PERMISSION_DENIED\"}}"
+  ],
+  "results": [
+    {
+      "feature": "api-endpoints",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "User API (/api/user): Unexpected status 200"
+      ],
+      "observations": [
+        "Hidden Gems API: HTTP 200 ✓",
+        "Leaderboard API: HTTP 200 ✓",
+        "Agent Stream API: HTTP 401 ✓"
+      ],
+      "timestamp": "2026-03-22T21:31:36.863Z"
+    },
+    {
+      "feature": "hidden-gems",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":403,\"message\":\"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.\",\"status\":\"PERMISSION_DENIED\"}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:31:37.056Z"
+    },
+    {
+      "feature": "leaderboards",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":403,\"message\":\"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.\",\"status\":\"PERMISSION_DENIED\"}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:31:38.111Z"
+    },
+    {
+      "feature": "explore",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":403,\"message\":\"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.\",\"status\":\"PERMISSION_DENIED\"}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:31:39.170Z"
+    },
+    {
+      "feature": "home",
+      "persona": "whale",
+      "status": "fail",
+      "bugs": [
+        "AI analysis failed: {\"error\":{\"code\":403,\"message\":\"Method doesn't allow unregistered callers (callers without established identity). Please use API Key or other form of API consumer identity to call this API.\",\"status\":\"PERMISSION_DENIED\"}}"
+      ],
+      "observations": [],
+      "timestamp": "2026-03-22T21:31:40.220Z"
+    }
+  ],
+  "completedAt": "2026-03-22T21:31:41.221Z"
+}

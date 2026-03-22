@@ -1,0 +1,71 @@
+import { chromium, BrowserContext, Page } from 'playwright';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// 1. Setup Gemini 2.5 Flash
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+
+async function runUserProxy(goal: string) {
+  // 2. Launch Replit-friendly Browser
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--disable-dev-shm-usage', // Critical for Replit's 64MB limit
+      '--no-sandbox',
+      '--disable-setuid-sandbox'
+    ]
+  });
+
+  // Load the session (bypasses Google OAuth)
+  const context = await browser.newContext({ storageState: 'auth/user-session.json' });
+  const page = await context.newPage();
+  await page.goto('https://your-app-url.replit.app/dashboard');
+
+  console.log(`🚀 Agent Started. Mission: ${goal}`);
+
+  let step = 0;
+  while (step < 15) { // Safety cap
+    const screenshot = await page.screenshot({ type: 'png', fullPage: false });
+    const base64Image = screenshot.toString('base64');
+
+    // 3. The "Human Reasoning" Prompt
+    const prompt = `
+      You are a "Whale" collector using sportscardportfolio.io. 
+      Your Persona: Professional, impatient, and looking for high-ROI 'Hidden Gems'.
+      Current Goal: ${goal}
+      
+      Look at this screenshot of the app. Based on what you see:
+      1. What is the next logical step a human would take to reach the goal?
+      2. If you see any bugs (overlapping text, 404s, or broken images), report them.
+      
+      Return ONLY a JSON object: 
+      { "reasoning": "...", "action": "click" | "type" | "scroll" | "wait", "selector": "css-selector-or-text", "value": "text-to-type", "status": "CONTINUE" | "SUCCESS" | "BUG" }
+    `;
+
+    const result = await model.generateContent([
+      prompt,
+      { inlineData: { data: base64Image, mimeType: "image/png" } }
+    ]);
+
+    const response = JSON.parse(result.response.text());
+    console.log(`🤖 Step ${step}: ${response.reasoning}`);
+
+    if (response.status === "SUCCESS") break;
+    if (response.status === "BUG") {
+      console.error(`❌ BUG DETECTED: ${response.reasoning}`);
+      break;
+    }
+
+    // 4. Execute the Action
+    if (response.action === 'click') await page.click(response.selector);
+    if (response.action === 'type') await page.fill(response.selector, response.value);
+    if (response.action === 'scroll') await page.mouse.wheel(0, 500);
+    
+    await page.waitForTimeout(2000); // "Human" think time
+    step++;
+  }
+
+  await browser.close();
+}
+
+runUserProxy("Create a new display case called 'March Grails' and check for Hidden Gems.");

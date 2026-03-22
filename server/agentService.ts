@@ -8,7 +8,10 @@ import { getMarketBenchmarks } from "./marketBenchmarkService";
 import type { Response } from "express";
 
 const gemini = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
+  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "",
+  httpOptions: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
+    ? { apiVersion: "", baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL }
+    : undefined,
 });
 
 const AGENT_TOOLS = [
