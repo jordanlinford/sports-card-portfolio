@@ -1,0 +1,20 @@
+sportscardportfolio.io from a standard tracker to an Elite Asset Terminal by capitalizing on the unique market pressures of 2026 (Junk Wax 2.0 and the Panini/Topps license pivot).
+🛑 The "Kill" List (Sunset Features)
+• Portfolio Builder (Splits/Box Breaks): Sunset the hosting/payment portion to avoid 2026 "unlicensed gambling" regulations; pivot to a Break Value Auditor.
+• Deep Social Integration: Freeze new development on internal feeds/messaging; maintain existing "Likes/Guest Comments" for low-friction SEO only.
+🚀 Phase 1: Revenue & Conversion (Next 30 Days)
+• Hidden Gems Paywall: Implement blur(12px) on card/player names for free users to drive Pro conversions.
+• Portfolio Alpha Benchmarking: Add real-time ROI comparisons against the S&P 500 and Bitcoin to validate cards as institutional assets.
+• "Independence Manifesto": Update homepage copy to position the platform as the only Conflict-Free Auditor in a Fanatics-dominated market.
+🤖 Phase 2: The Agentic Pivot (Days 30–60)
+• "Auditor" Agent Mode: A ⌘K command bar and sidebar agent using Gemini 2.5 Flash to orchestrate your 40 features as autonomous tools.
+• Supply Saturation Alerts: A new pop_history table to track MoM population growth; trigger "Risk" badges if supply outpaces demand (Anti-Junk Wax 2.0).
+• Agentic QA Tester: An autonomous User Proxy script to simulate "Whale" behavior and run regression tests on your data logic via Replit.
+• SSE Infrastructure: Implement Server-Sent Events to bypass the 120s Replit gateway timeout for long-running AI agent tasks.
+🌍 Phase 3: Global SEO & Market Events (Days 60–90)
+• Topps Takeover Landing Pages: Rapid SEO deployment for the April 1st NFL license shift to capture "Panini vs. Topps" value searches.
+• Daily "Big Mover" Expansion: Scale prewarm jobs to refresh the top 50 players daily for high-intent organic search traffic.
+• World Cup 2026 Engine: A dedicated "International Prospecting" filter in Hidden Gems ahead of the June tournament.
+🛠 Technical Maintenance
+• Indexing: Add B-Tree/GIN indexes to unified_analysis_cache and pop_history for sub-100ms performance.
+• Scraper Resilience: Move the VPS worker to a dedicated rotating proxy to bypass 2026 anti-botting measures.
