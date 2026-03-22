@@ -105,6 +105,10 @@ import {
   scanHistory,
   type ScanHistory,
   type InsertScanHistory,
+  popHistory,
+  type PopHistory,
+  type InsertPopHistory,
+  type PopTrend,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -405,6 +409,12 @@ export interface IStorage {
   deleteScanHistory(id: number, userId: string): Promise<void>;
   getScanHistoryByIds(ids: number[], userId: string): Promise<ScanHistory[]>;
   updateScanHistoryAnalysis(id: number, userId: string, marketValue: number | null, action: string | null): Promise<ScanHistory | undefined>;
+
+  // Pop Report History operations
+  insertPopSnapshots(snapshots: InsertPopHistory[]): Promise<PopHistory[]>;
+  getPopTrends(playerName: string, grader?: string, grade?: string, cardFilters?: { year?: number; setName?: string; variation?: string }): Promise<PopTrend[]>;
+  getPopHistory(playerName: string, options?: { year?: number; setName?: string; grader?: string; grade?: string; limit?: number }): Promise<PopHistory[]>;
+  getLatestPopSnapshot(playerName: string, grader: string, grade: string): Promise<PopHistory | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3425,6 +3435,102 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(scanHistory.id, id), eq(scanHistory.userId, userId)))
       .returning();
     return record;
+  }
+
+  // Pop Report History operations
+  async insertPopSnapshots(snapshots: InsertPopHistory[]): Promise<PopHistory[]> {
+    if (snapshots.length === 0) return [];
+    const results: PopHistory[] = [];
+    for (const snap of snapshots) {
+      const [row] = await db.execute(sql`
+        INSERT INTO pop_history (player_name, year, set_name, variation, card_number, grader, grade, population, snapshot_date, source)
+        VALUES (${snap.playerName}, ${snap.year ?? null}, ${snap.setName ?? null}, ${snap.variation ?? null}, ${snap.cardNumber ?? null}, ${snap.grader}, ${snap.grade}, ${snap.population}, ${snap.snapshotDate}, ${snap.source ?? 'vps_scraper'})
+        ON CONFLICT (player_name, COALESCE(year::text, ''), COALESCE(set_name, ''), COALESCE(variation, ''), COALESCE(card_number, ''), grader, grade, snapshot_date)
+        DO UPDATE SET population = EXCLUDED.population, source = EXCLUDED.source
+        RETURNING *
+      `);
+      if (row) results.push(row as unknown as PopHistory);
+    }
+    return results;
+  }
+
+  async getPopTrends(playerName: string, grader?: string, grade?: string, cardFilters?: { year?: number; setName?: string; variation?: string }): Promise<PopTrend[]> {
+    const conditions = [sql`LOWER(${popHistory.playerName}) = LOWER(${playerName})`];
+    if (grader) conditions.push(eq(popHistory.grader, grader));
+    if (grade) conditions.push(eq(popHistory.grade, grade));
+    if (cardFilters?.year) conditions.push(eq(popHistory.year, cardFilters.year));
+    if (cardFilters?.setName) conditions.push(sql`LOWER(${popHistory.setName}) = LOWER(${cardFilters.setName})`);
+    if (cardFilters?.variation) conditions.push(sql`LOWER(${popHistory.variation}) = LOWER(${cardFilters.variation})`);
+
+    const rows = await db
+      .select()
+      .from(popHistory)
+      .where(and(...conditions))
+      .orderBy(asc(popHistory.snapshotDate));
+
+    const grouped = new Map<string, PopHistory[]>();
+    for (const row of rows) {
+      const key = `${row.grader}|${row.grade}`;
+      const arr = grouped.get(key) || [];
+      arr.push(row);
+      grouped.set(key, arr);
+    }
+
+    const trends: PopTrend[] = [];
+    for (const [key, snapshots] of grouped) {
+      const [g, gr] = key.split("|");
+      const sorted = snapshots.sort((a, b) => new Date(a.snapshotDate).getTime() - new Date(b.snapshotDate).getTime());
+      const current = sorted[sorted.length - 1];
+      const previous = sorted.length >= 2 ? sorted[sorted.length - 2] : null;
+      const momGrowthPct = previous && previous.population > 0
+        ? Math.round(((current.population - previous.population) / previous.population) * 10000) / 100
+        : null;
+
+      trends.push({
+        playerName: current.playerName,
+        grader: g,
+        grade: gr,
+        snapshots: sorted.map(s => ({
+          date: new Date(s.snapshotDate).toISOString().split("T")[0],
+          population: s.population,
+        })),
+        currentPopulation: current.population,
+        previousPopulation: previous?.population ?? null,
+        momGrowthPct,
+        totalSnapshots: sorted.length,
+      });
+    }
+
+    return trends;
+  }
+
+  async getPopHistory(playerName: string, options?: { year?: number; setName?: string; grader?: string; grade?: string; limit?: number }): Promise<PopHistory[]> {
+    const conditions = [sql`LOWER(${popHistory.playerName}) = LOWER(${playerName})`];
+    if (options?.year) conditions.push(eq(popHistory.year, options.year));
+    if (options?.setName) conditions.push(sql`LOWER(${popHistory.setName}) = LOWER(${options.setName})`);
+    if (options?.grader) conditions.push(eq(popHistory.grader, options.grader));
+    if (options?.grade) conditions.push(eq(popHistory.grade, options.grade));
+
+    return db
+      .select()
+      .from(popHistory)
+      .where(and(...conditions))
+      .orderBy(desc(popHistory.snapshotDate))
+      .limit(options?.limit ?? 100);
+  }
+
+  async getLatestPopSnapshot(playerName: string, grader: string, grade: string): Promise<PopHistory | undefined> {
+    const [row] = await db
+      .select()
+      .from(popHistory)
+      .where(and(
+        sql`LOWER(${popHistory.playerName}) = LOWER(${playerName})`,
+        eq(popHistory.grader, grader),
+        eq(popHistory.grade, grade),
+      ))
+      .orderBy(desc(popHistory.snapshotDate))
+      .limit(1);
+    return row;
   }
 }
 

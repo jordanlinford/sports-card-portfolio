@@ -2372,3 +2372,46 @@ export const unifiedAnalysisDbCache = pgTable("unified_analysis_cache", {
 ]);
 
 export type UnifiedAnalysisDbCache = typeof unifiedAnalysisDbCache.$inferSelect;
+
+// ============================================================================
+// POP REPORT HISTORY - Weekly population snapshots from grading houses
+// ============================================================================
+export const GRADERS = ["PSA", "BGS", "SGC", "CGC", "HGA", "TAG", "CSG", "AGS"] as const;
+export type Grader = typeof GRADERS[number];
+
+export const popHistory = pgTable("pop_history", {
+  id: serial("id").primaryKey(),
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  year: integer("year"),
+  setName: varchar("set_name", { length: 255 }),
+  variation: varchar("variation", { length: 255 }),
+  cardNumber: varchar("card_number", { length: 50 }),
+  grader: varchar("grader", { length: 20 }).notNull(),
+  grade: varchar("grade", { length: 20 }).notNull(),
+  population: integer("population").notNull(),
+  snapshotDate: timestamp("snapshot_date").notNull(),
+  source: varchar("source", { length: 50 }).default("vps_scraper").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_pop_history_player_grader").on(table.playerName, table.grader),
+  index("idx_pop_history_snapshot_date").on(table.snapshotDate),
+  index("idx_pop_history_lookup").on(table.playerName, table.year, table.setName, table.grader, table.grade),
+]);
+
+export const insertPopHistorySchema = createInsertSchema(popHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertPopHistory = z.infer<typeof insertPopHistorySchema>;
+export type PopHistory = typeof popHistory.$inferSelect;
+
+export type PopTrend = {
+  playerName: string;
+  grader: string;
+  grade: string;
+  snapshots: { date: string; population: number }[];
+  currentPopulation: number;
+  previousPopulation: number | null;
+  momGrowthPct: number | null;
+  totalSnapshots: number;
+};

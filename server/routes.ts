@@ -14,6 +14,7 @@ import {
   insertBreakEventSchema,
   insertSplitInstanceSchema,
   insertSeatSchema,
+  insertPopHistorySchema,
   SPLIT_STATUSES,
   BREAKER_FEE_CENTS,
   SHIPPING_FEE_CENTS,
@@ -3056,38 +3057,76 @@ Sitemap: ${origin}/sitemap.xml
             reason: isPro ? outlook.bigMoverReason : null,
           },
           supply: await (async () => {
-            const persistedGrowth = card.outlookSupplyGrowth || null;
+            let supplyGrowth: string | null = card.outlookSupplyGrowth || null;
             let supplyNote: string | undefined;
             let estimatedPopulation: number | undefined;
-            try {
-              const { getGeminiMarketCacheEntry, getDbCachedAnalysis, getGeminiCacheKey } = await import("./outlookEngine");
-              const memCached = getGeminiMarketCacheEntry({
-                title: card.title, playerName: card.playerName, year: card.year,
-                set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
-              });
-              if (memCached?.supply) {
-                supplyNote = memCached.supply.supplyNote;
-                estimatedPopulation = memCached.supply.estimatedPopulation;
-              } else {
-                const unifiedCacheKey = "unified|" + getGeminiCacheKey({
+            let dataSource: "pop_history" | "ai_estimate" = "ai_estimate";
+
+            if (card.playerName && card.grader) {
+              try {
+                const trends = await storage.getPopTrends(
+                  card.playerName,
+                  card.grader,
+                  card.grade || undefined,
+                  { year: card.year || undefined, setName: card.set || undefined, variation: card.variation || undefined },
+                );
+                if (trends.length > 0) {
+                  const trend = trends[0];
+                  estimatedPopulation = trend.currentPopulation;
+                  dataSource = "pop_history";
+                  if (trend.momGrowthPct !== null) {
+                    if (trend.momGrowthPct > 15) {
+                      supplyGrowth = "surging";
+                      supplyNote = `Population grew ${trend.momGrowthPct.toFixed(1)}% MoM (${trend.previousPopulation} → ${trend.currentPopulation})`;
+                    } else if (trend.momGrowthPct > 5) {
+                      supplyGrowth = "growing";
+                      supplyNote = `Population grew ${trend.momGrowthPct.toFixed(1)}% MoM (${trend.previousPopulation} → ${trend.currentPopulation})`;
+                    } else {
+                      supplyGrowth = "stable";
+                      supplyNote = `Population stable at ${trend.currentPopulation} (${trend.momGrowthPct.toFixed(1)}% MoM)`;
+                    }
+                  } else {
+                    supplyGrowth = supplyGrowth || "stable";
+                    supplyNote = `Current population: ${trend.currentPopulation} (single snapshot — trend data pending)`;
+                  }
+                }
+              } catch (e) {
+                console.warn(`[Outlook] Pop history lookup failed for ${card.playerName}:`, (e as Error).message);
+              }
+            }
+
+            if (dataSource === "ai_estimate") {
+              try {
+                const { getGeminiMarketCacheEntry, getDbCachedAnalysis, getGeminiCacheKey } = await import("./outlookEngine");
+                const memCached = getGeminiMarketCacheEntry({
                   title: card.title, playerName: card.playerName, year: card.year,
                   set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
                 });
-                const dbCached = await getDbCachedAnalysis(unifiedCacheKey);
-                if (dbCached?.supply) {
-                  supplyNote = dbCached.supply.supplyNote;
-                  estimatedPopulation = dbCached.supply.estimatedPopulation;
+                if (memCached?.supply) {
+                  supplyNote = memCached.supply.supplyNote;
+                  estimatedPopulation = memCached.supply.estimatedPopulation;
+                } else {
+                  const unifiedCacheKey = "unified|" + getGeminiCacheKey({
+                    title: card.title, playerName: card.playerName, year: card.year,
+                    set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
+                  });
+                  const dbCached = await getDbCachedAnalysis(unifiedCacheKey);
+                  if (dbCached?.supply) {
+                    supplyNote = dbCached.supply.supplyNote;
+                    estimatedPopulation = dbCached.supply.estimatedPopulation;
+                  }
                 }
+              } catch (e) {
+                console.warn(`[Outlook] Failed to enrich supply data from cache for card ${cardId}:`, (e as Error).message);
               }
-            } catch (e) {
-              console.warn(`[Outlook] Failed to enrich supply data from cache for card ${cardId}:`, (e as Error).message);
             }
-            const supplyGrowth = persistedGrowth || null;
+
             if (!supplyGrowth) return null;
             return {
               supplyGrowth,
               supplyNote: isPro ? supplyNote : undefined,
               estimatedPopulation: isPro ? estimatedPopulation : undefined,
+              dataSource: isPro ? dataSource : undefined,
             };
           })(),
           generatedAt: outlook.updatedAt,
@@ -10178,6 +10217,114 @@ RULES:
     } catch (error) {
       console.error("Error deleting scan history:", error);
       res.status(500).json({ message: "Failed to delete scan history entry" });
+    }
+  });
+
+  // ============================================================================
+  // POP REPORT HISTORY - Ingestion & Query APIs
+  // ============================================================================
+
+  const POP_INGESTION_API_KEY = process.env.POP_INGESTION_API_KEY;
+
+  app.post("/api/pop-history/ingest", async (req: any, res) => {
+    try {
+      if (!POP_INGESTION_API_KEY) {
+        return res.status(503).json({ message: "Pop ingestion API key not configured" });
+      }
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || authHeader !== `Bearer ${POP_INGESTION_API_KEY}`) {
+        return res.status(401).json({ message: "Invalid API key" });
+      }
+
+      const { snapshots } = req.body;
+      if (!Array.isArray(snapshots) || snapshots.length === 0) {
+        return res.status(400).json({ message: "Request body must include a non-empty 'snapshots' array" });
+      }
+
+      if (snapshots.length > 1000) {
+        return res.status(400).json({ message: "Maximum 1000 snapshots per request" });
+      }
+
+      const validated: any[] = [];
+      const errors: string[] = [];
+
+      for (let i = 0; i < snapshots.length; i++) {
+        const snap = snapshots[i];
+        const result = insertPopHistorySchema.safeParse({
+          ...snap,
+          snapshotDate: snap.snapshotDate ? new Date(snap.snapshotDate) : undefined,
+        });
+        if (result.success) {
+          validated.push(result.data);
+        } else {
+          errors.push(`[${i}]: ${result.error.issues.map(e => e.message).join(", ")}`);
+        }
+      }
+
+      if (validated.length === 0) {
+        return res.status(400).json({ message: "No valid snapshots", errors });
+      }
+
+      const inserted = await storage.insertPopSnapshots(validated);
+
+      res.json({
+        inserted: inserted.length,
+        rejected: errors.length,
+        errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
+      });
+    } catch (error) {
+      console.error("[Pop History] Ingestion error:", error);
+      res.status(500).json({ message: "Failed to ingest pop history data" });
+    }
+  });
+
+  app.get("/api/pop-history/trends/:playerName", async (req: any, res) => {
+    try {
+      const { playerName } = req.params;
+      const { grader, grade } = req.query;
+
+      if (!playerName || playerName.trim().length === 0) {
+        return res.status(400).json({ message: "playerName is required" });
+      }
+
+      const trends = await storage.getPopTrends(
+        decodeURIComponent(playerName),
+        grader as string | undefined,
+        grade as string | undefined,
+      );
+
+      res.json({ playerName: decodeURIComponent(playerName), trends });
+    } catch (error) {
+      console.error("[Pop History] Trends query error:", error);
+      res.status(500).json({ message: "Failed to fetch pop trends" });
+    }
+  });
+
+  app.get("/api/pop-history/:playerName", async (req: any, res) => {
+    try {
+      const { playerName } = req.params;
+      const { year, setName, grader, grade, limit } = req.query;
+
+      if (!playerName || playerName.trim().length === 0) {
+        return res.status(400).json({ message: "playerName is required" });
+      }
+
+      const history = await storage.getPopHistory(
+        decodeURIComponent(playerName),
+        {
+          year: year ? parseInt(year as string) : undefined,
+          setName: setName as string | undefined,
+          grader: grader as string | undefined,
+          grade: grade as string | undefined,
+          limit: limit ? Math.min(parseInt(limit as string) || 100, 500) : undefined,
+        },
+      );
+
+      res.json({ playerName: decodeURIComponent(playerName), history });
+    } catch (error) {
+      console.error("[Pop History] History query error:", error);
+      res.status(500).json({ message: "Failed to fetch pop history" });
     }
   });
 
