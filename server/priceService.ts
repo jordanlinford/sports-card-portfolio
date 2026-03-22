@@ -1161,7 +1161,7 @@ function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms:
   }
   
   // Detect case hits (Downtown, Kaboom, The Man, etc.) — check both variation AND set name
-  const caseHitPattern = /\b(downtown|kaboom|disco|stained.?glass|color.?blast|genesis|case.?hit|ssp|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension)\b/;
+  const caseHitPattern = /\b(downtown|kaboom|disco|stained.?glass|color.?blast|genesis|case.?hit|ssp|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
   const isCaseHit = caseHitPattern.test(variation) || caseHitPattern.test(setLower);
   if (isCaseHit) {
     return { term: card.variation || "", excludeTerms: [] };

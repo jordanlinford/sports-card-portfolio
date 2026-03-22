@@ -247,8 +247,9 @@ export async function fetchGeminiMarketData(card: {
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLowerStandalone = (card.variation || "").toLowerCase().trim();
   const setLowerStandalone = (card.set || "").toLowerCase();
-  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension)\b/i;
+  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
   const isPremiumUnnumberedStandalone = !isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
+  const isPremiumNumberedStandalone = isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
   const isOpticSetStandalone = /\boptic\b/i.test(card.set || "");
   const isPrizmFamilySetStandalone = /\bprizm\b|\bprisma\b/i.test(card.set || "");
   const isStrictBaseVariationStandalone = !card.variation || variationLowerStandalone === "base" || variationLowerStandalone === "base prizm";
@@ -263,7 +264,7 @@ export async function fetchGeminiMarketData(card: {
   const numberedPrintRunStandalone = isNumbered && card.variation ? card.variation.match(/\/\s*(\d+)/)?.[1] : null;
   const variationContext = isNumbered 
     ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnly ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}
-CRITICAL PARALLEL MATCHING: Only use comps from the SAME parallel type with the SAME print run (/${numberedPrintRunStandalone || "?"}). Different numbered parallels of the same card (e.g., /50 Gold vs /399 Yellow Holo) are COMPLETELY DIFFERENT cards at DIFFERENT price tiers. A /50 card is much rarer and more valuable than a /399 card. Do NOT mix comps from different parallel types or print runs. If a listing says "/${numberedPrintRunStandalone}" it must match — reject any comp that shows a different print run number.`
+CRITICAL PARALLEL MATCHING: Only use comps from the SAME parallel type with the SAME print run (/${numberedPrintRunStandalone || "?"}). Different numbered parallels of the same card (e.g., /50 Gold vs /399 Yellow Holo) are COMPLETELY DIFFERENT cards at DIFFERENT price tiers. A /50 card is much rarer and more valuable than a /399 card. Do NOT mix comps from different parallel types or print runs. If a listing says "/${numberedPrintRunStandalone}" it must match — reject any comp that shows a different print run number.${isPremiumNumberedStandalone ? `\nPREMIUM PARALLEL MATERIAL: This is a "${card.variation}" — a premium/SSP-class parallel material (like Wood, Silk, Sapphire, Platinum, etc.). These parallels command SIGNIFICANT premiums over standard numbered parallels of the same print run. A Wood /25 is worth considerably more than a standard Gold /25 because the material is rarer and more collectible. Factor this premium into your valuation. Include SSP-tagged listings as valid comps.` : ""}`
     : isPremiumUnnumberedStandalone
       ? `\nCRITICAL: This is a PREMIUM SSP/Case Hit insert — "${card.variation || card.set}". It is SIGNIFICANTLY more valuable than base/silver cards. Search specifically for "${searchDescription}" — do NOT return base card prices. Include the exact insert/parallel name in every search.${isOpticSetStandalone ? `\nOPTIC PRODUCT DISTINCTION: The SET is "${card.set}" which is a Donruss OPTIC (holographic/prismatic) product. Donruss Optic inserts are COMPLETELY DIFFERENT from base Donruss inserts of the same name — they are holographic and typically sell for 3-10x more. NEVER use base Donruss (non-Optic) prices as comps. Always include "Optic" in your eBay search queries.` : ""}`
     : (isPrizmFamilySetStandalone && isStrictBaseVariationStandalone
@@ -308,7 +309,7 @@ This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and g
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${searchDescription} raw sold eBay" and "${searchDescription} ungraded sold eBay"
 2. avgPrice, minPrice, maxPrice and rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
 3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into avgPrice or rawPrice.
-${isPremiumUnnumberedStandalone ? `4. SSP/CASE HIT INCLUSION: This card IS a premium SSP/Case Hit insert. Listings tagged "SSP", "Short Print", "Case Hit" ARE this card — INCLUDE them as valid comps. Do NOT exclude SSP-tagged listings.` : `4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.`}${isPrizmFamilySetStandalone && isStrictBaseVariationStandalone ? `
+${(isPremiumUnnumberedStandalone || isPremiumNumberedStandalone) ? `4. SSP/CASE HIT INCLUSION: This card IS a premium SSP/Case Hit parallel. Listings tagged "SSP", "Short Print", "Case Hit" ARE this card — INCLUDE them as valid comps. Do NOT exclude SSP-tagged listings.` : `4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.`}${isPrizmFamilySetStandalone && isStrictBaseVariationStandalone ? `
 4b. PRIZM BASE REFRACTOR EXCLUSION: This is a PAPER BASE Prizm card (NON-REFRACTOR). ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Gold", "Red", "Blue", "Green", "Purple", "Orange", "Pink" in the title is a DIFFERENT, MORE EXPENSIVE parallel — EXCLUDE it completely. Only use listings that are clearly the paper base version.` : ""}
 5. Example: raw sales $25, $32, $40 → avgPrice = $32 (median), rawPrice = $32, psa9Price (separate) = $60.
 6. Use the MEDIAN of the raw sales you find — do NOT skew low or high. Report it accurately.
@@ -482,7 +483,7 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
 
 SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
 - Drop ONLY generic words like "holo", "insert" from the search
-- NEVER drop SSP/Case Hit parallel names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer, etc.) — these define the card's rarity and price tier
+- NEVER drop SSP/Case Hit parallel names or premium material names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer, Wood, Silk, Sapphire, Platinum, Vintage Stock, Clear, Superfractor, etc.) — these define the card's rarity and price tier
 - Try: "[year] [set] [player name] [variation] sold"
 - For SSP/premium parallels, ALWAYS keep the parallel name — a Zebra is NOT a Silver
 
@@ -676,8 +677,9 @@ export async function fetchUnifiedCardAnalysis(card: {
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLower = (card.variation || "").toLowerCase().trim();
   const setLower = (card.set || "").toLowerCase();
-  const sspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension)\b/i;
+  const sspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
   const isPremiumUnnumberedParallel = !isNumbered && (sspPattern.test(variationLower) || sspPattern.test(setLower));
+  const isPremiumNumberedParallel = isNumbered && (sspPattern.test(variationLower) || sspPattern.test(setLower));
   // Prizm-family sets: base paper card is non-refractor; Silver Prizm/Silver/Refractor are DIFFERENT parallels
   const isPrizmFamilySet = /\bprizm\b|\bprisma\b/i.test(card.set || "");
   const isStrictBaseVariation = !card.variation || variationLower === "base" || variationLower === "base prizm";
@@ -700,7 +702,7 @@ export async function fetchUnifiedCardAnalysis(card: {
   const numberedPrintRun = isNumbered && card.variation ? card.variation.match(/\/\s*(\d+)/)?.[1] : null;
   const variationContext = isNumbered
     ? `\nNUMBERED CARD: This is a numbered parallel (${card.variation}). Search specifically for "${searchDescription}". ${isMemOnlyU ? "This is a non-auto memorabilia card — compare only with non-auto comps of the same type." : "It is rarer than base cards — do NOT return base card prices."}
-CRITICAL PARALLEL MATCHING: Only use comps from the SAME parallel type with the SAME print run (/${numberedPrintRun || "?"}). Different numbered parallels of the same card (e.g., /50 Gold vs /399 Yellow Holo) are COMPLETELY DIFFERENT cards at DIFFERENT price tiers. A /50 card is much rarer and more valuable than a /399 card. Do NOT mix comps from different parallel types or print runs. If a listing says "/${numberedPrintRun}" it must match — reject any comp that shows a different print run number.`
+CRITICAL PARALLEL MATCHING: Only use comps from the SAME parallel type with the SAME print run (/${numberedPrintRun || "?"}). Different numbered parallels of the same card (e.g., /50 Gold vs /399 Yellow Holo) are COMPLETELY DIFFERENT cards at DIFFERENT price tiers. A /50 card is much rarer and more valuable than a /399 card. Do NOT mix comps from different parallel types or print runs. If a listing says "/${numberedPrintRun}" it must match — reject any comp that shows a different print run number.${isPremiumNumberedParallel ? `\nPREMIUM PARALLEL MATERIAL: This is a "${card.variation}" — a premium/SSP-class parallel material (like Wood, Silk, Sapphire, Platinum, etc.). These parallels command SIGNIFICANT premiums over standard numbered parallels of the same print run. A Wood /25 is worth considerably more than a standard Gold /25 because the material is rarer and more collectible. Factor this premium into your valuation. Include SSP-tagged listings as valid comps.` : ""}`
     : isPremiumUnnumberedParallel
       ? `\nCRITICAL: This is a PREMIUM UNNUMBERED SSP/Case Hit insert — "${card.variation || card.set}". It is SIGNIFICANTLY more valuable than base/silver cards, even though it is unnumbered.
 - SSP/Case Hit inserts like Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer etc. are RARE and command PREMIUM prices
@@ -777,8 +779,8 @@ The FULL set name is "${card.set}". Every word matters — each word identifies 
 This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and graded prices:
 1. SEARCH A: Find raw/ungraded completed eBay sales ONLY. Search: "${unifiedSearchDescription} raw sold eBay" and "${unifiedSearchDescription} ungraded sold eBay"
 2. market.avgPrice, market.minPrice, market.maxPrice and market.rawPrice MUST reflect ONLY raw/ungraded completed sales. NEVER include PSA 9 or PSA 10 sale prices in these fields.
-3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into market.avgPrice or market.rawPrice.${isPremiumUnnumberedParallel ? `
-4. SSP/CASE HIT INCLUSION: This card IS a premium SSP/Case Hit insert. Listings tagged "SSP", "Short Print", "Case Hit" ARE this card — INCLUDE them as valid comps. Do NOT exclude SSP-tagged listings.` : `
+3. PSA 9 and PSA 10 prices go in psa9Price and psa10Price ONLY — they must NEVER be mixed into market.avgPrice or market.rawPrice.${(isPremiumUnnumberedParallel || isPremiumNumberedParallel) ? `
+4. SSP/CASE HIT INCLUSION: This card IS a premium SSP/Case Hit parallel. Listings tagged "SSP", "Short Print", "Case Hit" ARE this card — INCLUDE them as valid comps. Do NOT exclude SSP-tagged listings.` : `
 4. SSP/SHORT PRINT EXCLUSION: If a sold listing title contains "SSP", "Short Print", "SP", or "Case Hit", it is a DIFFERENT, MORE VALUABLE variation — EXCLUDE it completely. Do NOT use SSP sales as comps for the standard parallel.`}${isPrizmFamilySet && isStrictBaseVariation ? `
 4b. PRIZM BASE REFRACTOR EXCLUSION: This is a PAPER BASE Prizm card (NON-REFRACTOR). ANY listing with "Silver", "Prizm Prizm", "Refractor", "Chrome", "Holo", "Gold", "Red", "Blue", "Green", "Purple", "Orange", "Pink" in the title is a DIFFERENT, MORE EXPENSIVE parallel — EXCLUDE it completely. Only use listings that are clearly the paper base version.` : ""}
 5. Example: raw sales $25, $32, $40 → market.avgPrice = $32 (median), market.rawPrice = $32, psa9Price (separate) = $60.
@@ -933,7 +935,7 @@ PRICING RULES:
 
 SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
 - Drop ONLY generic descriptive words like "holo", "insert" from the search
-- NEVER drop SSP/Case Hit parallel names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer, Scope, Velocity, Hyper, Wave, Ice, Crystal, Cracked Ice, Laser, FOTL) — these define the card's rarity tier and price
+- NEVER drop SSP/Case Hit parallel names or premium material names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer, Scope, Velocity, Hyper, Wave, Ice, Crystal, Cracked Ice, Laser, FOTL, Wood, Silk, Sapphire, Platinum, Vintage Stock, Clear, Superfractor) — these define the card's rarity tier and price
 - NEVER drop "prizm" if the set name is "Prizm" — it's the brand name, not a descriptor
 - Try just: "[year] [brand] [player name] [variation] sold"  
 - Try: "[year] [set] [player name] [variation] sold"

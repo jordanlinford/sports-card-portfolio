@@ -3418,7 +3418,7 @@ Sitemap: ${origin}/sitemap.xml
       // Detect SSP/premium unnumbered parallels (wide price ranges are EXPECTED for these)
       const qaVariationLower = qaVariation.toLowerCase().trim();
       const qaSetLower = (set || "").toLowerCase();
-      const qaSspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line)\b/i;
+      const qaSspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
       const qaIsSSP = qaSspPattern.test(qaVariationLower) || qaSspPattern.test(qaSetLower);
       
       // Determine market value: prefer unified Gemini data, fall back to legacy
