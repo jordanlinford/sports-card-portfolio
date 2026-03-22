@@ -140,7 +140,7 @@ export function Navigation() {
                     size="sm" 
                     className={cn(
                       "gap-1",
-                      isActiveSection(["/cases", "/analytics", "/search", "/portfolio", "/portfolio-builder"]) && "bg-accent"
+                      isActiveSection(["/cases", "/analytics", "/search", "/portfolio"]) && "bg-accent"
                     )}
                     data-testid="nav-portfolio"
                   >
@@ -184,13 +184,6 @@ export function Navigation() {
                       <TrendingUp className="h-4 w-4" />
                       Growth Projections
                       <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-auto">Pro</Badge>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/portfolio-builder" className="flex items-center gap-2 cursor-pointer">
-                      <Package className="h-4 w-4" />
-                      Box Breaks
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -241,6 +234,12 @@ export function Navigation() {
                     <Link href="/market/topps-takeover" className="flex items-center gap-2 cursor-pointer" data-testid="nav-topps-takeover">
                       <Layers className="h-4 w-4" />
                       Topps NFL Takeover
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/market/break-auditor" className="flex items-center gap-2 cursor-pointer" data-testid="nav-break-auditor">
+                      <Package className="h-4 w-4" />
+                      Break Value Auditor
                     </Link>
                   </DropdownMenuItem>
                   {isAuthenticated && user && (
@@ -580,12 +579,6 @@ export function Navigation() {
                         <Badge variant="secondary" className="text-[10px] px-1 py-0 ml-auto">Pro</Badge>
                       </Button>
                     </Link>
-                    <Link href="/portfolio-builder" onClick={() => setMobileMenuOpen(false)}>
-                      <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/portfolio-builder") && "bg-accent")}>
-                        <Package className="h-4 w-4" />
-                        Box Breaks
-                      </Button>
-                    </Link>
                   </>
                 )}
 
@@ -609,6 +602,12 @@ export function Navigation() {
                   <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/market/topps-takeover") && "bg-accent")} data-testid="nav-topps-takeover-mobile">
                     <Layers className="h-4 w-4" />
                     Topps NFL Takeover
+                  </Button>
+                </Link>
+                <Link href="/market/break-auditor" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/market/break-auditor") && "bg-accent")} data-testid="nav-break-auditor-mobile">
+                    <Package className="h-4 w-4" />
+                    Break Value Auditor
                   </Button>
                 </Link>
                 {isAuthenticated && user && (

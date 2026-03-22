@@ -41,10 +41,6 @@ import PortfolioOutlookPage from "@/pages/portfolio-outlook";
 import NextBuysPage from "@/pages/next-buys";
 import GrowthProjectionsPage from "@/pages/growth-projections";
 import ShareViewer from "@/pages/share-viewer";
-import PortfolioBuilderPage from "@/pages/portfolio-builder";
-import PortfolioBuilderSplitPage from "@/pages/portfolio-builder-split";
-import PortfolioBuilderPreferencesPage from "@/pages/portfolio-builder-preferences";
-import AdminPortfolioBuilderPage from "@/pages/admin-portfolio-builder";
 import BlogListing from "@/pages/blog";
 import BlogPostPage from "@/pages/blog-post";
 import PublicPlayerOutlookPage from "@/pages/public-player-outlook";
@@ -55,6 +51,7 @@ import PodcastLanding from "@/pages/podcast";
 import ScanHistoryPage from "@/pages/scan-history";
 import LeaderboardsPage from "@/pages/leaderboards";
 import ToppsTakeoverPage from "@/pages/topps-takeover";
+import BreakAuditorPage from "@/pages/break-auditor";
 import { TrialBanner } from "@/components/trial-banner";
 import { GoogleLinkBanner } from "@/components/google-link-banner";
 import { BatchAnalysisBanner } from "@/components/batch-analysis-banner";
@@ -78,8 +75,7 @@ function Router() {
       <Route path="/support" component={SupportPage} />
       <Route path="/player-outlook" component={PlayerOutlookPage} />
       <Route path="/outlook/:sport/:slug" component={PublicPlayerOutlookPage} />
-      <Route path="/portfolio-builder/splits/:id" component={PortfolioBuilderSplitPage} />
-      <Route path="/portfolio-builder" component={PortfolioBuilderPage} />
+      <Route path="/market/break-auditor" component={BreakAuditorPage} />
       <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
       <Route path="/compare" component={ComparePage} />
       <Route path="/podcast" component={PodcastLanding} />
@@ -120,8 +116,6 @@ function Router() {
           <Route path="/settings" component={SettingsPage} />
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
           <Route path="/portfolio/next-buys" component={NextBuysPage} />
-          <Route path="/portfolio-builder/splits/:id/preferences" component={PortfolioBuilderPreferencesPage} />
-          <Route path="/admin/portfolio-builder" component={AdminPortfolioBuilderPage} />
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />

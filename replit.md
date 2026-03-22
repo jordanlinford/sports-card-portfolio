@@ -66,6 +66,7 @@ The application uses a full-stack TypeScript architecture. The frontend manages 
 - **Unified Analysis DB Cache**: Persistent caching of Gemini analysis results in PostgreSQL.
 - **Premium Numbered Parallel Detection**: Specific detection and handling for premium numbered parallels.
 - **Topps Takeover SEO Page**: Public `/market/topps-takeover` landing page covering the Panini-to-Topps NFL license transition. SSR for crawlers with FAQ JSON-LD + Article JSON-LD. Live player signals API at `/api/market/topps-takeover-signals`. Added to sitemap and Market nav dropdown.
+- **Break Value Auditor**: Replaced old box break hosting system. AI-powered EV analysis at `/market/break-auditor` using Gemini 2.5 Flash to evaluate break slot value. Old break/split API endpoints return 410 with redirect. Route: `POST /api/market/break-audit`. Page: `client/src/pages/break-auditor.tsx`.
 
 ## External Dependencies
 
