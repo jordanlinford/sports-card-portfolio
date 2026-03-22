@@ -13,7 +13,7 @@
 
 import { db } from "./db";
 import { marketCompsCache, cards, bookmarks, users, displayCases, playerOutlookCache } from "@shared/schema";
-import { desc, isNotNull, sql, and, lt, gt, eq, or } from "drizzle-orm";
+import { desc, isNotNull, sql, and, lt, gt, eq } from "drizzle-orm";
 import { enqueueFetchJob, normalizeEbayQuery, getActiveJobCount } from "./ebayCompsService";
 
 // Configuration
@@ -26,7 +26,6 @@ const MIN_HOURS_BEFORE_EXPIRY = 12; // Only prewarm if expiring within 12 hours
 // Player Outlook Refresh Configuration
 const MAX_PLAYER_OUTLOOKS_PER_RUN = 50;
 const OUTLOOK_DELAY_BETWEEN_MS = 60 * 1000; // 60 seconds between refreshes (Gemini rate limiting)
-const OUTLOOK_STALENESS_DAYS = 7; // Auto-queue if not refreshed in 7+ days
 
 // Priority allocation (how many slots per category)
 // Keys match the priority values used in PrewarmCard
@@ -311,19 +310,18 @@ interface PlayerOutlookRefreshEntry {
 }
 
 /**
- * Get public player outlook pages to refresh, prioritized by:
+ * Get top 50 public player outlook pages to refresh daily, prioritized by:
  * 1. Big Mover flag (HOT temperature) — highest SEO value
- * 2. Page view count (most-viewed pages matter most for SEO)
- * 3. Staleness (oldest-refreshed first)
+ * 2. Page view count desc (most-viewed pages matter most for SEO)
+ * 3. Staleness (oldest-refreshed first, ensures 7+ day stale pages bubble up)
  *
- * Only includes entries that are stale (7+ days) or expiring (within 12h).
- * Returns up to MAX_PLAYER_OUTLOOKS_PER_RUN entries in a single ranked query.
+ * Always selects up to MAX_PLAYER_OUTLOOKS_PER_RUN public pages per run,
+ * regardless of current staleness. The ranking naturally ensures stale
+ * high-value pages are refreshed first, while fresh low-value pages
+ * fill remaining slots.
  */
 async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshEntry[]> {
   try {
-    const stalenessCutoff = new Date(Date.now() - OUTLOOK_STALENESS_DAYS * 24 * 60 * 60 * 1000);
-    const expiryCutoff = new Date(Date.now() + 12 * 60 * 60 * 1000);
-
     const rows = await db
       .select({
         playerKey: playerOutlookCache.playerKey,
@@ -334,16 +332,7 @@ async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshE
         viewCount: playerOutlookCache.viewCount,
       })
       .from(playerOutlookCache)
-      .where(
-        and(
-          eq(playerOutlookCache.isPublic, true),
-          or(
-            lt(playerOutlookCache.lastFetchedAt, stalenessCutoff),
-            sql`${playerOutlookCache.lastFetchedAt} IS NULL`,
-            lt(playerOutlookCache.expiresAt, expiryCutoff)
-          )
-        )
-      )
+      .where(eq(playerOutlookCache.isPublic, true))
       .orderBy(
         sql`CASE WHEN ${playerOutlookCache.temperature} = 'HOT' THEN 0 ELSE 1 END`,
         desc(playerOutlookCache.viewCount),
