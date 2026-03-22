@@ -33,8 +33,10 @@ import {
   Bot,
   Users,
   Star,
+  Lock,
 } from "lucide-react";
 import type { PlayerVerdict, StockTier, MarketTemperature, HiddenGem } from "@shared/schema";
+import { hasProAccess } from "@shared/schema";
 import { PageShareButton } from "@/components/page-share-button";
 
 type RiskLevel = "LOW" | "MEDIUM" | "HIGH";
@@ -176,7 +178,7 @@ function getRiskLabel(risk: RiskLevel) {
   }
 }
 
-function GemCard({ gem }: { gem: GemCandidate }) {
+function GemCard({ gem, isPro }: { gem: GemCandidate; isPro: boolean }) {
   return (
     <Card className="h-full flex flex-col" data-testid={`card-gem-${gem.playerName.replace(/\s+/g, '-').toLowerCase()}`}>
       <CardHeader className="pb-3">
@@ -194,8 +196,6 @@ function GemCard({ gem }: { gem: GemCandidate }) {
             {getVerdictLabel(gem.verdict)}
           </Badge>
         </div>
-        
-        <p className="text-sm mt-3 text-foreground">{gem.thesis}</p>
         
         <div className="flex flex-wrap gap-2 mt-3">
           <Badge variant="outline" className={`${getTemperatureColor(gem.temperature)} flex items-center gap-1 text-xs`}>
@@ -229,45 +229,94 @@ function GemCard({ gem }: { gem: GemCandidate }) {
       </CardHeader>
       
       <CardContent className="space-y-4 flex-1 flex flex-col">
-        <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-            <DollarSign className="h-4 w-4" />
-            {isAvoidVerdict(gem.verdict) ? "Why Overpriced" : "Why Discounted"}
-          </h4>
-          <ul className="space-y-1">
-            {gem.whyDiscounted.slice(0, 2).map((reason, i) => (
-              <li key={i} className="text-sm text-foreground flex items-start gap-2">
-                <span className={`${isAvoidVerdict(gem.verdict) ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"} mt-0.5`}>-</span>
-                <span>{reason}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-        
-        <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-            {isAvoidVerdict(gem.verdict) ? <AlertTriangle className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
-            {isAvoidVerdict(gem.verdict) ? "Downward Catalyst" : "Repricing Catalyst"}
-          </h4>
-          <p className="text-sm text-foreground">{gem.repricingCatalysts[0]}</p>
-        </div>
-        
-        <div>
-          <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-            {isAvoidVerdict(gem.verdict) ? <TrendingUp className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
-            {isAvoidVerdict(gem.verdict) ? "Bull Case (Contrary)" : "Trap Risk"}
-          </h4>
-          <p className="text-sm text-foreground">{gem.trapRisks[0]}</p>
-        </div>
-        
-        <div className="mt-auto pt-4">
-          <Button variant="outline" className="w-full" asChild>
-            <Link href={`/player-outlook?player=${encodeURIComponent(gem.playerName)}&sport=${{ NFL: "football", NBA: "basketball", MLB: "baseball", NHL: "hockey" }[gem.sport.toUpperCase()] || gem.sport.toLowerCase()}&from=hidden-gems`}>
-              View Full Analysis
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Link>
-          </Button>
-        </div>
+        {isPro ? (
+          <>
+            <p className="text-sm text-foreground">{gem.thesis}</p>
+            
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                <DollarSign className="h-4 w-4" />
+                {isAvoidVerdict(gem.verdict) ? "Why Overpriced" : "Why Discounted"}
+              </h4>
+              <ul className="space-y-1">
+                {gem.whyDiscounted.slice(0, 2).map((reason, i) => (
+                  <li key={i} className="text-sm text-foreground flex items-start gap-2">
+                    <span className={`${isAvoidVerdict(gem.verdict) ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"} mt-0.5`}>-</span>
+                    <span>{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                {isAvoidVerdict(gem.verdict) ? <AlertTriangle className="h-4 w-4" /> : <TrendingUp className="h-4 w-4" />}
+                {isAvoidVerdict(gem.verdict) ? "Downward Catalyst" : "Repricing Catalyst"}
+              </h4>
+              <p className="text-sm text-foreground">{gem.repricingCatalysts[0]}</p>
+            </div>
+            
+            <div>
+              <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                {isAvoidVerdict(gem.verdict) ? <TrendingUp className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                {isAvoidVerdict(gem.verdict) ? "Bull Case (Contrary)" : "Trap Risk"}
+              </h4>
+              <p className="text-sm text-foreground">{gem.trapRisks[0]}</p>
+            </div>
+            
+            <div className="mt-auto pt-4">
+              <Button variant="outline" className="w-full" asChild>
+                <Link href={`/player-outlook?player=${encodeURIComponent(gem.playerName)}&sport=${{ NFL: "football", NBA: "basketball", MLB: "baseball", NHL: "hockey" }[gem.sport.toUpperCase()] || gem.sport.toLowerCase()}&from=hidden-gems`}>
+                  View Full Analysis
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Link>
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="relative flex-1 flex flex-col">
+            <div className="select-none" style={{ filter: "blur(6px)" }} aria-hidden="true">
+              <p className="text-sm text-foreground">This player is undervalued due to market sentiment and recent performance trends that create a buying window.</p>
+              
+              <div className="mt-3">
+                <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <DollarSign className="h-4 w-4" />
+                  Why Discounted
+                </h4>
+                <ul className="space-y-1">
+                  <li className="text-sm text-foreground flex items-start gap-2">
+                    <span className="text-emerald-600 mt-0.5">-</span>
+                    <span>Market has not yet priced in recent developments</span>
+                  </li>
+                </ul>
+              </div>
+              
+              <div className="mt-3">
+                <h4 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <TrendingUp className="h-4 w-4" />
+                  Repricing Catalyst
+                </h4>
+                <p className="text-sm text-foreground">Upcoming season performance and increased hobby attention</p>
+              </div>
+            </div>
+            
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px] rounded-md" data-testid="pro-gate-overlay">
+              <div className="text-center px-4">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                  <Lock className="h-5 w-5 text-primary" />
+                </div>
+                <p className="text-sm font-medium mb-1">Full analysis is Pro-only</p>
+                <p className="text-xs text-muted-foreground mb-4">Unlock thesis, catalysts, and risk analysis</p>
+                <Button size="sm" className="gap-1.5" asChild>
+                  <Link href="/upgrade">
+                    <Crown className="h-3.5 w-3.5" />
+                    Upgrade to Pro
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -319,6 +368,8 @@ export default function HiddenGemsPage() {
   
   const isAdmin = adminCheck?.isAdmin || false;
   
+  const isPro = hasProAccess(user);
+
   const { data: gemsData, isLoading: gemsLoading } = useQuery<{
     gems: HiddenGem[];
     stats: {
@@ -328,6 +379,7 @@ export default function HiddenGemsPage() {
       batchId: string | null;
     };
     isFallback?: boolean;
+    userIsPro?: boolean;
   }>({
     queryKey: ["/api/hidden-gems"],
   });
@@ -627,7 +679,7 @@ export default function HiddenGemsPage() {
           </p>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="grid-gems">
             {filteredGems.map((gem) => (
-              <GemCard key={`${gem.sport}-${gem.playerName}`} gem={gem} />
+              <GemCard key={`${gem.sport}-${gem.playerName}`} gem={gem} isPro={isPro} />
             ))}
           </div>
         </>

@@ -8608,8 +8608,8 @@ RULES:
   const { getActiveHiddenGems, refreshHiddenGems, getHiddenGemsStats, getFallbackFeaturedGems, seedPlayerOutlooks, getRefreshStatus } = await import("./hiddenGemsService");
   const { getPlayerOutlook } = await import("./playerOutlookEngine");
 
-  // GET /api/hidden-gems - Get active hidden gems (public)
-  app.get("/api/hidden-gems", async (req, res) => {
+  // GET /api/hidden-gems - Get active hidden gems (public, but detailed fields gated to Pro)
+  app.get("/api/hidden-gems", async (req: any, res) => {
     try {
       let gems = await getActiveHiddenGems();
       const stats = await getHiddenGemsStats();
@@ -8621,8 +8621,24 @@ RULES:
         isFallback = true;
       }
       
+      // Check if user has Pro access - strip detailed fields for free users
+      const userId = req.user?.claims?.sub;
+      let userIsPro = false;
+      if (userId) {
+        const user = await storage.getUser(userId);
+        userIsPro = hasProAccess(user);
+      }
+      
+      const responseGems = userIsPro ? gems : gems.map((gem: any) => ({
+        ...gem,
+        thesis: "",
+        whyDiscounted: [],
+        repricingCatalysts: [],
+        trapRisks: [],
+      }));
+      
       res.json({
-        gems,
+        gems: responseGems,
         stats: isFallback ? {
           ...stats,
           totalActive: gems.length,
@@ -8630,6 +8646,7 @@ RULES:
         } : stats,
         cached: true,
         isFallback,
+        userIsPro,
       });
     } catch (error) {
       console.error("[Hidden Gems] Error fetching:", error);
