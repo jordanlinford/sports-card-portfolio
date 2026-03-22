@@ -695,11 +695,21 @@ export default function CaseEdit() {
       setPreviewUrl(previewDataUrl);
       setSelectedFile(new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" }));
       
-      // Call scan-identify API
-      const response = await apiRequest("POST", "/api/cards/scan-identify", {
-        imageData: base64Data,
-        mimeType: "image/jpeg",
+      const scanAbort = new AbortController();
+      const scanTimeout = setTimeout(() => scanAbort.abort(), 60000);
+      const scanRes = await fetch("/api/cards/scan-identify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ imageData: base64Data, mimeType: "image/jpeg" }),
+        signal: scanAbort.signal,
       });
+      clearTimeout(scanTimeout);
+      if (!scanRes.ok) {
+        const errText = (await scanRes.text()) || scanRes.statusText;
+        throw new Error(`${scanRes.status}: ${errText}`);
+      }
+      const response = await scanRes.json();
       
       if (response.success && response.scan?.cardIdentification) {
         const card = response.scan.cardIdentification;
@@ -741,12 +751,20 @@ export default function CaseEdit() {
         setAddCardMode("manual");
       }
     } catch (error) {
-      console.error("Scan error:", error);
-      toast({
-        title: "Scan failed",
-        description: error instanceof Error ? error.message : "Please try again or enter details manually.",
-        variant: "destructive",
-      });
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast({
+          title: "Scan timed out",
+          description: "The scan took too long. Please try again — it may be a connection issue.",
+          variant: "destructive",
+        });
+      } else {
+        console.error("Scan error:", error);
+        toast({
+          title: "Scan failed",
+          description: error instanceof Error ? error.message : "Please try again or enter details manually.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setScanning(false);
     }

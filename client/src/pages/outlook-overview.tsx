@@ -1070,12 +1070,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         const { blob, base64 } = await compressImage(fileArray[i]);
         if (batchCancelledRef.current) break;
 
+        const batchAbort = new AbortController();
+        const batchTimeout = setTimeout(() => batchAbort.abort(), 60000);
         const scanRes = await fetch("/api/cards/scan-identify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ imageData: base64 }),
+          signal: batchAbort.signal,
         });
+        clearTimeout(batchTimeout);
 
         if (!scanRes.ok) throw new Error("Scan failed");
         const scanData = await scanRes.json();
@@ -1310,7 +1314,23 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   };
 
   // Handle photo scan - NEW: Uses scan-identify endpoint (faster, no pricing)
+  const scanAbortRef = useRef<AbortController | null>(null);
+
+  const cancelScan = () => {
+    if (scanAbortRef.current) {
+      scanAbortRef.current.abort();
+      scanAbortRef.current = null;
+    }
+    setScanning(false);
+  };
+
   const handlePhotoScan = async (file: File, currentBackImageData?: string | null) => {
+    if (scanAbortRef.current) {
+      scanAbortRef.current.abort();
+    }
+    const abortController = new AbortController();
+    scanAbortRef.current = abortController;
+
     setScanning(true);
     setScanResult(null);
     setScanIdentifyResult(null);
@@ -1319,25 +1339,35 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     setAnalysisInvalidated(false);
     
     try {
-      // Compress image to reduce payload size
       const { blob, base64: base64Data } = await compressImage(file, 1200, 0.85);
       
-      // Store front image data so we can re-scan with back image later
       setFrontImageData(base64Data);
       
-      // Create preview URL from compressed image
       const previewDataUrl = URL.createObjectURL(blob);
       setScanPreviewUrl(previewDataUrl);
       
-      // Use back image data passed in (for rescan) or existing state
       const effectiveBackData = currentBackImageData !== undefined ? currentBackImageData : backImageData;
 
-      // Call the NEW scan-identify API (faster, no pricing)
-      const response = await apiRequest("POST", "/api/cards/scan-identify", {
-        imageData: base64Data,
-        mimeType: "image/jpeg",
-        ...(effectiveBackData ? { imageDataBack: effectiveBackData, mimeTypeBack: "image/jpeg" } : {}),
+      const timeoutId = setTimeout(() => abortController.abort(), 60000);
+
+      const res = await fetch("/api/cards/scan-identify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          imageData: base64Data,
+          mimeType: "image/jpeg",
+          ...(effectiveBackData ? { imageDataBack: effectiveBackData, mimeTypeBack: "image/jpeg" } : {}),
+        }),
+        signal: abortController.signal,
       });
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        const text = (await res.text()) || res.statusText;
+        throw new Error(`${res.status}: ${text}`);
+      }
+      const response = await res.json();
       
       // Handle service unavailable errors
       if (response.serviceUnavailable || response.scanError) {
@@ -1380,13 +1410,22 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         });
       }
     } catch (error) {
-      console.error("Error scanning card:", error);
-      toast({
-        title: "Scan failed",
-        description: error instanceof Error ? error.message : "Failed to scan card image",
-        variant: "destructive",
-      });
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast({
+          title: "Scan timed out",
+          description: "The scan took too long. Please try again — it may be a connection issue.",
+          variant: "destructive",
+        });
+      } else {
+        console.error("Error scanning card:", error);
+        toast({
+          title: "Scan failed",
+          description: error instanceof Error ? error.message : "Failed to scan card image",
+          variant: "destructive",
+        });
+      }
     } finally {
+      scanAbortRef.current = null;
       setScanning(false);
     }
   };
@@ -1901,6 +1940,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                           <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-20">
                             <Loader2 className="h-6 w-6 animate-spin text-primary mb-1" />
                             <span className="text-xs font-medium">Scanning...</span>
+                            <button
+                              onClick={cancelScan}
+                              className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
+                              data-testid="button-cancel-scan"
+                            >
+                              Cancel
+                            </button>
                           </div>
                         )}
                       </div>
