@@ -3055,33 +3055,39 @@ Sitemap: ${origin}/sitemap.xml
             reason: isPro ? outlook.bigMoverReason : null,
           },
           supply: await (async () => {
+            const persistedGrowth = card.outlookSupplyGrowth || null;
+            let supplyNote: string | undefined;
+            let estimatedPopulation: number | undefined;
             try {
               const { getGeminiMarketCacheEntry, getDbCachedAnalysis, getGeminiCacheKey } = await import("./outlookEngine");
-              const supplyData = getGeminiMarketCacheEntry({
+              const memCached = getGeminiMarketCacheEntry({
                 title: card.title, playerName: card.playerName, year: card.year,
                 set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
               });
-              if (supplyData?.supply) {
-                return {
-                  supplyGrowth: supplyData.supply.supplyGrowth,
-                  supplyNote: isPro ? supplyData.supply.supplyNote : undefined,
-                  estimatedPopulation: isPro ? supplyData.supply.estimatedPopulation : undefined,
-                };
+              if (memCached?.supply) {
+                supplyNote = memCached.supply.supplyNote;
+                estimatedPopulation = memCached.supply.estimatedPopulation;
+              } else {
+                const unifiedCacheKey = "unified|" + getGeminiCacheKey({
+                  title: card.title, playerName: card.playerName, year: card.year,
+                  set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
+                });
+                const dbCached = await getDbCachedAnalysis(unifiedCacheKey);
+                if (dbCached?.supply) {
+                  supplyNote = dbCached.supply.supplyNote;
+                  estimatedPopulation = dbCached.supply.estimatedPopulation;
+                }
               }
-              const unifiedCacheKey = "unified|" + getGeminiCacheKey({
-                title: card.title, playerName: card.playerName, year: card.year,
-                set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
-              });
-              const dbCached = await getDbCachedAnalysis(unifiedCacheKey);
-              if (dbCached?.supply) {
-                return {
-                  supplyGrowth: dbCached.supply.supplyGrowth,
-                  supplyNote: isPro ? dbCached.supply.supplyNote : undefined,
-                  estimatedPopulation: isPro ? dbCached.supply.estimatedPopulation : undefined,
-                };
-              }
-            } catch (e) {}
-            return null;
+            } catch (e) {
+              console.warn(`[Outlook] Failed to enrich supply data from cache for card ${cardId}:`, (e as Error).message);
+            }
+            const supplyGrowth = persistedGrowth || null;
+            if (!supplyGrowth) return null;
+            return {
+              supplyGrowth,
+              supplyNote: isPro ? supplyNote : undefined,
+              estimatedPopulation: isPro ? estimatedPopulation : undefined,
+            };
           })(),
           generatedAt: outlook.updatedAt,
           cached: true,
