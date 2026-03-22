@@ -744,7 +744,12 @@ export async function generatePortfolioOutlook(userId: string): Promise<Portfoli
     const content = response.text || "";
     if (!content) throw new Error("No AI response");
     
-    aiResponse = JSON.parse(content);
+    let jsonText = content.trim();
+    const codeBlockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) {
+      jsonText = codeBlockMatch[1].trim();
+    }
+    aiResponse = JSON.parse(jsonText);
   } catch (error) {
     console.error("AI portfolio outlook failed:", error);
     aiResponse = {

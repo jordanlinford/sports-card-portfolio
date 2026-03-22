@@ -72,15 +72,25 @@ export function AgentSidebar() {
 
   return (
     <>
-      <Button
+      <button
         onClick={() => setIsOpen(!isOpen)}
         data-testid="button-agent-toggle"
-        className={`fixed bottom-6 h-12 w-12 rounded-full shadow-2xl bg-gradient-to-tr from-amber-500 to-orange-600 hover:scale-110 transition-all z-50 p-0 ${
-          isOpen ? "right-[416px]" : "right-6"
+        className={`fixed bottom-6 flex items-center gap-2 shadow-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white font-semibold hover:scale-105 active:scale-95 transition-all z-50 border-2 border-amber-300/30 ${
+          isOpen
+            ? "right-[416px] h-10 w-10 rounded-full justify-center p-0"
+            : "right-4 h-12 rounded-full px-4 sm:px-5"
         }`}
+        style={{ boxShadow: "0 4px 24px rgba(245, 158, 11, 0.4)" }}
       >
-        {isOpen ? <X className="h-5 w-5" /> : <Sparkles className="h-5 w-5 animate-pulse" />}
-      </Button>
+        {isOpen ? (
+          <X className="h-5 w-5" />
+        ) : (
+          <>
+            <Sparkles className="h-5 w-5 animate-pulse flex-shrink-0" />
+            <span className="hidden sm:inline text-sm">Agent</span>
+          </>
+        )}
+      </button>
 
       <AnimatePresence>
         {isOpen && (
