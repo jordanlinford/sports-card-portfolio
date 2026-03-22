@@ -15,6 +15,7 @@ import {
   insertSplitInstanceSchema,
   insertSeatSchema,
   insertPopHistorySchema,
+  type InsertPopHistory,
   SPLIT_STATUSES,
   BREAKER_FEE_CENTS,
   SHIPPING_FEE_CENTS,
@@ -10246,7 +10247,7 @@ RULES:
         return res.status(400).json({ message: "Maximum 1000 snapshots per request" });
       }
 
-      const validated: any[] = [];
+      const validated: InsertPopHistory[] = [];
       const errors: string[] = [];
 
       for (let i = 0; i < snapshots.length; i++) {
@@ -10282,7 +10283,7 @@ RULES:
   app.get("/api/pop-history/trends/:playerName", async (req: any, res) => {
     try {
       const { playerName } = req.params;
-      const { grader, grade } = req.query;
+      const { grader, grade, year, setName, variation, cardNumber } = req.query;
 
       if (!playerName || playerName.trim().length === 0) {
         return res.status(400).json({ message: "playerName is required" });
@@ -10292,6 +10293,12 @@ RULES:
         decodeURIComponent(playerName),
         grader as string | undefined,
         grade as string | undefined,
+        {
+          year: year ? parseInt(year as string) : undefined,
+          setName: setName as string | undefined,
+          variation: variation as string | undefined,
+          cardNumber: cardNumber as string | undefined,
+        },
       );
 
       res.json({ playerName: decodeURIComponent(playerName), trends });
