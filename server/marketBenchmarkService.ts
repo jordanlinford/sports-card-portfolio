@@ -153,8 +153,7 @@ export async function getPortfolioPerformanceOverTime(
   startDate.setMonth(startDate.getMonth() - monthsBack);
   startDate.setDate(1);
 
-  const points: PortfolioPerformancePoint[] = [];
-  let firstValue = 0;
+  const rawPoints: { date: string; value: number }[] = [];
 
   for (let m = 0; m <= monthsBack; m++) {
     const pointDate = new Date(startDate);
@@ -197,16 +196,21 @@ export async function getPortfolioPerformanceOverTime(
       portfolioValue += cardValue;
     }
 
-    if (m === 0 || firstValue === 0) {
-      firstValue = portfolioValue || 1;
-    }
-
-    points.push({
+    rawPoints.push({
       date: monthKey,
       value: Math.round(portfolioValue * 100) / 100,
-      changePct: Math.round(((portfolioValue - firstValue) / firstValue) * 10000) / 100,
     });
   }
 
-  return points;
+  const firstNonZeroIdx = rawPoints.findIndex(p => p.value > 0);
+  if (firstNonZeroIdx === -1) return [];
+
+  const trimmedPoints = rawPoints.slice(firstNonZeroIdx);
+  const firstValue = trimmedPoints[0].value;
+
+  return trimmedPoints.map(p => ({
+    date: p.date,
+    value: p.value,
+    changePct: Math.round(((p.value - firstValue) / firstValue) * 10000) / 100,
+  }));
 }
