@@ -1,0 +1,17 @@
+The short answer is yes, but the "why" and "where" change. If you stop scraping eBay directly and move 100% of your data sourcing to Gemini 2.5 Flash with Google Search Grounding, you are essentially outsourcing the "scraper resilience" to Google.
+However, in the context of your 40-feature stack and our 2026 roadmap, you still need resilience for the following three areas where Google Search Grounding typically falls short.
+1. The "Deep Data" Problem (Pop Reports & 1/1s)
+Google Search is excellent for finding snippets of news or a single high-profile sale. It is not a database.
+• The Reality: For your Supply Saturation Alert (Task 3), you need to pull the total population count for specific cards (e.g., 2025 Prizm Victor Wembanyama PSA 10) every week.
+• The Risk: Sites like PSA, BGS, and SGC have implemented "Behavioral Fingerprinting" in 2026 that is even more aggressive than eBay's. If you try to pull 500 pop report data points a day from a single Replit IP, you will be blocked within an hour.
+• The Verdict: You still need Scraper Resilience (Proxies/VPS) for your pop_history engine because Google Search Grounding won't give you the granular, recurring tabular data you need to build that moat.
+2. Bypassing "JavaScript Walls" on Alternative Marketplaces
+If you aren't using eBay, you are likely looking at 130Point, MySlabs, Goldin, or Heritage Auctions to get your "Unified Analysis" comps.
+• The Reality: 130Point, for example, is the hobby standard for seeing "Accepted Offer" prices on eBay—data that Google Search doesn't always index correctly.
+• The Risk: These sites use Cloudflare Turnstile or JavaScript Challenges to stop bots.
+• The Verdict: To get the high-fidelity "Solds" that a "Whale" collector expects, you still need a scraper that can execute JavaScript and mimic a real browser session.
+3. The "Grounding Limit" (Cost & Quotas)
+• The Reality: Gemini’s Google Search Grounding is powerful but has a 1 million query per day limit (and costs per request).  
+• The Strategic Play: For high-volume tasks like Batch Card Analysis (#47) where a user might upload 20-50 cards at once, using a custom scraper for the "heavy lifting" (raw data) and Gemini for the "reasoning" (investment verdict) is often 5x cheaper and faster than grounding every single card query.
+🛠 Revised Technical Strategy
+Since you are on Replit, here is how to handle "Resilience" without an eBay focus:
