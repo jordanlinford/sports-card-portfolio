@@ -470,7 +470,7 @@ function isStrictComp(
     "auto", "autograph", "signature", "signed", "on-card auto", "on card auto",
     // Holo/Shimmer family  
     "holo", "holographic", "holofoil", "holo flash",
-    "shimmer", "wave", "mojo", "kaboom", "downtown", "disco",
+    "shimmer", "wave", "mojo", "kaboom", "downtown", "uptown", "disco",
     // NOTE: Removed bare "ice" - it matches "price" as substring! Use specific terms only
     "cracked ice", "ice prizm", "ice parallel", "fractured", "shock", "sparkle", "white sparkle", "red sparkle",
     "velocity", "hyper", "scope", "fast break", "neon", "laser", "fluorescent", "seismic",
@@ -648,7 +648,7 @@ function computeListingMatchScore(
       "auto", "autograph", "signature", "signed", "on-card auto", "on card auto",
       // Holo/Shimmer family  
       "holo", "holographic", "holofoil", "holo flash",
-      "shimmer", "wave", "mojo", "kaboom", "downtown", "disco",
+      "shimmer", "wave", "mojo", "kaboom", "downtown", "uptown", "disco",
       "ice", "cracked ice", "fractured", "shock", "sparkle", "white sparkle", "red sparkle",
       "velocity", "hyper", "scope", "fast break", "flash", "neon", "laser", "fluorescent", "seismic",
       // Color parallels (Donruss Optic specific)
@@ -1161,7 +1161,7 @@ function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms:
   }
   
   // Detect case hits (Downtown, Kaboom, The Man, etc.) — check both variation AND set name
-  const caseHitPattern = /\b(downtown|kaboom|disco|stained.?glass|color.?blast|genesis|case.?hit|ssp|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
+  const caseHitPattern = /\b(downtown|uptown|kaboom|disco|stained.?glass|color.?blast|genesis|case.?hit|ssp|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
   const isCaseHit = caseHitPattern.test(variation) || caseHitPattern.test(setLower);
   if (isCaseHit) {
     return { term: card.variation || "", excludeTerms: [] };
@@ -1765,7 +1765,7 @@ Return JSON with pricePoints array (all prices found), estimatedValue, salesFoun
       const PREMIUM_KEYWORDS = [
         "black label", "gold label",
         "silver", "gold", "hyper", "shimmer", "wave", "camo", 
-        "kaboom", "downtown", "case hit", "ssp", "sp ",
+        "kaboom", "downtown", "uptown", "case hit", "ssp", "sp ",
         "refractor", "prizm", "auto", "autograph", "numbered", "/10", "/25", "/50", "/99",
         "1/1", "one of one", "superfractor", "atomic",
         // Insert set names (these are premium even without numbered)

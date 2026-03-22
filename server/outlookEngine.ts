@@ -247,7 +247,7 @@ export async function fetchGeminiMarketData(card: {
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLowerStandalone = (card.variation || "").toLowerCase().trim();
   const setLowerStandalone = (card.set || "").toLowerCase();
-  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
+  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|uptown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
   const isPremiumUnnumberedStandalone = !isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
   const isPremiumNumberedStandalone = isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
   const isOpticSetStandalone = /\boptic\b/i.test(card.set || "");
@@ -483,7 +483,7 @@ Be specific with numbers. If you find 19 sold listings, say 19, not "approximate
 
 SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
 - Drop ONLY generic words like "holo", "insert" from the search
-- NEVER drop SSP/Case Hit parallel names or premium material names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer, Wood, Silk, Sapphire, Platinum, Vintage Stock, Clear, Superfractor, etc.) — these define the card's rarity and price tier
+- NEVER drop SSP/Case Hit parallel names or premium material names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Uptown, Kaboom, Mojo, Shimmer, Wood, Silk, Sapphire, Platinum, Vintage Stock, Clear, Superfractor, etc.) — these define the card's rarity and price tier
 - Try: "[year] [set] [player name] [variation] sold"
 - For SSP/premium parallels, ALWAYS keep the parallel name — a Zebra is NOT a Silver
 
@@ -731,7 +731,7 @@ export async function fetchUnifiedCardAnalysis(card: {
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLower = (card.variation || "").toLowerCase().trim();
   const setLower = (card.set || "").toLowerCase();
-  const sspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
+  const sspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|uptown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
   const isPremiumUnnumberedParallel = !isNumbered && (sspPattern.test(variationLower) || sspPattern.test(setLower));
   const isPremiumNumberedParallel = isNumbered && (sspPattern.test(variationLower) || sspPattern.test(setLower));
   // Prizm-family sets: base paper card is non-refractor; Silver Prizm/Silver/Refractor are DIFFERENT parallels
@@ -989,7 +989,7 @@ PRICING RULES:
 
 SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
 - Drop ONLY generic descriptive words like "holo", "insert" from the search
-- NEVER drop SSP/Case Hit parallel names or premium material names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Kaboom, Mojo, Shimmer, Scope, Velocity, Hyper, Wave, Ice, Crystal, Cracked Ice, Laser, FOTL, Wood, Silk, Sapphire, Platinum, Vintage Stock, Clear, Superfractor) — these define the card's rarity tier and price
+- NEVER drop SSP/Case Hit parallel names or premium material names (Zebra, Tiger Stripe, Shock, Color Blast, Downtown, Uptown, Kaboom, Mojo, Shimmer, Scope, Velocity, Hyper, Wave, Ice, Crystal, Cracked Ice, Laser, FOTL, Wood, Silk, Sapphire, Platinum, Vintage Stock, Clear, Superfractor) — these define the card's rarity tier and price
 - NEVER drop "prizm" if the set name is "Prizm" — it's the brand name, not a descriptor
 - Try just: "[year] [brand] [player name] [variation] sold"  
 - Try: "[year] [set] [player name] [variation] sold"
