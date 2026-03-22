@@ -103,20 +103,12 @@ function calculateDiscountScore(outlook: PlayerOutlookResponse): number {
     temp === "NEUTRAL" ? 10 :
     temp === "WARM" ? 5 : 0;
   
-  const sport = outlook.player?.sport?.toLowerCase() || "";
-  const currentMonth = new Date().getMonth() + 1;
-  let eventBonus = 0;
-  if (sport === "soccer" && [3, 4, 5, 6, 7].includes(currentMonth)) {
-    eventBonus = 10;
-  }
-
   return Math.min(100, Math.max(0, 
     upsideScore * 0.4 + 
     (100 - riskScore) * 0.2 + 
     confidenceScore * 0.2 +
     discountBonus + 
-    tempBonus +
-    eventBonus
+    tempBonus
   ));
 }
 
@@ -683,6 +675,14 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
     expiresAt.setDate(expiresAt.getDate() + 14);
 
     let gemsCreated = 0;
+    const currentMonth = new Date().getMonth() + 1;
+    const isWorldCupWindow = [3, 4, 5, 6, 7].includes(currentMonth);
+    for (const gem of allGems) {
+      const sport = normalizeSport(gem.sport).toLowerCase();
+      if (sport === "soccer" && isWorldCupWindow) {
+        gem.discountScore = Math.min(95, (gem.discountScore || 60) + 10);
+      }
+    }
     const sortedGems = allGems
       .sort((a, b) => (b.discountScore || 60) - (a.discountScore || 60))
       .slice(0, targetCount);
@@ -734,12 +734,6 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         const gemIsFromCommunity = communityPlayerKeys.has(playerKey);
         const gemSource = gemIsFromAI && gemIsFromCommunity ? "BOTH" : gemIsFromCommunity ? "COMMUNITY" : "AI";
 
-        let adjustedDiscountScore = gem.discountScore || 60;
-        const currentMonth = new Date().getMonth() + 1;
-        if (normalizedSport.toLowerCase() === "soccer" && [3, 4, 5, 6, 7].includes(currentMonth)) {
-          adjustedDiscountScore = Math.min(95, adjustedDiscountScore + 10);
-        }
-
         const gemData: InsertHiddenGem = {
           playerKey,
           playerName: normalizedName,
@@ -757,7 +751,7 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
           trapRisks: (gem.trapRisks || []).slice(0, 2),
           upsideScore: gem.isAvoid ? null : Math.min(95, Math.max(30, gem.upsideScore || 65)),
           confidenceScore: Math.min(95, Math.max(30, gem.confidenceScore || 65)),
-          discountScore: Math.min(95, Math.max(30, adjustedDiscountScore)),
+          discountScore: Math.min(95, Math.max(30, gem.discountScore || 60)),
           source: gemSource,
           batchId,
           sortOrder: i,
