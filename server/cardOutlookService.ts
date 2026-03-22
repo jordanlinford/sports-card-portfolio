@@ -280,7 +280,7 @@ interface SeasonalConfig {
   offseasonPenalty: number;    // Upside reduction during offseason
 }
 
-const SEASONAL_CONFIGS: Record<string, SeasonalConfig> = {
+export const SEASONAL_CONFIGS: Record<string, SeasonalConfig> = {
   football: {
     peakMonths: [9, 10, 11, 12, 1, 2],  // Sept-Feb (NFL season + Super Bowl)
     playoffMonths: [1, 2],              // January/February playoffs

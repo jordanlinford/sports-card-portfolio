@@ -3,6 +3,7 @@ import { hiddenGems, playerOutlookCache, cards, displayCases, type HiddenGem, ty
 import { eq, desc, and, isNotNull, sql } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { getPlayerOutlook } from "./playerOutlookEngine";
+import { SEASONAL_CONFIGS } from "./cardOutlookService";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -676,11 +677,12 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
 
     let gemsCreated = 0;
     const currentMonth = new Date().getMonth() + 1;
-    const isWorldCupWindow = [3, 4, 5, 6, 7].includes(currentMonth);
     for (const gem of allGems) {
-      const sport = normalizeSport(gem.sport).toLowerCase();
-      if (sport === "soccer" && isWorldCupWindow) {
-        gem.discountScore = Math.min(95, (gem.discountScore || 60) + 10);
+      const sportKey = normalizeSport(gem.sport).toLowerCase();
+      const seasonalConfig = SEASONAL_CONFIGS[sportKey];
+      if (seasonalConfig && seasonalConfig.playoffMonths.includes(currentMonth)) {
+        const boostPoints = Math.round((seasonalConfig.playoffMultiplier - 1) * 40);
+        gem.discountScore = Math.min(95, (gem.discountScore || 60) + boostPoints);
       }
     }
     const sortedGems = allGems
