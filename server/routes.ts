@@ -6988,14 +6988,14 @@ RULES:
       
       const { getMarketBenchmarks, getPortfolioPerformanceOverTime } = await import("./marketBenchmarkService");
       
-      const [benchmarks, portfolioPerformance] = await Promise.all([
+      const [benchmarks, portfolioPerformance] = await Promise.allSettled([
         getMarketBenchmarks(),
         getPortfolioPerformanceOverTime(userId),
       ]);
       
       res.json({
-        benchmarks,
-        portfolioPerformance,
+        benchmarks: benchmarks.status === "fulfilled" ? benchmarks.value : { sp500: [], bitcoin: [], fetchedAt: new Date().toISOString() },
+        portfolioPerformance: portfolioPerformance.status === "fulfilled" ? portfolioPerformance.value : [],
       });
     } catch (error) {
       console.error("Error fetching market benchmarks:", error);

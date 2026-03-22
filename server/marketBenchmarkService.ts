@@ -124,13 +124,14 @@ export async function getPortfolioPerformanceOverTime(
   userId: string
 ): Promise<PortfolioPerformancePoint[]> {
   const { storage } = await import("./storage");
+  type Card = Awaited<ReturnType<typeof storage.getCards>>[number];
 
-  const displayCases = await storage.getDisplayCasesByUserId(userId);
+  const displayCases = await storage.getDisplayCases(userId);
   if (displayCases.length === 0) return [];
 
-  const allCards: any[] = [];
+  const allCards: Card[] = [];
   for (const dc of displayCases) {
-    const cards = await storage.getCardsByDisplayCaseId(dc.id);
+    const cards = await storage.getCards(dc.id);
     allCards.push(...cards);
   }
 
