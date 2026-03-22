@@ -1475,6 +1475,7 @@ export const playerOutlookCache = pgTable("player_outlook_cache", {
   
   // Cache management
   temperature: varchar("temperature", { length: 20 }), // For TTL decisions
+  viewCount: integer("view_count").default(0).notNull(),
   lastFetchedAt: timestamp("last_fetched_at"),
   expiresAt: timestamp("expires_at"),
   createdAt: timestamp("created_at").defaultNow(),

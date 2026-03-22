@@ -304,73 +304,34 @@ interface PlayerOutlookRefreshEntry {
   playerName: string;
   sport: string;
   playerKey: string;
-  priority: 'big-mover' | 'stale' | 'expiring';
+  isBigMover: boolean;
+  viewCount: number;
   lastFetchedAt: Date | null;
   temperature: string | null;
 }
 
 /**
  * Get public player outlook pages to refresh, prioritized by:
- * 1. Big Mover flag (HOT temperature or high-demand verdicts)
- * 2. Staleness (not refreshed in 7+ days)
- * 3. Expiring soon
+ * 1. Big Mover flag (HOT temperature) — highest SEO value
+ * 2. Page view count (most-viewed pages matter most for SEO)
+ * 3. Staleness (oldest-refreshed first)
+ *
+ * Only includes entries that are stale (7+ days) or expiring (within 12h).
+ * Returns up to MAX_PLAYER_OUTLOOKS_PER_RUN entries in a single ranked query.
  */
 async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshEntry[]> {
-  const results: PlayerOutlookRefreshEntry[] = [];
-  const seenKeys = new Set<string>();
-
-  const addIfUnique = (entry: PlayerOutlookRefreshEntry): boolean => {
-    if (results.length >= MAX_PLAYER_OUTLOOKS_PER_RUN) return false;
-    if (seenKeys.has(entry.playerKey)) return false;
-    seenKeys.add(entry.playerKey);
-    results.push(entry);
-    return true;
-  };
-
   try {
-    // Tier 1: Big Mover / HOT players (highest SEO value — trending searches)
-    const hotPlayers = await db
-      .select({
-        playerKey: playerOutlookCache.playerKey,
-        sport: playerOutlookCache.sport,
-        playerName: playerOutlookCache.playerName,
-        lastFetchedAt: playerOutlookCache.lastFetchedAt,
-        temperature: playerOutlookCache.temperature,
-      })
-      .from(playerOutlookCache)
-      .where(
-        and(
-          eq(playerOutlookCache.isPublic, true),
-          eq(playerOutlookCache.temperature, "HOT")
-        )
-      )
-      .orderBy(playerOutlookCache.lastFetchedAt) // Oldest first
-      .limit(25);
-
-    let added = 0;
-    for (const p of hotPlayers) {
-      if (addIfUnique({
-        playerName: p.playerName,
-        sport: p.sport,
-        playerKey: p.playerKey,
-        priority: 'big-mover',
-        lastFetchedAt: p.lastFetchedAt,
-        temperature: p.temperature,
-      })) {
-        added++;
-      }
-    }
-    console.log(`[Prewarm:Outlook] Added ${added} HOT/big-mover players`);
-
-    // Tier 2: Stale pages (not refreshed in 7+ days — auto-queue for freshness)
     const stalenessCutoff = new Date(Date.now() - OUTLOOK_STALENESS_DAYS * 24 * 60 * 60 * 1000);
-    const stalePlayers = await db
+    const expiryCutoff = new Date(Date.now() + 12 * 60 * 60 * 1000);
+
+    const rows = await db
       .select({
         playerKey: playerOutlookCache.playerKey,
         sport: playerOutlookCache.sport,
         playerName: playerOutlookCache.playerName,
         lastFetchedAt: playerOutlookCache.lastFetchedAt,
         temperature: playerOutlookCache.temperature,
+        viewCount: playerOutlookCache.viewCount,
       })
       .from(playerOutlookCache)
       .where(
@@ -378,63 +339,30 @@ async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshE
           eq(playerOutlookCache.isPublic, true),
           or(
             lt(playerOutlookCache.lastFetchedAt, stalenessCutoff),
-            sql`${playerOutlookCache.lastFetchedAt} IS NULL`
+            sql`${playerOutlookCache.lastFetchedAt} IS NULL`,
+            lt(playerOutlookCache.expiresAt, expiryCutoff)
           )
         )
       )
-      .orderBy(playerOutlookCache.lastFetchedAt) // Most stale first
-      .limit(50);
-
-    added = 0;
-    for (const p of stalePlayers) {
-      if (addIfUnique({
-        playerName: p.playerName,
-        sport: p.sport,
-        playerKey: p.playerKey,
-        priority: 'stale',
-        lastFetchedAt: p.lastFetchedAt,
-        temperature: p.temperature,
-      })) {
-        added++;
-      }
-    }
-    console.log(`[Prewarm:Outlook] Added ${added} stale players (7+ days old)`);
-
-    // Tier 3: Expiring soon (cache TTL approaching)
-    const expiringPlayers = await db
-      .select({
-        playerKey: playerOutlookCache.playerKey,
-        sport: playerOutlookCache.sport,
-        playerName: playerOutlookCache.playerName,
-        lastFetchedAt: playerOutlookCache.lastFetchedAt,
-        temperature: playerOutlookCache.temperature,
-      })
-      .from(playerOutlookCache)
-      .where(
-        and(
-          eq(playerOutlookCache.isPublic, true),
-          lt(playerOutlookCache.expiresAt, new Date(Date.now() + 12 * 60 * 60 * 1000)) // Expiring within 12 hours
-        )
+      .orderBy(
+        sql`CASE WHEN ${playerOutlookCache.temperature} = 'HOT' THEN 0 ELSE 1 END`,
+        desc(playerOutlookCache.viewCount),
+        playerOutlookCache.lastFetchedAt
       )
-      .orderBy(playerOutlookCache.expiresAt)
-      .limit(30);
+      .limit(MAX_PLAYER_OUTLOOKS_PER_RUN);
 
-    added = 0;
-    for (const p of expiringPlayers) {
-      if (addIfUnique({
-        playerName: p.playerName,
-        sport: p.sport,
-        playerKey: p.playerKey,
-        priority: 'expiring',
-        lastFetchedAt: p.lastFetchedAt,
-        temperature: p.temperature,
-      })) {
-        added++;
-      }
-    }
-    console.log(`[Prewarm:Outlook] Added ${added} expiring players`);
+    const results: PlayerOutlookRefreshEntry[] = rows.map(r => ({
+      playerName: r.playerName,
+      sport: r.sport,
+      playerKey: r.playerKey,
+      isBigMover: r.temperature === "HOT",
+      viewCount: r.viewCount,
+      lastFetchedAt: r.lastFetchedAt,
+      temperature: r.temperature,
+    }));
 
-    console.log(`[Prewarm:Outlook] Total player outlooks to refresh: ${results.length}`);
+    const bigMoverCount = results.filter(r => r.isBigMover).length;
+    console.log(`[Prewarm:Outlook] Found ${results.length} player outlooks to refresh (${bigMoverCount} big movers)`);
     return results;
   } catch (error) {
     console.error("[Prewarm:Outlook] Error fetching player outlooks to refresh:", error);
@@ -473,7 +401,8 @@ async function runPlayerOutlookRefresh(): Promise<void> {
     for (let i = 0; i < playersToRefresh.length; i++) {
       const entry = playersToRefresh[i];
 
-      console.log(`[Prewarm:Outlook] Refreshing ${i + 1}/${playersToRefresh.length} [${entry.priority}]: ${entry.playerName} (${entry.sport})`);
+      const label = entry.isBigMover ? "big-mover" : "standard";
+      console.log(`[Prewarm:Outlook] Refreshing ${i + 1}/${playersToRefresh.length} [${label}, ${entry.viewCount} views]: ${entry.playerName} (${entry.sport})`);
 
       try {
         await getPlayerOutlook(
@@ -482,10 +411,11 @@ async function runPlayerOutlookRefresh(): Promise<void> {
         );
         refreshed++;
         refreshedPlayers.push(entry.playerName);
-        console.log(`[Prewarm:Outlook] Refreshed [${entry.priority}]: ${entry.playerName}`);
-      } catch (err: any) {
+        console.log(`[Prewarm:Outlook] Refreshed [${label}]: ${entry.playerName}`);
+      } catch (err) {
         errors++;
-        console.error(`[Prewarm:Outlook] Failed to refresh ${entry.playerName}:`, err.message);
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[Prewarm:Outlook] Failed to refresh ${entry.playerName}:`, message);
       }
 
       // Rate limit between refreshes to avoid Gemini quota issues

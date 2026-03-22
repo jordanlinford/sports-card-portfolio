@@ -25,9 +25,10 @@ import {
   type BundleDefinition,
   userFeedback,
   hasProAccess,
+  playerOutlookCache,
 } from "@shared/schema";
 import { db } from "./db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -6792,6 +6793,13 @@ RULES:
       if (!outlook) {
         return res.status(404).json({ message: "Player outlook not found" });
       }
+      
+      // Increment view count (fire-and-forget for performance)
+      db.update(playerOutlookCache)
+        .set({ viewCount: sql`${playerOutlookCache.viewCount} + 1` })
+        .where(eq(playerOutlookCache.id, outlook.id))
+        .execute()
+        .catch(() => {});
       
       // Return the full outlook data
       res.json({
