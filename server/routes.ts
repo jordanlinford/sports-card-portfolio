@@ -5675,6 +5675,31 @@ RULES:
     }
   });
 
+  // Agent Mode: SSE streaming endpoint for AI portfolio auditor (Pro-only)
+  app.get("/api/agent/stream", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      if (!hasProAccess(user)) {
+        res.status(403).json({ message: "Agent Mode is a Pro feature" });
+        return;
+      }
+
+      const query = req.query.q as string;
+      if (!query || query.trim().length === 0) {
+        res.status(400).json({ message: "Query parameter 'q' is required" });
+        return;
+      }
+
+      const { runAgentStream } = await import("./agentService");
+      await runAgentStream(query.trim(), String(user.id), res);
+    } catch (error) {
+      console.error("Error in agent stream:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ message: "Agent stream failed" });
+      }
+    }
+  });
+
   // Admin: Prewarm job status and trigger
   app.get("/api/admin/prewarm/status", isAuthenticated, isAdmin, async (req: any, res) => {
     try {

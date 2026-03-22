@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { AgentSidebar } from "@/components/AgentSidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { initGA } from "./lib/analytics";
 import { useAnalytics } from "./hooks/use-analytics";
@@ -159,6 +160,7 @@ function App() {
             </main>
             <Footer />
           </div>
+          <AgentSidebar />
           <BatchAnalysisBanner />
           <Toaster />
           <FeedbackWidget />

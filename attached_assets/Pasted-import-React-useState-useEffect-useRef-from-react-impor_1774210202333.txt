@@ -1,0 +1,137 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Command, Sparkles, Zap, ShieldAlert, TrendingUp, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAgent } from '@/hooks/use-agent'; // SSE Hook detailed below
+
+export const AgentSidebar = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const { query, setQuery, steps, result, isThinking, sendQuery } = useAgent();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Global Shortcut (⌘+K)
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setIsOpen((prev) => !prev);
+      }
+    };
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, []);
+
+  return (
+    <>
+      {/* Agent Toggle Button */}
+      <Button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-2xl bg-gradient-to-tr from-amber-500 to-orange-600 hover:scale-110 transition-transform z-50"
+      >
+        {isOpen ? <X /> : <Sparkles className="animate-pulse" />}
+      </Button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: 'spring', damping: 20 }}
+            className="fixed top-0 right-0 h-screen w-[400px] z-40 bg-slate-950/80 backdrop-blur-xl border-l border-slate-800 p-6 flex flex-col shadow-[-20px_0_50px_rgba(0,0,0,0.5)]"
+          >
+            {/* Header */}
+            <div className="flex items-center gap-2 mb-8">
+              <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500">
+                <Command size={20} />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white leading-none">Agent Mode</h2>
+                <p className="text-xs text-slate-400 mt-1">Autonomous Asset Auditor v2.6</p>
+              </div>
+            </div>
+
+            {/* Input Area */}
+            <div className="relative mb-6">
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendQuery()}
+                placeholder="Ask about your portfolio..."
+                className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all"
+              />
+              <div className="absolute right-3 top-3 text-[10px] text-slate-500 font-mono uppercase">⌘K</div>
+            </div>
+
+            {/* Progress / Status Ticks */}
+            <ScrollArea className="flex-1 pr-4">
+              <div className="space-y-4">
+                {steps.map((step, i) => (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex gap-3 text-sm items-start"
+                    key={i}
+                  >
+                    <div className="mt-1 h-2 w-2 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+                    <span className="text-slate-300 font-medium">{step}</span>
+                  </motion.div>
+                ))}
+
+                {isThinking && (
+                  <div className="flex gap-3 items-center text-sm text-slate-500 italic px-5">
+                    <Zap className="animate-spin-slow text-amber-500/50" size={14} />
+                    Processing market signals...
+                  </div>
+                )}
+
+                {/* The "Asset Verdict" Card */}
+                {result && (
+                  <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="mt-6 p-4 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 relative overflow-hidden"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Auditor Verdict</span>
+                      {result.alert && <ShieldAlert className="text-red-500 animate-bounce" size={18} />}
+                    </div>
+                    <h3 className="text-white font-bold mb-2">{result.title}</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed mb-4">{result.description}</p>
+                    
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-slate-700/50">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp size={14} className="text-emerald-500" />
+                        <span className="text-[11px] text-white font-mono">Potential Alpha: +{result.alpha}%</span>
+                      </div>
+                      <Button variant="ghost" size="sm" className="h-7 text-[10px] bg-amber-500/20 text-amber-500 hover:bg-amber-500/30">
+                        View Strategy
+                      </Button>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* Default Queries for March 2026 */}
+            {!isThinking && !result && (
+              <div className="mt-auto space-y-2">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-tighter mb-2">Suggested Scenarios</p>
+                <button className="w-full text-left p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-400 transition-colors"
+                  onClick={() => setQuery("Audit Panini NFL risk before March 31")}>
+                  "Audit Panini NFL risk before March 31..."
+                </button>
+                <button className="w-full text-left p-3 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-700 text-xs text-slate-400 transition-colors"
+                  onClick={() => setQuery("Identify World Cup 2026 buy targets")}>
+                  "Identify World Cup 2026 buy targets..."
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
