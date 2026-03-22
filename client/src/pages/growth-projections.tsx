@@ -528,10 +528,11 @@ export default function GrowthProjectionsPage() {
                         className="text-muted-foreground text-xs"
                       />
                       <Tooltip 
-                        formatter={(value: number | null, name: string) => {
-                          if (value === null) return ["-", name];
+                        formatter={(value: any, name: any) => {
+                          if (value === null || value === undefined) return ["-", String(name)];
+                          const num = Number(value);
                           const label = name === "portfolio" ? "Your Portfolio" : name === "sp500" ? "S&P 500" : "Bitcoin";
-                          return [`${value > 0 ? "+" : ""}${value}%`, label];
+                          return [`${num > 0 ? "+" : ""}${num}%`, label];
                         }}
                         contentStyle={{ 
                           backgroundColor: "hsl(var(--card))",
