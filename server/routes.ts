@@ -3548,7 +3548,7 @@ Sitemap: ${origin}/sitemap.xml
       const legacyPricePoints = priceData.pricePoints || [];
       const legacyHasRealData = legacyPricePoints.length >= 2;
       const hasAnyRealComps = compCount > 0 || legacyHasRealData;
-      if (!hasAnyRealComps && !qaIs1of1 && !qaIsVeryLowPop) {
+      if (!hasAnyRealComps && !qaIs1of1 && !qaIsVeryLowPop && !qaIsSSP) {
         const preExisting = marketValue || 0;
         if (specCrossProduct && specCrossProduct.avgPrice > 0) {
           console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: Using $${specCrossProduct.avgPrice} (range $${specCrossProduct.minPrice}-$${specCrossProduct.maxPrice}, sport: ${detectedSport || "unknown"}). | ${specCrossProduct.notes.substring(0, 100)}`);
