@@ -241,6 +241,11 @@ type QuickAnalyzeResult = {
   actionReasons: string[] | null;
   explanation: { short: string; long: string | null; bullets?: string[] };
   bigMover: { flag: boolean; reason: string | null };
+  supply?: {
+    supplyGrowth: "stable" | "growing" | "surging";
+    supplyNote?: string;
+    estimatedPopulation?: number;
+  } | null;
   confidence: { level: string; reason: string | null };
   matchConfidence?: {
     score: number;
@@ -2655,6 +2660,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                     matchConfidence: result.matchConfidence,
                     explanation: result.explanation,
                     bigMover: result.bigMover,
+                    supply: result.supply,
                     isPro: result.isPro,
                   }}
                   cardImageUrl={previewUrl}

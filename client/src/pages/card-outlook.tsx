@@ -135,6 +135,11 @@ type OutlookData = {
     flag: boolean;
     reason?: string | null;
   };
+  supply?: {
+    supplyGrowth: "stable" | "growing" | "surging";
+    supplyNote?: string;
+    estimatedPopulation?: number;
+  } | null;
   generatedAt: string;
   cached?: boolean;
   stale?: boolean;
@@ -526,6 +531,15 @@ export default function CardOutlookPage() {
                       Big Mover
                     </Badge>
                   )}
+                  {outlook.supply?.supplyGrowth === "surging" && (
+                    <Badge 
+                      className="bg-yellow-500/20 border-yellow-500 border text-foreground gap-1"
+                      data-testid="badge-supply-alert"
+                    >
+                      <AlertTriangle className="h-3 w-3" />
+                      Supply Alert
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="text-right">
@@ -585,6 +599,35 @@ export default function CardOutlookPage() {
                 <p className="text-sm text-muted-foreground">
                   {outlook.bigMover.reason}
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {outlook?.supply?.supplyGrowth === "surging" && (
+        <Card className="mb-6 bg-yellow-500/10 border-yellow-500/50 border">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-yellow-500/20">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold mb-1" data-testid="text-supply-alert-title">Supply Saturation Alert</h3>
+                {isPro && outlook.supply.supplyNote ? (
+                  <p className="text-sm text-muted-foreground" data-testid="text-supply-note">
+                    {outlook.supply.supplyNote}
+                    {outlook.supply.estimatedPopulation != null && (
+                      <span className="block mt-1 text-xs">
+                        Estimated PSA pop: {outlook.supply.estimatedPopulation.toLocaleString()}
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Graded supply is growing rapidly. High submission volume may dilute scarcity value.
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>

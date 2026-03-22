@@ -111,6 +111,11 @@ export type OutlookDisplayData = {
     flag: boolean;
     reason?: string | null;
   };
+  supply?: {
+    supplyGrowth: "stable" | "growing" | "surging";
+    supplyNote?: string;
+    estimatedPopulation?: number;
+  } | null;
   generatedAt?: string;
   isPro?: boolean;
 };
@@ -419,6 +424,15 @@ export function OutlookDetails({
                     Big Mover
                   </Badge>
                 )}
+                {data.supply?.supplyGrowth === "surging" && (
+                  <Badge 
+                    className="bg-yellow-500/20 border-yellow-500 border text-foreground gap-1"
+                    data-testid="badge-supply-alert"
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    Supply Alert
+                  </Badge>
+                )}
                 <LiquidityBadge 
                   tier={getLiquidityTierFromScore(data.signals.liquidity)} 
                   size="sm"
@@ -542,6 +556,35 @@ export function OutlookDetails({
                 <p className="text-sm text-muted-foreground">
                   {data.bigMover.reason}
                 </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {data.supply?.supplyGrowth === "surging" && (
+        <Card className="bg-yellow-500/10 border-yellow-500/50 border">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-yellow-500/20">
+                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold mb-1" data-testid="text-supply-alert-title">Supply Saturation Alert</h3>
+                {data.isPro && data.supply.supplyNote ? (
+                  <p className="text-sm text-muted-foreground" data-testid="text-supply-note">
+                    {data.supply.supplyNote}
+                    {data.supply.estimatedPopulation != null && (
+                      <span className="block mt-1 text-xs">
+                        Estimated PSA pop: {data.supply.estimatedPopulation.toLocaleString()}
+                      </span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Graded supply is growing rapidly. High submission volume may dilute scarcity value.
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>

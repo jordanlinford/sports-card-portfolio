@@ -3050,6 +3050,23 @@ Sitemap: ${origin}/sitemap.xml
             flag: outlook.bigMoverFlag ?? false,
             reason: isPro ? outlook.bigMoverReason : null,
           },
+          supply: await (async () => {
+            try {
+              const { getGeminiMarketCacheEntry } = await import("./outlookEngine");
+              const supplyData = getGeminiMarketCacheEntry({
+                title: card.title, playerName: card.playerName, year: card.year,
+                set: card.set, variation: card.variation, grade: card.grade, grader: card.grader,
+              });
+              if (supplyData?.supply) {
+                return {
+                  supplyGrowth: supplyData.supply.supplyGrowth,
+                  supplyNote: isPro ? supplyData.supply.supplyNote : undefined,
+                  estimatedPopulation: isPro ? supplyData.supply.estimatedPopulation : undefined,
+                };
+              }
+            } catch (e) {}
+            return null;
+          })(),
           generatedAt: outlook.updatedAt,
           cached: true,
           stale: hoursSinceGenerated > 168, // Stale after 7 days
@@ -3845,6 +3862,11 @@ Sitemap: ${origin}/sitemap.xml
           flag: signals.bigMoverFlag,
           reason: isPro ? signals.bigMoverReason : null,
         },
+        supply: unifiedResult?.supply ? {
+          supplyGrowth: unifiedResult.supply.supplyGrowth,
+          supplyNote: isPro ? unifiedResult.supply.supplyNote : undefined,
+          estimatedPopulation: isPro ? unifiedResult.supply.estimatedPopulation : undefined,
+        } : null,
         comps: {
           status: "complete" as const,
           source: "SERPER" as const,

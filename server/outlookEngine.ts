@@ -176,6 +176,11 @@ export type GeminiMarketData = {
   priceStability: "STABLE" | "VOLATILE" | "UNKNOWN";
   dataSource: "gemini_grounded";
   searchQuery: string;
+  supply?: {
+    supplyGrowth: "stable" | "growing" | "surging";
+    supplyNote: string;
+    estimatedPopulation?: number;
+  };
 };
 
 // 24-hour cache for Gemini market data to ensure consistent pricing
@@ -205,6 +210,23 @@ function getGeminiCacheKey(card: {
     (card.grader || "").toLowerCase().trim(),
   ];
   return parts.join("|");
+}
+
+export function getGeminiMarketCacheEntry(card: {
+  title: string;
+  playerName?: string | null;
+  year?: number | null;
+  set?: string | null;
+  variation?: string | null;
+  grade?: string | null;
+  grader?: string | null;
+}): GeminiMarketData | null {
+  const cacheKey = getGeminiCacheKey(card);
+  const cached = geminiMarketCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < GEMINI_CACHE_TTL_MS) {
+    return cached.data;
+  }
+  return null;
 }
 
 // Fetch real eBay market data using Gemini with Google Search grounding
@@ -448,6 +470,8 @@ PRICING RULES — RECENCY IS KING:
 - CRITICAL: For numbered cards, ONLY use comps with the SAME print run. A /50 Gold and a /399 Yellow Holo are DIFFERENT parallels at DIFFERENT price points — never mix them.
 - When in doubt: "What would this card sell for if I listed it on eBay today?" — that is your avgPrice
 
+Also estimate the PSA grading supply trend for this card — is the graded population stable, growing, or surging?
+
 Return ONLY a JSON object with these exact fields:
 {
   "soldCount": <number of recent completed sold listings found>,
@@ -463,7 +487,12 @@ Return ONLY a JSON object with these exact fields:
   "liquidity": "HIGH" | "MEDIUM" | "LOW",
   "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
   "confidence": "HIGH" | "MEDIUM" | "LOW",
-  "notes": "<brief note citing specific sold listings with prices when possible>"
+  "notes": "<brief note citing specific sold listings with prices when possible>",
+  "supply": {
+    "supplyGrowth": "stable" | "growing" | "surging",
+    "supplyNote": "<short explanation of grading supply trend>",
+    "estimatedPopulation": <estimated PSA population for top grade, or null>
+  }
 }
 
 GRADED PRICE PRIORITY RULES:
@@ -572,6 +601,14 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
               dataSource: "gemini_grounded",
               searchQuery: searchDescription,
             };
+
+            if (parsed.supply && parsed.supply.supplyGrowth) {
+              marketData.supply = {
+                supplyGrowth: ["stable", "growing", "surging"].includes(parsed.supply.supplyGrowth) ? parsed.supply.supplyGrowth : "stable",
+                supplyNote: parsed.supply.supplyNote || "",
+                estimatedPopulation: typeof parsed.supply.estimatedPopulation === "number" ? parsed.supply.estimatedPopulation : undefined,
+              };
+            }
             
             // Cache result for 24 hours
             geminiMarketCache.set(cacheKey, { data: marketData, cachedAt: Date.now() });
@@ -635,6 +672,11 @@ export interface UnifiedCardAnalysis {
     shortSummary: string;
     detailedAnalysis: string;
     keyBullets: string[];
+  };
+  supply?: {
+    supplyGrowth: "stable" | "growing" | "surging";
+    supplyNote: string;
+    estimatedPopulation?: number;
   };
   dataSource: "gemini_unified";
 }
@@ -984,6 +1026,15 @@ Do ALL of the following in this single search:
 
 3. INVESTMENT ANALYSIS: Based on the pricing data AND player news, provide your investment verdict.
 
+4. SUPPLY ANALYSIS: Estimate the PSA population and grading volume trend for this card:
+   - Search for PSA population report data or grading trends for this card/player
+   - Estimate whether the graded supply is stable, growing, or surging (mass submissions flooding the market)
+   - "stable" = normal grading volume, pop counts not rising fast
+   - "growing" = moderate increase in submissions, supply expanding
+   - "surging" = heavy submission volume, PSA pop growing rapidly, diluting scarcity
+   - Provide a short note explaining the supply situation (e.g. "PSA 10 pop jumped from 200 to 800 in 6 months" or "Low submission volume keeps supply tight")
+   - If you can find or estimate the PSA population count for this card's top grade, include it
+
 PRICING RULES:
 - Report COMPLETED SOLD prices only — NOT "Buy It Now" asking prices, NOT active unsold listings
 - avgPrice = what this card realistically sells for based on recent completed sales (use MEDIAN of recent sales, not mean)
@@ -1044,6 +1095,11 @@ Return ONLY a JSON object with this EXACT structure:
     "shortSummary": "<one sentence investment summary>",
     "detailedAnalysis": "<2-3 paragraph detailed analysis for pro users>",
     "keyBullets": ["<key point 1>", "<key point 2>", "<key point 3>", "<key point 4>"]
+  },
+  "supply": {
+    "supplyGrowth": "stable" | "growing" | "surging",
+    "supplyNote": "<short explanation of supply trend, e.g. 'PSA 10 pop at 1,200 and climbing fast' or 'Low submission volume keeps supply tight'>",
+    "estimatedPopulation": <estimated PSA population count for top grade, or null if unknown>
   }
 }
 
@@ -1169,6 +1225,14 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
               },
               dataSource: "gemini_unified",
             };
+
+            if (parsed.supply && parsed.supply.supplyGrowth) {
+              result.supply = {
+                supplyGrowth: ["stable", "growing", "surging"].includes(parsed.supply.supplyGrowth) ? parsed.supply.supplyGrowth : "stable",
+                supplyNote: parsed.supply.supplyNote || "",
+                estimatedPopulation: typeof parsed.supply.estimatedPopulation === "number" ? parsed.supply.estimatedPopulation : undefined,
+              };
+            }
 
             unifiedAnalysisCache.set(cacheKey, { data: result, cachedAt: Date.now() });
             setDbCachedAnalysis(cacheKey, result);
