@@ -434,27 +434,51 @@ export default function GrowthProjectionsPage() {
             const btc = benchmarkData.benchmarks.bitcoin;
             
             const portfolioReturn = portfolio.length > 0 ? portfolio[portfolio.length - 1].changePct : 0;
-            const sp500Return = sp500.length > 0 ? sp500[sp500.length - 1].changePct : 0;
-            const btcReturn = btc.length > 0 ? btc[btc.length - 1].changePct : 0;
+            const portfolioStartDate = portfolio.length > 0 ? portfolio[0].date : "";
+            
+            const alignBenchmarkReturn = (series: BenchmarkDataPoint[]): number => {
+              if (series.length === 0 || !portfolioStartDate) return 0;
+              const startPoint = series.find(p => p.date >= portfolioStartDate);
+              const endPoint = series[series.length - 1];
+              if (!startPoint || !endPoint || startPoint.value === 0) return 0;
+              return Math.round(((endPoint.value - startPoint.value) / startPoint.value) * 10000) / 100;
+            };
+            
+            const sp500Return = alignBenchmarkReturn(sp500);
+            const btcReturn = alignBenchmarkReturn(btc);
             
             const sp500Alpha = Math.round((portfolioReturn - sp500Return) * 100) / 100;
             
+            const alignBenchmarkSeries = (series: BenchmarkDataPoint[]): Map<string, number> => {
+              if (series.length === 0 || !portfolioStartDate) return new Map();
+              const startPoint = series.find(p => p.date >= portfolioStartDate);
+              if (!startPoint || startPoint.value === 0) return new Map();
+              const baseValue = startPoint.value;
+              const result = new Map<string, number>();
+              for (const p of series) {
+                if (p.date >= portfolioStartDate) {
+                  result.set(p.date, Math.round(((p.value - baseValue) / baseValue) * 10000) / 100);
+                }
+              }
+              return result;
+            };
+            
+            const sp500AlignedMap = alignBenchmarkSeries(sp500);
+            const btcAlignedMap = alignBenchmarkSeries(btc);
+            const portfolioMap = new Map(portfolio.map(p => [p.date, p.changePct]));
+            
             const allDates = new Set<string>();
             portfolio.forEach(p => allDates.add(p.date));
-            sp500.forEach(p => allDates.add(p.date));
-            btc.forEach(p => allDates.add(p.date));
+            sp500AlignedMap.forEach((_, date) => allDates.add(date));
+            btcAlignedMap.forEach((_, date) => allDates.add(date));
             
             const sortedDates = Array.from(allDates).sort();
-            
-            const sp500Map = new Map(sp500.map(p => [p.date, p.changePct]));
-            const btcMap = new Map(btc.map(p => [p.date, p.changePct]));
-            const portfolioMap = new Map(portfolio.map(p => [p.date, p.changePct]));
             
             const comparisonData = sortedDates.map(date => ({
               date,
               portfolio: portfolioMap.get(date) ?? null,
-              sp500: sp500Map.get(date) ?? null,
-              bitcoin: btcMap.get(date) ?? null,
+              sp500: sp500AlignedMap.get(date) ?? null,
+              bitcoin: btcAlignedMap.get(date) ?? null,
             }));
             
             const beatingMarket = sp500.length > 0 && portfolioReturn > sp500Return;
@@ -528,7 +552,7 @@ export default function GrowthProjectionsPage() {
                         className="text-muted-foreground text-xs"
                       />
                       <Tooltip 
-                        formatter={(value: any, name: any) => {
+                        formatter={(value, name) => {
                           if (value === null || value === undefined) return ["-", String(name)];
                           const num = Number(value);
                           const label = name === "portfolio" ? "Your Portfolio" : name === "sp500" ? "S&P 500" : "Bitcoin";
