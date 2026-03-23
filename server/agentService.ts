@@ -86,7 +86,7 @@ const AGENT_TOOLS = [
   },
   {
     name: "get_market_benchmarks",
-    description: "Get S&P 500 and Bitcoin performance data to compare against card portfolio returns. Use when the user asks about portfolio performance vs market benchmarks or alpha.",
+    description: "Get the user's portfolio growth compared against S&P 500 and Bitcoin performance. Returns the user's total cost basis, current value, portfolio return %, and how it compares to market benchmarks. Use when the user asks about portfolio performance, alpha, or how their cards are doing vs the market.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -235,8 +235,90 @@ async function executeToolCall(
     }
 
     case "get_market_benchmarks": {
-      const benchmarks = await getMarketBenchmarks();
-      return benchmarks;
+      const [benchmarks, allCases] = await Promise.all([
+        getMarketBenchmarks(),
+        storage.getDisplayCases(userId),
+      ]);
+
+      let totalCostBasis = 0;
+      let totalCurrentValue = 0;
+      let cardsWithCost = 0;
+      let cardsWithValue = 0;
+      let totalCards = 0;
+      const sportBreakdown: Record<string, { cost: number; value: number; count: number }> = {};
+
+      for (const dc of allCases) {
+        const cards = await storage.getCards(dc.id);
+        for (const c of cards) {
+          totalCards++;
+          const currentVal = c.manualValue ?? c.estimatedValue ?? 0;
+          const costBasis = c.purchasePrice ?? 0;
+          const sport = c.sport || "Unknown";
+
+          if (costBasis > 0) {
+            totalCostBasis += costBasis;
+            cardsWithCost++;
+          }
+          if (currentVal > 0) {
+            totalCurrentValue += currentVal;
+            cardsWithValue++;
+          }
+
+          if (!sportBreakdown[sport]) sportBreakdown[sport] = { cost: 0, value: 0, count: 0 };
+          sportBreakdown[sport].cost += costBasis;
+          sportBreakdown[sport].value += currentVal;
+          sportBreakdown[sport].count++;
+        }
+      }
+
+      const portfolioReturnPct = totalCostBasis > 0
+        ? Math.round(((totalCurrentValue - totalCostBasis) / totalCostBasis) * 10000) / 100
+        : null;
+
+      const portfolioGainLoss = totalCostBasis > 0
+        ? Math.round((totalCurrentValue - totalCostBasis) * 100) / 100
+        : null;
+
+      const sp500Latest = benchmarks.sp500.length > 0 ? benchmarks.sp500[benchmarks.sp500.length - 1] : null;
+      const btcLatest = benchmarks.bitcoin.length > 0 ? benchmarks.bitcoin[benchmarks.bitcoin.length - 1] : null;
+
+      const sportPerformance = Object.entries(sportBreakdown)
+        .filter(([, v]) => v.cost > 0)
+        .map(([sport, v]) => ({
+          sport,
+          costBasis: Math.round(v.cost * 100) / 100,
+          currentValue: Math.round(v.value * 100) / 100,
+          returnPct: Math.round(((v.value - v.cost) / v.cost) * 10000) / 100,
+          cardCount: v.count,
+        }))
+        .sort((a, b) => b.currentValue - a.currentValue);
+
+      return {
+        portfolio: {
+          totalCards,
+          cardsWithPurchasePrice: cardsWithCost,
+          cardsWithEstimatedValue: cardsWithValue,
+          totalCostBasis: Math.round(totalCostBasis * 100) / 100,
+          totalCurrentValue: Math.round(totalCurrentValue * 100) / 100,
+          gainLoss: portfolioGainLoss,
+          returnPct: portfolioReturnPct,
+          bySport: sportPerformance,
+          note: cardsWithCost < totalCards * 0.5
+            ? `Only ${cardsWithCost} of ${totalCards} cards have purchase prices entered. Add purchase prices for more accurate return tracking.`
+            : undefined,
+        },
+        benchmarks: {
+          sp500: sp500Latest ? { latestChangePct: sp500Latest.changePct, period: "12 months" } : null,
+          bitcoin: btcLatest ? { latestChangePct: btcLatest.changePct, period: "12 months" } : null,
+        },
+        alpha: portfolioReturnPct !== null && sp500Latest ? {
+          vsSP500: Math.round((portfolioReturnPct - sp500Latest.changePct) * 100) / 100,
+          vsBitcoin: btcLatest ? Math.round((portfolioReturnPct - btcLatest.changePct) * 100) / 100 : null,
+          verdict: portfolioReturnPct > (sp500Latest?.changePct || 0)
+            ? "Your portfolio is outperforming the S&P 500"
+            : "Your portfolio is underperforming the S&P 500",
+        } : null,
+      };
     }
 
     case "get_all_portfolio_cards": {
@@ -313,6 +395,7 @@ Guidelines:
 - If the user asks about a specific display case, use get_display_case_cards first to see what's in it.
 - For broad portfolio questions, start with get_portfolio_summary or get_all_portfolio_cards.
 - Think like a financial advisor for sports cards — be data-driven and risk-aware.
+- For benchmark/alpha questions, ALWAYS lead with the user's portfolio performance first (cost basis → current value → return %), THEN compare against S&P 500 and Bitcoin. Show the alpha (difference). If many cards lack purchase prices, mention that adding them would improve accuracy. Never just report S&P/Bitcoin numbers without the portfolio comparison.
 
 The current date is ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
 The user's ID is: ${userId}`;
