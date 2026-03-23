@@ -588,13 +588,30 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
               }
             }
             
+            let finalPsa9 = parsePrice(parsed.psa9Price);
+            let finalPsa10 = parsePrice(parsed.psa10Price);
+
+            if (finalPsa9 && finalPsa10 && finalPsa9 > finalPsa10) {
+              console.warn(`[OutlookEngine] GRADED PRICE INVERSION: PSA 9 ($${finalPsa9}) > PSA 10 ($${finalPsa10}) — swapping`);
+              [finalPsa9, finalPsa10] = [finalPsa10, finalPsa9];
+            }
+
+            if (finalPsa9 && correctedAvg > 0 && finalPsa9 < correctedAvg * 0.8) {
+              console.warn(`[OutlookEngine] PSA 9 ($${finalPsa9}) suspiciously below raw ($${correctedAvg}) — adjusting to 1.5x raw`);
+              finalPsa9 = Math.round(correctedAvg * 1.5);
+            }
+            if (finalPsa10 && correctedAvg > 0 && finalPsa10 < correctedAvg) {
+              console.warn(`[OutlookEngine] PSA 10 ($${finalPsa10}) below raw ($${correctedAvg}) — adjusting to 2x raw`);
+              finalPsa10 = Math.round(correctedAvg * 2);
+            }
+
             const marketData: GeminiMarketData = {
               soldCount: parsed.soldCount || 0,
               avgPrice: correctedAvg,
               minPrice: correctedMin,
               maxPrice: correctedMax,
-              psa9Price: parsePrice(parsed.psa9Price),
-              psa10Price: parsePrice(parsed.psa10Price),
+              psa9Price: finalPsa9,
+              psa10Price: finalPsa10,
               activeListing: parsed.activeListing || 0,
               liquidity: parsed.liquidity || "MEDIUM",
               priceStability: parsed.priceStability || "UNKNOWN",
@@ -1193,6 +1210,23 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
 
             const analysis = parsed.analysis || {};
 
+            let finalPsa9 = parsePrice(parsed.market.psa9Price);
+            let finalPsa10 = parsePrice(parsed.market.psa10Price);
+
+            if (finalPsa9 && finalPsa10 && finalPsa9 > finalPsa10) {
+              console.warn(`[Unified Analysis] GRADED PRICE INVERSION: PSA 9 ($${finalPsa9}) > PSA 10 ($${finalPsa10}) — swapping`);
+              [finalPsa9, finalPsa10] = [finalPsa10, finalPsa9];
+            }
+
+            if (finalPsa9 && correctedAvg > 0 && finalPsa9 < correctedAvg * 0.8) {
+              console.warn(`[Unified Analysis] PSA 9 ($${finalPsa9}) suspiciously below raw ($${correctedAvg}) — adjusting to 1.5x raw`);
+              finalPsa9 = Math.round(correctedAvg * 1.5);
+            }
+            if (finalPsa10 && correctedAvg > 0 && finalPsa10 < correctedAvg) {
+              console.warn(`[Unified Analysis] PSA 10 ($${finalPsa10}) below raw ($${correctedAvg}) — adjusting to 2x raw`);
+              finalPsa10 = Math.round(correctedAvg * 2);
+            }
+
             const result: UnifiedCardAnalysis = {
               market: {
                 soldCount: parsed.market.soldCount || 0,
@@ -1200,8 +1234,8 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
                 minPrice: correctedMin,
                 maxPrice: correctedMax,
                 rawPrice: parsed.market.rawPrice || null,
-                psa9Price: parsePrice(parsed.market.psa9Price),
-                psa10Price: parsePrice(parsed.market.psa10Price),
+                psa9Price: finalPsa9,
+                psa10Price: finalPsa10,
                 activeListing: parsed.market.activeListing || 0,
                 liquidity: parsed.market.liquidity || "MEDIUM",
                 priceStability: parsed.market.priceStability || "UNKNOWN",
