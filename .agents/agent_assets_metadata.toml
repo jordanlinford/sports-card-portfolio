@@ -30,3 +30,21 @@ id = "SNfyArdEtyBiQo3lVLNUP"
 uri = "file://attached_assets/generated_images/wide_banner_logo_variation.png"
 type = "image"
 title = "MyDisplayCase Wide Banner"
+
+[[outputs]]
+id = "bxtL1HbmB6NnLO57EHrf3"
+uri = "file://attached_assets/generated_images/scp_logo_light.png"
+type = "image"
+title = "Sports Card Portfolio - Light Background"
+
+[[outputs]]
+id = "xYnzWV_psmDDG9fJPzz-U"
+uri = "file://attached_assets/generated_images/scp_logo_dark.png"
+type = "image"
+title = "Sports Card Portfolio - Dark Background"
+
+[[outputs]]
+id = "uqbX6AwAy7IyOnPZCf9lb"
+uri = "file://attached_assets/generated_images/scp_wide_banner.png"
+type = "image"
+title = "Sports Card Portfolio - Wide Banner"
