@@ -9163,10 +9163,19 @@ RULES:
         return res.status(401).json({ error: "Not authenticated" });
       }
 
-      const { sport, product, pricePerSlot, totalSlots, teams } = req.body;
-      if (!sport || !product || !pricePerSlot || !totalSlots) {
-        return res.status(400).json({ error: "Missing required fields: sport, product, pricePerSlot, totalSlots" });
+      const { z } = await import("zod");
+      const breakAuditSchema = z.object({
+        sport: z.string().min(1),
+        product: z.string().min(1),
+        pricePerSlot: z.coerce.number().positive(),
+        totalSlots: z.coerce.number().int().positive(),
+        teams: z.array(z.string()).optional(),
+      });
+      const parseResult = breakAuditSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid input", details: parseResult.error.flatten().fieldErrors });
       }
+      const { sport, product, pricePerSlot, totalSlots, teams } = parseResult.data;
 
       const dbUser = await storage.getUser(userId);
       const isPro = dbUser ? hasProAccess(dbUser) : false;
@@ -9389,6 +9398,13 @@ Return ONLY valid JSON, no markdown.`;
   app.post("/api/admin/splits/:id/lock-and-assign", breakDeprecated);
   app.get("/api/admin/splits/:id/seats", breakDeprecated);
   app.post("/api/webhooks/stripe", breakDeprecated);
+
+  app.get("/portfolio-builder*", (_req, res) => {
+    res.redirect(301, "/market/break-auditor");
+  });
+  app.get("/admin/portfolio-builder*", (_req, res) => {
+    res.redirect(301, "/market/break-auditor");
+  });
 
   // NOTE: ~1000 lines of box break hosting code (routes for /api/breaks, /api/splits,
   // /api/admin/breaks, /api/admin/splits, /api/webhooks/stripe, seat management,
