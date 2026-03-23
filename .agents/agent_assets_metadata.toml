@@ -1,0 +1,32 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "smbQ9lYdzvlZ7YURIbJMb"
+uri = "file://attached_assets/logo_full_1765509917656.png"
+type = "image"
+title = "MyDisplayCase Logo (Light Background)"
+
+[[outputs]]
+id = "8BWTZcCqTOe7f3aF3l8Hj"
+uri = "file://attached_assets/generated_images/dark_background_logo.png"
+type = "image"
+title = "MyDisplayCase Logo (Dark/App Icon Style)"
+
+[[outputs]]
+id = "ilwQOk4f7oGNLqTXrW5m4"
+uri = "file://attached_assets/generated_images/mydisplaycase_main_logo.png"
+type = "image"
+title = "MyDisplayCase Display Case Logo (Light)"
+
+[[outputs]]
+id = "COwdoTOanMbvqow1-CGEU"
+uri = "file://attached_assets/generated_images/dark_mode_logo_version.png"
+type = "image"
+title = "MyDisplayCase Display Case Logo (Dark)"
+
+[[outputs]]
+id = "SNfyArdEtyBiQo3lVLNUP"
+uri = "file://attached_assets/generated_images/wide_banner_logo_variation.png"
+type = "image"
+title = "MyDisplayCase Wide Banner"
