@@ -380,10 +380,10 @@ export async function runAgentStream(
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  sendSSE(res, { status: "step", message: "Agent online, analyzing your query..." });
+  sendSSE(res, { status: "step", message: "Card Advisor online, analyzing your query..." });
 
   try {
-    const systemPrompt = `You are the Sports Card Portfolio Auditor — an elite AI agent that helps collectors make smart investment decisions about their sports card collections.
+    const systemPrompt = `You are the Card Advisor — an elite AI agent that helps collectors make smart investment decisions about their sports card collections.
 
 You have access to powerful tools that can analyze portfolios, check player outlooks, get real-time market data, find hidden gems, and benchmark performance. Use these tools strategically to answer the user's question thoroughly.
 

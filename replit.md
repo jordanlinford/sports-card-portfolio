@@ -46,7 +46,7 @@ The application uses a full-stack TypeScript architecture. The frontend manages 
 - **Dual-Source Hidden Gems**: Discovery of undervalued players via AI and community signals. Now includes Soccer with World Cup 2026-specific AI discovery prompts and a World Cup boost to discount scoring (March-July). Frontend filter includes "Soccer (World Cup 2026)" option.
 - **Portfolio Alpha Benchmark**: Compares portfolio performance against market benchmarks like S&P 500 and Bitcoin.
 - **Nightly Player Outlook Refresh**: Automated refresh of public player outlook pages for SEO.
-- **Agent Mode (Pro-only)**: AI-powered portfolio auditor sidebar (⌘+K toggle). Gemini 2.5 Flash with function-calling orchestrates 8 tools: portfolio summary, player outlooks, real-time news, eBay market data, display case inspection, hidden gems, market benchmarks, full collection scan. SSE streaming bypasses 120s timeout. Service: `server/agentService.ts`. Route: `GET /api/agent/stream?q=`. Frontend: `client/src/components/AgentSidebar.tsx`, `client/src/hooks/use-agent.ts`.
+- **Card Advisor (Pro-only)**: AI-powered portfolio auditor sidebar (⌘+K toggle). Gemini 2.5 Flash with function-calling orchestrates 8 tools: portfolio summary, player outlooks, real-time news, eBay market data, display case inspection, hidden gems, market benchmarks, full collection scan. SSE streaming bypasses 120s timeout. Service: `server/agentService.ts`. Route: `GET /api/agent/stream?q=`. Frontend: `client/src/components/AgentSidebar.tsx`, `client/src/hooks/use-agent.ts`.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM.

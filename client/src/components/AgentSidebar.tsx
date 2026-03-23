@@ -89,7 +89,7 @@ export function AgentSidebar() {
           style={{ boxShadow: "0 4px 20px rgba(245, 158, 11, 0.35)" }}
         >
           <Sparkles className="h-4 w-4 animate-pulse" />
-          <span>Agent</span>
+          <span>Advisor</span>
         </button>
       )}
 
@@ -118,10 +118,10 @@ export function AgentSidebar() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-base sm:text-lg font-bold text-white leading-none">
-                    Agent Mode
+                    Card Advisor
                   </h2>
                   <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5">
-                    Autonomous Portfolio Auditor
+                    AI Portfolio Auditor
                   </p>
                 </div>
                 <Button
@@ -144,7 +144,7 @@ export function AgentSidebar() {
                     Pro Feature
                   </h3>
                   <p className="text-slate-400 text-sm leading-relaxed">
-                    Agent Mode is an AI-powered portfolio auditor that analyzes
+                    Card Advisor is an AI-powered portfolio auditor that analyzes
                     your collection using real-time market data, player news, and
                     investment signals. Upgrade to Pro to unlock it.
                   </p>
@@ -243,7 +243,7 @@ export function AgentSidebar() {
                         >
                           <div className="flex justify-between items-start mb-3">
                             <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">
-                              Auditor Verdict
+                              Advisor Verdict
                             </span>
                             {result.alert && (
                               <ShieldAlert
