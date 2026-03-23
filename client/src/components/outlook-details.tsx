@@ -652,7 +652,7 @@ export function OutlookDetails({
                     <SignalBar 
                       label="Comp Volume" 
                       value={data.signals.liquidity}
-                      tooltip="Number of recent sales found. Higher = more data points for accurate pricing. 7+ is solid."
+                      tooltip="How actively this card trades on eBay. 10 = extremely high volume (hundreds of sales), 5 = moderate, 1 = rarely traded."
                     />
                     <SignalBar 
                       label="Price Volatility" 

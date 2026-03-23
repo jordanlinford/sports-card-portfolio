@@ -2350,15 +2350,25 @@ Sitemap: ${origin}/sitemap.xml
 
       if (geminiMarketData) {
         console.log(`[Outlook 2.0] Enhancing signals with Gemini market data: ${geminiMarketData.soldCount} sold, avg $${geminiMarketData.avgPrice}`);
-        if (geminiMarketData.soldCount >= 25) signals.liquidityScore = 10;
-        else if (geminiMarketData.soldCount >= 15) signals.liquidityScore = 8;
-        else if (geminiMarketData.soldCount >= 10) signals.liquidityScore = 7;
-        else if (geminiMarketData.soldCount >= 5) signals.liquidityScore = 5;
-        else if (geminiMarketData.soldCount >= 2) signals.liquidityScore = 3;
-        else {
-          if (geminiMarketData.liquidity === "HIGH") signals.liquidityScore = 7;
-          else if (geminiMarketData.liquidity === "MEDIUM") signals.liquidityScore = 4;
-          else if (geminiMarketData.liquidity === "LOW") signals.liquidityScore = 2;
+        const activeListings = geminiMarketData.activeListing || 0;
+        const soldCount = geminiMarketData.soldCount || 0;
+        const geminiLiquidity = geminiMarketData.liquidity || "MEDIUM";
+
+        if (geminiLiquidity === "HIGH" || soldCount >= 50 || activeListings >= 100) {
+          signals.liquidityScore = 10;
+        } else if (soldCount >= 25 || activeListings >= 50) {
+          signals.liquidityScore = 9;
+        } else if (soldCount >= 15 || activeListings >= 25) {
+          signals.liquidityScore = 8;
+        } else if (soldCount >= 10 || activeListings >= 15) {
+          signals.liquidityScore = 7;
+        } else if (soldCount >= 5) {
+          signals.liquidityScore = 6;
+        } else if (soldCount >= 2) {
+          signals.liquidityScore = 4;
+        } else {
+          if (geminiLiquidity === "MEDIUM") signals.liquidityScore = 4;
+          else if (geminiLiquidity === "LOW") signals.liquidityScore = 2;
           else signals.liquidityScore = 1;
         }
         if (geminiMarketData.soldCount >= 10) {
@@ -2660,15 +2670,25 @@ Sitemap: ${origin}/sitemap.xml
         const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
 
         if (geminiMarketData) {
-          if (geminiMarketData.soldCount >= 25) signals.liquidityScore = 10;
-          else if (geminiMarketData.soldCount >= 15) signals.liquidityScore = 8;
-          else if (geminiMarketData.soldCount >= 10) signals.liquidityScore = 7;
-          else if (geminiMarketData.soldCount >= 5) signals.liquidityScore = 5;
-          else if (geminiMarketData.soldCount >= 2) signals.liquidityScore = 3;
-          else {
-            if (geminiMarketData.liquidity === "HIGH") signals.liquidityScore = 7;
-            else if (geminiMarketData.liquidity === "MEDIUM") signals.liquidityScore = 4;
-            else if (geminiMarketData.liquidity === "LOW") signals.liquidityScore = 2;
+          const bActiveListings = geminiMarketData.activeListing || 0;
+          const bSoldCount = geminiMarketData.soldCount || 0;
+          const bGeminiLiquidity = geminiMarketData.liquidity || "MEDIUM";
+
+          if (bGeminiLiquidity === "HIGH" || bSoldCount >= 50 || bActiveListings >= 100) {
+            signals.liquidityScore = 10;
+          } else if (bSoldCount >= 25 || bActiveListings >= 50) {
+            signals.liquidityScore = 9;
+          } else if (bSoldCount >= 15 || bActiveListings >= 25) {
+            signals.liquidityScore = 8;
+          } else if (bSoldCount >= 10 || bActiveListings >= 15) {
+            signals.liquidityScore = 7;
+          } else if (bSoldCount >= 5) {
+            signals.liquidityScore = 6;
+          } else if (bSoldCount >= 2) {
+            signals.liquidityScore = 4;
+          } else {
+            if (bGeminiLiquidity === "MEDIUM") signals.liquidityScore = 4;
+            else if (bGeminiLiquidity === "LOW") signals.liquidityScore = 2;
             else signals.liquidityScore = 1;
           }
           if (geminiMarketData.soldCount >= 10) {
@@ -2678,8 +2698,8 @@ Sitemap: ${origin}/sitemap.xml
             signals.dataConfidence = "MEDIUM";
             signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
           }
-          if (geminiMarketData.liquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
-          else if (geminiMarketData.liquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
+          if (bGeminiLiquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
+          else if (bGeminiLiquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
           signals.demandScore = Math.round((signals.liquidityScore * 0.4) + (signals.sportScore * 0.3) + (signals.positionScore * 0.3)) * 10;
           const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
             signals.qualityScore, signals.demandScore, signals.momentumScore, signals.trendScore,
@@ -3362,19 +3382,25 @@ Sitemap: ${origin}/sitemap.xml
       // Enhance signals with unified Gemini data (more accurate than legacy alone)
       if (unifiedResult) {
         const uMarket = unifiedResult.market;
-        
-        if (uMarket.soldCount >= 25) signals.liquidityScore = 10;
-        else if (uMarket.soldCount >= 15) signals.liquidityScore = 8;
-        else if (uMarket.soldCount >= 10) signals.liquidityScore = 7;
-        else if (uMarket.soldCount >= 5) signals.liquidityScore = 5;
-        else if (uMarket.soldCount >= 2) signals.liquidityScore = 3;
-        else {
-          // soldCount = 0 or 1 — Gemini couldn't find exact comps but still knows
-          // the card category's typical market depth from its training. Use the
-          // qualitative liquidity field as the fallback (same logic the Gemini app uses).
-          if (uMarket.liquidity === "HIGH") signals.liquidityScore = 7;
-          else if (uMarket.liquidity === "MEDIUM") signals.liquidityScore = 4;
-          else if (uMarket.liquidity === "LOW") signals.liquidityScore = 2;
+        const uActiveListings = uMarket.activeListing || 0;
+        const uSoldCount = uMarket.soldCount || 0;
+        const uGeminiLiquidity = uMarket.liquidity || "MEDIUM";
+
+        if (uGeminiLiquidity === "HIGH" || uSoldCount >= 50 || uActiveListings >= 100) {
+          signals.liquidityScore = 10;
+        } else if (uSoldCount >= 25 || uActiveListings >= 50) {
+          signals.liquidityScore = 9;
+        } else if (uSoldCount >= 15 || uActiveListings >= 25) {
+          signals.liquidityScore = 8;
+        } else if (uSoldCount >= 10 || uActiveListings >= 15) {
+          signals.liquidityScore = 7;
+        } else if (uSoldCount >= 5) {
+          signals.liquidityScore = 6;
+        } else if (uSoldCount >= 2) {
+          signals.liquidityScore = 4;
+        } else {
+          if (uGeminiLiquidity === "MEDIUM") signals.liquidityScore = 4;
+          else if (uGeminiLiquidity === "LOW") signals.liquidityScore = 2;
           else signals.liquidityScore = 1;
         }
         
