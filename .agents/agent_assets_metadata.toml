@@ -48,3 +48,21 @@ id = "uqbX6AwAy7IyOnPZCf9lb"
 uri = "file://attached_assets/generated_images/scp_wide_banner.png"
 type = "image"
 title = "Sports Card Portfolio - Wide Banner"
+
+[[outputs]]
+id = "gXyaJkzMdI9xWRdtazyS4"
+uri = "file://attached_assets/generated_images/splash_screen_portrait.png"
+type = "image"
+title = "Splash Screen - Dark with Glow Rays"
+
+[[outputs]]
+id = "Q9Mymuc2vPEevvc93d3gE"
+uri = "file://attached_assets/generated_images/splash_screen_navy.png"
+type = "image"
+title = "Splash Screen - Navy Blue"
+
+[[outputs]]
+id = "3qCd6pl1i6TQyAN_HWQJ9"
+uri = "file://attached_assets/generated_images/splash_screen_black.png"
+type = "image"
+title = "Splash Screen - Pure Black"
