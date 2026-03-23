@@ -9171,6 +9171,78 @@ RULES:
       const dbUser = await storage.getUser(userId);
       const isPro = dbUser ? hasProAccess(dbUser) : false;
 
+      const sportLower = sport.toLowerCase();
+      const { SPORT_FRAMEWORKS } = await import("./playerClassificationEngine");
+
+      const framework = SPORT_FRAMEWORKS[sportLower] || SPORT_FRAMEWORKS["football"];
+      const checklistContext = framework ? `
+INTERNAL CHECKLIST DATA for ${sport}:
+- Premium targets (highest value cards): ${framework.premium.join(", ")}
+- Growth targets (mid-tier value): ${framework.growth.join(", ")}
+- Core targets (base-level value): ${framework.core.join(", ")}
+- Speculative targets (upside plays): ${framework.speculative.join(", ")}` : "";
+
+      const sportBaseRanges: Record<string, { low: number; mid: number; high: number }> = {
+        football: { low: 12, mid: 22, high: 35 },
+        basketball: { low: 15, mid: 28, high: 45 },
+        baseball: { low: 8, mid: 16, high: 28 },
+        hockey: { low: 6, mid: 12, high: 22 },
+        soccer: { low: 10, mid: 20, high: 35 },
+      };
+      const baseRange = sportBaseRanges[sportLower] || sportBaseRanges.football;
+
+      let playerDataContext = "";
+      try {
+        const registryPlayers = await db.select({
+          playerName: playerRegistry.playerName,
+          roleTier: playerRegistry.roleTier,
+          careerStage: playerRegistry.careerStage,
+          positionGroup: playerRegistry.positionGroup,
+        }).from(playerRegistry).where(eq(playerRegistry.sport, sportLower)).limit(80);
+
+        if (registryPlayers.length > 0) {
+          const tierGroups: Record<string, string[]> = {};
+          for (const p of registryPlayers) {
+            const tier = p.roleTier || "UNKNOWN";
+            if (!tierGroups[tier]) tierGroups[tier] = [];
+            tierGroups[tier].push(`${p.playerName} (${p.positionGroup || "?"}, ${p.careerStage || "?"})`);
+          }
+          const tierSummary = Object.entries(tierGroups)
+            .map(([tier, players]) => `  ${tier}: ${players.slice(0, 12).join(", ")}${players.length > 12 ? ` (+${players.length - 12} more)` : ""}`)
+            .join("\n");
+          playerDataContext = `
+INTERNAL PLAYER REGISTRY DATA (${registryPlayers.length} ${sport} players tracked):
+${tierSummary}
+Use these player tiers to inform which teams carry the most value — FRANCHISE_CORE and STARTER players drive slot value.`;
+        }
+      } catch (e) {
+        console.warn("[BreakAuditor] Could not load player registry:", e);
+      }
+
+      let recentAnalysisContext = "";
+      try {
+        const recentAnalyses = await db.execute(sql`
+          SELECT c.player_name, c.year, c.card_set, c.estimated_value, c.sport
+          FROM cards c
+          WHERE LOWER(c.sport) = ${sportLower}
+            AND c.estimated_value IS NOT NULL
+            AND c.estimated_value > 0
+          ORDER BY c.estimated_value DESC
+          LIMIT 25
+        `);
+        if (recentAnalyses.rows && recentAnalyses.rows.length > 0) {
+          const cardLines = recentAnalyses.rows
+            .map((r: any) => `  ${r.player_name} - ${r.year || ""} ${r.card_set || ""}: $${Number(r.estimated_value).toFixed(0)}`)
+            .join("\n");
+          recentAnalysisContext = `
+INTERNAL CARD VALUE DATA (top valued ${sport} cards in our database):
+${cardLines}
+Use these actual card values to calibrate your slot value estimates.`;
+        }
+      } catch (e) {
+        console.warn("[BreakAuditor] Could not load card values:", e);
+      }
+
       const teamsContext = teams && teams.length > 0
         ? `Available teams/slots the user is considering: ${teams.join(", ")}.`
         : "No specific teams provided — analyze the most common team break structure for this product.";
@@ -9199,13 +9271,22 @@ A collector is considering joining a box break with these details:
 - Total slots: ${totalSlots}
 ${teamsContext}
 
+INTERNAL PRICING BASELINE for ${sport}:
+- Low-tier player base value: $${baseRange.low}
+- Mid-tier player base value: $${baseRange.mid}
+- High-tier player base value: $${baseRange.high}
+These are base card values — autographs, parallels, and numbered cards multiply these significantly.
+${checklistContext}
+${playerDataContext}
+${recentAnalysisContext}
+
 ${detailLevel}
 
 Analyze the expected value (EV) of this break. Consider:
+- The internal pricing data and player registry provided above as your primary grounding
 - Current market prices for key rookie cards, autos, and parallels from this product
-- Which teams have the most valuable rookies and current stars
-- Recent card market trends and whether this product's cards are trending up or down
-- Checklist strength (which teams have the most hits possible)
+- Which teams have the most valuable rookies and current stars (refer to FRANCHISE_CORE and STARTER tiers)
+- The checklist data above to assess which card types drive value in this product
 - Box odds and typical hit distribution
 
 Return a JSON object with this EXACT structure:
@@ -9233,7 +9314,7 @@ Return a JSON object with this EXACT structure:
 }
 
 RULES:
-- Use realistic, current market values based on actual card sale prices
+- Ground your analysis in the internal data provided above — use player tiers and card values as your baseline
 - overallEV should be the average expected value per slot, not total break value
 - evRatio = overallEV / pricePerSlot
 - overallVerdict: BUY if evRatio > 1.15, PASS if evRatio < 0.85, SELECTIVE otherwise
@@ -9268,6 +9349,7 @@ Return ONLY valid JSON, no markdown.`;
       parsed.totalSlots = totalSlots;
       parsed.sport = sport;
       parsed.product = product;
+      parsed.dataGrounded = true;
 
       if (!isPro) {
         parsed.slotAnalyses = [];
