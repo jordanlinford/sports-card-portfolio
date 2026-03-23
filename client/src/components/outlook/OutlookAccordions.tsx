@@ -307,8 +307,8 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
                     <div className="grid grid-cols-2 gap-1">
                       {outlook.evidence.compsSummary.breakdown.map((cat, i) => (
                         <div key={i} className="text-xs text-muted-foreground bg-muted/30 rounded px-2 py-1" data-testid={`comps-category-${i}`}>
-                          <span className="font-medium">{cat.category}:</span> ${cat.avgPrice.toFixed(2)}
-                          <span className="text-muted-foreground/60 ml-1">({cat.priceRange})</span>
+                          <span className="font-medium">{cat.category}:</span> {cat.avgPrice != null ? `$${cat.avgPrice.toFixed(2)}` : ""}
+                          {cat.priceRange && <span className="text-muted-foreground/60 ml-1">({cat.priceRange})</span>}
                         </div>
                       ))}
                     </div>
