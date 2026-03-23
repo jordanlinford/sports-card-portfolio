@@ -225,6 +225,9 @@ export function getGeminiMarketCacheEntry(card: {
   const cacheKey = getGeminiCacheKey(card);
   const cached = geminiMarketCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < GEMINI_CACHE_TTL_MS) {
+    if (!('monthlySalesVolume' in cached.data)) {
+      return null;
+    }
     return cached.data;
   }
   return null;
@@ -246,8 +249,12 @@ export async function fetchGeminiMarketData(card: {
   const cacheKey = getGeminiCacheKey(card);
   const cached = geminiMarketCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < GEMINI_CACHE_TTL_MS) {
-    console.log(`[Gemini Market] Cache hit for: ${cacheKey.split("|")[0]} (${Math.round((Date.now() - cached.cachedAt) / 1000 / 60)}min old)`);
-    return cached.data;
+    if (!('monthlySalesVolume' in cached.data)) {
+      console.log(`[Gemini Market] Cache stale (missing monthlySalesVolume) — forcing refresh`);
+    } else {
+      console.log(`[Gemini Market] Cache hit for: ${cacheKey.split("|")[0]} (${Math.round((Date.now() - cached.cachedAt) / 1000 / 60)}min old)`);
+      return cached.data;
+    }
   }
 
   const maxRetries = 2;
@@ -729,8 +736,13 @@ export async function getDbCachedAnalysis(cacheKey: string): Promise<UnifiedCard
       const row = rows[0];
       const age = Date.now() - new Date(row.createdAt).getTime();
       if (age < DB_CACHE_TTL_MS) {
+        const cached = row.resultJson as any;
+        if (cached?.market && !('monthlySalesVolume' in cached.market)) {
+          console.log(`[Unified Analysis] DB cache stale (missing monthlySalesVolume) — forcing refresh`);
+          return null;
+        }
         console.log(`[Unified Analysis] DB cache hit for key (${Math.round(age / 1000 / 60)}min old)`);
-        return row.resultJson as unknown as UnifiedCardAnalysis;
+        return cached as UnifiedCardAnalysis;
       }
     }
   } catch (e) {
