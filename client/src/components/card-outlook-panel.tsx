@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import type { Card as CardType, LiquidityTier } from "@shared/schema";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import { LiquidityBadge } from "@/components/liquidity-badge";
@@ -340,6 +341,7 @@ function getProgressColor(score: number, inverted = false): string {
 export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardOutlookPanelProps) {
   const [showDetails, setShowDetails] = useState(false);
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const { data: outlook, isLoading, refetch } = useQuery<OutlookData>({
     queryKey: ["/api/cards", card.id, "outlook"],
@@ -492,6 +494,22 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                 size="icon"
                 variant="ghost"
               />
+              {(outlook.playerName || card.playerName) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs gap-1"
+                  onClick={() => {
+                    const playerName = outlook.playerName || card.playerName || "";
+                    const sport = (outlook.sport || card.sport || "football").toLowerCase();
+                    navigate(`/player-outlook?player=${encodeURIComponent(playerName)}&sport=${encodeURIComponent(sport)}&from=card-analysis`);
+                  }}
+                  data-testid="button-view-player-market"
+                >
+                  <TrendingUp className="h-3 w-3" />
+                  Player Market
+                </Button>
+              )}
             </div>
             <p className="text-sm font-medium" data-testid="text-state-description">
               {getStateDescription(outlook.action)}

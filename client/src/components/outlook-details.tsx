@@ -25,6 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import { LiquidityBadge, DivergenceWarning, getDivergenceStatus } from "@/components/liquidity-badge";
 import type { LiquidityTier } from "@shared/schema";
 import {
@@ -281,6 +282,7 @@ export function OutlookDetails({
   const [showFullExplanation, setShowFullExplanation] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   const handleDownloadImage = async () => {
     setIsDownloading(true);
@@ -451,6 +453,21 @@ export function OutlookDetails({
                   )}
                   <span className="ml-1 hidden sm:inline">Share</span>
                 </Button>
+                {data.card.playerName && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const sport = (data.card.sport || "football").toLowerCase();
+                      navigate(`/player-outlook?player=${encodeURIComponent(data.card.playerName!)}&sport=${encodeURIComponent(sport)}&from=card-analysis`);
+                    }}
+                    data-testid="button-view-player-market"
+                  >
+                    <TrendingUp className="h-4 w-4" />
+                    <span className="ml-1 hidden sm:inline">Player Market</span>
+                    <span className="ml-1 sm:hidden">Market</span>
+                  </Button>
+                )}
               </div>
             </div>
             <div className="text-right">
