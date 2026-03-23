@@ -2351,10 +2351,11 @@ Sitemap: ${origin}/sitemap.xml
       if (geminiMarketData) {
         const activeListings = geminiMarketData.activeListing || 0;
         const soldCount = geminiMarketData.soldCount || 0;
+        const monthlyVolume = geminiMarketData.monthlySalesVolume || 0;
         const geminiLiquidity = (geminiMarketData.liquidity || "MEDIUM").toUpperCase();
-        console.log(`[Outlook 2.0] Enhancing signals with Gemini market data: ${soldCount} sold, ${activeListings} active listings, liquidity=${geminiLiquidity}, avg $${geminiMarketData.avgPrice}`);
+        console.log(`[Outlook 2.0] Enhancing signals with Gemini market data: ${soldCount} sold, ${activeListings} active listings, monthlyVolume=${monthlyVolume}, liquidity=${geminiLiquidity}, avg $${geminiMarketData.avgPrice}`);
 
-        if (geminiLiquidity === "HIGH" || soldCount >= 20 || activeListings >= 30) {
+        if (geminiLiquidity === "HIGH" || monthlyVolume >= 100 || soldCount >= 20 || activeListings >= 30) {
           signals.liquidityScore = 10;
         } else if (soldCount >= 12 || activeListings >= 20) {
           signals.liquidityScore = 9;
@@ -2378,8 +2379,9 @@ Sitemap: ${origin}/sitemap.xml
           signals.dataConfidence = "MEDIUM";
           signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
         }
-        if (geminiLiquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
-        else if (geminiLiquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
+        if (monthlyVolume >= 500) signals.marketFriction = Math.min(signals.marketFriction, 20);
+        else if (geminiLiquidity === "HIGH" || monthlyVolume >= 100) signals.marketFriction = Math.min(signals.marketFriction, 30);
+        else if (geminiLiquidity === "MEDIUM" || monthlyVolume >= 50) signals.marketFriction = Math.min(signals.marketFriction, 50);
         signals.demandScore = Math.round((signals.liquidityScore * 0.4) + (signals.sportScore * 0.3) + (signals.positionScore * 0.3)) * 10;
         const { computeAction } = await import("./outlookEngine");
         const originalAction = signals.action;
@@ -2672,9 +2674,10 @@ Sitemap: ${origin}/sitemap.xml
         if (geminiMarketData) {
           const bActiveListings = geminiMarketData.activeListing || 0;
           const bSoldCount = geminiMarketData.soldCount || 0;
+          const bMonthlyVolume = geminiMarketData.monthlySalesVolume || 0;
           const bGeminiLiquidity = (geminiMarketData.liquidity || "MEDIUM").toUpperCase();
 
-          if (bGeminiLiquidity === "HIGH" || bSoldCount >= 20 || bActiveListings >= 30) {
+          if (bGeminiLiquidity === "HIGH" || bMonthlyVolume >= 100 || bSoldCount >= 20 || bActiveListings >= 30) {
             signals.liquidityScore = 10;
           } else if (bSoldCount >= 12 || bActiveListings >= 20) {
             signals.liquidityScore = 9;
@@ -2698,8 +2701,9 @@ Sitemap: ${origin}/sitemap.xml
             signals.dataConfidence = "MEDIUM";
             signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
           }
-          if (bGeminiLiquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
-          else if (bGeminiLiquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
+          if (bMonthlyVolume >= 500) signals.marketFriction = Math.min(signals.marketFriction, 20);
+          else if (bGeminiLiquidity === "HIGH" || bMonthlyVolume >= 100) signals.marketFriction = Math.min(signals.marketFriction, 30);
+          else if (bGeminiLiquidity === "MEDIUM" || bMonthlyVolume >= 50) signals.marketFriction = Math.min(signals.marketFriction, 50);
           signals.demandScore = Math.round((signals.liquidityScore * 0.4) + (signals.sportScore * 0.3) + (signals.positionScore * 0.3)) * 10;
           const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
             signals.qualityScore, signals.demandScore, signals.momentumScore, signals.trendScore,
@@ -3384,10 +3388,11 @@ Sitemap: ${origin}/sitemap.xml
         const uMarket = unifiedResult.market;
         const uActiveListings = uMarket.activeListing || 0;
         const uSoldCount = uMarket.soldCount || 0;
+        const uMonthlyVolume = uMarket.monthlySalesVolume || 0;
         const uGeminiLiquidity = (uMarket.liquidity || "MEDIUM").toUpperCase();
-        console.log(`[Quick Analyze] Liquidity scoring: ${uSoldCount} sold, ${uActiveListings} active listings, liquidity=${uGeminiLiquidity}`);
+        console.log(`[Quick Analyze] Liquidity scoring: ${uSoldCount} sold, ${uActiveListings} active listings, monthlyVolume=${uMonthlyVolume}, liquidity=${uGeminiLiquidity}`);
 
-        if (uGeminiLiquidity === "HIGH" || uSoldCount >= 20 || uActiveListings >= 30) {
+        if (uGeminiLiquidity === "HIGH" || uMonthlyVolume >= 100 || uSoldCount >= 20 || uActiveListings >= 30) {
           signals.liquidityScore = 10;
         } else if (uSoldCount >= 12 || uActiveListings >= 20) {
           signals.liquidityScore = 9;
@@ -3413,8 +3418,9 @@ Sitemap: ${origin}/sitemap.xml
           signals.confidenceReason = `${uMarket.soldCount} recent sales found - moderate sample size`;
         }
         
-        if (uGeminiLiquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
-        else if (uGeminiLiquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
+        if (uMonthlyVolume >= 500) signals.marketFriction = Math.min(signals.marketFriction, 20);
+        else if (uGeminiLiquidity === "HIGH" || uMonthlyVolume >= 100) signals.marketFriction = Math.min(signals.marketFriction, 30);
+        else if (uGeminiLiquidity === "MEDIUM" || uMonthlyVolume >= 50) signals.marketFriction = Math.min(signals.marketFriction, 50);
         
         signals.demandScore = Math.round(
           (signals.liquidityScore * 0.4) + 

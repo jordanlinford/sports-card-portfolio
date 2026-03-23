@@ -172,6 +172,7 @@ export type GeminiMarketData = {
   psa9Price: number | null;
   psa10Price: number | null;
   activeListing: number;
+  monthlySalesVolume: number | null;
   liquidity: "HIGH" | "MEDIUM" | "LOW";
   priceStability: "STABLE" | "VOLATILE" | "UNKNOWN";
   dataSource: "gemini_grounded";
@@ -484,6 +485,7 @@ Return ONLY a JSON object with these exact fields:
   "psa9Price": <REAL PSA 9 sold price from SEARCH B above — use actual completed sale price; only estimate from raw if zero PSA 9 sales exist>,
   "psa10Price": <REAL PSA 10 sold price from SEARCH B above — use actual completed sale price; only estimate from raw if zero PSA 10 sales exist>,
   "activeListing": <number of current active listings>,
+  "monthlySalesVolume": <estimated total monthly eBay sales volume for this exact card — NOT just the comps you found, but total market volume. For a card selling ~1000/week put 4000. Use null if unknown>,
   "liquidity": "HIGH" | "MEDIUM" | "LOW",
   "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
   "confidence": "HIGH" | "MEDIUM" | "LOW",
@@ -622,6 +624,7 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
               psa9Price: finalPsa9,
               psa10Price: finalPsa10,
               activeListing: parsed.activeListing || 0,
+              monthlySalesVolume: typeof parsed.monthlySalesVolume === "number" ? parsed.monthlySalesVolume : null,
               liquidity: parsed.liquidity || "MEDIUM",
               priceStability: parsed.priceStability || "UNKNOWN",
               dataSource: "gemini_grounded",
@@ -679,6 +682,7 @@ export interface UnifiedCardAnalysis {
     psa9Price: number | null;
     psa10Price: number | null;
     activeListing: number;
+    monthlySalesVolume: number | null;
     liquidity: "HIGH" | "MEDIUM" | "LOW";
     priceStability: "STABLE" | "VOLATILE" | "UNKNOWN";
     confidence: "HIGH" | "MEDIUM" | "LOW";
@@ -1102,6 +1106,7 @@ Return ONLY a JSON object with this EXACT structure:
     "psa9Price": <REAL PSA 9 sold price from sub-search 1b — use actual sale price; only fall back to estimate if zero PSA 9 sales found>,
     "psa10Price": <REAL PSA 10 sold price from sub-search 1b — use actual sale price; only fall back to estimate if zero PSA 10 sales found>,
     "activeListing": <current active listings count>,
+    "monthlySalesVolume": <estimated total monthly eBay sales volume for this exact card — NOT just the comps you found, but total market volume. Use null if unknown>,
     "liquidity": "HIGH" | "MEDIUM" | "LOW",
     "priceStability": "STABLE" | "VOLATILE" | "UNKNOWN",
     "confidence": "HIGH" | "MEDIUM" | "LOW",
@@ -1255,6 +1260,7 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
                 psa9Price: finalPsa9,
                 psa10Price: finalPsa10,
                 activeListing: parsed.market.activeListing || 0,
+                monthlySalesVolume: typeof parsed.market.monthlySalesVolume === "number" ? parsed.market.monthlySalesVolume : null,
                 liquidity: parsed.market.liquidity || "MEDIUM",
                 priceStability: parsed.market.priceStability || "UNKNOWN",
                 confidence: parsed.market.confidence || "MEDIUM",
