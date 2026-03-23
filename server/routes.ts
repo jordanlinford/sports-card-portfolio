@@ -2349,23 +2349,23 @@ Sitemap: ${origin}/sitemap.xml
       const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
 
       if (geminiMarketData) {
-        console.log(`[Outlook 2.0] Enhancing signals with Gemini market data: ${geminiMarketData.soldCount} sold, avg $${geminiMarketData.avgPrice}`);
         const activeListings = geminiMarketData.activeListing || 0;
         const soldCount = geminiMarketData.soldCount || 0;
-        const geminiLiquidity = geminiMarketData.liquidity || "MEDIUM";
+        const geminiLiquidity = (geminiMarketData.liquidity || "MEDIUM").toUpperCase();
+        console.log(`[Outlook 2.0] Enhancing signals with Gemini market data: ${soldCount} sold, ${activeListings} active listings, liquidity=${geminiLiquidity}, avg $${geminiMarketData.avgPrice}`);
 
-        if (geminiLiquidity === "HIGH" || soldCount >= 50 || activeListings >= 100) {
+        if (geminiLiquidity === "HIGH" || soldCount >= 20 || activeListings >= 30) {
           signals.liquidityScore = 10;
-        } else if (soldCount >= 25 || activeListings >= 50) {
+        } else if (soldCount >= 12 || activeListings >= 20) {
           signals.liquidityScore = 9;
-        } else if (soldCount >= 15 || activeListings >= 25) {
+        } else if (soldCount >= 8 || activeListings >= 12) {
           signals.liquidityScore = 8;
-        } else if (soldCount >= 10 || activeListings >= 15) {
+        } else if (soldCount >= 5 || activeListings >= 8) {
           signals.liquidityScore = 7;
-        } else if (soldCount >= 5) {
-          signals.liquidityScore = 6;
-        } else if (soldCount >= 2) {
-          signals.liquidityScore = 4;
+        } else if (soldCount >= 3) {
+          signals.liquidityScore = 5;
+        } else if (soldCount >= 1) {
+          signals.liquidityScore = 3;
         } else {
           if (geminiLiquidity === "MEDIUM") signals.liquidityScore = 4;
           else if (geminiLiquidity === "LOW") signals.liquidityScore = 2;
@@ -2378,8 +2378,8 @@ Sitemap: ${origin}/sitemap.xml
           signals.dataConfidence = "MEDIUM";
           signals.confidenceReason = `${geminiMarketData.soldCount} recent sales found - moderate sample size`;
         }
-        if (geminiMarketData.liquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
-        else if (geminiMarketData.liquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
+        if (geminiLiquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
+        else if (geminiLiquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
         signals.demandScore = Math.round((signals.liquidityScore * 0.4) + (signals.sportScore * 0.3) + (signals.positionScore * 0.3)) * 10;
         const { computeAction } = await import("./outlookEngine");
         const originalAction = signals.action;
@@ -2672,20 +2672,20 @@ Sitemap: ${origin}/sitemap.xml
         if (geminiMarketData) {
           const bActiveListings = geminiMarketData.activeListing || 0;
           const bSoldCount = geminiMarketData.soldCount || 0;
-          const bGeminiLiquidity = geminiMarketData.liquidity || "MEDIUM";
+          const bGeminiLiquidity = (geminiMarketData.liquidity || "MEDIUM").toUpperCase();
 
-          if (bGeminiLiquidity === "HIGH" || bSoldCount >= 50 || bActiveListings >= 100) {
+          if (bGeminiLiquidity === "HIGH" || bSoldCount >= 20 || bActiveListings >= 30) {
             signals.liquidityScore = 10;
-          } else if (bSoldCount >= 25 || bActiveListings >= 50) {
+          } else if (bSoldCount >= 12 || bActiveListings >= 20) {
             signals.liquidityScore = 9;
-          } else if (bSoldCount >= 15 || bActiveListings >= 25) {
+          } else if (bSoldCount >= 8 || bActiveListings >= 12) {
             signals.liquidityScore = 8;
-          } else if (bSoldCount >= 10 || bActiveListings >= 15) {
+          } else if (bSoldCount >= 5 || bActiveListings >= 8) {
             signals.liquidityScore = 7;
-          } else if (bSoldCount >= 5) {
-            signals.liquidityScore = 6;
-          } else if (bSoldCount >= 2) {
-            signals.liquidityScore = 4;
+          } else if (bSoldCount >= 3) {
+            signals.liquidityScore = 5;
+          } else if (bSoldCount >= 1) {
+            signals.liquidityScore = 3;
           } else {
             if (bGeminiLiquidity === "MEDIUM") signals.liquidityScore = 4;
             else if (bGeminiLiquidity === "LOW") signals.liquidityScore = 2;
@@ -3384,20 +3384,21 @@ Sitemap: ${origin}/sitemap.xml
         const uMarket = unifiedResult.market;
         const uActiveListings = uMarket.activeListing || 0;
         const uSoldCount = uMarket.soldCount || 0;
-        const uGeminiLiquidity = uMarket.liquidity || "MEDIUM";
+        const uGeminiLiquidity = (uMarket.liquidity || "MEDIUM").toUpperCase();
+        console.log(`[Quick Analyze] Liquidity scoring: ${uSoldCount} sold, ${uActiveListings} active listings, liquidity=${uGeminiLiquidity}`);
 
-        if (uGeminiLiquidity === "HIGH" || uSoldCount >= 50 || uActiveListings >= 100) {
+        if (uGeminiLiquidity === "HIGH" || uSoldCount >= 20 || uActiveListings >= 30) {
           signals.liquidityScore = 10;
-        } else if (uSoldCount >= 25 || uActiveListings >= 50) {
+        } else if (uSoldCount >= 12 || uActiveListings >= 20) {
           signals.liquidityScore = 9;
-        } else if (uSoldCount >= 15 || uActiveListings >= 25) {
+        } else if (uSoldCount >= 8 || uActiveListings >= 12) {
           signals.liquidityScore = 8;
-        } else if (uSoldCount >= 10 || uActiveListings >= 15) {
+        } else if (uSoldCount >= 5 || uActiveListings >= 8) {
           signals.liquidityScore = 7;
-        } else if (uSoldCount >= 5) {
-          signals.liquidityScore = 6;
-        } else if (uSoldCount >= 2) {
-          signals.liquidityScore = 4;
+        } else if (uSoldCount >= 3) {
+          signals.liquidityScore = 5;
+        } else if (uSoldCount >= 1) {
+          signals.liquidityScore = 3;
         } else {
           if (uGeminiLiquidity === "MEDIUM") signals.liquidityScore = 4;
           else if (uGeminiLiquidity === "LOW") signals.liquidityScore = 2;
@@ -3412,8 +3413,8 @@ Sitemap: ${origin}/sitemap.xml
           signals.confidenceReason = `${uMarket.soldCount} recent sales found - moderate sample size`;
         }
         
-        if (uMarket.liquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
-        else if (uMarket.liquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
+        if (uGeminiLiquidity === "HIGH") signals.marketFriction = Math.min(signals.marketFriction, 30);
+        else if (uGeminiLiquidity === "MEDIUM") signals.marketFriction = Math.min(signals.marketFriction, 50);
         
         signals.demandScore = Math.round(
           (signals.liquidityScore * 0.4) + 
