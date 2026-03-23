@@ -25,6 +25,13 @@ const SUGGESTED_QUERIES = [
   "Which players have the hottest market momentum right now?",
 ];
 
+const FOLLOW_UP_QUERIES = [
+  "Dig deeper into my riskiest cards",
+  "What should I sell first?",
+  "Show me my best performing cards",
+  "Any hidden gems I should look at?",
+];
+
 export function AgentSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const { query, setQuery, steps, result, isThinking, error, sendQuery, reset } =
@@ -160,9 +167,12 @@ export function AgentSidebar() {
                       value={query}
                       onChange={(e) => setQuery(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSubmit();
+                        if (e.key === "Enter" && query.trim()) {
+                          if (result || error) reset();
+                          setTimeout(() => sendQuery(query), 50);
+                        }
                       }}
-                      placeholder="Ask about your portfolio..."
+                      placeholder={result ? "Ask a follow-up..." : "Ask about your portfolio..."}
                       disabled={isThinking}
                       className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-4 pr-14 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 transition-all disabled:opacity-50"
                       data-testid="input-agent-query"
@@ -170,7 +180,10 @@ export function AgentSidebar() {
                     <div className="absolute right-2 top-1.5 flex items-center gap-1">
                       <Button
                         size="sm"
-                        onClick={handleSubmit}
+                        onClick={() => {
+                          if (result || error) reset();
+                          setTimeout(() => sendQuery(query), 50);
+                        }}
                         disabled={isThinking || !query.trim()}
                         className="h-8 w-8 p-0 bg-amber-500 hover:bg-amber-600 text-black rounded-lg"
                         data-testid="button-agent-send"
@@ -268,17 +281,33 @@ export function AgentSidebar() {
                   </ScrollArea>
                   </div>
 
-                  {(result || error) && (
-                    <div className="mt-3">
+                  {(result || error) && !isThinking && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">
+                        Ask another question
+                      </p>
+                      {FOLLOW_UP_QUERIES.map((suggestion, i) => (
+                        <button
+                          key={i}
+                          className="w-full text-left p-2.5 rounded-lg bg-slate-900/80 border border-slate-800 hover:border-amber-500/30 hover:bg-slate-900 text-xs text-slate-400 hover:text-slate-300 transition-colors"
+                          onClick={() => {
+                            reset();
+                            setTimeout(() => sendQuery(suggestion), 50);
+                          }}
+                          data-testid={`button-agent-followup-${i}`}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={reset}
-                        className="text-slate-400 hover:text-white text-xs gap-1.5"
+                        className="text-slate-500 hover:text-white text-xs gap-1.5 w-full justify-center mt-1"
                         data-testid="button-agent-reset"
                       >
                         <RotateCcw size={12} />
-                        New Analysis
+                        Clear & start over
                       </Button>
                     </div>
                   )}
