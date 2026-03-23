@@ -1892,7 +1892,20 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
               {inputMode === "scan" ? (
                 /* Photo Scan Mode — two side-by-side image boxes */
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="relative grid grid-cols-2 gap-3">
+                    {scanning && (
+                      <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-20 rounded-lg">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary mb-1" />
+                        <span className="text-xs font-medium">Scanning...</span>
+                        <button
+                          onClick={cancelScan}
+                          className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
+                          data-testid="button-cancel-scan"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    )}
                     {/* Front box */}
                     <div className="space-y-1.5">
                       <Label className="text-xs font-medium">Front</Label>
@@ -1939,19 +1952,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                                 <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFrontImageSelect(f); e.target.value = ""; }} disabled={scanning} data-testid="input-scan-front-upload" />
                               </div>
                             </div>
-                          </div>
-                        )}
-                        {scanning && (
-                          <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-20">
-                            <Loader2 className="h-6 w-6 animate-spin text-primary mb-1" />
-                            <span className="text-xs font-medium">Scanning...</span>
-                            <button
-                              onClick={cancelScan}
-                              className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
-                              data-testid="button-cancel-scan"
-                            >
-                              Cancel
-                            </button>
                           </div>
                         )}
                       </div>
