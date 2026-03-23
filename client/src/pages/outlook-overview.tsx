@@ -438,7 +438,10 @@ function ComparisonVerdict({
     if (card.market.value && card.market.min && card.market.max && card.market.value > 0) {
       const range = card.market.max - card.market.min;
       const rangeRatio = range / card.market.value;
-      if (rangeRatio < 0.3) stabilityBonus = 10;
+      const hasMeaningfulData = card.market.compCount > 1 || (card.market.min !== card.market.max);
+      if (!hasMeaningfulData) {
+        stabilityBonus = -3;
+      } else if (rangeRatio < 0.3) stabilityBonus = 10;
       else if (rangeRatio < 0.5) stabilityBonus = 5;
       else if (rangeRatio > 1.0) stabilityBonus = -5;
     }
