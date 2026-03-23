@@ -66,6 +66,13 @@ When in doubt, label it as the base insert (e.g., "Deep Space") rather than addi
 SERIAL NUMBER RULE — CRITICAL:
 The physical stamp printed ON THE CARD (e.g., "377/350", "23/50", "1/1") is ALWAYS authoritative. NEVER infer or assume a print run from the variation label alone. "Superfractor" does not always mean 1/1 — it means the top parallel of that product, which may be /25, /50, /99, etc. depending on the set. Read the stamped number from the physical card (usually on the back) and use it EXACTLY. If you can see it stamped, that number wins over any assumption.
 
+SSP / SHORT PRINT CLASSIFICATION — CRITICAL:
+NEVER label a card as "SSP", "SP", "Short Print", or "Super Short Print" in the variation field unless you have SPECIFIC PHYSICAL EVIDENCE on the card itself (e.g., a different card number sequence, a stamped notation, or a confirmed short-print code visible on the card).
+- Insert subsets (All Aces, Deep Space, Warp Speed, Downtown, Kaboom, etc.) are NOT SSPs just because they are inserts. They are inserts with their own print runs — label them by their insert name only (e.g., "Base" for the base version of an insert).
+- Being an insert card does NOT make it a Short Print. Most inserts are seeded at known ratios and are NOT short-printed.
+- Only use "SSP" or "SP" when you can CONFIRM it from a checklist, physical card marking, or verified database — NOT from assumption.
+- If the card is the standard base version of an insert subset, the variation is "Base" — period.
+
 VINTAGE & SUBSET IDENTIFICATION — CRITICAL:
 For vintage cards (pre-2000), the same brand (Fleer, Topps, Donruss, etc.) released MULTIPLE different sets and subsets each year. You MUST read ALL text and logos on the card to identify the EXACT product:
 - "ALL STAR TEAM", "ALL STAR", "STICKER" = a subset/insert, NOT the base set. Example: "Fleer All Star Team" is a SEPARATE product from "Fleer" base.
@@ -209,12 +216,30 @@ export async function scanCardImage(
     const parsed = JSON.parse(jsonMatch[0]);
     
     let variation = parsed.variation || null;
-    const parallel = parsed.parallel || null;
+    let parallel = parsed.parallel || null;
     if (parallel && (!variation || variation.toLowerCase() === "base")) {
       variation = parallel;
     } else if (parallel && variation && !variation.toLowerCase().includes(parallel.toLowerCase())) {
       variation = `${variation} ${parallel}`.trim();
     }
+    
+    const hasSerialNumber = /\/\d+/.test(variation || "") || (parsed.cardNumber && /\/\d+/.test(parsed.cardNumber));
+    const falseSpLabels = /\b(super\s*short\s*print|short\s*print|ssp|sp)\b/i;
+    
+    function sanitizeSpLabel(value: string | null, fieldName: string): string | null {
+      if (!value) return value;
+      if (falseSpLabels.test(value.toLowerCase()) && !hasSerialNumber) {
+        const cleaned = value.replace(falseSpLabels, "").replace(/\(\s*\)/g, "").replace(/\s{2,}/g, " ").replace(/^[\s\-,]+|[\s\-,]+$/g, "").trim();
+        const result = (!cleaned || cleaned.toLowerCase() === "base") ? "Base" : cleaned;
+        console.log(`[CardScanner] Stripped false SP/SSP label from ${fieldName}. Original: "${value}", Cleaned: "${result}"`);
+        return result;
+      }
+      return value;
+    }
+    
+    variation = sanitizeSpLabel(variation, "variation");
+    parallel = sanitizeSpLabel(parallel, "parallel");
+    if (parallel === "Base") parallel = null;
     
     return {
       success: true,
