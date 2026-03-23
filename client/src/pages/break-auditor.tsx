@@ -135,7 +135,7 @@ export default function BreakAuditorPage() {
   const [error, setError] = useState("");
 
   const { data: userData } = useQuery<User>({
-    queryKey: ["/api/user"],
+    queryKey: ["/api/auth/user"],
     enabled: isAuthenticated,
   });
 
