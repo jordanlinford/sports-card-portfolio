@@ -605,6 +605,15 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
               finalPsa10 = Math.round(correctedAvg * 2);
             }
 
+            if (finalPsa9 && correctedAvg > 0 && finalPsa9 > correctedAvg * 5) {
+              console.warn(`[OutlookEngine] PSA 9 ($${finalPsa9}) unrealistically high vs raw ($${correctedAvg}) — capping at 3.5x`);
+              finalPsa9 = Math.round(correctedAvg * 3.5);
+            }
+            if (finalPsa10 && correctedAvg > 0 && finalPsa10 > correctedAvg * 8) {
+              console.warn(`[OutlookEngine] PSA 10 ($${finalPsa10}) unrealistically high vs raw ($${correctedAvg}) — capping at 6x`);
+              finalPsa10 = Math.round(correctedAvg * 6);
+            }
+
             const marketData: GeminiMarketData = {
               soldCount: parsed.soldCount || 0,
               avgPrice: correctedAvg,
@@ -1225,6 +1234,15 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
             if (finalPsa10 && correctedAvg > 0 && finalPsa10 < correctedAvg) {
               console.warn(`[Unified Analysis] PSA 10 ($${finalPsa10}) below raw ($${correctedAvg}) — adjusting to 2x raw`);
               finalPsa10 = Math.round(correctedAvg * 2);
+            }
+
+            if (finalPsa9 && correctedAvg > 0 && finalPsa9 > correctedAvg * 5) {
+              console.warn(`[Unified Analysis] PSA 9 ($${finalPsa9}) unrealistically high vs raw ($${correctedAvg}) — capping at 3.5x`);
+              finalPsa9 = Math.round(correctedAvg * 3.5);
+            }
+            if (finalPsa10 && correctedAvg > 0 && finalPsa10 > correctedAvg * 8) {
+              console.warn(`[Unified Analysis] PSA 10 ($${finalPsa10}) unrealistically high vs raw ($${correctedAvg}) — capping at 6x`);
+              finalPsa10 = Math.round(correctedAvg * 6);
             }
 
             const result: UnifiedCardAnalysis = {
