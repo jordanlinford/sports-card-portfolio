@@ -394,27 +394,62 @@ function ComparisonVerdict({
   leftImageUrl: string | null;
   rightImageUrl: string | null;
 }) {
-  // Calculate investment scores - action is primary, signals are tiebreaker
   const calculateScore = (card: QuickAnalyzeResult): number => {
-    // Action rank (0-100 scale) - primary differentiator
     const actionScore = 
       card.action === "BUY" ? 100 :
-      card.action === "MONITOR" ? 70 :
-      card.action === "LONG_HOLD" ? 60 :
-      card.action === "LEGACY_HOLD" ? 50 :
+      card.action === "STRONG_BUY" ? 95 :
+      card.action === "ACCUMULATE" ? 85 :
+      card.action === "LONG_HOLD" ? 75 :
+      card.action === "LEGACY_HOLD" ? 70 :
+      card.action === "WATCH" ? 45 :
+      card.action === "MONITOR" ? 40 :
+      card.action === "TRADE_HYPE" ? 30 :
       card.action === "SELL" ? 20 :
       card.action === "LITTLE_VALUE" ? 10 : 50;
     
-    // Signal adjustment (0-10 scale) - secondary tiebreaker
-    // Higher upside is good, higher downside/friction is bad
-    const signalAdjustment = (
+    const signalScore = (
       (card.signals.upside * 0.5) - 
       (card.signals.downsideRisk * 0.3) - 
       (card.signals.marketFriction * 0.2)
     );
     
-    // Combine: action dominates (90%) + signals break ties (10%)
-    return Math.round((actionScore * 0.9) + (signalAdjustment * 1.0));
+    let scarcityBonus = 0;
+    const variation = card.tempCard.variation || "";
+    const printRunMatch = variation.match(/\/(\d+)/);
+    if (printRunMatch) {
+      const printRun = parseInt(printRunMatch[1], 10);
+      if (printRun <= 1) scarcityBonus = 30;
+      else if (printRun <= 5) scarcityBonus = 25;
+      else if (printRun <= 10) scarcityBonus = 20;
+      else if (printRun <= 25) scarcityBonus = 15;
+      else if (printRun <= 50) scarcityBonus = 10;
+      else if (printRun <= 99) scarcityBonus = 5;
+    }
+    
+    let gradeBonus = 0;
+    const grade = parseFloat(card.tempCard.grade || "0");
+    if (grade >= 10) gradeBonus = 15;
+    else if (grade >= 9.5) gradeBonus = 12;
+    else if (grade >= 9) gradeBonus = 10;
+    else if (grade >= 8.5) gradeBonus = 7;
+    else if (grade >= 8) gradeBonus = 5;
+    
+    let stabilityBonus = 0;
+    if (card.market.value && card.market.min && card.market.max && card.market.value > 0) {
+      const range = card.market.max - card.market.min;
+      const rangeRatio = range / card.market.value;
+      if (rangeRatio < 0.3) stabilityBonus = 10;
+      else if (rangeRatio < 0.5) stabilityBonus = 5;
+      else if (rangeRatio > 1.0) stabilityBonus = -5;
+    }
+    
+    return Math.round(
+      (actionScore * 0.5) + 
+      (signalScore * 0.5) + 
+      scarcityBonus + 
+      gradeBonus + 
+      stabilityBonus
+    );
   };
   
   const leftScore = calculateScore(leftCard);
