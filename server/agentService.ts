@@ -106,6 +106,18 @@ const AGENT_TOOLS = [
       required: ["userId"],
     },
   },
+  {
+    name: "get_alpha_signals",
+    description: "Get active Alpha signals — AI-generated buy/sell/hold recommendations based on market analysis of the most popular cards. Optionally filter to only the user's portfolio cards. Use when the user asks about signals, Alpha feed, what to buy or sell, market opportunities, risk alerts, or 'what does Alpha say'.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        userId: { type: Type.STRING, description: "The user's ID — provide to get signals relevant to their portfolio" },
+        signalType: { type: Type.STRING, description: "Optional filter: 'buy', 'strong_buy', 'sell', 'strong_sell', or 'hold'" },
+        portfolioOnly: { type: Type.BOOLEAN, description: "If true, only return signals for cards the user owns" },
+      },
+    },
+  },
 ];
 
 function buildToolDeclarations() {
@@ -349,6 +361,48 @@ async function executeToolCall(
       };
     }
 
+    case "get_alpha_signals": {
+      const signals = await storage.getActiveSignals(50, args.signalType || undefined);
+      let relevantSignals = signals;
+
+      if (args.portfolioOnly === "true" || args.portfolioOnly === true) {
+        const userCards = await storage.getAllUserCards(userId);
+        const userCardIds = new Set(userCards.map(c => c.id));
+        relevantSignals = signals.filter(s => s.cardId && userCardIds.has(s.cardId));
+      }
+
+      const signalCards = await Promise.all(
+        relevantSignals.slice(0, 20).map(async (s) => {
+          const card = s.cardId ? await storage.getCard(s.cardId) : null;
+          return {
+            signalType: s.signalType,
+            alphaScore: s.alphaScore,
+            confidence: s.confidence,
+            playerName: s.playerName || card?.playerName,
+            cardTitle: s.cardTitle || card?.title,
+            drivers: s.drivers,
+            whyNow: s.whyNow,
+            reasoning: s.reasoning,
+            estimatedValue: card?.estimatedValue,
+            set: card?.set,
+            year: card?.year,
+            sport: card?.sport,
+          };
+        })
+      );
+
+      const buyCount = signalCards.filter(s => s.signalType === "buy" || s.signalType === "strong_buy").length;
+      const sellCount = signalCards.filter(s => s.signalType === "sell" || s.signalType === "strong_sell").length;
+      const holdCount = signalCards.filter(s => s.signalType === "hold").length;
+
+      return {
+        totalSignals: signalCards.length,
+        summary: { buy: buyCount, sell: sellCount, hold: holdCount },
+        signals: signalCards,
+        portfolioOnly: args.portfolioOnly === "true" || args.portfolioOnly === true,
+      };
+    }
+
     default:
       return { error: `Unknown tool: ${toolName}` };
   }
@@ -367,6 +421,7 @@ const TOOL_STEP_LABELS: Record<string, string> = {
   get_hidden_gems: "Checking Hidden Gems discovery engine...",
   get_market_benchmarks: "Comparing portfolio vs S&P 500 and Bitcoin...",
   get_all_portfolio_cards: "Scanning entire collection...",
+  get_alpha_signals: "Checking Alpha signals for market opportunities...",
 };
 
 export async function runAgentStream(
