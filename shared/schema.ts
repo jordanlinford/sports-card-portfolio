@@ -2523,6 +2523,8 @@ export const cardSignals = pgTable("card_signals", {
   signalType: varchar("signal_type", { length: 20 }).notNull(),
   confidence: varchar("confidence", { length: 10 }).notNull(),
   reasoning: text("reasoning"),
+  drivers: text("drivers").array(),
+  whyNow: text("why_now"),
   expiresAt: timestamp("expires_at").notNull(),
   batchRunId: varchar("batch_run_id", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -2540,3 +2542,21 @@ export const insertCardSignalSchema = createInsertSchema(cardSignals).omit({
 });
 export type InsertCardSignal = z.infer<typeof insertCardSignalSchema>;
 export type CardSignal = typeof cardSignals.$inferSelect;
+
+export const signalFeedback = pgTable("signal_feedback", {
+  id: serial("id").primaryKey(),
+  signalId: integer("signal_id").references(() => cardSignals.id, { onDelete: "cascade" }).notNull(),
+  userId: varchar("user_id").notNull(),
+  useful: boolean("useful").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("idx_feedback_signal_user").on(table.signalId, table.userId),
+  index("idx_feedback_signal").on(table.signalId),
+]);
+
+export const insertSignalFeedbackSchema = createInsertSchema(signalFeedback).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertSignalFeedback = z.infer<typeof insertSignalFeedbackSchema>;
+export type SignalFeedback = typeof signalFeedback.$inferSelect;

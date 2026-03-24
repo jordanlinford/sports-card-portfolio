@@ -1,9 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useEffect, useRef, useState } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -13,6 +16,9 @@ import {
   Zap,
   ImageIcon,
   Info,
+  ThumbsUp,
+  ThumbsDown,
+  Clock,
 } from "lucide-react";
 
 interface SignalCard {
@@ -37,6 +43,8 @@ interface Signal {
   signalType: string;
   confidence: string;
   reasoning: string | null;
+  drivers: string[] | null;
+  whyNow: string | null;
   expiresAt: string;
   createdAt: string;
   card: SignalCard | null;
@@ -99,13 +107,67 @@ function formatPrice(value: number | null | undefined) {
 
 function getSignalLabel(signalType?: string): { label: string; className: string } | null {
   if (!signalType) return null;
-  if (signalType === "strong_buy" || signalType === "buy") {
+  if (signalType === "strong_buy") {
+    return { label: "High Conviction", className: "text-emerald-700 dark:text-emerald-400" };
+  }
+  if (signalType === "buy") {
     return { label: "Early Signal", className: "text-green-700 dark:text-green-400" };
   }
   if (signalType === "strong_sell" || signalType === "sell") {
     return { label: "Emerging Risk", className: "text-red-700 dark:text-red-400" };
   }
   return { label: "Market Watch", className: "text-yellow-700 dark:text-yellow-400" };
+}
+
+function trackAlphaEvent(eventType: string, cardId?: number | null, playerName?: string | null, cardTitle?: string | null) {
+  fetch("/api/alpha/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ eventType, cardId, playerName, cardTitle }),
+  }).catch(() => {});
+}
+
+function FeedbackButtons({ signalId }: { signalId: number }) {
+  const { isAuthenticated } = useAuth();
+  const [localVote, setLocalVote] = useState<boolean | null>(null);
+
+  const feedbackMutation = useMutation({
+    mutationFn: async (useful: boolean) => {
+      await apiRequest("POST", `/api/alpha/signals/${signalId}/feedback`, { useful });
+      return useful;
+    },
+    onSuccess: (useful) => {
+      setLocalVote(useful);
+    },
+  });
+
+  if (!isAuthenticated) return null;
+
+  return (
+    <div className="flex items-center gap-1 mt-2" data-testid={`feedback-${signalId}`}>
+      <span className="text-[10px] text-muted-foreground mr-1">Useful?</span>
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`h-6 w-6 p-0 ${localVote === true ? "text-green-600 bg-green-500/10" : "text-muted-foreground/50 hover:text-green-600"}`}
+        onClick={(e) => { e.stopPropagation(); feedbackMutation.mutate(true); }}
+        disabled={feedbackMutation.isPending}
+        data-testid={`feedback-useful-${signalId}`}
+      >
+        <ThumbsUp className="h-3 w-3" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className={`h-6 w-6 p-0 ${localVote === false ? "text-red-600 bg-red-500/10" : "text-muted-foreground/50 hover:text-red-600"}`}
+        onClick={(e) => { e.stopPropagation(); feedbackMutation.mutate(false); }}
+        disabled={feedbackMutation.isPending}
+        data-testid={`feedback-not-useful-${signalId}`}
+      >
+        <ThumbsDown className="h-3 w-3" />
+      </Button>
+    </div>
+  );
 }
 
 function SignalCardComponent({ signal, card, showOwned, ownedAction }: {
@@ -120,18 +182,21 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction }: {
   const confidenceBadge = signal ? getConfidenceBadge(signal.confidence) : null;
   const signalLabel = getSignalLabel(signal?.signalType);
   const price = formatPrice(card.manualValue ?? card.estimatedValue);
+  const drivers = signal?.drivers?.filter(Boolean) ?? [];
+  const whyNow = signal?.whyNow;
+
+  const handleClick = () => {
+    trackAlphaEvent("signal_click", card.id, card.playerName, card.title);
+  };
 
   return (
-    <Card className="hover-elevate" data-testid={`signal-card-${card.id}`}>
+    <Card className="hover-elevate cursor-pointer" data-testid={`signal-card-${card.id}`} onClick={handleClick}>
       <CardContent className="p-4">
         {signalLabel && (
           <div className="flex items-center gap-1.5 mb-2" data-testid={`label-signal-type-${card.id}`}>
             <Zap className={`h-3 w-3 ${signalLabel.className}`} />
             <span className={`text-xs font-semibold ${signalLabel.className}`}>
               {signalLabel.label}
-            </span>
-            <span className="text-[10px] text-muted-foreground">
-              Based on recent observed market activity
             </span>
           </div>
         )}
@@ -191,11 +256,31 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction }: {
               </p>
             )}
 
-            {signal?.reasoning && (
+            {drivers.length > 0 && (
+              <ul className="mt-2 space-y-0.5" data-testid={`drivers-${card.id}`}>
+                {drivers.map((driver, i) => (
+                  <li key={i} className="text-xs text-muted-foreground flex items-start gap-1">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>{driver}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {!drivers.length && signal?.reasoning && (
               <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2" data-testid={`text-reasoning-${card.id}`}>
                 {signal.reasoning}
               </p>
             )}
+
+            {whyNow && (
+              <div className="flex items-center gap-1 mt-1.5" data-testid={`why-now-${card.id}`}>
+                <Clock className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
+                <span className="text-[11px] text-muted-foreground/80 italic">{whyNow}</span>
+              </div>
+            )}
+
+            {signal && <FeedbackButtons signalId={signal.id} />}
           </div>
         </div>
       </CardContent>
@@ -290,6 +375,14 @@ function EmptySection({ icon: Icon, title, description }: { icon: any; title: st
 
 export default function AlphaFeedPage() {
   const { user, isAuthenticated } = useAuth();
+  const tracked = useRef(false);
+
+  useEffect(() => {
+    if (!tracked.current) {
+      tracked.current = true;
+      trackAlphaEvent("alpha_view");
+    }
+  }, []);
 
   const { data: feedData, isLoading: feedLoading, isError: feedError } = useQuery<FeedData>({
     queryKey: ["/api/alpha/feed"],

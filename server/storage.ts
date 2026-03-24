@@ -121,6 +121,9 @@ import {
   cardSignals,
   type CardSignal,
   type InsertCardSignal,
+  signalFeedback,
+  type SignalFeedback,
+  type InsertSignalFeedback,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -445,6 +448,11 @@ export interface IStorage {
   getCardSignal(cardId: number): Promise<CardSignal | undefined>;
   getTopCardsByOwnership(limit?: number): Promise<{ cardId: number; title: string; playerName: string | null; ownerCount: number; interestCount: number; observationCount: number; totalScore: number }[]>;
   getAllCardIdsWithSnapshots(): Promise<number[]>;
+
+  // Signal Feedback
+  upsertSignalFeedback(data: InsertSignalFeedback): Promise<SignalFeedback>;
+  getSignalFeedbackCounts(signalId: number): Promise<{ useful: number; notUseful: number }>;
+  getUserSignalFeedback(signalId: number, userId: string): Promise<SignalFeedback | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3754,6 +3762,8 @@ export class DatabaseStorage implements IStorage {
           signalType: data.signalType,
           confidence: data.confidence,
           reasoning: data.reasoning,
+          drivers: data.drivers,
+          whyNow: data.whyNow,
           playerName: data.playerName,
           cardTitle: data.cardTitle,
           expiresAt: data.expiresAt,
@@ -3857,6 +3867,45 @@ export class DatabaseStorage implements IStorage {
       .from(cardMarketSnapshots)
       .where(sql`${cardMarketSnapshots.cardId} IS NOT NULL`);
     return rows.map(r => r.cardId!).filter(Boolean);
+  }
+
+  async upsertSignalFeedback(data: InsertSignalFeedback): Promise<SignalFeedback> {
+    const [row] = await db
+      .insert(signalFeedback)
+      .values(data)
+      .onConflictDoUpdate({
+        target: [signalFeedback.signalId, signalFeedback.userId],
+        set: {
+          useful: data.useful,
+          createdAt: new Date(),
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async getSignalFeedbackCounts(signalId: number): Promise<{ useful: number; notUseful: number }> {
+    const rows = await db
+      .select({
+        useful: signalFeedback.useful,
+      })
+      .from(signalFeedback)
+      .where(eq(signalFeedback.signalId, signalId));
+    return {
+      useful: rows.filter(r => r.useful).length,
+      notUseful: rows.filter(r => !r.useful).length,
+    };
+  }
+
+  async getUserSignalFeedback(signalId: number, userId: string): Promise<SignalFeedback | undefined> {
+    const [row] = await db
+      .select()
+      .from(signalFeedback)
+      .where(and(
+        eq(signalFeedback.signalId, signalId),
+        eq(signalFeedback.userId, userId),
+      ));
+    return row;
   }
 }
 

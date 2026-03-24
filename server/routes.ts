@@ -10126,6 +10126,62 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  // Alpha Signal Feedback
+  app.post("/api/alpha/signals/:signalId/feedback", isAuthenticated, async (req: any, res) => {
+    try {
+      const signalId = parseInt(req.params.signalId);
+      if (isNaN(signalId)) return res.status(400).json({ message: "Invalid signal ID" });
+
+      const { useful } = req.body;
+      if (typeof useful !== "boolean") return res.status(400).json({ message: "useful must be a boolean" });
+
+      const userId = req.user.claims.sub;
+      const feedback = await storage.upsertSignalFeedback({ signalId, userId, useful });
+      res.json({ feedback });
+    } catch (error) {
+      console.error("[Alpha] Feedback error:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  app.get("/api/alpha/signals/:signalId/feedback", async (req, res) => {
+    try {
+      const signalId = parseInt(req.params.signalId);
+      if (isNaN(signalId)) return res.status(400).json({ message: "Invalid signal ID" });
+      const counts = await storage.getSignalFeedbackCounts(signalId);
+      res.json(counts);
+    } catch (error) {
+      console.error("[Alpha] Feedback counts error:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  // Alpha Interaction Tracking
+  app.post("/api/alpha/track", async (req: any, res) => {
+    try {
+      const { eventType, cardId, playerName, cardTitle } = req.body;
+      const validEvents = ["alpha_view", "signal_click", "signal_expand", "card_revisit"];
+      if (!eventType || !validEvents.includes(eventType)) {
+        return res.status(400).json({ message: "Invalid event type" });
+      }
+
+      const userId = req.user?.claims?.sub || "anonymous";
+
+      const { recordInterestEvent } = await import("./alphaHooks");
+      recordInterestEvent(storage, {
+        cardId: cardId || null,
+        playerName: playerName || null,
+        cardTitle: cardTitle || null,
+        eventType,
+        userId,
+      });
+
+      res.json({ tracked: true });
+    } catch (error) {
+      res.json({ tracked: true });
+    }
+  });
+
   // Start the Alpha batch scheduler
   import("./alphaEngine").then(({ startBatchScheduler }) => {
     startBatchScheduler();
