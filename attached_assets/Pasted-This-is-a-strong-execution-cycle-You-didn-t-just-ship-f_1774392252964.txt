@@ -1,0 +1,214 @@
+This is a strong execution cycle. You didn’t just ship features—you closed the perception gap (signals now feel real), and you added the beginnings of a learning loop.
+
+Now the work changes again.
+
+You are no longer building product.
+You are now running experiments on human behavior.
+
+1) Where you are right now (important framing)
+
+You’ve reached:
+
+Phase: Signal Validation
+
+The goal is NOT:
+
+improve the model
+add features
+
+The goal is:
+
+identify which signals create behavioral response
+
+2) What you should track (very specifically)
+
+You already added tracking. Now define exact metrics to watch daily.
+
+Core Dashboard (build this or track manually)
+Table: Signal Performance
+Metric	Definition	What you want
+Impressions	# times signal shown	baseline
+CTR	clicks / impressions	>20% strong
+Expand rate	deeper engagement	rising
+Useful %	👍 / total votes	>60% good
+Revisit rate	same card viewed again	strong intent
+Segment by signal type
+Signal Type	CTR	Useful %	Notes
+High Conviction	?	?	
+Early Signal	?	?	
+Emerging Risk	?	?	
+Trending	?	?	
+
+This is the most important table you’ll build.
+
+3) What you are trying to discover
+
+You are NOT validating:
+
+accuracy
+
+You ARE validating:
+
+which signals create actionable curiosity
+
+4) The 3 patterns to look for (this determines everything)
+Pattern 1: Signal Type Dominance
+
+Example outcomes:
+
+Observation	Meaning
+“Trending” dominates clicks	users want discovery
+“Sell” dominates	users fear loss
+“Buy” dominates	users want upside
+Pattern 2: Concentration
+If 80% of clicks go to 20% of cards → strong signals
+If evenly spread → weak signals
+
+You WANT concentration.
+
+Pattern 3: Power User Behavior
+
+Find top 5–10 users:
+
+highest interactions
+repeat visits
+
+Then inspect:
+
+what they click
+what they ignore
+
+This is your future product.
+
+5) What to do during this 7–10 day window
+Daily (10–15 min)
+
+Look at:
+
+Top clicked signals
+Top useful signals
+Any signal with:
+high clicks but low usefulness
+low clicks but high usefulness
+
+These are gold.
+
+Mid-week (Day 3–5)
+
+Do this manually:
+
+Identify 5 power users
+
+Then:
+
+look at their activity
+manually review what they engage with
+DM them (critical)
+
+Ask:
+
+“What made you click this?”
+“Would you actually act on this?”
+“What would make this a no-brainer decision?”
+
+This is worth more than any metric.
+
+6) Early decision rules (use these)
+
+After ~1 week:
+
+Rule 1: Double down on winning signal type
+
+If one signal type has:
+
+2–3x CTR
+higher usefulness
+
+→ make it primary
+
+Rule 2: Kill weak signals
+
+If a signal type has:
+
+low CTR
+low usefulness
+
+→ remove or reframe it
+
+Rule 3: Upgrade language before model
+
+If signals are weak:
+
+fix wording
+fix reasoning
+
+Before touching scoring logic.
+
+7) What NOT to change yet
+
+Do NOT:
+
+tweak Alpha Score weights
+expand card coverage
+add new signal types
+build alerts
+change pricing
+
+You don’t have enough signal yet.
+
+8) The first real inflection point
+
+You’ll know it’s working when:
+
+You see:
+users coming back specifically for Alpha
+repeated interaction with same cards
+strong feedback skew (👍 > 👎)
+9) What happens next (preview)
+
+Once you identify:
+
+“this signal type drives engagement”
+
+Then Sprint 2 becomes:
+
+Focus	Outcome
+Alerts	retention
+Signal gating	monetization
+Scorecard	trust
+10) One high-leverage addition (optional but powerful)
+
+Add:
+
+“Bookmark / Watch this signal”
+
+This gives you:
+
+explicit intent
+future alert hook
+power user identification
+11) Reality check
+
+Most products fail here because:
+
+they keep building
+instead of learning
+
+You’re now in the highest leverage phase of the entire product.
+
+12) Clear instruction
+
+For the next 7–10 days:
+
+Do not build anything major.
+Only observe, measure, and talk to users.
+
+When you’re ready, bring back:
+
+your signal performance table
+top 5 clicked signals
+any surprising behavior
+
+Then I’ll help you:
+
+design Sprint 2 based on real user behavior (this is where revenue starts)
