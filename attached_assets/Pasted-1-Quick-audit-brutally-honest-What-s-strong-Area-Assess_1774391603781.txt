@@ -1,0 +1,249 @@
+1) Quick audit (brutally honest)
+What’s strong
+Area	Assessment
+Architecture	Correct (batch + observation + feed)
+Cost discipline	Excellent
+Scope control	Very good
+UI framing	Correct (“Early Signal”, etc.)
+Portfolio alerts	High leverage
+What’s weak (this is where to focus)
+1. Alpha Score is still “black box-ish”
+
+Right now it likely feels like:
+
+“interesting… but why should I trust this?”
+
+You need:
+
+sharper reasoning
+more specific explanations
+2. Signals are not yet “decision forcing”
+
+Your current labels:
+
+Early Signal
+Emerging Risk
+Market Watch
+
+These are safe.
+
+They are not:
+
+“I should actually act on this”
+
+3. No feedback loop yet
+
+Right now:
+
+system talks → user listens
+
+Missing:
+
+user reacts → system learns
+4. No visible proof of value
+
+User sees:
+
+signal
+
+User does NOT see:
+
+“this would have made you money”
+2) What matters now (priority shift)
+
+You are no longer building infrastructure.
+
+You are now optimizing for:
+
+perceived edge
+
+That comes from:
+
+clarity
+specificity
+reinforcement
+3) Immediate improvements (no heavy engineering)
+
+Do these before anything else.
+
+Improvement 1: Sharpen reasoning (HIGH IMPACT)
+
+Current:
+
+“Based on recent observed market activity”
+
+Too generic.
+
+Change to:
+
+Force 2–3 specific drivers:
+
+Examples:
+
+“Recent sales trending above average with increased user interest”
+“Declining demand with rising supply from new graded cards”
+“High scan volume spike with stable pricing suggests early demand”
+Why this matters
+
+Users don’t trust scores.
+
+They trust:
+
+narratives that feel grounded
+
+Improvement 2: Add “Signal Strength” framing
+
+Right now:
+
+Strong Buy / Buy
+Strong Sell / Sell
+
+Not enough separation psychologically.
+
+Add visual hierarchy:
+Label	Meaning
+High Conviction	strongest signals
+Emerging Opportunity	early-stage
+Watch	weak signal
+
+This helps users:
+
+prioritize attention
+feel hierarchy
+Improvement 3: Add “Why now?” (critical)
+
+Every signal should answer:
+
+“Why is this happening right now?”
+
+Add 1 line:
+
+“Momentum increased in last 48 hours”
+“User interest spiked this week”
+“Recent comps showing upward shift”
+
+This creates:
+
+urgency
+timing clarity
+Improvement 4: Add interaction tracking (you don’t have this yet)
+
+You described the system—but not tracking.
+
+You need this immediately.
+
+Track:
+Event	Why
+Alpha tab opened	baseline engagement
+Card clicked	interest
+Signal expanded	deeper intent
+Same card revisited	strong signal
+
+Without this:
+
+you are blind
+you cannot optimize
+4) First real test (this is the moment)
+
+Run this test over the next 7–10 days:
+
+Test 1: Engagement
+Metric	Good signal
+Alpha tab opens	increasing
+CTR on cards	>15–25%
+repeat visits	noticeable
+Test 2: Signal concentration
+Are users clicking the same few cards?
+→ good (means signal is working)
+Or random spread?
+→ weak signals
+Test 3: Portfolio interaction
+Do users engage more with:
+cards they own
+or new opportunities
+
+This determines:
+
+whether you lean into alerts vs discovery
+5) The most important thing to look for
+
+After ~1 week:
+
+You should be able to answer:
+
+“Which signal type actually makes people click?”
+
+Examples:
+
+trending → high clicks
+buy → low clicks
+sell → high engagement
+
+This determines your product direction.
+
+6) What NOT to do yet
+
+Do NOT:
+
+add more signal types
+expand to more cards
+refine scoring model
+build alerts system
+increase pricing
+
+You don’t have signal validation yet.
+
+7) The next inflection (what unlocks money)
+
+You will know you’re ready when:
+
+You see:
+repeat engagement with Alpha
+concentrated clicks
+users returning for signals
+
+Then:
+
+you introduce monetization + alerts
+
+8) One high-leverage move (do this now)
+Add a simple “Was this useful?” button
+
+On each signal:
+
+👍 Useful
+👎 Not useful
+
+This gives you:
+
+instant feedback
+training signal
+product direction
+9) Strategic reality check
+
+Right now you have:
+
+infrastructure ✔
+signals ✔
+UI ✔
+
+You do NOT yet have:
+
+trust
+habit
+perceived edge
+
+That’s what this phase builds.
+
+10) Clear next move
+
+Do this:
+
+Improve reasoning clarity
+Add interaction tracking
+Run for 7–10 days
+Analyze behavior
+
+Then come back and:
+
+we design Sprint 2 based on real usage patterns
