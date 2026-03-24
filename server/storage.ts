@@ -427,13 +427,13 @@ export interface IStorage {
 
   // Alpha Engine - Price Observations
   insertPriceObservation(data: InsertCardPriceObservation): Promise<CardPriceObservation>;
-  getPriceObservations(cardId?: number, playerName?: string, limit?: number): Promise<CardPriceObservation[]>;
+  getPriceObservations(cardId?: number, playerName?: string, limit?: number, cardTitle?: string): Promise<CardPriceObservation[]>;
   updateMarketSnapshot(cardId?: number, playerName?: string, cardTitle?: string): Promise<CardMarketSnapshot | undefined>;
-  getMarketSnapshot(cardId?: number, playerName?: string): Promise<CardMarketSnapshot | undefined>;
+  getMarketSnapshot(cardId?: number, playerName?: string, cardTitle?: string): Promise<CardMarketSnapshot | undefined>;
 
   // Alpha Engine - Interest Events
   insertInterestEvent(data: InsertCardInterestEvent): Promise<CardInterestEvent>;
-  getInterestVelocity(cardId?: number, playerName?: string): Promise<InterestVelocity>;
+  getInterestVelocity(cardId?: number, playerName?: string, cardTitle?: string): Promise<InterestVelocity>;
   getTopCardsByInterest(limit?: number): Promise<{ cardId: number | null; playerName: string | null; cardTitle: string | null; totalEvents: number }[]>;
 }
 
@@ -3563,10 +3563,11 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async getPriceObservations(cardId?: number, playerName?: string, limit: number = 10): Promise<CardPriceObservation[]> {
+  async getPriceObservations(cardId?: number, playerName?: string, limit: number = 10, cardTitle?: string): Promise<CardPriceObservation[]> {
     const conditions = [];
     if (cardId) conditions.push(eq(cardPriceObservations.cardId, cardId));
-    if (playerName) conditions.push(sql`LOWER(${cardPriceObservations.playerName}) = LOWER(${playerName})`);
+    else if (cardTitle) conditions.push(sql`LOWER(${cardPriceObservations.cardTitle}) = LOWER(${cardTitle})`);
+    else if (playerName) conditions.push(sql`LOWER(${cardPriceObservations.playerName}) = LOWER(${playerName})`);
     if (conditions.length === 0) return [];
 
     return db
@@ -3578,7 +3579,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateMarketSnapshot(cardId?: number, playerName?: string, cardTitle?: string): Promise<CardMarketSnapshot | undefined> {
-    const observations = await this.getPriceObservations(cardId, playerName, 10);
+    const observations = await this.getPriceObservations(cardId, playerName, 10, cardTitle);
     if (observations.length === 0) return undefined;
 
     const prices = observations.map(o => o.priceEstimate).filter(p => p > 0);
@@ -3590,6 +3591,7 @@ export class DatabaseStorage implements IStorage {
 
     const lookupConditions = [];
     if (cardId) lookupConditions.push(eq(cardMarketSnapshots.cardId, cardId));
+    else if (cardTitle) lookupConditions.push(sql`LOWER(${cardMarketSnapshots.cardTitle}) = LOWER(${cardTitle})`);
     else if (playerName) lookupConditions.push(sql`LOWER(${cardMarketSnapshots.playerName}) = LOWER(${playerName})`);
     else return undefined;
 
@@ -3633,10 +3635,11 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getMarketSnapshot(cardId?: number, playerName?: string): Promise<CardMarketSnapshot | undefined> {
+  async getMarketSnapshot(cardId?: number, playerName?: string, cardTitle?: string): Promise<CardMarketSnapshot | undefined> {
     const conditions = [];
     if (cardId) conditions.push(eq(cardMarketSnapshots.cardId, cardId));
-    if (playerName) conditions.push(sql`LOWER(${cardMarketSnapshots.playerName}) = LOWER(${playerName})`);
+    else if (cardTitle) conditions.push(sql`LOWER(${cardMarketSnapshots.cardTitle}) = LOWER(${cardTitle})`);
+    else if (playerName) conditions.push(sql`LOWER(${cardMarketSnapshots.playerName}) = LOWER(${playerName})`);
     if (conditions.length === 0) return undefined;
 
     const [row] = await db
@@ -3656,10 +3659,11 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async getInterestVelocity(cardId?: number, playerName?: string): Promise<InterestVelocity> {
+  async getInterestVelocity(cardId?: number, playerName?: string, cardTitle?: string): Promise<InterestVelocity> {
     const conditions = [];
     if (cardId) conditions.push(eq(cardInterestEvents.cardId, cardId));
-    if (playerName) conditions.push(sql`LOWER(${cardInterestEvents.playerName}) = LOWER(${playerName})`);
+    else if (cardTitle) conditions.push(sql`LOWER(${cardInterestEvents.cardTitle}) = LOWER(${cardTitle})`);
+    else if (playerName) conditions.push(sql`LOWER(${cardInterestEvents.playerName}) = LOWER(${playerName})`);
 
     const empty: InterestVelocity = {
       cardId: cardId ?? null,

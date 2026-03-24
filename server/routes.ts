@@ -8526,6 +8526,12 @@ RULES:
         return res.status(400).json({ message: "Invalid card ID" });
       }
 
+      const card = await storage.getCard(cardId);
+      if (card) {
+        const userId = req.user?.claims?.sub;
+        recordInterestEvent({ cardId, playerName: card.playerName ?? undefined, cardTitle: card.title, eventType: "view", userId });
+      }
+
       const history = await storage.getCardPriceHistory(cardId, days);
       res.json(history);
     } catch (error: any) {
@@ -9856,10 +9862,12 @@ Return ONLY valid JSON, no markdown.`;
       const decoded = decodeURIComponent(identifier);
       const numericId = parseInt(decoded);
       const isCardId = !isNaN(numericId) && numericId > 0;
+      const cardTitle = req.query.cardTitle ? decodeURIComponent(req.query.cardTitle as string) : undefined;
 
       const velocity = await storage.getInterestVelocity(
         isCardId ? numericId : undefined,
         isCardId ? undefined : decoded,
+        cardTitle,
       );
 
       res.json(velocity);
@@ -9891,11 +9899,13 @@ Return ONLY valid JSON, no markdown.`;
       const numericId = parseInt(decoded);
       const isCardId = !isNaN(numericId) && numericId > 0;
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+      const cardTitle = req.query.cardTitle ? decodeURIComponent(req.query.cardTitle as string) : undefined;
 
       const observations = await storage.getPriceObservations(
         isCardId ? numericId : undefined,
         isCardId ? undefined : decoded,
         limit,
+        cardTitle,
       );
 
       res.json({ observations });
@@ -9915,10 +9925,12 @@ Return ONLY valid JSON, no markdown.`;
       const decoded = decodeURIComponent(identifier);
       const numericId = parseInt(decoded);
       const isCardId = !isNaN(numericId) && numericId > 0;
+      const cardTitle = req.query.cardTitle ? decodeURIComponent(req.query.cardTitle as string) : undefined;
 
       const snapshot = await storage.getMarketSnapshot(
         isCardId ? numericId : undefined,
         isCardId ? undefined : decoded,
+        cardTitle,
       );
 
       res.json({ snapshot: snapshot ?? null });
