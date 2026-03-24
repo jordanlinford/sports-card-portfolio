@@ -444,6 +444,7 @@ export interface IStorage {
   getActiveSignals(limit?: number, signalType?: string): Promise<CardSignal[]>;
   getCardSignal(cardId: number): Promise<CardSignal | undefined>;
   getTopCardsByOwnership(limit?: number): Promise<{ cardId: number; title: string; playerName: string | null; ownerCount: number; interestCount: number; observationCount: number; totalScore: number }[]>;
+  getAllCardIdsWithSnapshots(): Promise<number[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3848,6 +3849,14 @@ export class DatabaseStorage implements IStorage {
 
     scored.sort((a, b) => b.totalScore - a.totalScore);
     return scored.slice(0, limit);
+  }
+
+  async getAllCardIdsWithSnapshots(): Promise<number[]> {
+    const rows = await db
+      .select({ cardId: cardMarketSnapshots.cardId })
+      .from(cardMarketSnapshots)
+      .where(sql`${cardMarketSnapshots.cardId} IS NOT NULL`);
+    return rows.map(r => r.cardId!).filter(Boolean);
   }
 }
 

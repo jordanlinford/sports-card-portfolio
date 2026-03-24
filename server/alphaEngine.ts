@@ -125,10 +125,13 @@ function computeAlphaScore(
   return { alphaScore: score, signalType, confidence, reasoning };
 }
 
-async function runSignalEngine(batchRunId: string, cardIds: number[]): Promise<number> {
+async function runSignalEngine(batchRunId: string): Promise<number> {
   let signalsGenerated = 0;
 
-  for (const cardId of cardIds) {
+  const allCardIds = await storage.getAllCardIdsWithSnapshots();
+  console.log(`[Alpha Signal] Scoring ${allCardIds.length} cards with market snapshots`);
+
+  for (const cardId of allCardIds) {
     try {
       const card = await storage.getCard(cardId);
       if (!card) continue;
@@ -255,7 +258,7 @@ export async function runAlphaBatchJob(): Promise<BatchRunStats> {
     }
 
     console.log(`[Alpha Batch] Analysis complete. Running signal engine on ${analyzedCardIds.length} cards...`);
-    const signalsGenerated = await runSignalEngine(runId, analyzedCardIds);
+    const signalsGenerated = await runSignalEngine(runId);
 
     const stats: BatchRunStats = {
       runId,

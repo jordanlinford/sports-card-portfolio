@@ -1,0 +1,236 @@
+Good. At this stage the biggest risk is not strategy—it’s execution drift (overbuilding, adding complexity, or breaking current flows).
+
+I’m going to give you tight guardrails + a build checklist so you stay on track while Replit is coding.
+
+1) Build order (do not deviate)
+
+This sequence matters:
+
+Order	Component	Why
+1	Observation layer	everything depends on memory
+2	Hook into existing analysis	zero new infra
+3	Snapshot aggregation	enables usable signals
+4	Alpha Feed (basic)	visible value
+5	Batch job	fills data gaps
+6	Interest velocity	early moat
+
+If they jump ahead to Alpha scoring or UI polish → stop them.
+
+2) Critical implementation rules
+Rule 1: No new Gemini calls in user flow
+
+Only:
+
+piggyback on existing analysis
+batch job later
+
+If they add calls → cost explodes + latency increases.
+
+Rule 2: Raw response MUST be stored
+
+You already called this out—double down on it.
+
+Future you will need:
+
+fields you didn’t extract yet
+debugging
+model improvements
+Rule 3: Snapshots must handle low data
+
+Force this logic:
+
+Observations	Behavior
+1	use last price
+2–3	simple avg
+<5	mark low confidence
+
+Do NOT:
+
+fake trends
+interpolate data
+Rule 4: Alpha Feed = simple ranking, not “smart”
+
+If they try to build:
+
+ML
+complex weighting
+predictive modeling
+
+Stop it.
+
+v1 should feel:
+
+“this looks interesting”
+
+not:
+
+“this is mathematically perfect”
+
+3) What to watch while they build (live QA)
+
+Check these manually:
+
+Test 1: Observation creation
+analyze a card
+check DB
+
+You should see:
+
+Field	Expected
+card_id	correct
+price_estimate	present
+raw_response	full JSON
+timestamp	current
+
+If not → stop everything and fix.
+
+Test 2: Snapshot updates
+analyze same card 2–3 times
+snapshot should:
+Field	Expected
+avg_price	changes
+count	increments
+range	updates
+Test 3: No latency regression
+click analyze
+compare before vs after
+
+If slower → make observation write async.
+
+Test 4: Alpha Feed sanity
+
+You should see:
+
+10–20 cards
+different signals
+not static
+
+If it looks like:
+
+same cards every time
+generic labels
+
+→ ranking is broken
+
+4) Cost control (watch this early)
+
+You are now introducing a recurring cost loop.
+
+Track:
+
+Metric	Target
+cost per batch run	<$2
+runs per month	~10
+monthly batch cost	<$50
+
+If this drifts early, it compounds fast.
+
+5) Early signal quality (what “good enough” looks like)
+
+You are NOT aiming for:
+
+accuracy
+precision
+
+You ARE aiming for:
+
+Signal Quality	Definition
+Plausible	makes sense to a user
+Explainable	user understands why
+Non-random	feels intentional
+
+If a user says:
+
+“yeah I can see why this is here”
+
+You’re good.
+
+6) What to say to Replit (copy/paste)
+
+Give them this constraint block:
+
+Focus on building persistent data + a basic Alpha Feed.
+
+Do NOT:
+- implement trend percentages yet
+- add new Gemini calls in user flow
+- expand beyond top 50 cards for batch job
+- replace existing home screen
+- build complex scoring logic
+
+DO:
+- store every analysis result
+- keep raw_response
+- ensure snapshot aggregation works with low data
+- build Alpha tab using existing signals
+- keep everything fast and stable
+7) What you should be doing (not coding)
+
+While they build:
+
+1. Watch behavior, not code
+
+Ask:
+
+what cards get clicked?
+what signals get attention?
+2. Identify power users early
+
+Look for users who:
+
+analyze frequently
+revisit daily
+interact with Alpha
+
+Those are your future $99 users.
+
+3. Start thinking about signal types
+
+You’ll need soon:
+
+undervalued
+momentum spike
+sell pressure
+trending among users
+
+Don’t build yet—but observe patterns.
+
+8) Biggest mistake to avoid right now
+
+This will kill momentum:
+
+trying to make the Alpha Feed “perfect” before users see it
+
+Instead:
+
+ship slightly rough
+learn fast
+iterate
+9) Definition of success for this sprint
+
+Not revenue.
+
+Not accuracy.
+
+Success =
+
+Metric	Target
+Alpha tab clicks	increasing
+repeat visits	increasing
+time in Alpha	> current home
+user curiosity	high
+10) What happens next (so you stay focused)
+
+After this sprint:
+
+Sprint 2 = alerts + monetization
+Sprint 3 = accuracy + scorecard
+
+Do not jump ahead.
+
+If you want, while they’re building, I can:
+
+define the first 10 signal types (this matters a lot)
+or design the exact upgrade trigger moments so you convert users when Alpha goes live
+
+That’s where this turns from “cool feature” into “money product.”
