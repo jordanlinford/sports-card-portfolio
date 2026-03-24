@@ -11,6 +11,7 @@ import {
   real,
   serial,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -2463,6 +2464,8 @@ export const cardMarketSnapshots = pgTable("card_market_snapshots", {
 }, (table) => [
   index("idx_market_snap_card_id").on(table.cardId),
   index("idx_market_snap_player").on(table.playerName),
+  uniqueIndex("idx_market_snap_card_id_unique").on(table.cardId).where(sql`card_id IS NOT NULL`),
+  uniqueIndex("idx_market_snap_card_title_unique").on(table.cardTitle).where(sql`card_title IS NOT NULL AND card_id IS NULL`),
 ]);
 
 export type CardMarketSnapshot = typeof cardMarketSnapshots.$inferSelect;
