@@ -585,12 +585,16 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
                 correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
                 correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
               } else {
-                // rawPrice absent or itself contaminated — check avgPrice
                 if (isPSA9Contaminated(correctedAvg)) {
                   const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
                   console.warn(`[OutlookEngine] RAW CONTAMINATION DETECTED: avg $${correctedAvg} is ≥80% of psa9 $${psa9} → using min-based raw estimate $${newAvg}`);
                   correctedAvg = newAvg;
                   correctedMax = Math.round(correctedMin * 1.8 * 100) / 100;
+                } else if (!psa9 && !psa10 && correctedMin > 0 && correctedAvg > correctedMin * 2) {
+                  const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
+                  console.warn(`[OutlookEngine] RAW NO-ANCHOR CORRECTION: avg $${correctedAvg} is ${(correctedAvg / correctedMin).toFixed(1)}x min $${correctedMin} with no graded anchor — likely blended. Correcting to $${newAvg}`);
+                  correctedAvg = newAvg;
+                  correctedMax = Math.round(correctedMin * 2 * 100) / 100;
                 } else if (parsed.rawPrice && parsed.rawPrice > 0) {
                   console.warn(`[OutlookEngine] RAW CARD: rawPrice $${parsed.rawPrice} looks contaminated (psa9 $${psa9}), using avgPrice $${correctedAvg} instead`);
                 }
@@ -1214,12 +1218,17 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
                 correctedMin = parsed.market.rawMinPrice || parsed.market.rawPrice * 0.7;
                 correctedMax = parsed.market.rawMaxPrice || parsed.market.rawPrice * 1.5;
               } else {
-                // rawPrice absent or itself contaminated — check avgPrice
+                const psa10 = parsePrice(parsed.market.psa10Price);
                 if (isPSA9Contaminated(correctedAvg)) {
                   const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
                   console.warn(`[Unified Analysis] RAW CONTAMINATION DETECTED: avg $${correctedAvg} is ≥80% of psa9 $${psa9} → using min-based raw estimate $${newAvg}`);
                   correctedAvg = newAvg;
                   correctedMax = Math.round(correctedMin * 1.8 * 100) / 100;
+                } else if (!psa9 && !psa10 && correctedMin > 0 && correctedAvg > correctedMin * 2) {
+                  const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
+                  console.warn(`[Unified Analysis] RAW NO-ANCHOR CORRECTION: avg $${correctedAvg} is ${(correctedAvg / correctedMin).toFixed(1)}x min $${correctedMin} with no graded anchor — likely blended. Correcting to $${newAvg}`);
+                  correctedAvg = newAvg;
+                  correctedMax = Math.round(correctedMin * 2 * 100) / 100;
                 } else if (parsed.market.rawPrice && parsed.market.rawPrice > 0) {
                   console.warn(`[Unified Analysis] rawPrice $${parsed.market.rawPrice} looks contaminated (psa9 $${psa9}), using avgPrice $${correctedAvg} instead`);
                 }
