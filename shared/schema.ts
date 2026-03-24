@@ -2415,3 +2415,88 @@ export type PopTrend = {
   momGrowthPct: number | null;
   totalSnapshots: number;
 };
+
+// ============================================================================
+// ALPHA ENGINE - Price Observations, Market Snapshots, Interest Events
+// ============================================================================
+
+export const cardPriceObservations = pgTable("card_price_observations", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id"),
+  playerName: varchar("player_name", { length: 255 }),
+  cardTitle: varchar("card_title", { length: 512 }),
+  setName: varchar("set_name", { length: 255 }),
+  year: integer("year"),
+  variation: varchar("variation", { length: 255 }),
+  priceEstimate: real("price_estimate").notNull(),
+  lowEstimate: real("low_estimate"),
+  highEstimate: real("high_estimate"),
+  confidence: varchar("confidence", { length: 20 }),
+  source: varchar("source", { length: 50 }).default("gemini").notNull(),
+  soldCount: integer("sold_count"),
+  rawResponse: jsonb("raw_response"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_price_obs_card_id").on(table.cardId),
+  index("idx_price_obs_player").on(table.playerName),
+  index("idx_price_obs_created").on(table.createdAt),
+]);
+
+export const insertCardPriceObservationSchema = createInsertSchema(cardPriceObservations).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCardPriceObservation = z.infer<typeof insertCardPriceObservationSchema>;
+export type CardPriceObservation = typeof cardPriceObservations.$inferSelect;
+
+export const cardMarketSnapshots = pgTable("card_market_snapshots", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id"),
+  playerName: varchar("player_name", { length: 255 }),
+  cardTitle: varchar("card_title", { length: 512 }),
+  avgPriceSimple: real("avg_price_simple"),
+  observationCount: integer("observation_count").default(0).notNull(),
+  priceRangeMin: real("price_range_min"),
+  priceRangeMax: real("price_range_max"),
+  lastPrice: real("last_price"),
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+}, (table) => [
+  index("idx_market_snap_card_id").on(table.cardId),
+  index("idx_market_snap_player").on(table.playerName),
+]);
+
+export type CardMarketSnapshot = typeof cardMarketSnapshots.$inferSelect;
+
+export const INTEREST_EVENT_TYPES = ["scan", "add", "view", "analyze"] as const;
+export type InterestEventType = typeof INTEREST_EVENT_TYPES[number];
+
+export const cardInterestEvents = pgTable("card_interest_events", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id"),
+  playerName: varchar("player_name", { length: 255 }),
+  cardTitle: varchar("card_title", { length: 512 }),
+  eventType: varchar("event_type", { length: 20 }).notNull(),
+  userId: varchar("user_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_interest_card_id").on(table.cardId),
+  index("idx_interest_player").on(table.playerName),
+  index("idx_interest_created").on(table.createdAt),
+  index("idx_interest_event_type").on(table.eventType),
+]);
+
+export const insertCardInterestEventSchema = createInsertSchema(cardInterestEvents).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCardInterestEvent = z.infer<typeof insertCardInterestEventSchema>;
+export type CardInterestEvent = typeof cardInterestEvents.$inferSelect;
+
+export type InterestVelocity = {
+  cardId: number | null;
+  playerName: string | null;
+  recentCount: number;
+  historicalAvgWeekly: number;
+  velocity: number;
+  eventBreakdown: Record<string, number>;
+};

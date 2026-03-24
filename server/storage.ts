@@ -109,6 +109,15 @@ import {
   type PopHistory,
   type InsertPopHistory,
   type PopTrend,
+  cardPriceObservations,
+  type CardPriceObservation,
+  type InsertCardPriceObservation,
+  cardMarketSnapshots,
+  type CardMarketSnapshot,
+  cardInterestEvents,
+  type CardInterestEvent,
+  type InsertCardInterestEvent,
+  type InterestVelocity,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -415,6 +424,17 @@ export interface IStorage {
   getPopTrends(playerName: string, grader?: string, grade?: string, cardFilters?: { year?: number; setName?: string; variation?: string; cardNumber?: string }): Promise<PopTrend[]>;
   getPopHistory(playerName: string, options?: { year?: number; setName?: string; grader?: string; grade?: string; limit?: number }): Promise<PopHistory[]>;
   getLatestPopSnapshot(playerName: string, grader: string, grade: string): Promise<PopHistory | undefined>;
+
+  // Alpha Engine - Price Observations
+  insertPriceObservation(data: InsertCardPriceObservation): Promise<CardPriceObservation>;
+  getPriceObservations(cardId?: number, playerName?: string, limit?: number): Promise<CardPriceObservation[]>;
+  updateMarketSnapshot(cardId?: number, playerName?: string, cardTitle?: string): Promise<CardMarketSnapshot | undefined>;
+  getMarketSnapshot(cardId?: number, playerName?: string): Promise<CardMarketSnapshot | undefined>;
+
+  // Alpha Engine - Interest Events
+  insertInterestEvent(data: InsertCardInterestEvent): Promise<CardInterestEvent>;
+  getInterestVelocity(cardId?: number, playerName?: string): Promise<InterestVelocity>;
+  getTopCardsByInterest(limit?: number): Promise<{ cardId: number | null; playerName: string | null; cardTitle: string | null; totalEvents: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3532,6 +3552,177 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(popHistory.snapshotDate))
       .limit(1);
     return row;
+  }
+
+  // =========================================================================
+  // Alpha Engine - Price Observations
+  // =========================================================================
+
+  async insertPriceObservation(data: InsertCardPriceObservation): Promise<CardPriceObservation> {
+    const [row] = await db.insert(cardPriceObservations).values(data).returning();
+    return row;
+  }
+
+  async getPriceObservations(cardId?: number, playerName?: string, limit: number = 10): Promise<CardPriceObservation[]> {
+    const conditions = [];
+    if (cardId) conditions.push(eq(cardPriceObservations.cardId, cardId));
+    if (playerName) conditions.push(sql`LOWER(${cardPriceObservations.playerName}) = LOWER(${playerName})`);
+    if (conditions.length === 0) return [];
+
+    return db
+      .select()
+      .from(cardPriceObservations)
+      .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+      .orderBy(desc(cardPriceObservations.createdAt))
+      .limit(limit);
+  }
+
+  async updateMarketSnapshot(cardId?: number, playerName?: string, cardTitle?: string): Promise<CardMarketSnapshot | undefined> {
+    const observations = await this.getPriceObservations(cardId, playerName, 10);
+    if (observations.length === 0) return undefined;
+
+    const prices = observations.map(o => o.priceEstimate).filter(p => p > 0);
+    if (prices.length === 0) return undefined;
+
+    const avg = prices.reduce((s, p) => s + p, 0) / prices.length;
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+
+    const lookupConditions = [];
+    if (cardId) lookupConditions.push(eq(cardMarketSnapshots.cardId, cardId));
+    else if (playerName) lookupConditions.push(sql`LOWER(${cardMarketSnapshots.playerName}) = LOWER(${playerName})`);
+    else return undefined;
+
+    const existing = await db
+      .select()
+      .from(cardMarketSnapshots)
+      .where(lookupConditions[0])
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(cardMarketSnapshots)
+        .set({
+          avgPriceSimple: Math.round(avg * 100) / 100,
+          observationCount: observations.length,
+          priceRangeMin: Math.round(min * 100) / 100,
+          priceRangeMax: Math.round(max * 100) / 100,
+          lastPrice: Math.round(prices[0] * 100) / 100,
+          lastUpdated: new Date(),
+          ...(cardTitle ? { cardTitle } : {}),
+        })
+        .where(eq(cardMarketSnapshots.id, existing[0].id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(cardMarketSnapshots)
+        .values({
+          cardId: cardId ?? null,
+          playerName: playerName ?? null,
+          cardTitle: cardTitle ?? null,
+          avgPriceSimple: Math.round(avg * 100) / 100,
+          observationCount: observations.length,
+          priceRangeMin: Math.round(min * 100) / 100,
+          priceRangeMax: Math.round(max * 100) / 100,
+          lastPrice: Math.round(prices[0] * 100) / 100,
+          lastUpdated: new Date(),
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async getMarketSnapshot(cardId?: number, playerName?: string): Promise<CardMarketSnapshot | undefined> {
+    const conditions = [];
+    if (cardId) conditions.push(eq(cardMarketSnapshots.cardId, cardId));
+    if (playerName) conditions.push(sql`LOWER(${cardMarketSnapshots.playerName}) = LOWER(${playerName})`);
+    if (conditions.length === 0) return undefined;
+
+    const [row] = await db
+      .select()
+      .from(cardMarketSnapshots)
+      .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+      .limit(1);
+    return row;
+  }
+
+  // =========================================================================
+  // Alpha Engine - Interest Events
+  // =========================================================================
+
+  async insertInterestEvent(data: InsertCardInterestEvent): Promise<CardInterestEvent> {
+    const [row] = await db.insert(cardInterestEvents).values(data).returning();
+    return row;
+  }
+
+  async getInterestVelocity(cardId?: number, playerName?: string): Promise<InterestVelocity> {
+    const conditions = [];
+    if (cardId) conditions.push(eq(cardInterestEvents.cardId, cardId));
+    if (playerName) conditions.push(sql`LOWER(${cardInterestEvents.playerName}) = LOWER(${playerName})`);
+
+    const empty: InterestVelocity = {
+      cardId: cardId ?? null,
+      playerName: playerName ?? null,
+      recentCount: 0,
+      historicalAvgWeekly: 0,
+      velocity: 0,
+      eventBreakdown: {},
+    };
+
+    if (conditions.length === 0) return empty;
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const condition = conditions.length === 1 ? conditions[0] : or(...conditions);
+
+    const recentRows = await db
+      .select({
+        eventType: cardInterestEvents.eventType,
+        cnt: sql<number>`count(*)::int`,
+      })
+      .from(cardInterestEvents)
+      .where(and(condition, sql`${cardInterestEvents.createdAt} >= ${sevenDaysAgo}`))
+      .groupBy(cardInterestEvents.eventType);
+
+    const recentCount = recentRows.reduce((s, r) => s + r.cnt, 0);
+    const eventBreakdown: Record<string, number> = {};
+    for (const r of recentRows) eventBreakdown[r.eventType] = r.cnt;
+
+    const [historicalRow] = await db
+      .select({ cnt: sql<number>`count(*)::int` })
+      .from(cardInterestEvents)
+      .where(and(condition, sql`${cardInterestEvents.createdAt} >= ${thirtyDaysAgo}`));
+
+    const totalIn30d = historicalRow?.cnt ?? 0;
+    const historicalAvgWeekly = totalIn30d > 0 ? totalIn30d / 4.28 : 0;
+    const velocity = historicalAvgWeekly > 0 ? recentCount / historicalAvgWeekly : (recentCount > 0 ? recentCount : 0);
+
+    return {
+      cardId: cardId ?? null,
+      playerName: playerName ?? null,
+      recentCount,
+      historicalAvgWeekly: Math.round(historicalAvgWeekly * 100) / 100,
+      velocity: Math.round(velocity * 100) / 100,
+      eventBreakdown,
+    };
+  }
+
+  async getTopCardsByInterest(limit: number = 50): Promise<{ cardId: number | null; playerName: string | null; cardTitle: string | null; totalEvents: number }[]> {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    return db
+      .select({
+        cardId: cardInterestEvents.cardId,
+        playerName: cardInterestEvents.playerName,
+        cardTitle: cardInterestEvents.cardTitle,
+        totalEvents: sql<number>`count(*)::int`,
+      })
+      .from(cardInterestEvents)
+      .where(sql`${cardInterestEvents.createdAt} >= ${thirtyDaysAgo}`)
+      .groupBy(cardInterestEvents.cardId, cardInterestEvents.playerName, cardInterestEvents.cardTitle)
+      .orderBy(sql`count(*) DESC`)
+      .limit(limit);
   }
 }
 

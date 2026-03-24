@@ -43,6 +43,65 @@ import {
 } from "./portfolioIntelligenceService";
 
 // ============================================================================
+// Alpha Engine - Fire-and-forget observation & interest tracking
+// ============================================================================
+
+function recordPriceObservation(data: {
+  cardId?: number;
+  playerName?: string;
+  cardTitle?: string;
+  setName?: string;
+  year?: number;
+  variation?: string;
+  priceEstimate: number;
+  lowEstimate?: number;
+  highEstimate?: number;
+  confidence?: string;
+  soldCount?: number;
+  rawResponse?: any;
+  source?: string;
+}) {
+  if (!data.priceEstimate || data.priceEstimate <= 0) return;
+  storage.insertPriceObservation({
+    cardId: data.cardId ?? null,
+    playerName: data.playerName ?? null,
+    cardTitle: data.cardTitle ?? null,
+    setName: data.setName ?? null,
+    year: data.year ?? null,
+    variation: data.variation ?? null,
+    priceEstimate: data.priceEstimate,
+    lowEstimate: data.lowEstimate ?? null,
+    highEstimate: data.highEstimate ?? null,
+    confidence: data.confidence ?? null,
+    source: data.source ?? "gemini",
+    soldCount: data.soldCount ?? null,
+    rawResponse: data.rawResponse ?? null,
+  }).then((obs) => {
+    storage.updateMarketSnapshot(
+      data.cardId ?? undefined,
+      data.playerName ?? undefined,
+      data.cardTitle ?? undefined
+    ).catch(e => console.error("[Alpha] Snapshot update error:", e.message));
+  }).catch(e => console.error("[Alpha] Observation insert error:", e.message));
+}
+
+function recordInterestEvent(data: {
+  cardId?: number;
+  playerName?: string;
+  cardTitle?: string;
+  eventType: string;
+  userId?: string;
+}) {
+  storage.insertInterestEvent({
+    cardId: data.cardId ?? null,
+    playerName: data.playerName ?? null,
+    cardTitle: data.cardTitle ?? null,
+    eventType: data.eventType,
+    userId: data.userId ?? null,
+  }).catch(e => console.error("[Alpha] Interest event error:", e.message));
+}
+
+// ============================================================================
 // Free User Cost Safeguards
 // ============================================================================
 
@@ -1609,6 +1668,7 @@ Sitemap: ${origin}/sitemap.xml
         },
         req,
       });
+      recordInterestEvent({ cardId: card.id, playerName: card.playerName ?? undefined, cardTitle: card.title, eventType: "add", userId });
       
       res.status(201).json(card);
     } catch (error: any) {
@@ -2114,6 +2174,18 @@ Sitemap: ${origin}/sitemap.xml
         outlookExplanationLong: outlook.explanation.long,
         outlookGeneratedAt: new Date(),
       });
+
+      recordPriceObservation({
+        cardId,
+        playerName: enrichedCard.playerName ?? undefined,
+        cardTitle: card.title,
+        setName: card.set ?? undefined,
+        year: card.year ?? undefined,
+        variation: card.variation ?? undefined,
+        priceEstimate: card.estimatedValue ?? 0,
+        source: "outlook",
+      });
+      recordInterestEvent({ cardId, playerName: enrichedCard.playerName ?? undefined, cardTitle: card.title, eventType: "analyze", userId: (req as any).user?.id });
 
       res.json(outlook);
     } catch (error) {
@@ -2793,6 +2865,23 @@ Sitemap: ${origin}/sitemap.xml
 
         await storage.upsertCardOutlook(card.id, outlookData);
         await storage.recordOutlookUsage(userId, 'collection', card.id, card.title);
+
+        if (marketValue && marketValue > 0) {
+          recordPriceObservation({
+            cardId: card.id,
+            playerName: card.playerName ?? undefined,
+            cardTitle: card.title,
+            setName: card.set ?? undefined,
+            year: card.year ?? undefined,
+            variation: card.variation ?? undefined,
+            priceEstimate: marketValue,
+            lowEstimate: priceMin ?? undefined,
+            highEstimate: priceMax ?? undefined,
+            soldCount: compCount ?? undefined,
+            source: "batch",
+          });
+          recordInterestEvent({ cardId: card.id, playerName: card.playerName ?? undefined, cardTitle: card.title, eventType: "analyze", userId });
+        }
 
         const batchSupplyGrowth = geminiMarketData?.supply?.supplyGrowth || null;
         const cardUpdate: any = {
@@ -3965,6 +4054,22 @@ Sitemap: ${origin}/sitemap.xml
         generatedAt: new Date().toISOString(),
         isPro,
       });
+
+      if (marketValue && marketValue > 0) {
+        recordPriceObservation({
+          playerName: playerName ?? undefined,
+          cardTitle: title,
+          setName: set ?? undefined,
+          year: year ?? undefined,
+          variation: variation ?? undefined,
+          priceEstimate: marketValue,
+          lowEstimate: priceMin ?? undefined,
+          highEstimate: priceMax ?? undefined,
+          soldCount: unifiedResult?.market?.soldCount ?? undefined,
+          source: "quick_analyze",
+        });
+        recordInterestEvent({ playerName: playerName ?? undefined, cardTitle: title, eventType: "analyze", userId: (req as any).user?.claims?.sub });
+      }
     } catch (error) {
       console.error("Error in quick analyze:", error);
       res.status(500).json({ message: "Failed to analyze card" });
@@ -4122,6 +4227,12 @@ Sitemap: ${origin}/sitemap.xml
           confidence: scanResult.confidence,
         },
         req,
+      });
+      recordInterestEvent({
+        playerName: scanResult.cardIdentification?.playerName ?? undefined,
+        cardTitle: scanResult.cardIdentification ? `${scanResult.cardIdentification.playerName} ${scanResult.cardIdentification.year || ''} ${scanResult.cardIdentification.setName || ''}`.trim() : undefined,
+        eventType: "scan",
+        userId,
       });
 
       let scanHistoryId: number | undefined;
@@ -9728,6 +9839,92 @@ Return ONLY valid JSON, no markdown.`;
     } catch (error) {
       console.error("[Pop History] History query error:", error);
       res.status(500).json({ message: "Failed to fetch pop history" });
+    }
+  });
+
+  // =========================================================================
+  // Alpha Engine API
+  // =========================================================================
+
+  app.get("/api/alpha/interest-velocity/:identifier", async (req: any, res) => {
+    try {
+      const { identifier } = req.params;
+      if (!identifier || identifier.trim().length === 0) {
+        return res.status(400).json({ message: "Card identifier is required" });
+      }
+
+      const decoded = decodeURIComponent(identifier);
+      const numericId = parseInt(decoded);
+      const isCardId = !isNaN(numericId) && numericId > 0;
+
+      const velocity = await storage.getInterestVelocity(
+        isCardId ? numericId : undefined,
+        isCardId ? undefined : decoded,
+      );
+
+      res.json(velocity);
+    } catch (error) {
+      console.error("[Alpha] Interest velocity error:", error);
+      res.status(500).json({ message: "Failed to fetch interest velocity" });
+    }
+  });
+
+  app.get("/api/alpha/top-interest", async (req: any, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      const topCards = await storage.getTopCardsByInterest(limit);
+      res.json({ cards: topCards });
+    } catch (error) {
+      console.error("[Alpha] Top interest error:", error);
+      res.status(500).json({ message: "Failed to fetch top interest cards" });
+    }
+  });
+
+  app.get("/api/alpha/observations/:identifier", async (req: any, res) => {
+    try {
+      const { identifier } = req.params;
+      if (!identifier || identifier.trim().length === 0) {
+        return res.status(400).json({ message: "Card identifier is required" });
+      }
+
+      const decoded = decodeURIComponent(identifier);
+      const numericId = parseInt(decoded);
+      const isCardId = !isNaN(numericId) && numericId > 0;
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100);
+
+      const observations = await storage.getPriceObservations(
+        isCardId ? numericId : undefined,
+        isCardId ? undefined : decoded,
+        limit,
+      );
+
+      res.json({ observations });
+    } catch (error) {
+      console.error("[Alpha] Observations error:", error);
+      res.status(500).json({ message: "Failed to fetch price observations" });
+    }
+  });
+
+  app.get("/api/alpha/snapshot/:identifier", async (req: any, res) => {
+    try {
+      const { identifier } = req.params;
+      if (!identifier || identifier.trim().length === 0) {
+        return res.status(400).json({ message: "Card identifier is required" });
+      }
+
+      const decoded = decodeURIComponent(identifier);
+      const numericId = parseInt(decoded);
+      const isCardId = !isNaN(numericId) && numericId > 0;
+
+      const snapshot = await storage.getMarketSnapshot(
+        isCardId ? numericId : undefined,
+        isCardId ? undefined : decoded,
+      );
+
+      res.json({ snapshot: snapshot ?? null });
+    } catch (error) {
+      console.error("[Alpha] Snapshot error:", error);
+      res.status(500).json({ message: "Failed to fetch market snapshot" });
     }
   });
 

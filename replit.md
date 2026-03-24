@@ -47,6 +47,7 @@ The application uses a full-stack TypeScript architecture. The frontend manages 
 - **Portfolio Alpha Benchmark**: Compares portfolio performance against market benchmarks like S&P 500 and Bitcoin.
 - **Nightly Player Outlook Refresh**: Automated refresh of public player outlook pages for SEO.
 - **Card Advisor (Pro-only)**: AI-powered portfolio auditor sidebar (⌘+K toggle). Gemini 2.5 Flash with function-calling orchestrates 8 tools: portfolio summary, player outlooks, real-time news, eBay market data, display case inspection, hidden gems, market benchmarks, full collection scan. SSE streaming bypasses 120s timeout. Service: `server/agentService.ts`. Route: `GET /api/agent/stream?q=`. Frontend: `client/src/components/AgentSidebar.tsx`, `client/src/hooks/use-agent.ts`.
+- **Alpha Data Infrastructure**: Persistent price observation layer for future Alpha Engine. Three new tables: `card_price_observations` (time-series price data from every analysis), `card_market_snapshots` (rolling averages from last 10 observations), `card_interest_events` (scan/add/view/analyze events per card). Fire-and-forget hooks in all 3 analysis paths (outlook, batch, quick-analyze) plus card create and scan endpoints. APIs: `GET /api/alpha/interest-velocity/:identifier`, `GET /api/alpha/top-interest`, `GET /api/alpha/observations/:identifier`, `GET /api/alpha/snapshot/:identifier`.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM.
