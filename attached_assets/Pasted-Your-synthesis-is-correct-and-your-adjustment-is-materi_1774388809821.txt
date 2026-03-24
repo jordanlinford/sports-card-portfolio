@@ -1,0 +1,315 @@
+Your synthesis is correct, and your adjustment is materially closer to something that will actually work.
+
+The key improvement you made:
+
+recognizing this is not a “feature sprint” — it’s a system architecture shift
+
+That’s the right frame.
+
+What I’m going to do is tighten this into something you can hand to Replit that:
+
+reduces engineering risk
+avoids overbuilding
+still gets you to signals quickly
+1) One critical correction before we plan sprint 1
+
+You said:
+
+“Score and rank opportunities across the entire card universe”
+
+Do NOT do this yet.
+
+That is:
+
+computationally expensive
+data incomplete
+unnecessary for finding power users
+Instead:
+
+Start with:
+
+“cards your users already care about”
+
+That means:
+
+cards in portfolios
+cards recently scanned
+cards frequently analyzed
+
+This reduces:
+
+infra complexity
+data sparsity
+noise
+
+And increases:
+
+relevance
+engagement
+conversion
+2) System architecture (simplified, buildable)
+
+You only need 3 core systems to start:
+
+System 1: Observation Layer (new)
+
+Stores all pricing + analysis outputs
+
+Table: card_price_observations
+Field	Type	Notes
+id	uuid	
+card_id	string	normalized
+price_estimate	float	from Gemini
+low_estimate	float	optional
+high_estimate	float	optional
+confidence	string	low/med/high
+source	string	"gemini"
+created_at	timestamp	
+Table: card_market_snapshots (derived)
+Field	Type
+card_id	string
+avg_price_7d	float
+avg_price_30d	float
+trend_pct_7d	float
+observation_count	int
+volatility	float
+last_updated	timestamp
+System 2: Batch Engine (new)
+
+Runs on schedule.
+
+Job 1: Nightly Analysis Job
+
+Scope:
+
+top 100–200 cards (by usage)
+
+Selection logic:
+
+most owned cards
+most scanned
+most viewed
+Job flow:
+for card in top_cards:
+  analysis = run_gemini_analysis(card)
+
+  store(card_price_observations)
+
+  update(card_market_snapshots)
+IMPORTANT constraint
+
+Do NOT:
+
+analyze entire database
+chase long tail cards
+
+Start with dense data only.
+
+System 3: Alpha Engine (new)
+
+Generates signals from snapshots
+
+Table: card_signals
+Field	Type
+card_id	string
+alpha_score	float
+signal_type	enum (buy/sell/hold)
+confidence	string
+reasoning	text
+created_at	timestamp
+Simple v1 scoring (keep this lightweight)
+undervaluation = (current_price - avg_price_7d) / avg_price_7d
+momentum = trend_pct_7d
+liquidity = observation_count
+confidence = function(observation_count, variance)
+
+alpha_score =
+  undervaluation_weight +
+  momentum_weight +
+  liquidity_weight
+
+No ML. No complexity.
+
+3) Sprint 1 (Week 1–2) — exact task breakdown
+Goal
+
+Create persistent memory + first version of Alpha Feed
+
+Backend Tasks
+Task 1: Create Observation Table
+schema above
+write insert function from existing analysis pipeline
+Task 2: Modify existing “analyze card” flow
+
+Every time user runs analysis:
+
+store result in card_price_observations
+
+This gives you:
+
+immediate data accumulation
+zero extra infra
+Task 3: Build Nightly Job (CRITICAL)
+cron job / scheduled function
+select top 100 cards
+run Gemini analysis
+store results
+
+Keep it simple:
+
+no retries
+no parallel scaling yet
+Task 4: Build Snapshot Aggregator
+
+For each card:
+
+compute:
+avg_price_7d
+observation_count
+basic trend
+
+Run:
+
+after nightly job
+or as separate job
+Task 5: Alpha Score v1
+simple weighted function
+store results in card_signals
+Frontend Tasks
+Task 6: Replace Home Screen
+
+Build:
+
+“Daily Alpha Feed”
+
+Sections:
+
+Top Opportunities (Buy)
+Risk Alerts (Sell)
+Portfolio Alerts
+Task 7: Signal Card UI
+
+Each card shows:
+
+Signal (Buy / Sell)
+Confidence (Low/Med/High)
+1-line reason
+
+Example:
+
+“Early Signal: Undervalued vs recent comps, rising interest”
+Task 8: Label everything clearly
+
+You MUST include:
+
+“Early Signal”
+“Based on recent observed market activity”
+confidence indicator
+4) Sprint 2 (Week 3–4)
+Goal
+
+Personalization + monetization
+
+Backend
+Task 1: Portfolio Signal Mapping
+
+For each user:
+
+match signals to owned cards
+Task 2: Alert Generation
+
+Trigger:
+
+sell alerts
+buy-more alerts
+Frontend
+Task 3: Portfolio Alerts Section
+
+“You own this → act”
+
+Monetization
+Task 4: Launch Alpha Tier ($29)
+
+Gate:
+
+full Alpha Feed
+portfolio alerts
+5) Sprint 3 (Week 5–8)
+Goal
+
+Upgrade signal credibility
+
+Backend
+add 30-day averages
+improve trend calculation
+add volatility
+New System
+Signal Scorecard
+
+Track:
+
+Metric
+price at signal
+price after 7 days
+price after 30 days
+Output
+hit rate
+avg return
+6) Most important prioritization (don’t mess this up)
+Priority Order
+Observation layer
+Nightly job
+Alpha Feed
+Portfolio alerts
+Pricing
+NOT priority
+expanding card coverage
+UI polish
+social features
+more AI features
+7) The real unlock (your biggest edge)
+
+You correctly identified this:
+
+user behavior data
+
+But here’s how to operationalize it:
+
+Add this in Sprint 2.5
+Table: card_interest_signals
+Field
+card_id
+add_to_portfolio_count
+scan_count
+watchlist_count
+time_window
+
+Then feed into Alpha Score:
+
+interest_velocity = recent_adds / historical_avg
+
+if interest_velocity spikes:
+  boost alpha_score
+
+This is your moat.
+
+8) Final alignment
+
+You now have:
+
+correct strategy
+realistic timeline
+scoped engineering
+
+The only thing that matters now is:
+
+shipping the first version fast enough to learn
+
+If you want next step
+
+I can:
+
+write the exact Replit task board (ticket-by-ticket with acceptance criteria)
+or define the Alpha Score thresholds + signal rules so your first signals feel sharp, not generic
+
+That’s where execution quality will determine whether this becomes a $1M product or just a good app.

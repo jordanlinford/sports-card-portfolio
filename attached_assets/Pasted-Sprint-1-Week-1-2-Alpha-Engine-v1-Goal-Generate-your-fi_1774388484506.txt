@@ -1,0 +1,189 @@
+Sprint 1 (Week 1–2): Alpha Engine v1
+Goal
+
+Generate your first real “money-making signals”
+
+Backend tasks
+1. Create simple pricing store
+CardPriceObservation:
+  card_id
+  price
+  timestamp
+  source
+CardMarketStats:
+  card_id
+  avg_price_7d
+  avg_price_30d
+  comp_count
+  trend_pct
+  volatility
+2. Build Alpha Score function
+alpha_score = (
+  undervaluation_score * 0.3 +
+  momentum_score * 0.25 +
+  liquidity_score * 0.15 +
+  supply_score * 0.15 +
+  scarcity_score * 0.15
+)
+3. Output signals
+{
+  "card_id": "...",
+  "alpha_score": 82,
+  "confidence": "high",
+  "signal": "strong_buy",
+  "reason": "recent comps undervalued, rising demand, stable supply"
+}
+Frontend tasks
+Build new home screen:
+
+Daily Alpha Feed
+
+Sections:
+
+Top 5 Buys
+Top 3 Sell Alerts
+Portfolio Alerts
+Critical rule
+
+No dashboards.
+No exploration-first UI.
+
+This screen = product.
+
+Sprint 2 (Week 3–4): Portfolio Alerts (retention engine)
+Goal
+
+Make users feel like they’re missing money if they don’t check
+
+Backend
+
+For every user card:
+
+Trigger alerts:
+
+if trend_drop > threshold and comp_volume rising:
+  trigger_sell_alert()
+
+if price_gap_vs_comps > threshold:
+  trigger_buy_more_alert()
+Frontend
+
+Add:
+
+“You should sell this” cards
+“You should consider buying more” cards
+Notification system
+daily email
+in-app alerts
+Sprint 3 (Week 5–6): Monetization Layer
+Goal
+
+Increase ARPU immediately
+
+Pricing structure
+Tier	Price	Access
+Free	$0	limited scans
+Core	$12	current product
+Alpha	$39	signals + feed
+Pro	$99	advanced + early signals
+Gate these:
+Alpha Feed
+Buy/Sell signals
+Portfolio alerts
+Upgrade triggers
+
+Show paywall when:
+
+user clicks a signal
+user receives alert
+user tries to see full reasoning
+Sprint 4 (Week 7–10): Power User Lock-in
+Goal
+
+Make serious users dependent on the product
+
+1. Add Watchlist Intelligence
+
+Users track cards → system monitors:
+
+price spikes
+comp changes
+momentum shifts
+2. Weekly Performance Report
+
+Email:
+
+“You missed +18% on X”
+“You gained +12% on Y”
+3. Trade/Flip Opportunities
+
+Surface:
+
+cards with high liquidity + momentum
+short-term opportunities
+5) Growth system (you already have advantage)
+
+You said you can get users cheap.
+
+Now refine targeting:
+
+Content strategy (very specific)
+
+Post:
+
+“Top 3 cards to buy this week”
+“Cards about to drop — sell now”
+“Undervalued cards under $100”
+
+NOT:
+
+product features
+UI
+
+Drive directly into:
+
+Alpha Feed
+6) How you find power users (this is key)
+
+Track this immediately:
+
+Metric	Why
+scans per user	engagement
+cards added	seriousness
+repeat sessions	habit
+signals clicked	intent
+
+Power users will:
+
+use product daily
+engage with signals
+have larger collections
+
+Then:
+
+DM them
+interview them
+optimize product around them
+7) What to ignore (for now)
+
+These do not move you to $1M:
+
+more social features
+display case improvements
+UI polish
+more scanning capabilities
+8) Targets to hit
+Timeframe	Goal
+60 days	100+ paying users
+120 days	$5K–$10K MRR
+6 months	$25K+ MRR
+12 months	$80K+ MRR
+9) The core shift (don’t lose this)
+
+Right now:
+
+you help users understand their cards
+
+You need to:
+
+tell them what to do with their money

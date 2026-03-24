@@ -1,0 +1,226 @@
+You’re thinking about this at the right level now. The plan is buildable, and your refinements are mostly correct. The only thing I’m going to do is tighten this into execution-grade tasks with guardrails so you don’t accidentally overbuild or stall.
+
+Key principle for Sprint 1:
+
+Don’t try to build “alpha.”
+Build memory + a believable first signal surface.
+
+Sprint 1 — Execution Plan (Hand to Replit)
+Objective
+Start accumulating market memory immediately
+Ship a visible “Alpha Feed” using existing intelligence
+Avoid heavy infra + unnecessary cost
+Task 1 — Observation Layer (highest priority)
+Goal
+
+Persist every analysis result with timestamps
+
+Implementation
+Create table: card_price_observations
+id (uuid, pk)
+card_id (string, indexed)
+price_estimate (float)
+confidence (string) -- low/med/high from Gemini
+raw_response (jsonb) -- optional but HIGHLY recommended
+created_at (timestamp, indexed)
+Modify existing flow
+
+Wherever you currently run:
+
+analysis = run_gemini_analysis(card)
+
+Add:
+
+store_observation({
+  card_id,
+  price_estimate,
+  confidence,
+  raw_response,
+  created_at
+})
+Important constraints
+Do NOT add new API calls
+Do NOT change user flow
+This is passive accumulation
+Acceptance Criteria
+Every analysis creates a row
+Can query last N observations per card
+No noticeable latency added
+Task 2 — Lightweight Snapshot Aggregator
+Goal
+
+Create usable summaries without overfitting to sparse data
+
+Implementation
+Create table: card_market_snapshots
+card_id (pk)
+avg_price_simple (float)
+observation_count (int)
+price_range_min (float)
+price_range_max (float)
+last_price (float)
+last_updated (timestamp)
+Aggregation logic (v1 — intentionally simple)
+observations = get_last_n(card_id, n=10)
+
+avg_price_simple = mean(observations)
+min_price = min(observations)
+max_price = max(observations)
+count = len(observations)
+last_price = observations[-1]
+Critical adjustment (your insight applied)
+NO 7-day / 30-day logic yet
+NO trend % yet
+NO volatility modeling
+
+You don’t have enough data.
+
+Acceptance Criteria
+Snapshot updates after each new observation OR via batch job
+Handles low data gracefully (1–3 observations)
+Task 3 — Batch Job (cost-controlled)
+Goal
+
+Accumulate data without blowing budget
+
+Implementation
+Scope (important)
+
+Start with:
+
+top 50 cards (not 200)
+run every 3 days
+Selection logic
+top_cards = get_top_cards_by(
+  portfolio_count + scan_count + analysis_count
+)
+Job flow
+for card in top_cards:
+  analysis = run_gemini_analysis(card)
+  store_observation(analysis)
+  update_snapshot(card)
+Cost guardrail
+cap total calls per run (e.g. 50)
+log cost per run
+Acceptance Criteria
+Job runs successfully on schedule
+Observations increase over time
+Cost remains predictable (<$50/month initially)
+Task 4 — Alpha Feed (frontend + logic)
+Goal
+
+Ship a compelling surface WITHOUT needing full signal accuracy
+
+Key principle
+
+You are NOT building:
+
+perfect buy/sell engine
+
+You ARE building:
+
+“this feels useful and interesting” feed
+Backend logic (v1 signals)
+
+Use EXISTING data heavily:
+
+Signal	Source
+Investment verdict	already exists
+Player momentum	already exists
+Liquidity score	already exists
+Observation count	new
+Price range	new
+Simple ranking (v1)
+score =
+  investment_verdict_weight +
+  momentum_weight +
+  liquidity_weight +
+  observation_count_weight
+Output structure
+{
+  "card_id": "...",
+  "signal": "early_buy",
+  "confidence": "low",
+  "reason": "strong player momentum + increasing interest",
+}
+Frontend UI
+New tab: “Alpha”
+
+Do NOT replace home screen yet.
+
+Sections
+Top Opportunities
+Emerging Risks
+Portfolio Highlights (if user logged in)
+Each card shows:
+Signal label:
+“Early Signal”
+“Emerging Risk”
+Confidence:
+Low / Medium
+1-line explanation
+Acceptance Criteria
+Feed loads in <2s
+Contains 10–20 ranked cards
+Feels dynamic, not static
+Task 5 — Interest Velocity (your edge, minimal version)
+Goal
+
+Start capturing proprietary signals early
+
+Table: card_interest_events
+id
+card_id
+event_type (scan / add / view)
+created_at
+Aggregation
+recent = count_events(card_id, last_7_days)
+historical = avg_weekly_events(card_id)
+
+velocity = recent / max(historical, 1)
+Use in feed
+boost cards with velocity spikes
+surface as “Trending Among Users”
+Acceptance Criteria
+Events tracked correctly
+Can compute velocity
+Visible impact in feed
+What NOT to build in Sprint 1
+
+Avoid:
+
+trend % calculations
+volatility models
+complex alpha scoring
+full market coverage
+replacing existing UI
+Sprint 1 success criteria (very important)
+
+You should be able to answer:
+
+Are users clicking on Alpha Feed?
+Are certain cards consistently getting engagement?
+Are power users emerging (high interaction)?
+
+Not:
+
+“is the model perfect?”
+Final guidance (this is the real difference-maker)
+
+You said this already, but it’s worth reinforcing:
+
+The danger is over-engineering the Alpha Score too early
+
+The actual path to $1M is:
+
+Ship signals fast
+Observe user behavior
+Refine what signals actually drive action
+If you want next step
+
+Next highest-leverage move after this:
+
+define exact signal types (10–15) that feel sharp and actionable
+or design conversion triggers (when users upgrade after seeing a signal)
+
+Those two things will determine whether this becomes a business or just a feature.
