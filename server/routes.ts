@@ -3508,6 +3508,23 @@ Sitemap: ${origin}/sitemap.xml
           priceMax = unifiedMax || marketValue * 1.5;
           compCount = unifiedResult.market.soldCount;
 
+          // ULTRA-LOW-POP SCARCITY FLOOR: For /1-/5 cards with 0 real comps, Gemini often
+          // under-values because it can't find exact sales and anchors to common parallels.
+          // Apply a minimum scarcity multiplier based on what a /99 of this player would sell for.
+          if (qaIsVeryLowPop && unifiedResult.market.soldCount === 0 && marketValue > 0) {
+            const popMatch = qaVariation.match(/\/\s*(\d+)/);
+            const popNum = popMatch ? parseInt(popMatch[1]) : 5;
+            // Minimum floor: /2 should be at least 5x the avg, /5 at least 3x
+            // This catches cases where Gemini returns $85 for a /2 that should be $500+
+            const scarcityFloor = popNum <= 2 ? marketValue * 5 : popNum <= 3 ? marketValue * 4 : popNum <= 5 ? marketValue * 3 : marketValue * 2;
+            if (marketValue < 200 && scarcityFloor > marketValue) {
+              console.warn(`[Quick Analyze] SCARCITY FLOOR: /${popNum} card estimated at $${marketValue} with 0 comps — applying ${popNum <= 2 ? "5x" : popNum <= 3 ? "4x" : "3x"} scarcity floor → $${scarcityFloor}`);
+              marketValue = Math.round(scarcityFloor);
+              priceMin = Math.round(marketValue * 0.6);
+              priceMax = Math.round(marketValue * 2);
+            }
+          }
+
           // RAW LOW-POP CONTAMINATION CHECK: For raw numbered cards (/6-/49), real raw sales are
           // extremely rare, so Gemini often returns PSA10/PSA9 prices as "raw" prices.
           // A raw card CANNOT cost more than its PSA 9 grade — if it does, the price is contaminated.

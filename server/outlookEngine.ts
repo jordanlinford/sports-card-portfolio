@@ -424,8 +424,13 @@ Direct sales of this exact card are rare. Search in this order and use your mark
 ${vs.join("\n")}
 4. If still no data, search: "${playerSearchStandalone} ${yearStrStandalone} sold eBay" for any recent sales
 
-Based on your search results and your expert knowledge of the sports card market, provide a realistic market value.
-Do NOT use fixed multiplier formulas. Use your judgment: what would this card actually sell for on eBay today?
+CRITICAL SCARCITY PRICING RULES for /${pn || 1} cards:
+- A /${pn || 1} is an ULTRA-RARE "whale" card. It is NOT comparable to common retail parallels.
+- If you find /99 comps at $X, a /${pn || 1} is typically 10-30x that value, NOT 1-2x.
+- Typical scarcity multipliers from base/common parallels: /99 = 5-10x base, /49 = 2-3x /99, /25 = 2-3x /49, /10 = 2-3x /25, /5 = 2x /10, /2 = 2-3x /5, 1/1 = 2-5x /2.
+- For star/elite players (franchise QBs, MVP candidates, top rookies), /1-/5 cards in premium sets regularly sell for $500-$5000+.
+- Do NOT anchor to the base card price. A /2 card of a franchise QB is a $500+ card, not an $85 card.
+- When no exact comps exist, TRIANGULATE UP from the highest-numbered parallel you can find, applying appropriate scarcity premiums.
 Cite which comps or knowledge you used in the notes field.`;
     }
 
@@ -1009,9 +1014,13 @@ Direct sales of this exact card are rare. Search in this order and use your mark
 ${verticalSearches.join("\n")}
 4. If still no data: "${playerSearch} ${yearStr} sold eBay" for any recent sales of this player
 
-Based on your search results and your expert knowledge of the sports card market, provide a realistic market value.
-Do NOT apply fixed multiplier formulas. Use your judgment: what would this card actually sell for on eBay today?
-Consider the player's position and tier, the memorabilia type (caps/hats are worth less than patches/jerseys), and the brand tier.
+CRITICAL SCARCITY PRICING RULES for /${popNumber || 1} cards:
+- A /${popNumber || 1} is an ULTRA-RARE "whale" card. It is NOT comparable to common retail parallels.
+- If you find /99 comps at $X, a /${popNumber || 1} is typically 10-30x that value, NOT 1-2x.
+- Typical scarcity multipliers from base/common parallels: /99 = 5-10x base, /49 = 2-3x /99, /25 = 2-3x /49, /10 = 2-3x /25, /5 = 2x /10, /2 = 2-3x /5, 1/1 = 2-5x /2.
+- For star/elite players (franchise QBs, MVP candidates, top rookies), /1-/5 cards in premium sets regularly sell for $500-$5000+.
+- Do NOT anchor to the base card price. A /2 Snakeskin Prizm of a franchise QB is a $500+ card, not an $85 card.
+- When no exact comps exist, TRIANGULATE UP from the highest-numbered parallel you can find, applying appropriate scarcity premiums.
 Cite which comps or market knowledge you used in the notes field.`;
     }
 
