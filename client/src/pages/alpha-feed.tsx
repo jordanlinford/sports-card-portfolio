@@ -97,6 +97,17 @@ function formatPrice(value: number | null | undefined) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
+function getSignalLabel(signalType?: string): { label: string; className: string } | null {
+  if (!signalType) return null;
+  if (signalType === "strong_buy" || signalType === "buy") {
+    return { label: "Early Signal", className: "text-green-700 dark:text-green-400" };
+  }
+  if (signalType === "strong_sell" || signalType === "sell") {
+    return { label: "Emerging Risk", className: "text-red-700 dark:text-red-400" };
+  }
+  return { label: "Market Watch", className: "text-yellow-700 dark:text-yellow-400" };
+}
+
 function SignalCardComponent({ signal, card, showOwned, ownedAction }: {
   signal?: Signal;
   card: SignalCard | null;
@@ -107,11 +118,23 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction }: {
 
   const signalBadge = signal ? getSignalBadge(signal.signalType) : null;
   const confidenceBadge = signal ? getConfidenceBadge(signal.confidence) : null;
+  const signalLabel = getSignalLabel(signal?.signalType);
   const price = formatPrice(card.manualValue ?? card.estimatedValue);
 
   return (
     <Card className="hover-elevate" data-testid={`signal-card-${card.id}`}>
       <CardContent className="p-4">
+        {signalLabel && (
+          <div className="flex items-center gap-1.5 mb-2" data-testid={`label-signal-type-${card.id}`}>
+            <Zap className={`h-3 w-3 ${signalLabel.className}`} />
+            <span className={`text-xs font-semibold ${signalLabel.className}`}>
+              {signalLabel.label}
+            </span>
+            <span className="text-[10px] text-muted-foreground">
+              Based on recent observed market activity
+            </span>
+          </div>
+        )}
         <div className="flex gap-3">
           <div className="w-16 h-20 flex-shrink-0 rounded-md overflow-hidden bg-muted">
             {card.imagePath ? (
