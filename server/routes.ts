@@ -3593,13 +3593,40 @@ Sitemap: ${origin}/sitemap.xml
       const legacyPricePoints = priceData.pricePoints || [];
       const legacyHasRealData = legacyPricePoints.length >= 2;
       const hasAnyRealComps = compCount > 0 || legacyHasRealData;
+      const unifiedZeroCompEstimate = (unifiedResult && unifiedResult.market.avgPrice > 0 && (unifiedResult.market.soldCount || 0) === 0)
+        ? ((qaIsRaw ? unifiedResult.market.rawPrice : null) ?? unifiedResult.market.avgPrice)
+        : null;
       if (!hasAnyRealComps && !qaIs1of1 && !qaIsVeryLowPop && !qaIsSSP) {
         const preExisting = marketValue || 0;
         if (specCrossProduct && specCrossProduct.avgPrice > 0) {
-          console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: Using $${specCrossProduct.avgPrice} (range $${specCrossProduct.minPrice}-$${specCrossProduct.maxPrice}, sport: ${detectedSport || "unknown"}). | ${specCrossProduct.notes.substring(0, 100)}`);
-          marketValue = specCrossProduct.avgPrice;
-          priceMin = specCrossProduct.minPrice;
-          priceMax = specCrossProduct.maxPrice;
+          if (unifiedZeroCompEstimate && unifiedZeroCompEstimate > 0) {
+            const ratio = unifiedZeroCompEstimate / specCrossProduct.avgPrice;
+            if (ratio > 2 || ratio < 0.5) {
+              console.log(`[Quick Analyze] CROSS-PRODUCT vs UNIFIED CONFLICT: CrossProduct $${specCrossProduct.avgPrice} vs Unified $${unifiedZeroCompEstimate} (${ratio.toFixed(1)}x diff). Using unified estimate — Gemini grounded search is more targeted than generic cross-product.`);
+              marketValue = unifiedZeroCompEstimate;
+              priceMin = Math.round(unifiedZeroCompEstimate * 0.6);
+              priceMax = Math.round(unifiedZeroCompEstimate * 1.5);
+              compCount = 0;
+            } else {
+              const blended = Math.round((unifiedZeroCompEstimate * 0.6 + specCrossProduct.avgPrice * 0.4) * 100) / 100;
+              console.log(`[Quick Analyze] CROSS-PRODUCT BLENDED: CrossProduct $${specCrossProduct.avgPrice} + Unified $${unifiedZeroCompEstimate} → blended $${blended}`);
+              marketValue = blended;
+              priceMin = Math.round(Math.min(specCrossProduct.minPrice, unifiedZeroCompEstimate * 0.7));
+              priceMax = Math.round(Math.max(specCrossProduct.maxPrice, unifiedZeroCompEstimate * 1.3));
+              compCount = 0;
+            }
+          } else {
+            console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: Using $${specCrossProduct.avgPrice} (range $${specCrossProduct.minPrice}-$${specCrossProduct.maxPrice}, sport: ${detectedSport || "unknown"}). | ${specCrossProduct.notes.substring(0, 100)}`);
+            marketValue = specCrossProduct.avgPrice;
+            priceMin = specCrossProduct.minPrice;
+            priceMax = specCrossProduct.maxPrice;
+            compCount = 0;
+          }
+        } else if (unifiedZeroCompEstimate && unifiedZeroCompEstimate > 0 && (!marketValue || marketValue <= 0)) {
+          console.log(`[Quick Analyze] UNIFIED LAST-RESORT: No cross-product available. Using unified zero-comp estimate $${unifiedZeroCompEstimate}`);
+          marketValue = unifiedZeroCompEstimate;
+          priceMin = Math.round(unifiedZeroCompEstimate * 0.6);
+          priceMax = Math.round(unifiedZeroCompEstimate * 1.5);
           compCount = 0;
         } else {
           console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: No usable result (current est: $${preExisting}).`);
