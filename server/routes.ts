@@ -9940,4 +9940,80 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  app.get("/api/alpha/signals", async (req: any, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      const signalType = req.query.type as string | undefined;
+      const signals = await storage.getActiveSignals(limit, signalType);
+      res.json({ signals });
+    } catch (error) {
+      console.error("[Alpha] Signals error:", error);
+      res.status(500).json({ message: "Failed to fetch signals" });
+    }
+  });
+
+  app.get("/api/alpha/signals/:cardId", async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+      const signal = await storage.getCardSignal(cardId);
+      res.json({ signal: signal ?? null });
+    } catch (error) {
+      console.error("[Alpha] Card signal error:", error);
+      res.status(500).json({ message: "Failed to fetch card signal" });
+    }
+  });
+
+  app.post("/api/admin/alpha-batch-run", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const isAdmin = await storage.isUserAdmin(userId);
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { isBatchRunning, runAlphaBatchJob } = await import("./alphaEngine");
+      if (isBatchRunning()) {
+        return res.status(409).json({ message: "Batch job already in progress" });
+      }
+
+      res.json({ message: "Batch job started", status: "running" });
+
+      runAlphaBatchJob().catch(err => {
+        console.error("[Alpha Batch] Admin-triggered run failed:", err.message);
+      });
+    } catch (error) {
+      console.error("[Alpha] Admin batch trigger error:", error);
+      res.status(500).json({ message: "Failed to start batch job" });
+    }
+  });
+
+  app.get("/api/admin/alpha-batch-status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const isAdmin = await storage.isUserAdmin(userId);
+      if (!isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { getLastBatchRunStats, isBatchRunning } = await import("./alphaEngine");
+      res.json({
+        running: isBatchRunning(),
+        lastRun: getLastBatchRunStats(),
+      });
+    } catch (error) {
+      console.error("[Alpha] Batch status error:", error);
+      res.status(500).json({ message: "Failed to fetch batch status" });
+    }
+  });
+
+  // Start the Alpha batch scheduler
+  import("./alphaEngine").then(({ startBatchScheduler }) => {
+    startBatchScheduler();
+  }).catch(err => {
+    console.error("[Alpha Batch] Failed to start scheduler:", err.message);
+  });
+
 }

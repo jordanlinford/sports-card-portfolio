@@ -118,6 +118,9 @@ import {
   type CardInterestEvent,
   type InsertCardInterestEvent,
   type InterestVelocity,
+  cardSignals,
+  type CardSignal,
+  type InsertCardSignal,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -435,6 +438,12 @@ export interface IStorage {
   insertInterestEvent(data: InsertCardInterestEvent): Promise<CardInterestEvent>;
   getInterestVelocity(cardId?: number, playerName?: string, cardTitle?: string): Promise<InterestVelocity>;
   getTopCardsByInterest(limit?: number): Promise<{ cardId: number | null; playerName: string | null; cardTitle: string | null; totalEvents: number }[]>;
+
+  // Alpha Engine - Signals
+  upsertCardSignal(data: InsertCardSignal): Promise<CardSignal>;
+  getActiveSignals(limit?: number, signalType?: string): Promise<CardSignal[]>;
+  getCardSignal(cardId: number): Promise<CardSignal | undefined>;
+  getTopCardsByOwnership(limit?: number): Promise<{ cardId: number; title: string; playerName: string | null; ownerCount: number; interestCount: number; observationCount: number; totalScore: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3727,6 +3736,118 @@ export class DatabaseStorage implements IStorage {
       .groupBy(cardInterestEvents.cardId, cardInterestEvents.playerName, cardInterestEvents.cardTitle)
       .orderBy(sql`count(*) DESC`)
       .limit(limit);
+  }
+
+  // =========================================================================
+  // Alpha Engine - Signals
+  // =========================================================================
+
+  async upsertCardSignal(data: InsertCardSignal): Promise<CardSignal> {
+    const [row] = await db
+      .insert(cardSignals)
+      .values(data)
+      .onConflictDoUpdate({
+        target: cardSignals.cardId,
+        set: {
+          alphaScore: data.alphaScore,
+          signalType: data.signalType,
+          confidence: data.confidence,
+          reasoning: data.reasoning,
+          playerName: data.playerName,
+          cardTitle: data.cardTitle,
+          expiresAt: data.expiresAt,
+          batchRunId: data.batchRunId,
+          createdAt: new Date(),
+        },
+      })
+      .returning();
+    return row;
+  }
+
+  async getActiveSignals(limit: number = 50, signalType?: string): Promise<CardSignal[]> {
+    const now = new Date();
+    const conditions = [sql`${cardSignals.expiresAt} > ${now}`];
+    if (signalType) {
+      conditions.push(eq(cardSignals.signalType, signalType));
+    }
+
+    return db
+      .select()
+      .from(cardSignals)
+      .where(and(...conditions))
+      .orderBy(desc(cardSignals.alphaScore))
+      .limit(limit);
+  }
+
+  async getCardSignal(cardId: number): Promise<CardSignal | undefined> {
+    const now = new Date();
+    const [row] = await db
+      .select()
+      .from(cardSignals)
+      .where(and(eq(cardSignals.cardId, cardId), sql`${cardSignals.expiresAt} > ${now}`))
+      .orderBy(desc(cardSignals.createdAt))
+      .limit(1);
+    return row;
+  }
+
+  async getTopCardsByOwnership(limit: number = 50): Promise<{ cardId: number; title: string; playerName: string | null; ownerCount: number; interestCount: number; observationCount: number; totalScore: number }[]> {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const ownershipQuery = db
+      .select({
+        cardId: sql<number>`MIN(${cards.id})::int`.as("card_id"),
+        title: sql<string>`MIN(${cards.title})`.as("title"),
+        playerName: sql<string | null>`MIN(${cards.playerName})`.as("player_name"),
+        ownerCount: sql<number>`COUNT(DISTINCT ${displayCases.userId})::int`.as("owner_count"),
+      })
+      .from(cards)
+      .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+      .where(sql`${cards.estimatedValue} IS NOT NULL AND ${cards.estimatedValue} > 0`)
+      .groupBy(sql`LOWER(${cards.title})`, cards.playerName)
+      .orderBy(sql`COUNT(DISTINCT ${displayCases.userId}) DESC`)
+      .limit(limit * 2);
+
+    const rows = await ownershipQuery;
+
+    const cardIds = rows.map(r => r.cardId).filter(Boolean);
+    if (cardIds.length === 0) return [];
+
+    const interestCounts = await db
+      .select({
+        cardId: cardInterestEvents.cardId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(cardInterestEvents)
+      .where(and(
+        inArray(cardInterestEvents.cardId, cardIds),
+        sql`${cardInterestEvents.createdAt} >= ${thirtyDaysAgo}`
+      ))
+      .groupBy(cardInterestEvents.cardId);
+
+    const observationCounts = await db
+      .select({
+        cardId: cardPriceObservations.cardId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(cardPriceObservations)
+      .where(inArray(cardPriceObservations.cardId, cardIds))
+      .groupBy(cardPriceObservations.cardId);
+
+    const interestMap = new Map(interestCounts.map(r => [r.cardId, r.count]));
+    const obsMap = new Map(observationCounts.map(r => [r.cardId, r.count]));
+
+    const scored = rows.map(r => ({
+      cardId: r.cardId,
+      title: r.title,
+      playerName: r.playerName,
+      ownerCount: r.ownerCount,
+      interestCount: interestMap.get(r.cardId) ?? 0,
+      observationCount: obsMap.get(r.cardId) ?? 0,
+      totalScore: (r.ownerCount * 3) + ((interestMap.get(r.cardId) ?? 0) * 2) + (obsMap.get(r.cardId) ?? 0),
+    }));
+
+    scored.sort((a, b) => b.totalScore - a.totalScore);
+    return scored.slice(0, limit);
   }
 }
 

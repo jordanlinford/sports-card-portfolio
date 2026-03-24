@@ -2503,3 +2503,40 @@ export type InterestVelocity = {
   velocity: number;
   eventBreakdown: Record<string, number>;
 };
+
+// ============================================================================
+// ALPHA ENGINE - Card Signals
+// ============================================================================
+
+export const SIGNAL_TYPES = ["strong_buy", "buy", "hold", "sell", "strong_sell"] as const;
+export type SignalType = typeof SIGNAL_TYPES[number];
+
+export const SIGNAL_CONFIDENCE = ["low", "medium", "high"] as const;
+export type SignalConfidence = typeof SIGNAL_CONFIDENCE[number];
+
+export const cardSignals = pgTable("card_signals", {
+  id: serial("id").primaryKey(),
+  cardId: integer("card_id").references(() => cards.id, { onDelete: "cascade" }),
+  playerName: varchar("player_name", { length: 255 }),
+  cardTitle: varchar("card_title", { length: 512 }),
+  alphaScore: real("alpha_score").notNull(),
+  signalType: varchar("signal_type", { length: 20 }).notNull(),
+  confidence: varchar("confidence", { length: 10 }).notNull(),
+  reasoning: text("reasoning"),
+  expiresAt: timestamp("expires_at").notNull(),
+  batchRunId: varchar("batch_run_id", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("idx_signals_card_id_unique").on(table.cardId),
+  index("idx_signals_created").on(table.createdAt),
+  index("idx_signals_type").on(table.signalType),
+  index("idx_signals_alpha_score").on(table.alphaScore),
+  index("idx_signals_expires").on(table.expiresAt),
+]);
+
+export const insertCardSignalSchema = createInsertSchema(cardSignals).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertCardSignal = z.infer<typeof insertCardSignalSchema>;
+export type CardSignal = typeof cardSignals.$inferSelect;
