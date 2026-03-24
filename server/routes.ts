@@ -10009,6 +10009,123 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  app.get("/api/alpha/feed", async (req: any, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+
+      const allSignals = await storage.getActiveSignals(200);
+
+      const buySignals = allSignals
+        .filter(s => s.signalType === "strong_buy" || s.signalType === "buy")
+        .sort((a, b) => b.alphaScore - a.alphaScore)
+        .slice(0, limit);
+
+      const sellSignals = allSignals
+        .filter(s => s.signalType === "strong_sell" || s.signalType === "sell")
+        .sort((a, b) => a.alphaScore - b.alphaScore)
+        .slice(0, limit);
+
+      const buyCardIds = buySignals.map(s => s.cardId).filter(Boolean) as number[];
+      const sellCardIds = sellSignals.map(s => s.cardId).filter(Boolean) as number[];
+      const trending = await storage.getTopCardsByInterest(limit);
+      const trendingCardIds = trending.map(t => t.cardId).filter(Boolean) as number[];
+      const allCardIds = [...new Set([...buyCardIds, ...sellCardIds, ...trendingCardIds])];
+
+      const cardMap = new Map<number, any>();
+      const toCardSummary = (card: any) => ({
+        id: card.id,
+        title: card.title,
+        playerName: card.playerName,
+        imagePath: card.imagePath,
+        set: card.set,
+        year: card.year,
+        estimatedValue: card.estimatedValue,
+        manualValue: card.manualValue,
+        sport: card.sport,
+        variation: card.variation,
+      });
+
+      const cardResults = await Promise.all(allCardIds.map(id => storage.getCard(id)));
+      for (const card of cardResults) {
+        if (card) cardMap.set(card.id, toCardSummary(card));
+      }
+
+      const trendingWithCards = trending
+        .filter(t => t.cardId && cardMap.has(t.cardId))
+        .map(t => ({ ...t, card: cardMap.get(t.cardId!) }));
+
+      res.json({
+        opportunities: buySignals.map(s => ({
+          ...s,
+          card: s.cardId ? cardMap.get(s.cardId) ?? null : null,
+        })),
+        risks: sellSignals.map(s => ({
+          ...s,
+          card: s.cardId ? cardMap.get(s.cardId) ?? null : null,
+        })),
+        trending: trendingWithCards,
+      });
+    } catch (error) {
+      console.error("[Alpha] Feed error:", error);
+      res.status(500).json({ message: "Failed to fetch alpha feed" });
+    }
+  });
+
+  app.get("/api/alpha/portfolio-alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const userCards = await storage.getAllUserCards(userId);
+
+      if (userCards.length === 0) {
+        return res.json({ alerts: [] });
+      }
+
+      const allSignals = await storage.getActiveSignals(200);
+      const signalMap = new Map<number, any>();
+      for (const s of allSignals) {
+        if (s.cardId) signalMap.set(s.cardId, s);
+      }
+
+      const alerts = [];
+      for (const card of userCards) {
+        const signal = signalMap.get(card.id);
+        if (signal) {
+          alerts.push({
+            signal,
+            card: {
+              id: card.id,
+              title: card.title,
+              playerName: card.playerName,
+              imagePath: card.imagePath,
+              set: card.set,
+              year: card.year,
+              estimatedValue: card.estimatedValue,
+              manualValue: card.manualValue,
+              sport: card.sport,
+              variation: card.variation,
+              displayCaseName: card.displayCaseName,
+            },
+            action: signal.signalType === "strong_sell" || signal.signalType === "sell"
+              ? "Consider selling"
+              : signal.signalType === "strong_buy" || signal.signalType === "buy"
+              ? "Consider adding more"
+              : "Monitor closely",
+          });
+        }
+      }
+
+      alerts.sort((a, b) => {
+        const priority: Record<string, number> = { strong_sell: 0, sell: 1, strong_buy: 2, buy: 3, hold: 4 };
+        return (priority[a.signal.signalType] ?? 5) - (priority[b.signal.signalType] ?? 5);
+      });
+
+      res.json({ alerts: alerts.slice(0, 20) });
+    } catch (error) {
+      console.error("[Alpha] Portfolio alerts error:", error);
+      res.status(500).json({ message: "Failed to fetch portfolio alerts" });
+    }
+  });
+
   // Start the Alpha batch scheduler
   import("./alphaEngine").then(({ startBatchScheduler }) => {
     startBatchScheduler();

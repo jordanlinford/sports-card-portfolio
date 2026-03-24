@@ -131,6 +131,22 @@ export function Navigation() {
               </Link>
             )}
 
+            {/* Alpha Feed */}
+            <Link href="/alpha">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className={cn("gap-2 relative", isActive("/alpha") && "bg-accent")}
+                data-testid="nav-alpha"
+              >
+                <Zap className="h-4 w-4" />
+                Alpha
+                <Badge variant="default" className="text-[9px] px-1 py-0 h-4 absolute -top-1 -right-1 bg-primary">
+                  New
+                </Badge>
+              </Button>
+            </Link>
+
             {/* Portfolio Dropdown - auth only */}
             {isAuthenticated && user && (
               <DropdownMenu>
@@ -541,6 +557,19 @@ export function Navigation() {
                     </Button>
                   </Link>
                 )}
+
+                {/* Alpha Feed */}
+                <Link href="/alpha" onClick={() => setMobileMenuOpen(false)}>
+                  <Button 
+                    variant="ghost" 
+                    className={cn("w-full justify-start gap-3", isActive("/alpha") && "bg-accent")}
+                    data-testid="nav-alpha-mobile"
+                  >
+                    <Zap className="h-4 w-4" />
+                    Alpha Feed
+                    <Badge variant="default" className="ml-auto text-[9px] px-1 py-0 h-4 bg-primary">New</Badge>
+                  </Button>
+                </Link>
 
                 {/* Portfolio Section - auth only */}
                 {isAuthenticated && user && (
