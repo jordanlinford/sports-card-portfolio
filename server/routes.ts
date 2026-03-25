@@ -4057,7 +4057,7 @@ Sitemap: ${origin}/sitemap.xml
 
       if (marketValue && marketValue > 0) {
         recordPriceObservation({
-          playerName: playerName ?? undefined,
+          playerName: playerNameForSearch ?? undefined,
           cardTitle: title,
           setName: set ?? undefined,
           year: year ?? undefined,
@@ -4068,7 +4068,7 @@ Sitemap: ${origin}/sitemap.xml
           soldCount: unifiedResult?.market?.soldCount ?? undefined,
           source: "quick_analyze",
         });
-        recordInterestEvent({ playerName: playerName ?? undefined, cardTitle: title, eventType: "analyze", userId: (req as any).user?.claims?.sub });
+        recordInterestEvent({ playerName: playerNameForSearch ?? undefined, cardTitle: title, eventType: "analyze", userId: (req as any).user?.claims?.sub });
       }
     } catch (error) {
       console.error("Error in quick analyze:", error);
