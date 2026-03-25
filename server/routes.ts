@@ -10014,6 +10014,20 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  app.get("/api/alpha/signals/player/:playerName", async (req: any, res) => {
+    try {
+      const playerName = decodeURIComponent(req.params.playerName);
+      const allSignals = await storage.getActiveSignals(200);
+      const playerSignals = allSignals.filter(s =>
+        s.playerName?.toLowerCase() === playerName.toLowerCase()
+      );
+      res.json({ signals: playerSignals });
+    } catch (error) {
+      console.error("[Alpha] Player signals error:", error);
+      res.status(500).json({ message: "Failed to fetch player signals" });
+    }
+  });
+
   app.post("/api/internal/alpha-batch-trigger", async (req: any, res) => {
     const secret = req.headers["x-internal-key"];
     if (secret !== process.env.REPL_ID) {

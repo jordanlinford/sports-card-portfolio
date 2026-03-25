@@ -43,8 +43,10 @@ import {
   Briefcase,
   History,
   ArrowLeft,
+  Zap,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/hooks/use-toast";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import { InvestmentCallCard } from "@/components/investment-call-card";
@@ -120,6 +122,137 @@ function getModifierColor(modifier: VerdictModifier) {
     case "Late Cycle": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
     default: return "bg-muted text-muted-foreground";
   }
+}
+
+function SignalContextHeader({ signalId, playerName }: { signalId: string; playerName?: string }) {
+  const { data: signalData } = useQuery<{ signal: any }>({
+    queryKey: ["/api/alpha/signals", signalId],
+    queryFn: async () => {
+      const res = await fetch(`/api/alpha/signals/${signalId}`);
+      if (!res.ok) return { signal: null };
+      return res.json();
+    },
+    enabled: !!signalId,
+    staleTime: 1000 * 60 * 10,
+  });
+
+  const signal = signalData?.signal;
+  const trackedRef = useRef(false);
+
+  useEffect(() => {
+    if (signal && !trackedRef.current) {
+      trackedRef.current = true;
+      trackEvent("signal_view", "alpha", playerName || undefined);
+      fetch("/api/alpha/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventType: "signal_view", playerName }),
+      }).catch(() => {});
+    }
+  }, [signal, playerName]);
+
+  if (!signal) return null;
+
+  const signalType = (signal.signalType || "").toLowerCase();
+  const isBuy = signalType.includes("buy");
+  const isSell = signalType.includes("sell");
+  const signalInfo = isBuy
+    ? { label: signalType.includes("strong") ? "Strong Conviction" : "High Conviction", textClass: "text-emerald-700 dark:text-emerald-400", bgClass: "bg-emerald-500/10", borderClass: "border-emerald-500/30", cardBg: "bg-emerald-500/5" }
+    : isSell
+    ? { label: signalType.includes("strong") ? "High Risk" : "Emerging Risk", textClass: "text-red-700 dark:text-red-400", bgClass: "bg-red-500/10", borderClass: "border-red-500/30", cardBg: "bg-red-500/5" }
+    : { label: "Market Watch", textClass: "text-amber-700 dark:text-amber-400", bgClass: "bg-amber-500/10", borderClass: "border-amber-500/30", cardBg: "bg-amber-500/5" };
+  const confidenceMap: Record<string, string> = { high: "High", med: "Medium", medium: "Medium", low: "Low" };
+  const drivers = (signal.drivers || []).filter(Boolean).slice(0, 2);
+
+  return (
+    <Card className={`border ${signalInfo.borderClass} ${signalInfo.cardBg}`} data-testid="signal-context-header">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className={`flex h-8 w-8 items-center justify-center rounded-full shrink-0 ${signalInfo.bgClass}`}>
+            <Zap className={`h-4 w-4 ${signalInfo.textClass}`} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className={`${signalInfo.bgClass} ${signalInfo.textClass} ${signalInfo.borderClass}`} data-testid="badge-signal-label">
+                {signalInfo.label}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]" data-testid="badge-signal-confidence">
+                {confidenceMap[signal.confidence] || signal.confidence} confidence
+              </Badge>
+            </div>
+            {drivers.length > 0 && (
+              <ul className="mt-2 space-y-0.5">
+                {drivers.map((d: string, i: number) => (
+                  <li key={i} className="text-sm text-muted-foreground flex items-start gap-1.5">
+                    <span className="text-primary mt-0.5">•</span>
+                    <span>{d}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {signal.whyNow && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <Clock className="h-3 w-3 text-muted-foreground/70 shrink-0" />
+                <span className="text-xs text-muted-foreground italic">{signal.whyNow}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function RelatedSignalsPanel({ playerName }: { playerName: string }) {
+  const { data: signalsData } = useQuery<{ signals: any[] }>({
+    queryKey: ["/api/alpha/signals/player", playerName],
+    queryFn: async () => {
+      const res = await fetch(`/api/alpha/signals/player/${encodeURIComponent(playerName)}`);
+      if (!res.ok) return { signals: [] };
+      return res.json();
+    },
+    enabled: !!playerName,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const signals = signalsData?.signals || [];
+  if (signals.length === 0) return null;
+
+  const labelMap: Record<string, { label: string; className: string }> = {
+    buy: { label: "Buy Signal", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" },
+    sell: { label: "Sell Signal", className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30" },
+    hold: { label: "Hold", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30" },
+  };
+
+  return (
+    <Card data-testid="related-signals-panel">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Zap className="h-4 w-4 text-primary" />
+          Active Signals for {playerName}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-2">
+          {signals.map((s: any) => {
+            const info = labelMap[s.signalType?.toLowerCase()] || labelMap.hold;
+            const topDriver = s.drivers?.filter(Boolean)?.[0];
+            return (
+              <div key={s.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50" data-testid={`related-signal-${s.id}`}>
+                <Badge className={`${info.className} text-[10px] shrink-0`}>{info.label}</Badge>
+                <span className="text-xs text-muted-foreground truncate flex-1">
+                  {topDriver || s.cardTitle || ""}
+                </span>
+                {s.confidence && (
+                  <span className="text-[10px] text-muted-foreground shrink-0">{s.confidence}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function PlayerOutlookSkeleton() {
@@ -559,10 +692,24 @@ interface PortfolioContextProps {
   hasMore: boolean;
 }
 
-function PortfolioContextPanel({ data }: { data: PortfolioContextProps }) {
-  const [isOpen, setIsOpen] = useState(false);
+function getCardActionFromVerdict(verdict?: string): { label: string; className: string; icon: typeof TrendingUp } {
+  const v = (verdict || "").toLowerCase();
+  if (v.includes("strong buy") || v.includes("buy")) {
+    return { label: "Add More", className: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", icon: TrendingUp };
+  }
+  if (v.includes("sell") || v.includes("reduce")) {
+    return { label: "Consider Selling", className: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30", icon: TrendingDown };
+  }
+  return { label: "Hold", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30", icon: Minus };
+}
+
+function PortfolioContextPanel({ data, verdict }: { data: PortfolioContextProps; verdict?: string }) {
+  const [isOpen, setIsOpen] = useState(true);
   
   if (data.cardCount === 0) return null;
+
+  const action = getCardActionFromVerdict(verdict);
+  const ActionIcon = action.icon;
   
   return (
     <Card className="border-primary/30 bg-primary/5" data-testid="card-portfolio-context">
@@ -571,12 +718,13 @@ function PortfolioContextPanel({ data }: { data: PortfolioContextProps }) {
           <CardHeader className="cursor-pointer hover-elevate pb-3" data-testid="trigger-portfolio-context">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-primary" />
-                Your {data.playerName} Holdings
+                <Target className="h-5 w-5 text-primary" />
+                What To Do Next
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Badge className="bg-primary/20 text-primary border-primary/30" data-testid="badge-card-count">
-                  {data.cardCount} {data.cardCount === 1 ? "Card" : "Cards"}
+                <Badge className={action.className} data-testid="badge-verdict-action">
+                  <ActionIcon className="h-3 w-3 mr-1" />
+                  {action.label}
                 </Badge>
                 <Badge variant="outline" className="gap-1" data-testid="badge-total-value">
                   <DollarSign className="h-3 w-3" />
@@ -586,51 +734,65 @@ function PortfolioContextPanel({ data }: { data: PortfolioContextProps }) {
               </div>
             </div>
             <CardDescription>
-              You own cards of this player worth ${data.totalValue.toLocaleString()} total
+              You own {data.cardCount} {data.cardCount === 1 ? "card" : "cards"} of {data.playerName} worth ${data.totalValue.toLocaleString()}
             </CardDescription>
           </CardHeader>
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0">
             <div className="space-y-3">
-              {data.cardsBySet.length > 0 && (
-                <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">By Set</h4>
-                  <div className="grid gap-2">
-                    {data.cardsBySet.map((setGroup, i) => (
-                      <div key={i} className="flex items-center justify-between p-2 rounded-md bg-background/50 border" data-testid={`set-group-${i}`}>
-                        <span className="text-sm">{setGroup.set}</span>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">{setGroup.count}</Badge>
-                          <span className="text-xs text-muted-foreground">
-                            ${setGroup.totalValue.toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
               {data.cards.length > 0 && (
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">Your Cards</h4>
                   <div className="grid gap-2">
-                    {data.cards.slice(0, 5).map((card) => (
-                      <div key={card.id} className="flex items-center justify-between p-2 rounded-md bg-background/50 border text-sm" data-testid={`portfolio-card-${card.id}`}>
-                        <span className="truncate flex-1 mr-2">{card.title}</span>
-                        {card.estimatedValue && (
-                          <span className="text-muted-foreground whitespace-nowrap">
-                            ${card.estimatedValue.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
+                    {data.cards.slice(0, 6).map((card) => (
+                      <Link key={card.id} href={`/cards/${card.id}`} onClick={() => {
+                        trackEvent("card_click_from_player", "navigation", card.title || undefined);
+                        fetch("/api/alpha/track", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ eventType: "card_click_from_player", cardId: card.id, cardTitle: card.title }),
+                        }).catch(() => {});
+                      }}>
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-background/50 border hover:bg-background/80 transition-colors cursor-pointer" data-testid={`portfolio-card-${card.id}`}>
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <span className="text-sm truncate">{card.title}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {card.estimatedValue != null && (
+                              <span className="text-sm font-medium whitespace-nowrap">
+                                ${card.estimatedValue.toLocaleString()}
+                              </span>
+                            )}
+                            <Badge className={`${action.className} text-[10px]`}>
+                              {action.label}
+                            </Badge>
+                            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                          </div>
+                        </div>
+                      </Link>
                     ))}
                     {data.hasMore && (
                       <p className="text-xs text-muted-foreground text-center py-1">
-                        + {data.cardCount - 5} more cards
+                        + {data.cardCount - 6} more cards
                       </p>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {data.cardsBySet.length > 1 && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">By Set</h4>
+                  <div className="grid gap-1.5">
+                    {data.cardsBySet.map((setGroup, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-md bg-background/30 text-sm" data-testid={`set-group-${i}`}>
+                        <span className="text-muted-foreground truncate">{setGroup.set}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-muted-foreground">{setGroup.count} cards</span>
+                          <span className="text-xs font-medium">${setGroup.totalValue.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -1064,6 +1226,22 @@ export default function PlayerOutlookPage() {
   const [sharedPlayerName, setSharedPlayerName] = useState<string | null>(null);
   const [isLoadingShared, setIsLoadingShared] = useState(false);
   const initialSearchDone = useRef(false);
+  const trackedAlphaRef = useRef(false);
+
+  useEffect(() => {
+    if (trackedAlphaRef.current) return;
+    const params = new URLSearchParams(search);
+    if (params.get("from") === "alpha") {
+      trackedAlphaRef.current = true;
+      const pName = params.get("player") || undefined;
+      trackEvent("player_page_from_alpha", "navigation", pName);
+      fetch("/api/alpha/track", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventType: "player_page_from_alpha", playerName: pName }),
+      }).catch(() => {});
+    }
+  }, [search]);
 
   // Player key must match server's normalization: sport:playername (all lowercase, no spaces/special chars)
   const playerKey = outlookData?.player?.name 
@@ -1382,6 +1560,7 @@ export default function PlayerOutlookPage() {
           "hidden-gems": { href: "/hidden-gems", label: "Hidden Gems" },
           "watchlist": { href: "/watchlist", label: "Watchlist" },
           "next-buys": { href: "/next-buys", label: "Next Buys" },
+          "alpha": { href: "/alpha", label: "Daily Alpha" },
         };
         const back = from ? backRoutes[from] : null;
         if (!back) return null;
@@ -1484,6 +1663,13 @@ export default function PlayerOutlookPage() {
             </Card>
           )}
           
+          {(() => {
+            const params = new URLSearchParams(search);
+            const signalId = params.get("signalId");
+            if (!signalId) return null;
+            return <SignalContextHeader signalId={signalId} playerName={outlookData.player.name} />;
+          })()}
+          
           <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} />
           
           <AdvisorSnapshot 
@@ -1491,9 +1677,11 @@ export default function PlayerOutlookPage() {
             playerName={outlookData.player.name} 
           />
 
-          {/* Portfolio context - show user's holdings of this player */}
           {portfolioContext && portfolioContext.cardCount > 0 && (
-            <PortfolioContextPanel data={portfolioContext} />
+            <PortfolioContextPanel 
+              data={portfolioContext} 
+              verdict={outlookData.investmentCall?.verdict || outlookData.verdict?.action}
+            />
           )}
 
           <PriceTrendChart
@@ -1508,6 +1696,8 @@ export default function PlayerOutlookPage() {
             advisor={advisorOutlook} 
             outlook={outlookData} 
           />
+
+          <RelatedSignalsPanel playerName={outlookData.player.name} />
 
           {/* Confidence breakdown - show analysis transparency */}
           <ConfidenceBreakdownPanel 

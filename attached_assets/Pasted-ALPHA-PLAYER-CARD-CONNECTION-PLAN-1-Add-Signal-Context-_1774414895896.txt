@@ -1,0 +1,153 @@
+ALPHA → PLAYER → CARD CONNECTION PLAN
+
+⸻
+
+1. Add Signal Context Header on Player Page
+
+Goal: Preserve Alpha context when user clicks into a player
+
+Requirements:
+	•	Detect if user came from Alpha (pass signal_id or query param)
+	•	Fetch signal data tied to that click
+
+UI (top of player page):
+	•	Signal label (High Conviction / Early Signal / Emerging Risk)
+	•	“Why now” (1–2 bullet points)
+	•	Timeframe (e.g., “Last 3–5 days”)
+	•	Confidence (High / Medium / Low)
+
+Example:
+	•	High Conviction
+	•	Interest spiked this week vs historical average
+	•	Recent sales trending above typical pricing
+	•	Last 3–5 days • Medium confidence
+
+⸻
+
+2. Route Alpha Clicks → Player Page (not Card)
+
+Goal: Shift from card-first → player-first decision flow
+
+Implementation:
+	•	Update Alpha card click handler
+	•	Route to: /player/[playerId]?signalId=[id]
+	•	Only deep-link to card AFTER player page
+
+⸻
+
+3. Restructure Player Page Layout
+
+New Order:
+	1.	Signal Context (NEW)
+	2.	Player Narrative / Outlook (existing)
+	3.	Market Indicators (momentum, liquidity, etc.)
+	4.	Cards Section (action layer)
+
+⸻
+
+4. Add “What To Do Next” Section (on Player Page)
+
+Goal: Bridge conviction → action
+
+Sections:
+	•	Cards gaining traction (buy candidates)
+	•	Cards losing momentum (sell/watch candidates)
+
+Each card should show:
+	•	Card name
+	•	Price (or estimate)
+	•	Trend indicator (up/down/flat)
+	•	Quick label (Buy / Watch / Sell)
+
+⸻
+
+5. Add “Related Signals” on Player Page
+
+Goal: Reinforce pattern recognition
+
+Show:
+	•	Other recent signals tied to same player
+	•	Short format (label + 1-line reason)
+
+⸻
+
+6. Update Alpha Card Language (Player-First Framing)
+
+Change from:
+	•	Card-centric wording
+
+To:
+	•	Player-driven signals
+
+Example:
+	•	“Interest in [Player] is rising — this card is seeing stronger recent sales”
+
+⸻
+
+7. Add Micro CTA in Alpha Cards
+
+Goal: Increase click-through to Player
+
+Add 1 line:
+	•	“See why this player is trending”
+OR
+	•	“Understand what’s driving this”
+
+⸻
+
+8. Reduce Alpha Card Depth
+
+Goal: Prevent duplication with Analysis
+
+Alpha cards should ONLY show:
+	•	Signal label
+	•	1–2 drivers
+	•	Timeframe
+	•	Confidence
+
+REMOVE:
+	•	Long explanations
+	•	Full reasoning
+	•	Deep analysis text
+
+⸻
+
+9. Track Core Flow Metrics
+
+Track these events:
+	•	Alpha signal viewed
+	•	Alpha signal clicked
+	•	Player page viewed (from Alpha)
+	•	Time on player page
+	•	Card clicked from player page
+
+⸻
+
+10. Success Criteria
+
+You know this is working if:
+	•	High Alpha → Player click rate
+	•	Increased time on Player pages
+	•	Increased Player → Card clicks
+	•	Users revisit same players multiple times
+
+⸻
+
+11. Mental Model (for internal alignment)
+	•	Alpha = “Something is happening”
+	•	Player = “Now I understand why”
+	•	Card = “Here’s what I do”
+
+⸻
+
+12. Implementation Order
+	1.	Signal context header
+	2.	Route Alpha → Player
+	3.	Restructure Player page
+	4.	Add “What to do next”
+	5.	Update Alpha card language
+	6.	Add tracking
+
+⸻
+
+If you execute this cleanly, you’ll turn two separate features into a single decision system, which is what unlocks retention and monetization.

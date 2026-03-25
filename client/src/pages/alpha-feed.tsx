@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { trackEvent } from "@/lib/analytics";
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import {
   TrendingUp,
   TrendingDown,
@@ -26,6 +28,7 @@ import {
   Flame,
   BarChart3,
   Eye,
+  ArrowRight,
 } from "lucide-react";
 
 interface SignalCard {
@@ -245,19 +248,27 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
   ownerCount?: number;
   weeklyScans?: number;
 }) {
+  const [, setLocation] = useLocation();
   if (!card) return null;
 
   const signalBadge = signal ? getSignalBadge(signal.signalType) : null;
   const confidenceBadge = signal ? getConfidenceBadge(signal.confidence) : null;
   const signalLabel = getSignalLabel(signal?.signalType);
   const price = formatPrice(card.manualValue ?? card.estimatedValue);
-  const drivers = signal?.drivers?.filter(Boolean) ?? [];
+  const drivers = signal?.drivers?.filter(Boolean)?.slice(0, 2) ?? [];
   const whyNow = signal?.whyNow;
   const oc = ownerCount ?? signal?.ownerCount;
   const ws = weeklyScans ?? signal?.weeklyScans;
+  const playerName = card.playerName || card.title;
 
   const handleClick = () => {
     trackAlphaEvent("signal_click", card.id, card.playerName, card.title);
+    trackEvent("signal_click", "alpha", card.playerName || card.title || undefined);
+    if (card.playerName) {
+      const sport = card.sport || "football";
+      const signalParam = signal?.id ? `&signalId=${signal.id}` : "";
+      setLocation(`/player-outlook?player=${encodeURIComponent(card.playerName)}&sport=${sport}&from=alpha${signalParam}`);
+    }
   };
 
   return (
@@ -290,7 +301,7 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="font-semibold text-sm truncate" data-testid={`text-card-name-${card.id}`}>
-                  {card.playerName || card.title}
+                  {playerName}
                 </h3>
                 <p className="text-xs text-muted-foreground truncate" data-testid={`text-card-set-${card.id}`}>
                   {[card.year, card.set, card.variation].filter(Boolean).join(" · ")}
@@ -340,12 +351,6 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
               </ul>
             )}
 
-            {!drivers.length && signal?.reasoning && (
-              <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2" data-testid={`text-reasoning-${card.id}`}>
-                {signal.reasoning}
-              </p>
-            )}
-
             {whyNow && (
               <div className="flex items-center gap-1 mt-1.5" data-testid={`why-now-${card.id}`}>
                 <Clock className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
@@ -353,7 +358,13 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
               </div>
             )}
 
-            {signal && <FeedbackButtons signalId={signal.id} />}
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-[11px] text-primary font-medium flex items-center gap-1" data-testid={`cta-${card.id}`}>
+                See what's driving {playerName?.split(" ")[0] || "this player"}
+                <ArrowRight className="h-3 w-3" />
+              </span>
+              {signal && <FeedbackButtons signalId={signal.id} />}
+            </div>
           </div>
         </div>
       </CardContent>
@@ -362,13 +373,22 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
 }
 
 function PriceMoverCard({ mover }: { mover: PriceMover }) {
+  const [, setLocation] = useLocation();
   const card = mover.card;
   if (!card) return null;
   const isUp = mover.pctChange > 0;
   const price = formatPrice(mover.currentPrice);
 
+  const handleClick = () => {
+    if (card.playerName) {
+      trackAlphaEvent("price_mover_click", card.id, card.playerName, card.title);
+      trackEvent("price_mover_click", "alpha", card.playerName || undefined);
+      setLocation(`/player-outlook?player=${encodeURIComponent(card.playerName)}&sport=${card.sport || "football"}&from=alpha`);
+    }
+  };
+
   return (
-    <Card className="hover-elevate" data-testid={`mover-card-${card.id}`}>
+    <Card className="hover-elevate cursor-pointer" data-testid={`mover-card-${card.id}`} onClick={handleClick}>
       <CardContent className="p-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-12 flex-shrink-0 rounded overflow-hidden bg-muted">
@@ -408,12 +428,21 @@ function PriceMoverCard({ mover }: { mover: PriceMover }) {
 }
 
 function MomentumCard({ item }: { item: MomentumItem }) {
+  const [, setLocation] = useLocation();
   const card = item.card;
   if (!card) return null;
   const price = formatPrice(card.manualValue ?? card.estimatedValue);
 
+  const handleClick = () => {
+    if (card.playerName) {
+      trackAlphaEvent("momentum_click", card.id, card.playerName, card.title);
+      trackEvent("momentum_click", "alpha", card.playerName || undefined);
+      setLocation(`/player-outlook?player=${encodeURIComponent(card.playerName)}&sport=${card.sport || "football"}&from=alpha`);
+    }
+  };
+
   return (
-    <Card className="hover-elevate" data-testid={`momentum-card-${card.id}`}>
+    <Card className="hover-elevate cursor-pointer" data-testid={`momentum-card-${card.id}`} onClick={handleClick}>
       <CardContent className="p-3">
         <div className="flex items-center gap-3">
           <div className="w-10 h-12 flex-shrink-0 rounded overflow-hidden bg-muted">
@@ -452,14 +481,23 @@ function MomentumCard({ item }: { item: MomentumItem }) {
 }
 
 function TrendingHeatCard({ item, rank }: { item: TrendingItem; rank: number }) {
+  const [, setLocation] = useLocation();
   const card = item.card;
   if (!card) return null;
   const price = formatPrice(card.manualValue ?? card.estimatedValue);
   const heatColors = ["bg-red-500/15 text-red-700 dark:text-red-400", "bg-orange-500/15 text-orange-700 dark:text-orange-400", "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400"];
   const heatClass = heatColors[Math.min(rank, heatColors.length - 1)] || "bg-muted text-muted-foreground";
 
+  const handleClick = () => {
+    if (card.playerName) {
+      trackAlphaEvent("trending_click", card.id, card.playerName, card.title);
+      trackEvent("trending_click", "alpha", card.playerName || undefined);
+      setLocation(`/player-outlook?player=${encodeURIComponent(card.playerName)}&sport=${card.sport || "football"}&from=alpha`);
+    }
+  };
+
   return (
-    <Card className="hover-elevate" data-testid={`trending-card-${card.id}`}>
+    <Card className="hover-elevate cursor-pointer" data-testid={`trending-card-${card.id}`} onClick={handleClick}>
       <CardContent className="p-3">
         <div className="flex items-center gap-3">
           <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${heatClass}`}>
