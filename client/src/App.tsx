@@ -141,6 +141,10 @@ function App() {
     } else {
       initGA();
     }
+
+    queryClient.prefetchQuery({
+      queryKey: ["/api/alpha/feed"],
+    });
   }, []);
 
   return (
