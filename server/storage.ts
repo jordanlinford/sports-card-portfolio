@@ -449,6 +449,12 @@ export interface IStorage {
   getTopCardsByOwnership(limit?: number): Promise<{ cardId: number; title: string; playerName: string | null; ownerCount: number; interestCount: number; observationCount: number; totalScore: number }[]>;
   getAllCardIdsWithSnapshots(): Promise<number[]>;
 
+  // Alpha Feed V2 - Community Intelligence
+  getCardOwnershipCounts(cardIds: number[]): Promise<Map<number, number>>;
+  getWeeklyScansForCards(cardIds: number[]): Promise<Map<number, number>>;
+  getPriceMovers(limit?: number): Promise<{ cardId: number; playerName: string | null; cardTitle: string | null; previousPrice: number; currentPrice: number; pctChange: number }[]>;
+  getCommunityMomentum(limit?: number): Promise<{ cardId: number; playerName: string | null; cardTitle: string | null; addCount: number; scanCount: number; totalMomentum: number }[]>;
+
   // Signal Feedback
   upsertSignalFeedback(data: InsertSignalFeedback): Promise<SignalFeedback>;
   getSignalFeedbackCounts(signalId: number): Promise<{ useful: number; notUseful: number }>;
@@ -3906,6 +3912,111 @@ export class DatabaseStorage implements IStorage {
         eq(signalFeedback.userId, userId),
       ));
     return row;
+  }
+
+  async getCardOwnershipCounts(cardIds: number[]): Promise<Map<number, number>> {
+    if (cardIds.length === 0) return new Map();
+    const rows = await db.execute(sql`
+      WITH card_sigs AS (
+        SELECT id, LOWER(title) AS sig, player_name
+        FROM cards WHERE id = ANY(${cardIds})
+      ),
+      ownership AS (
+        SELECT cs.sig, cs.player_name, COUNT(DISTINCT dc.user_id)::int AS owner_count
+        FROM cards c
+        JOIN display_cases dc ON c.display_case_id = dc.id
+        JOIN card_sigs cs ON LOWER(c.title) = cs.sig AND (c.player_name = cs.player_name OR (c.player_name IS NULL AND cs.player_name IS NULL))
+        GROUP BY cs.sig, cs.player_name
+      )
+      SELECT cs2.id AS "cardId", COALESCE(o.owner_count, 0)::int AS "ownerCount"
+      FROM card_sigs cs2
+      LEFT JOIN ownership o ON cs2.sig = o.sig AND (cs2.player_name = o.player_name OR (cs2.player_name IS NULL AND o.player_name IS NULL))
+    `);
+    return new Map((rows.rows as any[]).map(r => [Number(r.cardId), Number(r.ownerCount)]));
+  }
+
+  async getWeeklyScansForCards(cardIds: number[]): Promise<Map<number, number>> {
+    if (cardIds.length === 0) return new Map();
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const rows = await db
+      .select({
+        cardId: cardInterestEvents.cardId,
+        scanCount: sql<number>`count(*)::int`,
+      })
+      .from(cardInterestEvents)
+      .where(and(
+        inArray(cardInterestEvents.cardId, cardIds),
+        sql`${cardInterestEvents.createdAt} >= ${weekAgo}`,
+        eq(cardInterestEvents.eventType, "scan"),
+      ))
+      .groupBy(cardInterestEvents.cardId);
+    return new Map(rows.filter(r => r.cardId !== null).map(r => [r.cardId!, r.scanCount]));
+  }
+
+  async getPriceMovers(limit: number = 10): Promise<{ cardId: number; playerName: string | null; cardTitle: string | null; previousPrice: number; currentPrice: number; pctChange: number }[]> {
+    const rows = await db.execute(sql`
+      WITH ranked_obs AS (
+        SELECT
+          card_id,
+          player_name,
+          card_title,
+          price_estimate,
+          ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY created_at DESC) AS rn
+        FROM card_price_observations
+        WHERE card_id IS NOT NULL
+      )
+      SELECT
+        curr.card_id AS "cardId",
+        curr.player_name AS "playerName",
+        curr.card_title AS "cardTitle",
+        prev.price_estimate AS "previousPrice",
+        curr.price_estimate AS "currentPrice",
+        ROUND(((curr.price_estimate - prev.price_estimate) / NULLIF(prev.price_estimate, 0))::numeric * 100, 1) AS "pctChange"
+      FROM ranked_obs curr
+      JOIN ranked_obs prev ON curr.card_id = prev.card_id AND prev.rn = 2
+      WHERE curr.rn = 1
+        AND prev.price_estimate > 0
+        AND ABS((curr.price_estimate - prev.price_estimate) / NULLIF(prev.price_estimate, 0)) > 0.05
+      ORDER BY ABS((curr.price_estimate - prev.price_estimate) / NULLIF(prev.price_estimate, 0)) DESC
+      LIMIT ${limit * 2}
+    `);
+    return (rows.rows as any[]).map(r => ({
+      cardId: Number(r.cardId),
+      playerName: r.playerName,
+      cardTitle: r.cardTitle,
+      previousPrice: Number(r.previousPrice),
+      currentPrice: Number(r.currentPrice),
+      pctChange: Number(r.pctChange),
+    }));
+  }
+
+  async getCommunityMomentum(limit: number = 10): Promise<{ cardId: number; playerName: string | null; cardTitle: string | null; addCount: number; scanCount: number; totalMomentum: number }[]> {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const rows = await db
+      .select({
+        cardId: cardInterestEvents.cardId,
+        playerName: cardInterestEvents.playerName,
+        cardTitle: cardInterestEvents.cardTitle,
+        addCount: sql<number>`COUNT(*) FILTER (WHERE ${cardInterestEvents.eventType} = 'add')::int`,
+        scanCount: sql<number>`COUNT(*) FILTER (WHERE ${cardInterestEvents.eventType} = 'scan')::int`,
+        totalMomentum: sql<number>`(COUNT(*) FILTER (WHERE ${cardInterestEvents.eventType} = 'add') * 3 + COUNT(*) FILTER (WHERE ${cardInterestEvents.eventType} = 'scan') * 2 + COUNT(*) FILTER (WHERE ${cardInterestEvents.eventType} = 'view'))::int`,
+      })
+      .from(cardInterestEvents)
+      .where(and(
+        sql`${cardInterestEvents.cardId} IS NOT NULL`,
+        sql`${cardInterestEvents.createdAt} >= ${weekAgo}`,
+      ))
+      .groupBy(cardInterestEvents.cardId, cardInterestEvents.playerName, cardInterestEvents.cardTitle)
+      .orderBy(sql`(COUNT(*) FILTER (WHERE ${cardInterestEvents.eventType} = 'add') * 3 + COUNT(*) FILTER (WHERE ${cardInterestEvents.eventType} = 'scan') * 2 + COUNT(*) FILTER (WHERE ${cardInterestEvents.eventType} = 'view')) DESC`)
+      .limit(limit);
+    return rows.filter(r => r.cardId !== null).map(r => ({
+      cardId: r.cardId!,
+      playerName: r.playerName,
+      cardTitle: r.cardTitle,
+      addCount: r.addCount,
+      scanCount: r.scanCount,
+      totalMomentum: r.totalMomentum,
+    }));
   }
 }
 

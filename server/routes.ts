@@ -10033,7 +10033,12 @@ Return ONLY valid JSON, no markdown.`;
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
 
-      const allSignals = await storage.getActiveSignals(200);
+      const [allSignals, priceMovers, communityMomentum, trending] = await Promise.all([
+        storage.getActiveSignals(200),
+        storage.getPriceMovers(10),
+        storage.getCommunityMomentum(10),
+        storage.getTopCardsByInterest(limit),
+      ]);
 
       const buySignals = allSignals
         .filter(s => s.signalType === "strong_buy" || s.signalType === "buy")
@@ -10045,13 +10050,17 @@ Return ONLY valid JSON, no markdown.`;
         .sort((a, b) => a.alphaScore - b.alphaScore)
         .slice(0, limit);
 
-      const buyCardIds = buySignals.map(s => s.cardId).filter(Boolean) as number[];
-      const sellCardIds = sellSignals.map(s => s.cardId).filter(Boolean) as number[];
-      const trending = await storage.getTopCardsByInterest(limit);
-      const trendingCardIds = trending.map(t => t.cardId).filter(Boolean) as number[];
-      const allCardIds = [...new Set([...buyCardIds, ...sellCardIds, ...trendingCardIds])];
+      const holdSignals = allSignals
+        .filter(s => s.signalType === "hold")
+        .sort((a, b) => b.alphaScore - a.alphaScore)
+        .slice(0, limit);
 
-      const cardMap = new Map<number, any>();
+      const allSignalCardIds = allSignals.map(s => s.cardId).filter(Boolean) as number[];
+      const trendingCardIds = trending.map(t => t.cardId).filter(Boolean) as number[];
+      const moverCardIds = priceMovers.map(m => m.cardId);
+      const momentumCardIds = communityMomentum.map(m => m.cardId);
+      const allCardIds = [...new Set([...allSignalCardIds, ...trendingCardIds, ...moverCardIds, ...momentumCardIds])];
+
       const toCardSummary = (card: any) => ({
         id: card.id,
         title: card.title,
@@ -10065,24 +10074,71 @@ Return ONLY valid JSON, no markdown.`;
         variation: card.variation,
       });
 
-      const cardResults = await Promise.all(allCardIds.map(id => storage.getCard(id)));
+      const [cardResults, ownershipCounts, weeklyScanCounts] = await Promise.all([
+        Promise.all(allCardIds.map(id => storage.getCard(id))),
+        storage.getCardOwnershipCounts(allCardIds),
+        storage.getWeeklyScansForCards(allCardIds),
+      ]);
+
+      const cardMap = new Map<number, any>();
       for (const card of cardResults) {
         if (card) cardMap.set(card.id, toCardSummary(card));
       }
 
+      const enrichSignal = (s: any) => ({
+        ...s,
+        card: s.cardId ? cardMap.get(s.cardId) ?? null : null,
+        ownerCount: s.cardId ? ownershipCounts.get(s.cardId) ?? 0 : 0,
+        weeklyScans: s.cardId ? weeklyScanCounts.get(s.cardId) ?? 0 : 0,
+      });
+
       const trendingWithCards = trending
         .filter(t => t.cardId && cardMap.has(t.cardId))
-        .map(t => ({ ...t, card: cardMap.get(t.cardId!) }));
+        .map(t => ({
+          ...t,
+          card: cardMap.get(t.cardId!),
+          ownerCount: ownershipCounts.get(t.cardId!) ?? 0,
+          weeklyScans: weeklyScanCounts.get(t.cardId!) ?? 0,
+        }));
+
+      const enrichedMovers = priceMovers
+        .filter(m => cardMap.has(m.cardId))
+        .slice(0, 10)
+        .map(m => ({
+          ...m,
+          card: cardMap.get(m.cardId),
+          ownerCount: ownershipCounts.get(m.cardId) ?? 0,
+          weeklyScans: weeklyScanCounts.get(m.cardId) ?? 0,
+        }));
+
+      const enrichedMomentum = communityMomentum
+        .filter(m => cardMap.has(m.cardId))
+        .map(m => ({
+          ...m,
+          card: cardMap.get(m.cardId),
+          ownerCount: ownershipCounts.get(m.cardId) ?? 0,
+          weeklyScans: weeklyScanCounts.get(m.cardId) ?? 0,
+        }));
+
+      const biggestMover = enrichedMovers.length > 0 ? enrichedMovers[0] : null;
+      const hottestPlayer = enrichedMomentum.length > 0 ? enrichedMomentum[0].playerName : (trendingWithCards.length > 0 ? trendingWithCards[0].playerName : null);
 
       res.json({
-        opportunities: buySignals.map(s => ({
-          ...s,
-          card: s.cardId ? cardMap.get(s.cardId) ?? null : null,
-        })),
-        risks: sellSignals.map(s => ({
-          ...s,
-          card: s.cardId ? cardMap.get(s.cardId) ?? null : null,
-        })),
+        marketPulse: {
+          totalSignals: allSignals.length,
+          buySignals: buySignals.length,
+          sellSignals: sellSignals.length,
+          biggestMover: biggestMover ? {
+            playerName: biggestMover.playerName,
+            pctChange: biggestMover.pctChange,
+          } : null,
+          hottestPlayer,
+        },
+        opportunities: buySignals.map(enrichSignal),
+        risks: sellSignals.map(enrichSignal),
+        holds: holdSignals.map(enrichSignal),
+        priceMovers: enrichedMovers,
+        communityMomentum: enrichedMomentum,
         trending: trendingWithCards,
       });
     } catch (error) {
