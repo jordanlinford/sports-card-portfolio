@@ -1302,8 +1302,7 @@ function AlphaEngineTab() {
 
   const runBatchMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/admin/alpha-batch-run");
-      return res.json();
+      await apiRequest("POST", "/api/admin/alpha-batch-run");
     },
     onSuccess: () => {
       setBatchRunning(true);
