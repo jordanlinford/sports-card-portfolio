@@ -257,6 +257,7 @@ export async function runAlphaBatchJob(): Promise<BatchRunStats> {
   const startedAt = new Date();
   let cardsAnalyzed = 0;
   let cardsFailed = 0;
+  let signalsGenerated = 0;
   const analyzedCardIds: number[] = [];
 
   console.log(`[Alpha Batch] Starting batch run ${runId}`);
@@ -322,6 +323,41 @@ export async function runAlphaBatchJob(): Promise<BatchRunStats> {
           }
         }
 
+        // Score signal immediately (incremental — survives restarts)
+        try {
+          const updatedCard = await storage.getCard(selected.cardId);
+          if (updatedCard) {
+            const snapshot = await storage.getMarketSnapshot(selected.cardId);
+            const velocity = await storage.getInterestVelocity(selected.cardId);
+            const batchScoreResult = {
+              marketValue: updatedCard.estimatedValue,
+              soldCount: updatedCard.salesLast30Days ?? result.soldCount,
+              confidence: (updatedCard.salesLast30Days ?? result.soldCount) >= 10 ? "high" : (updatedCard.salesLast30Days ?? result.soldCount) >= 5 ? "medium" : "low",
+            };
+            const { alphaScore, signalType, confidence, reasoning, drivers, whyNow } = computeAlphaScore(
+              updatedCard, snapshot, velocity.velocity, batchScoreResult
+            );
+            const expiresAt = new Date(Date.now() + SIGNAL_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+            await storage.upsertCardSignal({
+              cardId: selected.cardId,
+              playerName: updatedCard.playerName ?? null,
+              cardTitle: updatedCard.title,
+              alphaScore,
+              signalType,
+              confidence,
+              reasoning,
+              drivers,
+              whyNow,
+              expiresAt,
+              batchRunId: runId,
+            });
+            signalsGenerated++;
+            console.log(`[Alpha Batch] Signal: ${signalType} (${alphaScore}) for ${updatedCard.title}`);
+          }
+        } catch (sigErr: any) {
+          console.error(`[Alpha Batch] Signal scoring failed for card ${selected.cardId}: ${sigErr.message}`);
+        }
+
         analyzedCardIds.push(selected.cardId);
         cardsAnalyzed++;
 
@@ -332,8 +368,11 @@ export async function runAlphaBatchJob(): Promise<BatchRunStats> {
       }
     }
 
-    console.log(`[Alpha Batch] Analysis complete. Running signal engine on ${analyzedCardIds.length} cards...`);
-    const signalsGenerated = await runSignalEngine(runId);
+    console.log(`[Alpha Batch] Analysis complete. ${signalsGenerated} signals generated incrementally.`);
+
+    // Also run full signal engine to catch any cards with snapshots but not in this batch
+    const additionalSignals = await runSignalEngine(runId);
+    signalsGenerated += additionalSignals;
 
     const stats: BatchRunStats = {
       runId,

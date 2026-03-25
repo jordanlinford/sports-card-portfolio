@@ -9966,6 +9966,26 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  app.post("/api/internal/alpha-batch-trigger", async (req: any, res) => {
+    const secret = req.headers["x-internal-key"];
+    if (secret !== process.env.REPL_ID) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    try {
+      const { isBatchRunning, runAlphaBatchJob } = await import("./alphaEngine");
+      if (isBatchRunning()) {
+        return res.status(409).json({ message: "Batch job already in progress" });
+      }
+      res.json({ message: "Batch job started", status: "running" });
+      runAlphaBatchJob().catch(err => {
+        console.error("[Alpha Batch] Internal-triggered run failed:", err.message);
+      });
+    } catch (error) {
+      console.error("[Alpha] Internal batch trigger error:", error);
+      res.status(500).json({ message: "Failed to start batch job" });
+    }
+  });
+
   app.post("/api/admin/alpha-batch-run", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
