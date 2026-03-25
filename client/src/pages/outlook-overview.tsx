@@ -3488,9 +3488,11 @@ export default function OutlookOverviewPage() {
         <div className="flex items-center gap-3 mb-2">
           <Zap className="h-8 w-8 text-primary" />
           <h1 className="text-3xl font-bold" data-testid="text-page-title">Market Outlook</h1>
+          <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30" data-testid="badge-scope-collection">Your Collection</Badge>
         </div>
         <p className="text-muted-foreground">
-          AI-powered analysis of your cards with buy, sell, and hold recommendations based on market signals.
+          Buy, sell, and hold recommendations based on AI analysis of cards <span className="font-medium">you own</span>. For market-wide signals across all collectors, see{" "}
+          <Link href="/alpha" className="text-primary hover:underline">Daily Alpha</Link>.
         </p>
         <div className="mt-4">
           <Link href="/player-outlook">
@@ -3677,7 +3679,7 @@ export default function OutlookOverviewPage() {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Cards you own that are good opportunities to add more of. Market conditions favor accumulating these players.
+                Cards in your collection where individual analysis suggests buying more. Based on each card's market data, not broader market trends.
               </p>
               <div className="space-y-2">
                 {buyCards.map(card => (
@@ -3697,7 +3699,7 @@ export default function OutlookOverviewPage() {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Cards you own where the AI suggests considering an exit. Market conditions or player outlook may be declining.
+                Cards in your collection where individual analysis suggests considering an exit. Based on each card's market data and player outlook.
               </p>
               <div className="space-y-2">
                 {sellCards.map(card => (
@@ -3717,7 +3719,7 @@ export default function OutlookOverviewPage() {
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
-                Cards you own with stable long-term value. These players have established careers worth holding onto.
+                Cards in your collection with stable long-term value. These players have established careers worth holding onto.
               </p>
               <div className="space-y-2">
                 {holdCards.map(card => (

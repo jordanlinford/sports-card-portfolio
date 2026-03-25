@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import {
   TrendingUp,
   TrendingDown,
@@ -694,11 +694,15 @@ export default function AlphaFeedPage() {
             <Zap className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-alpha-feed-title">
-              Daily Alpha
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-alpha-feed-title">
+                Daily Alpha
+              </h1>
+              <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/30" data-testid="badge-scope-market">All Collectors</Badge>
+            </div>
             <p className="text-sm text-muted-foreground">
-              Cross-platform intelligence from {pulse?.totalSignals ?? 0} signals and community activity
+              Market-wide intelligence from {pulse?.totalSignals ?? 0} signals and community activity across all collectors. For analysis of your own cards, see{" "}
+              <Link href="/outlook" className="text-primary hover:underline">Market Outlook</Link>.
             </p>
           </div>
         </div>
