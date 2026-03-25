@@ -452,7 +452,7 @@ export interface IStorage {
   // Alpha Feed V2 - Community Intelligence
   getCardOwnershipCounts(cardIds: number[]): Promise<Map<number, number>>;
   getWeeklyScansForCards(cardIds: number[]): Promise<Map<number, number>>;
-  getPriceMovers(limit?: number): Promise<{ cardId: number; playerName: string | null; cardTitle: string | null; previousPrice: number; currentPrice: number; pctChange: number }[]>;
+  getPriceMovers(limit?: number): Promise<{ gainers: { cardId: number; playerName: string | null; cardTitle: string | null; previousPrice: number; currentPrice: number; pctChange: number }[]; decliners: { cardId: number; playerName: string | null; cardTitle: string | null; previousPrice: number; currentPrice: number; pctChange: number }[] }>;
   getCommunityMomentum(limit?: number): Promise<{ cardId: number; playerName: string | null; cardTitle: string | null; addCount: number; scanCount: number; totalMomentum: number }[]>;
 
   // Signal Feedback
@@ -3916,23 +3916,48 @@ export class DatabaseStorage implements IStorage {
 
   async getCardOwnershipCounts(cardIds: number[]): Promise<Map<number, number>> {
     if (cardIds.length === 0) return new Map();
-    const rows = await db.execute(sql`
-      WITH card_sigs AS (
-        SELECT id, LOWER(title) AS sig, player_name
-        FROM cards WHERE id = ANY(${cardIds})
-      ),
-      ownership AS (
-        SELECT cs.sig, cs.player_name, COUNT(DISTINCT dc.user_id)::int AS owner_count
-        FROM cards c
-        JOIN display_cases dc ON c.display_case_id = dc.id
-        JOIN card_sigs cs ON LOWER(c.title) = cs.sig AND (c.player_name = cs.player_name OR (c.player_name IS NULL AND cs.player_name IS NULL))
-        GROUP BY cs.sig, cs.player_name
-      )
-      SELECT cs2.id AS "cardId", COALESCE(o.owner_count, 0)::int AS "ownerCount"
-      FROM card_sigs cs2
-      LEFT JOIN ownership o ON cs2.sig = o.sig AND (cs2.player_name = o.player_name OR (cs2.player_name IS NULL AND o.player_name IS NULL))
-    `);
-    return new Map((rows.rows as any[]).map(r => [Number(r.cardId), Number(r.ownerCount)]));
+
+    const targetCards = await db
+      .select({
+        id: cards.id,
+        title: cards.title,
+        playerName: cards.playerName,
+        year: cards.year,
+        set: cards.set,
+      })
+      .from(cards)
+      .where(inArray(cards.id, cardIds));
+
+    if (targetCards.length === 0) return new Map();
+
+    const result = new Map<number, number>();
+
+    for (const tc of targetCards) {
+      const conditions = [sql`LOWER(${cards.title}) = LOWER(${tc.title})`];
+      if (tc.playerName !== null) {
+        conditions.push(eq(cards.playerName, tc.playerName));
+      } else {
+        conditions.push(isNull(cards.playerName));
+      }
+      if (tc.year !== null) {
+        conditions.push(eq(cards.year, tc.year));
+      }
+      if (tc.set !== null) {
+        conditions.push(eq(cards.set, tc.set));
+      }
+
+      const [row] = await db
+        .select({
+          ownerCount: sql<number>`COUNT(DISTINCT ${displayCases.userId})::int`,
+        })
+        .from(cards)
+        .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+        .where(and(...conditions));
+
+      result.set(tc.id, row?.ownerCount ?? 0);
+    }
+
+    return result;
   }
 
   async getWeeklyScansForCards(cardIds: number[]): Promise<Map<number, number>> {
@@ -3953,8 +3978,8 @@ export class DatabaseStorage implements IStorage {
     return new Map(rows.filter(r => r.cardId !== null).map(r => [r.cardId!, r.scanCount]));
   }
 
-  async getPriceMovers(limit: number = 10): Promise<{ cardId: number; playerName: string | null; cardTitle: string | null; previousPrice: number; currentPrice: number; pctChange: number }[]> {
-    const rows = await db.execute(sql`
+  async getPriceMovers(limit: number = 10): Promise<{ gainers: { cardId: number; playerName: string | null; cardTitle: string | null; previousPrice: number; currentPrice: number; pctChange: number }[]; decliners: { cardId: number; playerName: string | null; cardTitle: string | null; previousPrice: number; currentPrice: number; pctChange: number }[] }> {
+    const baseQuery = sql`
       WITH ranked_obs AS (
         SELECT
           card_id,
@@ -3964,30 +3989,41 @@ export class DatabaseStorage implements IStorage {
           ROW_NUMBER() OVER (PARTITION BY card_id ORDER BY created_at DESC) AS rn
         FROM card_price_observations
         WHERE card_id IS NOT NULL
+      ),
+      movers AS (
+        SELECT
+          curr.card_id AS card_id,
+          curr.player_name AS player_name,
+          curr.card_title AS card_title,
+          prev.price_estimate AS previous_price,
+          curr.price_estimate AS current_price,
+          ROUND(((curr.price_estimate - prev.price_estimate) / NULLIF(prev.price_estimate, 0))::numeric * 100, 1) AS pct_change
+        FROM ranked_obs curr
+        JOIN ranked_obs prev ON curr.card_id = prev.card_id AND prev.rn = 2
+        WHERE curr.rn = 1
+          AND prev.price_estimate > 0
+          AND ABS((curr.price_estimate - prev.price_estimate) / NULLIF(prev.price_estimate, 0)) > 0.05
       )
-      SELECT
-        curr.card_id AS "cardId",
-        curr.player_name AS "playerName",
-        curr.card_title AS "cardTitle",
-        prev.price_estimate AS "previousPrice",
-        curr.price_estimate AS "currentPrice",
-        ROUND(((curr.price_estimate - prev.price_estimate) / NULLIF(prev.price_estimate, 0))::numeric * 100, 1) AS "pctChange"
-      FROM ranked_obs curr
-      JOIN ranked_obs prev ON curr.card_id = prev.card_id AND prev.rn = 2
-      WHERE curr.rn = 1
-        AND prev.price_estimate > 0
-        AND ABS((curr.price_estimate - prev.price_estimate) / NULLIF(prev.price_estimate, 0)) > 0.05
-      ORDER BY ABS((curr.price_estimate - prev.price_estimate) / NULLIF(prev.price_estimate, 0)) DESC
-      LIMIT ${limit * 2}
-    `);
-    return (rows.rows as any[]).map(r => ({
+    `;
+
+    const [gainersResult, declinersResult] = await Promise.all([
+      db.execute(sql`${baseQuery} SELECT card_id AS "cardId", player_name AS "playerName", card_title AS "cardTitle", previous_price AS "previousPrice", current_price AS "currentPrice", pct_change AS "pctChange" FROM movers WHERE pct_change > 0 ORDER BY pct_change DESC LIMIT ${limit}`),
+      db.execute(sql`${baseQuery} SELECT card_id AS "cardId", player_name AS "playerName", card_title AS "cardTitle", previous_price AS "previousPrice", current_price AS "currentPrice", pct_change AS "pctChange" FROM movers WHERE pct_change < 0 ORDER BY pct_change ASC LIMIT ${limit}`),
+    ]);
+
+    const mapRow = (r: any) => ({
       cardId: Number(r.cardId),
       playerName: r.playerName,
       cardTitle: r.cardTitle,
       previousPrice: Number(r.previousPrice),
       currentPrice: Number(r.currentPrice),
       pctChange: Number(r.pctChange),
-    }));
+    });
+
+    return {
+      gainers: (gainersResult.rows as any[]).map(mapRow),
+      decliners: (declinersResult.rows as any[]).map(mapRow),
+    };
   }
 
   async getCommunityMomentum(limit: number = 10): Promise<{ cardId: number; playerName: string | null; cardTitle: string | null; addCount: number; scanCount: number; totalMomentum: number }[]> {

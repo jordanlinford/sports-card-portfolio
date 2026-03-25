@@ -10033,12 +10033,13 @@ Return ONLY valid JSON, no markdown.`;
     try {
       const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
 
-      const [allSignals, priceMovers, communityMomentum, trending] = await Promise.all([
+      const [allSignals, priceMoversData, communityMomentum, trending] = await Promise.all([
         storage.getActiveSignals(200),
         storage.getPriceMovers(10),
         storage.getCommunityMomentum(10),
         storage.getTopCardsByInterest(limit),
       ]);
+      const allPriceMovers = [...priceMoversData.gainers, ...priceMoversData.decliners];
 
       const buySignals = allSignals
         .filter(s => s.signalType === "strong_buy" || s.signalType === "buy")
@@ -10057,7 +10058,7 @@ Return ONLY valid JSON, no markdown.`;
 
       const allSignalCardIds = allSignals.map(s => s.cardId).filter(Boolean) as number[];
       const trendingCardIds = trending.map(t => t.cardId).filter(Boolean) as number[];
-      const moverCardIds = priceMovers.map(m => m.cardId);
+      const moverCardIds = allPriceMovers.map(m => m.cardId);
       const momentumCardIds = communityMomentum.map(m => m.cardId);
       const allCardIds = [...new Set([...allSignalCardIds, ...trendingCardIds, ...moverCardIds, ...momentumCardIds])];
 
@@ -10101,15 +10102,18 @@ Return ONLY valid JSON, no markdown.`;
           weeklyScans: weeklyScanCounts.get(t.cardId!) ?? 0,
         }));
 
-      const enrichedMovers = priceMovers
+      const enrichMover = (m: any) => ({
+        ...m,
+        card: cardMap.get(m.cardId),
+        ownerCount: ownershipCounts.get(m.cardId) ?? 0,
+        weeklyScans: weeklyScanCounts.get(m.cardId) ?? 0,
+      });
+      const enrichedGainers = priceMoversData.gainers
         .filter(m => cardMap.has(m.cardId))
-        .slice(0, 10)
-        .map(m => ({
-          ...m,
-          card: cardMap.get(m.cardId),
-          ownerCount: ownershipCounts.get(m.cardId) ?? 0,
-          weeklyScans: weeklyScanCounts.get(m.cardId) ?? 0,
-        }));
+        .map(enrichMover);
+      const enrichedDecliners = priceMoversData.decliners
+        .filter(m => cardMap.has(m.cardId))
+        .map(enrichMover);
 
       const enrichedMomentum = communityMomentum
         .filter(m => cardMap.has(m.cardId))
@@ -10120,7 +10124,9 @@ Return ONLY valid JSON, no markdown.`;
           weeklyScans: weeklyScanCounts.get(m.cardId) ?? 0,
         }));
 
-      const biggestMover = enrichedMovers.length > 0 ? enrichedMovers[0] : null;
+      const allEnrichedMovers = [...enrichedGainers, ...enrichedDecliners];
+      allEnrichedMovers.sort((a, b) => Math.abs(b.pctChange) - Math.abs(a.pctChange));
+      const biggestMover = allEnrichedMovers.length > 0 ? allEnrichedMovers[0] : null;
       const hottestPlayer = enrichedMomentum.length > 0 ? enrichedMomentum[0].playerName : (trendingWithCards.length > 0 ? trendingWithCards[0].playerName : null);
 
       res.json({
@@ -10137,7 +10143,7 @@ Return ONLY valid JSON, no markdown.`;
         opportunities: buySignals.map(enrichSignal),
         risks: sellSignals.map(enrichSignal),
         holds: holdSignals.map(enrichSignal),
-        priceMovers: enrichedMovers,
+        priceMovers: { gainers: enrichedGainers, decliners: enrichedDecliners },
         communityMomentum: enrichedMomentum,
         trending: trendingWithCards,
       });

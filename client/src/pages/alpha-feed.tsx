@@ -112,7 +112,7 @@ interface FeedData {
   opportunities: Signal[];
   risks: Signal[];
   holds: Signal[];
-  priceMovers: PriceMover[];
+  priceMovers: { gainers: PriceMover[]; decliners: PriceMover[] };
   communityMomentum: MomentumItem[];
   trending: TrendingItem[];
 }
@@ -639,14 +639,13 @@ export default function AlphaFeedPage() {
   const displayedSells = showAllSignals ? allSells : highConvictionSells;
   const displayedHolds = showAllSignals ? allHolds : [];
 
-  const hasMovers = (feedData?.priceMovers?.length ?? 0) > 0;
+  const gainers = feedData?.priceMovers?.gainers ?? [];
+  const decliners = feedData?.priceMovers?.decliners ?? [];
+  const hasMovers = gainers.length > 0 || decliners.length > 0;
   const hasMomentum = (feedData?.communityMomentum?.length ?? 0) > 0;
   const hasTrending = (feedData?.trending?.length ?? 0) > 0;
   const hasSignals = displayedBuys.length > 0 || displayedSells.length > 0 || displayedHolds.length > 0;
   const hasAnyData = hasSignals || hasMovers || hasMomentum || hasTrending;
-
-  const gainers = feedData?.priceMovers?.filter(m => m.pctChange > 0) ?? [];
-  const decliners = feedData?.priceMovers?.filter(m => m.pctChange < 0) ?? [];
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
