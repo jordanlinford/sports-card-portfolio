@@ -1254,6 +1254,198 @@ const ACTIVITY_TYPE_LABELS: Record<string, { label: string; color: string }> = {
   share_case: { label: "Case Shared", color: "bg-rose-500" },
 };
 
+function AlphaEngineTab() {
+  const { toast } = useToast();
+  const [batchRunning, setBatchRunning] = useState(false);
+
+  const { data: batchStatus, isLoading: statusLoading, refetch: refetchStatus } = useQuery<{
+    running: boolean;
+    lastRun: {
+      runId: string;
+      startedAt: string;
+      completedAt: string;
+      cardsAnalyzed: number;
+      cardsFailed: number;
+      signalsGenerated: number;
+      estimatedCost: number;
+      durationMs: number;
+    } | null;
+  }>({
+    queryKey: ["/api/admin/alpha-batch-status"],
+    refetchInterval: batchRunning ? 10000 : false,
+  });
+
+  const { data: signalsData, isLoading: signalsLoading, refetch: refetchSignals } = useQuery<{
+    signals: Array<{
+      id: number;
+      cardId: number;
+      playerName: string | null;
+      cardTitle: string | null;
+      signalType: string;
+      alphaScore: number;
+      confidence: string;
+      drivers: string[] | null;
+      whyNow: string | null;
+      expiresAt: string;
+    }>;
+  }>({
+    queryKey: ["/api/alpha/signals"],
+  });
+
+  useEffect(() => {
+    if (batchStatus && !batchStatus.running && batchRunning) {
+      setBatchRunning(false);
+      refetchSignals();
+      toast({ title: "Batch complete", description: `${batchStatus.lastRun?.signalsGenerated || 0} signals generated` });
+    }
+  }, [batchStatus]);
+
+  const runBatchMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/alpha-batch-run");
+      return res.json();
+    },
+    onSuccess: () => {
+      setBatchRunning(true);
+      toast({ title: "Alpha batch started", description: "Analyzing cards and generating signals..." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to start batch", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const signals = signalsData?.signals || [];
+  const signalsByType: Record<string, number> = {};
+  signals.forEach(s => { signalsByType[s.signalType] = (signalsByType[s.signalType] || 0) + 1; });
+
+  const lastRun = batchStatus?.lastRun;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5" />
+            Alpha Engine Controls
+          </CardTitle>
+          <CardDescription>
+            Run the Alpha batch job to analyze top cards and generate buy/sell/hold signals for the Alpha Feed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <Button
+              onClick={() => runBatchMutation.mutate()}
+              disabled={runBatchMutation.isPending || batchRunning || batchStatus?.running}
+              data-testid="button-run-alpha-batch"
+            >
+              {(batchRunning || batchStatus?.running) ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Batch Running...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Run Alpha Batch
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => { refetchStatus(); refetchSignals(); }}
+              data-testid="button-refresh-alpha-status"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh Status
+            </Button>
+          </div>
+
+          {lastRun && (
+            <div className="rounded-lg border p-4 space-y-2">
+              <h4 className="font-medium text-sm">Last Batch Run</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Cards Analyzed:</span>
+                  <span className="ml-1 font-medium">{lastRun.cardsAnalyzed}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Failed:</span>
+                  <span className="ml-1 font-medium">{lastRun.cardsFailed}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Signals:</span>
+                  <span className="ml-1 font-medium">{lastRun.signalsGenerated}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Cost:</span>
+                  <span className="ml-1 font-medium">~${lastRun.estimatedCost.toFixed(2)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Duration:</span>
+                  <span className="ml-1 font-medium">{Math.round(lastRun.durationMs / 1000)}s</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Completed:</span>
+                  <span className="ml-1 font-medium">{format(new Date(lastRun.completedAt), "MMM d, h:mm a")}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Active Signals ({signals.length})</CardTitle>
+          <CardDescription>
+            {Object.entries(signalsByType).map(([type, count]) => `${type}: ${count}`).join(" · ") || "No active signals"}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {signalsLoading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}
+            </div>
+          ) : signals.length > 0 ? (
+            <ScrollArea className="h-[400px]">
+              <div className="space-y-2">
+                {signals.map((signal) => (
+                  <div key={signal.id} className="flex items-center justify-between p-3 rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      <Badge variant={
+                        signal.signalType === "strong_buy" || signal.signalType === "buy" ? "default" :
+                        signal.signalType === "strong_sell" || signal.signalType === "sell" ? "destructive" :
+                        "secondary"
+                      }>
+                        {signal.signalType.replace("_", " ").toUpperCase()}
+                      </Badge>
+                      <div>
+                        <p className="font-medium text-sm">{signal.playerName || signal.cardTitle || `Card #${signal.cardId}`}</p>
+                        {signal.drivers && signal.drivers.length > 0 && (
+                          <p className="text-xs text-muted-foreground">{signal.drivers[0]}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-mono text-sm font-medium">{signal.alphaScore}</p>
+                      <p className="text-xs text-muted-foreground">{signal.confidence}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">
+              No active signals. Run the Alpha batch to generate signals.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function ActivityTab() {
   const { data: activity, isLoading } = useQuery<ActivityLog[]>({
     queryKey: ["/api/admin/activity?limit=100"],
@@ -2180,6 +2372,10 @@ export default function AdminDashboard() {
               <Clock className="h-4 w-4 mr-1" />
               Activity
             </TabsTrigger>
+            <TabsTrigger value="alpha" data-testid="tab-alpha">
+              <Zap className="h-4 w-4 mr-1" />
+              Alpha Engine
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -2256,6 +2452,10 @@ export default function AdminDashboard() {
 
           <TabsContent value="activity">
             <ActivityTab />
+          </TabsContent>
+
+          <TabsContent value="alpha">
+            <AlphaEngineTab />
           </TabsContent>
         </Tabs>
       </div>
