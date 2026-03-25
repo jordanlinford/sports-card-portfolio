@@ -644,8 +644,9 @@ export default function AlphaFeedPage() {
   const hasMovers = gainers.length > 0 || decliners.length > 0;
   const hasMomentum = (feedData?.communityMomentum?.length ?? 0) > 0;
   const hasTrending = (feedData?.trending?.length ?? 0) > 0;
-  const hasSignals = displayedBuys.length > 0 || displayedSells.length > 0 || displayedHolds.length > 0;
-  const hasAnyData = hasSignals || hasMovers || hasMomentum || hasTrending;
+  const hasAnySignals = allBuys.length > 0 || allSells.length > 0 || allHolds.length > 0;
+  const hasDisplayedSignals = displayedBuys.length > 0 || displayedSells.length > 0 || displayedHolds.length > 0;
+  const hasAnyData = hasAnySignals || hasMovers || hasMomentum || hasTrending;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -804,7 +805,7 @@ export default function AlphaFeedPage() {
               </div>
             )}
 
-            {!hasSignals && (
+            {!hasDisplayedSignals && (
               <EmptySection
                 icon={Zap}
                 title={showAllSignals ? "No signals yet" : "No high-conviction signals"}
