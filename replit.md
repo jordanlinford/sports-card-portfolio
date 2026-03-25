@@ -39,6 +39,7 @@ The application uses a full-stack TypeScript architecture. The frontend manages 
 - **Raw Card Price Accuracy**: Direct use of Gemini's raw price estimates.
 - **Supply Saturation Alert**: Alerts for surging grading volume of specific cards. Now backed by real `pop_history` table data when available, falling back to AI estimates.
 - **Pop Report History**: `pop_history` table stores weekly population snapshots from grading houses (PSA, BGS, SGC). VPS scraper POSTs to `POST /api/pop-history/ingest` (API key auth via `POP_INGESTION_API_KEY` env var). Query trends at `GET /api/pop-history/trends/:playerName` and raw history at `GET /api/pop-history/:playerName`.
+- **Watchlist Change Alerts**: Automatic detection and surfacing of market outlook changes for watched players. Compares current cached outlook (verdict, temperature) against snapshot stored at add-time. Orange alert banner on watchlist page with before/after badges. Badge count on Players nav item and Watchlist menu link. API: `GET /api/unified-watchlist/alerts`.
 - **Liquidity Scoring UI**: Visual badges for market health and exit risk.
 - **Portfolio-Specific Next Buys (Pro)**: AI recommendations tailored to portfolio themes.
 - **Next Buys Recommendation Engine**: Balanced, investment-focused recommendation system.

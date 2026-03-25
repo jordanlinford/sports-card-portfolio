@@ -39,10 +39,28 @@ import {
   X,
   User,
   CreditCard,
+  Bell,
+  ArrowRightLeft,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PlayerVerdict, StockTier, MarketTemperature, VerdictModifier, Watchlist as WatchlistType } from "@shared/schema";
+
+interface WatchlistAlert {
+  id: number;
+  playerName: string;
+  playerKey: string;
+  sport: string;
+  previousVerdict: string | null;
+  currentVerdict: string | null;
+  verdictChanged: boolean;
+  previousModifier: string | null;
+  currentModifier: string | null;
+  previousTemperature: string | null;
+  currentTemperature: string | null;
+  temperatureChanged: boolean;
+  addedAt: string;
+}
 
 const LAUNCH_PLAYERS = [
   { name: "Drake Maye", sport: "football" },
@@ -154,6 +172,75 @@ function WatchlistSkeleton() {
         </Card>
       ))}
     </div>
+  );
+}
+
+function AlertsBanner({ alerts }: { alerts: WatchlistAlert[] }) {
+  const [dismissed, setDismissed] = useState(false);
+
+  if (dismissed || alerts.length === 0) return null;
+
+  return (
+    <Card className="mb-6 border-orange-500/30 bg-orange-500/5" data-testid="watchlist-alerts-banner">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-500/10">
+              <Bell className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm" data-testid="text-alerts-title">
+                {alerts.length} Market {alerts.length === 1 ? "Change" : "Changes"} Detected
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Players on your watchlist have updated outlooks
+              </p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setDismissed(true)} data-testid="button-dismiss-alerts">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="space-y-2">
+          {alerts.map((alert) => (
+            <Link key={alert.id} href={`/player-outlook?player=${encodeURIComponent(alert.playerName)}&sport=${alert.sport || 'football'}&from=watchlist`}>
+              <div className="flex items-center gap-3 p-2.5 rounded-lg bg-background/60 hover:bg-background/90 cursor-pointer transition-colors" data-testid={`alert-item-${alert.id}`}>
+                <div className="flex-1 min-w-0">
+                  <span className="font-medium text-sm capitalize">{alert.playerName}</span>
+                  <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                    {alert.verdictChanged && (
+                      <div className="flex items-center gap-1">
+                        <Badge className={`${getVerdictColor(alert.previousVerdict as PlayerVerdict)} text-[10px] px-1.5 py-0`}>
+                          {alert.previousVerdict}
+                        </Badge>
+                        <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
+                        <Badge className={`${getVerdictColor(alert.currentVerdict as PlayerVerdict)} text-[10px] px-1.5 py-0`}>
+                          {alert.currentVerdict}
+                        </Badge>
+                      </div>
+                    )}
+                    {alert.temperatureChanged && (
+                      <div className="flex items-center gap-1">
+                        <Badge className={`${getTemperatureColor(alert.previousTemperature as MarketTemperature)} text-[10px] px-1.5 py-0`}>
+                          {getTemperatureIcon(alert.previousTemperature as MarketTemperature)}
+                          {alert.previousTemperature}
+                        </Badge>
+                        <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
+                        <Badge className={`${getTemperatureColor(alert.currentTemperature as MarketTemperature)} text-[10px] px-1.5 py-0`}>
+                          {getTemperatureIcon(alert.currentTemperature as MarketTemperature)}
+                          {alert.currentTemperature}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </div>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -474,10 +561,15 @@ export default function Watchlist() {
   const [activeTab, setActiveTab] = useState<"all" | "players" | "cards">("all");
   const [sportFilter, setSportFilter] = useState<string>("all");
 
-  // Use unified watchlist API
   const { data: watchlist, isLoading } = useQuery<UnifiedWatchlistItem[]>({
     queryKey: ["/api/unified-watchlist"],
     enabled: !!user,
+  });
+
+  const { data: alertsData } = useQuery<{ alerts: WatchlistAlert[]; totalWatchlistItems: number }>({
+    queryKey: ["/api/unified-watchlist/alerts"],
+    enabled: !!user,
+    staleTime: 120000,
   });
 
   const removeMutation = useMutation({
@@ -610,6 +702,10 @@ export default function Watchlist() {
           Track players and cards you're interested in. Monitor changes to their market outlook.
         </p>
       </div>
+
+      {alertsData?.alerts && alertsData.alerts.length > 0 && (
+        <AlertsBanner alerts={alertsData.alerts} />
+      )}
 
       {isLoading ? (
         <WatchlistSkeleton />

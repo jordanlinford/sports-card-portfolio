@@ -5165,6 +5165,54 @@ RULES:
     }
   });
 
+  app.get("/api/unified-watchlist/alerts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const items = await storage.getUnifiedWatchlist(userId, "player");
+
+      const alerts: any[] = [];
+      for (const item of items) {
+        if (!item.playerKey) continue;
+        try {
+          const currentOutlook = await storage.getCachedPlayerOutlook(item.playerKey);
+          if (!currentOutlook?.outlookJson) continue;
+
+          const currentVerdict = (currentOutlook.outlookJson as any)?.verdict?.action || null;
+          const currentModifier = (currentOutlook.outlookJson as any)?.verdict?.modifier || null;
+          const currentTemperature = (currentOutlook.outlookJson as any)?.snapshot?.temperature || null;
+
+          const verdictChanged = currentVerdict && item.verdictAtAdd && currentVerdict !== item.verdictAtAdd;
+          const temperatureChanged = currentTemperature && item.temperatureAtAdd && currentTemperature !== item.temperatureAtAdd;
+
+          if (verdictChanged || temperatureChanged) {
+            alerts.push({
+              id: item.id,
+              playerName: item.playerName,
+              playerKey: item.playerKey,
+              sport: item.sport,
+              previousVerdict: item.verdictAtAdd,
+              currentVerdict,
+              verdictChanged: !!verdictChanged,
+              previousModifier: item.actionAtAdd,
+              currentModifier,
+              previousTemperature: item.temperatureAtAdd,
+              currentTemperature,
+              temperatureChanged: !!temperatureChanged,
+              addedAt: item.createdAt,
+            });
+          }
+        } catch {
+          // skip items with lookup errors
+        }
+      }
+
+      res.json({ alerts, totalWatchlistItems: items.length });
+    } catch (error) {
+      console.error("Error getting watchlist alerts:", error);
+      res.status(500).json({ message: "Failed to get watchlist alerts" });
+    }
+  });
+
   // Check if item is in unified watchlist
   app.get("/api/unified-watchlist/check", isAuthenticated, async (req: any, res) => {
     try {

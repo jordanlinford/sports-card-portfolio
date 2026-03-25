@@ -61,7 +61,8 @@ import {
   GitCompareArrows,
   History,
   Trophy,
-  Layers
+  Layers,
+  Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +81,15 @@ export function Navigation() {
     enabled: isAuthenticated,
     refetchInterval: 30000,
   });
+
+  const { data: watchlistAlerts } = useQuery<{ alerts: any[]; totalWatchlistItems: number }>({
+    queryKey: ["/api/unified-watchlist/alerts"],
+    enabled: isAuthenticated,
+    refetchInterval: 300000,
+    staleTime: 120000,
+  });
+
+  const watchlistAlertCount = watchlistAlerts?.alerts?.length || 0;
 
   const isAdmin = adminCheck?.isAdmin || false;
 
@@ -276,7 +286,7 @@ export function Navigation() {
                     variant="ghost" 
                     size="sm" 
                     className={cn(
-                      "gap-1",
+                      "gap-1 relative",
                       isActiveSection(["/player-outlook", "/watchlist", "/compare"]) && "bg-accent"
                     )}
                     data-testid="nav-players"
@@ -284,6 +294,11 @@ export function Navigation() {
                     <TrendingUp className="h-4 w-4" />
                     Players
                     <ChevronDown className="h-3 w-3" />
+                    {watchlistAlertCount > 0 && (
+                      <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white px-0.5" data-testid="badge-players-alerts">
+                        {watchlistAlertCount}
+                      </span>
+                    )}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
@@ -308,6 +323,11 @@ export function Navigation() {
                     <Link href="/watchlist" className="flex items-center gap-2 cursor-pointer">
                       <Star className="h-4 w-4" />
                       Player Watchlist
+                      {watchlistAlertCount > 0 && (
+                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white px-1" data-testid="badge-watchlist-alerts">
+                          {watchlistAlertCount}
+                        </span>
+                      )}
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -669,6 +689,11 @@ export function Navigation() {
                   <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/watchlist") && "bg-accent")}>
                     <Star className="h-4 w-4" />
                     Player Watchlist
+                    {watchlistAlertCount > 0 && (
+                      <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white px-1" data-testid="badge-watchlist-alerts-mobile">
+                        {watchlistAlertCount}
+                      </span>
+                    )}
                   </Button>
                 </Link>
 
