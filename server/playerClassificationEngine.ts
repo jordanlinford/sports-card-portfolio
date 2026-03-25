@@ -158,21 +158,18 @@ const CURRENT_SEASON_YEAR = 2025;
 // Uses explicit season years for consistency and testability
 // CRITICAL: Never default to PRIME when unknown - use UNKNOWN stage instead
 function inferCareerStage(rookieSeasonYear?: number): PlayerStage {
-  // If no rookieSeasonYear provided, we cannot determine stage
   if (!rookieSeasonYear) return "UNKNOWN";
   
-  // Validate rookieSeasonYear is reasonable (not hallucinated by AI)
-  // Reject years in the future or before 1950 (pre-modern era)
   if (rookieSeasonYear > CURRENT_SEASON_YEAR || rookieSeasonYear < 1950) return "UNKNOWN";
   
   const yearsPro = CURRENT_SEASON_YEAR - rookieSeasonYear;
   
-  // Simple 3-bucket mapping (clean and sufficient):
-  // yearsPro == 0 → ROOKIE (e.g., 2025 rookie in 2025 season)
-  // yearsPro == 1 → YEAR_2 (e.g., 2024 rookie in 2025 season)
-  // yearsPro >= 2 → PRIME (e.g., 2023 or earlier rookie)
   if (yearsPro === 0) return "ROOKIE";
   if (yearsPro === 1) return "YEAR_2";
+  if (yearsPro === 2) return "YEAR_3";
+  if (yearsPro === 3) return "YEAR_4";
+  if (yearsPro >= 14) return "AGING";
+  if (yearsPro >= 10) return "VETERAN";
   return "PRIME";
 }
 

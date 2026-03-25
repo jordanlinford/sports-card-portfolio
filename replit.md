@@ -26,7 +26,7 @@ The application uses a full-stack TypeScript architecture. The frontend manages 
 - **Batch Card Analysis (Pro-only)**: Analyze multiple unanalyzed cards with real-time progress and summary.
 - **1-of-1 Card Valuation**: Automated detection and valuation of rare cards using Gemini AI and triangulation.
 - **AI Player Registry Refresh**: Admin tool for bulk updating player data using Gemini AI.
-- **Role Stability System**: 6-tier player role classification influencing investment recommendations.
+- **Role Stability System**: 6-tier player role classification influencing investment recommendations. Fading veteran detection: VETERAN/AGING stage + BACKUP/ROTATIONAL role → AVOID_STRUCTURAL verdict. `inferCareerStage` now maps 10+ years → VETERAN, 14+ → AGING (previously all 2+ years were PRIME).
 - **Unified Usage Tracking**: Consistent enforcement of free tier limits.
 - **Display Customization**: Multiple layout styles and premium themes for display cases.
 - **Collection Organization**: Tagging, automatic case generation, and duplicate detection.

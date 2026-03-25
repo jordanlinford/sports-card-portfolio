@@ -1434,7 +1434,33 @@ async function generateFreshOutlook(
       "RETIRED_HOF": "RETIRED_HOF",
       "BUST": "BUST",
     };
-    const registryStage = registryStageMap[entry.careerStage];
+    let registryStage = registryStageMap[entry.careerStage];
+    
+    // GUARDRAIL: Don't trust stale PRIME from registry when rookie year proves VETERAN/AGING.
+    // The registry was bulk-populated and many long-tenured players were incorrectly tagged PRIME.
+    // If AI or rookie year indicates VETERAN/AGING, prefer the more accurate stage.
+    if (registryStage === "PRIME" && aiRookieYear) {
+      const yearsPro = new Date().getFullYear() - aiRookieYear;
+      if (yearsPro >= 14) {
+        console.log(`[PlayerOutlook] Registry PRIME override → AGING: ${playerName} has ${yearsPro} years pro (rookie ${aiRookieYear})`);
+        registryStage = "AGING";
+        enrichedPlayerInfo.stage = "AGING";
+      } else if (yearsPro >= 10) {
+        console.log(`[PlayerOutlook] Registry PRIME override → VETERAN: ${playerName} has ${yearsPro} years pro (rookie ${aiRookieYear})`);
+        registryStage = "VETERAN";
+        enrichedPlayerInfo.stage = "VETERAN";
+      }
+    }
+    // Also trust AI career stage over stale registry PRIME when AI says VETERAN/AGING
+    if (registryStage === "PRIME" && aiCareerStage) {
+      const aiUpper = aiCareerStage.toUpperCase();
+      if (aiUpper === "VETERAN" || aiUpper === "AGING") {
+        console.log(`[PlayerOutlook] Registry PRIME override by AI → ${aiUpper}: ${playerName}`);
+        registryStage = aiUpper as PlayerStage;
+        enrichedPlayerInfo.stage = aiUpper as PlayerStage;
+      }
+    }
+    
     if (registryStage && registryStage !== classification.stage) {
       console.log(`[PlayerOutlook] Registry override: ${playerName} stage ${classification.stage} → ${registryStage}`);
       const correctedInput: ClassificationInput = {

@@ -585,6 +585,14 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
     negativeReasons.push("Overpriced relative to fundamentals");
   }
   
+  // 7. Fading veteran: VETERAN/AGING + BACKUP/ROTATIONAL with very low stability
+  // A 10+ year veteran who is a backup/rotational player with minimal role stability
+  // has no realistic path to relevance — this is a terminal trajectory, not a dip.
+  if (isAgingNegative && roleStabilityScore <= 30) {
+    negativeFactors++;
+    negativeReasons.push("Fading veteran with no path to meaningful role");
+  }
+  
   // ============================================================
   // Evaluate positive factors (mitigate towards HOLD or SPECULATIVE)
   // ============================================================
@@ -633,6 +641,16 @@ function evaluateBackupFringePlayer(ctx: BackupEvaluationContext): BackupVerdict
     return { 
       verdict: "AVOID_STRUCTURAL", 
       reason: `Structural decline: ${negativeReasons.join(", ")}` 
+    };
+  }
+  
+  // VETERAN/AGING with 2+ negatives and NO positives = also AVOID_STRUCTURAL
+  // These players have no development window — multiple negatives without mitigators
+  // means terminal decline, not temporary uncertainty.
+  if (isAgingNegative && negativeFactors >= 2 && positiveFactors === 0 && !isEarlyCareer) {
+    return {
+      verdict: "AVOID_STRUCTURAL",
+      reason: `Veteran in decline: ${negativeReasons.join(", ")}`,
     };
   }
   
@@ -1814,9 +1832,16 @@ function generatePackHitReaction(verdict: InvestmentVerdict, scores: InvestmentS
 }
 
 // Generate collector tip based on price momentum - helps fans/collectors time their purchases
-// This is INDEPENDENT of the investment verdict - speaks to collectors who want the card regardless
+// For AVOID_STRUCTURAL verdicts, override the generic momentum tip with a clear warning.
 // ALWAYS returns a tip - collectors deserve timing guidance for any player
-function generateCollectorTip(scores: InvestmentScores, momentum: "UP" | "DOWN" | "STABLE" | undefined): string {
+function generateCollectorTip(scores: InvestmentScores, momentum: "UP" | "DOWN" | "STABLE" | undefined, verdict?: InvestmentVerdict): string {
+  if (verdict === "AVOID_STRUCTURAL") {
+    return "For collectors: Only buy if this is a personal collection player you love. These cards have no investment upside and will likely keep losing value.";
+  }
+  if (verdict === "AVOID_NEW_MONEY") {
+    return "For collectors: If you're a fan, buy for the PC — but don't expect investment returns at current prices.";
+  }
+  
   const { trendScore, volatilityScore, liquidityScore } = scores;
   
   // Determine price direction based on trendScore and momentum
@@ -2204,7 +2229,7 @@ export function generateInvestmentCall(input: DecisionInput): InvestmentCall & {
     // Advisor voice fields
     advisorTake: generateAdvisorTake(verdict, input, scores),
     packHitReaction: generatePackHitReaction(verdict, scores),
-    collectorTip: generateCollectorTip(scores, input.momentum),
+    collectorTip: generateCollectorTip(scores, input.momentum, verdict),
   };
 }
 
