@@ -136,7 +136,7 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
                   ) : (
                     <TrendingDown className="h-3 w-3 text-red-500" />
                   )}
-                  <span className="font-medium">{advisor.shortTermTrend.priceTrend14d}</span> 14d
+                  <span className="font-medium">{advisor.shortTermTrend.priceTrend14d}</span> ~14d
                 </span>
               )}
               {advisor.shortTermTrend.priceTrend30d && (
