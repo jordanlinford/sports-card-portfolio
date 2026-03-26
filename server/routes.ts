@@ -3699,9 +3699,14 @@ Sitemap: ${origin}/sitemap.xml
       const legacyPricePoints = priceData.pricePoints || [];
       const legacyHasRealData = legacyPricePoints.length >= 2;
       const hasAnyRealComps = compCount > 0 || legacyHasRealData;
-      const unifiedZeroCompEstimate = (unifiedResult && unifiedResult.market.avgPrice > 0 && (unifiedResult.market.soldCount || 0) === 0)
+      let unifiedZeroCompEstimate = (unifiedResult && unifiedResult.market.avgPrice > 0 && (unifiedResult.market.soldCount || 0) === 0)
         ? ((qaIsRaw ? unifiedResult.market.rawPrice : null) ?? unifiedResult.market.avgPrice)
         : null;
+      if (unifiedZeroCompEstimate && unifiedZeroCompEstimate > 0) {
+        const originalEstimate = unifiedZeroCompEstimate;
+        unifiedZeroCompEstimate = Math.round(unifiedZeroCompEstimate * 0.5 * 100) / 100;
+        console.log(`[Quick Analyze] ZERO-COMP DISCOUNT: Unified estimate $${originalEstimate} → $${unifiedZeroCompEstimate} (50% haircut — no sold comps means BIN anchor risk)`);
+      }
       if (!hasAnyRealComps && !qaIs1of1 && !qaIsVeryLowPop && !qaIsSSP) {
         const preExisting = marketValue || 0;
         if (specCrossProduct && specCrossProduct.avgPrice > 0) {
