@@ -165,16 +165,18 @@ function computeConviction(
   const bullishCount = allDirs.filter(d => d === "bullish").length;
   const bearishCount = allDirs.filter(d => d === "bearish").length;
   const neutralCount = allDirs.filter(d => d === "neutral").length;
-  const totalSignals = allDirs.length;
 
-  const agreementScore = Math.round((Math.abs(bullishCount - bearishCount) / totalSignals) * 100);
+  const activeSignals = bullishCount + bearishCount;
+  const agreementScore = activeSignals === 0
+    ? 0
+    : Math.round((Math.abs(bullishCount - bearishCount) / activeSignals) * 100);
 
   const distanceFromNeutral = Math.abs(signals.composite - 50) * 2;
 
   const convictionScore = Math.round(
-    (agreementScore * 0.5) +
+    (agreementScore * 0.4) +
     (signals.confidenceScore * 0.3) +
-    (clamp(distanceFromNeutral, 0, 100) * 0.2)
+    (clamp(distanceFromNeutral, 0, 100) * 0.3)
   );
 
   let level: ConvictionLevel;
@@ -444,9 +446,14 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
     }
   }
 
-  if (conv && conv.score < 40 && verdict === "ACCUMULATE") {
-    verdict = "HOLD_CORE";
-    verdictReason += ` (downgraded: ${convLabel}, signals ${conv.alignmentLabel.toLowerCase()})`;
+  if (conv && conv.score < 40) {
+    if (verdict === "ACCUMULATE") {
+      verdict = "HOLD_CORE";
+      verdictReason += ` (downgraded: ${convLabel}, signals ${conv.alignmentLabel.toLowerCase()})`;
+    } else if (verdict === "TRADE_THE_HYPE") {
+      verdict = "SPECULATIVE_FLYER";
+      verdictReason += ` (downgraded: ${convLabel}, insufficient conviction for timing call)`;
+    }
   }
 
   if (roleStabilityScore <= 45 && verdict === "ACCUMULATE") {

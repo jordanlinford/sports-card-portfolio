@@ -474,12 +474,14 @@ function extractConviction(outlook: PlayerOutlookResponse): AdvisorOutlook["conv
     narrative = `Signals are strongly aligned across ${bullishSignals.slice(0, 3).join(", ")}`;
   } else if (conv.agreementScore >= 80 && bearishSignals.length >= 4) {
     narrative = `Signals are aligned bearish across ${bearishSignals.slice(0, 3).join(", ")}`;
-  } else if (conv.agreementScore >= 60) {
-    narrative = `Signals are mostly aligned${bullishSignals.length > bearishSignals.length ? ` bullish on ${bullishSignals.slice(0, 2).join(" and ")}` : ` bearish on ${bearishSignals.slice(0, 2).join(" and ")}`}`;
+  } else if (conv.agreementScore >= 60 && bullishSignals.length > bearishSignals.length) {
+    narrative = `Signals skew bullish, led by ${bullishSignals.slice(0, 2).join(" and ")}`;
+  } else if (conv.agreementScore >= 60 && bearishSignals.length > bullishSignals.length) {
+    narrative = `Signals skew bearish, driven by ${bearishSignals.slice(0, 2).join(" and ")}`;
   } else if (conv.agreementScore >= 40) {
-    const bull = bullishSignals.length > 0 ? `strong ${bullishSignals[0]}` : "";
-    const bear = bearishSignals.length > 0 ? `weak ${bearishSignals[0]}` : "";
-    narrative = `Signals are mixed${bull && bear ? `, with ${bull} but ${bear}` : ""}`;
+    const bull = bullishSignals.length > 0 ? bullishSignals[0] : "";
+    const bear = bearishSignals.length > 0 ? bearishSignals[0] : "";
+    narrative = `Signals are mixed${bull && bear ? `, with conflicting ${bull} and ${bear} dynamics` : ""}`;
   } else {
     narrative = `Signals are conflicting — no clear directional consensus`;
   }
