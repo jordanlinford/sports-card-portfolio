@@ -387,14 +387,17 @@ function getSignalBarColor(score: number): string {
 
 function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?: MarketPhase }) {
   const signalEntries = [
-    { label: "Demand", score: signals.demandScore, description: "Sales volume & buyer interest" },
-    { label: "Momentum", score: signals.momentumScore, description: "Price trend direction" },
-    { label: "Liquidity", score: signals.liquidityScore, description: "Ease of buying/selling" },
-    { label: "Supply Pressure", score: signals.supplyPressureScore, description: "Listing-to-sales ratio", inverted: true },
-    { label: "Volatility", score: signals.volatilityScore, description: "Price stability", inverted: true },
-    { label: "Hype", score: signals.hypeScore, description: "News & community buzz" },
-    { label: "Confidence", score: signals.confidenceScore, description: "Data quality & reliability" },
+    { label: "Demand", score: signals.demandScore, description: "Log-scaled sales velocity (dampened by sample size)", contribKey: "demand" as const },
+    { label: "Momentum", score: signals.momentumScore, description: "Price trend vs prior period", contribKey: "momentum" as const },
+    { label: "Liquidity", score: signals.liquidityScore, description: "Sell-through rate × volume", contribKey: "liquidity" as const },
+    { label: "Supply", score: signals.supplyPressureScore, description: "Listings-to-sales pressure (higher = less pressure)", contribKey: "supply" as const },
+    { label: "Volatility", score: signals.volatilityScore, description: "Price stability (higher = more stable)", contribKey: "volatility" as const },
+    { label: "Hype", score: signals.hypeScore, description: "Price vs participation divergence (high = price outpacing volume)", contribKey: "antiHype" as const },
+    { label: "Confidence", score: signals.confidenceScore, description: "Sample size & data coverage" },
   ];
+
+  const derived = signals.derivedMetrics;
+  const contribs = signals.contributions;
 
   return (
     <Card data-testid="card-market-signals">
@@ -410,28 +413,57 @@ function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?
         </CardTitle>
         <CardDescription>
           Composite Score: <span className={`font-semibold ${getSignalColor(signals.composite)}`} data-testid="text-composite-score">{signals.composite}/100</span>
+          {derived && (
+            <span className="ml-2 text-xs text-muted-foreground" data-testid="text-sample-factor">
+              (sample factor: {derived.sampleFactor})
+            </span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {signalEntries.map(({ label, score, description, inverted }) => (
-            <div key={label} className="space-y-1" data-testid={`signal-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">{label}</span>
-                <span className={`font-medium ${inverted ? getSignalColor(100 - score) : getSignalColor(score)}`}>
-                  {score}
-                </span>
+          {signalEntries.map(({ label, score, description, contribKey }) => {
+            const contribValue = contribKey && contribs ? contribs[contribKey] : undefined;
+            return (
+              <div key={label} className="space-y-1" data-testid={`signal-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{label}</span>
+                  <div className="flex items-center gap-2">
+                    {contribValue !== undefined && (
+                      <span className="text-xs text-muted-foreground" data-testid={`contrib-${label.toLowerCase()}`}>
+                        +{contribValue}
+                      </span>
+                    )}
+                    <span className={`font-medium ${getSignalColor(score)}`}>
+                      {score}
+                    </span>
+                  </div>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${getSignalBarColor(score)}`}
+                    style={{ width: `${score}%` }}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">{description}</p>
               </div>
-              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${inverted ? getSignalBarColor(100 - score) : getSignalBarColor(score)}`}
-                  style={{ width: `${score}%` }}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">{description}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
+
+        {derived && (
+          <div className="mt-4 pt-3 border-t border-border">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Raw Derived Metrics</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="derived-metrics">
+              <span>Sales velocity: {derived.salesVelocity}/day</span>
+              <span>Volume trend: {derived.volumeTrend}x</span>
+              <span>Price trend: {(derived.priceTrend * 100).toFixed(1)}%</span>
+              <span>Sell-through: {derived.sellThrough.toFixed(2)}</span>
+              <span>CV: {derived.cv.toFixed(3)}</span>
+              <span>Supply ratio: {derived.supplyRatio.toFixed(2)}x</span>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

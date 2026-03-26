@@ -1417,6 +1417,25 @@ export type PlayerOutlookRequest = {
 export const MARKET_PHASES = ["ACCUMULATION", "BREAKOUT", "EXPANSION", "EXHAUSTION", "DECLINE", "UNKNOWN"] as const;
 export type MarketPhase = typeof MARKET_PHASES[number];
 
+export type SignalContributions = {
+  demand: number;
+  momentum: number;
+  liquidity: number;
+  supply: number;
+  volatility: number;
+  antiHype: number;
+};
+
+export type DerivedMetrics = {
+  salesVelocity: number;
+  volumeTrend: number;
+  priceTrend: number;
+  sellThrough: number;
+  cv: number;
+  sampleFactor: number;
+  supplyRatio: number;
+};
+
 export type MarketSignals = {
   demandScore: number;
   momentumScore: number;
@@ -1426,14 +1445,20 @@ export type MarketSignals = {
   hypeScore: number;
   confidenceScore: number;
   composite: number;
+  contributions?: SignalContributions;
+  derivedMetrics?: DerivedMetrics;
 };
 
 export type MarketMetrics = {
   soldCount30d?: number;
+  soldCount7d?: number;
+  soldCountPrev30d?: number;
   activeListingCount?: number;
   avgSoldPrice?: number;
+  avgSoldPrice7d?: number;
   medianSoldPrice?: number;
   priceTrend?: number;
+  priceStdDev30d?: number;
   volumeTrend?: "up" | "stable" | "down";
   volatilityEstimate?: number;
   priceRangeLow?: number;

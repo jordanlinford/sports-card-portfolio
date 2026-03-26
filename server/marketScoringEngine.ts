@@ -9,6 +9,8 @@ import type {
   InvestmentHorizon,
   InvestmentVerdict,
   DataConfidence,
+  SignalContributions,
+  DerivedMetrics,
 } from "@shared/schema";
 import type { RoleTier } from "./investmentDecisionEngine";
 
@@ -39,203 +41,125 @@ export type MarketScoringResult = {
 };
 
 const SIGNAL_WEIGHTS = {
-  demand: 0.22,
+  demand: 0.25,
   momentum: 0.20,
   liquidity: 0.15,
-  supplyPressure: 0.12,
+  supply: 0.15,
   volatility: 0.10,
-  hype: 0.11,
-  confidence: 0.10,
+  antiHype: 0.15,
 };
 
-function scoreDemand(metrics: MarketMetrics, newsHype?: string): number {
-  let score = 50;
-
-  if (metrics.soldCount30d !== undefined) {
-    if (metrics.soldCount30d >= 200) score = 90;
-    else if (metrics.soldCount30d >= 100) score = 78;
-    else if (metrics.soldCount30d >= 50) score = 65;
-    else if (metrics.soldCount30d >= 20) score = 52;
-    else if (metrics.soldCount30d >= 5) score = 38;
-    else score = 20;
-  } else if (newsHype === "HIGH") {
-    score = 70;
-  } else if (newsHype === "MEDIUM") {
-    score = 55;
-  } else if (newsHype === "LOW") {
-    score = 35;
-  }
-
-  if (metrics.weeklyAdds && metrics.weeklyAdds >= 5) {
-    score = Math.min(95, score + 8);
-  }
-  if (metrics.weeklyScans && metrics.weeklyScans >= 10) {
-    score = Math.min(95, score + 5);
-  }
-
-  return Math.max(5, Math.min(95, score));
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
 }
 
-function scoreMomentum(metrics: MarketMetrics, momentum?: string): number {
-  let score = 50;
-
-  if (metrics.priceTrend !== undefined) {
-    score = 50 + (metrics.priceTrend * 200);
-    score = Math.max(10, Math.min(90, score));
-  }
-
-  if (metrics.internalPriceChange !== undefined) {
-    const internalSignal = 50 + (metrics.internalPriceChange * 150);
-    const clampedInternal = Math.max(10, Math.min(90, internalSignal));
-    score = metrics.priceTrend !== undefined
-      ? score * 0.6 + clampedInternal * 0.4
-      : clampedInternal;
-  }
-
-  if (metrics.priceTrend === undefined && metrics.internalPriceChange === undefined) {
-    if (momentum === "UP") score = 68;
-    else if (momentum === "DOWN") score = 32;
-    else score = 50;
-  }
-
-  const volumeAdj = metrics.volumeTrend === "up" ? 8 : metrics.volumeTrend === "down" ? -8 : 0;
-  score += volumeAdj;
-
-  return Math.max(5, Math.min(95, score));
+function normalize(value: number, min: number, max: number): number {
+  if (max <= min) return 0;
+  return clamp((value - min) / (max - min), 0, 1);
 }
 
-function scoreLiquidity(metrics: MarketMetrics): number {
-  let score = 50;
+function computeDerivedMetrics(metrics: MarketMetrics): DerivedMetrics {
+  const sales30d = metrics.soldCount30d ?? 0;
+  const sales7d = metrics.soldCount7d ?? Math.round(sales30d * 7 / 30);
+  const salesPrev30d = metrics.soldCountPrev30d ?? sales30d;
+  const activeListings = metrics.activeListingCount ?? 0;
+  const price30dAvg = metrics.avgSoldPrice ?? metrics.medianSoldPrice ?? 0;
+  const price7dAvg = metrics.avgSoldPrice7d ?? price30dAvg;
+  const priceStd = metrics.priceStdDev30d ?? 0;
 
-  if (metrics.soldCount30d !== undefined && metrics.activeListingCount !== undefined && metrics.activeListingCount > 0) {
-    const sellThroughRate = metrics.soldCount30d / (metrics.soldCount30d + metrics.activeListingCount);
-    if (sellThroughRate >= 0.7) score = 88;
-    else if (sellThroughRate >= 0.5) score = 72;
-    else if (sellThroughRate >= 0.3) score = 55;
-    else if (sellThroughRate >= 0.15) score = 38;
-    else score = 22;
+  const salesVelocity = sales7d / 7;
+  const volumeTrend = salesPrev30d > 0 ? sales30d / salesPrev30d : 1;
+  const priceTrend = metrics.priceTrend !== undefined
+    ? metrics.priceTrend
+    : (price30dAvg > 0 ? (price7dAvg - price30dAvg) / price30dAvg : 0);
+  const sellThrough = activeListings > 0 ? sales30d / activeListings : (sales30d > 0 ? 2 : 0);
+  const cv = price30dAvg > 0 ? priceStd / price30dAvg : 0;
+  const sampleFactor = Math.min(1.0, Math.log(1 + sales30d) / Math.log(50));
+  const supplyRatio = sales30d > 0 ? activeListings / sales30d : (activeListings > 0 ? 5 : 1);
 
-    if (metrics.soldCount30d >= 100) score = Math.min(95, score + 10);
-    else if (metrics.soldCount30d >= 30) score = Math.min(95, score + 5);
-  } else if (metrics.soldCount30d !== undefined) {
-    if (metrics.soldCount30d >= 100) score = 82;
-    else if (metrics.soldCount30d >= 40) score = 65;
-    else if (metrics.soldCount30d >= 10) score = 48;
-    else score = 28;
-  }
-
-  return Math.max(5, Math.min(95, score));
+  return {
+    salesVelocity,
+    volumeTrend,
+    priceTrend,
+    sellThrough,
+    cv,
+    sampleFactor,
+    supplyRatio,
+  };
 }
 
-function scoreSupplyPressure(metrics: MarketMetrics): number {
-  let score = 50;
-
-  if (metrics.activeListingCount !== undefined && metrics.soldCount30d !== undefined && metrics.soldCount30d > 0) {
-    const ratio = metrics.activeListingCount / metrics.soldCount30d;
-    if (ratio >= 5) score = 85;
-    else if (ratio >= 3) score = 72;
-    else if (ratio >= 1.5) score = 58;
-    else if (ratio >= 0.5) score = 40;
-    else score = 25;
-  }
-
-  return Math.max(5, Math.min(95, score));
+function scoreDemand(derived: DerivedMetrics): number {
+  const demandRaw = Math.log(1 + derived.salesVelocity);
+  const maxVelocityLog = Math.log(1 + 20);
+  const score = normalize(demandRaw, 0, maxVelocityLog) * 100;
+  return clamp(score * derived.sampleFactor, 0, 100);
 }
 
-function scoreVolatility(metrics: MarketMetrics): number {
-  let score = 50;
-
-  if (metrics.volatilityEstimate !== undefined) {
-    if (metrics.volatilityEstimate >= 0.8) score = 85;
-    else if (metrics.volatilityEstimate >= 0.5) score = 70;
-    else if (metrics.volatilityEstimate >= 0.3) score = 55;
-    else if (metrics.volatilityEstimate >= 0.1) score = 40;
-    else score = 25;
-  } else if (metrics.priceRangeLow !== undefined && metrics.priceRangeHigh !== undefined && metrics.avgSoldPrice) {
-    const spread = (metrics.priceRangeHigh - metrics.priceRangeLow) / metrics.avgSoldPrice;
-    if (spread >= 10) score = 85;
-    else if (spread >= 5) score = 70;
-    else if (spread >= 2) score = 55;
-    else score = 35;
-  }
-
-  return Math.max(5, Math.min(95, score));
+function scoreMomentum(derived: DerivedMetrics): number {
+  const score = 50 + (derived.priceTrend * 200);
+  return clamp(score * derived.sampleFactor, 0, 100);
 }
 
-function scoreHype(newsHype?: string, newsCount?: number, metrics?: MarketMetrics): number {
-  let score = 40;
-
-  if (metrics?.priceTrend !== undefined && metrics?.soldCount30d !== undefined) {
-    const priceUp = metrics.priceTrend > 0.05;
-    const highVolume = metrics.soldCount30d >= 50;
-    const volumeUp = metrics.volumeTrend === "up";
-
-    if (priceUp && highVolume && volumeUp) score = 85;
-    else if (priceUp && (highVolume || volumeUp)) score = 72;
-    else if (priceUp) score = 60;
-    else if (metrics.priceTrend < -0.05 && highVolume) score = 35;
-    else score = 50;
-  } else {
-    if (newsHype === "HIGH") score = 75;
-    else if (newsHype === "MEDIUM") score = 52;
-    else if (newsHype === "LOW") score = 30;
-  }
-
-  if (newsCount !== undefined && newsCount >= 8) {
-    score = Math.min(95, score + 8);
-  }
-
-  if (metrics?.weeklyScans && metrics.weeklyScans >= 15) {
-    score = Math.min(95, score + 5);
-  }
-  if (metrics?.weeklyAdds && metrics.weeklyAdds >= 5) {
-    score = Math.min(95, score + 5);
-  }
-
-  return Math.max(5, Math.min(95, score));
+function scoreLiquidity(derived: DerivedMetrics, metrics: MarketMetrics): number {
+  const raw = clamp(derived.sellThrough * 100, 0, 100);
+  const sales30d = metrics.soldCount30d ?? 0;
+  const volumeDampener = Math.min(1, Math.log(1 + sales30d) / 3);
+  return clamp(raw * volumeDampener, 0, 100);
 }
 
-function scoreConfidence(metrics: MarketMetrics): number {
-  let score = 30;
+function scoreSupply(derived: DerivedMetrics): number {
+  return clamp(100 - (derived.supplyRatio * 20), 0, 100);
+}
 
-  if (metrics.source === "blended") score = 75;
-  else if (metrics.source === "gemini_search") score = 60;
-  else if (metrics.source === "internal") score = 50;
-  else score = 25;
+function scoreVolatility(derived: DerivedMetrics): number {
+  return clamp(100 - (derived.cv * 200), 0, 100);
+}
 
-  if (metrics.soldCount30d !== undefined && metrics.soldCount30d >= 30) {
-    score = Math.min(90, score + 15);
+function scoreHype(derived: DerivedMetrics): number {
+  const priceSignal = derived.priceTrend;
+  const volumeSignal = derived.volumeTrend - 1;
+  const hypeRaw = priceSignal - volumeSignal;
+  return clamp(50 + (hypeRaw * 150), 0, 100);
+}
+
+function scoreConfidence(derived: DerivedMetrics, metrics: MarketMetrics): number {
+  const sales30d = metrics.soldCount30d ?? 0;
+  let score = clamp(derived.sampleFactor * 100, 0, 100);
+  if (sales30d < 5) {
+    score *= 0.5;
   }
-  if (metrics.internalObservationCount !== undefined && metrics.internalObservationCount >= 5) {
-    score = Math.min(90, score + 10);
-  }
-
-  return Math.max(5, Math.min(95, score));
+  return clamp(score, 0, 100);
 }
 
 export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
-  const { metrics, newsHype, momentum, newsCount } = input;
+  const { metrics } = input;
 
-  const demandScore = scoreDemand(metrics, newsHype);
-  const momentumScore = scoreMomentum(metrics, momentum);
-  const liquidityScore = scoreLiquidity(metrics);
-  const supplyPressureScore = scoreSupplyPressure(metrics);
-  const volatilityScore = scoreVolatility(metrics);
-  const hypeScore = scoreHype(newsHype, newsCount, metrics);
-  const confidenceScore = scoreConfidence(metrics);
+  const derived = computeDerivedMetrics(metrics);
 
-  const hypeContribution = hypeScore > 70 && demandScore < 50
-    ? (100 - hypeScore) * SIGNAL_WEIGHTS.hype
-    : hypeScore * SIGNAL_WEIGHTS.hype;
+  const demandScore = scoreDemand(derived);
+  const momentumScore = scoreMomentum(derived);
+  const liquidityScore = scoreLiquidity(derived, metrics);
+  const supplyPressureScore = scoreSupply(derived);
+  const volatilityScore = scoreVolatility(derived);
+  const hypeScore = scoreHype(derived);
+  const confidenceScore = scoreConfidence(derived, metrics);
+
+  const contributions: SignalContributions = {
+    demand: demandScore * SIGNAL_WEIGHTS.demand,
+    momentum: momentumScore * SIGNAL_WEIGHTS.momentum,
+    liquidity: liquidityScore * SIGNAL_WEIGHTS.liquidity,
+    supply: supplyPressureScore * SIGNAL_WEIGHTS.supply,
+    volatility: volatilityScore * SIGNAL_WEIGHTS.volatility,
+    antiHype: (100 - hypeScore) * SIGNAL_WEIGHTS.antiHype,
+  };
 
   const composite =
-    demandScore * SIGNAL_WEIGHTS.demand +
-    momentumScore * SIGNAL_WEIGHTS.momentum +
-    liquidityScore * SIGNAL_WEIGHTS.liquidity +
-    (100 - supplyPressureScore) * SIGNAL_WEIGHTS.supplyPressure +
-    (100 - volatilityScore) * SIGNAL_WEIGHTS.volatility +
-    hypeContribution +
-    confidenceScore * SIGNAL_WEIGHTS.confidence;
+    contributions.demand +
+    contributions.momentum +
+    contributions.liquidity +
+    contributions.supply +
+    contributions.volatility +
+    contributions.antiHype;
 
   return {
     demandScore: Math.round(demandScore),
@@ -246,33 +170,50 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
     hypeScore: Math.round(hypeScore),
     confidenceScore: Math.round(confidenceScore),
     composite: Math.round(composite),
+    contributions: {
+      demand: Math.round(contributions.demand * 10) / 10,
+      momentum: Math.round(contributions.momentum * 10) / 10,
+      liquidity: Math.round(contributions.liquidity * 10) / 10,
+      supply: Math.round(contributions.supply * 10) / 10,
+      volatility: Math.round(contributions.volatility * 10) / 10,
+      antiHype: Math.round(contributions.antiHype * 10) / 10,
+    },
+    derivedMetrics: {
+      salesVelocity: Math.round(derived.salesVelocity * 100) / 100,
+      volumeTrend: Math.round(derived.volumeTrend * 100) / 100,
+      priceTrend: Math.round(derived.priceTrend * 1000) / 1000,
+      sellThrough: Math.round(derived.sellThrough * 100) / 100,
+      cv: Math.round(derived.cv * 1000) / 1000,
+      sampleFactor: Math.round(derived.sampleFactor * 100) / 100,
+      supplyRatio: Math.round(derived.supplyRatio * 100) / 100,
+    },
   };
 }
 
-export function classifyMarketPhase(signals: MarketSignals): MarketPhase {
-  const { demandScore, momentumScore, liquidityScore, supplyPressureScore, hypeScore, composite } = signals;
+export function classifyMarketPhase(derived: DerivedMetrics): MarketPhase {
+  const { priceTrend, volumeTrend, supplyRatio } = derived;
 
-  if (composite >= 72 && momentumScore >= 70 && hypeScore >= 70) {
-    return demandScore >= 75 ? "EXPANSION" : "EXHAUSTION";
-  }
-
-  if (composite >= 65 && momentumScore >= 65) {
-    return "BREAKOUT";
-  }
-
-  if (composite <= 35 || (momentumScore <= 30 && demandScore <= 35)) {
+  if (priceTrend < -0.05 && supplyRatio > 1.5) {
     return "DECLINE";
   }
 
-  if (momentumScore >= 50 && liquidityScore >= 45 && supplyPressureScore <= 60) {
-    return "ACCUMULATION";
+  if (priceTrend > 0.05 && volumeTrend > 1.2) {
+    return "BREAKOUT";
   }
 
-  if (hypeScore >= 75 && momentumScore <= 45) {
+  if (priceTrend > 0.05 && volumeTrend <= 1.0) {
     return "EXHAUSTION";
   }
 
-  if (demandScore >= 55 && momentumScore >= 45) {
+  if (Math.abs(priceTrend) < 0.03 && volumeTrend > 1.1) {
+    return "ACCUMULATION";
+  }
+
+  if (priceTrend > 0 && volumeTrend > 1) {
+    return "EXPANSION";
+  }
+
+  if (Math.abs(priceTrend) <= 0.05 && supplyRatio <= 1.5) {
     return "ACCUMULATION";
   }
 
@@ -303,13 +244,14 @@ function applyCareerModifier(baseScore: number, stage: PlayerStage, position?: s
     }
   }
 
-  return Math.max(5, Math.min(95, baseScore + modifier));
+  return clamp(baseScore + modifier, 5, 95);
 }
 
 export function generateMarketVerdict(input: MarketScoringInput): MarketScoringResult {
   const signals = computeMarketSignals(input);
-  const phase = classifyMarketPhase(signals);
-  const { stage, roleTier, roleStabilityScore, position, sport } = input;
+  const derived = signals.derivedMetrics!;
+  const phase = classifyMarketPhase(derived);
+  const { stage, roleStabilityScore, position, sport } = input;
 
   const adjustedComposite = applyCareerModifier(signals.composite, stage, position, sport);
 
@@ -324,83 +266,22 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
     verdictReason = "Retired player - stable legacy hold";
   } else if (stage === "RETIRED_HOF") {
     verdict = adjustedComposite >= 55 ? "ACCUMULATE" : "HOLD_CORE";
-    verdictReason = stage === "RETIRED_HOF" ? "Hall of Fame legacy value" : "Retired - stable hold";
-  } else if (phase === "EXHAUSTION" && signals.hypeScore >= 70 && signals.momentumScore <= 50) {
-    if (roleStabilityScore >= 75 && stage === "PRIME") {
-      verdict = "HOLD_CORE";
-      verdictReason = "Franchise star at peak visibility - hold, don't chase";
-    } else {
-      verdict = "TRADE_THE_HYPE";
-      verdictReason = `Market exhaustion: hype (${signals.hypeScore}) exceeds momentum (${signals.momentumScore})`;
-    }
-  } else if (phase === "DECLINE") {
-    if (roleStabilityScore <= 30) {
-      verdict = "AVOID_STRUCTURAL";
-      verdictReason = `Declining market + low role stability (${roleStabilityScore})`;
-    } else if (adjustedComposite <= 30) {
-      verdict = "AVOID_NEW_MONEY";
-      verdictReason = `Market in decline phase - composite score ${adjustedComposite}`;
-    } else {
-      verdict = "HOLD_CORE";
-      verdictReason = "Market softening but fundamentals intact";
-    }
-  } else if (phase === "EXPANSION" && adjustedComposite >= 72) {
-    if (signals.hypeScore > signals.demandScore + 15) {
-      verdict = "TRADE_THE_HYPE";
-      verdictReason = `Expansion driven by hype (${signals.hypeScore}) over demand (${signals.demandScore})`;
-    } else {
-      verdict = "HOLD_CORE";
-      verdictReason = "Strong expansion phase - hold and ride the wave";
-    }
-  } else if (phase === "BREAKOUT") {
-    if (roleStabilityScore >= 55 && adjustedComposite >= 60) {
-      verdict = "ACCUMULATE";
-      verdictReason = `Breakout phase with solid role stability - momentum (${signals.momentumScore}), demand (${signals.demandScore})`;
-    } else if (stage === "ROOKIE" || stage === "YEAR_2") {
-      verdict = "SPECULATIVE_FLYER";
-      verdictReason = "Early-career breakout - high upside but unproven";
-    } else {
-      verdict = "ACCUMULATE";
-      verdictReason = `Breakout with positive signals - composite ${adjustedComposite}`;
-    }
-  } else if (phase === "ACCUMULATION") {
-    if (adjustedComposite >= 60 && roleStabilityScore >= 55) {
-      verdict = "ACCUMULATE";
-      verdictReason = `Accumulation phase - fair prices with upside. Demand ${signals.demandScore}, momentum ${signals.momentumScore}`;
-    } else if (adjustedComposite >= 50 && stage !== "BUST") {
-      verdict = "HOLD_CORE";
-      verdictReason = "Stable accumulation zone - hold position";
-    } else if (stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3") {
-      verdict = "SPECULATIVE_FLYER";
-      verdictReason = "Early-career in accumulation zone - speculative upside";
-    } else {
-      verdict = "HOLD_CORE";
-      verdictReason = "Accumulation phase with moderate signals";
-    }
+    verdictReason = "Hall of Fame legacy value";
+  } else if (adjustedComposite > 75 && (phase === "ACCUMULATION" || phase === "BREAKOUT")) {
+    verdict = "ACCUMULATE";
+    verdictReason = `Strong composite (${adjustedComposite}) in ${phase.toLowerCase()} phase — demand (${signals.demandScore}), momentum (${signals.momentumScore})`;
+  } else if (adjustedComposite > 65) {
+    verdict = "HOLD_CORE";
+    verdictReason = `Solid composite (${adjustedComposite}) — fundamentals intact`;
+  } else if (signals.hypeScore > 70 && phase === "EXHAUSTION") {
+    verdict = "TRADE_THE_HYPE";
+    verdictReason = `Market exhaustion: prices up ${(derived.priceTrend * 100).toFixed(0)}% but volume trend ${derived.volumeTrend.toFixed(2)}x — hype outpacing participation`;
+  } else if (adjustedComposite < 40) {
+    verdict = "AVOID_NEW_MONEY";
+    verdictReason = `Weak composite (${adjustedComposite}) — supply ratio ${derived.supplyRatio.toFixed(1)}x, confidence ${signals.confidenceScore}`;
   } else {
-    if (adjustedComposite >= 65 && roleStabilityScore >= 60) {
-      verdict = "ACCUMULATE";
-      verdictReason = `Strong composite (${adjustedComposite}) with role stability`;
-    } else if (adjustedComposite >= 55) {
-      verdict = "HOLD_CORE";
-      verdictReason = "Moderate market signals - hold position";
-    } else if (adjustedComposite >= 40) {
-      if (stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3") {
-        verdict = "SPECULATIVE_FLYER";
-        verdictReason = "Early-career with mixed signals - speculative";
-      } else {
-        verdict = "HOLD_CORE";
-        verdictReason = "Mixed signals - maintain position";
-      }
-    } else {
-      if (roleStabilityScore <= 25) {
-        verdict = "AVOID_NEW_MONEY";
-        verdictReason = `Weak market signals (${adjustedComposite}) with uncertain role`;
-      } else {
-        verdict = "HOLD_CORE";
-        verdictReason = "Below-average market signals - hold but monitor";
-      }
-    }
+    verdict = "SPECULATIVE_FLYER";
+    verdictReason = `Mixed signals — composite ${adjustedComposite}, phase ${phase.toLowerCase()}`;
   }
 
   if (roleStabilityScore <= 45 && verdict === "ACCUMULATE") {
@@ -424,7 +305,13 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
   const horizon = deriveHorizon(stage, phase);
   const confidence = deriveConfidence(signals);
 
-  console.log(`[MarketScoring] ${input.playerName}: phase=${phase}, composite=${adjustedComposite}, verdict=${verdict}, demand=${signals.demandScore}, momentum=${signals.momentumScore}, hype=${signals.hypeScore}, liquidity=${signals.liquidityScore}`);
+  const topContribs = Object.entries(signals.contributions!)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(", ");
+
+  console.log(`[MarketScoring] ${input.playerName}: phase=${phase}, composite=${adjustedComposite}, verdict=${verdict}, sampleFactor=${derived.sampleFactor}, topContribs=[${topContribs}], demand=${signals.demandScore}, momentum=${signals.momentumScore}, hype=${signals.hypeScore}, liquidity=${signals.liquidityScore}, supply=${signals.supplyPressureScore}, vol=${signals.volatilityScore}, conf=${signals.confidenceScore}`);
 
   return {
     signals,
@@ -447,14 +334,14 @@ function deriveTemperature(signals: MarketSignals, phase: MarketPhase): MarketTe
 }
 
 function deriveVolatility(signals: MarketSignals): VolatilityLevel {
-  if (signals.volatilityScore >= 65) return "HIGH";
-  if (signals.volatilityScore >= 40) return "MEDIUM";
+  if (signals.volatilityScore <= 35) return "HIGH";
+  if (signals.volatilityScore <= 60) return "MEDIUM";
   return "LOW";
 }
 
 function deriveRisk(signals: MarketSignals, stage: PlayerStage, roleStability: number): RiskLevel {
   if (stage === "BUST" || roleStability <= 15) return "HIGH";
-  if (signals.volatilityScore >= 70 || signals.supplyPressureScore >= 75) return "HIGH";
+  if (signals.volatilityScore <= 30 || signals.supplyPressureScore <= 25) return "HIGH";
   if (signals.confidenceScore <= 30) return "HIGH";
   if (stage === "ROOKIE" || stage === "YEAR_2") return "MEDIUM";
   if (signals.composite >= 60 && roleStability >= 55) return "LOW";

@@ -735,13 +735,17 @@ async function aggregateInternalMetrics(playerName: string): Promise<Partial<Mar
 interface PlayerMarketData {
   available: boolean;
   totalAvgPrice?: number;
+  avgSoldPrice7d?: number;
   estimatedVolume?: "high" | "medium" | "low";
   volumeTrend?: "up" | "stable" | "down";
   priceRange?: { low: number; high: number };
   soldCount30d?: number;
+  soldCount7d?: number;
+  soldCountPrev30d?: number;
   activeListingCount?: number;
   medianSoldPrice?: number;
   priceTrendPercent?: number;
+  priceStdDev30d?: number;
   breakdown?: {
     category: string;
     avgPrice: number;
@@ -758,25 +762,33 @@ async function fetchPlayerMarketData(playerName: string, sport: string): Promise
   const searchPrompt = `Search for all sports cards sold for ${playerName} (${sport}) over the last 30 days on eBay and other card marketplaces.
 
 Provide a detailed market summary with NUMERIC data:
-1. Total average sale price across ALL cards (base, parallels, autos, graded, etc.)
-2. Median sale price across all cards
-3. Approximate number of cards sold in the last 30 days (actual count or best estimate)
-4. Approximate number of active/unsold listings currently available
-5. Estimated sales volume category (high/medium/low)
-6. Volume trend compared to previous period (up/stable/down)
-7. Price trend direction as a percentage change vs prior 30 days (e.g., +15 means prices up 15%, -10 means prices down 10%)
-8. Price range from lowest to highest sale
-9. Breakdown by card category with average prices
+1. Total average sale price across ALL cards (base, parallels, autos, graded, etc.) for last 30 days
+2. Average sale price for the last 7 days specifically
+3. Median sale price across all cards (30 days)
+4. Approximate number of cards sold in the last 30 days (actual count or best estimate)
+5. Approximate number of cards sold in the last 7 days specifically
+6. Approximate number of cards sold in the PRIOR 30-day period (days 31-60 ago) for comparison
+7. Approximate number of active/unsold listings currently available
+8. Estimated sales volume category (high/medium/low)
+9. Volume trend compared to previous period (up/stable/down)
+10. Price trend direction as a percentage change vs prior 30 days (e.g., +15 means prices up 15%, -10 means prices down 10%)
+11. Standard deviation of sale prices over the last 30 days (rough estimate)
+12. Price range from lowest to highest sale
+13. Breakdown by card category with average prices
 
 Return ONLY a JSON object:
 {
-  "totalAvgPrice": <number - average sale price across all cards>,
+  "totalAvgPrice": <number - average sale price across all cards, 30d>,
+  "avgSoldPrice7d": <number - average sale price last 7 days>,
   "medianSoldPrice": <number - median sale price>,
   "soldCount30d": <number - approximate cards sold in last 30 days>,
+  "soldCount7d": <number - approximate cards sold in last 7 days>,
+  "soldCountPrev30d": <number - approximate cards sold in prior 30 days (days 31-60)>,
   "activeListingCount": <number - approximate active unsold listings>,
   "estimatedVolume": "high" | "medium" | "low",
   "volumeTrend": "up" | "stable" | "down",
   "priceTrendPercent": <number - percentage price change vs prior period, e.g. 15 or -10>,
+  "priceStdDev30d": <number - standard deviation of sale prices over 30 days>,
   "priceRange": { "low": <number>, "high": <number> },
   "breakdown": [
     { "category": "Base/Common", "avgPrice": <number>, "priceRange": "$X - $Y" },
@@ -833,10 +845,14 @@ If no sales data is found, return: { "available": false }`;
           return {
             available: true,
             totalAvgPrice: parsed.totalAvgPrice,
+            avgSoldPrice7d: typeof parsed.avgSoldPrice7d === "number" ? parsed.avgSoldPrice7d : undefined,
             medianSoldPrice: typeof parsed.medianSoldPrice === "number" ? parsed.medianSoldPrice : undefined,
             soldCount30d: typeof parsed.soldCount30d === "number" ? parsed.soldCount30d : undefined,
+            soldCount7d: typeof parsed.soldCount7d === "number" ? parsed.soldCount7d : undefined,
+            soldCountPrev30d: typeof parsed.soldCountPrev30d === "number" ? parsed.soldCountPrev30d : undefined,
             activeListingCount: typeof parsed.activeListingCount === "number" ? parsed.activeListingCount : undefined,
             priceTrendPercent: typeof parsed.priceTrendPercent === "number" ? parsed.priceTrendPercent : undefined,
+            priceStdDev30d: typeof parsed.priceStdDev30d === "number" ? parsed.priceStdDev30d : undefined,
             estimatedVolume,
             volumeTrend,
             priceRange: parsed.priceRange,
@@ -882,10 +898,14 @@ function buildMarketMetrics(
       : hasGemini && geminiData.estimatedVolume
         ? volumeFallbackMap[geminiData.estimatedVolume]
         : undefined,
+    soldCount7d: hasGemini ? geminiData.soldCount7d : undefined,
+    soldCountPrev30d: hasGemini ? geminiData.soldCountPrev30d : undefined,
     activeListingCount: hasGemini ? geminiData.activeListingCount : undefined,
     avgSoldPrice: hasGemini ? geminiData.totalAvgPrice : internalData.internalAvgPrice,
+    avgSoldPrice7d: hasGemini ? geminiData.avgSoldPrice7d : undefined,
     medianSoldPrice: hasGemini && geminiData.medianSoldPrice ? geminiData.medianSoldPrice : (hasGemini ? geminiData.totalAvgPrice : internalData.internalAvgPrice),
     priceTrend: undefined,
+    priceStdDev30d: hasGemini ? geminiData.priceStdDev30d : undefined,
     volumeTrend: hasGemini ? geminiData.volumeTrend : undefined,
     priceRangeLow: hasGemini && geminiData.priceRange ? geminiData.priceRange.low : undefined,
     priceRangeHigh: hasGemini && geminiData.priceRange ? geminiData.priceRange.high : undefined,
