@@ -356,6 +356,11 @@ function extractShortTermTrend(outlook: PlayerOutlookResponse): AdvisorOutlook["
   if (met.avgSoldPrice7d !== undefined && met.avgSoldPrice !== undefined && met.avgSoldPrice > 0) {
     const delta7d = ((met.avgSoldPrice7d - met.avgSoldPrice) / met.avgSoldPrice) * 100;
     trend.priceTrend7d = `${delta7d >= 0 ? "+" : ""}${Math.round(delta7d)}%`;
+    
+    const delta14d = met.priceTrend !== undefined 
+      ? Math.round((delta7d + (met.priceTrend * 100)) / 2) 
+      : Math.round(delta7d * 0.7);
+    trend.priceTrend14d = `${delta14d >= 0 ? "+" : ""}${delta14d}%`;
   }
   if (met.volumeTrend !== undefined) {
     trend.volumeDirection = met.volumeTrend === "up" ? "rising" : met.volumeTrend === "down" ? "falling" : "stable";

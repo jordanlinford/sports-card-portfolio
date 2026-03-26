@@ -1507,6 +1507,7 @@ export type AdvisorOutlook = {
   marketPhase?: string; // Market phase (Accumulation, Breakout, etc.)
   shortTermTrend?: {
     priceTrend30d?: string; // e.g. "+12%" or "-5%"
+    priceTrend14d?: string; // 14d estimated price change
     priceTrend7d?: string; // 7d price change vs 30d avg
     volumeDirection?: string; // "rising" | "stable" | "falling"
     soldCount30d?: number;

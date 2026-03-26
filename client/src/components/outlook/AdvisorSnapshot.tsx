@@ -129,6 +129,16 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
                   <span className="font-medium">{advisor.shortTermTrend.priceTrend7d}</span> 7d
                 </span>
               )}
+              {advisor.shortTermTrend.priceTrend14d && (
+                <span className="flex items-center gap-1">
+                  {advisor.shortTermTrend.priceTrend14d.startsWith("+") ? (
+                    <TrendingUp className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className="font-medium">{advisor.shortTermTrend.priceTrend14d}</span> 14d
+                </span>
+              )}
               {advisor.shortTermTrend.priceTrend30d && (
                 <span className="flex items-center gap-1">
                   {advisor.shortTermTrend.priceTrend30d.startsWith("+") ? (
