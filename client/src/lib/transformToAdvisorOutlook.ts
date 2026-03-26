@@ -22,7 +22,7 @@ function mapVerdictToAdvisor(
       case "AVOID_NEW_MONEY":
         return { verdict: "AVOID", label: "Avoid new positions" };
       case "SPECULATIVE_FLYER":
-        return { verdict: "HOLD", label: "Small speculative bet only" };
+        return { verdict: "SPECULATIVE", label: "Small speculative bet only" };
       case "HOLD_ROLE_RISK":
         return { verdict: "HOLD", label: "Hold, monitor role" };
       case "HOLD_INJURY_CONTINGENT":
@@ -344,8 +344,35 @@ function buildEvidenceNote(outlook: PlayerOutlookResponse): string {
   return `Based on ${parts.join(" and ")}; ${qualityNote}.`;
 }
 
+function extractShortTermTrend(outlook: PlayerOutlookResponse): AdvisorOutlook["shortTermTrend"] {
+  const met = outlook.marketMetrics;
+  if (!met) return undefined;
+  
+  const trend: AdvisorOutlook["shortTermTrend"] = {};
+  
+  if (met.priceTrend !== undefined) {
+    trend.priceTrend = `${met.priceTrend >= 0 ? "+" : ""}${Math.round(met.priceTrend * 100)}%`;
+  }
+  if (met.volumeTrend !== undefined) {
+    trend.volumeDirection = met.volumeTrend === "up" ? "rising" : met.volumeTrend === "down" ? "falling" : "stable";
+  }
+  if (met.soldCount30d !== undefined) {
+    trend.soldCount30d = met.soldCount30d;
+  }
+  if (met.avgSoldPrice !== undefined) {
+    trend.avgPrice = `$${met.avgSoldPrice.toFixed(0)}`;
+  }
+  
+  return Object.keys(trend).length > 0 ? trend : undefined;
+}
+
 export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): AdvisorOutlook {
   const { verdict, label } = mapVerdictToAdvisor(outlook.investmentCall, outlook.verdict);
+  
+  const phase = outlook.marketPhase;
+  const phaseLabel = phase && phase !== "UNKNOWN" 
+    ? phase.charAt(0) + phase.slice(1).toLowerCase()
+    : undefined;
   
   return {
     verdict,
@@ -362,6 +389,8 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     cards: extractCards(outlook),
     evidenceNote: buildEvidenceNote(outlook),
     liquidityTier: deriveLiquidityTier(outlook),
+    marketPhase: phaseLabel,
+    shortTermTrend: extractShortTermTrend(outlook),
   };
 }
 
@@ -397,10 +426,7 @@ export function applyVerdictGuardrails(advisor: AdvisorOutlook): AdvisorOutlook 
     }
   }
   
-  const isSpeculative = result.verdictLabel.toLowerCase().includes("speculative") ||
-    result.verdict === "HOLD" && result.verdictLabel.toLowerCase().includes("small");
-  
-  if (isSpeculative) {
+  if (result.verdict === "SPECULATIVE") {
     result = {
       ...result,
       actionPlan: {

@@ -221,6 +221,9 @@ export function classifyMarketPhase(derived: DerivedMetrics): MarketPhase {
   }
 
   if (priceTrend > 0.05 && volumeTrend > 1.2) {
+    if (supplyRatio > 10) {
+      return "EXHAUSTION";
+    }
     return "BREAKOUT";
   }
 
@@ -229,6 +232,9 @@ export function classifyMarketPhase(derived: DerivedMetrics): MarketPhase {
   }
 
   if (priceTrend > 0) {
+    if (supplyRatio > 10) {
+      return "EXHAUSTION";
+    }
     return "EXPANSION";
   }
 
@@ -292,15 +298,18 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
   } else if (adjustedComposite > 75 && (phase === "ACCUMULATION" || phase === "BREAKOUT")) {
     verdict = "ACCUMULATE";
     verdictReason = `Strong composite (${adjustedComposite}) in ${phase.toLowerCase()} phase — ${agreementLabel} (${agreement}/6)${accel > 1.3 ? `, volume accelerating ${accel.toFixed(1)}x` : ""}`;
+  } else if (signals.hypeScore > 70 && (phase === "EXHAUSTION" || (signals.momentumScore > 65 && signals.liquidityScore > 50))) {
+    verdict = "TRADE_THE_HYPE";
+    verdictReason = `Overheated market: prices up ${(derived.priceTrend * 100).toFixed(0)}% but volume trend ${derived.volumeTrend.toFixed(2)}x${accel < 0.7 ? `, volume decelerating ${accel.toFixed(1)}x` : ""} — hype outpacing participation, high liquidity means exit opportunity`;
   } else if (adjustedComposite > 65) {
     verdict = "HOLD_CORE";
     verdictReason = `Solid composite (${adjustedComposite}) — ${agreementLabel} (${agreement}/6)`;
-  } else if (signals.hypeScore > 70 && phase === "EXHAUSTION") {
-    verdict = "TRADE_THE_HYPE";
-    verdictReason = `Market exhaustion: prices up ${(derived.priceTrend * 100).toFixed(0)}% but volume trend ${derived.volumeTrend.toFixed(2)}x${accel < 0.7 ? `, volume decelerating ${accel.toFixed(1)}x` : ""} — hype outpacing participation`;
-  } else if (adjustedComposite < 40) {
+  } else if (adjustedComposite < 40 && !(signals.liquidityScore > 60 && signals.demandScore > 60)) {
     verdict = "AVOID_NEW_MONEY";
     verdictReason = `Weak composite (${adjustedComposite}) — supply ratio ${derived.supplyRatio.toFixed(1)}x, ${agreementLabel} (${agreement}/6)`;
+  } else if (adjustedComposite < 40 && signals.liquidityScore > 60 && signals.demandScore > 60) {
+    verdict = "TRADE_THE_HYPE";
+    verdictReason = `Weak composite (${adjustedComposite}) but high liquidity (${signals.liquidityScore}) and demand (${signals.demandScore}) — sell opportunity, not avoidance`;
   } else {
     verdict = "SPECULATIVE_FLYER";
     verdictReason = `Mixed signals — composite ${adjustedComposite}, ${agreementLabel} (${agreement}/6), phase ${phase.toLowerCase()}`;

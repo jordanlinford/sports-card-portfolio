@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { 
   TrendingDown, 
+  TrendingUp,
   Minus, 
   ShoppingCart, 
   Ban,
@@ -10,6 +11,8 @@ import {
   Target,
   Scale,
   Heart,
+  Activity,
+  BarChart3,
 } from "lucide-react";
 import type { AdvisorOutlook } from "@shared/schema";
 import { LiquidityBadge } from "@/components/liquidity-badge";
@@ -51,6 +54,13 @@ function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
         text: "text-orange-700 dark:text-orange-400",
         icon: <TrendingDown className="h-5 w-5" />,
       };
+    case "SPECULATIVE":
+      return {
+        bg: "bg-amber-500/10",
+        border: "border-amber-500/30",
+        text: "text-amber-700 dark:text-amber-400",
+        icon: <Zap className="h-5 w-5" />,
+      };
     case "AVOID":
       return {
         bg: "bg-red-500/10",
@@ -86,21 +96,54 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
             </div>
             <div>
               <h2 className={`text-2xl font-bold ${verdictStyles.text}`} data-testid="text-advisor-verdict">
-                {advisor.verdict === "TRADE_THE_HYPE" ? "TRADE THE HYPE" : advisor.verdict.replace(/_/g, " ")}
+                {advisor.verdict === "TRADE_THE_HYPE" ? "TRADE THE HYPE" : advisor.verdict === "SPECULATIVE" ? "SPECULATIVE FLYER" : advisor.verdict.replace(/_/g, " ")}
               </h2>
               <p className="text-sm text-muted-foreground">{advisor.verdictLabel}</p>
             </div>
           </div>
           
-          {/* Liquidity badge - shows overall market health for this player's cards */}
-          {advisor.liquidityTier && (
-            <LiquidityBadge tier={advisor.liquidityTier} />
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {advisor.marketPhase && (
+              <Badge variant="secondary" className="text-xs font-medium" data-testid="badge-market-phase">
+                <Activity className="h-3 w-3 mr-1" />
+                {advisor.marketPhase}
+              </Badge>
+            )}
+            {advisor.liquidityTier && (
+              <LiquidityBadge tier={advisor.liquidityTier} />
+            )}
+          </div>
         </div>
+        
+        {advisor.shortTermTrend && (
+          <div className="flex flex-wrap items-center gap-3 px-4 py-2 text-xs text-muted-foreground" data-testid="row-short-term-trend">
+            {advisor.shortTermTrend.priceTrend && (
+              <span className="flex items-center gap-1">
+                {advisor.shortTermTrend.priceTrend.startsWith("+") ? (
+                  <TrendingUp className="h-3 w-3 text-green-500" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-red-500" />
+                )}
+                <span className="font-medium">{advisor.shortTermTrend.priceTrend}</span> price
+              </span>
+            )}
+            {advisor.shortTermTrend.volumeDirection && (
+              <span className="flex items-center gap-1">
+                <BarChart3 className="h-3 w-3" />
+                Volume {advisor.shortTermTrend.volumeDirection}
+              </span>
+            )}
+            {advisor.shortTermTrend.soldCount30d !== undefined && (
+              <span>{advisor.shortTermTrend.soldCount30d} sold/30d</span>
+            )}
+            {advisor.shortTermTrend.avgPrice && (
+              <span>{advisor.shortTermTrend.avgPrice} avg</span>
+            )}
+          </div>
+        )}
       </CardHeader>
       
       <CardContent className="space-y-4">
-        {/* Advisor's Take - the core commentary */}
         {advisor.advisorTake && (
           <p className="text-sm text-foreground leading-relaxed" data-testid="text-advisor-take">
             {advisor.advisorTake}

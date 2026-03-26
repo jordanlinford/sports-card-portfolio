@@ -1476,7 +1476,7 @@ export type MarketMetrics = {
 // ============ ADVISOR OUTLOOK - Trusted Advisor Format ============
 // Compact, opinionated summary for the above-the-fold view
 
-export type AdvisorVerdict = "BUY" | "HOLD_CORE" | "HOLD" | "SELL" | "AVOID" | "TRADE_THE_HYPE";
+export type AdvisorVerdict = "BUY" | "HOLD_CORE" | "HOLD" | "SELL" | "AVOID" | "TRADE_THE_HYPE" | "SPECULATIVE";
 export type AdvisorConfidence = "LOW" | "MED" | "HIGH";
 export type AdvisorHorizon = "1-3m" | "3-12m" | "12m+";
 
@@ -1504,6 +1504,13 @@ export type AdvisorOutlook = {
   };
   evidenceNote: string; // 1 sentence: data sources and limitations
   liquidityTier?: LiquidityTier; // Overall player market liquidity (derived from exposures)
+  marketPhase?: string; // Market phase (Accumulation, Breakout, etc.)
+  shortTermTrend?: {
+    priceTrend?: string; // e.g. "+12%" or "-5%"
+    volumeDirection?: string; // "rising" | "stable" | "falling"
+    soldCount30d?: number;
+    avgPrice?: string; // e.g. "$45"
+  };
 };
 
 // Player Outlook Cache table

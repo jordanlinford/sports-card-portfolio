@@ -1789,14 +1789,21 @@ async function generateFreshOutlook(
   const metricsWhyBullets: string[] = [];
 
   if (met.soldCount30d !== undefined) {
-    metricsWhyBullets.push(`${met.soldCount30d} cards sold in the last 30 days${met.activeListingCount ? `, ${met.activeListingCount} active listings` : ""}`);
+    const supplyRatioNote = met.activeListingCount && met.soldCount30d > 0
+      ? ` (${(met.activeListingCount / met.soldCount30d).toFixed(0)}x supply-to-sales ratio)`
+      : "";
+    metricsWhyBullets.push(`${met.soldCount30d} cards sold in 30 days${met.activeListingCount ? `, ${met.activeListingCount} active listings${supplyRatioNote}` : ""}`);
   }
   if (met.priceTrend !== undefined) {
     const dir = met.priceTrend >= 0 ? "up" : "down";
-    metricsWhyBullets.push(`Prices trending ${dir} ${Math.abs(Math.round(met.priceTrend * 100))}% vs prior period`);
+    const volNote = met.volumeTrend !== undefined 
+      ? ` while volume is ${met.volumeTrend === "up" ? "rising" : met.volumeTrend === "down" ? "falling" : "stable"}`
+      : "";
+    metricsWhyBullets.push(`Prices ${dir} ${Math.abs(Math.round(met.priceTrend * 100))}%${volNote}`);
   }
   if (marketResult.phase !== "UNKNOWN") {
-    metricsWhyBullets.push(`Market in ${marketResult.phase.toLowerCase()} phase — composite score ${sig.composite}/100`);
+    const signalSummary = sig.demandScore > 70 ? "strong demand" : sig.demandScore < 40 ? "weak demand" : "moderate demand";
+    metricsWhyBullets.push(`${marketResult.phase.toLowerCase().charAt(0).toUpperCase() + marketResult.phase.toLowerCase().slice(1)} phase with ${signalSummary} — score ${sig.composite}/100`);
   }
 
   if (metricsWhyBullets.length > 0) {
@@ -1820,27 +1827,34 @@ async function generateFreshOutlook(
   const trendStr = met.priceTrend !== undefined ? `${met.priceTrend >= 0 ? "+" : ""}${Math.round(met.priceTrend * 100)}%` : "";
   const metricsSnippet = [priceStr, soldStr, trendStr].filter(Boolean).join(", ");
 
+  const supplyStr = met.activeListingCount && met.soldCount30d 
+    ? `${(met.activeListingCount / Math.max(met.soldCount30d, 1)).toFixed(0)}x supply-to-sales ratio`
+    : "";
+  const demandStr = sig.demandScore > 70 ? "strong demand" : sig.demandScore > 50 ? "moderate demand" : "weak demand";
+  const momentumStr = sig.momentumScore > 70 ? "accelerating" : sig.momentumScore > 50 ? "stable momentum" : "decelerating";
+  const hypeStr = sig.hypeScore > 70 ? "overheated" : sig.hypeScore > 50 ? "elevated attention" : "";
+
   const verdictActionMap: Record<string, { advisorTake: string; packHit: string; collectorTip: string; actionPlan: { whatToDoNow: string; entryPlan: string; positionSizing: string } }> = {
     ACCUMULATE: {
-      advisorTake: `Market is in ${phaseName} phase with solid fundamentals${metricsSnippet ? ` (${metricsSnippet})` : ""}. This is a buying window — add exposure on dips while prices are fair. The thesis holds as long as on-field production continues.`,
+      advisorTake: `Market is in ${phaseName} phase with ${demandStr} and ${momentumStr}${metricsSnippet ? ` (${metricsSnippet})` : ""}. This is a buying window — prices haven't caught up to the demand signal. Add exposure on dips while the window is open.`,
       packHit: "Great pull — hold it. This player is in an accumulation zone with upside ahead.",
       collectorTip: "Look for dips on quiet news days to add at better prices.",
       actionPlan: { whatToDoNow: "Accumulate on weakness — buy dips in base rookies and mid-tier parallels.", entryPlan: "Target pullbacks on quiet news days; avoid chasing spikes.", positionSizing: "Build a core position across 3-5 cards." },
     },
     HOLD_CORE: {
-      advisorTake: `Stable market position in ${phaseName} phase${metricsSnippet ? ` (${metricsSnippet})` : ""}. No urgency to add or sell. Hold your core cards and monitor for catalysts that could shift the thesis.`,
+      advisorTake: `Stable market position in ${phaseName} phase with ${demandStr}${metricsSnippet ? ` (${metricsSnippet})` : ""}. Prices reflect the current story — no urgency to add or sell. Hold your core cards and wait for a catalyst.`,
       packHit: "Solid pull — worth keeping. Not a sell-now situation.",
       collectorTip: "No rush to buy more. Wait for a clear catalyst before adding.",
       actionPlan: { whatToDoNow: "Hold your current position — no urgency to add or sell.", entryPlan: "Wait for a clear catalyst before adding new exposure.", positionSizing: "Maintain current allocation; don't average up." },
     },
     TRADE_THE_HYPE: {
-      advisorTake: `Market is showing exhaustion signals${metricsSnippet ? ` (${metricsSnippet})` : ""}. Hype exceeds sustainable demand. Consider trimming into strength — sell spikes, not dips.`,
+      advisorTake: `Market is ${hypeStr || "showing exhaustion signals"} in ${phaseName} phase${metricsSnippet ? ` (${metricsSnippet})` : ""}${supplyStr ? `. ${supplyStr} — more sellers than the market can absorb` : ""}. Hype exceeds sustainable demand. Sell into strength, not weakness.`,
       packHit: "Sell into the hype. List quickly while demand is elevated.",
       collectorTip: "If you want to collect long-term, wait for the correction before buying.",
       actionPlan: { whatToDoNow: "Sell into strength — trim non-core holdings first.", entryPlan: "Don't buy now; wait for post-hype correction.", positionSizing: "Reduce exposure by 30-50%." },
     },
     SPECULATIVE_FLYER: {
-      advisorTake: `Early-career player with speculative upside in ${phaseName} phase${metricsSnippet ? ` (${metricsSnippet})` : ""}. Small position only — the upside is real but so is the downside risk.`,
+      advisorTake: `Speculative profile in ${phaseName} phase with ${demandStr}${metricsSnippet ? ` (${metricsSnippet})` : ""}. The upside runway exists but there's not enough data for a high-conviction call. Small position only.`,
       packHit: "Interesting pull — hold a copy but don't go deep. Let the career develop first.",
       collectorTip: "Keep exposure small. This is a lottery ticket, not a core holding.",
       actionPlan: { whatToDoNow: "Small speculative position only — one or two cards max.", entryPlan: "Buy base/common at current prices; save premium for role confirmation.", positionSizing: "Keep under 5% of portfolio." },
@@ -1852,7 +1866,7 @@ async function generateFreshOutlook(
       actionPlan: { whatToDoNow: "Hold but don't add — wait for role clarity.", entryPlan: "Only add if promoted to starter or key role.", positionSizing: "Freeze current allocation." },
     },
     AVOID_NEW_MONEY: {
-      advisorTake: `Market signals are weak in ${phaseName} phase${metricsSnippet ? ` (${metricsSnippet})` : ""}. Better opportunities exist elsewhere. If you hold cards, monitor for a bounce before selling.`,
+      advisorTake: `Market signals are weak — ${demandStr} with ${momentumStr}${metricsSnippet ? ` (${metricsSnippet})` : ""}${supplyStr ? `. ${supplyStr}` : ""}. Better opportunities exist elsewhere. If you hold, monitor for a bounce before selling.`,
       packHit: "Sell when you can get a fair price. Don't hold hoping for a turnaround.",
       collectorTip: "Steer clear for investment purposes. Better value elsewhere.",
       actionPlan: { whatToDoNow: "No new money — look for exits on bounces.", entryPlan: "Don't buy; capital is better deployed elsewhere.", positionSizing: "Reduce to zero if possible." },
