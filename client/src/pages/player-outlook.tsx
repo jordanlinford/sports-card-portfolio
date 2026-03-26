@@ -683,6 +683,7 @@ interface PortfolioContextProps {
     title: string;
     set: string | null;
     estimatedValue: number | null;
+    trend: { previousPrice: number; pctChange: number } | null;
   }>;
   cardsBySet: Array<{
     set: string;
@@ -758,6 +759,12 @@ function PortfolioContextPanel({ data, verdict }: { data: PortfolioContextProps;
                             <span className="text-sm truncate">{card.title}</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
+                            {card.trend && card.trend.pctChange !== 0 && (
+                              <span className={`text-[11px] font-medium inline-flex items-center gap-0.5 ${card.trend.pctChange > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid={`trend-${card.id}`}>
+                                {card.trend.pctChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                                {card.trend.pctChange > 0 ? "+" : ""}{card.trend.pctChange}%
+                              </span>
+                            )}
                             {card.estimatedValue != null && (
                               <span className="text-sm font-medium whitespace-nowrap">
                                 ${card.estimatedValue.toLocaleString()}
@@ -1272,7 +1279,6 @@ export default function PlayerOutlookPage() {
     }
   }, [watchlistStatus]);
 
-  // Portfolio context - fetch user's cards for this player
   interface PortfolioContextData {
     playerName: string;
     cardCount: number;
@@ -1282,6 +1288,7 @@ export default function PlayerOutlookPage() {
       title: string;
       set: string | null;
       estimatedValue: number | null;
+      trend: { previousPrice: number; pctChange: number } | null;
     }>;
     cardsBySet: Array<{
       set: string;

@@ -3707,18 +3707,31 @@ Sitemap: ${origin}/sitemap.xml
         if (specCrossProduct && specCrossProduct.avgPrice > 0) {
           if (unifiedZeroCompEstimate && unifiedZeroCompEstimate > 0) {
             const ratio = unifiedZeroCompEstimate / specCrossProduct.avgPrice;
-            if (ratio > 2 || ratio < 0.5) {
-              console.log(`[Quick Analyze] CROSS-PRODUCT vs UNIFIED CONFLICT: CrossProduct $${specCrossProduct.avgPrice} vs Unified $${unifiedZeroCompEstimate} (${ratio.toFixed(1)}x diff). Using unified estimate — Gemini grounded search is more targeted than generic cross-product.`);
+            if (ratio > 2) {
+              // Unified is much higher than cross-product with 0 sold comps.
+              // Gemini often anchors to unsold BIN listing prices, inflating the estimate.
+              // Cross-product uses actual sold data from comparable players/sets — trust it more.
+              console.log(`[Quick Analyze] CROSS-PRODUCT vs UNIFIED CONFLICT: CrossProduct $${specCrossProduct.avgPrice} vs Unified $${unifiedZeroCompEstimate} (${ratio.toFixed(1)}x diff). Unified likely anchored to unsold listings — using cross-product.`);
+              marketValue = specCrossProduct.avgPrice;
+              priceMin = specCrossProduct.minPrice;
+              priceMax = specCrossProduct.maxPrice;
+              compCount = 0;
+            } else if (ratio < 0.5) {
+              // Cross-product much higher — unified's targeted search found lower real-world pricing.
+              console.log(`[Quick Analyze] CROSS-PRODUCT vs UNIFIED CONFLICT: CrossProduct $${specCrossProduct.avgPrice} vs Unified $${unifiedZeroCompEstimate} (${ratio.toFixed(1)}x diff). Using unified — lower estimate likely more accurate.`);
               marketValue = unifiedZeroCompEstimate;
               priceMin = Math.round(unifiedZeroCompEstimate * 0.6);
               priceMax = Math.round(unifiedZeroCompEstimate * 1.5);
               compCount = 0;
             } else {
-              const blended = Math.round((unifiedZeroCompEstimate * 0.6 + specCrossProduct.avgPrice * 0.4) * 100) / 100;
-              console.log(`[Quick Analyze] CROSS-PRODUCT BLENDED: CrossProduct $${specCrossProduct.avgPrice} + Unified $${unifiedZeroCompEstimate} → blended $${blended}`);
+              // Both estimates are in the same ballpark — blend with cross-product weighted higher.
+              // Cross-product uses real sold data from comparable cards; unified with 0 comps
+              // often anchors to unsold listing prices or AI guesses.
+              const blended = Math.round((unifiedZeroCompEstimate * 0.35 + specCrossProduct.avgPrice * 0.65) * 100) / 100;
+              console.log(`[Quick Analyze] CROSS-PRODUCT BLENDED: CrossProduct $${specCrossProduct.avgPrice} (65%) + Unified $${unifiedZeroCompEstimate} (35%) → blended $${blended}`);
               marketValue = blended;
-              priceMin = Math.round(Math.min(specCrossProduct.minPrice, unifiedZeroCompEstimate * 0.7));
-              priceMax = Math.round(Math.max(specCrossProduct.maxPrice, unifiedZeroCompEstimate * 1.3));
+              priceMin = specCrossProduct.minPrice;
+              priceMax = Math.round(Math.max(specCrossProduct.maxPrice, unifiedZeroCompEstimate * 0.9));
               compCount = 0;
             }
           } else {
@@ -4898,6 +4911,51 @@ RULES:
         .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
         .where(and(...conditions));
       
+      // Fetch previous price observations for trend indicator
+      const { cardPriceObservations } = await import("@shared/schema");
+      const cardIds = userCards.map((c: typeof userCards[0]) => c.id);
+      let trendMap: Record<number, { previousPrice: number; pctChange: number }> = {};
+      if (cardIds.length > 0) {
+        try {
+          const priceObs = await db
+            .select({
+              cardId: cardPriceObservations.cardId,
+              priceEstimate: cardPriceObservations.priceEstimate,
+              createdAt: cardPriceObservations.createdAt,
+            })
+            .from(cardPriceObservations)
+            .where(sql`${cardPriceObservations.cardId} IN (${sql.join(cardIds.map((id: number) => sql`${id}`), sql`, `)})`)
+            .orderBy(sql`${cardPriceObservations.createdAt} DESC`);
+          
+          const byCard: Record<number, Array<{ price: number; createdAt: Date }>> = {};
+          for (const obs of priceObs) {
+            if (!obs.cardId) continue;
+            if (!byCard[obs.cardId]) byCard[obs.cardId] = [];
+            byCard[obs.cardId].push({ price: Number(obs.priceEstimate), createdAt: obs.createdAt });
+          }
+          
+          for (const [cardId, obs] of Object.entries(byCard)) {
+            if (obs.length >= 2) {
+              const current = obs[0].price;
+              const previous = obs[1].price;
+              if (previous > 0) {
+                trendMap[Number(cardId)] = {
+                  previousPrice: previous,
+                  pctChange: Math.round(((current - previous) / previous) * 1000) / 10,
+                };
+              }
+            }
+          }
+        } catch (e) {
+          // Price observations table may not exist, ignore
+        }
+      }
+
+      const cardsWithTrend = userCards.map((card: typeof userCards[0]) => ({
+        ...card,
+        trend: trendMap[card.id] || null,
+      }));
+
       // Calculate total value
       const totalValue = userCards.reduce((sum: number, card: typeof userCards[0]) => sum + (card.estimatedValue || 0), 0);
       
@@ -4913,7 +4971,7 @@ RULES:
         playerName: decodedPlayerName,
         cardCount: userCards.length,
         totalValue,
-        cards: userCards.slice(0, 10), // Limit to 10 for preview
+        cards: cardsWithTrend.slice(0, 10),
         cardsBySet: Object.entries(cardsBySet).map(([set, setCards]) => ({
           set,
           count: setCards.length,

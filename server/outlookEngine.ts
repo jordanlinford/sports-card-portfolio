@@ -1474,43 +1474,62 @@ export async function fetchCrossProductFallbackPrice(card: {
   const cardDesc = `${year} ${set} ${player} ${variation} ${gradeLabel}`.trim();
 
   // Build serial number context for premium
+  const baseLabel = isAuto ? "base auto" : "base card";
   let serialPremium = "";
   if (serialNumber) {
-    if (serialNumber <= 10) serialPremium = "This is a VERY rare low-numbered parallel. Apply a significant premium (5-15x) over the base auto price.";
-    else if (serialNumber <= 25) serialPremium = "This is a rare low-numbered parallel. Apply a premium (3-6x) over the base auto price.";
-    else if (serialNumber <= 50) serialPremium = "This is a numbered parallel /50. Apply a premium (2-4x) over the base auto price.";
-    else if (serialNumber <= 99) serialPremium = "This is a numbered parallel /99. Apply a premium (1.5-2.5x) over the base auto price.";
-    else if (serialNumber <= 299) serialPremium = "This is a numbered parallel /299. Apply a modest premium (1.2-1.8x) over the base auto price.";
-    else serialPremium = "This is a numbered parallel but highly numbered. Price similarly to a base auto.";
+    if (serialNumber <= 10) serialPremium = `This is a VERY rare low-numbered parallel. Apply a significant premium (5-15x) over the ${baseLabel} price.`;
+    else if (serialNumber <= 25) serialPremium = `This is a rare low-numbered parallel. Apply a premium (3-6x) over the ${baseLabel} price.`;
+    else if (serialNumber <= 50) serialPremium = `This is a numbered parallel /50. Apply a premium (2-4x) over the ${baseLabel} price.`;
+    else if (serialNumber <= 99) serialPremium = `This is a numbered parallel /99. Apply a premium (1.5-2.5x) over the ${baseLabel} price.`;
+    else if (serialNumber <= 299) serialPremium = `This is a numbered parallel /299. Apply a modest premium (1.2-1.8x) over the ${baseLabel} price.`;
+    else serialPremium = `This is a numbered parallel but highly numbered. Price similarly to a ${baseLabel}.`;
   }
+
+  const searchQueries = isAuto ? [
+    `"${player} ${year} ${sport} auto sold eBay"`,
+    `"${player} ${year} autograph sold eBay"`,
+    `"${player} ${year} Donruss auto sold eBay"`,
+    `"${player} ${year} Prizm auto sold eBay"`,
+    `"${player} ${year} Select auto sold eBay"`,
+  ] : [
+    `"${player} ${year} ${sport} card sold eBay"`,
+    `"${player} ${year} ${set || "Prizm"} sold eBay"`,
+    `"${player} ${year} parallel numbered sold eBay"`,
+    `"${player} ${year} rookie card sold eBay"`,
+  ];
+
+  const compSearches = isAuto ? [
+    `Look at what their comparable autos sell for (Donruss, Illusions, Score, Chronicles)`,
+  ] : [
+    `Look at what their comparable base/parallel cards sell for — NOT autographs`,
+    `For non-auto numbered parallels of mid-tier rookies, base cards typically sell $1-5 and /25 parallels sell $5-25`,
+  ];
+
+  const baseRangeHint = isAuto
+    ? `For ${sport} rookies in products like Donruss, Score, Chronicles, Illusions: base autos typically range $5-$30 depending on player tier; premium numbered parallels go higher`
+    : `For ${sport} rookies: base cards typically sell $0.50-$5. Non-auto numbered parallels (/99) sell $3-$15, (/25) sell $8-$30, (/10) sell $15-$60 depending on player tier. Do NOT use autograph prices as a baseline for non-auto parallels.`;
 
   const prompt = `You are a sports card pricing expert. I need a realistic market value estimate for a ${sport} card:
 
 CARD: "${cardDesc}"
-Card Type: ${serialLabel} ${cardTypeLabel}
+Card Type: ${serialLabel} ${cardTypeLabel}${isAuto ? "" : " (NOT an autograph)"}
 
 This card has NO direct eBay sold comps available yet. You need to estimate its value using cross-product comparables. Here is exactly how to do it:
 
 STEP 1 — Find this PLAYER'S comparable cards in any product:
-- Search: "${player} ${year} ${sport} card sold eBay"
-- Search: "${player} ${year} rookie auto sold eBay"
-- Search: "${player} ${year} autograph sold eBay"
-- Search: "${player} ${year} Donruss auto sold eBay"
-- Search: "${player} ${year} Illusions auto sold eBay"  
-- Search: "${player} ${year} Select auto sold eBay"
-- Search: "${player} ${year} Prizm auto sold eBay"
-- Search: "${player} ${year} Chronicles auto sold eBay"
+${searchQueries.map(q => `- Search: ${q}`).join("\n")}
 
 STEP 2 — If the player has no sales yet, find COMPARABLE PLAYERS at the same tier:
 - Search for rookies drafted in the same round, same position, same year
 - Search for rookies with similar hype/draft stock from ${year} ${sport}
-- Look at what their comparable autos sell for (Donruss, Illusions, Score, Chronicles)
+${compSearches.map(s => `- ${s}`).join("\n")}
 ${serialPremium ? `\nSTEP 3 — APPLY SERIAL NUMBER PREMIUM:\n${serialPremium}\n` : ""}
 IMPORTANT RULES:
 - NEVER return 0 or null for avgPrice. A thoughtful estimate is always required.
-- If the player is a rookie, search specifically for ${year} rookie autos in budget-to-mid products
+- If the player is a rookie, search specifically for ${year} rookie ${isAuto ? "autos" : "cards (NOT autos)"} in budget-to-mid products
 - Return the REALISTIC current market value, not the ceiling potential
-- For ${sport} rookies in products like Donruss, Score, Chronicles, Illusions: base autos typically range $5-$30 depending on player tier; premium numbered parallels go higher
+- ${baseRangeHint}
+- ${isAuto ? "" : "CRITICAL: This is NOT an autograph card. Do NOT anchor to autograph prices. Non-auto parallels are worth significantly less than auto versions."}
 
 Return ONLY this JSON:
 {

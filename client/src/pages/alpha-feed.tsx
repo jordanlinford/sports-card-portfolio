@@ -240,6 +240,23 @@ function CommunityBadges({ ownerCount, weeklyScans }: { ownerCount?: number; wee
   );
 }
 
+function getPlayerHeadline(signalType?: string, playerName?: string | null): string | null {
+  const name = playerName || "This player";
+  const firstName = name.split(" ")[0];
+  if (!signalType) return null;
+  if (signalType === "strong_buy") return `${firstName}'s market is heating up`;
+  if (signalType === "buy") return `Interest in ${firstName} is rising`;
+  if (signalType === "sell" || signalType === "strong_sell") return `${firstName}'s market is cooling`;
+  return `${firstName} is on the radar`;
+}
+
+function getPlayerCta(signalType?: string): string {
+  if (!signalType) return "See full outlook";
+  if (signalType === "strong_buy" || signalType === "buy") return "See why this player is trending";
+  if (signalType === "sell" || signalType === "strong_sell") return "See the risk factors";
+  return "See full player outlook";
+}
+
 function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount, weeklyScans }: {
   signal?: Signal;
   card: SignalCard | null;
@@ -251,15 +268,15 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
   const [, setLocation] = useLocation();
   if (!card) return null;
 
-  const signalBadge = signal ? getSignalBadge(signal.signalType) : null;
-  const confidenceBadge = signal ? getConfidenceBadge(signal.confidence) : null;
   const signalLabel = getSignalLabel(signal?.signalType);
+  const confidenceBadge = signal ? getConfidenceBadge(signal.confidence) : null;
   const price = formatPrice(card.manualValue ?? card.estimatedValue);
   const drivers = signal?.drivers?.filter(Boolean)?.slice(0, 2) ?? [];
-  const whyNow = signal?.whyNow;
   const oc = ownerCount ?? signal?.ownerCount;
   const ws = weeklyScans ?? signal?.weeklyScans;
   const playerName = card.playerName || card.title;
+  const headline = getPlayerHeadline(signal?.signalType, playerName);
+  const cta = getPlayerCta(signal?.signalType);
 
   const handleClick = () => {
     trackAlphaEvent("signal_click", card.id, card.playerName, card.title);
@@ -283,7 +300,7 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
           </div>
         )}
         <div className="flex gap-3">
-          <div className="w-16 h-20 flex-shrink-0 rounded-md overflow-hidden bg-muted">
+          <div className="w-14 h-18 flex-shrink-0 rounded-md overflow-hidden bg-muted">
             {card.imagePath ? (
               <img
                 src={card.imagePath}
@@ -293,7 +310,7 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                <ImageIcon className="h-5 w-5 text-muted-foreground/30" />
               </div>
             )}
           </div>
@@ -303,64 +320,54 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
                 <h3 className="font-semibold text-sm truncate" data-testid={`text-card-name-${card.id}`}>
                   {playerName}
                 </h3>
-                <p className="text-xs text-muted-foreground truncate" data-testid={`text-card-set-${card.id}`}>
-                  {[card.year, card.set, card.variation].filter(Boolean).join(" · ")}
-                </p>
+                {headline && (
+                  <p className="text-xs text-muted-foreground mt-0.5" data-testid={`text-headline-${card.id}`}>
+                    {headline}
+                  </p>
+                )}
               </div>
-              {price && (
-                <span className="text-sm font-semibold whitespace-nowrap" data-testid={`text-price-${card.id}`}>
-                  {price}
-                </span>
-              )}
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                {price && (
+                  <span className="text-sm font-semibold whitespace-nowrap" data-testid={`text-price-${card.id}`}>
+                    {price}
+                  </span>
+                )}
+                {confidenceBadge && (
+                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${confidenceBadge.className}`} data-testid={`badge-confidence-${card.id}`}>
+                    {confidenceBadge.label}
+                  </Badge>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {showOwned && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30" data-testid={`badge-owned-${card.id}`}>
-                  You own this
-                </Badge>
-              )}
-              {signalBadge && (
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${signalBadge.className}`} data-testid={`badge-signal-${card.id}`}>
-                  {signalBadge.label}
-                </Badge>
-              )}
-              {confidenceBadge && (
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${confidenceBadge.className}`} data-testid={`badge-confidence-${card.id}`}>
-                  {confidenceBadge.label}
-                </Badge>
-              )}
-            </div>
+            {showOwned && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 mt-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30" data-testid={`badge-owned-${card.id}`}>
+                In your portfolio
+              </Badge>
+            )}
 
             {ownedAction && (
-              <p className="text-xs font-medium mt-1.5 text-primary" data-testid={`text-action-${card.id}`}>
+              <p className="text-xs font-medium mt-1 text-primary" data-testid={`text-action-${card.id}`}>
                 {ownedAction}
               </p>
             )}
 
-            <CommunityBadges ownerCount={oc} weeklyScans={ws} />
-
             {drivers.length > 0 && (
-              <ul className="mt-2 space-y-0.5" data-testid={`drivers-${card.id}`}>
+              <ul className="mt-1.5 space-y-0.5" data-testid={`drivers-${card.id}`}>
                 {drivers.map((driver, i) => (
                   <li key={i} className="text-xs text-muted-foreground flex items-start gap-1">
                     <span className="text-primary mt-0.5">•</span>
-                    <span>{driver}</span>
+                    <span className="line-clamp-1">{driver}</span>
                   </li>
                 ))}
               </ul>
             )}
 
-            {whyNow && (
-              <div className="flex items-center gap-1 mt-1.5" data-testid={`why-now-${card.id}`}>
-                <Clock className="h-3 w-3 text-muted-foreground/70 flex-shrink-0" />
-                <span className="text-[11px] text-muted-foreground/80 italic">{whyNow}</span>
-              </div>
-            )}
+            <CommunityBadges ownerCount={oc} weeklyScans={ws} />
 
             <div className="flex items-center justify-between mt-2">
               <span className="text-[11px] text-primary font-medium flex items-center gap-1" data-testid={`cta-${card.id}`}>
-                See what's driving {playerName?.split(" ")[0] || "this player"}
+                {cta}
                 <ArrowRight className="h-3 w-3" />
               </span>
               {signal && <FeedbackButtons signalId={signal.id} />}
