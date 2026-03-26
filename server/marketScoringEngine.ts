@@ -224,13 +224,17 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
   const hypeScore = scoreHype(newsHype, newsCount, metrics);
   const confidenceScore = scoreConfidence(metrics);
 
+  const hypeContribution = hypeScore > 70 && demandScore < 50
+    ? (100 - hypeScore) * SIGNAL_WEIGHTS.hype
+    : hypeScore * SIGNAL_WEIGHTS.hype;
+
   const composite =
     demandScore * SIGNAL_WEIGHTS.demand +
     momentumScore * SIGNAL_WEIGHTS.momentum +
     liquidityScore * SIGNAL_WEIGHTS.liquidity +
     (100 - supplyPressureScore) * SIGNAL_WEIGHTS.supplyPressure +
     (100 - volatilityScore) * SIGNAL_WEIGHTS.volatility +
-    hypeScore * SIGNAL_WEIGHTS.hype +
+    hypeContribution +
     confidenceScore * SIGNAL_WEIGHTS.confidence;
 
   return {
