@@ -1793,6 +1793,65 @@ async function generateFreshOutlook(
   if (marketResult.phase !== "UNKNOWN" && phasePostureMap[marketResult.phase]) {
     investmentCall.postureLabel = phasePostureMap[marketResult.phase];
   }
+
+  const phaseName = marketResult.phase !== "UNKNOWN" ? marketResult.phase.toLowerCase() : "current";
+  const priceStr = met.avgSoldPrice ? `$${met.avgSoldPrice.toFixed(0)} avg` : "";
+  const soldStr = met.soldCount30d ? `${met.soldCount30d} sold/30d` : "";
+  const trendStr = met.priceTrend !== undefined ? `${met.priceTrend >= 0 ? "+" : ""}${Math.round(met.priceTrend * 100)}%` : "";
+  const metricsSnippet = [priceStr, soldStr, trendStr].filter(Boolean).join(", ");
+
+  const verdictActionMap: Record<string, { advisorTake: string; packHit: string; collectorTip: string; actionPlan: { whatToDoNow: string; entryPlan: string; positionSizing: string } }> = {
+    ACCUMULATE: {
+      advisorTake: `Market is in ${phaseName} phase with solid fundamentals${metricsSnippet ? ` (${metricsSnippet})` : ""}. This is a buying window — add exposure on dips while prices are fair. The thesis holds as long as on-field production continues.`,
+      packHit: "Great pull — hold it. This player is in an accumulation zone with upside ahead.",
+      collectorTip: "Look for dips on quiet news days to add at better prices.",
+      actionPlan: { whatToDoNow: "Accumulate on weakness — buy dips in base rookies and mid-tier parallels.", entryPlan: "Target pullbacks on quiet news days; avoid chasing spikes.", positionSizing: "Build a core position across 3-5 cards." },
+    },
+    HOLD_CORE: {
+      advisorTake: `Stable market position in ${phaseName} phase${metricsSnippet ? ` (${metricsSnippet})` : ""}. No urgency to add or sell. Hold your core cards and monitor for catalysts that could shift the thesis.`,
+      packHit: "Solid pull — worth keeping. Not a sell-now situation.",
+      collectorTip: "No rush to buy more. Wait for a clear catalyst before adding.",
+      actionPlan: { whatToDoNow: "Hold your current position — no urgency to add or sell.", entryPlan: "Wait for a clear catalyst before adding new exposure.", positionSizing: "Maintain current allocation; don't average up." },
+    },
+    TRADE_THE_HYPE: {
+      advisorTake: `Market is showing exhaustion signals${metricsSnippet ? ` (${metricsSnippet})` : ""}. Hype exceeds sustainable demand. Consider trimming into strength — sell spikes, not dips.`,
+      packHit: "Sell into the hype. List quickly while demand is elevated.",
+      collectorTip: "If you want to collect long-term, wait for the correction before buying.",
+      actionPlan: { whatToDoNow: "Sell into strength — trim non-core holdings first.", entryPlan: "Don't buy now; wait for post-hype correction.", positionSizing: "Reduce exposure by 30-50%." },
+    },
+    SPECULATIVE_FLYER: {
+      advisorTake: `Early-career player with speculative upside in ${phaseName} phase${metricsSnippet ? ` (${metricsSnippet})` : ""}. Small position only — the upside is real but so is the downside risk.`,
+      packHit: "Interesting pull — hold a copy but don't go deep. Let the career develop first.",
+      collectorTip: "Keep exposure small. This is a lottery ticket, not a core holding.",
+      actionPlan: { whatToDoNow: "Small speculative position only — one or two cards max.", entryPlan: "Buy base/common at current prices; save premium for role confirmation.", positionSizing: "Keep under 5% of portfolio." },
+    },
+    HOLD_ROLE_RISK: {
+      advisorTake: `Role uncertainty is the main concern${metricsSnippet ? ` (${metricsSnippet})` : ""}. The talent may be there but the opportunity isn't locked in. Hold what you have but don't add until the role clarifies.`,
+      packHit: "Keep it for now, but watch the role situation closely.",
+      collectorTip: "Wait for role clarity before making any moves.",
+      actionPlan: { whatToDoNow: "Hold but don't add — wait for role clarity.", entryPlan: "Only add if promoted to starter or key role.", positionSizing: "Freeze current allocation." },
+    },
+    AVOID_NEW_MONEY: {
+      advisorTake: `Market signals are weak in ${phaseName} phase${metricsSnippet ? ` (${metricsSnippet})` : ""}. Better opportunities exist elsewhere. If you hold cards, monitor for a bounce before selling.`,
+      packHit: "Sell when you can get a fair price. Don't hold hoping for a turnaround.",
+      collectorTip: "Steer clear for investment purposes. Better value elsewhere.",
+      actionPlan: { whatToDoNow: "No new money — look for exits on bounces.", entryPlan: "Don't buy; capital is better deployed elsewhere.", positionSizing: "Reduce to zero if possible." },
+    },
+    AVOID_STRUCTURAL: {
+      advisorTake: `Structural decline with no clear path to recovery${metricsSnippet ? ` (${metricsSnippet})` : ""}. Cards are likely to keep losing value. Sell into any bounces.`,
+      packHit: "Sell as soon as you can. This is not a hold situation.",
+      collectorTip: "Only buy if you're a personal fan collecting for nostalgia, not investment.",
+      actionPlan: { whatToDoNow: "Exit position — sell into any bounces.", entryPlan: "Do not buy at any price for investment.", positionSizing: "Zero allocation." },
+    },
+  };
+
+  const narrativeOverride = verdictActionMap[marketResult.verdict];
+  if (narrativeOverride) {
+    investmentCall.advisorTake = narrativeOverride.advisorTake;
+    investmentCall.packHitReaction = narrativeOverride.packHit;
+    investmentCall.collectorTip = narrativeOverride.collectorTip;
+    investmentCall.actionPlan = narrativeOverride.actionPlan;
+  }
   
   // Step 8.5: Apply market-derived temperature to snapshot
   snapshot.temperature = marketResult.temperature;

@@ -107,13 +107,16 @@ function scoreMomentum(metrics: MarketMetrics, momentum?: string): number {
 function scoreLiquidity(metrics: MarketMetrics): number {
   let score = 50;
 
-  if (metrics.soldCount30d !== undefined && metrics.activeListingCount !== undefined) {
-    const totalActivity = metrics.soldCount30d + metrics.activeListingCount;
-    if (totalActivity >= 300) score = 90;
-    else if (totalActivity >= 150) score = 75;
-    else if (totalActivity >= 50) score = 60;
-    else if (totalActivity >= 15) score = 42;
-    else score = 25;
+  if (metrics.soldCount30d !== undefined && metrics.activeListingCount !== undefined && metrics.activeListingCount > 0) {
+    const sellThroughRate = metrics.soldCount30d / (metrics.soldCount30d + metrics.activeListingCount);
+    if (sellThroughRate >= 0.7) score = 88;
+    else if (sellThroughRate >= 0.5) score = 72;
+    else if (sellThroughRate >= 0.3) score = 55;
+    else if (sellThroughRate >= 0.15) score = 38;
+    else score = 22;
+
+    if (metrics.soldCount30d >= 100) score = Math.min(95, score + 10);
+    else if (metrics.soldCount30d >= 30) score = Math.min(95, score + 5);
   } else if (metrics.soldCount30d !== undefined) {
     if (metrics.soldCount30d >= 100) score = 82;
     else if (metrics.soldCount30d >= 40) score = 65;
@@ -162,17 +165,31 @@ function scoreVolatility(metrics: MarketMetrics): number {
 function scoreHype(newsHype?: string, newsCount?: number, metrics?: MarketMetrics): number {
   let score = 40;
 
-  if (newsHype === "HIGH") score = 82;
-  else if (newsHype === "MEDIUM") score = 55;
-  else if (newsHype === "LOW") score = 30;
+  if (metrics?.priceTrend !== undefined && metrics?.soldCount30d !== undefined) {
+    const priceUp = metrics.priceTrend > 0.05;
+    const highVolume = metrics.soldCount30d >= 50;
+    const volumeUp = metrics.volumeTrend === "up";
 
-  if (newsCount !== undefined) {
-    if (newsCount >= 8) score = Math.max(score, 80);
-    else if (newsCount >= 5) score = Math.max(score, 65);
+    if (priceUp && highVolume && volumeUp) score = 85;
+    else if (priceUp && (highVolume || volumeUp)) score = 72;
+    else if (priceUp) score = 60;
+    else if (metrics.priceTrend < -0.05 && highVolume) score = 35;
+    else score = 50;
+  } else {
+    if (newsHype === "HIGH") score = 75;
+    else if (newsHype === "MEDIUM") score = 52;
+    else if (newsHype === "LOW") score = 30;
+  }
+
+  if (newsCount !== undefined && newsCount >= 8) {
+    score = Math.min(95, score + 8);
   }
 
   if (metrics?.weeklyScans && metrics.weeklyScans >= 15) {
-    score = Math.min(95, score + 10);
+    score = Math.min(95, score + 5);
+  }
+  if (metrics?.weeklyAdds && metrics.weeklyAdds >= 5) {
+    score = Math.min(95, score + 5);
   }
 
   return Math.max(5, Math.min(95, score));
