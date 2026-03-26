@@ -1,0 +1,233 @@
+Good—this is the right moment to tighten the engine.
+
+You don’t need more features. You need mathematically consistent signals that behave correctly across edge cases.
+
+Below are the exact formulas + logic to stabilize and improve what you just built.
+
+1. Core Principle
+
+All signals should be:
+
+bounded (0–100)
+comparable across players
+robust to small samples
+derived from actual behavior, not labels
+2. Required Raw Inputs (standardize this first)
+
+Make sure every player dataset produces:
+
+Variable	Definition
+sales_7d	# of sold listings in last 7 days
+sales_30d	# of sold listings in last 30 days
+price_7d_avg	avg or median sold price (7d)
+price_30d_avg	avg or median sold price (30d)
+sales_prev_30d	prior 30d period sales (days 31–60)
+listings_active	current active listings
+price_std_30d	std deviation of prices (30d)
+
+Derived:
+
+sales_velocity = sales_7d / 7
+volume_trend = sales_30d / max(sales_prev_30d, 1)
+price_trend = (price_7d_avg - price_30d_avg) / max(price_30d_avg, 1)
+sell_through = sales_30d / max(listings_active, 1)
+cv = price_std_30d / max(price_30d_avg, 1)
+3. Sample Size Normalization (CRITICAL)
+
+Every signal must be dampened by data strength.
+
+sample_factor = min(1.0, log(1 + sales_30d) / log(50))
+~50 sales/month = full confidence
+small sample = heavily dampened
+
+You will multiply most signals by this.
+
+4. Signal Formulas (Replace Current Versions)
+4.1 Demand Score
+demand_raw = log(1 + sales_velocity)
+demand_score = normalize(demand_raw, min=0, max=log(1+20)) * 100
+demand_score *= sample_factor
+
+Interpretation:
+
+Measures real buyer activity
+Log prevents whales dominating
+4.2 Momentum Score
+momentum_raw = price_trend
+momentum_score = clamp(50 + (momentum_raw * 200), 0, 100)
+momentum_score *= sample_factor
+
+Interpretation:
+
++10% → ~70
+-10% → ~30
+4.3 Liquidity Score
+liquidity_raw = sell_through
+liquidity_score = clamp(liquidity_raw * 100, 0, 100)
+
+Refinement:
+
+liquidity_score *= min(1, log(1 + sales_30d)/3)
+
+Interpretation:
+
+High sell-through + enough volume = liquid
+4.4 Supply Pressure Score
+
+Inverse logic (high = bad):
+
+supply_ratio = listings_active / max(sales_30d, 1)
+supply_score = clamp(100 - (supply_ratio * 20), 0, 100)
+
+Interpretation:
+
+More listings than sales = pressure
+4.5 Volatility Score
+
+Higher volatility = worse:
+
+volatility_score = clamp(100 - (cv * 200), 0, 100)
+
+Interpretation:
+
+Stable assets score higher
+Wild swings reduce score
+4.6 Hype Score (IMPORTANT FIX)
+
+Replace vague hype with:
+
+Price vs Participation Divergence
+price_signal = price_trend
+volume_signal = volume_trend - 1
+
+hype_raw = price_signal - volume_signal
+hype_score = clamp(50 + (hype_raw * 150), 0, 100)
+
+Interpretation:
+
+Scenario	Result
+Price ↑ + Volume ↑	neutral (healthy)
+Price ↑ + Volume ↓	high hype (bad)
+Price flat + Volume ↑	low hype (good)
+4.7 Confidence Score
+confidence_score = clamp(sample_factor * 100, 0, 100)
+
+Enhancement:
+
+if sales_30d < 5:
+    confidence_score *= 0.5
+5. Composite Score (Weighted, Not Equal)
+
+Do NOT weight equally.
+
+market_score =
+    (demand_score * 0.25) +
+    (momentum_score * 0.20) +
+    (liquidity_score * 0.15) +
+    (supply_score * 0.15) +
+    (volatility_score * 0.10) +
+    ((100 - hype_score) * 0.15)
+
+Key:
+
+Hype is inverted (high hype = negative)
+6. Phase Classification (Make This Deterministic)
+Define clearly:
+if price_trend < -0.05 and supply_ratio > 1.5:
+    phase = "Decline"
+
+elif price_trend > 0.05 and volume_trend > 1.2:
+    phase = "Breakout"
+
+elif price_trend > 0.05 and volume_trend <= 1.0:
+    phase = "Exhaustion"
+
+elif abs(price_trend) < 0.03 and volume_trend > 1.1:
+    phase = "Accumulation"
+
+elif price_trend > 0 and volume_trend > 1:
+    phase = "Expansion"
+
+else:
+    phase = "Neutral"
+
+This removes ambiguity.
+
+7. Verdict Logic (Replace Precedence System)
+Use score + phase together:
+if market_score > 75 and phase in ["Accumulation", "Breakout"]:
+    verdict = "ACCUMULATE"
+
+elif market_score > 65:
+    verdict = "HOLD_CORE"
+
+elif hype_score > 70 and phase == "Exhaustion":
+    verdict = "TRADE_THE_HYPE"
+
+elif market_score < 40:
+    verdict = "AVOID_NEW_MONEY"
+
+else:
+    verdict = "SPECULATIVE_FLYER"
+8. Add Signal Contribution Tracking (for debugging)
+
+Store this:
+
+contributions = {
+  "demand": demand_score * 0.25,
+  "momentum": momentum_score * 0.20,
+  "liquidity": liquidity_score * 0.15,
+  "supply": supply_score * 0.15,
+  "volatility": volatility_score * 0.10,
+  "anti_hype": (100 - hype_score) * 0.15
+}
+
+You’ll use this later for:
+
+debugging
+UI explanations
+tuning
+9. Narrative Anchors (must be data-driven)
+
+Force this structure:
+
+Section	Content
+What’s happening	price trend %, volume trend
+Demand	sales count change
+Risk	volatility + supply
+Why verdict fired	top 2–3 contributing signals
+
+Example:
+
+Prices up 18% in 14 days while sales volume dropped 22%
+Active listings now exceed sales by 2.1x
+Momentum strong but participation weakening → exhaustion phase
+10. Immediate Implementation Order
+
+Do this in order:
+
+Standardize raw inputs
+Implement sample_factor
+Replace all 7 signal formulas
+Replace composite score
+Lock phase classification rules
+Replace verdict logic
+Add contribution tracking
+11. What This Fixes
+Problem	Fix
+Small sample noise	sample_factor
+Fake hype signals	price vs volume divergence
+Weird verdict jumps	weighted scoring
+Phase inconsistency	deterministic rules
+Lack of trust	contribution tracking
+Bottom Line
+
+If you implement exactly this:
+
+your engine becomes stable
+your signals become interpretable
+your verdicts become defensible
+
+And most importantly:
+
+it will behave like a real market system, not an opinion engine
