@@ -11,6 +11,9 @@ import type {
   DataConfidence,
   SignalContributions,
   DerivedMetrics,
+  SignalDirection,
+  ConvictionLevel,
+  ConvictionData,
 } from "@shared/schema";
 import type { RoleTier } from "./investmentDecisionEngine";
 
@@ -140,6 +143,64 @@ function scoreConfidence(derived: DerivedMetrics, metrics: MarketMetrics): numbe
   return clamp(score, 0, 100);
 }
 
+function classifyDirection(score: number, bullishThreshold: number, bearishThreshold: number): SignalDirection {
+  if (score > bullishThreshold) return "bullish";
+  if (score < bearishThreshold) return "bearish";
+  return "neutral";
+}
+
+function computeConviction(
+  signals: { demandScore: number; momentumScore: number; liquidityScore: number; supplyPressureScore: number; volatilityScore: number; hypeScore: number; confidenceScore: number; composite: number }
+): ConvictionData {
+  const directions = {
+    demand: classifyDirection(signals.demandScore, 55, 45),
+    momentum: classifyDirection(signals.momentumScore, 55, 45),
+    liquidity: classifyDirection(signals.liquidityScore, 55, 45),
+    supply: classifyDirection(signals.supplyPressureScore, 55, 45),
+    volatility: classifyDirection(signals.volatilityScore, 50, 40),
+    hype: signals.hypeScore > 55 ? "bearish" : signals.hypeScore < 45 ? "bullish" : "neutral",
+  };
+
+  const allDirs = Object.values(directions);
+  const bullishCount = allDirs.filter(d => d === "bullish").length;
+  const bearishCount = allDirs.filter(d => d === "bearish").length;
+  const neutralCount = allDirs.filter(d => d === "neutral").length;
+  const totalSignals = allDirs.length;
+
+  const agreementScore = Math.round((Math.abs(bullishCount - bearishCount) / totalSignals) * 100);
+
+  const distanceFromNeutral = Math.abs(signals.composite - 50) * 2;
+
+  const convictionScore = Math.round(
+    (agreementScore * 0.5) +
+    (signals.confidenceScore * 0.3) +
+    (clamp(distanceFromNeutral, 0, 100) * 0.2)
+  );
+
+  let level: ConvictionLevel;
+  if (convictionScore >= 75) level = "HIGH";
+  else if (convictionScore >= 55) level = "MEDIUM";
+  else if (convictionScore >= 35) level = "LOW";
+  else level = "VERY_LOW";
+
+  let alignmentLabel: string;
+  if (agreementScore >= 80) alignmentLabel = "Aligned";
+  else if (agreementScore >= 60) alignmentLabel = "Mostly Aligned";
+  else if (agreementScore >= 40) alignmentLabel = "Mixed";
+  else alignmentLabel = "Conflicting";
+
+  return {
+    score: clamp(convictionScore, 0, 100),
+    level,
+    agreementScore,
+    bullishCount,
+    bearishCount,
+    neutralCount,
+    alignmentLabel,
+    directions,
+  };
+}
+
 export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
   const { metrics } = input;
 
@@ -216,7 +277,12 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
     (liquidityScore * 0.4) + (volatilityScore * 0.3) + (supplyPressureScore * 0.3)
   );
 
-  return {
+  const conviction = computeConviction({
+    demandScore, momentumScore, liquidityScore, supplyPressureScore,
+    volatilityScore, hypeScore, confidenceScore, composite,
+  });
+
+  const roundedSignals = {
     demandScore: Math.round(demandScore),
     momentumScore: Math.round(momentumScore),
     liquidityScore: Math.round(liquidityScore),
@@ -225,6 +291,10 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
     hypeScore: Math.round(hypeScore),
     confidenceScore: Math.round(confidenceScore),
     composite: Math.round(composite),
+  };
+
+  return {
+    ...roundedSignals,
     contributions: {
       demand: Math.round(contributions.demand * 10) / 10,
       momentum: Math.round(contributions.momentum * 10) / 10,
@@ -244,6 +314,7 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
       volumeAcceleration: Math.round(derived.volumeAcceleration * 100) / 100,
       signalAgreement,
       marketQuality,
+      conviction,
     },
   };
 }
@@ -320,7 +391,9 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
   let verdictReason: string;
 
   const agreement = derived.signalAgreement;
-  const agreementLabel = agreement >= 5 ? "strong conviction" : agreement >= 3 ? "mixed signals" : "weak alignment";
+  const conv = derived.conviction;
+  const convLabel = conv ? `${conv.level.toLowerCase()} conviction (${conv.score})` : "";
+  const agreementLabel = conv ? conv.alignmentLabel.toLowerCase() : (agreement >= 5 ? "strong conviction" : agreement >= 3 ? "mixed signals" : "weak alignment");
   const accel = derived.volumeAcceleration;
 
   if (stage === "BUST" && roleStabilityScore <= 15) {
@@ -371,6 +444,11 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
     }
   }
 
+  if (conv && conv.score < 40 && verdict === "ACCUMULATE") {
+    verdict = "HOLD_CORE";
+    verdictReason += ` (downgraded: ${convLabel}, signals ${conv.alignmentLabel.toLowerCase()})`;
+  }
+
   if (roleStabilityScore <= 45 && verdict === "ACCUMULATE") {
     if (stage === "ROOKIE" || stage === "YEAR_2" || stage === "YEAR_3") {
       verdict = "SPECULATIVE_FLYER";
@@ -398,7 +476,7 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
     .map(([k, v]) => `${k}=${v}`)
     .join(", ");
 
-  console.log(`[MarketScoring] ${input.playerName}: phase=${phase}, composite=${adjustedComposite}, verdict=${verdict}, mq=${mq}, sampleFactor=${derived.sampleFactor}, topContribs=[${topContribs}], demand=${signals.demandScore}, momentum=${signals.momentumScore}, hype=${signals.hypeScore}, liquidity=${signals.liquidityScore}, supply=${signals.supplyPressureScore}, vol=${signals.volatilityScore}, conf=${signals.confidenceScore}`);
+  console.log(`[MarketScoring] ${input.playerName}: phase=${phase}, composite=${adjustedComposite}, verdict=${verdict}, mq=${mq}, conviction=${conv?.score ?? "n/a"}(${conv?.level ?? "?"}) agreement=${conv?.alignmentLabel ?? "?"}, sampleFactor=${derived.sampleFactor}, topContribs=[${topContribs}], demand=${signals.demandScore}, momentum=${signals.momentumScore}, hype=${signals.hypeScore}, liquidity=${signals.liquidityScore}, supply=${signals.supplyPressureScore}, vol=${signals.volatilityScore}, conf=${signals.confidenceScore}`);
 
   return {
     signals,

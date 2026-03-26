@@ -148,6 +148,20 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
                 {advisor.structure}
               </Badge>
             )}
+            {advisor.conviction && (
+              <Badge 
+                variant="outline" 
+                className={`text-xs font-medium ${
+                  advisor.conviction.level === "High Conviction" ? "text-green-600 border-green-300 dark:text-green-400 dark:border-green-500" :
+                  advisor.conviction.level === "Medium Conviction" ? "text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-500" :
+                  advisor.conviction.level === "Low Conviction" ? "text-yellow-600 border-yellow-300 dark:text-yellow-400 dark:border-yellow-500" :
+                  "text-red-600 border-red-300 dark:text-red-400 dark:border-red-500"
+                }`}
+                data-testid="badge-conviction"
+              >
+                {advisor.conviction.level}
+              </Badge>
+            )}
             {advisor.liquidityTier && (
               <LiquidityBadge tier={advisor.liquidityTier} />
             )}
@@ -250,6 +264,12 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
         {advisor.advisorTake && (
           <p className="text-sm text-foreground leading-relaxed" data-testid="text-advisor-take">
             {advisor.advisorTake}
+          </p>
+        )}
+
+        {advisor.conviction?.narrative && (
+          <p className="text-xs text-muted-foreground italic" data-testid="text-conviction-narrative">
+            {advisor.conviction.narrative}
           </p>
         )}
         

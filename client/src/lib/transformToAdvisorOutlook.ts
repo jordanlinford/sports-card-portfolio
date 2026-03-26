@@ -448,6 +448,50 @@ function extractMarketQuality(outlook: PlayerOutlookResponse): number | undefine
   return Math.round((liq * 0.4) + (vol * 0.3) + (sup * 0.3));
 }
 
+function extractConviction(outlook: PlayerOutlookResponse): AdvisorOutlook["conviction"] {
+  const conv = outlook.marketSignals?.derivedMetrics?.conviction;
+  if (!conv) return undefined;
+
+  const levelLabels: Record<string, string> = {
+    HIGH: "High Conviction",
+    MEDIUM: "Medium Conviction",
+    LOW: "Low Conviction",
+    VERY_LOW: "Very Low Conviction",
+  };
+
+  const bullishSignals: string[] = [];
+  const bearishSignals: string[] = [];
+  if (conv.directions) {
+    const names: Record<string, string> = { demand: "demand", momentum: "momentum", liquidity: "liquidity", supply: "supply", volatility: "volatility", hype: "hype" };
+    for (const [key, dir] of Object.entries(conv.directions)) {
+      if (dir === "bullish") bullishSignals.push(names[key] || key);
+      else if (dir === "bearish") bearishSignals.push(names[key] || key);
+    }
+  }
+
+  let narrative: string;
+  if (conv.agreementScore >= 80 && bullishSignals.length >= 4) {
+    narrative = `Signals are strongly aligned across ${bullishSignals.slice(0, 3).join(", ")}`;
+  } else if (conv.agreementScore >= 80 && bearishSignals.length >= 4) {
+    narrative = `Signals are aligned bearish across ${bearishSignals.slice(0, 3).join(", ")}`;
+  } else if (conv.agreementScore >= 60) {
+    narrative = `Signals are mostly aligned${bullishSignals.length > bearishSignals.length ? ` bullish on ${bullishSignals.slice(0, 2).join(" and ")}` : ` bearish on ${bearishSignals.slice(0, 2).join(" and ")}`}`;
+  } else if (conv.agreementScore >= 40) {
+    const bull = bullishSignals.length > 0 ? `strong ${bullishSignals[0]}` : "";
+    const bear = bearishSignals.length > 0 ? `weak ${bearishSignals[0]}` : "";
+    narrative = `Signals are mixed${bull && bear ? `, with ${bull} but ${bear}` : ""}`;
+  } else {
+    narrative = `Signals are conflicting — no clear directional consensus`;
+  }
+
+  return {
+    level: levelLabels[conv.level] || "Unknown",
+    score: conv.score,
+    alignment: conv.alignmentLabel,
+    narrative,
+  };
+}
+
 export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): AdvisorOutlook {
   const { verdict, label } = mapVerdictToAdvisor(outlook.investmentCall, outlook.verdict);
   
@@ -477,6 +521,7 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     timing: deriveTiming(outlook),
     structure: deriveStructure(outlook),
     marketQuality: extractMarketQuality(outlook),
+    conviction: extractConviction(outlook),
   };
 }
 

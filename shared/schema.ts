@@ -1426,6 +1426,28 @@ export type SignalContributions = {
   antiHype: number;
 };
 
+export type SignalDirection = "bullish" | "bearish" | "neutral";
+
+export type ConvictionLevel = "HIGH" | "MEDIUM" | "LOW" | "VERY_LOW";
+
+export type ConvictionData = {
+  score: number;
+  level: ConvictionLevel;
+  agreementScore: number;
+  bullishCount: number;
+  bearishCount: number;
+  neutralCount: number;
+  alignmentLabel: string;
+  directions: {
+    demand: SignalDirection;
+    momentum: SignalDirection;
+    liquidity: SignalDirection;
+    supply: SignalDirection;
+    volatility: SignalDirection;
+    hype: SignalDirection;
+  };
+};
+
 export type DerivedMetrics = {
   salesVelocity: number;
   volumeTrend: number;
@@ -1437,6 +1459,7 @@ export type DerivedMetrics = {
   volumeAcceleration: number;
   signalAgreement: number;
   marketQuality: number;
+  conviction?: ConvictionData;
 };
 
 export type MarketSignals = {
@@ -1526,6 +1549,12 @@ export type AdvisorOutlook = {
     hype?: string; // "Top 90%" (higher = more hyped = worse)
     quality?: string; // "Top 15%"
     sampleSize?: number; // how many players in the pool
+  };
+  conviction?: {
+    level: string; // "High Conviction" | "Medium Conviction" | "Low Conviction" | "Very Low Conviction"
+    score: number; // 0-100
+    alignment: string; // "Aligned" | "Mostly Aligned" | "Mixed" | "Conflicting"
+    narrative: string; // one-line explanation
   };
 };
 
