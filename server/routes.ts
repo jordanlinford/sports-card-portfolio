@@ -881,6 +881,25 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  app.get("/api/market-leaderboard", async (req, res) => {
+    try {
+      const { getLeaderboard } = await import("./leaderboardEngine");
+      const type = (req.query.type as string) || "best";
+      const sport = (req.query.sport as string) || "all";
+      const limit = Math.min(parseInt(req.query.limit as string) || 25, 50);
+
+      if (!["best", "hype", "emerging"].includes(type)) {
+        return res.status(400).json({ message: "Invalid type. Use: best, hype, emerging" });
+      }
+
+      const entries = await getLeaderboard(type as any, sport, limit);
+      res.json({ type, sport, entries, generatedAt: new Date().toISOString() });
+    } catch (error) {
+      console.error("Error fetching market leaderboard:", error);
+      res.status(500).json({ message: "Failed to fetch market leaderboard" });
+    }
+  });
+
   app.get("/api/explore/search", async (req, res) => {
     try {
       const query = (req.query.q as string) || "";

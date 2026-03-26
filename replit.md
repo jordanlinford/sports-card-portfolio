@@ -25,6 +25,7 @@ The application features a full-stack TypeScript architecture. The frontend uses
 - **Alpha Intelligence**: Alpha Data Infrastructure captures granular price observations and interest events. Alpha Batch Job and Signal Engine generate daily buy/sell/hold signals. Daily Alpha Feed (Alpha Feed V2) presents market pulse, price movers, investment signals, community momentum, and trending cards.
 - **Social & Sharing**: Liking, commenting, prestige system, bookmarking, and shareable display cases.
 - **Reporting & Alerts**: Monthly price trend charts, graded value matrix, supply saturation alerts, pop report history, watchlist change alerts, and liquidity scoring UI.
+- **Market Leaderboard**: 3 ranked views of player markets — Best Markets (weighted by composite+momentum+demand+confidence), Hype/Sell Candidates (hype+momentum-volume divergence), Emerging Opportunities (demand+volume+low-hype+early-phase bonus). Sport filter, computed from player_outlook_cache, in-memory caching with 1hr TTL. Falls back to verdict-based scoring for older cached outlooks without full market signals.
 - **Recommendation Engines**: Next Buys Recommendation Engine (balanced, investment-focused), Dual-Source Hidden Gems (AI and community signals, including Soccer with World Cup focus), and Portfolio Alpha Benchmark.
 - **SEO & Public Pages**: Public landing pages for podcasts, Pro trials, and a Topps Takeover SEO page with live player signals.
 - **Break Value Auditor**: AI-powered EV analysis for break slot value evaluation.

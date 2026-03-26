@@ -1,0 +1,201 @@
+This is where your system turns from a feature into a product.
+
+Right now you answer:
+
+“What should I do about this player?”
+
+A leaderboard answers:
+
+“Where should I be looking right now?”
+
+That’s a fundamentally higher-leverage surface.
+
+1. Problem Framing
+Current state
+User searches player → gets insight
+Pull-based, reactive
+Target state
+System surfaces opportunities → user explores
+Push-based, proactive
+
+This is how you create:
+
+retention
+habit
+differentiation
+2. What the “Market Leaderboard” Actually Is
+
+Not a popularity list.
+Not just top prices.
+
+It is:
+
+A ranked view of player markets based on real-time opportunity, strength, and risk.
+
+3. Core Leaderboards You Should Build (Start with 3)
+3.1 “Best Markets Right Now” (Primary)
+
+This is your hero surface.
+
+Ranking logic:
+rank_score =
+  (market_score * 0.5) +
+  (momentum_score * 0.2) +
+  (demand_score * 0.2) +
+  (confidence_score * 0.1)
+Output:
+Rank	Player	Score	Phase	Verdict	Key Signal
+1	Player A	82	Breakout	ACCUMULATE	Demand +22
+2	Player B	79	Accumulation	ACCUMULATE	Supply tightening
+3	Player C	76	Expansion	HOLD	Stable liquidity
+3.2 “Hype / Sell Candidates”
+
+This becomes your most viral feature.
+
+Ranking logic:
+hype_rank =
+  (hype_score * 0.5) +
+  (momentum_score * 0.3) -
+  (volume_trend * 20)
+Output:
+Rank	Player	Hype Score	Phase	Signal
+1	Player X	88	Exhaustion	Price > volume
+2	Player Y	84	Expansion	weak participation
+3	Player Z	81	Exhaustion	rising supply
+3.3 “Emerging Opportunities”
+
+This is where you create alpha.
+
+Ranking logic:
+opportunity_score =
+  (demand_score * 0.3) +
+  (volume_trend * 30) +
+  (low_hype_bonus) +
+  (early_phase_bonus)
+
+Where:
+
+low_hype_bonus = (100 - hype_score) * 0.2
+early_phase_bonus = 15 if phase in ["Accumulation", "Breakout"] else 0
+Output:
+Rank	Player	Phase	Why
+1	Player D	Accumulation	volume rising, price stable
+2	Player E	Breakout	demand spike + low hype
+3	Player F	Accumulation	supply tightening
+4. UI Structure (Simple but Powerful)
+Top-level tabs
+Tab	Purpose
+Best Markets	where money should go
+Hype / Sell	where to exit
+Emerging	where to look early
+Each row should show:
+Field	Why
+Player	obvious
+Market Score	anchor
+Phase	context
+Verdict	action
+1–2 key signals	explanation
+Trend snippet	quick validation
+5. Key Product Insight
+
+The leaderboard should answer:
+
+“Why is this player here?”
+
+Not just:
+
+“Who is ranked highest?”
+
+6. Add Filters (Important Early)
+Filter	Why
+Sport	NBA / NFL / MLB
+Liquidity	avoid niche traps
+Confidence	filter low-data players
+Price tier	cheap vs high-end
+Timeframe	short-term vs mid-term
+7. Data Requirements (You Already Have Most)
+
+You already compute:
+
+market_score
+signals
+phase
+verdict
+confidence
+
+You just need:
+
+ranking functions
+sorting layer
+caching
+8. Architecture (Simple Version)
+Backend
+for player in player_pool:
+    compute_market_signals(player)
+    compute_rank_scores(player)
+
+store:
+  - best_market_rank
+  - hype_rank
+  - opportunity_rank
+Frontend
+fetch top N per category
+render table/cards
+9. MVP Scope (Do NOT Overbuild)
+
+Start with:
+
+Feature	Include
+3 leaderboards	yes
+top 25 players each	yes
+basic filters	sport only
+refresh frequency	daily
+
+Skip:
+
+personalization
+alerts
+advanced filters
+10. Why This Is High Leverage
+
+This unlocks:
+
+10.1 Discovery
+
+Users no longer need to know who to search
+
+10.2 Habit loops
+
+“Check what’s moving today”
+
+10.3 Social/viral potential
+“Top hype players this week”
+“Top breakout markets”
+10.4 Monetization
+
+Eventually:
+
+premium rankings
+alerts
+deeper analytics
+11. What Good Looks Like
+
+A user opens your app and immediately sees:
+
+3 players they didn’t think about
+1 obvious sell candidate
+1 early opportunity
+
+That’s value.
+
+12. One-Line Product Definition
+
+The leaderboard is a real-time map of where capital is flowing and where it should move next in the sports card market.
+
+13. Next Step (If You Want)
+
+I can:
+
+define exact ranking weights using your current signals
+design the Firestore schema + cron jobs
+or map this into your current API structure so it’s quick to ship

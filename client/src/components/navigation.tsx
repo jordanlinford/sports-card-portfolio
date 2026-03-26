@@ -224,7 +224,7 @@ export function Navigation() {
                     size="sm" 
                     className={cn(
                       "gap-1",
-                      isActiveSection(["/outlook", "/hidden-gems", "/scan-history", "/market"]) && "bg-accent"
+                      isActiveSection(["/outlook", "/hidden-gems", "/scan-history", "/market", "/market-leaderboard"]) && "bg-accent"
                     )}
                     data-testid="nav-market"
                   >
@@ -242,6 +242,12 @@ export function Navigation() {
                     <Link href="/outlook" className="flex items-center gap-2 cursor-pointer">
                       <Zap className="h-4 w-4" />
                       Market Outlook
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/market-leaderboard" className="flex items-center gap-2 cursor-pointer" data-testid="nav-market-leaderboard">
+                      <BarChart3 className="h-4 w-4" />
+                      Market Leaderboard
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -639,6 +645,12 @@ export function Navigation() {
                   <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/outlook") && "bg-accent")}>
                     <Zap className="h-4 w-4" />
                     Card Analysis
+                  </Button>
+                </Link>
+                <Link href="/market-leaderboard" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/market-leaderboard") && "bg-accent")} data-testid="nav-market-leaderboard-mobile">
+                    <BarChart3 className="h-4 w-4" />
+                    Market Leaderboard
                   </Button>
                 </Link>
                 <Link href="/hidden-gems" onClick={() => setMobileMenuOpen(false)}>
