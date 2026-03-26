@@ -1436,6 +1436,7 @@ export type DerivedMetrics = {
   supplyRatio: number;
   volumeAcceleration: number;
   signalAgreement: number;
+  marketQuality: number;
 };
 
 export type MarketSignals = {
@@ -1515,6 +1516,9 @@ export type AdvisorOutlook = {
     avgPrice?: string; // e.g. "$45"
   };
   topSignals?: string[]; // Top 2 signal contributions driving the verdict
+  timing?: string; // "Overextended" | "Early" | "Fair" | "Late"
+  structure?: string; // "Strong" | "Mixed" | "Weak"
+  marketQuality?: number; // 0-100 composite of liquidity, volatility, supply health
 };
 
 // Player Outlook Cache table

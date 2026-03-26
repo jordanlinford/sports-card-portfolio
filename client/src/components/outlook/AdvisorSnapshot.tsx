@@ -109,6 +109,33 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
                 {advisor.marketPhase}
               </Badge>
             )}
+            {advisor.timing && (
+              <Badge 
+                variant="outline" 
+                className={`text-xs font-medium ${
+                  advisor.timing === "Early" ? "text-green-600 border-green-300" :
+                  advisor.timing === "Overextended" ? "text-red-600 border-red-300" :
+                  advisor.timing === "Late" ? "text-orange-600 border-orange-300" :
+                  "text-muted-foreground"
+                }`}
+                data-testid="badge-timing"
+              >
+                {advisor.timing}
+              </Badge>
+            )}
+            {advisor.structure && (
+              <Badge 
+                variant="outline" 
+                className={`text-xs font-medium ${
+                  advisor.structure === "Strong" ? "text-green-600 border-green-300" :
+                  advisor.structure === "Weak" ? "text-red-600 border-red-300" :
+                  "text-yellow-600 border-yellow-300"
+                }`}
+                data-testid="badge-structure"
+              >
+                {advisor.structure}
+              </Badge>
+            )}
             {advisor.liquidityTier && (
               <LiquidityBadge tier={advisor.liquidityTier} />
             )}

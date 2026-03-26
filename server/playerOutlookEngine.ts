@@ -1834,6 +1834,9 @@ async function generateFreshOutlook(
   const momentumStr = sig.momentumScore > 70 ? "accelerating" : sig.momentumScore > 50 ? "stable momentum" : "decelerating";
   const hypeStr = sig.hypeScore > 70 ? "overheated" : sig.hypeScore > 50 ? "elevated attention" : "";
 
+  const mqScore = sig.derivedMetrics?.marketQuality ?? 0;
+  const mqLabel = mqScore >= 60 ? "strong structure" : mqScore >= 40 ? "mixed structure" : "weak structure";
+
   const topContribStr = sig.contributions ? (() => {
     const c = sig.contributions!;
     const scored = [
@@ -1847,19 +1850,19 @@ async function generateFreshOutlook(
 
   const verdictActionMap: Record<string, { advisorTake: string; packHit: string; collectorTip: string; actionPlan: { whatToDoNow: string; entryPlan: string; positionSizing: string } }> = {
     ACCUMULATE: {
-      advisorTake: `Market is in ${phaseName} phase with ${demandStr} and ${momentumStr}${metricsSnippet ? ` (${metricsSnippet})` : ""}${topContribStr ? `. Key drivers: ${topContribStr}` : ""}. This is a buying window — prices haven't caught up to the demand signal. Add exposure on dips while the window is open.`,
+      advisorTake: `Market is in ${phaseName} phase with ${demandStr} and ${momentumStr}, ${mqLabel}${metricsSnippet ? ` (${metricsSnippet})` : ""}${topContribStr ? `. Key drivers: ${topContribStr}` : ""}. This is a buying window — prices haven't caught up to the demand signal. Add exposure on dips while the window is open.`,
       packHit: "Great pull — hold it. This player is in an accumulation zone with upside ahead.",
       collectorTip: "Look for dips on quiet news days to add at better prices.",
       actionPlan: { whatToDoNow: "Accumulate on weakness — buy dips in base rookies and mid-tier parallels.", entryPlan: "Target pullbacks on quiet news days; avoid chasing spikes.", positionSizing: "Build a core position across 3-5 cards." },
     },
     HOLD_CORE: {
-      advisorTake: `Stable market position in ${phaseName} phase with ${demandStr}${metricsSnippet ? ` (${metricsSnippet})` : ""}${topContribStr ? `. Key drivers: ${topContribStr}` : ""}. Prices reflect the current story — no urgency to add or sell. Hold your core cards and wait for a catalyst.`,
+      advisorTake: `Stable market position in ${phaseName} phase with ${demandStr}, ${mqLabel}${metricsSnippet ? ` (${metricsSnippet})` : ""}${topContribStr ? `. Key drivers: ${topContribStr}` : ""}. Prices reflect the current story — no urgency to add or sell. Hold your core cards and wait for a catalyst.`,
       packHit: "Solid pull — worth keeping. Not a sell-now situation.",
       collectorTip: "No rush to buy more. Wait for a clear catalyst before adding.",
       actionPlan: { whatToDoNow: "Hold your current position — no urgency to add or sell.", entryPlan: "Wait for a clear catalyst before adding new exposure.", positionSizing: "Maintain current allocation; don't average up." },
     },
     TRADE_THE_HYPE: {
-      advisorTake: `Market is ${hypeStr || "showing exhaustion signals"} in ${phaseName} phase${metricsSnippet ? ` (${metricsSnippet})` : ""}${supplyStr ? `. ${supplyStr} — more sellers than the market can absorb` : ""}${topContribStr ? `. Key drivers: ${topContribStr}` : ""}. Hype exceeds sustainable demand. Sell into strength, not weakness.`,
+      advisorTake: `Market is ${hypeStr || "showing exhaustion signals"} in ${phaseName} phase, ${mqLabel}${metricsSnippet ? ` (${metricsSnippet})` : ""}${supplyStr ? `. ${supplyStr} — more sellers than the market can absorb` : ""}${topContribStr ? `. Key drivers: ${topContribStr}` : ""}. Hype exceeds sustainable demand. Sell into strength, not weakness.`,
       packHit: "Sell into the hype. List quickly while demand is elevated.",
       collectorTip: "If you want to collect long-term, wait for the correction before buying.",
       actionPlan: { whatToDoNow: "Sell into strength — trim non-core holdings first.", entryPlan: "Don't buy now; wait for post-hype correction.", positionSizing: "Reduce exposure by 30-50%." },
@@ -1877,7 +1880,7 @@ async function generateFreshOutlook(
       actionPlan: { whatToDoNow: "Hold but don't add — wait for role clarity.", entryPlan: "Only add if promoted to starter or key role.", positionSizing: "Freeze current allocation." },
     },
     AVOID_NEW_MONEY: {
-      advisorTake: `Market signals are weak — ${demandStr} with ${momentumStr}${metricsSnippet ? ` (${metricsSnippet})` : ""}${supplyStr ? `. ${supplyStr}` : ""}${topContribStr ? `. Key drivers: ${topContribStr}` : ""}. Better opportunities exist elsewhere. If you hold, monitor for a bounce before selling.`,
+      advisorTake: `Market signals are weak — ${demandStr} with ${momentumStr}, ${mqLabel}${metricsSnippet ? ` (${metricsSnippet})` : ""}${supplyStr ? `. ${supplyStr}` : ""}${topContribStr ? `. Key drivers: ${topContribStr}` : ""}. Better opportunities exist elsewhere. If you hold, monitor for a bounce before selling.`,
       packHit: "Sell when you can get a fair price. Don't hold hoping for a turnaround.",
       collectorTip: "Steer clear for investment purposes. Better value elsewhere.",
       actionPlan: { whatToDoNow: "No new money — look for exits on bounces.", entryPlan: "Don't buy; capital is better deployed elsewhere.", positionSizing: "Reduce to zero if possible." },

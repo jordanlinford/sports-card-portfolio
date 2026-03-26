@@ -89,6 +89,7 @@ function computeDerivedMetrics(metrics: MarketMetrics): DerivedMetrics {
     supplyRatio,
     volumeAcceleration,
     signalAgreement: 0,
+    marketQuality: 0,
   };
 }
 
@@ -161,7 +162,7 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
     hypeScore < 50,
   ].filter(Boolean).length;
 
-  const contributions: SignalContributions = {
+  const rawContributions: SignalContributions = {
     demand: demandScore * SIGNAL_WEIGHTS.demand,
     momentum: momentumScore * SIGNAL_WEIGHTS.momentum,
     liquidity: liquidityScore * SIGNAL_WEIGHTS.liquidity,
@@ -170,6 +171,39 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
     antiHype: (100 - hypeScore) * SIGNAL_WEIGHTS.antiHype,
   };
 
+  const rawComposite =
+    rawContributions.demand +
+    rawContributions.momentum +
+    rawContributions.liquidity +
+    rawContributions.supply +
+    rawContributions.volatility +
+    rawContributions.antiHype;
+
+  const contributions = { ...rawContributions };
+  const MAX_SHARE = 0.35;
+  for (let iter = 0; iter < 3; iter++) {
+    const currentTotal = (Object.values(contributions) as number[]).reduce((a, b) => a + b, 0);
+    if (currentTotal <= 0) break;
+    const cap = MAX_SHARE * currentTotal;
+    let excess = 0;
+    const cappedKeys: string[] = [];
+    for (const [key, val] of Object.entries(contributions) as [keyof SignalContributions, number][]) {
+      if (val > cap) {
+        excess += val - cap;
+        contributions[key] = cap;
+        cappedKeys.push(key);
+      }
+    }
+    if (excess <= 0) break;
+    const uncappedKeys = (Object.keys(contributions) as (keyof SignalContributions)[]).filter(k => !cappedKeys.includes(k));
+    const uncappedTotal = uncappedKeys.reduce((sum, k) => sum + contributions[k], 0);
+    if (uncappedTotal > 0) {
+      for (const k of uncappedKeys) {
+        contributions[k] += excess * (contributions[k] / uncappedTotal);
+      }
+    }
+  }
+
   const composite =
     contributions.demand +
     contributions.momentum +
@@ -177,6 +211,10 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
     contributions.supply +
     contributions.volatility +
     contributions.antiHype;
+
+  const marketQuality = Math.round(
+    (liquidityScore * 0.4) + (volatilityScore * 0.3) + (supplyPressureScore * 0.3)
+  );
 
   return {
     demandScore: Math.round(demandScore),
@@ -205,6 +243,7 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
       supplyRatio: Math.round(derived.supplyRatio * 100) / 100,
       volumeAcceleration: Math.round(derived.volumeAcceleration * 100) / 100,
       signalAgreement,
+      marketQuality,
     },
   };
 }
@@ -275,6 +314,7 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
   const { stage, roleStabilityScore, position, sport } = input;
 
   const adjustedComposite = applyCareerModifier(signals.composite, stage, position, sport);
+  const mq = derived.marketQuality;
 
   let verdict: InvestmentVerdict;
   let verdictReason: string;
@@ -295,15 +335,21 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
   } else if (signals.confidenceScore < 40) {
     verdict = "SPECULATIVE_FLYER";
     verdictReason = `Low data confidence (${signals.confidenceScore}) — sample factor ${derived.sampleFactor}, insufficient data for strong conviction`;
-  } else if (adjustedComposite > 75 && (phase === "ACCUMULATION" || phase === "BREAKOUT")) {
+  } else if (adjustedComposite > 75 && agreement >= 4 && phase !== "DECLINE" && phase !== "EXHAUSTION" && mq >= 40) {
     verdict = "ACCUMULATE";
-    verdictReason = `Strong composite (${adjustedComposite}) in ${phase.toLowerCase()} phase — ${agreementLabel} (${agreement}/6)${accel > 1.3 ? `, volume accelerating ${accel.toFixed(1)}x` : ""}`;
+    verdictReason = `Strong composite (${adjustedComposite}) with ${agreementLabel} (${agreement}/6)${accel > 1.3 ? `, volume accelerating ${accel.toFixed(1)}x` : ""} — ${phase.toLowerCase()} phase, market quality ${mq}`;
+  } else if (adjustedComposite > 75 && (phase === "ACCUMULATION" || phase === "BREAKOUT") && mq >= 35) {
+    verdict = "ACCUMULATE";
+    verdictReason = `Strong composite (${adjustedComposite}) in favorable ${phase.toLowerCase()} phase — ${agreementLabel} (${agreement}/6)${accel > 1.3 ? `, volume accelerating ${accel.toFixed(1)}x` : ""}, market quality ${mq}`;
+  } else if (adjustedComposite > 75 && mq < 35) {
+    verdict = "HOLD_CORE";
+    verdictReason = `Strong composite (${adjustedComposite}) but weak market structure (quality ${mq}) — hold, don't accumulate into a fragile market`;
   } else if (signals.hypeScore > 70 && (phase === "EXHAUSTION" || (signals.momentumScore > 65 && signals.liquidityScore > 50))) {
     verdict = "TRADE_THE_HYPE";
     verdictReason = `Overheated market: prices up ${(derived.priceTrend * 100).toFixed(0)}% but volume trend ${derived.volumeTrend.toFixed(2)}x${accel < 0.7 ? `, volume decelerating ${accel.toFixed(1)}x` : ""} — hype outpacing participation, high liquidity means exit opportunity`;
   } else if (adjustedComposite > 65) {
     verdict = "HOLD_CORE";
-    verdictReason = `Solid composite (${adjustedComposite}) — ${agreementLabel} (${agreement}/6)`;
+    verdictReason = `Solid composite (${adjustedComposite}) — ${agreementLabel} (${agreement}/6), market quality ${mq}`;
   } else if (adjustedComposite < 40 && !(signals.liquidityScore > 60 && signals.demandScore > 60)) {
     verdict = "AVOID_NEW_MONEY";
     verdictReason = `Weak composite (${adjustedComposite}) — supply ratio ${derived.supplyRatio.toFixed(1)}x, ${agreementLabel} (${agreement}/6)`;
@@ -313,6 +359,16 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
   } else {
     verdict = "SPECULATIVE_FLYER";
     verdictReason = `Mixed signals — composite ${adjustedComposite}, ${agreementLabel} (${agreement}/6), phase ${phase.toLowerCase()}`;
+  }
+
+  if (signals.confidenceScore < 50 && signals.confidenceScore >= 40) {
+    if (verdict === "ACCUMULATE") {
+      verdict = "HOLD_CORE";
+      verdictReason += " (downgraded: medium-low confidence)";
+    } else if (verdict === "TRADE_THE_HYPE") {
+      verdict = "SPECULATIVE_FLYER";
+      verdictReason += " (downgraded: insufficient confidence for timing call)";
+    }
   }
 
   if (roleStabilityScore <= 45 && verdict === "ACCUMULATE") {
@@ -342,7 +398,7 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
     .map(([k, v]) => `${k}=${v}`)
     .join(", ");
 
-  console.log(`[MarketScoring] ${input.playerName}: phase=${phase}, composite=${adjustedComposite}, verdict=${verdict}, sampleFactor=${derived.sampleFactor}, topContribs=[${topContribs}], demand=${signals.demandScore}, momentum=${signals.momentumScore}, hype=${signals.hypeScore}, liquidity=${signals.liquidityScore}, supply=${signals.supplyPressureScore}, vol=${signals.volatilityScore}, conf=${signals.confidenceScore}`);
+  console.log(`[MarketScoring] ${input.playerName}: phase=${phase}, composite=${adjustedComposite}, verdict=${verdict}, mq=${mq}, sampleFactor=${derived.sampleFactor}, topContribs=[${topContribs}], demand=${signals.demandScore}, momentum=${signals.momentumScore}, hype=${signals.hypeScore}, liquidity=${signals.liquidityScore}, supply=${signals.supplyPressureScore}, vol=${signals.volatilityScore}, conf=${signals.confidenceScore}`);
 
   return {
     signals,

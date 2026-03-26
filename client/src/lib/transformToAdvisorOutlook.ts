@@ -400,6 +400,54 @@ function extractTopSignals(outlook: PlayerOutlookResponse): string[] | undefined
   });
 }
 
+function deriveTiming(outlook: PlayerOutlookResponse): string | undefined {
+  const signals = outlook.marketSignals;
+  if (!signals) return undefined;
+  
+  const momentum = signals.momentumScore ?? 50;
+  const hype = signals.hypeScore ?? 50;
+  const derived = signals.derivedMetrics;
+  const accel = derived?.volumeAcceleration ?? 1;
+  
+  if (hype > 70 && momentum > 65) return "Overextended";
+  if (momentum < 35 && accel < 0.8) return "Late";
+  if (momentum > 55 && hype < 40 && accel > 1.1) return "Early";
+  return "Fair";
+}
+
+function deriveStructure(outlook: PlayerOutlookResponse): string | undefined {
+  const signals = outlook.marketSignals;
+  if (!signals) return undefined;
+  
+  const mq = signals.derivedMetrics?.marketQuality;
+  if (mq === undefined) {
+    const liq = signals.liquidityScore ?? 50;
+    const vol = signals.volatilityScore ?? 50;
+    const sup = signals.supplyPressureScore ?? 50;
+    const quality = (liq * 0.4) + (vol * 0.3) + (sup * 0.3);
+    if (quality >= 60) return "Strong";
+    if (quality >= 40) return "Mixed";
+    return "Weak";
+  }
+  
+  if (mq >= 60) return "Strong";
+  if (mq >= 40) return "Mixed";
+  return "Weak";
+}
+
+function extractMarketQuality(outlook: PlayerOutlookResponse): number | undefined {
+  const mq = outlook.marketSignals?.derivedMetrics?.marketQuality;
+  if (mq !== undefined) return mq;
+  
+  const signals = outlook.marketSignals;
+  if (!signals) return undefined;
+  
+  const liq = signals.liquidityScore ?? 50;
+  const vol = signals.volatilityScore ?? 50;
+  const sup = signals.supplyPressureScore ?? 50;
+  return Math.round((liq * 0.4) + (vol * 0.3) + (sup * 0.3));
+}
+
 export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): AdvisorOutlook {
   const { verdict, label } = mapVerdictToAdvisor(outlook.investmentCall, outlook.verdict);
   
@@ -426,6 +474,9 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     marketPhase: phaseLabel,
     shortTermTrend: extractShortTermTrend(outlook),
     topSignals: extractTopSignals(outlook),
+    timing: deriveTiming(outlook),
+    structure: deriveStructure(outlook),
+    marketQuality: extractMarketQuality(outlook),
   };
 }
 
