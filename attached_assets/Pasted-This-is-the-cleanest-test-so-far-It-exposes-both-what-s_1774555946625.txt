@@ -1,0 +1,217 @@
+This is the cleanest test so far. It exposes both what’s working and what still needs tightening.
+
+1. First Pass: Internal Consistency
+What the system is saying
+Element	Signal
+Verdict	AVOID
+Tags	HOT, High Vol, High Risk
+Liquidity	High
+Timeframe	Short Term
+Price trend	+167%
+Narrative	“hype has outpaced production”
+2. This Is a Classic “Hype Spike” Setup
+
+Structurally, this is:
+
+massive short-term price spike
+early-career player
+high volatility
+likely surge in listings following spike
+
+This is exactly the scenario your engine should detect as:
+
+Overextension → sell / avoid new money
+
+So at a high level:
+
+The verdict direction (AVOID) is correct
+
+3. Signal Alignment Check
+
+Let’s reconstruct what your engine is likely seeing:
+
+Signal	Expected
+Demand	high
+Momentum	extremely high
+Liquidity	high
+Supply	rising (likely)
+Volatility	high
+Hype	very high
+Confidence	probably moderate-high
+
+This should produce:
+
+strong activity
+strong price movement
+weak sustainability
+
+That maps cleanly to:
+
+TRADE_THE_HYPE or AVOID_NEW_MONEY
+
+4. Verdict Choice: Slight Misclassification
+
+Right now you output:
+
+AVOID (zero allocation)
+
+But the action plan says:
+
+“if you hold, consider selling”
+
+That is not a pure AVOID.
+
+That is:
+
+TRADE_THE_HYPE
+
+Correct distinction:
+Verdict	Meaning
+TRADE_THE_HYPE	Sell into strength
+AVOID	Stay away entirely (no edge, no liquidity, or structural decline)
+
+This market has:
+
+high liquidity
+strong demand
+clear exit opportunity
+
+So:
+
+It is NOT an “avoid everything” market
+It is a “sell into strength” market
+
+5. This Is the Key Misclassification Pattern
+
+You’re collapsing two cases into one:
+
+Case A: Bad asset
+low demand
+falling price
+high supply
+→ AVOID
+Case B: Overheated asset
+high demand
+rising price
+weak participation
+→ TRADE_THE_HYPE
+
+Your engine is detecting Case B, but labeling it as Case A.
+
+6. Why This Matters (Product-wise)
+
+If you mislabel this:
+
+Users will:
+
+miss profitable exits
+think the system is overly conservative
+lose trust in nuanced situations
+
+This is one of the highest-value signals your product can generate.
+
+7. Fix #1 (Critical): Add Hype Override Rule
+
+Insert this BEFORE AVOID logic:
+
+if hype_score > 75 and momentum_score > 70:
+    verdict = "TRADE_THE_HYPE"
+
+Optional refinement:
+
+if hype_score > 75 and momentum_score > 70 and liquidity_score > 50:
+    verdict = "TRADE_THE_HYPE"
+8. Fix #2: Prevent AVOID in High-Liquidity Markets
+
+Add guardrail:
+
+if liquidity_score > 60 and demand_score > 60:
+    cannot_be = "AVOID"
+
+Reason:
+
+If you can easily sell, it's not a true avoid market
+9. Fix #3: Narrative Still Leaking Old Logic
+
+This line:
+
+“Early-career hype has pushed pricing beyond production”
+
+This is:
+
+not derived from your signals
+still classification-driven
+
+Instead it should say:
+
+Prices up X% in Y days
+Volume trend vs prior period
+Listings change
+
+Right now:
+
+explanation ≠ engine
+
+10. Fix #4: Missing Phase Again
+
+This is where phase matters most.
+
+This should clearly be:
+
+Exhaustion
+
+If your phase is not showing that, your thresholds are off.
+
+11. What This Test Confirms
+What’s working:
+Hype detection (very strong)
+Momentum detection (correct)
+Risk identification (correct)
+Liquidity awareness (correct)
+What’s broken:
+Verdict classification boundary (HYPE vs AVOID)
+Narrative still partially legacy
+Phase visibility/accuracy unclear
+12. One Key Insight
+
+You are now correctly detecting:
+
+“This is a great market to sell into”
+
+But labeling it as:
+
+“This is a bad market”
+
+That’s a critical distinction.
+
+13. Summary Diagnosis
+Layer	Status
+Signals	strong
+Composite	likely correct
+Phase	needs verification
+Verdict boundary	incorrect in hype scenarios
+Narrative	outdated logic leaking in
+14. Bottom Line
+
+This is actually a high-quality detection system now.
+
+The remaining work is:
+
+sharpening classification edges
+aligning labels with market reality
+removing legacy narrative logic
+15. Next Step
+
+You’ve now tested:
+
+declining market (LaMelo)
+mixed market (Soto)
+hype spike (Maye)
+
+That’s perfect coverage.
+
+If you want to take this to the next level, next step is:
+
+tune verdict boundaries using these three archetypes as anchors
+
+I can help you formalize that into a clean decision map if you want.
