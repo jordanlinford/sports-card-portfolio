@@ -1394,6 +1394,9 @@ export type PlayerOutlookResponse = {
   teamContext?: TeamContext; // Team performance context
   exposures: ExposureRecommendation[];
   evidence: EvidenceData;
+  marketPhase?: MarketPhase;
+  marketSignals?: MarketSignals;
+  marketMetrics?: MarketMetrics;
   generatedAt: string;
   cacheStatus?: "fresh" | "stale" | "miss";
 };
@@ -1407,6 +1410,40 @@ export type PlayerOutlookRequest = {
     year?: number;
     parallel?: string;
   };
+};
+
+// ============ MARKET SCORING ENGINE V2 TYPES ============
+
+export const MARKET_PHASES = ["ACCUMULATION", "BREAKOUT", "EXPANSION", "EXHAUSTION", "DECLINE", "UNKNOWN"] as const;
+export type MarketPhase = typeof MARKET_PHASES[number];
+
+export type MarketSignals = {
+  demandScore: number;
+  momentumScore: number;
+  liquidityScore: number;
+  supplyPressureScore: number;
+  volatilityScore: number;
+  hypeScore: number;
+  confidenceScore: number;
+  composite: number;
+};
+
+export type MarketMetrics = {
+  soldCount30d?: number;
+  activeListingCount?: number;
+  avgSoldPrice?: number;
+  medianSoldPrice?: number;
+  priceTrend?: number;
+  volumeTrend?: "up" | "stable" | "down";
+  volatilityEstimate?: number;
+  priceRangeLow?: number;
+  priceRangeHigh?: number;
+  internalObservationCount?: number;
+  internalAvgPrice?: number;
+  internalPriceChange?: number;
+  weeklyScans?: number;
+  weeklyAdds?: number;
+  source: "gemini_search" | "internal" | "blended" | "unavailable";
 };
 
 // ============ ADVISOR OUTLOOK - Trusted Advisor Format ============

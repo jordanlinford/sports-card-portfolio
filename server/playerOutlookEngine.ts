@@ -1,12 +1,14 @@
 import { GoogleGenAI } from "@google/genai";
 import { db } from "./db";
-import { playerOutlookCache, playerOutlookHistory } from "@shared/schema";
-import { eq, and, gt, lt, desc } from "drizzle-orm";
+import { playerOutlookCache, playerOutlookHistory, cardPriceObservations, cardInterestEvents } from "@shared/schema";
+import { eq, and, gt, lt, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { classifyPlayer, getExposureRecommendations, type ClassificationInput, type ClassificationOutput } from "./playerClassificationEngine";
 import { calculateValuation } from "./valuationService";
-import { generateInvestmentCall, type RoleTier } from "./investmentDecisionEngine";
+import { generateInvestmentCall, getRoleTier, getRoleStabilityScore, type RoleTier } from "./investmentDecisionEngine";
+import { generateMarketVerdict, type MarketScoringInput } from "./marketScoringEngine";
 import { lookupPlayer, ensureRegistryLoaded } from "./playerRegistry";
+import type { MarketMetrics } from "@shared/schema";
 
 // ============================================================
 // AI-BASED ROLE TIER INFERENCE
@@ -147,7 +149,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 17; // v17: Added Gemini search for player market data (real avg price, volume, tier breakdown)
+const PROMPT_VERSION = 18; // v18: Market Scoring Engine V2 - market-behavior-first verdicts with 7-signal scoring
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -657,6 +659,78 @@ BUST CLARIFICATION:
   return { momentum: "flat", newsHype: "none", snippets: [] };
 }
 
+async function aggregateInternalMetrics(playerName: string): Promise<Partial<MarketMetrics>> {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+
+    const normalizedName = playerName.toLowerCase().trim();
+
+    const [priceObs, recentEvents, olderPriceObs] = await Promise.all([
+      db.select({
+        count: sql<number>`count(*)::int`,
+        avgPrice: sql<number>`avg(price_estimate)`,
+        minPrice: sql<number>`min(price_estimate)`,
+        maxPrice: sql<number>`max(price_estimate)`,
+      })
+        .from(cardPriceObservations)
+        .where(and(
+          sql`lower(player_name) = ${normalizedName}`,
+          gt(cardPriceObservations.createdAt, thirtyDaysAgo)
+        )),
+
+      db.select({
+        eventType: cardInterestEvents.eventType,
+        count: sql<number>`count(*)::int`,
+      })
+        .from(cardInterestEvents)
+        .where(and(
+          sql`lower(player_name) = ${normalizedName}`,
+          gt(cardInterestEvents.createdAt, sevenDaysAgo)
+        ))
+        .groupBy(cardInterestEvents.eventType),
+
+      db.select({
+        avgPrice: sql<number>`avg(price_estimate)`,
+      })
+        .from(cardPriceObservations)
+        .where(and(
+          sql`lower(player_name) = ${normalizedName}`,
+          gt(cardPriceObservations.createdAt, sixtyDaysAgo),
+          lt(cardPriceObservations.createdAt, thirtyDaysAgo)
+        )),
+    ]);
+
+    const obsRow = priceObs[0];
+    const olderRow = olderPriceObs[0];
+
+    const scans = recentEvents.find(e => e.eventType === "scan")?.count || 0;
+    const adds = recentEvents.find(e => e.eventType === "add")?.count || 0;
+
+    let internalPriceChange: number | undefined;
+    if (obsRow?.avgPrice && olderRow?.avgPrice && olderRow.avgPrice > 0) {
+      internalPriceChange = (obsRow.avgPrice - olderRow.avgPrice) / olderRow.avgPrice;
+    }
+
+    const result: Partial<MarketMetrics> = {};
+    if (obsRow?.count && obsRow.count > 0) {
+      result.internalObservationCount = obsRow.count;
+      result.internalAvgPrice = Math.round(obsRow.avgPrice * 100) / 100;
+      result.internalPriceChange = internalPriceChange !== undefined ? Math.round(internalPriceChange * 1000) / 1000 : undefined;
+    }
+    if (scans > 0) result.weeklyScans = scans;
+    if (adds > 0) result.weeklyAdds = adds;
+
+    console.log(`[PlayerOutlook] Internal metrics for ${playerName}: obs=${obsRow?.count || 0}, avgPrice=$${obsRow?.avgPrice?.toFixed(2) || "N/A"}, priceChange=${internalPriceChange?.toFixed(3) || "N/A"}, scans=${scans}, adds=${adds}`);
+
+    return result;
+  } catch (error) {
+    console.error(`[PlayerOutlook] Internal metrics aggregation failed for ${playerName}:`, error);
+    return {};
+  }
+}
+
 // Fetch player market data (all cards sold) using Gemini with Google Search grounding
 interface PlayerMarketData {
   available: boolean;
@@ -776,6 +850,43 @@ If no sales data is found, return: { "available": false }`;
   
   console.error("[PlayerOutlook] Market data fetch failed after retries:", lastError?.message);
   return { available: false, source: "unavailable" };
+}
+
+function buildMarketMetrics(
+  geminiData: PlayerMarketData,
+  internalData: Partial<MarketMetrics>
+): MarketMetrics {
+  const hasGemini = geminiData.available && geminiData.totalAvgPrice !== undefined;
+  const hasInternal = (internalData.internalObservationCount ?? 0) > 0;
+
+  const volumeMap: Record<string, number> = { high: 150, medium: 50, low: 15 };
+
+  const metrics: MarketMetrics = {
+    source: hasGemini && hasInternal ? "blended" : hasGemini ? "gemini_search" : hasInternal ? "internal" : "unavailable",
+    soldCount30d: hasGemini && geminiData.estimatedVolume ? volumeMap[geminiData.estimatedVolume] : undefined,
+    avgSoldPrice: hasGemini ? geminiData.totalAvgPrice : internalData.internalAvgPrice,
+    medianSoldPrice: hasGemini ? geminiData.totalAvgPrice : internalData.internalAvgPrice,
+    priceTrend: undefined,
+    volumeTrend: hasGemini ? geminiData.volumeTrend : undefined,
+    priceRangeLow: hasGemini && geminiData.priceRange ? geminiData.priceRange.low : undefined,
+    priceRangeHigh: hasGemini && geminiData.priceRange ? geminiData.priceRange.high : undefined,
+    internalObservationCount: internalData.internalObservationCount,
+    internalAvgPrice: internalData.internalAvgPrice,
+    internalPriceChange: internalData.internalPriceChange,
+    weeklyScans: internalData.weeklyScans,
+    weeklyAdds: internalData.weeklyAdds,
+  };
+
+  if (internalData.internalPriceChange !== undefined) {
+    metrics.priceTrend = internalData.internalPriceChange;
+  }
+
+  if (metrics.priceRangeLow !== undefined && metrics.priceRangeHigh !== undefined && metrics.avgSoldPrice) {
+    const spread = (metrics.priceRangeHigh - metrics.priceRangeLow) / Math.max(1, metrics.avgSoldPrice);
+    metrics.volatilityEstimate = Math.min(1, Math.max(0, spread / 10));
+  }
+
+  return metrics;
 }
 
 // Use AI to infer player info and generate thesis
@@ -1315,8 +1426,9 @@ async function generateFreshOutlook(
   sport: string,
   playerKey: string
 ): Promise<PlayerOutlookResponse> {
-  // Step 1: Start market data fetch in background (does NOT block next steps)
+  // Step 1: Start market data + internal metrics fetch in background
   const marketDataPromise = fetchPlayerMarketData(playerName, sport);
+  const internalMetricsPromise = aggregateInternalMetrics(playerName);
   
   // Step 1b: Fetch news signals (blocks until complete — classification + narrative depend on this)
   const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus, aiCareerStage, aiRookieYear, aiPosition } = await getPlayerNewsSignals(playerName, sport);
@@ -1527,8 +1639,11 @@ async function generateFreshOutlook(
   // Step 6: Calculate valuation using heuristic model
   const valuation = calculateValuation(sport, finalClassification, verdict.modifier);
   
-  // Step 6.5: Await market data (started in Step 1, has been fetching in background while we did classification + narrative)
-  const marketData = await marketDataPromise;
+  // Step 6.5: Await market data + internal metrics (started in Step 1)
+  const [marketData, internalMetrics] = await Promise.all([marketDataPromise, internalMetricsPromise]);
+  
+  // Step 6.6: Build unified market metrics from Gemini + internal data
+  const marketMetrics = buildMarketMetrics(marketData, internalMetrics);
   
   // Step 7: Build evidence with real market data when available, fallback to modeled
   const useRealMarketData = marketData.available && marketData.totalAvgPrice !== undefined;
@@ -1539,9 +1654,8 @@ async function generateFreshOutlook(
       median: useRealMarketData ? marketData.totalAvgPrice! : valuation.estimatedRange.mid,
       low: useRealMarketData && marketData.priceRange ? marketData.priceRange.low : valuation.estimatedRange.low,
       high: useRealMarketData && marketData.priceRange ? marketData.priceRange.high : valuation.estimatedRange.high,
-      soldCount: undefined,
+      soldCount: marketMetrics.soldCount30d,
       source: useRealMarketData ? "gemini_search" : "modeled",
-      // New fields for player market data
       estimatedVolume: marketData.estimatedVolume,
       volumeTrend: marketData.volumeTrend,
       breakdown: marketData.breakdown,
@@ -1554,7 +1668,8 @@ async function generateFreshOutlook(
       useRealMarketData 
         ? `Market data from search - avg across all ${playerName} cards sold in last 30 days.`
         : "Modeled estimate - not live market data. Use as directional guidance.",
-    ],
+      marketMetrics.source !== "unavailable" ? `Market scoring: ${marketMetrics.source} data source` : "",
+    ].filter(Boolean),
     newsSnippets: snippets.slice(0, 3),
     lastUpdated: new Date().toISOString(),
     dataQuality,
@@ -1562,7 +1677,7 @@ async function generateFreshOutlook(
     newsCoverageConfidence,
   };
   
-  // Step 8: Generate Investment Call (new 5-state forced-decision system)
+  // Step 8: Market Scoring Engine V2 — market-behavior-first verdict
   const momentumMap: Record<string, "UP" | "DOWN" | "STABLE"> = {
     up: "UP",
     down: "DOWN",
@@ -1575,16 +1690,34 @@ async function generateFreshOutlook(
     none: "LOW",
   };
   
-  // Infer role tier from news context - use AI-detected roleStatus if available
   const inferredRoleTier = inferRoleTierFromContext(snippets, playerName, roleStatus, injuryStatus);
+  const roleTier = getRoleTier(playerName) !== "UNKNOWN" ? getRoleTier(playerName) : inferredRoleTier;
+  const roleStabilityScore = getRoleStabilityScore(playerName);
   
+  const marketScoringInput: MarketScoringInput = {
+    metrics: marketMetrics,
+    playerName,
+    stage: enrichedPlayerInfo.stage || finalClassification.stage,
+    position: enrichedPlayerInfo.position,
+    sport,
+    team: enrichedPlayerInfo.team,
+    roleTier,
+    roleStabilityScore: roleStabilityScore > 0 ? roleStabilityScore : 50,
+    newsHype: hypeMap[newsHype] || "LOW",
+    momentum: momentumMap[momentum] || "STABLE",
+    newsCount: snippets.length,
+  };
+  
+  const marketResult = generateMarketVerdict(marketScoringInput);
+  
+  // Step 8.1: Generate Investment Call using market scoring as primary, legacy as fallback enrichment
   const investmentCall = generateInvestmentCall({
     stage: finalClassification.stage,
-    temperature: finalClassification.baseTemperature,
-    volatility: finalClassification.baseVolatility,
-    risk: finalClassification.baseRisk,
-    horizon: finalClassification.baseHorizon,
-    confidence,
+    temperature: marketResult.temperature,
+    volatility: marketResult.volatility,
+    risk: marketResult.risk,
+    horizon: marketResult.horizon,
+    confidence: marketResult.confidence,
     exposures,
     thesis,
     marketRealityCheck,
@@ -1598,27 +1731,32 @@ async function generateFreshOutlook(
     inferredRoleTier: inferredRoleTier,
   });
   
-  // Step 8.5: Ensure temperature-verdict consistency
-  // TRADE_THE_HYPE = "sell into spikes" implies HOT market
-  // HOLD_ROLE_RISK + down momentum = COOLING market
-  // This prevents UI showing identical temps for very different market dynamics
-  const verdictValue = investmentCall.verdict;
-  let adjustedTemperature: MarketTemperature = snapshot.temperature;
-  
-  if (verdictValue === "TRADE_THE_HYPE" && snapshot.temperature !== "HOT") {
-    console.log(`[PlayerOutlook] Temperature adjustment: ${snapshot.temperature} → HOT (TRADE_THE_HYPE verdict implies hot market)`);
-    adjustedTemperature = "HOT";
-  } else if (verdictValue === "HOLD_ROLE_RISK" && momentum === "down" && snapshot.temperature !== "COOLING") {
-    console.log(`[PlayerOutlook] Temperature adjustment: ${snapshot.temperature} → COOLING (HOLD_ROLE_RISK + down momentum)`);
-    adjustedTemperature = "COOLING";
-  } else if (verdictValue === "AVOID_STRUCTURAL" && snapshot.temperature !== "COOLING") {
-    console.log(`[PlayerOutlook] Temperature adjustment: ${snapshot.temperature} → COOLING (AVOID_STRUCTURAL verdict)`);
-    adjustedTemperature = "COOLING";
+  // Step 8.2: Override investment call with market scoring results
+  // The market scoring engine is now the primary verdict source
+  const legacyVerdict = investmentCall.verdict;
+  investmentCall.verdict = marketResult.verdict;
+  investmentCall.oneLineRationale = marketResult.verdictReason;
+  investmentCall.confidence = marketResult.confidence;
+  investmentCall.timeHorizon = marketResult.horizon;
+
+  if (investmentCall.scores) {
+    investmentCall.scores = {
+      ...investmentCall.scores,
+      marketSignalOverride: true as any,
+    };
+  }
+
+  if (legacyVerdict !== marketResult.verdict) {
+    console.log(`[PlayerOutlook] Verdict override: ${legacyVerdict} → ${marketResult.verdict} (market scoring). Phase: ${marketResult.phase}, composite: ${marketResult.signals.composite}`);
   }
   
-  // Apply adjusted temperature to both snapshot and classification for cache consistency
-  snapshot.temperature = adjustedTemperature;
-  finalClassification.baseTemperature = adjustedTemperature;
+  // Step 8.5: Apply market-derived temperature to snapshot
+  snapshot.temperature = marketResult.temperature;
+  snapshot.volatility = marketResult.volatility;
+  snapshot.risk = marketResult.risk;
+  snapshot.horizon = marketResult.horizon;
+  snapshot.confidence = marketResult.confidence;
+  finalClassification.baseTemperature = marketResult.temperature;
   
   // Step 9: Build response
   const response: PlayerOutlookResponse = {
@@ -1630,14 +1768,17 @@ async function generateFreshOutlook(
     investmentCall,
     exposures,
     evidence,
+    marketPhase: marketResult.phase,
+    marketSignals: marketResult.signals,
+    marketMetrics,
     peakTiming,
     tieredRecommendations,
     teamContext: teamContextWithTeam,
     generatedAt: new Date().toISOString(),
   };
   
-  // Step 10: Save to cache
-  await saveToCache(playerKey, sport, playerName, classification, response);
+  // Step 10: Save to cache (use finalClassification which includes market-derived temperature)
+  await saveToCache(playerKey, sport, playerName, finalClassification, response);
   
   return response;
 }

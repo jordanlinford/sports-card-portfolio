@@ -1,7 +1,7 @@
 # Sports Card Portfolio
 
 ## Overview
-Sports Card Portfolio is a web application for collectors to manage, analyze, and grow their sports card collections. It provides AI-powered market intelligence, real eBay comparisons, and investment-focused tools. Key features include portfolio management, personalized buy recommendations, and collection sharing, with advanced features available for Pro users. The project aims to offer a comprehensive platform for sports card investment and management.
+Sports Card Portfolio is a web application designed for sports card collectors to manage, analyze, and grow their collections. It offers AI-powered market intelligence, real-time eBay comparisons, and investment-focused tools. The platform includes portfolio management, personalized buy recommendations, and collection sharing, with advanced features available for Pro users. The project aims to be a comprehensive solution for sports card investment and management, leveraging AI for valuation and market trend analysis to enhance collection value and user insight.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -9,78 +9,45 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### UI/UX Decisions
-The frontend is built with React 18, TypeScript, and Wouter for routing. It utilizes `shadcn/ui` components based on Radix UI and Tailwind CSS for a modern, responsive design. The visual style emphasizes card-focused layouts, clean aesthetics, DM Sans typography, and a HSL-based color system with CSS variables for dynamic theming.
+The frontend uses React 18, TypeScript, and Wouter for routing, built with `shadcn/ui` components based on Radix UI and Tailwind CSS. The design emphasizes card-focused layouts, clean aesthetics, DM Sans typography, and a dynamic HSL-based color system.
 
 ### Technical Implementations
-The application uses a full-stack TypeScript architecture. The frontend manages server state with TanStack Query, handles forms with React Hook Form and Zod, and implements theme management via React Context. The backend, built with Express.js, features dual-provider authentication using Passport.js (Google OAuth as primary, Replit OpenID Connect as a legacy fallback) with session management backed by PostgreSQL. Google Cloud Storage (via Replit Object Storage) is used for image uploads. Key features include CRUD operations for cards and display cases, a Stripe-based subscription model (Free and Pro tiers), AI-powered value tracking, a Gemini 2.5 Flash vision-based card image scanner, and sophisticated 1-of-1 card valuation. Pro features include batch scanning, batch card analysis, growth projections, and portfolio-specific buy recommendations.
+The application features a full-stack TypeScript architecture. The frontend uses TanStack Query for server state, React Hook Form with Zod for forms, and React Context for theme management. The Express.js backend handles dual-provider authentication via Passport.js (Google OAuth, Replit OpenID Connect) with PostgreSQL-backed session management. Google Cloud Storage (via Replit Object Storage) handles image uploads. Key features include CRUD for cards and display cases, a Stripe-based subscription model (Free/Pro), AI-powered value tracking, and a Gemini 2.5 Flash vision-based card image scanner. Pro features include batch scanning, batch analysis, growth projections, and portfolio-specific buy recommendations. Advanced AI systems include 1-of-1 card valuation, a sophisticated Market Scoring Engine V2 for market phase classification and verdicts based on weighted signals (Demand, Momentum, Liquidity, Supply Pressure, Hype, Volatility, Confidence), and a Card Advisor (Pro-only) that uses Gemini 2.5 Flash with function-calling to orchestrate various tools for portfolio auditing. A robust Alpha Data Infrastructure with `card_price_observations`, `card_market_snapshots`, and `card_interest_events` tables supports a nightly Alpha Batch Job and Signal Engine, producing buy/sell/hold signals stored in `card_signals`. The Alpha Feed V2 provides a daily briefing with market pulse, price movers, investment signals, community momentum, and trending cards. A unified pipeline connects Alpha insights to player outlooks and individual cards, providing context-aware recommendations and actions.
 
 ### Feature Specifications
-- **Card and Display Case Management**: Full CRUD operations with visibility settings.
-- **Subscription Model**: Free and Pro tiers managed via Stripe.
-- **Authentication**: Dual-provider Passport.js with Google OAuth and Replit OpenID Connect, supporting account merging.
-- **Image Handling**: Google Cloud Storage integration for card image uploads.
-- **Value Tracking & AI**: AI-powered market intelligence, historical data, price lookups, and investment outlooks.
-- **Card Image Scanner**: Gemini 2.5 Flash for card identification, supporting various workflows and daily scan limits.
-- **Scan History**: Automatic saving and management of all card scans.
-- **Batch Scanning (Pro-only)**: Multi-image upload for sequential processing of cards.
-- **Batch Card Analysis (Pro-only)**: Analyze multiple unanalyzed cards with real-time progress and summary.
-- **1-of-1 Card Valuation**: Automated detection and valuation of rare cards using Gemini AI and triangulation.
-- **AI Player Registry Refresh**: Admin tool for bulk updating player data using Gemini AI.
-- **Role Stability System**: 6-tier player role classification influencing investment recommendations. Fading veteran detection: VETERAN/AGING stage + BACKUP/ROTATIONAL role → AVOID_STRUCTURAL verdict. `inferCareerStage` now maps 10+ years → VETERAN, 14+ → AGING (previously all 2+ years were PRIME). Deserved-heat guardrail: players with upward momentum + STARTER+ role (roleStability >= 55) cannot receive TRADE_THE_HYPE from classification alone — their heat is justified by production, not pure hype.
-- **Unified Usage Tracking**: Consistent enforcement of free tier limits.
-- **Display Customization**: Multiple layout styles and premium themes for display cases.
-- **Collection Organization**: Tagging, automatic case generation, and duplicate detection.
-- **Social Features**: Liking, commenting, prestige system, bookmarking, and shareable display cases with rich previews.
-- **Leaderboards**: Public display of top display cases.
-- **Trading & Communication**: Offers system and direct messaging.
-- **Growth Projections (Pro)**: AI-powered collection growth forecasts.
-- **Monthly Price Trend Charts**: 18-month historical price charts.
-- **Graded Value Matrix**: Estimates graded values for raw cards with grading recommendations.
-- **Raw Card Price Accuracy**: Direct use of Gemini's raw price estimates.
-- **Supply Saturation Alert**: Alerts for surging grading volume of specific cards. Now backed by real `pop_history` table data when available, falling back to AI estimates.
-- **Pop Report History**: `pop_history` table stores weekly population snapshots from grading houses (PSA, BGS, SGC). VPS scraper POSTs to `POST /api/pop-history/ingest` (API key auth via `POP_INGESTION_API_KEY` env var). Query trends at `GET /api/pop-history/trends/:playerName` and raw history at `GET /api/pop-history/:playerName`.
-- **Watchlist Change Alerts**: Automatic detection and surfacing of market outlook changes for watched players. Compares current cached outlook (verdict, temperature) against snapshot stored at add-time. Orange alert banner on watchlist page with before/after badges. Badge count on Players nav item and Watchlist menu link. API: `GET /api/unified-watchlist/alerts`.
-- **Liquidity Scoring UI**: Visual badges for market health and exit risk.
-- **Portfolio-Specific Next Buys (Pro)**: AI recommendations tailored to portfolio themes.
-- **Next Buys Recommendation Engine**: Balanced, investment-focused recommendation system.
-- **Podcast Landing Page & Pro Trial**: Public landing page with a 7-day Pro trial.
-- **Dual-Source Hidden Gems**: Discovery of undervalued players via AI and community signals. Now includes Soccer with World Cup 2026-specific AI discovery prompts and a World Cup boost to discount scoring (March-July). Frontend filter includes "Soccer (World Cup 2026)" option.
-- **Portfolio Alpha Benchmark**: Compares portfolio performance against market benchmarks like S&P 500 and Bitcoin.
-- **Nightly Player Outlook Refresh**: Automated refresh of public player outlook pages for SEO.
-- **Card Advisor (Pro-only)**: AI-powered portfolio auditor sidebar (⌘+K toggle). Gemini 2.5 Flash with function-calling orchestrates 9 tools: portfolio summary, player outlooks, real-time news, eBay market data, display case inspection, hidden gems, market benchmarks, full collection scan, and Alpha signals. The `get_alpha_signals` tool provides active buy/sell/hold signals with drivers, timing context, and portfolio filtering. SSE streaming bypasses 120s timeout. Service: `server/agentService.ts`. Route: `GET /api/agent/stream?q=`. Frontend: `client/src/components/AgentSidebar.tsx`, `client/src/hooks/use-agent.ts`.
-- **Alpha Data Infrastructure**: Persistent price observation layer for future Alpha Engine. Three new tables: `card_price_observations` (time-series price data from every analysis), `card_market_snapshots` (rolling averages from last 10 observations), `card_interest_events` (scan/add/view/analyze events per card). Fire-and-forget hooks in all 3 analysis paths (outlook, batch, quick-analyze) plus card create and scan endpoints. APIs: `GET /api/alpha/interest-velocity/:identifier`, `GET /api/alpha/top-interest`, `GET /api/alpha/observations/:identifier`, `GET /api/alpha/snapshot/:identifier`.
-- **Alpha Batch Job & Signal Engine**: Nightly batch analysis job runs every 3 days, analyzing top 50 most-held/scanned cards via Gemini market data. Alpha Score v1 scoring engine produces buy/sell/hold signals with confidence levels stored in `card_signals` table. Hard cap of 50 analyses/run (~$2/run). Admin-triggered via `POST /api/admin/alpha-batch-run`, status at `GET /api/admin/alpha-batch-status`. Signals API: `GET /api/alpha/signals`, `GET /api/alpha/signals/:cardId`. Engine: `server/alphaEngine.ts`. Shared hooks: `server/alphaHooks.ts`.
-- **Alpha Feed V2 (Daily Alpha)**: Public `/alpha` page redesigned as a daily briefing with unique cross-platform intelligence. Sections: Market Pulse summary (total signals, buy/sell counts, biggest mover, hottest player), Price Movers (gainers/decliners with % change badges), Investment Signals with conviction-based filtering (Show All toggle; defaults to high-conviction only: buy >= 65 score, sell <= 35 score), Community Momentum (cards most added/scanned this week across all users), Trending Cards (heat-map style ranking with velocity), and Portfolio Alerts (auth-required). Signal cards enriched with "Owned by X collectors" and "Y scans this week" community data. APIs: `GET /api/alpha/feed` returns `marketPulse`, `opportunities`, `risks`, `holds`, `priceMovers`, `communityMomentum`, `trending` — all enriched with `ownerCount` and `weeklyScans`. Backend storage methods: `getCardOwnershipCounts` (cross-user ownership via canonical card signature), `getWeeklyScansForCards`, `getPriceMovers` (CTE comparing last 2 price observations), `getCommunityMomentum` (weighted interest events). Page: `client/src/pages/alpha-feed.tsx`. Nav: "Alpha" with "New" badge.
-- **Alpha → Player → Card Pipeline**: Unified decision flow connecting Alpha feed to Player Outlook to individual cards. All Alpha feed cards (signals, price movers, momentum, trending) navigate to player-outlook with `?from=alpha` and optional `?signalId=X`. Signal cards use player-first language (headlines like "Interest in [Player] is rising", CTAs like "See why this player is trending"). Signal Context Header on player page shows conviction label, drivers, timeframe, and confidence when arriving from a signal. RelatedSignalsPanel shows all active signals for the player. "What To Do Next" section (enhanced PortfolioContextPanel) shows user's cards with verdict-based action labels (Add More/Hold/Consider Selling) and price trend indicators (% change from last observation) linking to individual card pages. Back navigation returns to Daily Alpha. Full GA + backend tracking: signal_click, momentum_click, trending_click, price_mover_click, player_page_from_alpha, signal_view, card_click_from_player.
+- **Core Collection Management**: CRUD for cards and display cases, tagging, automatic case generation, duplicate detection, and visibility settings.
+- **Monetization**: Free and Pro subscription tiers via Stripe.
+- **Authentication**: Dual-provider (Google OAuth, Replit OpenID Connect) with account merging.
+- **AI & Market Intelligence**: AI-powered value tracking, historical data, price lookups, investment outlooks, Gemini 2.5 Flash card image scanning with daily limits, and 1-of-1 card valuation.
+- **Pro Features**: Batch scanning, batch card analysis, growth projections, and portfolio-specific buy recommendations.
+- **Market Analysis**: Market Scoring Engine V2 for market phase classification (Accumulation, Breakout, Expansion, Exhaustion, Decline) and verdicts. Includes 7 weighted market signals.
+- **Advanced AI Tools**: Card Advisor (Pro-only) for portfolio auditing, utilizing Gemini 2.5 Flash with multiple function-calling tools (e.g., portfolio summary, player outlooks, eBay market data, Alpha signals).
+- **Alpha Intelligence**: Alpha Data Infrastructure captures granular price observations and interest events. Alpha Batch Job and Signal Engine generate daily buy/sell/hold signals. Daily Alpha Feed (Alpha Feed V2) presents market pulse, price movers, investment signals, community momentum, and trending cards.
+- **Social & Sharing**: Liking, commenting, prestige system, bookmarking, and shareable display cases.
+- **Reporting & Alerts**: Monthly price trend charts, graded value matrix, supply saturation alerts, pop report history, watchlist change alerts, and liquidity scoring UI.
+- **Recommendation Engines**: Next Buys Recommendation Engine (balanced, investment-focused), Dual-Source Hidden Gems (AI and community signals, including Soccer with World Cup focus), and Portfolio Alpha Benchmark.
+- **SEO & Public Pages**: Public landing pages for podcasts, Pro trials, and a Topps Takeover SEO page with live player signals.
+- **Break Value Auditor**: AI-powered EV analysis for break slot value evaluation.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM.
-- **API**: RESTful API design.
-- **Build Process**: Vite for client, esbuild for server.
+- **API**: RESTful API.
+- **Build**: Vite for client, esbuild for server.
 - **Session Management**: Secure, HttpOnly cookies with PostgreSQL-backed sessions.
-- **Unified Card Analysis**: Single Gemini 2.5 Flash call for comprehensive market analysis.
-- **SSP/Case Hit Parallel Detection**: Advanced detection and pricing of premium parallels.
-- **Chrome Insert Scanner Accuracy**: Enhanced scanner prompts to differentiate various chrome inserts.
-- **Numbered Card Parallel Isolation**: Strict enforcement of print-run matching for numbered cards.
-- **Gemini-First Pricing Philosophy**: Gemini analysis as the primary pricing source with legacy fallbacks. Cross-product fallback differentiates auto vs non-auto cards with separate search queries and multiplier baselines. Zero-comp blending weights cross-product at 65% when Gemini has 0 sold comps (Gemini often anchors to unsold BIN listings). When unified estimate is >2x cross-product with 0 comps, cross-product is used exclusively. Both prompts include player demand tier assessment (draft position, position, starter/backup, team quality) to prevent price inflation for low-demand players. Active BIN listing prices are treated as ceiling references only, not market value. Code-level 50% zero-comp discount applied to all unified estimates with 0 sold comps before blending.
-- **Player Outlook Parallelization**: Parallel fetching of news and market data.
-- **eBay Comps Caching**: Stale-while-revalidate pattern with extended TTLs.
-- **Player News Caching**: 4-hour in-memory cache for news results.
-- **VPS Worker Architecture**: Dedicated-IP VPS for eBay scraper.
-- **Hidden Gems Auto-Refresh**: Weekly scheduled job for refreshing Hidden Gems.
-- **Unified Analysis DB Cache**: Persistent caching of Gemini analysis results in PostgreSQL.
-- **Premium Numbered Parallel Detection**: Specific detection and handling for premium numbered parallels.
-- **Topps Takeover SEO Page**: Public `/market/topps-takeover` landing page covering the Panini-to-Topps NFL license transition. SSR for crawlers with FAQ JSON-LD + Article JSON-LD. Live player signals API at `/api/market/topps-takeover-signals`. Added to sitemap and Market nav dropdown.
-- **Break Value Auditor**: Replaced old box break hosting system. AI-powered EV analysis at `/market/break-auditor` using Gemini 2.5 Flash to evaluate break slot value. Old break/split API endpoints return 410 with redirect. Route: `POST /api/market/break-audit`. Page: `client/src/pages/break-auditor.tsx`.
+- **AI Integration**: Gemini 2.5 Flash as the primary AI engine for comprehensive market analysis and pricing, with strategic fallbacks.
+- **Parallel Detection**: Advanced detection and pricing for SSPs, case hits, Chrome inserts, and numbered card parallels.
+- **Caching**: eBay comps caching (stale-while-revalidate), player news caching (in-memory), and persistent caching of Gemini analysis results in PostgreSQL.
+- **Worker Architecture**: Dedicated-IP VPS for eBay scraper.
+- **Scheduled Jobs**: Weekly auto-refresh for Hidden Gems, nightly player outlook refresh.
 
 ## External Dependencies
 
 ### Third-Party Services
 - **Replit Services**: Replit Auth (OpenID Connect), Replit Object Storage (Google Cloud Storage).
-- **Stripe**: Payment processing for subscriptions.
-- **OpenAI GPT & Serper API**: AI-powered lookups and real-time news for recommendations.
-- **Yahoo Finance**: For S&P 500 market data.
-- **CoinGecko**: For Bitcoin market data.
+- **Stripe**: Payment processing.
+- **OpenAI GPT & Serper API**: AI lookups and real-time news.
+- **Yahoo Finance**: S&P 500 market data.
+- **CoinGecko**: Bitcoin market data.
 
 ### Frontend Libraries
 - **UI & Components**: Radix UI, Uppy, date-fns, Lucide React, shadcn/ui.

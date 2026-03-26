@@ -54,7 +54,7 @@ import { AdvisorSnapshot } from "@/components/outlook/AdvisorSnapshot";
 import { OutlookAccordions } from "@/components/outlook/OutlookAccordions";
 import { PriceTrendChart } from "@/components/price-trend-chart";
 import { transformToAdvisorOutlook, applyVerdictGuardrails } from "@/lib/transformToAdvisorOutlook";
-import type { PlayerOutlookResponse, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext, AdvisorOutlook } from "@shared/schema";
+import type { PlayerOutlookResponse, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext, AdvisorOutlook, MarketPhase, MarketSignals } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
   switch (temp) {
@@ -279,7 +279,7 @@ function PlayerOutlookSkeleton() {
   );
 }
 
-function PlayerHeader({ player, snapshot }: { player: PlayerOutlookResponse["player"]; snapshot: PlayerOutlookResponse["snapshot"] }) {
+function PlayerHeader({ player, snapshot, marketPhase }: { player: PlayerOutlookResponse["player"]; snapshot: PlayerOutlookResponse["snapshot"]; marketPhase?: MarketPhase }) {
   const { data: imageData } = useQuery({
     queryKey: ["/api/player-image", player.name, player.sport],
     queryFn: async () => {
@@ -320,6 +320,12 @@ function PlayerHeader({ player, snapshot }: { player: PlayerOutlookResponse["pla
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
+        {marketPhase && marketPhase !== "UNKNOWN" && (
+          <Badge className={`${getMarketPhaseColor(marketPhase)} gap-1`} data-testid="badge-market-phase">
+            <BarChart3 className="h-3 w-3" />
+            {formatMarketPhase(marketPhase)}
+          </Badge>
+        )}
         <Badge className={`${getTemperatureColor(snapshot.temperature)} gap-1`} data-testid="badge-temperature">
           {getTemperatureIcon(snapshot.temperature)}
           {snapshot.temperature}
@@ -338,6 +344,96 @@ function PlayerHeader({ player, snapshot }: { player: PlayerOutlookResponse["pla
         </Badge>
       </div>
     </div>
+  );
+}
+
+function getMarketPhaseColor(phase: MarketPhase): string {
+  switch (phase) {
+    case "ACCUMULATION": return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
+    case "BREAKOUT": return "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300";
+    case "EXPANSION": return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300";
+    case "EXHAUSTION": return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300";
+    case "DECLINE": return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300";
+    default: return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+  }
+}
+
+function formatMarketPhase(phase: MarketPhase): string {
+  switch (phase) {
+    case "ACCUMULATION": return "Accumulation";
+    case "BREAKOUT": return "Breakout";
+    case "EXPANSION": return "Expansion";
+    case "EXHAUSTION": return "Exhaustion";
+    case "DECLINE": return "Decline";
+    default: return phase;
+  }
+}
+
+function getSignalColor(score: number): string {
+  if (score >= 70) return "text-green-600 dark:text-green-400";
+  if (score >= 55) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 45) return "text-yellow-600 dark:text-yellow-400";
+  if (score >= 30) return "text-orange-600 dark:text-orange-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+function getSignalBarColor(score: number): string {
+  if (score >= 70) return "bg-green-500";
+  if (score >= 55) return "bg-emerald-500";
+  if (score >= 45) return "bg-yellow-500";
+  if (score >= 30) return "bg-orange-500";
+  return "bg-red-500";
+}
+
+function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?: MarketPhase }) {
+  const signalEntries = [
+    { label: "Demand", score: signals.demandScore, description: "Sales volume & buyer interest" },
+    { label: "Momentum", score: signals.momentumScore, description: "Price trend direction" },
+    { label: "Liquidity", score: signals.liquidityScore, description: "Ease of buying/selling" },
+    { label: "Supply Pressure", score: signals.supplyPressureScore, description: "Listing-to-sales ratio", inverted: true },
+    { label: "Volatility", score: signals.volatilityScore, description: "Price stability", inverted: true },
+    { label: "Hype", score: signals.hypeScore, description: "News & community buzz" },
+    { label: "Confidence", score: signals.confidenceScore, description: "Data quality & reliability" },
+  ];
+
+  return (
+    <Card data-testid="card-market-signals">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <BarChart3 className="h-5 w-5 text-primary" />
+          Market Signals
+          {phase && phase !== "UNKNOWN" && (
+            <Badge className={`${getMarketPhaseColor(phase)} ml-2 text-xs`} data-testid="badge-signals-phase">
+              {formatMarketPhase(phase)} Phase
+            </Badge>
+          )}
+        </CardTitle>
+        <CardDescription>
+          Composite Score: <span className={`font-semibold ${getSignalColor(signals.composite)}`} data-testid="text-composite-score">{signals.composite}/100</span>
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {signalEntries.map(({ label, score, description, inverted }) => (
+            <div key={label} className="space-y-1" data-testid={`signal-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{label}</span>
+                <span className={`font-medium ${inverted ? getSignalColor(100 - score) : getSignalColor(score)}`}>
+                  {score}
+                </span>
+              </div>
+              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${inverted ? getSignalBarColor(100 - score) : getSignalBarColor(score)}`}
+                  style={{ width: `${score}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1677,7 +1773,7 @@ export default function PlayerOutlookPage() {
             return <SignalContextHeader signalId={signalId} playerName={outlookData.player.name} />;
           })()}
           
-          <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} />
+          <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} marketPhase={outlookData.marketPhase} />
           
           <AdvisorSnapshot 
             advisor={advisorOutlook} 
@@ -1698,6 +1794,13 @@ export default function PlayerOutlookPage() {
               sport: outlookData.player.sport || sport,
             }}
           />
+
+          {outlookData.marketSignals && (
+            <MarketSignalsPanel 
+              signals={outlookData.marketSignals} 
+              phase={outlookData.marketPhase} 
+            />
+          )}
 
           <OutlookAccordions 
             advisor={advisorOutlook} 
