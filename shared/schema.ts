@@ -1980,6 +1980,20 @@ export const hiddenGems = pgTable("hidden_gems", {
   upsideScore: integer("upside_score"),
   confidenceScore: integer("confidence_score"),
   discountScore: integer("discount_score"), // How undervalued (higher = more undervalued)
+
+  // Market Scoring Engine data (enriched from player outlook)
+  compositeScore: integer("composite_score"),
+  convictionScore: integer("conviction_score"),
+  convictionLevel: varchar("conviction_level", { length: 20 }),
+  marketPhase: varchar("market_phase", { length: 30 }),
+  demandScore: integer("demand_score"),
+  momentumScore: integer("momentum_score"),
+  liquidityScore: integer("liquidity_score"),
+  marketQuality: integer("market_quality"),
+  percentileRank: integer("percentile_rank"),
+  signalAgreement: integer("signal_agreement"),
+  engineVerdict: varchar("engine_verdict", { length: 40 }),
+  aiVsEngineConflict: boolean("ai_vs_engine_conflict").default(false),
   
   // Discovery source
   source: varchar("source", { length: 20 }).default("AI").notNull(), // "AI" | "COMMUNITY" | "BOTH"

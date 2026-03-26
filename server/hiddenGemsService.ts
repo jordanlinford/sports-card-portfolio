@@ -1,9 +1,10 @@
 import { db } from "./db";
-import { hiddenGems, playerOutlookCache, cards, displayCases, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse } from "@shared/schema";
+import { hiddenGems, playerOutlookCache, cards, displayCases, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse, type MarketSignals, type ConvictionData } from "@shared/schema";
 import { eq, desc, and, isNotNull, sql } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { getPlayerOutlook } from "./playerOutlookEngine";
 import { SEASONAL_CONFIGS } from "./cardOutlookService";
+import { getPlayerPercentiles } from "./leaderboardEngine";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -138,6 +139,89 @@ function getDisplayVerdict(verdict?: string): string {
 
 const BULLISH_VERDICTS = new Set(["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER", "BUY"]);
 const BEARISH_VERDICTS = new Set(["AVOID_NEW_MONEY", "TRADE_THE_HYPE", "AVOID", "AVOID_STRUCTURAL", "HOLD_ROLE_RISK", "SELL"]);
+
+interface MarketEnrichment {
+  compositeScore: number | null;
+  convictionScore: number | null;
+  convictionLevel: string | null;
+  marketPhase: string | null;
+  demandScore: number | null;
+  momentumScore: number | null;
+  liquidityScore: number | null;
+  marketQuality: number | null;
+  percentileRank: number | null;
+  signalAgreement: number | null;
+  engineVerdict: string | null;
+  aiVsEngineConflict: boolean;
+}
+
+function extractMarketEnrichment(
+  outlook: PlayerOutlookResponse | null,
+  aiIsAvoid: boolean,
+  percentileComposite?: number | null,
+): MarketEnrichment {
+  const empty: MarketEnrichment = {
+    compositeScore: null, convictionScore: null, convictionLevel: null,
+    marketPhase: null, demandScore: null, momentumScore: null,
+    liquidityScore: null, marketQuality: null, percentileRank: null,
+    signalAgreement: null, engineVerdict: null, aiVsEngineConflict: false,
+  };
+  if (!outlook) return empty;
+
+  const ms = outlook.marketSignals;
+  const snap = outlook.snapshot as any;
+  const conv = ms?.conviction || (snap?.conviction ? {
+    score: snap.conviction.score,
+    level: snap.conviction.level,
+    agreementScore: snap.conviction.alignment === "Aligned" ? 90 :
+                    snap.conviction.alignment === "Mostly Aligned" ? 70 :
+                    snap.conviction.alignment === "Mixed" ? 45 : 25,
+  } : null);
+
+  const engineVerdict = outlook.investmentCall?.verdict || null;
+  const engineBullish = engineVerdict ? BULLISH_VERDICTS.has(engineVerdict) : null;
+  const aiBullish = !aiIsAvoid;
+
+  const conflict = engineBullish !== null && engineBullish !== aiBullish;
+
+  return {
+    compositeScore: ms ? Math.round(ms.composite) : null,
+    convictionScore: conv ? Math.round(conv.score) : null,
+    convictionLevel: conv?.level || null,
+    marketPhase: outlook.marketPhase || (snap?.marketPhase as string) || null,
+    demandScore: ms ? Math.round(ms.demandScore) : null,
+    momentumScore: ms ? Math.round(ms.momentumScore) : null,
+    liquidityScore: ms ? Math.round(ms.liquidityScore) : null,
+    marketQuality: ms?.derivedMetrics ? Math.round(ms.derivedMetrics.marketQuality) : null,
+    percentileRank: percentileComposite ?? null,
+    signalAgreement: conv ? Math.round(conv.agreementScore) : null,
+    engineVerdict,
+    aiVsEngineConflict: conflict,
+  };
+}
+
+function computeBlendedGemScore(
+  gem: AiDiscoveredGem,
+  enrichment: MarketEnrichment,
+): number {
+  const aiScore = gem.discountScore || 60;
+
+  if (!enrichment.compositeScore) {
+    return aiScore;
+  }
+
+  const composite = enrichment.compositeScore;
+  const conviction = enrichment.convictionScore || 50;
+  const demand = enrichment.demandScore || 50;
+
+  const engineScore = (composite * 0.5) + (conviction * 0.3) + (demand * 0.2);
+
+  if (enrichment.aiVsEngineConflict) {
+    return Math.round(engineScore * 0.7 + aiScore * 0.3);
+  }
+
+  return Math.round(engineScore * 0.55 + aiScore * 0.45);
+}
 
 
 function calculateCautionScore(outlook: PlayerOutlookResponse): number {
@@ -523,9 +607,21 @@ async function discoverGemsFromUserSignals(existingPlayerKeys: Set<string>): Pro
       const verdict = outlook?.investmentCall?.verdict;
       if (!verdict || !BULLISH_VERDICTS.has(verdict)) continue;
 
+      const ms = outlook.marketSignals;
+      const snap = outlook.snapshot as any;
+      const conv = ms?.conviction || snap?.conviction;
+
+      if (conv && typeof conv.score === "number" && conv.score < 35) {
+        console.log(`[HiddenGems] Skipping ${normalizedName}: conviction too low (${conv.score})`);
+        continue;
+      }
+
       seenKeys.add(key);
       const scores = outlook.investmentCall?.scores;
       const temp = (outlook.snapshot?.temperature as string) || "NEUTRAL";
+
+      const compositeBoost = ms ? Math.round((ms.composite - 50) * 0.3) : 0;
+      const baseDiscount = Math.min(90, Math.max(35, (scores?.upsideScore ?? 65) - 5));
 
       candidates.push({
         playerName: normalizedName,
@@ -542,7 +638,7 @@ async function discoverGemsFromUserSignals(existingPlayerKeys: Set<string>): Pro
         trapRisks: (outlook.investmentCall?.thesisBreakers || ["Situation could remain unchanged."]).slice(0, 2),
         upsideScore: scores?.upsideScore ?? 65,
         confidenceScore: scores?.overallScore ?? 60,
-        discountScore: Math.min(90, Math.max(35, (scores?.upsideScore ?? 65) - 5)),
+        discountScore: Math.min(95, Math.max(35, baseDiscount + compositeBoost)),
         isAvoid: false,
       });
     }
@@ -689,43 +785,100 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         gem.discountScore = Math.min(95, (gem.discountScore || 60) + boostPoints);
       }
     }
-    const sortedGems = allGems
-      .sort((a, b) => (b.discountScore || 60) - (a.discountScore || 60))
+
+    updateRefreshStatus({ progress: "Enriching gems with market scoring engine..." });
+    let percentileMap: Map<string, any> | null = null;
+    try {
+      percentileMap = await getPlayerPercentiles();
+      console.log(`[HiddenGems] Loaded ${percentileMap.size} player percentiles for enrichment`);
+    } catch (err) {
+      console.warn("[HiddenGems] Could not load percentiles, continuing without:", err);
+    }
+
+    interface EnrichedGem {
+      gem: AiDiscoveredGem;
+      enrichment: MarketEnrichment;
+      outlook: PlayerOutlookResponse | null;
+      blendedScore: number;
+      playerKey: string;
+      normalizedName: string;
+      normalizedSport: string;
+    }
+
+    const enrichedGems: EnrichedGem[] = [];
+    let enrichedCount = 0;
+
+    for (const gem of allGems) {
+      const normalizedSport = normalizeSport(gem.sport);
+      const normalizedName = normalizePlayerName(gem.playerName);
+      const playerKey = normalizePlayerKey(normalizedName, normalizedSport);
+
+      let outlook: PlayerOutlookResponse | null = null;
+      try {
+        const sportForOutlook = normalizedSport.toLowerCase() === "nfl" ? "football" :
+          normalizedSport.toLowerCase() === "nba" ? "basketball" :
+          normalizedSport.toLowerCase() === "mlb" ? "baseball" :
+          normalizedSport.toLowerCase() === "nhl" ? "hockey" : normalizedSport.toLowerCase();
+        outlook = await getPlayerOutlook({ playerName: normalizedName, sport: sportForOutlook });
+      } catch (err) {
+        console.log(`[HiddenGems] Outlook lookup failed for ${normalizedName}, using AI data only`);
+      }
+
+      const pctData = percentileMap?.get(playerKey);
+      let pctComposite: number | null = null;
+      if (pctData?.marketScore) {
+        const match = pctData.marketScore.match(/(\d+)/);
+        if (match) {
+          const num = parseInt(match[1], 10);
+          pctComposite = pctData.marketScore.startsWith("Top") ? num : (100 - num);
+        }
+      }
+
+      const enrichment = extractMarketEnrichment(outlook, !!gem.isAvoid, pctComposite);
+      const blendedScore = computeBlendedGemScore(gem, enrichment);
+
+      enrichedCount++;
+      if (enrichedCount % 10 === 0) {
+        updateRefreshStatus({ progress: `Enriching gems... ${enrichedCount}/${allGems.length}` });
+      }
+
+      enrichedGems.push({ gem, enrichment, outlook, blendedScore, playerKey, normalizedName, normalizedSport });
+    }
+
+    console.log(`[HiddenGems] Enriched ${enrichedGems.length} gems with market data. ${enrichedGems.filter(e => e.enrichment.compositeScore !== null).length} have engine scores.`);
+
+    const sortedGems = enrichedGems
+      .sort((a, b) => b.blendedScore - a.blendedScore)
       .slice(0, targetCount);
 
+    updateRefreshStatus({ progress: `Saving top ${sortedGems.length} gems...` });
+
     for (let i = 0; i < sortedGems.length; i++) {
-      const gem = sortedGems[i];
+      const { gem, enrichment, outlook, playerKey, normalizedName, normalizedSport } = sortedGems[i];
 
       try {
-        const normalizedSport = normalizeSport(gem.sport);
-        const normalizedName = normalizePlayerName(gem.playerName);
-        const playerKey = normalizePlayerKey(normalizedName, normalizedSport);
-
         const validVerdicts = ["ACCUMULATE", "HOLD_CORE", "SPECULATIVE_FLYER", "TRADE_THE_HYPE", "AVOID_NEW_MONEY",
           "HOLD_ROLE_RISK", "HOLD_INJURY_CONTINGENT", "SPECULATIVE_SUPPRESSED", "AVOID_STRUCTURAL"];
-        let verdict: string;
 
-        try {
-          const sportForOutlook = normalizedSport.toLowerCase() === "nfl" ? "football" :
-            normalizedSport.toLowerCase() === "nba" ? "basketball" :
-            normalizedSport.toLowerCase() === "mlb" ? "baseball" :
-            normalizedSport.toLowerCase() === "nhl" ? "hockey" : normalizedSport.toLowerCase();
-          
-          const outlook = await getPlayerOutlook({ playerName: normalizedName, sport: sportForOutlook });
-          const outlookVerdict = outlook?.investmentCall?.verdict;
-          
-          if (outlookVerdict && validVerdicts.includes(outlookVerdict)) {
-            verdict = outlookVerdict;
-            console.log(`[HiddenGems] Using outlook engine verdict for ${normalizedName}: ${verdict}`);
+        let verdict: string;
+        const aiVerdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
+
+        if (enrichment.aiVsEngineConflict && enrichment.engineVerdict && validVerdicts.includes(enrichment.engineVerdict)) {
+          if (enrichment.convictionScore && enrichment.convictionScore >= 55) {
+            verdict = enrichment.engineVerdict;
+            console.log(`[HiddenGems] Engine override (conviction ${enrichment.convictionScore}): ${normalizedName} AI=${aiVerdict} → Engine=${verdict}`);
           } else {
-            verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
-            console.log(`[HiddenGems] No outlook verdict for ${normalizedName}, using AI verdict: ${verdict}`);
+            verdict = aiVerdict;
+            console.log(`[HiddenGems] Conflict but low conviction (${enrichment.convictionScore}), keeping AI verdict: ${normalizedName} → ${verdict}`);
           }
-          gem.isAvoid = BEARISH_VERDICTS.has(verdict);
-        } catch (err) {
-          verdict = validVerdicts.includes(gem.verdict) ? gem.verdict : (gem.isAvoid ? "AVOID_NEW_MONEY" : "ACCUMULATE");
-          console.log(`[HiddenGems] Outlook lookup failed for ${normalizedName}, using AI verdict: ${verdict}`);
+        } else if (enrichment.engineVerdict && validVerdicts.includes(enrichment.engineVerdict)) {
+          verdict = enrichment.engineVerdict;
+          console.log(`[HiddenGems] Using engine verdict for ${normalizedName}: ${verdict}`);
+        } else {
+          verdict = aiVerdict;
+          console.log(`[HiddenGems] No engine verdict for ${normalizedName}, using AI: ${verdict}`);
         }
+        gem.isAvoid = BEARISH_VERDICTS.has(verdict);
 
         const validTemps = ["HOT", "WARM", "NEUTRAL", "COOLING"];
         const temperature = validTemps.includes(gem.temperature) ? gem.temperature : "NEUTRAL";
@@ -758,6 +911,18 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
           upsideScore: gem.isAvoid ? null : Math.min(95, Math.max(30, gem.upsideScore || 65)),
           confidenceScore: Math.min(95, Math.max(30, gem.confidenceScore || 65)),
           discountScore: Math.min(95, Math.max(30, gem.discountScore || 60)),
+          compositeScore: enrichment.compositeScore,
+          convictionScore: enrichment.convictionScore,
+          convictionLevel: enrichment.convictionLevel,
+          marketPhase: enrichment.marketPhase,
+          demandScore: enrichment.demandScore,
+          momentumScore: enrichment.momentumScore,
+          liquidityScore: enrichment.liquidityScore,
+          marketQuality: enrichment.marketQuality,
+          percentileRank: enrichment.percentileRank,
+          signalAgreement: enrichment.signalAgreement,
+          engineVerdict: enrichment.engineVerdict,
+          aiVsEngineConflict: enrichment.aiVsEngineConflict,
           source: gemSource,
           batchId,
           sortOrder: i,
@@ -768,16 +933,20 @@ async function refreshHiddenGemsInternal(targetCount: number, batchId: string): 
         await db.insert(hiddenGems).values(gemData);
         gemsCreated++;
         updateRefreshStatus({ gemsCreated });
-        console.log(`[HiddenGems] Created gem ${gemsCreated}: ${normalizedName} (${verdict}, source: ${gemSource})`);
+        const conflictTag = enrichment.aiVsEngineConflict ? " ⚠️CONFLICT" : "";
+        const engineTag = enrichment.compositeScore !== null ? ` [engine:${enrichment.compositeScore}/conv:${enrichment.convictionScore}]` : " [no engine data]";
+        console.log(`[HiddenGems] Created gem ${gemsCreated}: ${normalizedName} (${verdict}, source: ${gemSource}${engineTag}${conflictTag})`);
       } catch (err) {
         console.error(`[HiddenGems] Failed to create gem for ${gem.playerName}:`, err);
       }
     }
 
-    console.log(`[HiddenGems] Refresh complete. Created ${gemsCreated} gems.`);
+    const conflictCount = sortedGems.filter(g => g.enrichment.aiVsEngineConflict).length;
+    const engineEnrichedCount = sortedGems.filter(g => g.enrichment.compositeScore !== null).length;
+    console.log(`[HiddenGems] Refresh complete. Created ${gemsCreated} gems. ${engineEnrichedCount} engine-enriched, ${conflictCount} AI/engine conflicts resolved.`);
     updateRefreshStatus({
       status: "completed",
-      progress: `Done! Created ${gemsCreated} fresh gems across all sports.`,
+      progress: `Done! ${gemsCreated} gems created (${engineEnrichedCount} engine-validated, ${conflictCount} conflicts resolved).`,
       gemsCreated,
       completedAt: Date.now(),
     });

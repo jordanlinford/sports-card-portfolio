@@ -46,7 +46,7 @@ interface GemCandidate {
   sport: string;
   position?: string | null;
   team?: string | null;
-  verdict: string; // Now stores actual verdict: ACCUMULATE, HOLD_CORE, etc.
+  verdict: string;
   modifier: string;
   temperature: MarketTemperature;
   tier: string;
@@ -55,7 +55,16 @@ interface GemCandidate {
   whyDiscounted: string[];
   repricingCatalysts: string[];
   trapRisks: string[];
-  source?: string; // "AI" | "COMMUNITY" | "BOTH"
+  source?: string;
+  compositeScore?: number | null;
+  convictionScore?: number | null;
+  convictionLevel?: string | null;
+  marketPhase?: string | null;
+  demandScore?: number | null;
+  momentumScore?: number | null;
+  percentileRank?: number | null;
+  engineVerdict?: string | null;
+  aiVsEngineConflict?: boolean;
 }
 
 function getVerdictIcon(verdict: string) {
@@ -225,7 +234,42 @@ function GemCard({ gem, isPro }: { gem: GemCandidate; isPro: boolean }) {
               AI + Community
             </Badge>
           )}
+          {gem.aiVsEngineConflict && (
+            <Badge variant="outline" className="text-xs bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 flex items-center gap-1">
+              <AlertTriangle className="h-3 w-3" />
+              Engine Override
+            </Badge>
+          )}
         </div>
+
+        {gem.compositeScore != null && isPro && (
+          <div className="flex items-center gap-3 mt-3 px-2 py-1.5 rounded-md bg-muted/50 text-xs" data-testid={`gem-engine-data-${gem.playerName.replace(/\s+/g, '-').toLowerCase()}`}>
+            <span className="font-medium text-muted-foreground">Engine:</span>
+            <span title="Composite Score">{gem.compositeScore}</span>
+            {gem.convictionLevel && (
+              <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${
+                gem.convictionLevel === "HIGH" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                gem.convictionLevel === "MEDIUM" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                gem.convictionLevel === "LOW" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+              }`}>
+                {gem.convictionLevel}
+              </Badge>
+            )}
+            {gem.marketPhase && (
+              <span className="text-muted-foreground">{gem.marketPhase}</span>
+            )}
+            {gem.percentileRank != null && (
+              <span className={`ml-auto font-medium ${
+                gem.percentileRank <= 15 ? "text-green-600 dark:text-green-400" :
+                gem.percentileRank <= 35 ? "text-blue-600 dark:text-blue-400" :
+                "text-muted-foreground"
+              }`}>
+                Top {gem.percentileRank}%
+              </span>
+            )}
+          </div>
+        )}
       </CardHeader>
       
       <CardContent className="space-y-4 flex-1 flex flex-col">
@@ -328,7 +372,7 @@ function mapHiddenGemToCandidate(gem: HiddenGem): GemCandidate {
     sport: gem.sport,
     position: gem.position,
     team: gem.team,
-    verdict: gem.verdict, // Now stores actual verdict
+    verdict: gem.verdict,
     modifier: gem.modifier || "Value",
     temperature: gem.temperature as MarketTemperature,
     tier: gem.tier,
@@ -338,6 +382,15 @@ function mapHiddenGemToCandidate(gem: HiddenGem): GemCandidate {
     repricingCatalysts: gem.repricingCatalysts || [],
     trapRisks: gem.trapRisks || [],
     source: (gem as any).source || "AI",
+    compositeScore: gem.compositeScore,
+    convictionScore: gem.convictionScore,
+    convictionLevel: gem.convictionLevel,
+    marketPhase: gem.marketPhase,
+    demandScore: gem.demandScore,
+    momentumScore: gem.momentumScore,
+    percentileRank: gem.percentileRank,
+    engineVerdict: gem.engineVerdict,
+    aiVsEngineConflict: gem.aiVsEngineConflict ?? false,
   };
 }
 
