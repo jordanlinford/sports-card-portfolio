@@ -62,7 +62,7 @@ The application uses a full-stack TypeScript architecture. The frontend manages 
 - **SSP/Case Hit Parallel Detection**: Advanced detection and pricing of premium parallels.
 - **Chrome Insert Scanner Accuracy**: Enhanced scanner prompts to differentiate various chrome inserts.
 - **Numbered Card Parallel Isolation**: Strict enforcement of print-run matching for numbered cards.
-- **Gemini-First Pricing Philosophy**: Gemini analysis as the primary pricing source with legacy fallbacks. Cross-product fallback differentiates auto vs non-auto cards with separate search queries and multiplier baselines. Zero-comp blending weights cross-product at 65% when Gemini has 0 sold comps (Gemini often anchors to unsold BIN listings). When unified estimate is >2x cross-product with 0 comps, cross-product is used exclusively.
+- **Gemini-First Pricing Philosophy**: Gemini analysis as the primary pricing source with legacy fallbacks. Cross-product fallback differentiates auto vs non-auto cards with separate search queries and multiplier baselines. Zero-comp blending weights cross-product at 65% when Gemini has 0 sold comps (Gemini often anchors to unsold BIN listings). When unified estimate is >2x cross-product with 0 comps, cross-product is used exclusively. Both prompts include player demand tier assessment (draft position, position, starter/backup, team quality) to prevent price inflation for low-demand players. Active BIN listing prices are treated as ceiling references only, not market value.
 - **Player Outlook Parallelization**: Parallel fetching of news and market data.
 - **eBay Comps Caching**: Stale-while-revalidate pattern with extended TTLs.
 - **Player News Caching**: 4-hour in-memory cache for news results.

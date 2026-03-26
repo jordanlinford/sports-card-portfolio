@@ -1112,13 +1112,21 @@ Report whatever comps you find from these broader searches.
 
 ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and confidence to "LOW". However, you MUST STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — NEVER return 0 or null for avgPrice. This is mandatory. Use this hierarchy:
 
-STEP 1 — ACTIVE LISTINGS (do this first): Search eBay for CURRENT active listings of this exact card. Active BIN prices from real sellers are the best available market signal when no sales exist. If you find active listings at $X, that IS the market price floor — use it as your primary estimate. Record the count in activeListing.
+STEP 1 — ASSESS PLAYER DEMAND TIER (do this FIRST for zero-comp cards):
+Before estimating any price, figure out WHO this player is:
+- What round/pick were they drafted? (1st round = high demand, 4th+ round = low demand)
+- What position? (QB/WR/RB = high demand. TE/OL/K/P/DL/DB = low demand in card market)
+- Are they a starter, backup, or rotational player?
+- Popular franchise or rebuilding team?
+This determines the CEILING for your estimate. A late-round TE on a bad team does NOT have cards worth $50-100 in any non-auto parallel.
 
-STEP 2 — If no active listings either: Search for the SAME player's recently sold cards in any product to understand their market tier (e.g. "${card.playerName || card.title} 2025 baseball card sold eBay"). Apply a scarcity premium for the specific variation/numbering based on your market knowledge.
+STEP 2 — PLAYER'S OTHER SOLD CARDS: Search for the SAME player's recently sold cards in any product to understand their market tier (e.g. "${card.playerName || card.title} ${card.year || "2025"} ${card.sport || "football"} card sold eBay"). Apply a scarcity premium for the specific variation/numbering based on your market knowledge.
 
-STEP 3 — Last resort: Search for COMPARABLE players at the same tier in similar products, or the same product with different players, to understand the product price floor. Apply scarcity premium.
+STEP 3 — COMPARABLE PLAYERS: Search for COMPARABLE players at the same demand tier (same draft round, position, similar hype level) in similar products. Use their sold prices as comps.
 
-NOTE: The "completed sales only" rule above applies when completed sales EXIST. When soldCount=0, active listing prices ARE valid — use them aggressively. A price based on real active listings at $X beats a cross-player estimate every time. Note your methodology in "notes".
+STEP 4 — ACTIVE LISTINGS (supplementary only): Search eBay for current active listings. Record the count in activeListing. BUT: active BIN prices are ASKING prices, NOT market value. Sellers routinely list cards at 2-5x what they actually sell for. Use active listings only as a CEILING reference, not as your estimate. If the only data you have is a $80 BIN listing, the card is likely worth $20-40 (50% or less of BIN).
+
+NOTE: For low-demand players (late-round picks, non-skill positions, backups on bad teams), even /25 non-auto parallels typically sell for $5-$25. Do NOT inflate estimates just because a card is numbered — the player's actual demand matters more than scarcity alone.
 
 Return ONLY a JSON object with this EXACT structure:
 {
@@ -1514,6 +1522,21 @@ export async function fetchCrossProductFallbackPrice(card: {
 CARD: "${cardDesc}"
 Card Type: ${serialLabel} ${cardTypeLabel}${isAuto ? "" : " (NOT an autograph)"}
 
+PLAYER TIER ASSESSMENT (DO THIS FIRST):
+Before estimating price, assess this player's actual market demand tier. Search for who "${player}" is:
+- What round were they drafted? What pick? (1st round picks = high demand, 3rd+ round = low-mid demand)
+- What position? (QB/WR/RB = high demand positions. TE/OL/K/P/DB = low demand in card market)
+- Are they a starter or bench player? Pro Bowl caliber or replacement level?
+- What team? (Popular franchises like Cowboys, Chiefs, Lakers = premium. Rebuilding/small-market teams = discount)
+- Is there actual collector demand for this player, or are they a common/overlooked rookie?
+
+PLAYER DEMAND TIERS for ${sport} pricing:
+- ELITE: Top 5 pick QB/WR, franchise face, superstar → highest multipliers
+- HIGH: 1st round pick skill position, proven starter, popular team → above-average multipliers
+- MID: 2nd-3rd round pick, solid starter, average team → standard multipliers
+- LOW: 4th+ round pick, backup/rotational, non-skill position (TE/OL/K), bad team → MINIMUM multipliers
+- For LOW-tier players: their /25 non-auto parallels typically sell for $5-$20, NOT $50-$100
+
 This card has NO direct eBay sold comps available yet. You need to estimate its value using cross-product comparables. Here is exactly how to do it:
 
 STEP 1 — Find this PLAYER'S comparable cards in any product:
@@ -1522,14 +1545,17 @@ ${searchQueries.map(q => `- Search: ${q}`).join("\n")}
 STEP 2 — If the player has no sales yet, find COMPARABLE PLAYERS at the same tier:
 - Search for rookies drafted in the same round, same position, same year
 - Search for rookies with similar hype/draft stock from ${year} ${sport}
+- CRITICAL: Match by DEMAND TIER, not just position. A 4th-round TE's comps are other late-round TEs, NOT 1st-round WRs.
 ${compSearches.map(s => `- ${s}`).join("\n")}
-${serialPremium ? `\nSTEP 3 — APPLY SERIAL NUMBER PREMIUM:\n${serialPremium}\n` : ""}
+${serialPremium ? `\nSTEP 3 — APPLY SERIAL NUMBER PREMIUM:\n${serialPremium}\nIMPORTANT: Apply the multiplier to the player's ACTUAL base price at their demand tier, not to a generic base price. A LOW-tier player's base card sells for $0.25-$1, so even 6x is only $1.50-$6.\n` : ""}
 IMPORTANT RULES:
 - NEVER return 0 or null for avgPrice. A thoughtful estimate is always required.
 - If the player is a rookie, search specifically for ${year} rookie ${isAuto ? "autos" : "cards (NOT autos)"} in budget-to-mid products
 - Return the REALISTIC current market value, not the ceiling potential
 - ${baseRangeHint}
 - ${isAuto ? "" : "CRITICAL: This is NOT an autograph card. Do NOT anchor to autograph prices. Non-auto parallels are worth significantly less than auto versions."}
+- NEVER anchor to unsold Buy-It-Now (BIN) listing prices. Only use SOLD/completed auction prices as comps. A BIN price of $80 does NOT mean the card is worth $80 — it means someone is ASKING $80.
+- For low-demand players (late draft picks, non-skill positions, backup players): be CONSERVATIVE. Their cards often sell at or near minimum bid prices ($1-$10 for non-auto parallels).
 
 Return ONLY this JSON:
 {
