@@ -738,6 +738,10 @@ interface PlayerMarketData {
   estimatedVolume?: "high" | "medium" | "low";
   volumeTrend?: "up" | "stable" | "down";
   priceRange?: { low: number; high: number };
+  soldCount30d?: number;
+  activeListingCount?: number;
+  medianSoldPrice?: number;
+  priceTrendPercent?: number;
   breakdown?: {
     category: string;
     avgPrice: number;
@@ -753,18 +757,26 @@ async function fetchPlayerMarketData(playerName: string, sport: string): Promise
   
   const searchPrompt = `Search for all sports cards sold for ${playerName} (${sport}) over the last 30 days on eBay and other card marketplaces.
 
-Provide a market summary with:
+Provide a detailed market summary with NUMERIC data:
 1. Total average sale price across ALL cards (base, parallels, autos, graded, etc.)
-2. Estimated sales volume (high/medium/low based on number of listings)
-3. Volume trend compared to previous period (up/stable/down)
-4. Price range from lowest to highest sale
-5. Breakdown by card category with average prices
+2. Median sale price across all cards
+3. Approximate number of cards sold in the last 30 days (actual count or best estimate)
+4. Approximate number of active/unsold listings currently available
+5. Estimated sales volume category (high/medium/low)
+6. Volume trend compared to previous period (up/stable/down)
+7. Price trend direction as a percentage change vs prior 30 days (e.g., +15 means prices up 15%, -10 means prices down 10%)
+8. Price range from lowest to highest sale
+9. Breakdown by card category with average prices
 
 Return ONLY a JSON object:
 {
   "totalAvgPrice": <number - average sale price across all cards>,
+  "medianSoldPrice": <number - median sale price>,
+  "soldCount30d": <number - approximate cards sold in last 30 days>,
+  "activeListingCount": <number - approximate active unsold listings>,
   "estimatedVolume": "high" | "medium" | "low",
   "volumeTrend": "up" | "stable" | "down",
+  "priceTrendPercent": <number - percentage price change vs prior period, e.g. 15 or -10>,
   "priceRange": { "low": <number>, "high": <number> },
   "breakdown": [
     { "category": "Base/Common", "avgPrice": <number>, "priceRange": "$X - $Y" },
@@ -806,15 +818,13 @@ If no sales data is found, return: { "available": false }`;
             return { available: false, source: "unavailable" };
           }
           
-          console.log(`[PlayerOutlook] Market data for ${playerName}: avg=$${parsed.totalAvgPrice}, volume=${parsed.estimatedVolume}`);
+          console.log(`[PlayerOutlook] Market data for ${playerName}: avg=$${parsed.totalAvgPrice}, sold=${parsed.soldCount30d}, active=${parsed.activeListingCount}, volume=${parsed.estimatedVolume}, trend=${parsed.priceTrendPercent}%`);
           
-          // Validate and cast estimatedVolume to the expected union type
           const validVolumes = ["high", "medium", "low"] as const;
           const estimatedVolume = validVolumes.includes(parsed.estimatedVolume) 
             ? parsed.estimatedVolume as "high" | "medium" | "low"
             : undefined;
           
-          // Validate and cast volumeTrend
           const validTrends = ["up", "stable", "down"] as const;
           const volumeTrend = validTrends.includes(parsed.volumeTrend)
             ? parsed.volumeTrend as "up" | "stable" | "down"
@@ -823,6 +833,10 @@ If no sales data is found, return: { "available": false }`;
           return {
             available: true,
             totalAvgPrice: parsed.totalAvgPrice,
+            medianSoldPrice: typeof parsed.medianSoldPrice === "number" ? parsed.medianSoldPrice : undefined,
+            soldCount30d: typeof parsed.soldCount30d === "number" ? parsed.soldCount30d : undefined,
+            activeListingCount: typeof parsed.activeListingCount === "number" ? parsed.activeListingCount : undefined,
+            priceTrendPercent: typeof parsed.priceTrendPercent === "number" ? parsed.priceTrendPercent : undefined,
             estimatedVolume,
             volumeTrend,
             priceRange: parsed.priceRange,
@@ -859,13 +873,18 @@ function buildMarketMetrics(
   const hasGemini = geminiData.available && geminiData.totalAvgPrice !== undefined;
   const hasInternal = (internalData.internalObservationCount ?? 0) > 0;
 
-  const volumeMap: Record<string, number> = { high: 150, medium: 50, low: 15 };
+  const volumeFallbackMap: Record<string, number> = { high: 150, medium: 50, low: 15 };
 
   const metrics: MarketMetrics = {
     source: hasGemini && hasInternal ? "blended" : hasGemini ? "gemini_search" : hasInternal ? "internal" : "unavailable",
-    soldCount30d: hasGemini && geminiData.estimatedVolume ? volumeMap[geminiData.estimatedVolume] : undefined,
+    soldCount30d: hasGemini && geminiData.soldCount30d !== undefined
+      ? geminiData.soldCount30d
+      : hasGemini && geminiData.estimatedVolume
+        ? volumeFallbackMap[geminiData.estimatedVolume]
+        : undefined,
+    activeListingCount: hasGemini ? geminiData.activeListingCount : undefined,
     avgSoldPrice: hasGemini ? geminiData.totalAvgPrice : internalData.internalAvgPrice,
-    medianSoldPrice: hasGemini ? geminiData.totalAvgPrice : internalData.internalAvgPrice,
+    medianSoldPrice: hasGemini && geminiData.medianSoldPrice ? geminiData.medianSoldPrice : (hasGemini ? geminiData.totalAvgPrice : internalData.internalAvgPrice),
     priceTrend: undefined,
     volumeTrend: hasGemini ? geminiData.volumeTrend : undefined,
     priceRangeLow: hasGemini && geminiData.priceRange ? geminiData.priceRange.low : undefined,
@@ -877,13 +896,15 @@ function buildMarketMetrics(
     weeklyAdds: internalData.weeklyAdds,
   };
 
-  if (internalData.internalPriceChange !== undefined) {
+  if (hasGemini && geminiData.priceTrendPercent !== undefined) {
+    metrics.priceTrend = geminiData.priceTrendPercent / 100;
+  } else if (internalData.internalPriceChange !== undefined) {
     metrics.priceTrend = internalData.internalPriceChange;
   }
 
-  if (metrics.priceRangeLow !== undefined && metrics.priceRangeHigh !== undefined && metrics.avgSoldPrice) {
-    const spread = (metrics.priceRangeHigh - metrics.priceRangeLow) / Math.max(1, metrics.avgSoldPrice);
-    metrics.volatilityEstimate = Math.min(1, Math.max(0, spread / 10));
+  if (metrics.priceRangeLow !== undefined && metrics.priceRangeHigh !== undefined && metrics.avgSoldPrice && metrics.avgSoldPrice > 0) {
+    const spread = (metrics.priceRangeHigh - metrics.priceRangeLow) / metrics.avgSoldPrice;
+    metrics.volatilityEstimate = Math.min(1, Math.max(0, spread / 5));
   }
 
   return metrics;
@@ -1739,15 +1760,38 @@ async function generateFreshOutlook(
   investmentCall.confidence = marketResult.confidence;
   investmentCall.timeHorizon = marketResult.horizon;
 
-  if (investmentCall.scores) {
-    investmentCall.scores = {
-      ...investmentCall.scores,
-      marketSignalOverride: true as any,
-    };
-  }
-
   if (legacyVerdict !== marketResult.verdict) {
     console.log(`[PlayerOutlook] Verdict override: ${legacyVerdict} → ${marketResult.verdict} (market scoring). Phase: ${marketResult.phase}, composite: ${marketResult.signals.composite}`);
+  }
+
+  const sig = marketResult.signals;
+  const met = marketMetrics;
+  const metricsWhyBullets: string[] = [];
+
+  if (met.soldCount30d !== undefined) {
+    metricsWhyBullets.push(`${met.soldCount30d} cards sold in the last 30 days${met.activeListingCount ? `, ${met.activeListingCount} active listings` : ""}`);
+  }
+  if (met.priceTrend !== undefined) {
+    const dir = met.priceTrend >= 0 ? "up" : "down";
+    metricsWhyBullets.push(`Prices trending ${dir} ${Math.abs(Math.round(met.priceTrend * 100))}% vs prior period`);
+  }
+  if (marketResult.phase !== "UNKNOWN") {
+    metricsWhyBullets.push(`Market in ${marketResult.phase.toLowerCase()} phase — composite score ${sig.composite}/100`);
+  }
+
+  if (metricsWhyBullets.length > 0) {
+    investmentCall.whyBullets = metricsWhyBullets.slice(0, 3);
+  }
+
+  const phasePostureMap: Record<string, string> = {
+    ACCUMULATION: "Buy on weakness",
+    BREAKOUT: "Add with momentum",
+    EXPANSION: "Hold and ride",
+    EXHAUSTION: "Trim into strength",
+    DECLINE: "Wait for stabilization",
+  };
+  if (marketResult.phase !== "UNKNOWN" && phasePostureMap[marketResult.phase]) {
+    investmentCall.postureLabel = phasePostureMap[marketResult.phase];
   }
   
   // Step 8.5: Apply market-derived temperature to snapshot
