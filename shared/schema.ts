@@ -1519,6 +1519,14 @@ export type AdvisorOutlook = {
   timing?: string; // "Overextended" | "Early" | "Fair" | "Late"
   structure?: string; // "Strong" | "Mixed" | "Weak"
   marketQuality?: number; // 0-100 composite of liquidity, volatility, supply health
+  percentiles?: {
+    marketScore?: string; // "Top 12%"
+    demand?: string; // "Top 8%"
+    momentum?: string; // "Top 25%"
+    hype?: string; // "Top 90%" (higher = more hyped = worse)
+    quality?: string; // "Top 15%"
+    sampleSize?: number; // how many players in the pool
+  };
 };
 
 // Player Outlook Cache table

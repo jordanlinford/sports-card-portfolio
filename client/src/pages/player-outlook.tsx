@@ -1370,6 +1370,7 @@ export default function PlayerOutlookPage() {
   const [sport, setSport] = useState("football");
   const [outlookData, setOutlookData] = useState<PlayerOutlookResponse | null>(null);
   const [outlookSport, setOutlookSport] = useState<string>("football");
+  const [percentileData, setPercentileData] = useState<{ marketScore: string; demand: string; momentum: string; hype: string; quality: string; sampleSize: number } | null>(null);
   const [showSignupDialog, setShowSignupDialog] = useState(false);
   const [isSharedView, setIsSharedView] = useState(false);
   const [sharedPlayerName, setSharedPlayerName] = useState<string | null>(null);
@@ -1540,12 +1541,25 @@ export default function PlayerOutlookPage() {
 
   const outlookMutation = useMutation({
     mutationFn: async (data: { playerName: string; sport: string }) => {
+      setPercentileData(null);
       const result = await apiRequest("POST", "/api/player-outlook", data);
       return { data: result, sport: data.sport };
     },
-    onSuccess: ({ data, sport: usedSport }) => {
+    onSuccess: async ({ data, sport: usedSport }) => {
       setOutlookData(data);
       setOutlookSport(usedSport);
+      if (data.player?.sport && data.player?.name) {
+        const playerKey = `${data.player.sport.toLowerCase()}:${data.player.name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+        try {
+          const pctRes = await fetch(`/api/market-percentiles/${encodeURIComponent(playerKey)}`);
+          if (pctRes.ok) {
+            const pctData = await pctRes.json();
+            if (pctData.found) {
+              setPercentileData(pctData);
+            }
+          }
+        } catch {}
+      }
     },
     onError: (error: any) => {
       const message = error?.message || "Failed to get player outlook";
@@ -1591,6 +1605,13 @@ export default function PlayerOutlookPage() {
           .then(data => {
             setOutlookData(data);
             setOutlookSport(sportParam);
+            if (data.player?.sport && data.player?.name) {
+              const pk = `${data.player.sport.toLowerCase()}:${data.player.name.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
+              fetch(`/api/market-percentiles/${encodeURIComponent(pk)}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(p => { if (p?.found) setPercentileData(p); })
+                .catch(() => {});
+            }
           })
           .catch(err => {
             console.log("No cached data for shared player, prompting signup");
@@ -1786,6 +1807,16 @@ export default function PlayerOutlookPage() {
         <PlayerResultErrorBoundary onReset={() => setOutlookData(null)}>
         {(() => {
         const advisorOutlook = applyVerdictGuardrails(transformToAdvisorOutlook(outlookData));
+        if (percentileData) {
+          advisorOutlook.percentiles = {
+            marketScore: percentileData.marketScore,
+            demand: percentileData.demand,
+            momentum: percentileData.momentum,
+            hype: percentileData.hype,
+            quality: percentileData.quality,
+            sampleSize: percentileData.sampleSize,
+          };
+        }
         return (
         <div className="space-y-6 animate-in fade-in duration-500">
           {/* Shared view banner for unauthenticated users */}

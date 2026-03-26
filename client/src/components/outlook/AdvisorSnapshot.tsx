@@ -13,6 +13,7 @@ import {
   Heart,
   Activity,
   BarChart3,
+  BarChart2,
 } from "lucide-react";
 import type { AdvisorOutlook } from "@shared/schema";
 import { LiquidityBadge } from "@/components/liquidity-badge";
@@ -76,6 +77,17 @@ function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
         icon: <Minus className="h-5 w-5" />,
       };
   }
+}
+
+function getPercentileColor(label: string, inverted: boolean = false): string {
+  const num = parseInt(label.replace(/[^0-9]/g, ""), 10);
+  const isTop = label.startsWith("Top");
+  const isGood = inverted ? !isTop : isTop;
+  const position = isGood ? num : 100 - num;
+  if (position <= 15) return "text-green-600 border-green-300 dark:text-green-400 dark:border-green-600";
+  if (position <= 35) return "text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-600";
+  if (position <= 60) return "text-muted-foreground";
+  return "text-orange-600 border-orange-300 dark:text-orange-400 dark:border-orange-600";
 }
 
 interface AdvisorSnapshotProps {
@@ -190,6 +202,44 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
               )}
               {advisor.shortTermTrend.avgPrice && (
                 <span>{advisor.shortTermTrend.avgPrice} avg</span>
+              )}
+            </div>
+          </div>
+        )}
+        {advisor.percentiles && (
+          <div className="space-y-1 px-4 py-2" data-testid="row-percentile-rankings">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              <BarChart2 className="h-3 w-3" />
+              Relative Ranking
+              {advisor.percentiles.sampleSize && advisor.percentiles.sampleSize < 100 && (
+                <span className="font-normal text-muted-foreground/60 ml-1">(limited sample: {advisor.percentiles.sampleSize} players)</span>
+              )}
+            </p>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {advisor.percentiles.marketScore && (
+                <Badge variant="outline" className={`text-xs font-medium ${getPercentileColor(advisor.percentiles.marketScore)}`} data-testid="badge-pct-market">
+                  Market: {advisor.percentiles.marketScore}
+                </Badge>
+              )}
+              {advisor.percentiles.demand && (
+                <Badge variant="outline" className={`text-xs font-medium ${getPercentileColor(advisor.percentiles.demand)}`} data-testid="badge-pct-demand">
+                  Demand: {advisor.percentiles.demand}
+                </Badge>
+              )}
+              {advisor.percentiles.momentum && (
+                <Badge variant="outline" className={`text-xs font-medium ${getPercentileColor(advisor.percentiles.momentum)}`} data-testid="badge-pct-momentum">
+                  Momentum: {advisor.percentiles.momentum}
+                </Badge>
+              )}
+              {advisor.percentiles.hype && (
+                <Badge variant="outline" className={`text-xs font-medium ${getPercentileColor(advisor.percentiles.hype)}`} data-testid="badge-pct-hype">
+                  Hype: {advisor.percentiles.hype}
+                </Badge>
+              )}
+              {advisor.percentiles.quality && (
+                <Badge variant="outline" className={`text-xs font-medium ${getPercentileColor(advisor.percentiles.quality)}`} data-testid="badge-pct-quality">
+                  Quality: {advisor.percentiles.quality}
+                </Badge>
               )}
             </div>
           </div>

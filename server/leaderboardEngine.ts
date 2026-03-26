@@ -21,6 +21,7 @@ export type LeaderboardEntry = {
   confidence: string;
   marketQuality: number;
   slug?: string;
+  percentile?: string;
 };
 
 type CachedLeaderboard = {
@@ -212,6 +213,9 @@ export async function getLeaderboard(
     scored.sort((a, b) => b.score - a.score);
   }
 
+  const totalPlayers = scored.length;
+  const sortedScores = scored.map(s => s.score).sort((a, b) => a - b);
+
   const entries: LeaderboardEntry[] = scored.slice(0, limit).map((s, i) => {
     const investmentVerdict = s.outlook.investmentCall?.verdict || "HOLD_CORE";
     const { verdict, label } = mapVerdict(investmentVerdict as InvestmentVerdict);
@@ -225,6 +229,9 @@ export async function getLeaderboard(
 
     const avgPrice = met?.avgSoldPrice ? `$${met.avgSoldPrice.toFixed(0)}` : "";
     const mq = s.signals.derivedMetrics?.marketQuality ?? 0;
+
+    const pctRaw = computePercentile(s.score, sortedScores);
+    const pctLabel = formatPercentile(pctRaw);
 
     return {
       rank: i + 1,
@@ -240,6 +247,7 @@ export async function getLeaderboard(
       confidence: s.signals.confidenceScore >= 65 ? "HIGH" : s.signals.confidenceScore >= 40 ? "MED" : "LOW",
       marketQuality: mq,
       slug: s.slug,
+      percentile: pctLabel,
     };
   });
 
@@ -249,4 +257,141 @@ export async function getLeaderboard(
 
 export function invalidateLeaderboardCache() {
   leaderboardCache.clear();
+  percentileCache = null;
+}
+
+export type PercentileData = {
+  marketScore: string;
+  demand: string;
+  momentum: string;
+  hype: string;
+  quality: string;
+  sampleSize: number;
+};
+
+type PercentileCacheEntry = {
+  data: Map<string, PercentileData>;
+  generatedAt: number;
+};
+
+let percentileCache: PercentileCacheEntry | null = null;
+const PERCENTILE_TTL_MS = 60 * 60 * 1000;
+
+function computePercentile(value: number, sortedValues: number[]): number {
+  if (sortedValues.length <= 1) return 50;
+  let below = 0;
+  let equal = 0;
+  for (const v of sortedValues) {
+    if (v < value) below++;
+    else if (v === value) equal++;
+  }
+  const midrank = below + (equal - 1) / 2;
+  return Math.round((midrank / (sortedValues.length - 1)) * 100);
+}
+
+function formatPercentile(pct: number, inverted: boolean = false): string {
+  const effective = inverted ? pct : (100 - pct);
+  if (effective <= 0) return "Top 1%";
+  if (effective >= 100) return "Bottom 1%";
+  return effective <= 50 ? `Top ${effective}%` : `Bottom ${100 - effective}%`;
+}
+
+export async function getPlayerPercentiles(playerKey?: string): Promise<Map<string, PercentileData>> {
+  if (percentileCache && Date.now() - percentileCache.generatedAt < PERCENTILE_TTL_MS) {
+    return percentileCache.data;
+  }
+
+  const rows = await db
+    .select()
+    .from(playerOutlookCache)
+    .where(isNotNull(playerOutlookCache.outlookJson));
+
+  type PlayerScore = {
+    key: string;
+    composite: number;
+    demand: number;
+    momentum: number;
+    hype: number;
+    quality: number;
+  };
+
+  const players: PlayerScore[] = [];
+
+  for (const row of rows) {
+    const outlook = row.outlookJson as PlayerOutlookResponse;
+    if (!outlook) continue;
+
+    let signals = outlook.marketSignals;
+
+    if (!signals || !signals.composite) {
+      const met = outlook.marketMetrics;
+      if (met && met.source !== "unavailable") {
+        try {
+          const classification = row.classificationJson as any;
+          const input: MarketScoringInput = {
+            metrics: met,
+            playerName: row.playerName,
+            stage: classification?.stage || "UNKNOWN",
+            roleTier: "STARTER",
+            roleStabilityScore: 50,
+          };
+          signals = computeMarketSignals(input);
+        } catch {
+          continue;
+        }
+      } else {
+        const investmentVerdict = outlook.investmentCall?.verdict;
+        if (investmentVerdict) {
+          const verdictScoreMap: Record<string, number> = {
+            ACCUMULATE: 80, HOLD_CORE: 60, TRADE_THE_HYPE: 55,
+            SPECULATIVE_FLYER: 45, HOLD_ROLE_RISK: 50,
+            AVOID_NEW_MONEY: 25, AVOID_STRUCTURAL: 15,
+          };
+          const base = verdictScoreMap[investmentVerdict] ?? 50;
+          signals = {
+            demandScore: base, momentumScore: 50, liquidityScore: 50,
+            supplyPressureScore: 50, volatilityScore: 50, hypeScore: 50,
+            confidenceScore: 35, composite: base,
+          };
+        } else {
+          continue;
+        }
+      }
+    }
+
+    const mq = signals.derivedMetrics?.marketQuality ??
+      Math.round((signals.liquidityScore * 0.4) + (signals.volatilityScore * 0.3) + (signals.supplyPressureScore * 0.3));
+
+    players.push({
+      key: row.playerKey,
+      composite: signals.composite,
+      demand: signals.demandScore,
+      momentum: signals.momentumScore,
+      hype: signals.hypeScore,
+      quality: mq,
+    });
+  }
+
+  const sortedComposite = players.map(p => p.composite).sort((a, b) => a - b);
+  const sortedDemand = players.map(p => p.demand).sort((a, b) => a - b);
+  const sortedMomentum = players.map(p => p.momentum).sort((a, b) => a - b);
+  const sortedHype = players.map(p => p.hype).sort((a, b) => a - b);
+  const sortedQuality = players.map(p => p.quality).sort((a, b) => a - b);
+
+  const result = new Map<string, PercentileData>();
+  const sampleSize = players.length;
+
+  for (const p of players) {
+    result.set(p.key, {
+      marketScore: formatPercentile(computePercentile(p.composite, sortedComposite)),
+      demand: formatPercentile(computePercentile(p.demand, sortedDemand)),
+      momentum: formatPercentile(computePercentile(p.momentum, sortedMomentum)),
+      hype: formatPercentile(computePercentile(p.hype, sortedHype), true),
+      quality: formatPercentile(computePercentile(p.quality, sortedQuality)),
+      sampleSize,
+    });
+  }
+
+  percentileCache = { data: result, generatedAt: Date.now() };
+  return result;
 }

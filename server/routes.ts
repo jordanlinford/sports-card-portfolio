@@ -900,6 +900,22 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  app.get("/api/market-percentiles/:playerKey", async (req, res) => {
+    try {
+      const { getPlayerPercentiles } = await import("./leaderboardEngine");
+      const playerKey = decodeURIComponent(req.params.playerKey);
+      const allPercentiles = await getPlayerPercentiles();
+      const data = allPercentiles.get(playerKey);
+      if (!data) {
+        return res.json({ found: false, sampleSize: allPercentiles.size });
+      }
+      res.json({ found: true, ...data });
+    } catch (error) {
+      console.error("Error fetching percentiles:", error);
+      res.status(500).json({ message: "Failed to fetch percentiles" });
+    }
+  });
+
   app.get("/api/explore/search", async (req, res) => {
     try {
       const query = (req.query.q as string) || "";
