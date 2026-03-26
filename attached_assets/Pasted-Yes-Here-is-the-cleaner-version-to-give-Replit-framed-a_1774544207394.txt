@@ -1,0 +1,100 @@
+Yes. Here is the cleaner version to give Replit, framed around the real job of the feature:
+
+This engine should answer:
+“Should I be buying, holding, or selling this player’s card market in general?”
+
+Not:
+“Is this specific card a buy?”
+
+Your current engine is useful, but it is too driven by AI classification and rule precedence instead of broad player-level card market behavior.
+
+Replit brief: Player Outlook Engine rebuild
+Section	Instruction
+Feature goal	Build a player-level sports card market outlook engine that tells users whether the overall market for a player’s cards is attractive to buy, hold, sell into, or avoid.
+Key constraint	Do not make this feature card-specific. It should evaluate the player’s market as a whole.
+Core principle	Use actual market behavior across the player’s card ecosystem to drive the recommendation.
+Product question	“Should I be allocating money into this player’s cards right now?”
+What to change conceptually
+Current approach	New approach
+AI classification first	Market behavior first
+Rule precedence	Weighted scoring
+Heat / narrative-first logic	Demand / liquidity / momentum-first logic
+One blended opinion	A player market view based on broad signals
+Somewhat abstract sports framing	Sports-card-market-native framing
+The right abstraction
+
+Tell Replit this:
+
+Instruction	Explanation
+Analyze the player’s card market broadly	Do not analyze one specific card in this feature
+Aggregate market behavior across the player’s ecosystem	Use sold comps and active listings across relevant cards tied to that player
+Focus on market-wide signals	The output should reflect broad buying interest, momentum, liquidity, and risk across that player’s market
+Use AI only as support	AI can help interpret or explain, but should not be the primary driver of the verdict
+What data this engine should use
+Data type	What it should measure	Why it matters
+Sold sales activity	Number of recent sales across the player’s cards	Measures actual buyer demand
+Active listings	Number of cards currently for sale	Measures supply pressure
+Price trend	Direction of recent average or median sold prices	Measures momentum
+Volume trend	Whether transaction count is increasing or decreasing	Separates strong moves from weak ones
+Volatility	Stability or instability of recent prices	Measures risk
+Sell-through proxy	Relationship between sold activity and available supply	Measures liquidity quality
+Event context	Injuries, playoffs, awards, hype cycles, call-ups, offseason	Sports card markets are catalyst-driven
+Signals the engine should calculate
+
+These should be player-level market signals, not card-level signals.
+
+Signal	How it should be interpreted
+Demand Score	Are people actively buying this player’s cards right now?
+Momentum Score	Is the player’s card market trending up or down?
+Liquidity Score	Can positions in this player be entered and exited reasonably well?
+Supply Pressure Score	Is there too much inventory hitting the market?
+Volatility Score	Is this player’s market stable or unstable?
+Hype Score	Is price movement running ahead of real demand?
+Confidence Score	Do we have enough good market data to trust the result?
+Add a market phase layer
+
+This is important because it gives the engine better sports-card-native logic than just hot/warm/cooling.
+
+Market phase	What it means
+Accumulation	Quiet market, stable prices, demand starting to build
+Breakout	Price and activity rising together
+Expansion	Strong demand, broad participation, prices elevated
+Exhaustion	Prices still high but participation weakening
+Decline	Prices falling, supply rising, demand fading
+
+Tell Replit:
+The system should classify the player’s overall card market into one of these phases before generating the final verdict.
+
+What the output should be
+Output element	Requirement
+Final verdict	ACCUMULATE, HOLD_CORE, TRADE_THE_HYPE, AVOID_NEW_MONEY, SPECULATIVE_FLYER, etc.
+Market phase	Show the current player market phase
+Confidence	Show how reliable the signal is
+Why it fired	Explain using real data, not vague AI language
+What to do next	Tell the user the practical action: buy more, hold, trim, avoid adding, etc.
+How the verdict should be generated
+Requirement	Instruction
+Use weighted scoring	Do not use brittle first-match-wins rule logic
+Keep guardrails limited	Only use hard overrides for truly obvious cases
+Make the verdict player-market-driven	Recommendation should come mostly from demand, liquidity, momentum, supply, and volatility
+Use player context as a modifier, not the foundation	Career stage, injuries, and narrative can adjust the signal, but should not dominate it
+What not to do
+Do not do this	Why
+Do not make the feature about a specific card	Wrong product job
+Do not let one rare sale skew the outlook	The feature is about the overall player market
+Do not rely mainly on AI classification	That creates opinion-first outputs
+Do not use vague labels without measurable support	Low trust
+Do not blend all logic into a black box	Users need explainability
+Exact instruction for Replit
+Prompt	Content
+Copy/paste prompt	Rebuild the Player Outlook Engine so it evaluates a player’s sports card market in general, not specific cards. The feature should answer: “Should I be buying, holding, or selling this player’s card market right now?” Use real player-level market behavior as the primary driver, including sold sales activity, active listing supply, price trend, volume trend, volatility, liquidity, and catalyst context. Do not make the engine card-specific. Instead, aggregate broad market behavior across the player’s card ecosystem and generate player-level signals such as demand, momentum, liquidity, supply pressure, hype, and confidence. Add a market phase classification layer with phases like accumulation, breakout, expansion, exhaustion, and decline. Replace brittle rule-precedence logic with weighted scoring. Keep the final verdicts simple and user-friendly, but make them driven by measurable sports card market behavior. Use AI mainly for interpretation and explanation, not as the main decision-maker. Every output should explain what is happening in the player’s market, why, how confident the engine is, and what action the user should take next.
+MVP build order
+Phase	What to build
+Phase 1	Demand, momentum, liquidity, supply pressure, volatility, weighted verdict logic
+Phase 2	Market phase detection and confidence score
+Phase 3	Better narratives grounded in actual metrics
+Phase 4	Event/catalyst adjustments
+Phase 5	Portfolio-aware action recommendations
+One-line summary
+Final goal	Description
+Product target	Turn the feature into a player-level sports card market allocation engine, not a card-by-card analyzer
