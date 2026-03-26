@@ -1387,11 +1387,18 @@ function generateWhyBullets(verdict: InvestmentVerdict, scores: InvestmentScores
       break;
 
     case "TRADE_THE_HYPE":
-      if (narrativeHeatScore >= 70) bullets.push("Narrative outpacing production—classic sell signal.");
-      else bullets.push("Peak pricing typically retraces 30-50% within 6 months.");
-      if (mispricingScore <= -20) bullets.push("Premium pricing leaves no margin of safety for new buyers.");
-      else bullets.push(`${positionLabel}s at this hype level historically mean-revert.`);
-      bullets.push("Lock in gains before the correction hits.");
+      if (isEarlyCareer) {
+        bullets.push("Breakout pricing has run ahead of proven production—sell into the excitement.");
+        if (mispricingScore <= -20) bullets.push("Premium pricing leaves no margin of safety for new buyers.");
+        else bullets.push(`Early-career ${positionLabel}s at this pricing level often cool off after the initial surge.`);
+        bullets.push("Consider re-entering at a better price if next season confirms the trajectory.");
+      } else {
+        if (narrativeHeatScore >= 70) bullets.push("Narrative outpacing production—classic sell signal.");
+        else bullets.push("Peak pricing typically retraces 30-50% within 6 months.");
+        if (mispricingScore <= -20) bullets.push("Premium pricing leaves no margin of safety for new buyers.");
+        else bullets.push(`${positionLabel}s at this hype level historically mean-revert.`);
+        bullets.push("Lock in gains before the correction hits.");
+      }
       break;
 
     case "AVOID_NEW_MONEY":
@@ -1803,7 +1810,9 @@ function generateAdvisorTake(verdict: InvestmentVerdict, input: DecisionInput, s
     
     HOLD_CORE: holdCoreThesis,
     
-    TRADE_THE_HYPE: `${name} is a sell at current prices. Market pricing has outrun realistic production outcomes—history shows these peaks rarely sustain. Late-stage hype cycles for ${positionLabel}s often retrace 30-50% within 6 months. Lock in gains before the correction. Only reconsider if a career-defining moment extends the runway.`,
+    TRADE_THE_HYPE: isEarlyCareer
+      ? `${name} is a sell at current prices. The breakout hype has pushed prices ahead of what the production has proven so far—early-career ${positionLabel}s at this pricing level often pull back once the initial excitement cools. Consider locking in gains while demand is hot. Re-enter if the next season confirms the trajectory at a better price.`
+      : `${name} is a sell at current prices. Market pricing has outrun realistic production outcomes—history shows these peaks rarely sustain. Hype cycles for ${positionLabel}s at this level often retrace 30-50% within 6 months. Lock in gains before the correction. Only reconsider if a career-defining moment extends the runway.`,
     
     AVOID_NEW_MONEY: isEarlyCareer
       ? `${name} is a pass at current prices. Early-career hype has pushed pricing beyond what production has proven—${positionLabel}s at this stage often see corrections once the initial excitement fades. Wait for prices to settle or production to validate the hype before entering. This view changes if on-field performance confirms the premium.`
