@@ -1506,11 +1506,14 @@ export type AdvisorOutlook = {
   liquidityTier?: LiquidityTier; // Overall player market liquidity (derived from exposures)
   marketPhase?: string; // Market phase (Accumulation, Breakout, etc.)
   shortTermTrend?: {
-    priceTrend?: string; // e.g. "+12%" or "-5%"
+    priceTrend30d?: string; // e.g. "+12%" or "-5%"
+    priceTrend7d?: string; // 7d price change vs 30d avg
     volumeDirection?: string; // "rising" | "stable" | "falling"
     soldCount30d?: number;
+    soldCount7d?: number;
     avgPrice?: string; // e.g. "$45"
   };
+  topSignals?: string[]; // Top 2 signal contributions driving the verdict
 };
 
 // Player Outlook Cache table

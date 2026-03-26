@@ -348,10 +348,14 @@ function extractShortTermTrend(outlook: PlayerOutlookResponse): AdvisorOutlook["
   const met = outlook.marketMetrics;
   if (!met) return undefined;
   
-  const trend: AdvisorOutlook["shortTermTrend"] = {};
+  const trend: NonNullable<AdvisorOutlook["shortTermTrend"]> = {};
   
   if (met.priceTrend !== undefined) {
-    trend.priceTrend = `${met.priceTrend >= 0 ? "+" : ""}${Math.round(met.priceTrend * 100)}%`;
+    trend.priceTrend30d = `${met.priceTrend >= 0 ? "+" : ""}${Math.round(met.priceTrend * 100)}%`;
+  }
+  if (met.avgSoldPrice7d !== undefined && met.avgSoldPrice !== undefined && met.avgSoldPrice > 0) {
+    const delta7d = ((met.avgSoldPrice7d - met.avgSoldPrice) / met.avgSoldPrice) * 100;
+    trend.priceTrend7d = `${delta7d >= 0 ? "+" : ""}${Math.round(delta7d)}%`;
   }
   if (met.volumeTrend !== undefined) {
     trend.volumeDirection = met.volumeTrend === "up" ? "rising" : met.volumeTrend === "down" ? "falling" : "stable";
@@ -359,11 +363,36 @@ function extractShortTermTrend(outlook: PlayerOutlookResponse): AdvisorOutlook["
   if (met.soldCount30d !== undefined) {
     trend.soldCount30d = met.soldCount30d;
   }
+  if (met.soldCount7d !== undefined) {
+    trend.soldCount7d = met.soldCount7d;
+  }
   if (met.avgSoldPrice !== undefined) {
     trend.avgPrice = `$${met.avgSoldPrice.toFixed(0)}`;
   }
   
   return Object.keys(trend).length > 0 ? trend : undefined;
+}
+
+function extractTopSignals(outlook: PlayerOutlookResponse): string[] | undefined {
+  const signals = outlook.marketSignals;
+  if (!signals?.contributions) return undefined;
+  
+  const c = signals.contributions;
+  const scored: { name: string; value: number }[] = [
+    { name: "Demand", value: c.demand },
+    { name: "Momentum", value: c.momentum },
+    { name: "Liquidity", value: c.liquidity },
+    { name: "Supply", value: c.supply },
+    { name: "Anti-Hype", value: c.antiHype },
+    { name: "Volatility", value: c.volatility },
+  ];
+  
+  scored.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+  
+  return scored.slice(0, 2).map(s => {
+    const dir = s.value > 0 ? "bullish" : "bearish";
+    return `${s.name}: ${dir} (${s.value > 0 ? "+" : ""}${s.value.toFixed(0)} pts)`;
+  });
 }
 
 export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): AdvisorOutlook {
@@ -391,6 +420,7 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     liquidityTier: deriveLiquidityTier(outlook),
     marketPhase: phaseLabel,
     shortTermTrend: extractShortTermTrend(outlook),
+    topSignals: extractTopSignals(outlook),
   };
 }
 

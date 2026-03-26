@@ -116,29 +116,45 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
         </div>
         
         {advisor.shortTermTrend && (
-          <div className="flex flex-wrap items-center gap-3 px-4 py-2 text-xs text-muted-foreground" data-testid="row-short-term-trend">
-            {advisor.shortTermTrend.priceTrend && (
-              <span className="flex items-center gap-1">
-                {advisor.shortTermTrend.priceTrend.startsWith("+") ? (
-                  <TrendingUp className="h-3 w-3 text-green-500" />
-                ) : (
-                  <TrendingDown className="h-3 w-3 text-red-500" />
-                )}
-                <span className="font-medium">{advisor.shortTermTrend.priceTrend}</span> price
-              </span>
-            )}
-            {advisor.shortTermTrend.volumeDirection && (
-              <span className="flex items-center gap-1">
-                <BarChart3 className="h-3 w-3" />
-                Volume {advisor.shortTermTrend.volumeDirection}
-              </span>
-            )}
-            {advisor.shortTermTrend.soldCount30d !== undefined && (
-              <span>{advisor.shortTermTrend.soldCount30d} sold/30d</span>
-            )}
-            {advisor.shortTermTrend.avgPrice && (
-              <span>{advisor.shortTermTrend.avgPrice} avg</span>
-            )}
+          <div className="space-y-1 px-4 py-2" data-testid="row-short-term-trend">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Short-term outlook ({advisor.horizon})</p>
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              {advisor.shortTermTrend.priceTrend7d && (
+                <span className="flex items-center gap-1">
+                  {advisor.shortTermTrend.priceTrend7d.startsWith("+") ? (
+                    <TrendingUp className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className="font-medium">{advisor.shortTermTrend.priceTrend7d}</span> 7d
+                </span>
+              )}
+              {advisor.shortTermTrend.priceTrend30d && (
+                <span className="flex items-center gap-1">
+                  {advisor.shortTermTrend.priceTrend30d.startsWith("+") ? (
+                    <TrendingUp className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 text-red-500" />
+                  )}
+                  <span className="font-medium">{advisor.shortTermTrend.priceTrend30d}</span> 30d
+                </span>
+              )}
+              {advisor.shortTermTrend.volumeDirection && (
+                <span className="flex items-center gap-1">
+                  <BarChart3 className="h-3 w-3" />
+                  Vol {advisor.shortTermTrend.volumeDirection}
+                </span>
+              )}
+              {advisor.shortTermTrend.soldCount7d !== undefined && (
+                <span>{advisor.shortTermTrend.soldCount7d} sold/7d</span>
+              )}
+              {advisor.shortTermTrend.soldCount30d !== undefined && (
+                <span>{advisor.shortTermTrend.soldCount30d} sold/30d</span>
+              )}
+              {advisor.shortTermTrend.avgPrice && (
+                <span>{advisor.shortTermTrend.avgPrice} avg</span>
+              )}
+            </div>
           </div>
         )}
       </CardHeader>
@@ -148,6 +164,16 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
           <p className="text-sm text-foreground leading-relaxed" data-testid="text-advisor-take">
             {advisor.advisorTake}
           </p>
+        )}
+        
+        {advisor.topSignals && advisor.topSignals.length > 0 && (
+          <div className="flex flex-wrap gap-2" data-testid="row-top-signals">
+            {advisor.topSignals.map((signal, i) => (
+              <Badge key={i} variant="outline" className="text-xs font-normal">
+                {signal}
+              </Badge>
+            ))}
+          </div>
         )}
         
         {advisor.packHitReaction && (

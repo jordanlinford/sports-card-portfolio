@@ -222,7 +222,7 @@ export function classifyMarketPhase(derived: DerivedMetrics): MarketPhase {
 
   if (priceTrend > 0.05 && volumeTrend > 1.2) {
     if (supplyRatio > 10) {
-      return "EXHAUSTION";
+      return "EXPANSION";
     }
     return "BREAKOUT";
   }
