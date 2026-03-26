@@ -76,6 +76,8 @@ function computeDerivedMetrics(metrics: MarketMetrics): DerivedMetrics {
   const cv = price30dAvg > 0 ? priceStd / price30dAvg : 0;
   const sampleFactor = Math.min(1.0, Math.log(1 + sales30d) / Math.log(50));
   const supplyRatio = sales30d > 0 ? activeListings / sales30d : (activeListings > 0 ? 5 : 1);
+  const weeklyAvg = sales30d / 4;
+  const volumeAcceleration = weeklyAvg > 0 ? sales7d / weeklyAvg : 1;
 
   return {
     salesVelocity,
@@ -85,6 +87,8 @@ function computeDerivedMetrics(metrics: MarketMetrics): DerivedMetrics {
     cv,
     sampleFactor,
     supplyRatio,
+    volumeAcceleration,
+    signalAgreement: 0,
   };
 }
 
@@ -96,7 +100,7 @@ function scoreDemand(derived: DerivedMetrics): number {
 }
 
 function scoreMomentum(derived: DerivedMetrics): number {
-  const score = 50 + (derived.priceTrend * 200);
+  const score = 50 + (derived.priceTrend * 120);
   return clamp(score * derived.sampleFactor, 0, 100);
 }
 
@@ -104,22 +108,26 @@ function scoreLiquidity(derived: DerivedMetrics, metrics: MarketMetrics): number
   const raw = clamp(derived.sellThrough * 100, 0, 100);
   const sales30d = metrics.soldCount30d ?? 0;
   const volumeDampener = Math.min(1, Math.log(1 + sales30d) / 3);
-  return clamp(raw * volumeDampener, 0, 100);
+  let score = clamp(raw * volumeDampener, 0, 100);
+  if (sales30d < 10) {
+    score *= 0.6;
+  }
+  return clamp(score, 0, 100);
 }
 
 function scoreSupply(derived: DerivedMetrics): number {
-  return clamp(100 - (derived.supplyRatio * 20), 0, 100);
+  return clamp(100 - (derived.supplyRatio * 15), 0, 100);
 }
 
 function scoreVolatility(derived: DerivedMetrics): number {
-  return clamp(100 - (derived.cv * 200), 0, 100);
+  return clamp(100 - (derived.cv * 150), 0, 100);
 }
 
 function scoreHype(derived: DerivedMetrics): number {
   const priceSignal = derived.priceTrend;
   const volumeSignal = derived.volumeTrend - 1;
   const hypeRaw = priceSignal - volumeSignal;
-  return clamp(50 + (hypeRaw * 150), 0, 100);
+  return clamp(50 + (hypeRaw * 100), 0, 100);
 }
 
 function scoreConfidence(derived: DerivedMetrics, metrics: MarketMetrics): number {
@@ -143,6 +151,15 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
   const volatilityScore = scoreVolatility(derived);
   const hypeScore = scoreHype(derived);
   const confidenceScore = scoreConfidence(derived, metrics);
+
+  const signalAgreement = [
+    demandScore > 60,
+    momentumScore > 60,
+    liquidityScore > 60,
+    supplyPressureScore > 50,
+    volatilityScore > 50,
+    hypeScore < 50,
+  ].filter(Boolean).length;
 
   const contributions: SignalContributions = {
     demand: demandScore * SIGNAL_WEIGHTS.demand,
@@ -186,6 +203,8 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
       cv: Math.round(derived.cv * 1000) / 1000,
       sampleFactor: Math.round(derived.sampleFactor * 100) / 100,
       supplyRatio: Math.round(derived.supplyRatio * 100) / 100,
+      volumeAcceleration: Math.round(derived.volumeAcceleration * 100) / 100,
+      signalAgreement,
     },
   };
 }
@@ -197,27 +216,23 @@ export function classifyMarketPhase(derived: DerivedMetrics): MarketPhase {
     return "DECLINE";
   }
 
-  if (priceTrend > 0.05 && volumeTrend > 1.2) {
-    return "BREAKOUT";
-  }
-
   if (priceTrend > 0.05 && volumeTrend <= 1.0) {
     return "EXHAUSTION";
+  }
+
+  if (priceTrend > 0.05 && volumeTrend > 1.2) {
+    return "BREAKOUT";
   }
 
   if (Math.abs(priceTrend) < 0.03 && volumeTrend > 1.1) {
     return "ACCUMULATION";
   }
 
-  if (priceTrend > 0 && volumeTrend > 1) {
+  if (priceTrend > 0) {
     return "EXPANSION";
   }
 
-  if (Math.abs(priceTrend) <= 0.05 && supplyRatio <= 1.5) {
-    return "ACCUMULATION";
-  }
-
-  return "UNKNOWN";
+  return "ACCUMULATION";
 }
 
 function applyCareerModifier(baseScore: number, stage: PlayerStage, position?: string, sport?: string): number {
@@ -258,6 +273,10 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
   let verdict: InvestmentVerdict;
   let verdictReason: string;
 
+  const agreement = derived.signalAgreement;
+  const agreementLabel = agreement >= 5 ? "strong conviction" : agreement >= 3 ? "mixed signals" : "weak alignment";
+  const accel = derived.volumeAcceleration;
+
   if (stage === "BUST" && roleStabilityScore <= 15) {
     verdict = "AVOID_STRUCTURAL";
     verdictReason = "Career stalled with no realistic path back";
@@ -267,21 +286,24 @@ export function generateMarketVerdict(input: MarketScoringInput): MarketScoringR
   } else if (stage === "RETIRED_HOF") {
     verdict = adjustedComposite >= 55 ? "ACCUMULATE" : "HOLD_CORE";
     verdictReason = "Hall of Fame legacy value";
+  } else if (signals.confidenceScore < 40) {
+    verdict = "SPECULATIVE_FLYER";
+    verdictReason = `Low data confidence (${signals.confidenceScore}) — sample factor ${derived.sampleFactor}, insufficient data for strong conviction`;
   } else if (adjustedComposite > 75 && (phase === "ACCUMULATION" || phase === "BREAKOUT")) {
     verdict = "ACCUMULATE";
-    verdictReason = `Strong composite (${adjustedComposite}) in ${phase.toLowerCase()} phase — demand (${signals.demandScore}), momentum (${signals.momentumScore})`;
+    verdictReason = `Strong composite (${adjustedComposite}) in ${phase.toLowerCase()} phase — ${agreementLabel} (${agreement}/6)${accel > 1.3 ? `, volume accelerating ${accel.toFixed(1)}x` : ""}`;
   } else if (adjustedComposite > 65) {
     verdict = "HOLD_CORE";
-    verdictReason = `Solid composite (${adjustedComposite}) — fundamentals intact`;
+    verdictReason = `Solid composite (${adjustedComposite}) — ${agreementLabel} (${agreement}/6)`;
   } else if (signals.hypeScore > 70 && phase === "EXHAUSTION") {
     verdict = "TRADE_THE_HYPE";
-    verdictReason = `Market exhaustion: prices up ${(derived.priceTrend * 100).toFixed(0)}% but volume trend ${derived.volumeTrend.toFixed(2)}x — hype outpacing participation`;
+    verdictReason = `Market exhaustion: prices up ${(derived.priceTrend * 100).toFixed(0)}% but volume trend ${derived.volumeTrend.toFixed(2)}x${accel < 0.7 ? `, volume decelerating ${accel.toFixed(1)}x` : ""} — hype outpacing participation`;
   } else if (adjustedComposite < 40) {
     verdict = "AVOID_NEW_MONEY";
-    verdictReason = `Weak composite (${adjustedComposite}) — supply ratio ${derived.supplyRatio.toFixed(1)}x, confidence ${signals.confidenceScore}`;
+    verdictReason = `Weak composite (${adjustedComposite}) — supply ratio ${derived.supplyRatio.toFixed(1)}x, ${agreementLabel} (${agreement}/6)`;
   } else {
     verdict = "SPECULATIVE_FLYER";
-    verdictReason = `Mixed signals — composite ${adjustedComposite}, phase ${phase.toLowerCase()}`;
+    verdictReason = `Mixed signals — composite ${adjustedComposite}, ${agreementLabel} (${agreement}/6), phase ${phase.toLowerCase()}`;
   }
 
   if (roleStabilityScore <= 45 && verdict === "ACCUMULATE") {

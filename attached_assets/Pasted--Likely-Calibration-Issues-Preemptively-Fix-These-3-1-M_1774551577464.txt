@@ -1,0 +1,163 @@
+. Likely Calibration Issues (Preemptively Fix These)
+3.1 Momentum is probably too sensitive
+
+Current:
+
+momentum_score = 50 + (price_trend * 200)
+
+Problem:
+
++20% move → 90 score (too aggressive)
+Fix (recommended):
+momentum_score = clamp(50 + (price_trend * 120), 0, 100)
+
+This reduces overreaction.
+
+3.2 Hype multiplier likely too strong
+
+Current:
+
+hype_score = 50 + (hype_raw * 150)
+
+This can dominate composite.
+
+Fix:
+hype_score = clamp(50 + (hype_raw * 100), 0, 100)
+
+You want hype to influence, not override.
+
+3.3 Supply pressure slope may be too harsh
+
+Current:
+
+supply_score = 100 - (supply_ratio * 20)
+
+If supply_ratio = 3 → score = 40 (very punitive)
+
+Fix:
+supply_score = clamp(100 - (supply_ratio * 15), 0, 100)
+
+More forgiving, more realistic.
+
+3.4 Liquidity false positives (edge case)
+
+Problem:
+
+2 sales / 1 listing → sell-through = 2 → looks amazing
+Fix:
+
+Add floor condition:
+
+if sales_30d < 10:
+    liquidity_score *= 0.6
+
+This prevents fake liquidity.
+
+3.5 Volatility over-penalization
+
+If CV spikes slightly, score drops too fast.
+
+Fix:
+volatility_score = clamp(100 - (cv * 150), 0, 100)
+
+Less aggressive penalty.
+
+4. Phase Classification: One Critical Adjustment
+
+Right now your logic likely has overlap.
+
+Fix ordering strictly:
+
+if price_trend < -0.05 and supply_ratio > 1.5:
+    phase = "Decline"
+
+elif price_trend > 0.05 and volume_trend <= 1.0:
+    phase = "Exhaustion"
+
+elif price_trend > 0.05 and volume_trend > 1.2:
+    phase = "Breakout"
+
+elif abs(price_trend) < 0.03 and volume_trend > 1.1:
+    phase = "Accumulation"
+
+elif price_trend > 0:
+    phase = "Expansion"
+
+else:
+    phase = "Neutral"
+
+Key change:
+
+Exhaustion must come before breakout
+otherwise it gets swallowed
+5. Verdict Logic: Add One Missing Condition
+
+Right now:
+
+strong hype + exhaustion → TRADE_THE_HYPE
+
+But you need:
+
+Add this:
+if confidence_score < 40:
+    verdict = "SPECULATIVE_FLYER"
+
+Why:
+
+low data should never produce strong conviction
+6. Add One High-Leverage Metric (Small Change, Big Impact)
+Volume acceleration
+volume_acceleration = sales_7d / max(sales_30d / 4, 1)
+
+Interpretation:
+
+1.5 → sudden spike
+
+<0.7 → fading interest
+
+Use it to:
+
+boost breakout confidence
+confirm exhaustion
+7. What to Watch in Real Outputs
+
+When you run real players, check:
+
+Good output looks like:
+Breakout players → high demand, high momentum, neutral hype
+Hype players → high momentum, weak volume, high hype
+Blue chips → strong liquidity, moderate momentum, low volatility
+Decliners → negative momentum, high supply, weak demand
+Bad output looks like:
+Illiquid players scoring high
+Small sample players getting strong verdicts
+Everything clustering around 60–70
+Hype not being flagged early enough
+8. One Strategic Addition (Optional but Powerful)
+
+Add:
+
+“Signal Agreement Score”
+
+Count how many signals are aligned:
+
+positive_signals = count([
+  demand > 60,
+  momentum > 60,
+  liquidity > 60,
+  supply > 50,
+  volatility > 50,
+  hype < 50
+])
+
+Then:
+
+Count	Meaning
+5–6	strong conviction
+3–4	mixed
+0–2	weak
+
+This gives you:
+
+an additional trust layer
+better narrative (“signals are aligned” vs “mixed”)

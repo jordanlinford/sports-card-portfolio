@@ -453,7 +453,18 @@ function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?
 
         {derived && (
           <div className="mt-4 pt-3 border-t border-border">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Raw Derived Metrics</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-muted-foreground">Raw Derived Metrics</p>
+              {derived.signalAgreement !== undefined && (
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${derived.signalAgreement >= 5 ? "border-green-500 text-green-700 dark:text-green-400" : derived.signalAgreement >= 3 ? "border-yellow-500 text-yellow-700 dark:text-yellow-400" : "border-red-500 text-red-700 dark:text-red-400"}`}
+                  data-testid="badge-signal-agreement"
+                >
+                  {derived.signalAgreement}/6 signals aligned
+                </Badge>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground" data-testid="derived-metrics">
               <span>Sales velocity: {derived.salesVelocity}/day</span>
               <span>Volume trend: {derived.volumeTrend}x</span>
@@ -461,6 +472,9 @@ function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?
               <span>Sell-through: {derived.sellThrough.toFixed(2)}</span>
               <span>CV: {derived.cv.toFixed(3)}</span>
               <span>Supply ratio: {derived.supplyRatio.toFixed(2)}x</span>
+              {derived.volumeAcceleration !== undefined && (
+                <span>Vol accel: {derived.volumeAcceleration.toFixed(2)}x</span>
+              )}
             </div>
           </div>
         )}

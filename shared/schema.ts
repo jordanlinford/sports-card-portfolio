@@ -1434,6 +1434,8 @@ export type DerivedMetrics = {
   cv: number;
   sampleFactor: number;
   supplyRatio: number;
+  volumeAcceleration: number;
+  signalAgreement: number;
 };
 
 export type MarketSignals = {
