@@ -1525,11 +1525,30 @@ export type TradeTargetsData = {
   caveat?: string;
 };
 
+export type HolderAction = "HOLD" | "HOLD / ADD" | "SELL into strength" | "SELL / EXIT" | "REDUCE exposure" | "HOLD (small only)";
+export type BuyerAction = "BUY now" | "WAIT" | "WAIT for pullback" | "DO NOT BUY" | "AVOID" | "AVOID entry" | "SMALL BUY only";
+
+export type HolderDecisionBox = {
+  action: HolderAction;
+  reason: string;
+};
+
+export type BuyerDecisionBox = {
+  action: BuyerAction;
+  reason: string;
+};
+
+export type Decisions = {
+  holder: HolderDecisionBox;
+  buyer: BuyerDecisionBox;
+};
+
 export type AdvisorOutlook = {
   verdict: AdvisorVerdict;
   verdictLabel: string; // Human-readable label like "Hold, don't chase"
   confidence: AdvisorConfidence;
   horizon: AdvisorHorizon;
+  decisions?: Decisions;
   advisorTake: string; // 3-4 sentences max: the advisor's voice
   packHitReaction?: string; // One line: how to feel/act if you pull this player in a pack
   collectorTip?: string; // Timing tip for fans/collectors based on price momentum

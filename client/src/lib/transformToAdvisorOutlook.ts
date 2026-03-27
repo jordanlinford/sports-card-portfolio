@@ -7,6 +7,7 @@ import type {
   LiquidityTier,
   TradeTarget,
   TradeTargetsData,
+  Decisions,
 } from "@shared/schema";
 
 function mapVerdictToAdvisor(
@@ -496,6 +497,59 @@ function extractConviction(outlook: PlayerOutlookResponse): AdvisorOutlook["conv
   };
 }
 
+function buildDecisions(outlook: PlayerOutlookResponse, verdict: AdvisorVerdict): Decisions {
+  const call = outlook.investmentCall;
+  const actionPlanNow = call?.actionPlan?.whatToDoNow || "";
+  const rationale = call?.oneLineRationale || "";
+  const thesis = outlook.thesis?.[0] || "";
+  const shortReason = rationale || thesis || actionPlanNow;
+
+  const truncate = (s: string, max = 120) => {
+    if (!s) return "";
+    const trimmed = s.length > max ? s.slice(0, max).replace(/\s\S*$/, "…") : s;
+    return trimmed;
+  };
+
+  switch (verdict) {
+    case "BUY":
+      return {
+        holder: { action: "HOLD / ADD", reason: truncate(shortReason || "Fundamentals support adding on dips") },
+        buyer: { action: "BUY now", reason: truncate(shortReason || "Entry window is favorable at current prices") },
+      };
+    case "HOLD_CORE":
+      return {
+        holder: { action: "HOLD", reason: truncate(shortReason || "Core position — no reason to sell") },
+        buyer: { action: "WAIT", reason: truncate(actionPlanNow || "Prices reflect current momentum — wait for a dip") },
+      };
+    case "TRADE_THE_HYPE":
+      return {
+        holder: { action: "SELL into strength", reason: truncate(shortReason || "Take profits while demand is elevated") },
+        buyer: { action: "DO NOT BUY", reason: truncate("Prices are inflated — wait for pullback") },
+      };
+    case "SELL":
+      return {
+        holder: { action: "SELL into strength", reason: truncate(shortReason || "Lock in gains before further decline") },
+        buyer: { action: "AVOID entry", reason: truncate("Market conditions don't support new positions") },
+      };
+    case "AVOID":
+      return {
+        holder: { action: "SELL / EXIT", reason: truncate(shortReason || "Reduce exposure — risk outweighs upside") },
+        buyer: { action: "AVOID", reason: truncate(shortReason || "No favorable entry at current levels") },
+      };
+    case "SPECULATIVE":
+      return {
+        holder: { action: "HOLD (small only)", reason: truncate(shortReason || "Keep small position — lottery ticket sizing") },
+        buyer: { action: "SMALL BUY only", reason: truncate(shortReason || "Speculative upside exists but size accordingly") },
+      };
+    case "HOLD":
+    default:
+      return {
+        holder: { action: "HOLD", reason: truncate(shortReason || "No clear catalyst to act on") },
+        buyer: { action: "WAIT", reason: truncate(actionPlanNow || "No clear edge — wait for a better entry") },
+      };
+  }
+}
+
 function buildTradeTargets(outlook: PlayerOutlookResponse, verdict: AdvisorVerdict): TradeTargetsData | undefined {
   const call = outlook.investmentCall;
   const evidence = outlook.evidence;
@@ -719,6 +773,7 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     verdictLabel: label,
     confidence: mapConfidence(outlook.investmentCall, outlook.snapshot),
     horizon: mapHorizon(outlook.investmentCall, outlook.snapshot),
+    decisions: buildDecisions(outlook, verdict),
     advisorTake: buildAdvisorTake(outlook, label),
     packHitReaction: extractPackHitReaction(outlook),
     collectorTip: outlook.investmentCall?.collectorTip,
