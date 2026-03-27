@@ -1496,15 +1496,27 @@ export async function getPlayerOutlook(
     || cachedOutlook.marketSignals?.derivedMetrics?.sampleFactor === 0
   );
 
+  const ZERO_DATA_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+  const zeroDataCooldownExpired = hasZeroMarketData && cacheRecord?.lastFetchedAt 
+    ? (Date.now() - new Date(cacheRecord.lastFetchedAt).getTime()) > ZERO_DATA_COOLDOWN_MS
+    : true;
+
   if (cachedOutlook && !isStale && !hasZeroMarketData) {
     console.log(`[PlayerOutlook] Cache HIT (fresh) for ${playerName}`);
     return { ...cachedOutlook, cacheStatus: "fresh" };
   }
   
-  if (hasZeroMarketData) {
-    console.log(`[PlayerOutlook] Cache has zero market data for ${playerName}, forcing synchronous refresh`);
-    const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
-    return { ...freshOutlook, cacheStatus: "miss" };
+  if (hasZeroMarketData && zeroDataCooldownExpired) {
+    console.log(`[PlayerOutlook] Cache has zero market data for ${playerName} (cooldown expired), refreshing async`);
+    generateFreshOutlook(playerName, sport, playerKey).catch(err => {
+      console.error(`[PlayerOutlook] Background refresh failed:`, err);
+    });
+    return { ...cachedOutlook!, cacheStatus: "stale" };
+  }
+
+  if (hasZeroMarketData && !zeroDataCooldownExpired) {
+    console.log(`[PlayerOutlook] Cache has zero market data for ${playerName} (within cooldown), serving cached`);
+    return { ...cachedOutlook!, cacheStatus: "fresh" };
   }
 
   if (cachedOutlook && isStale) {
