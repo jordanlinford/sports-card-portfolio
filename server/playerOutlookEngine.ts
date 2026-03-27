@@ -1497,8 +1497,17 @@ export async function getPlayerOutlook(
     return { ...cachedOutlook, cacheStatus: "fresh" };
   }
   
-  // If stale, return cached immediately and refresh async
+  // If stale, check if the cached outlook has zero market data
   if (cachedOutlook && isStale) {
+    const hasZeroMarketData = !cachedOutlook.marketSignals?.derivedMetrics?.sampleFactor 
+      || cachedOutlook.marketSignals?.derivedMetrics?.sampleFactor === 0;
+    
+    if (hasZeroMarketData) {
+      console.log(`[PlayerOutlook] Cache HIT (stale + zero market data) for ${playerName}, forcing synchronous refresh`);
+      const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
+      return { ...freshOutlook, cacheStatus: "miss" };
+    }
+    
     console.log(`[PlayerOutlook] Cache HIT (stale) for ${playerName}, refreshing async`);
     
     // Fire-and-forget refresh
