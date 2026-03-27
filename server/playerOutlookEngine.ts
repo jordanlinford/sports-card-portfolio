@@ -759,47 +759,32 @@ async function fetchPlayerMarketData(playerName: string, sport: string): Promise
   const maxRetries = 2;
   let lastError: Error | null = null;
   
-  const searchPrompt = `Search for all sports cards sold for ${playerName} (${sport}) over the last 30 days on eBay and other card marketplaces.
+  const searchPrompt = `Search eBay sold listings for "${playerName}" sports cards. Look at recently completed sales from the last 30 days.
 
-Provide a detailed market summary with NUMERIC data:
-1. Total average sale price across ALL cards (base, parallels, autos, graded, etc.) for last 30 days
-2. Average sale price for the last 7 days specifically
-3. Median sale price across all cards (30 days)
-4. Approximate number of cards sold in the last 30 days (actual count or best estimate)
-5. Approximate number of cards sold in the last 7 days specifically
-6. Approximate number of cards sold in the PRIOR 30-day period (days 31-60 ago) for comparison
-7. Approximate number of active/unsold listings currently available
-8. Estimated sales volume category (high/medium/low)
-9. Volume trend compared to previous period (up/stable/down)
-10. Price trend direction as a percentage change vs prior 30 days (e.g., +15 means prices up 15%, -10 means prices down 10%)
-11. Standard deviation of sale prices over the last 30 days (rough estimate)
-12. Price range from lowest to highest sale
-13. Breakdown by card category with average prices
+Based on what you find, estimate these numbers as best you can:
+- How many ${playerName} cards have sold on eBay in roughly the last 30 days?
+- How many sold in the last 7 days?
+- What is the average sale price across all card types?
+- How many active (unsold) listings are there currently?
+- Are prices trending up, down, or stable compared to 1-2 months ago?
 
-Return ONLY a JSON object:
+Even rough estimates are very helpful. Use your best judgment based on the search results.
+
+Return ONLY a JSON object with your estimates:
 {
-  "totalAvgPrice": <number - average sale price across all cards, 30d>,
-  "avgSoldPrice7d": <number - average sale price last 7 days>,
-  "medianSoldPrice": <number - median sale price>,
-  "soldCount30d": <number - approximate cards sold in last 30 days>,
-  "soldCount7d": <number - approximate cards sold in last 7 days>,
-  "soldCountPrev30d": <number - approximate cards sold in prior 30 days (days 31-60)>,
-  "activeListingCount": <number - approximate active unsold listings>,
+  "totalAvgPrice": <number - estimated average sale price>,
+  "soldCount30d": <number - estimated cards sold in 30 days>,
+  "soldCount7d": <number - estimated cards sold in 7 days>,
+  "soldCountPrev30d": <number - estimated cards sold in prior 30 days for comparison>,
+  "activeListingCount": <number - estimated active unsold listings>,
   "estimatedVolume": "high" | "medium" | "low",
   "volumeTrend": "up" | "stable" | "down",
-  "priceTrendPercent": <number - percentage price change vs prior period, e.g. 15 or -10>,
-  "priceStdDev30d": <number - standard deviation of sale prices over 30 days>,
-  "priceRange": { "low": <number>, "high": <number> },
-  "breakdown": [
-    { "category": "Base/Common", "avgPrice": <number>, "priceRange": "$X - $Y" },
-    { "category": "Refractors/Inserts", "avgPrice": <number>, "priceRange": "$X - $Y" },
-    { "category": "Numbered/Auto", "avgPrice": <number>, "priceRange": "$X - $Y" },
-    { "category": "High-End/PSA 10", "avgPrice": <number>, "priceRange": "$X - $Y" }
-  ],
-  "observations": ["<key market observation 1>", "<key market observation 2>"]
+  "priceTrendPercent": <number - estimated percentage price change, e.g. 15 or -10>,
+  "priceStdDev30d": <number - rough price standard deviation>,
+  "priceRange": { "low": <number>, "high": <number> }
 }
 
-If no sales data is found, return: { "available": false }`;
+Important: Always provide your best estimates. Only return { "available": false } if the player literally does not have any sports cards (not a real athlete).`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
@@ -826,8 +811,8 @@ If no sales data is found, return: { "available": false }`;
           const parsed = JSON.parse(jsonMatch[0]);
           
           if (parsed.available === false) {
-            console.log(`[PlayerOutlook] No market data available for ${playerName}`);
-            return { available: false, source: "unavailable" };
+            console.log(`[PlayerOutlook] Gemini returned available:false for ${playerName} (attempt ${attempt}), will retry or fallback`);
+            continue;
           }
           
           console.log(`[PlayerOutlook] Market data for ${playerName}: avg=$${parsed.totalAvgPrice}, sold=${parsed.soldCount30d}, active=${parsed.activeListingCount}, volume=${parsed.estimatedVolume}, trend=${parsed.priceTrendPercent}%`);
