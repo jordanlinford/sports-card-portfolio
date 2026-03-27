@@ -7,7 +7,6 @@ import {
   ChevronUp,
   AlertTriangle,
   ShoppingCart,
-  BookOpen,
   FileText,
   TrendingUp,
   TrendingDown,
@@ -62,109 +61,22 @@ interface OutlookAccordionsProps {
 }
 
 export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) {
+  const risks = [
+    ...(advisor.whatChangesMyMind || []),
+    ...(outlook.marketRealityCheck || []),
+  ];
+  const uniqueRisks = Array.from(new Set(risks)).slice(0, 6);
+
+  const hasTimedStrategy = outlook.tieredRecommendations && 
+    [outlook.tieredRecommendations.baseCards, outlook.tieredRecommendations.midTierParallels, outlook.tieredRecommendations.premiumGraded]
+      .some(t => t?.verdict);
+
+  const hasDiscount = outlook.discountAnalysis && 
+    (outlook.discountAnalysis.whyDiscounted?.length || outlook.discountAnalysis.repricingCatalysts?.length);
+
   return (
     <div className="space-y-3">
-      {advisor.whatChangesMyMind.length > 0 && (
-        <AccordionSection
-          title="What Changes My Mind"
-          description="Conditions that would break this thesis"
-          icon={<AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
-          testId="accordion-what-changes"
-        >
-          <ul className="space-y-2">
-            {advisor.whatChangesMyMind.map((item, i) => (
-              <li key={i} className="text-sm text-foreground flex items-start gap-2">
-                <span className="text-yellow-600 dark:text-yellow-400 mt-0.5">•</span>
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </AccordionSection>
-      )}
-      
-      {advisor.buyTriggers.length > 0 && (
-        <AccordionSection
-          title="Buy Triggers"
-          description="What would make this a buy opportunity"
-          icon={<TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />}
-          testId="accordion-buy-triggers"
-        >
-          <ul className="space-y-2">
-            {advisor.buyTriggers.map((item, i) => (
-              <li key={i} className="text-sm text-foreground flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400 mt-0.5">•</span>
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </AccordionSection>
-      )}
-      
-      {outlook.thesis && outlook.thesis.length > 0 && (
-        <AccordionSection
-          title="Full Thesis"
-          description="Complete investment rationale"
-          icon={<BookOpen className="h-4 w-4 text-primary" />}
-          testId="accordion-thesis"
-        >
-          <ul className="space-y-2">
-            {outlook.thesis.map((bullet, i) => (
-              <li key={i} className="text-sm text-foreground flex items-start gap-2">
-                <span className="text-primary mt-0.5">•</span>
-                <span>{bullet}</span>
-              </li>
-            ))}
-          </ul>
-        </AccordionSection>
-      )}
-      
-      {outlook.marketRealityCheck && outlook.marketRealityCheck.length > 0 && (
-        <AccordionSection
-          title="Market Reality Check"
-          description="Uncomfortable truths to consider"
-          icon={<AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
-          testId="accordion-reality-check"
-        >
-          <ul className="space-y-2">
-            {outlook.marketRealityCheck.map((check, i) => (
-              <li key={i} className="text-sm text-foreground flex items-start gap-2">
-                <span className="text-yellow-600 dark:text-yellow-400 mt-0.5">−</span>
-                <span>{check}</span>
-              </li>
-            ))}
-          </ul>
-        </AccordionSection>
-      )}
-      
-      {outlook.peakTiming && (
-        <AccordionSection
-          title="Peak Timing Analysis"
-          description="Where is this player in their value cycle?"
-          icon={<BarChart3 className="h-4 w-4 text-primary" />}
-          testId="accordion-peak-timing"
-        >
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
-                {outlook.peakTiming.peakStatus.replace("_", " ")}
-              </Badge>
-            </div>
-            <p className="text-sm text-foreground">{outlook.peakTiming.peakReason}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-2 rounded bg-muted/30">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Short-Term (3-6m)</p>
-                <p className="text-sm text-foreground">{outlook.peakTiming.shortTermOutlook}</p>
-              </div>
-              <div className="p-2 rounded bg-muted/30">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Long-Term (1-2y)</p>
-                <p className="text-sm text-foreground">{outlook.peakTiming.longTermOutlook}</p>
-              </div>
-            </div>
-          </div>
-        </AccordionSection>
-      )}
-      
-      {outlook.tieredRecommendations && (
+      {hasTimedStrategy && (
         <AccordionSection
           title="Tiered Card Strategy"
           description="Different advice for different card types"
@@ -173,9 +85,9 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
         >
           <div className="space-y-3">
             {[
-              { key: "baseCards", label: "Base Cards", desc: "Common base cards ($1-5)", data: outlook.tieredRecommendations.baseCards },
-              { key: "midTierParallels", label: "Mid-Tier Parallels", desc: "Numbered parallels, inserts ($10-100)", data: outlook.tieredRecommendations.midTierParallels },
-              { key: "premiumGraded", label: "Premium Graded", desc: "PSA 10 rookies, autos ($100+)", data: outlook.tieredRecommendations.premiumGraded },
+              { key: "baseCards", label: "Base Cards", desc: "Common base cards ($1-5)", data: outlook.tieredRecommendations!.baseCards },
+              { key: "midTierParallels", label: "Mid-Tier Parallels", desc: "Numbered parallels, inserts ($10-100)", data: outlook.tieredRecommendations!.midTierParallels },
+              { key: "premiumGraded", label: "Premium Graded", desc: "PSA 10 rookies, autos ($100+)", data: outlook.tieredRecommendations!.premiumGraded },
             ].filter(t => t.data?.verdict).map((tier) => (
               <div key={tier.key} className="p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex items-center gap-3 flex-1">
@@ -200,8 +112,54 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
           </div>
         </AccordionSection>
       )}
-      
-      {outlook.discountAnalysis && (outlook.discountAnalysis.whyDiscounted?.length || outlook.discountAnalysis.repricingCatalysts?.length) && (
+
+      {outlook.peakTiming && (
+        <AccordionSection
+          title="Peak Timing"
+          description="Where is this player in their value cycle?"
+          icon={<BarChart3 className="h-4 w-4 text-primary" />}
+          testId="accordion-peak-timing"
+        >
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {outlook.peakTiming.peakStatus.replace("_", " ")}
+              </Badge>
+            </div>
+            <p className="text-sm text-foreground">{outlook.peakTiming.peakReason}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="p-2 rounded bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Short-Term (3-6m)</p>
+                <p className="text-sm text-foreground">{outlook.peakTiming.shortTermOutlook}</p>
+              </div>
+              <div className="p-2 rounded bg-muted/30">
+                <p className="text-xs font-medium text-muted-foreground mb-1">Long-Term (1-2y)</p>
+                <p className="text-sm text-foreground">{outlook.peakTiming.longTermOutlook}</p>
+              </div>
+            </div>
+          </div>
+        </AccordionSection>
+      )}
+
+      {uniqueRisks.length > 0 && (
+        <AccordionSection
+          title="Risks"
+          description="What could change this thesis"
+          icon={<AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
+          testId="accordion-risks"
+        >
+          <ul className="space-y-2">
+            {uniqueRisks.map((item, i) => (
+              <li key={i} className="text-sm text-foreground flex items-start gap-2">
+                <span className="text-yellow-600 dark:text-yellow-400 mt-0.5">•</span>
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </AccordionSection>
+      )}
+
+      {hasDiscount && (
         <AccordionSection
           title="Hidden Gem Analysis"
           description="Why this player might be underpriced"
@@ -209,11 +167,11 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
           testId="accordion-discount"
         >
           <div className="space-y-4">
-            {outlook.discountAnalysis.whyDiscounted && outlook.discountAnalysis.whyDiscounted.length > 0 && (
+            {outlook.discountAnalysis!.whyDiscounted && outlook.discountAnalysis!.whyDiscounted.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Why Discounted</h4>
                 <ul className="space-y-2">
-                  {outlook.discountAnalysis.whyDiscounted.map((reason, i) => (
+                  {outlook.discountAnalysis!.whyDiscounted.map((reason, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
                       <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
                       <span className="text-foreground">{reason}</span>
@@ -222,11 +180,11 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
                 </ul>
               </div>
             )}
-            {outlook.discountAnalysis.repricingCatalysts && outlook.discountAnalysis.repricingCatalysts.length > 0 && (
+            {outlook.discountAnalysis!.repricingCatalysts && outlook.discountAnalysis!.repricingCatalysts.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Repricing Catalysts</h4>
                 <ul className="space-y-2">
-                  {outlook.discountAnalysis.repricingCatalysts.map((catalyst, i) => (
+                  {outlook.discountAnalysis!.repricingCatalysts.map((catalyst, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
                       <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                       <span className="text-foreground">{catalyst}</span>
@@ -235,11 +193,11 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
                 </ul>
               </div>
             )}
-            {outlook.discountAnalysis.trapRisks && outlook.discountAnalysis.trapRisks.length > 0 && (
+            {outlook.discountAnalysis!.trapRisks && outlook.discountAnalysis!.trapRisks.length > 0 && (
               <div>
                 <h4 className="text-sm font-medium text-muted-foreground mb-2">Value Trap Risks</h4>
                 <ul className="space-y-2">
-                  {outlook.discountAnalysis.trapRisks.map((risk, i) => (
+                  {outlook.discountAnalysis!.trapRisks.map((risk, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
                       <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
                       <span className="text-foreground">{risk}</span>
@@ -300,7 +258,6 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
                     </Badge>
                   )}
                 </div>
-                {/* Category breakdown from Gemini search */}
                 {outlook.evidence.compsSummary.breakdown && outlook.evidence.compsSummary.breakdown.length > 0 && (
                   <div className="mt-2 space-y-1" data-testid="comps-breakdown">
                     <p className="text-xs text-muted-foreground">Price by Category:</p>
