@@ -149,7 +149,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 19; // v19: Tiered volatility dampening for extreme CV players
+const PROMPT_VERSION = 20; // v20: Simplified market data prompt + retry on available:false + bypass cooldown for old prompts
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -1481,6 +1481,9 @@ export async function getPlayerOutlook(
     || cachedOutlook.marketSignals?.derivedMetrics?.sampleFactor === 0
   );
 
+  const cachedPromptVersion = (cachedOutlook as any)?._promptVersion || 0;
+  const isOldPrompt = cachedPromptVersion < PROMPT_VERSION;
+
   const ZERO_DATA_COOLDOWN_MS = 2 * 60 * 60 * 1000;
   const zeroDataCooldownExpired = hasZeroMarketData && cacheRecord?.lastFetchedAt 
     ? (Date.now() - new Date(cacheRecord.lastFetchedAt).getTime()) > ZERO_DATA_COOLDOWN_MS
@@ -1491,8 +1494,8 @@ export async function getPlayerOutlook(
     return { ...cachedOutlook, cacheStatus: "fresh" };
   }
   
-  if (hasZeroMarketData && zeroDataCooldownExpired) {
-    console.log(`[PlayerOutlook] Cache has zero market data for ${playerName} (cooldown expired), refreshing async`);
+  if (hasZeroMarketData && (zeroDataCooldownExpired || isOldPrompt)) {
+    console.log(`[PlayerOutlook] Cache has zero market data for ${playerName} (${isOldPrompt ? 'old prompt v' + cachedPromptVersion : 'cooldown expired'}), refreshing async`);
     generateFreshOutlook(playerName, sport, playerKey).catch(err => {
       console.error(`[PlayerOutlook] Background refresh failed:`, err);
     });
