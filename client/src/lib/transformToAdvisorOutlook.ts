@@ -510,8 +510,8 @@ function buildDecisions(outlook: PlayerOutlookResponse, verdict: AdvisorVerdict)
   switch (verdict) {
     case "BUY":
       return {
-        holder: { action: "HOLD / ADD", reason: truncate(shortReason || "Fundamentals support adding on dips") },
-        buyer: { action: "BUY now", reason: truncate(shortReason || "Entry window is favorable at current prices") },
+        holder: { action: "HOLD", reason: truncate(shortReason || "Keep your position — fundamentals are strong") },
+        buyer: { action: "BUY", reason: truncate(shortReason || "Entry window is favorable at current prices") },
       };
     case "HOLD_CORE":
       return {
