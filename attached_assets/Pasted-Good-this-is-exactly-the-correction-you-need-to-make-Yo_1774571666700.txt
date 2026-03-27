@@ -1,0 +1,180 @@
+Good—this is exactly the correction you need to make.
+
+You’re right to push back.
+
+The goal is NOT:
+
+more features
+more layers
+more surfaces
+
+The goal is:
+
+one clear decision per user state
+
+1. The Real Problem
+
+Right now your system is correct but over-expressive.
+
+You show:
+
+verdict
+conviction
+phase
+structure
+timing
+percentiles
+narrative
+action plan
+trade targets
+
+That creates:
+
+interpretation overload instead of decision clarity
+
+2. Reframe the Product (This Is the Key Shift)
+
+Every user is in one of two states:
+
+User State	Core Question
+Holder	“Should I sell or hold?”
+Buyer	“Should I buy now or wait?”
+
+Everything you built should collapse into answering those two questions.
+
+3. What You Should Do (High Leverage Fix)
+Replace “Action Plan” with TWO CLEAR DECISIONS
+3.1 Holder Decision
+If you own this player:
+
+→ SELL into strength
+→ HOLD (no action)
+→ REDUCE exposure
+3.2 Buyer Decision
+If you want exposure:
+
+→ BUY now
+→ WAIT for pullback
+→ AVOID entry
+4. Map Your System to These Decisions
+
+You already have everything needed.
+
+Just translate.
+
+Example Mapping
+Verdict	Holder	Buyer
+ACCUMULATE	HOLD / ADD	BUY now
+HOLD CORE	HOLD	WAIT
+TRADE THE HYPE	SELL	DO NOT BUY
+AVOID	SELL / EXIT	AVOID
+SPECULATIVE	HOLD small	SMALL BUY only
+5. Apply It to Your Screens
+5.1 Puka / Bryce (Speculative, Very Low Conviction)
+Instead of:
+long explanation
+trade targets
+Show:
+If you own:
+→ HOLD (small position only)
+
+If you want exposure:
+→ WAIT — no clear edge
+
+Done.
+
+5.2 Cooper Flagg (Trade the Hype)
+If you own:
+→ SELL into strength
+
+If you want exposure:
+→ DO NOT BUY — wait for pullback
+
+Done.
+
+5.3 Bam (Hold Core, Weak Structure)
+If you own:
+→ HOLD
+
+If you want exposure:
+→ WAIT — prices reflect current momentum
+
+Done.
+
+6. This Fix Solves Everything
+Problem	Fix
+UI feels busy	collapse into 2 decisions
+too many signals	hidden behind decision
+trade targets confusion	no longer required
+cognitive overload	removed
+7. What Stays vs What Becomes Secondary
+Primary (always visible)
+Verdict (big)
+Conviction (small)
+TWO decisions (holder / buyer)
+Secondary (collapsed or below)
+narrative
+signals
+percentiles
+
+These support the decision—not compete with it.
+
+8. Design It Like This
+Core Card
+SPECULATIVE FLYER
+Very Low Conviction
+
+If you own:
+→ HOLD (small position only)
+
+If you want exposure:
+→ WAIT — no clear edge
+
+That’s it.
+
+Everything else becomes optional depth.
+
+9. Product Insight (This Is Important)
+
+Users don’t want:
+
+analysis
+
+They want:
+
+permission to act
+
+Right now you give:
+
+great analysis
+
+But you need to convert that into:
+
+clear permission
+
+10. Bottom Line
+
+You don’t need to remove features.
+
+You need to:
+
+compress everything into two decisions
+
+11. Final Recommendation
+
+Do this next:
+
+Add “If you own” section
+Add “If you want exposure” section
+Make them the most prominent elements on the page
+Demote everything else
+
+If you do this:
+
+your system becomes instantly understandable
+your UI becomes clean without removing intelligence
+users actually act on it
+
+If you want, I can help you:
+
+map every verdict cleanly into those two decision outputs (with exact wording rules so it’s consistent across all players)
