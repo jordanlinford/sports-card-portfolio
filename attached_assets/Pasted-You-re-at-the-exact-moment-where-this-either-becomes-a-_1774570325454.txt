@@ -1,0 +1,205 @@
+You’re at the exact moment where this either becomes a tool people check occasionally or a system people actually act on.
+
+Right now, looking at your screenshots:
+
+What’s working
+Verdict + conviction is clear
+Percentiles add context
+Narrative is grounded in data
+Structure/timing badges are doing real work
+What’s missing (very obvious now)
+
+There is no execution layer visible.
+
+Everything says:
+
+“Here’s the situation”
+
+Nothing says:
+
+“Here’s what to actually buy or sell”
+
+That’s why wiring Hidden Gems here is high leverage.
+
+1. What the UI Is Currently Saying (Reality Check)
+
+Take Ohtani:
+
+SPECULATIVE FLYER
+Very Low Conviction
+Mixed signals
+
+User takeaway:
+
+“ok… so what do I do?”
+
+There is no next step.
+
+2. Where Hidden Gems Should Live (Exact Placement)
+
+Do NOT bury this.
+
+Placement:
+
+Directly below Action Plan
+
+Flow becomes:
+
+Verdict
+Narrative
+Action Plan
+→ Hidden Gems (execution)
+3. Rename It (Important)
+
+“Hidden Gems” is slightly hobbyist.
+
+You are building a decision platform, not a collector blog.
+
+Better options:
+
+Option	Why
+Entry Targets	action-oriented
+Trade Targets	flexible (buy/sell)
+Market Opportunities	neutral + scalable
+
+Best for now:
+
+Trade Targets
+
+4. What Should Change Per Player (Using Your Screens)
+4.1 Ohtani (Speculative + Very Low Conviction)
+
+You should NOT show aggressive buys.
+
+Show:
+2–3 low-risk entries
+or even:
+
+“No strong entries — market lacks clarity”
+
+That’s powerful.
+
+4.2 Bam (Breakout + Weak Structure + Low Conviction)
+
+This is interesting.
+
+You should show:
+
+NOT “buy”
+NOT “sell everything”
+
+Instead:
+
+selective exposure
+
+Show:
+cards NOT yet spiking with momentum
+mid-tier liquidity
+
+Label:
+
+“Lagging relative to breakout — selective entry only”
+
+4.3 JSN (Speculative + Accumulation + Low Conviction)
+
+Here you show:
+
+cheap, early-stage cards
+low hype
+low volume
+
+Label:
+
+“Early accumulation — high risk / asymmetric upside”
+
+5. Core Logic (This Is the Important Part)
+
+Hidden Gems MUST be:
+
+verdict-aware
+
+Mapping:
+Verdict	What to Show
+ACCUMULATE	underpriced, lagging cards
+HOLD CORE	stable, liquid cards
+TRADE THE HYPE	recent top performers (sell candidates)
+SPECULATIVE	low price, early signals
+AVOID	none or warning
+6. Minimal Scoring Formula (Use This Now)
+
+You don’t need anything fancy.
+
+card_score =
+  (price_lag_vs_player * 0.4) +
+  (liquidity_score * 0.3) +
+  (price_position * 0.3)
+Definitions:
+price_lag_vs_player
+player_trend - card_trend
+positive = card lagging → good for buy
+liquidity_score
+sales count normalized
+avoid dead cards
+price_position
+where current price sits in 30d range
+7. UI Structure (Keep It Tight)
+
+Each card:
+
+Field	Example
+Card	2023 Prizm Silver PSA 10
+Price	$120
+Trend	+5%
+Tag	“Lagging demand”
+Liquidity	High
+
+Limit to:
+
+3 cards max
+8. One Critical Insight
+
+Right now your system stops at:
+
+interpretation
+
+Hidden Gems turns it into:
+
+execution
+
+That is the difference between:
+
+“interesting product”
+“money-making product”
+9. Biggest Risk to Avoid
+
+Do NOT:
+
+show the same cards regardless of verdict
+hardcode “good cards”
+ignore liquidity
+
+If users see:
+
+same suggestions across players
+
+trust collapses immediately.
+
+10. What Success Looks Like
+
+User flow:
+
+Sees leaderboard → clicks player
+Reads outlook → understands situation
+Scrolls → sees:
+exact cards to buy OR sell
+Takes action
+
+That’s the loop.
+
+11. Bottom Line
+
+You are missing exactly one thing:
+
+a clear bridge from insight → transaction
+
+Hidden Gems (done correctly) is that bridge.

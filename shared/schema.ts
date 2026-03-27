@@ -1510,6 +1510,21 @@ export type AdvisorActionPlan = {
   sizingRule: string; // 1 sentence: position sizing guidance
 };
 
+export type TradeTarget = {
+  card: string;
+  price?: string;
+  trend?: string;
+  tag: string;
+  liquidity?: "High" | "Medium" | "Low";
+  action: "BUY" | "SELL" | "WATCH";
+};
+
+export type TradeTargetsData = {
+  headline: string;
+  targets: TradeTarget[];
+  caveat?: string;
+};
+
 export type AdvisorOutlook = {
   verdict: AdvisorVerdict;
   verdictLabel: string; // Human-readable label like "Hold, don't chase"
@@ -1526,6 +1541,7 @@ export type AdvisorOutlook = {
     buy: string[]; // 0-6 specific cards to buy
     avoid: string[]; // 0-6 specific cards to avoid
   };
+  tradeTargets?: TradeTargetsData;
   evidenceNote: string; // 1 sentence: data sources and limitations
   liquidityTier?: LiquidityTier; // Overall player market liquidity (derived from exposures)
   marketPhase?: string; // Market phase (Accumulation, Breakout, etc.)

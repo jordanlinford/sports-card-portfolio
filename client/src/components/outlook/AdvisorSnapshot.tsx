@@ -14,8 +14,11 @@ import {
   Activity,
   BarChart3,
   BarChart2,
+  Crosshair,
+  AlertCircle,
+  Eye,
 } from "lucide-react";
-import type { AdvisorOutlook } from "@shared/schema";
+import type { AdvisorOutlook, TradeTarget } from "@shared/schema";
 import { LiquidityBadge } from "@/components/liquidity-badge";
 
 function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
@@ -338,7 +341,86 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
             </div>
           </div>
         </div>
+        
+        {advisor.tradeTargets && (
+          <TradeTargetsSection data={advisor.tradeTargets} verdict={advisor.verdict} />
+        )}
       </CardContent>
     </Card>
+  );
+}
+
+function getActionStyles(action: TradeTarget["action"]) {
+  switch (action) {
+    case "BUY":
+      return { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-400", border: "border-green-200 dark:border-green-800" };
+    case "SELL":
+      return { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-400", border: "border-red-200 dark:border-red-800" };
+    case "WATCH":
+      return { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-400", border: "border-amber-200 dark:border-amber-800" };
+  }
+}
+
+function TradeTargetsSection({ data, verdict }: { data: NonNullable<AdvisorOutlook["tradeTargets"]>; verdict: AdvisorOutlook["verdict"] }) {
+  const headerColor = verdict === "BUY" || verdict === "HOLD_CORE"
+    ? "text-green-700 dark:text-green-400"
+    : verdict === "SELL" || verdict === "AVOID" || verdict === "TRADE_THE_HYPE"
+    ? "text-red-700 dark:text-red-400"
+    : "text-amber-700 dark:text-amber-400";
+
+  return (
+    <div className="pt-4 mt-4 border-t border-border" data-testid="section-trade-targets">
+      <h4 className={`text-sm font-semibold mb-3 flex items-center gap-1.5 ${headerColor}`}>
+        <Crosshair className="h-4 w-4" />
+        Trade Targets
+      </h4>
+      
+      <p className="text-xs text-muted-foreground mb-3">{data.headline}</p>
+
+      {data.targets.length === 0 && data.caveat && (
+        <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border border-border">
+          <AlertCircle className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="text-sm text-muted-foreground">{data.caveat}</span>
+        </div>
+      )}
+
+      {data.targets.length > 0 && (
+        <div className="space-y-2">
+          {data.targets.map((target, i) => {
+            const styles = getActionStyles(target.action);
+            return (
+              <div
+                key={i}
+                className={`flex items-center gap-3 p-2.5 rounded-md border ${styles.border} ${styles.bg}`}
+                data-testid={`trade-target-${i}`}
+              >
+                <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 shrink-0 ${styles.text} bg-transparent border ${styles.border}`}>
+                  {target.action === "WATCH" ? <Eye className="h-3 w-3 mr-0.5" /> : null}
+                  {target.action}
+                </Badge>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-medium truncate block">{target.card}</span>
+                  <span className="text-xs text-muted-foreground">{target.tag}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0 text-xs">
+                  {target.price && (
+                    <span className="font-medium">{target.price}</span>
+                  )}
+                  {target.liquidity && (
+                    <Badge variant="outline" className="text-[10px] px-1 py-0">
+                      {target.liquidity}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {data.caveat && data.targets.length > 0 && (
+        <p className="text-xs text-muted-foreground mt-2 italic">{data.caveat}</p>
+      )}
+    </div>
   );
 }

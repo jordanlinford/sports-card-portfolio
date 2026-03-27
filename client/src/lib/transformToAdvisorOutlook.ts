@@ -4,7 +4,9 @@ import type {
   AdvisorVerdict, 
   AdvisorConfidence,
   AdvisorHorizon,
-  LiquidityTier 
+  LiquidityTier,
+  TradeTarget,
+  TradeTargetsData,
 } from "@shared/schema";
 
 function mapVerdictToAdvisor(
@@ -494,6 +496,216 @@ function extractConviction(outlook: PlayerOutlookResponse): AdvisorOutlook["conv
   };
 }
 
+function buildTradeTargets(outlook: PlayerOutlookResponse, verdict: AdvisorVerdict): TradeTargetsData | undefined {
+  const call = outlook.investmentCall;
+  const evidence = outlook.evidence;
+  const tiered = outlook.tieredRecommendations;
+  const exposures = outlook.exposures || [];
+  const comps = evidence?.compsSummary;
+  const breakdown = comps?.breakdown || [];
+  const ms = outlook.marketSignals;
+  const conv = ms?.derivedMetrics?.conviction;
+
+  if (conv && typeof conv.score === "number" && conv.score < 30) {
+    return {
+      headline: "No strong entries — market lacks clarity",
+      targets: [],
+      caveat: "Signals are too conflicting for actionable trade targets. Wait for conviction to improve.",
+    };
+  }
+
+  if (verdict === "SELL" || verdict === "AVOID" || verdict === "TRADE_THE_HYPE") {
+    const sellTargets: TradeTarget[] = [];
+
+    if (call?.whatToSell) {
+      for (const card of call.whatToSell.slice(0, 3)) {
+        sellTargets.push({
+          card,
+          tag: "Sell into demand",
+          action: "SELL",
+          liquidity: "High",
+        });
+      }
+    }
+
+    if (tiered) {
+      if (tiered.premiumGraded?.verdict === "SELL" && !sellTargets.some(t => t.card.toLowerCase().includes("graded"))) {
+        const bd = breakdown.find(b => b.category.toLowerCase().includes("premium") || b.category.toLowerCase().includes("graded"));
+        sellTargets.push({
+          card: "Premium graded cards",
+          price: bd ? `~$${bd.avgPrice}` : undefined,
+          tag: "Take profits before correction",
+          action: "SELL",
+          liquidity: "High",
+        });
+      }
+      if (tiered.midTierParallels?.verdict === "SELL" && !sellTargets.some(t => t.card.toLowerCase().includes("parallel"))) {
+        const bd = breakdown.find(b => b.category.toLowerCase().includes("mid") || b.category.toLowerCase().includes("parallel"));
+        sellTargets.push({
+          card: "Mid-tier parallels",
+          price: bd ? `~$${bd.avgPrice}` : undefined,
+          tag: "Overpriced relative to demand",
+          action: "SELL",
+        });
+      }
+    }
+
+    if (sellTargets.length === 0) {
+      return {
+        headline: "Reduce exposure — sell into strength",
+        targets: [{
+          card: "Recent top performers",
+          tag: "Lock in gains before pullback",
+          action: "SELL",
+        }],
+        caveat: verdict === "AVOID" ? "No new money recommended at current levels." : undefined,
+      };
+    }
+
+    const sellHeadline = verdict === "TRADE_THE_HYPE"
+      ? "Sell candidates — trade the hype"
+      : verdict === "SELL"
+      ? "Sell targets — take profits"
+      : "Avoid new positions";
+
+    return {
+      headline: sellHeadline,
+      targets: sellTargets.slice(0, 3),
+    };
+  }
+
+  if (verdict === "BUY" || verdict === "HOLD_CORE") {
+    const buyTargets: TradeTarget[] = [];
+
+    if (call?.whatToBuy) {
+      for (const card of call.whatToBuy.slice(0, 3)) {
+        const bd = breakdown.find(b => card.toLowerCase().includes(b.category.toLowerCase().split("/")[0].split(" ")[0]));
+        buyTargets.push({
+          card,
+          price: bd ? `~$${bd.avgPrice}` : undefined,
+          tag: verdict === "BUY" ? "Underpriced, lagging demand" : "Stable, liquid position",
+          action: "BUY",
+          liquidity: exposures.find(e => e.cardTargets?.some(ct => card.toLowerCase().includes(ct.toLowerCase().split(" ")[0])))?.liquidity === "HIGH" ? "High" : exposures.find(e => e.cardTargets?.some(ct => card.toLowerCase().includes(ct.toLowerCase().split(" ")[0])))?.liquidity === "LOW" ? "Low" : "Medium",
+        });
+      }
+    }
+
+    if (buyTargets.length < 3 && tiered) {
+      if (tiered.baseCards?.verdict === "BUY" && !buyTargets.some(t => t.card.toLowerCase().includes("base"))) {
+        const bd = breakdown.find(b => b.category.toLowerCase().includes("base") || b.category.toLowerCase().includes("common"));
+        buyTargets.push({
+          card: "Base rookies",
+          price: bd ? `~$${bd.avgPrice}` : undefined,
+          tag: "High volume, easy exit",
+          action: "BUY",
+          liquidity: "High",
+        });
+      }
+      if (tiered.midTierParallels?.verdict === "BUY" && !buyTargets.some(t => t.card.toLowerCase().includes("parallel"))) {
+        const bd = breakdown.find(b => b.category.toLowerCase().includes("mid") || b.category.toLowerCase().includes("refractor") || b.category.toLowerCase().includes("insert"));
+        buyTargets.push({
+          card: "Mid-tier parallels / inserts",
+          price: bd ? `~$${bd.avgPrice}` : undefined,
+          tag: "Value sweet spot",
+          action: "BUY",
+          liquidity: "Medium",
+        });
+      }
+    }
+
+    if (buyTargets.length === 0 && exposures.length > 0) {
+      for (const exp of exposures.slice(0, 2)) {
+        if (exp.cardTargets && exp.cardTargets.length > 0) {
+          buyTargets.push({
+            card: exp.cardTargets[0],
+            tag: exp.why?.slice(0, 60) || "Favorable risk/reward",
+            action: "BUY",
+            liquidity: exp.liquidity === "HIGH" ? "High" : exp.liquidity === "LOW" ? "Low" : "Medium",
+          });
+        }
+      }
+    }
+
+    if (buyTargets.length === 0) {
+      return undefined;
+    }
+
+    return {
+      headline: verdict === "BUY" ? "Entry targets — cards lagging demand" : "Core positions — stable holdings",
+      targets: buyTargets.slice(0, 3),
+    };
+  }
+
+  if (verdict === "SPECULATIVE") {
+    const specTargets: TradeTarget[] = [];
+
+    if (call?.whatToBuy) {
+      for (const card of call.whatToBuy.slice(0, 2)) {
+        specTargets.push({
+          card,
+          tag: "Asymmetric upside",
+          action: "WATCH",
+        });
+      }
+    }
+
+    if (specTargets.length < 2) {
+      const cheapBd = breakdown
+        .filter(b => b.avgPrice > 0)
+        .sort((a, b) => a.avgPrice - b.avgPrice);
+      for (const bd of cheapBd.slice(0, 2 - specTargets.length)) {
+        if (!specTargets.some(t => t.card.toLowerCase().includes(bd.category.toLowerCase().split("/")[0]))) {
+          specTargets.push({
+            card: bd.category,
+            price: `~$${bd.avgPrice}`,
+            tag: "Early accumulation — high risk",
+            action: "WATCH",
+            liquidity: "Low",
+          });
+        }
+      }
+    }
+
+    if (specTargets.length === 0) return undefined;
+
+    return {
+      headline: "Early accumulation — high risk / asymmetric upside",
+      targets: specTargets.slice(0, 3),
+      caveat: "Small positions only — lottery ticket sizing.",
+    };
+  }
+
+  if (verdict === "HOLD") {
+    const holdTargets: TradeTarget[] = [];
+
+    if (call?.whatToBuy && call.whatToBuy.length > 0) {
+      holdTargets.push({
+        card: call.whatToBuy[0],
+        tag: "Selective entry only",
+        action: "WATCH",
+      });
+    }
+
+    if (tiered?.premiumGraded?.verdict === "SELL") {
+      holdTargets.push({
+        card: "Premium graded",
+        tag: "Trim if overweight",
+        action: "SELL",
+      });
+    }
+
+    if (holdTargets.length === 0) return undefined;
+
+    return {
+      headline: "Selective exposure — not chasing",
+      targets: holdTargets.slice(0, 3),
+      caveat: "Lagging relative to breakout — selective entry only.",
+    };
+  }
+
+  return undefined;
+}
+
 export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): AdvisorOutlook {
   const { verdict, label } = mapVerdictToAdvisor(outlook.investmentCall, outlook.verdict);
   
@@ -515,6 +727,7 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     whatChangesMyMind: extractWhatChangesMyMind(outlook),
     buyTriggers: extractBuyTriggers(outlook),
     cards: extractCards(outlook),
+    tradeTargets: buildTradeTargets(outlook, verdict),
     evidenceNote: buildEvidenceNote(outlook),
     liquidityTier: deriveLiquidityTier(outlook),
     marketPhase: phaseLabel,
