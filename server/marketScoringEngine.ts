@@ -143,8 +143,10 @@ function scoreSupply(derived: DerivedMetrics): number {
 function scoreVolatility(derived: DerivedMetrics): number {
   if (derived.sampleFactor === 0) return 50;
   const rawScore = 100 - (derived.cv * 150);
-  if (derived.salesVelocity >= 5 && derived.cv > 1.5) {
-    const dampened = 100 - (Math.log(1 + derived.cv) * 45);
+  if (derived.salesVelocity >= 5 && derived.cv > 1.0) {
+    const dampened = derived.cv > 5
+      ? 100 - (Math.log(1 + Math.log(1 + derived.cv)) * 25)
+      : 100 - (Math.log(1 + derived.cv) * 45);
     return clamp(Math.max(rawScore, dampened), 0, 100);
   }
   return clamp(rawScore, 0, 100);
