@@ -234,6 +234,9 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
 
   const derived = computeDerivedMetrics(metrics);
 
+  console.log(`[MarketScoring] Input metrics for ${input.playerName}: soldCount30d=${metrics.soldCount30d}, soldCount7d=${metrics.soldCount7d}, activeListings=${metrics.activeListingCount}, avgPrice=${metrics.avgSoldPrice}, priceStdDev=${metrics.priceStdDev30d}, priceTrend=${metrics.priceTrend}`);
+  console.log(`[MarketScoring] Derived for ${input.playerName}: velocity=${derived.salesVelocity.toFixed(2)}, sellThrough=${derived.sellThrough.toFixed(4)}, cv=${derived.cv.toFixed(3)}, supplyRatio=${derived.supplyRatio.toFixed(2)}, sampleFactor=${derived.sampleFactor.toFixed(3)}`);
+
   const demandScore = scoreDemand(derived);
   const momentumScore = scoreMomentum(derived);
   const liquidityScore = scoreLiquidity(derived, metrics);
@@ -241,6 +244,8 @@ export function computeMarketSignals(input: MarketScoringInput): MarketSignals {
   const volatilityScore = scoreVolatility(derived);
   const hypeScore = scoreHype(derived);
   const confidenceScore = scoreConfidence(derived, metrics);
+
+  console.log(`[MarketScoring] Scores for ${input.playerName}: demand=${demandScore.toFixed(1)}, momentum=${momentumScore.toFixed(1)}, liquidity=${liquidityScore.toFixed(1)}, supply=${supplyPressureScore.toFixed(1)}, volatility=${volatilityScore.toFixed(1)}, hype=${hypeScore.toFixed(1)}, confidence=${confidenceScore.toFixed(1)}`);
 
   const signalAgreement = [
     demandScore > 60,

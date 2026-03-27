@@ -1491,26 +1491,25 @@ export async function getPlayerOutlook(
     return { ...freshOutlook, cacheStatus: "miss" };
   }
   
-  // Return cached if fresh
-  if (cachedOutlook && !isStale) {
+  const hasZeroMarketData = cachedOutlook && (
+    !cachedOutlook.marketSignals?.derivedMetrics?.sampleFactor 
+    || cachedOutlook.marketSignals?.derivedMetrics?.sampleFactor === 0
+  );
+
+  if (cachedOutlook && !isStale && !hasZeroMarketData) {
     console.log(`[PlayerOutlook] Cache HIT (fresh) for ${playerName}`);
     return { ...cachedOutlook, cacheStatus: "fresh" };
   }
   
-  // If stale, check if the cached outlook has zero market data
+  if (hasZeroMarketData) {
+    console.log(`[PlayerOutlook] Cache has zero market data for ${playerName}, forcing synchronous refresh`);
+    const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
+    return { ...freshOutlook, cacheStatus: "miss" };
+  }
+
   if (cachedOutlook && isStale) {
-    const hasZeroMarketData = !cachedOutlook.marketSignals?.derivedMetrics?.sampleFactor 
-      || cachedOutlook.marketSignals?.derivedMetrics?.sampleFactor === 0;
-    
-    if (hasZeroMarketData) {
-      console.log(`[PlayerOutlook] Cache HIT (stale + zero market data) for ${playerName}, forcing synchronous refresh`);
-      const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
-      return { ...freshOutlook, cacheStatus: "miss" };
-    }
-    
     console.log(`[PlayerOutlook] Cache HIT (stale) for ${playerName}, refreshing async`);
     
-    // Fire-and-forget refresh
     generateFreshOutlook(playerName, sport, playerKey).catch(err => {
       console.error(`[PlayerOutlook] Background refresh failed:`, err);
     });
