@@ -371,7 +371,7 @@ function extractShortTermTrend(outlook: PlayerOutlookResponse): AdvisorOutlook["
   if (met.soldCount7d !== undefined) {
     trend.soldCount7d = met.soldCount7d;
   }
-  if (met.avgSoldPrice !== undefined) {
+  if (met.avgSoldPrice != null) {
     trend.avgPrice = `$${met.avgSoldPrice.toFixed(0)}`;
   }
   
