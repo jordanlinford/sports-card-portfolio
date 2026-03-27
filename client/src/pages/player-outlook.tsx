@@ -387,17 +387,18 @@ function getSignalBarColor(score: number): string {
 
 function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?: MarketPhase }) {
   const signalEntries = [
-    { label: "Demand", score: signals.demandScore, description: "Log-scaled sales velocity (dampened by sample size)", contribKey: "demand" as const },
+    { label: "Demand", score: signals.demandScore, description: "Sales velocity across marketplaces", contribKey: "demand" as const },
     { label: "Momentum", score: signals.momentumScore, description: "Price trend vs prior period", contribKey: "momentum" as const },
-    { label: "Liquidity", score: signals.liquidityScore, description: "Sell-through rate × volume", contribKey: "liquidity" as const },
+    { label: "Liquidity", score: signals.liquidityScore, description: "Sell-through rate and volume", contribKey: "liquidity" as const },
     { label: "Supply", score: signals.supplyPressureScore, description: "Listings-to-sales pressure (higher = less pressure)", contribKey: "supply" as const },
     { label: "Volatility", score: signals.volatilityScore, description: "Price stability (higher = more stable)", contribKey: "volatility" as const },
     { label: "Hype", score: signals.hypeScore, description: "Price vs participation divergence (high = price outpacing volume)", contribKey: "antiHype" as const },
-    { label: "Confidence", score: signals.confidenceScore, description: "Sample size & data coverage" },
+    { label: "Confidence", score: signals.confidenceScore, description: "Data coverage and sample size" },
   ];
 
   const derived = signals.derivedMetrics;
   const contribs = signals.contributions;
+  const noData = derived?.sampleFactor === 0;
 
   return (
     <Card data-testid="card-market-signals">
@@ -405,53 +406,66 @@ function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?
         <CardTitle className="text-lg flex items-center gap-2">
           <BarChart3 className="h-5 w-5 text-primary" />
           Market Signals
-          {phase && phase !== "UNKNOWN" && (
+          {phase && phase !== "UNKNOWN" && !noData && (
             <Badge className={`${getMarketPhaseColor(phase)} ml-2 text-xs`} data-testid="badge-signals-phase">
               {formatMarketPhase(phase)} Phase
             </Badge>
           )}
         </CardTitle>
-        <CardDescription>
-          Composite Score: <span className={`font-semibold ${getSignalColor(signals.composite)}`} data-testid="text-composite-score">{signals.composite}/100</span>
-          {derived && (
-            <span className="ml-2 text-xs text-muted-foreground" data-testid="text-sample-factor">
-              (sample factor: {derived.sampleFactor})
-            </span>
-          )}
-        </CardDescription>
+        {noData ? (
+          <CardDescription className="text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-3.5 w-3.5 inline mr-1" />
+            Market data unavailable — signals could not be calculated. Try refreshing the outlook.
+          </CardDescription>
+        ) : (
+          <CardDescription>
+            Composite Score: <span className={`font-semibold ${getSignalColor(signals.composite)}`} data-testid="text-composite-score">{signals.composite}/100</span>
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent>
-        <div className="space-y-3">
-          {signalEntries.map(({ label, score, description, contribKey }) => {
-            const contribValue = contribKey && contribs ? contribs[contribKey] : undefined;
-            return (
-              <div key={label} className="space-y-1" data-testid={`signal-${label.toLowerCase().replace(/\s+/g, "-")}`}>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{label}</span>
-                  <div className="flex items-center gap-2">
-                    {contribValue !== undefined && (
-                      <span className="text-xs text-muted-foreground" data-testid={`contrib-${label.toLowerCase()}`}>
-                        +{contribValue}
+        {noData ? (
+          <div className="text-sm text-muted-foreground space-y-2" data-testid="text-no-market-data">
+            <p>
+              The market data search returned no sales data for this player. This can happen when the search service is temporarily unavailable.
+            </p>
+            <p>
+              All signal scores below are defaults and should not be used for decisions. Refresh the outlook to retry the market data search.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {signalEntries.map(({ label, score, description, contribKey }) => {
+              const contribValue = contribKey && contribs ? contribs[contribKey] : undefined;
+              return (
+                <div key={label} className="space-y-1" data-testid={`signal-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{label}</span>
+                    <div className="flex items-center gap-2">
+                      {contribValue !== undefined && (
+                        <span className="text-xs text-muted-foreground" data-testid={`contrib-${label.toLowerCase()}`}>
+                          +{contribValue}
+                        </span>
+                      )}
+                      <span className={`font-medium ${getSignalColor(score)}`}>
+                        {score}
                       </span>
-                    )}
-                    <span className={`font-medium ${getSignalColor(score)}`}>
-                      {score}
-                    </span>
+                    </div>
                   </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${getSignalBarColor(score)}`}
+                      style={{ width: `${score}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">{description}</p>
                 </div>
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${getSignalBarColor(score)}`}
-                    style={{ width: `${score}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">{description}</p>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
-        {derived && (
+        {derived && !noData && (
           <div className="mt-4 pt-3 border-t border-border">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-medium text-muted-foreground">Raw Derived Metrics</p>

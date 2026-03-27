@@ -878,7 +878,61 @@ If no sales data is found, return: { "available": false }`;
     }
   }
   
-  console.error("[PlayerOutlook] Market data fetch failed after retries:", lastError?.message);
+  console.log(`[PlayerOutlook] Primary market data search failed for ${playerName}, trying simplified fallback...`);
+  
+  try {
+    const fallbackPrompt = `What is the approximate eBay sold price and sales volume for ${playerName} ${sport} cards in the last 30 days?
+
+Return ONLY a JSON object with your best estimates:
+{
+  "totalAvgPrice": <number>,
+  "soldCount30d": <number>,
+  "activeListingCount": <number>,
+  "estimatedVolume": "high" | "medium" | "low",
+  "volumeTrend": "up" | "stable" | "down"
+}
+
+If truly unknown, return: { "available": false }`;
+
+    const fallbackResponse = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: fallbackPrompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    let fallbackText = fallbackResponse.text || "";
+    fallbackText = fallbackText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+    const jsonMatch = fallbackText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.available !== false && typeof parsed.totalAvgPrice === "number") {
+        console.log(`[PlayerOutlook] Fallback market data for ${playerName}: avg=$${parsed.totalAvgPrice}, sold=${parsed.soldCount30d}, volume=${parsed.estimatedVolume}`);
+        const validVolumes = ["high", "medium", "low"] as const;
+        const estimatedVolume = validVolumes.includes(parsed.estimatedVolume) 
+          ? parsed.estimatedVolume as "high" | "medium" | "low"
+          : undefined;
+        const validTrends = ["up", "stable", "down"] as const;
+        const volumeTrend = validTrends.includes(parsed.volumeTrend)
+          ? parsed.volumeTrend as "up" | "stable" | "down"
+          : undefined;
+        return {
+          available: true,
+          totalAvgPrice: parsed.totalAvgPrice,
+          soldCount30d: typeof parsed.soldCount30d === "number" ? parsed.soldCount30d : undefined,
+          activeListingCount: typeof parsed.activeListingCount === "number" ? parsed.activeListingCount : undefined,
+          estimatedVolume,
+          volumeTrend,
+          source: "gemini_search",
+        };
+      }
+    }
+  } catch (fallbackError: any) {
+    console.error("[PlayerOutlook] Fallback market data search also failed:", fallbackError.message);
+  }
+
+  console.error("[PlayerOutlook] All market data fetch attempts failed for:", playerName);
   return { available: false, source: "unavailable" };
 }
 

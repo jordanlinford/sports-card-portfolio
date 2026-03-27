@@ -120,14 +120,17 @@ function scoreLiquidity(derived: DerivedMetrics, metrics: MarketMetrics): number
 }
 
 function scoreSupply(derived: DerivedMetrics): number {
+  if (derived.sampleFactor === 0) return 50;
   return clamp(100 - (derived.supplyRatio * 15), 0, 100);
 }
 
 function scoreVolatility(derived: DerivedMetrics): number {
+  if (derived.sampleFactor === 0) return 50;
   return clamp(100 - (derived.cv * 150), 0, 100);
 }
 
 function scoreHype(derived: DerivedMetrics): number {
+  if (derived.sampleFactor === 0) return 50;
   const priceSignal = derived.priceTrend;
   const volumeSignal = derived.volumeTrend - 1;
   const hypeRaw = priceSignal - volumeSignal;
