@@ -30,21 +30,21 @@ import { LiquidityBadge } from "@/components/liquidity-badge";
 function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
   switch (verdict) {
     case "BUY":
-      return { bg: "bg-green-500/10", border: "border-green-500/40", text: "text-green-700 dark:text-green-400", icon: <ShoppingCart className="h-6 w-6" />, glow: "shadow-green-500/5" };
+      return { bg: "bg-green-500/10", border: "border-green-500/40", text: "text-green-700 dark:text-green-400", icon: <ShoppingCart className="h-4 w-4" /> };
     case "HOLD_CORE":
-      return { bg: "bg-blue-500/10", border: "border-blue-500/40", text: "text-blue-700 dark:text-blue-400", icon: <Shield className="h-6 w-6" />, glow: "shadow-blue-500/5" };
+      return { bg: "bg-blue-500/10", border: "border-blue-500/40", text: "text-blue-700 dark:text-blue-400", icon: <Shield className="h-4 w-4" /> };
     case "HOLD":
-      return { bg: "bg-yellow-500/10", border: "border-yellow-500/40", text: "text-yellow-700 dark:text-yellow-400", icon: <Minus className="h-6 w-6" />, glow: "shadow-yellow-500/5" };
+      return { bg: "bg-yellow-500/10", border: "border-yellow-500/40", text: "text-yellow-700 dark:text-yellow-400", icon: <Minus className="h-4 w-4" /> };
     case "TRADE_THE_HYPE":
-      return { bg: "bg-orange-500/10", border: "border-orange-500/40", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-6 w-6" />, glow: "shadow-orange-500/5" };
+      return { bg: "bg-orange-500/10", border: "border-orange-500/40", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-4 w-4" /> };
     case "SELL":
-      return { bg: "bg-orange-500/10", border: "border-orange-500/40", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-6 w-6" />, glow: "shadow-orange-500/5" };
+      return { bg: "bg-orange-500/10", border: "border-orange-500/40", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-4 w-4" /> };
     case "SPECULATIVE":
-      return { bg: "bg-amber-500/10", border: "border-amber-500/40", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-6 w-6" />, glow: "shadow-amber-500/5" };
+      return { bg: "bg-amber-500/10", border: "border-amber-500/40", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-4 w-4" /> };
     case "AVOID":
-      return { bg: "bg-red-500/10", border: "border-red-500/40", text: "text-red-700 dark:text-red-400", icon: <Ban className="h-6 w-6" />, glow: "shadow-red-500/5" };
+      return { bg: "bg-red-500/10", border: "border-red-500/40", text: "text-red-700 dark:text-red-400", icon: <Ban className="h-4 w-4" /> };
     default:
-      return { bg: "bg-muted", border: "border-muted", text: "text-muted-foreground", icon: <Minus className="h-6 w-6" />, glow: "" };
+      return { bg: "bg-muted", border: "border-muted", text: "text-muted-foreground", icon: <Minus className="h-4 w-4" /> };
   }
 }
 
@@ -86,42 +86,28 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
 
   const toggle = (id: string) => setOpenSection(prev => prev === id ? null : id);
 
+  const convictionColor = advisor.conviction?.level === "High Conviction" ? "text-green-600 dark:text-green-400" :
+    advisor.conviction?.level === "Medium Conviction" ? "text-blue-600 dark:text-blue-400" :
+    advisor.conviction?.level === "Low Conviction" ? "text-yellow-600 dark:text-yellow-400" :
+    "text-red-600 dark:text-red-400";
+
+  const verdictDisplay = advisor.verdict === "TRADE_THE_HYPE" ? "Trade the Hype" : advisor.verdict === "SPECULATIVE" ? "Speculative" : advisor.verdict.replace(/_/g, " ").split(" ").map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(" ");
+
   return (
-    <Card className={`border-2 ${v.border} shadow-lg ${v.glow}`} data-testid="card-advisor-snapshot">
+    <Card className={`border ${v.border} shadow-md`} data-testid="card-advisor-snapshot">
       <CardContent className="p-0">
-        <div className={`px-5 py-4 ${v.bg} rounded-t-lg`}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${v.bg} ${v.text}`}>
-                {v.icon}
-              </div>
-              <div>
-                <h2 className={`text-xl sm:text-2xl font-extrabold tracking-tight ${v.text}`} data-testid="text-advisor-verdict">
-                  {advisor.verdict === "TRADE_THE_HYPE" ? "TRADE THE HYPE" : advisor.verdict === "SPECULATIVE" ? "SPECULATIVE FLYER" : advisor.verdict.replace(/_/g, " ")}
-                </h2>
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 flex-wrap justify-end">
-              {advisor.conviction && (
-                <Badge 
-                  variant="outline" 
-                  className={`text-[11px] font-semibold ${
-                    advisor.conviction.level === "High Conviction" ? "text-green-600 border-green-400 dark:text-green-400 dark:border-green-600" :
-                    advisor.conviction.level === "Medium Conviction" ? "text-blue-600 border-blue-400 dark:text-blue-400 dark:border-blue-600" :
-                    advisor.conviction.level === "Low Conviction" ? "text-yellow-600 border-yellow-400 dark:text-yellow-400 dark:border-yellow-600" :
-                    "text-red-600 border-red-400 dark:text-red-400 dark:border-red-600"
-                  }`}
-                  data-testid="badge-conviction"
-                >
-                  {advisor.conviction.level}
-                </Badge>
-              )}
-              {advisor.liquidityTier && <LiquidityBadge tier={advisor.liquidityTier} />}
-            </div>
+        <div className="px-5 pt-4 pb-2">
+          <div className="flex items-center gap-2 text-sm" data-testid="text-advisor-verdict">
+            <span className={`${v.text}`}>{v.icon}</span>
+            <span className={`font-bold ${convictionColor}`}>
+              {advisor.conviction?.level || ""}
+            </span>
+            <span className="text-muted-foreground">•</span>
+            <span className={`font-semibold ${v.text}`}>{verdictDisplay}</span>
           </div>
         </div>
 
-        <div className="px-5 py-5 space-y-5">
+        <div className="px-5 pb-5 space-y-4">
           {advisor.decisions && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="section-decisions">
               <DecisionCard
@@ -147,7 +133,7 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
           )}
 
           {advisor.advisorTake && (
-            <p className="text-sm text-muted-foreground leading-relaxed" data-testid="text-advisor-take">
+            <p className="text-sm text-muted-foreground leading-snug" data-testid="text-advisor-take">
               {advisor.advisorTake}
             </p>
           )}
@@ -313,6 +299,9 @@ function buildMarketBadges(advisor: AdvisorOutlook): string[] | undefined {
 }
 
 function MarketDataContent({ advisor }: { advisor: AdvisorOutlook }) {
+  const riskLevel = advisor.structure === "Weak" ? "High Risk" : advisor.structure === "Strong" ? "Low Risk" : "Moderate Risk";
+  const riskColor = advisor.structure === "Weak" ? "text-red-600 border-red-300" : advisor.structure === "Strong" ? "text-green-600 border-green-300" : "text-yellow-600 border-yellow-300";
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-2 mb-2">
@@ -322,23 +311,9 @@ function MarketDataContent({ advisor }: { advisor: AdvisorOutlook }) {
             {advisor.marketPhase}
           </Badge>
         )}
-        {advisor.timing && (
-          <Badge variant="outline" className={`text-xs font-medium ${
-            advisor.timing === "Early" ? "text-green-600 border-green-300" :
-            advisor.timing === "Overextended" ? "text-red-600 border-red-300" :
-            advisor.timing === "Late" ? "text-orange-600 border-orange-300" :
-            "text-muted-foreground"
-          }`} data-testid="badge-timing">
-            {advisor.timing}
-          </Badge>
-        )}
         {advisor.structure && (
-          <Badge variant="outline" className={`text-xs font-medium ${
-            advisor.structure === "Strong" ? "text-green-600 border-green-300" :
-            advisor.structure === "Weak" ? "text-red-600 border-red-300" :
-            "text-yellow-600 border-yellow-300"
-          }`} data-testid="badge-structure">
-            {advisor.structure}
+          <Badge variant="outline" className={`text-xs font-medium ${riskColor}`} data-testid="badge-structure">
+            {riskLevel}
           </Badge>
         )}
       </div>

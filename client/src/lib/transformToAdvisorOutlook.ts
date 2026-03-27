@@ -73,19 +73,28 @@ function mapHorizon(
   return "3-12m";
 }
 
+function cleanSystemLanguage(text: string): string {
+  return text
+    .replace(/\bsample factor\s*\d*(\.\d+)?/gi, "limited market data")
+    .replace(/\blow data confidence\s*\(\d+\)/gi, "low confidence")
+    .replace(/\bdata confidence\s*\(\d+\)/gi, "confidence")
+    .replace(/\bconfidence(?:Score)?\s*(?:of\s*)?\(\s*\d+\s*\)/gi, "confidence")
+    .replace(/\bconfidenceScore\s*[:=]\s*\d+/gi, "confidence")
+    .replace(/\b\d+(?:\.\d+)?%?\s*sample\b/gi, "limited sample")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function buildAdvisorTake(
   outlook: PlayerOutlookResponse,
   verdictLabel: string
 ): string {
   const call = outlook.investmentCall;
   
-  // Prefer the new pre-generated advisorTake from investmentDecisionEngine
   if (call?.advisorTake && call.advisorTake.length > 50) {
-    return call.advisorTake;
+    return cleanSystemLanguage(call.advisorTake).slice(0, 200);
   }
   
-  // Legacy fallback: build from pieces
-  const playerName = outlook.player?.name || "This player";
   const thesis = outlook.thesis || [];
   
   let sentence1 = `${verdictLabel}.`;
@@ -97,22 +106,10 @@ function buildAdvisorTake(
     sentence2 = thesis[0];
   }
   
-  let sentence3 = "";
-  if (call?.thesisBreakers && call.thesisBreakers.length > 0) {
-    sentence3 = `This changes if: ${call.thesisBreakers[0].toLowerCase()}.`;
-  } else if (outlook.marketRealityCheck?.length > 0) {
-    sentence3 = outlook.marketRealityCheck[0];
-  }
-  
-  let sentence4 = "";
-  if (call?.actionPlan?.whatToDoNow) {
-    sentence4 = call.actionPlan.whatToDoNow;
-  }
-  
-  return [sentence1, sentence2, sentence3, sentence4]
+  return cleanSystemLanguage([sentence1, sentence2]
     .filter(s => s.length > 0)
-    .join(" ")
-    .slice(0, 500);
+    .join(" "))
+    .slice(0, 200);
 }
 
 function extractPackHitReaction(outlook: PlayerOutlookResponse): string | undefined {
@@ -474,19 +471,19 @@ function extractConviction(outlook: PlayerOutlookResponse): AdvisorOutlook["conv
 
   let narrative: string;
   if (conv.agreementScore >= 80 && bullishSignals.length >= 4) {
-    narrative = `Signals are strongly aligned across ${bullishSignals.slice(0, 3).join(", ")}`;
+    narrative = `Strong alignment — ${bullishSignals.slice(0, 3).join(", ")} all bullish`;
   } else if (conv.agreementScore >= 80 && bearishSignals.length >= 4) {
-    narrative = `Signals are aligned bearish across ${bearishSignals.slice(0, 3).join(", ")}`;
+    narrative = `Aligned bearish — ${bearishSignals.slice(0, 3).join(", ")}`;
   } else if (conv.agreementScore >= 60 && bullishSignals.length > bearishSignals.length) {
-    narrative = `Signals skew bullish, led by ${bullishSignals.slice(0, 2).join(" and ")}`;
+    narrative = `Driven by ${bullishSignals.slice(0, 2).join(" and ")}`;
   } else if (conv.agreementScore >= 60 && bearishSignals.length > bullishSignals.length) {
-    narrative = `Signals skew bearish, driven by ${bearishSignals.slice(0, 2).join(" and ")}`;
+    narrative = `Driven by weak ${bearishSignals.slice(0, 2).join(" and ")}`;
   } else if (conv.agreementScore >= 40) {
     const bull = bullishSignals.length > 0 ? bullishSignals[0] : "";
     const bear = bearishSignals.length > 0 ? bearishSignals[0] : "";
-    narrative = `Signals are mixed${bull && bear ? `, with conflicting ${bull} and ${bear} dynamics` : ""}`;
+    narrative = bull && bear ? `Conflicting ${bull} and ${bear}` : "Mixed signals";
   } else {
-    narrative = `Signals are conflicting — no clear directional consensus`;
+    narrative = `Conflicting signals — no reliable edge`;
   }
 
   return {
@@ -539,7 +536,7 @@ function buildDecisions(outlook: PlayerOutlookResponse, verdict: AdvisorVerdict)
     case "SPECULATIVE":
       return {
         holder: { action: "HOLD (small only)", reason: truncate(shortReason || "Keep small position — lottery ticket sizing") },
-        buyer: { action: "SMALL BUY only", reason: truncate(shortReason || "Speculative upside exists but size accordingly") },
+        buyer: { action: "WAIT", reason: truncate("Low conviction — no clear edge. If you choose to enter, small speculative position only.") },
       };
     case "HOLD":
     default:
