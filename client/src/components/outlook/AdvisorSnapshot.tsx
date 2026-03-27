@@ -427,9 +427,6 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
               </div>
             </div>
 
-            {advisor.tradeTargets && advisor.tradeTargets.targets.length > 0 && (
-              <TradeTargetsSection data={advisor.tradeTargets} verdict={advisor.verdict} />
-            )}
           </div>
         )}
       </CardContent>

@@ -1525,7 +1525,7 @@ export type TradeTargetsData = {
   caveat?: string;
 };
 
-export type HolderAction = "HOLD" | "HOLD / ADD" | "SELL into strength" | "SELL / EXIT" | "REDUCE exposure" | "HOLD (small only)";
+export type HolderAction = "HOLD" | "HOLD / ADD" | "SELL" | "SELL into strength" | "SELL / EXIT" | "REDUCE exposure" | "HOLD (small only)";
 export type BuyerAction = "BUY now" | "WAIT" | "WAIT for pullback" | "DO NOT BUY" | "AVOID" | "AVOID entry" | "SMALL BUY only";
 
 export type HolderDecisionBox = {

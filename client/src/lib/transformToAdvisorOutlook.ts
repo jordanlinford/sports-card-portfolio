@@ -528,7 +528,7 @@ function buildDecisions(outlook: PlayerOutlookResponse, verdict: AdvisorVerdict)
       };
     case "SELL":
       return {
-        holder: { action: "SELL into strength", reason: truncate(shortReason || "Lock in gains before further decline") },
+        holder: { action: "SELL", reason: truncate(shortReason || "Lock in gains before further decline") },
         buyer: { action: "AVOID entry", reason: truncate("Market conditions don't support new positions") },
       };
     case "AVOID":
