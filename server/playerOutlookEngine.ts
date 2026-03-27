@@ -149,7 +149,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 18; // v18: Market Scoring Engine V2 - market-behavior-first verdicts with 7-signal scoring
+const PROMPT_VERSION = 19; // v19: Tiered volatility dampening for extreme CV players
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
