@@ -305,7 +305,7 @@ function SignalCardComponent({ signal, card, showOwned, ownedAction, ownerCount,
               <img
                 src={card.imagePath}
                 alt={card.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 data-testid={`img-card-${card.id}`}
               />
             ) : (
@@ -400,7 +400,7 @@ function PriceMoverCard({ mover }: { mover: PriceMover }) {
         <div className="flex items-center gap-3">
           <div className="w-10 h-12 flex-shrink-0 rounded overflow-hidden bg-muted">
             {card.imagePath ? (
-              <img src={card.imagePath} alt={card.title} className="w-full h-full object-cover" />
+              <img src={card.imagePath} alt={card.title} className="w-full h-full object-contain" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <ImageIcon className="h-4 w-4 text-muted-foreground/30" />
@@ -454,7 +454,7 @@ function MomentumCard({ item }: { item: MomentumItem }) {
         <div className="flex items-center gap-3">
           <div className="w-10 h-12 flex-shrink-0 rounded overflow-hidden bg-muted">
             {card.imagePath ? (
-              <img src={card.imagePath} alt={card.title} className="w-full h-full object-cover" />
+              <img src={card.imagePath} alt={card.title} className="w-full h-full object-contain" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <ImageIcon className="h-4 w-4 text-muted-foreground/30" />
@@ -512,7 +512,7 @@ function TrendingHeatCard({ item, rank }: { item: TrendingItem; rank: number }) 
           </div>
           <div className="w-10 h-12 flex-shrink-0 rounded overflow-hidden bg-muted">
             {card.imagePath ? (
-              <img src={card.imagePath} alt={card.title} className="w-full h-full object-cover" />
+              <img src={card.imagePath} alt={card.title} className="w-full h-full object-contain" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <ImageIcon className="h-4 w-4 text-muted-foreground/30" />

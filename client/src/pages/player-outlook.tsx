@@ -1777,7 +1777,14 @@ export default function PlayerOutlookPage() {
                 onSelect={(player) => {
                   setPlayerName(player.name);
                   if (player.sport) {
-                    setSport(player.sport.toLowerCase());
+                    const sportMap: Record<string, string> = {
+                      "nba": "basketball", "nfl": "football", "mlb": "baseball",
+                      "nhl": "hockey", "mls": "soccer",
+                      "basketball": "basketball", "football": "football",
+                      "baseball": "baseball", "hockey": "hockey", "soccer": "soccer",
+                    };
+                    const mapped = sportMap[player.sport.toLowerCase()] || player.sport.toLowerCase();
+                    setSport(mapped);
                   }
                 }}
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
