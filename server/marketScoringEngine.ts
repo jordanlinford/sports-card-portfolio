@@ -109,10 +109,23 @@ function scoreMomentum(derived: DerivedMetrics): number {
 }
 
 function scoreLiquidity(derived: DerivedMetrics, metrics: MarketMetrics): number {
-  const raw = clamp(derived.sellThrough * 100, 0, 100);
   const sales30d = metrics.soldCount30d ?? 0;
-  const volumeDampener = Math.min(1, Math.log(1 + sales30d) / 3);
-  let score = clamp(raw * volumeDampener, 0, 100);
+
+  const sellThroughScore = clamp(derived.sellThrough * 100, 0, 100);
+
+  const maxVelocityLog = Math.log(1 + 20);
+  const velocityScore = clamp(normalize(Math.log(1 + derived.salesVelocity), 0, maxVelocityLog) * 100, 0, 100);
+
+  let score: number;
+  if (sales30d >= 100) {
+    score = velocityScore * 0.7 + sellThroughScore * 0.3;
+  } else if (sales30d >= 30) {
+    const velocityWeight = 0.3 + (0.4 * (sales30d - 30) / 70);
+    score = velocityScore * velocityWeight + sellThroughScore * (1 - velocityWeight);
+  } else {
+    score = sellThroughScore;
+  }
+
   if (sales30d < 10) {
     score *= 0.6;
   }
@@ -121,12 +134,20 @@ function scoreLiquidity(derived: DerivedMetrics, metrics: MarketMetrics): number
 
 function scoreSupply(derived: DerivedMetrics): number {
   if (derived.sampleFactor === 0) return 50;
-  return clamp(100 - (derived.supplyRatio * 15), 0, 100);
+  const volumeFloor = Math.min(1, Math.log(1 + derived.salesVelocity * 7) / Math.log(50));
+  const rawScore = 100 - (derived.supplyRatio * 15);
+  const flooredScore = Math.max(rawScore, volumeFloor * 40);
+  return clamp(flooredScore, 0, 100);
 }
 
 function scoreVolatility(derived: DerivedMetrics): number {
   if (derived.sampleFactor === 0) return 50;
-  return clamp(100 - (derived.cv * 150), 0, 100);
+  const rawScore = 100 - (derived.cv * 150);
+  if (derived.salesVelocity >= 5 && derived.cv > 1.5) {
+    const dampened = 100 - (Math.log(1 + derived.cv) * 45);
+    return clamp(Math.max(rawScore, dampened), 0, 100);
+  }
+  return clamp(rawScore, 0, 100);
 }
 
 function scoreHype(derived: DerivedMetrics): number {
