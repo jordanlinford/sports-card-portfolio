@@ -957,12 +957,22 @@ async function searchAndAnalyzeCardPrice(card: CardInfo): Promise<PriceLookupRes
   
   // Build variation-aware search query hints
   const variationStr = card.variation || "Base";
+  const setLowerForHints = (card.set || "").toLowerCase();
   const isNumbered = variationStr.match(/\/\d+/);
-  const searchHints = isNumbered 
-    ? `This is a NUMBERED parallel (${variationStr}) — it is significantly more valuable than a base card. Search specifically for this parallel.`
-    : (variationStr.toLowerCase() !== "base" 
-      ? `This is a ${variationStr} parallel — search for this specific variation, not the base card.`
-      : "");
+  const isAutoFromSet = /\b(signature|autograph|auto|ink|penmanship)\b/.test(setLowerForHints);
+  const isAutoFromVariation = /\b(auto|autograph|signature|signed)\b/.test(variationStr.toLowerCase());
+  const isAutoCard = isAutoFromSet || isAutoFromVariation;
+  
+  let searchHints = "";
+  if (isAutoCard && isNumbered) {
+    searchHints = `This is a NUMBERED AUTOGRAPH card (${variationStr} from ${card.set || "unknown set"}) — this is a PREMIUM card combining autograph + numbered parallel. These are typically HIGH VALUE. Search specifically for this exact parallel, not base versions.`;
+  } else if (isAutoCard) {
+    searchHints = `This is an AUTOGRAPH card (${card.set || ""} ${variationStr}) — autographs are significantly more valuable than base cards. Search for autograph-specific prices.`;
+  } else if (isNumbered) {
+    searchHints = `This is a NUMBERED parallel (${variationStr}) — it is significantly more valuable than a base card. Search specifically for this parallel.`;
+  } else if (variationStr.toLowerCase() !== "base") {
+    searchHints = `This is a ${variationStr} parallel — search for this specific variation, not the base card.`;
+  }
 
   const hasMissingIdentity = !card.set || variationStr === "Base";
   const specificityWarning = hasMissingIdentity
@@ -1157,9 +1167,11 @@ function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms:
   }
   
   // Detect auto/memorabilia cards (highest priority - these are premium)
-  const hasAuto = /\b(auto|autograph|signature|signed)\b/.test(variation);
-  const hasPatch = /\b(patch|relic|jersey|memorabilia|game.?used|player.?worn)\b/.test(variation);
-  const hasRPA = /\brpa\b/.test(variation) || (hasAuto && hasPatch);
+  // Check both variation AND set name for auto indicators (e.g., "Donruss Signature Series" has auto in set name)
+  const combinedText = `${variation} ${setLower}`;
+  const hasAuto = /\b(auto|autograph|signature|signed)\b/.test(combinedText);
+  const hasPatch = /\b(patch|relic|jersey|memorabilia|game.?used|player.?worn)\b/.test(combinedText);
+  const hasRPA = /\brpa\b/.test(combinedText) || (hasAuto && hasPatch);
   
   if (hasRPA) {
     // RPA / Auto + Patch combo
