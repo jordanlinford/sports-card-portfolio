@@ -963,8 +963,22 @@ async function searchAndAnalyzeCardPrice(card: CardInfo): Promise<PriceLookupRes
   const isAutoFromVariation = /\b(auto|autograph|signature|signed)\b/.test(variationStr.toLowerCase());
   const isAutoCard = isAutoFromSet || isAutoFromVariation;
   
+  const is1of1 = isOneOfOneCard(card);
+  
   let searchHints = "";
-  if (isAutoCard && isNumbered) {
+  if (is1of1 && isAutoCard) {
+    searchHints = `CRITICAL: This is a 1/1 (ONE OF ONE) AUTOGRAPH card — the ONLY copy in existence. This is an ULTRA-PREMIUM card.
+DO NOT use prices from base cards, /199, /99, /50, or any other numbered parallels. Those are COMPLETELY DIFFERENT cards.
+A 1/1 autograph is typically worth 10x-50x the /50 version. Even for lesser-known players, 1/1 autos in Chrome sets rarely sell below $100-$200.
+Search for: "${card.title} 1/1" OR "${card.title} one of one" OR "${card.title} superfractor" on eBay sold listings.
+If you cannot find this EXACT 1/1 sale, look for similar 1/1 autos from the same set/year to estimate, and set confidence to "low".
+NEVER return a value under $50 for a 1/1 autograph unless you have a specific sold listing proving it.`;
+  } else if (is1of1) {
+    searchHints = `CRITICAL: This is a 1/1 (ONE OF ONE) card — the ONLY copy in existence. This is a PREMIUM card.
+DO NOT use prices from base cards or numbered parallels (/199, /99, /50). Those are DIFFERENT cards.
+A 1/1 is typically worth 5x-20x the /50 version. Search specifically for 1/1 or superfractor sales.
+If you cannot find this EXACT 1/1 sale, look for similar 1/1 cards from the same set/year and set confidence to "low".`;
+  } else if (isAutoCard && isNumbered) {
     searchHints = `This is a NUMBERED AUTOGRAPH card (${variationStr} from ${card.set || "unknown set"}) — this is a PREMIUM card combining autograph + numbered parallel. These are typically HIGH VALUE. Search specifically for this exact parallel, not base versions.`;
   } else if (isAutoCard) {
     searchHints = `This is an AUTOGRAPH card (${card.set || ""} ${variationStr}) — autographs are significantly more valuable than base cards. Search for autograph-specific prices.`;
@@ -1415,6 +1429,34 @@ export async function lookupCardPrice(card: CardInfo): Promise<PriceLookupResult
     
     if (result && result.estimatedValue) {
       if (is1of1) {
+        const variationLower = ((card.variation || "") + " " + (card.set || "")).toLowerCase();
+        const isAutoCard = /\b(auto|autograph|signature|signed|ink|penmanship)\b/.test(variationLower);
+        const suspiciouslyLowThreshold = isAutoCard ? 100 : 50;
+        
+        if (result.estimatedValue < suspiciouslyLowThreshold) {
+          console.warn(`[1/1 Sanity] Gemini returned $${result.estimatedValue} for 1/1 card "${card.title}" (${isAutoCard ? "auto" : "non-auto"}). Running parallel comp check...`);
+          
+          try {
+            const projection = await lookupParallelComps(card);
+            if (projection.projectedValue && projection.projectedValue > result.estimatedValue) {
+              console.log(`[1/1 Sanity] Parallel projection ($${projection.projectedValue}) > Gemini ($${result.estimatedValue}). Using parallel projection.`);
+              return {
+                estimatedValue: projection.projectedValue,
+                source: "Projected from Parallel Comps (1/1 sanity override)",
+                searchQuery: `${card.title} ${card.set || ""} ${card.grade || ""}`,
+                salesFound: projection.parallelComps.reduce((sum, c) => sum + c.salesFound, 0),
+                confidence: "low",
+                details: `Gemini initially estimated $${result.estimatedValue} which is suspiciously low for a 1/1 ${isAutoCard ? "autograph" : "card"}. ${projection.projectionMethod}`,
+                oneOfOneProjection: projection,
+              };
+            } else {
+              console.log(`[1/1 Sanity] Parallel projection ($${projection.projectedValue}) not higher than Gemini ($${result.estimatedValue}). Using Gemini value.`);
+            }
+          } catch (err) {
+            console.warn(`[1/1 Sanity] Parallel comp fallback failed:`, err);
+          }
+        }
+        
         result.oneOfOneProjection = {
           isOneOfOne: true,
           projectedValue: result.estimatedValue,
