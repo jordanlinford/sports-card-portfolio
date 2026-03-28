@@ -1036,13 +1036,15 @@ PRICING RULES:
 - Lower-tier grading companies (BCCG, CGC) are worth less than PSA/BGS
 - ACCURACY matters more than caution. Users rely on these values for investment decisions.
 
-CRITICAL — PLAYER PERFORMANCE MATTERS:
+CRITICAL — PLAYER STATUS & PERFORMANCE MATTERS:
 - A numbered parallel of a BUST or underperforming player is worth FAR LESS than the same parallel of a star
 - Example: A /2 National Treasures RPA of a QB who lost his starting job might sell for $200-$1000, NOT $10,000+
 - The card's rarity ALONE does not determine value — demand driven by player performance is the primary driver
-- Always factor in whether the player is currently a star, a role player, injured, or a bust
-- If you cannot find ACTUAL sold listings for this specific card, set confidence to "low" and be conservative
+- Always factor in whether the player is currently a star, a role player, injured, retired, or a bust
+- RETIRED/LEGACY PLAYERS: Modern releases (retro sets, Prizm, etc.) of retired players trade at a SIGNIFICANT DISCOUNT vs. the same parallels of active stars. A Michael Vick /15 auto is NOT comparable to a Patrick Mahomes /15 auto. Use the RETIRED PLAYER'S OWN comparable autos (similar sets, similar print runs) — NOT active star player comps.
+- If you cannot find ACTUAL sold listings for this specific card, search for the SAME PLAYER's other low-numbered autos from similar products to estimate. Set confidence to "low" and be conservative.
 - NEVER extrapolate from other players' card prices for the same parallel — a Patrick Mahomes /2 and a Trey Lance /2 are vastly different values
+- NO DIRECT SALES FOUND? If there are ZERO sold listings for this exact card, you MUST: (1) search for the same player's comparable autos from similar products, (2) set salesFound to 0, (3) set confidence to "low", and (4) clearly state in details that no direct sales were found. Do NOT hallucinate a price from unrelated cards.
 
 Return ONLY a JSON object:
 {
@@ -1086,6 +1088,13 @@ You MUST return an estimatedValue if you find ANY price information.`;
               console.warn(`[Price Lookup] SANITY WARNING: $${finalValue} with only ${parsed.salesFound} sales and ${parsed.confidence} confidence for ${card.title}. Marking as low confidence.`);
               parsed.confidence = "low";
               parsed.details = (parsed.details || "") + " [Warning: High estimated value with limited sales evidence. Verify manually.]";
+            }
+            
+            // SANITY CHECK 2: Zero direct sales with high value — likely hallucinated from other players' comps
+            if ((parsed.salesFound || 0) === 0 && finalValue > 500) {
+              console.warn(`[Price Lookup] ZERO-SALES WARNING: $${finalValue} with 0 direct sales for ${card.title}. Capping at conservative estimate.`);
+              parsed.confidence = "low";
+              parsed.details = (parsed.details || "") + " [Warning: No direct sales found for this exact card. Estimate based on comparable cards — verify manually.]";
             }
             
             // RAW CARD CORRECTION: Use raw-specific price when available
