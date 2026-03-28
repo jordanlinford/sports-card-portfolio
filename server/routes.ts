@@ -18,7 +18,7 @@ import {
   playerOutlookCache,
 } from "@shared/schema";
 import { db } from "./db";
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql, isNotNull } from "drizzle-orm";
 import { runMigrations } from "stripe-replit-sync";
 import { getStripeSync, getUncachableStripeClient } from "./stripeClient";
 import { WebhookHandlers } from "./webhookHandlers";
@@ -10198,121 +10198,121 @@ Return ONLY valid JSON, no markdown.`;
 
   app.get("/api/alpha/feed", async (req: any, res) => {
     try {
-      const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+      const sportFilter = (req.query.sport as string)?.toLowerCase() || undefined;
 
-      const [allSignals, priceMoversData, communityMomentum, trending] = await Promise.all([
-        storage.getActiveSignals(200),
-        storage.getPriceMovers(10),
-        storage.getCommunityMomentum(10),
-        storage.getTopCardsByInterest(limit),
-      ]);
-      const allPriceMovers = [...priceMoversData.gainers, ...priceMoversData.decliners];
+      const allOutlooks = await db
+        .select({
+          playerKey: playerOutlookCache.playerKey,
+          playerName: playerOutlookCache.playerName,
+          sport: playerOutlookCache.sport,
+          temperature: playerOutlookCache.temperature,
+          viewCount: playerOutlookCache.viewCount,
+          outlookJson: playerOutlookCache.outlookJson,
+          lastFetchedAt: playerOutlookCache.lastFetchedAt,
+        })
+        .from(playerOutlookCache)
+        .where(isNotNull(playerOutlookCache.outlookJson));
 
-      const buySignals = allSignals
-        .filter(s => s.signalType === "strong_buy" || s.signalType === "buy")
-        .sort((a, b) => b.alphaScore - a.alphaScore)
-        .slice(0, limit);
+      const normSport = (s: string) => {
+        const map: Record<string, string> = { nba: "basketball", nfl: "football", mlb: "baseball", nhl: "hockey", mls: "soccer" };
+        return map[s.toLowerCase()] || s.toLowerCase();
+      };
 
-      const sellSignals = allSignals
-        .filter(s => s.signalType === "strong_sell" || s.signalType === "sell")
-        .sort((a, b) => a.alphaScore - b.alphaScore)
-        .slice(0, limit);
+      const players = allOutlooks
+        .filter(o => {
+          if (!o.outlookJson) return false;
+          const oj = o.outlookJson as any;
+          if (!oj.verdict?.action) return false;
+          if (sportFilter && normSport(o.sport) !== sportFilter) return false;
+          return true;
+        })
+        .map(o => {
+          const oj = o.outlookJson as any;
+          const ms = oj.marketSignals || {};
+          const composite = ms.composite ?? ms.compositeScore ?? null;
+          const demand = ms.demandScore ?? ms.scores?.demandScore ?? null;
+          const momentum = ms.momentumScore ?? ms.scores?.momentumScore ?? null;
+          const hype = ms.hypeScore ?? ms.scores?.hypeScore ?? null;
+          const liquidity = ms.liquidityScore ?? ms.scores?.liquidityScore ?? null;
+          const confidence = ms.confidenceScore ?? ms.scores?.confidenceScore ?? null;
+          const phase = ms.phase ?? null;
+          const sampleFactor = ms.derivedMetrics?.sampleFactor ?? 0;
 
-      const holdSignals = allSignals
-        .filter(s => s.signalType === "hold")
-        .sort((a, b) => b.alphaScore - a.alphaScore)
-        .slice(0, limit);
+          return {
+            playerKey: o.playerKey,
+            playerName: o.playerName,
+            sport: normSport(o.sport),
+            temperature: o.temperature,
+            viewCount: o.viewCount,
+            verdict: oj.verdict?.action,
+            verdictSummary: oj.verdict?.summary || null,
+            composite,
+            demand,
+            momentum,
+            hype,
+            liquidity,
+            confidence,
+            phase,
+            sampleFactor,
+            lastFetchedAt: o.lastFetchedAt,
+          };
+        });
 
-      const allSignalCardIds = allSignals.map(s => s.cardId).filter(Boolean) as number[];
-      const trendingCardIds = trending.map(t => t.cardId).filter(Boolean) as number[];
-      const moverCardIds = allPriceMovers.map(m => m.cardId);
-      const momentumCardIds = communityMomentum.map(m => m.cardId);
-      const allCardIds = [...new Set([...allSignalCardIds, ...trendingCardIds, ...moverCardIds, ...momentumCardIds])];
+      const withScores = players.filter(p => p.composite !== null && p.sampleFactor > 0);
+      const hotMarkets = [...withScores]
+        .sort((a, b) => (b.composite ?? 0) - (a.composite ?? 0))
+        .slice(0, 10);
 
-      const toCardSummary = (card: any) => ({
-        id: card.id,
-        title: card.title,
-        playerName: card.playerName,
-        imagePath: card.imagePath,
-        set: card.set,
-        year: card.year,
-        estimatedValue: card.estimatedValue,
-        manualValue: card.manualValue,
-        sport: card.sport,
-        variation: card.variation,
-      });
+      const coolingMarkets = [...withScores]
+        .filter(p => (p.momentum ?? 50) < 40 || p.temperature === "COOLING")
+        .sort((a, b) => (a.momentum ?? 50) - (b.momentum ?? 50))
+        .slice(0, 8);
 
-      const [cardResults, ownershipCounts, weeklyScanCounts] = await Promise.all([
-        Promise.all(allCardIds.map(id => storage.getCard(id))),
-        storage.getCardOwnershipCounts(allCardIds),
-        storage.getWeeklyScansForCards(allCardIds),
-      ]);
+      const buyOpportunities = players
+        .filter(p => ["BUY", "ACCUMULATE", "HOLD_CORE"].includes(p.verdict))
+        .sort((a, b) => (b.composite ?? 50) - (a.composite ?? 50))
+        .slice(0, 10);
 
-      const cardMap = new Map<number, any>();
-      for (const card of cardResults) {
-        if (card) cardMap.set(card.id, toCardSummary(card));
+      const sellWarnings = players
+        .filter(p => ["AVOID", "SELL", "TRADE_THE_HYPE"].includes(p.verdict))
+        .sort((a, b) => (a.composite ?? 50) - (b.composite ?? 50))
+        .slice(0, 10);
+
+      const speculativePlays = players
+        .filter(p => p.verdict === "SPECULATIVE_FLYER")
+        .sort((a, b) => (b.composite ?? 50) - (a.composite ?? 50))
+        .slice(0, 8);
+
+      const hottestByTemp = players
+        .filter(p => p.temperature === "HOT")
+        .sort((a, b) => (b.composite ?? 50) - (a.composite ?? 50))
+        .slice(0, 8);
+
+      const sportCounts: Record<string, number> = {};
+      const verdictCounts: Record<string, number> = {};
+      for (const p of players) {
+        sportCounts[p.sport] = (sportCounts[p.sport] || 0) + 1;
+        verdictCounts[p.verdict] = (verdictCounts[p.verdict] || 0) + 1;
       }
 
-      const enrichSignal = (s: any) => ({
-        ...s,
-        card: s.cardId ? cardMap.get(s.cardId) ?? null : null,
-        ownerCount: s.cardId ? ownershipCounts.get(s.cardId) ?? 0 : 0,
-        weeklyScans: s.cardId ? weeklyScanCounts.get(s.cardId) ?? 0 : 0,
-      });
-
-      const trendingWithCards = trending
-        .filter(t => t.cardId && cardMap.has(t.cardId))
-        .map(t => ({
-          ...t,
-          card: cardMap.get(t.cardId!),
-          ownerCount: ownershipCounts.get(t.cardId!) ?? 0,
-          weeklyScans: weeklyScanCounts.get(t.cardId!) ?? 0,
-        }));
-
-      const enrichMover = (m: any) => ({
-        ...m,
-        card: cardMap.get(m.cardId),
-        ownerCount: ownershipCounts.get(m.cardId) ?? 0,
-        weeklyScans: weeklyScanCounts.get(m.cardId) ?? 0,
-      });
-      const enrichedGainers = priceMoversData.gainers
-        .filter(m => cardMap.has(m.cardId))
-        .map(enrichMover);
-      const enrichedDecliners = priceMoversData.decliners
-        .filter(m => cardMap.has(m.cardId))
-        .map(enrichMover);
-
-      const enrichedMomentum = communityMomentum
-        .filter(m => cardMap.has(m.cardId))
-        .map(m => ({
-          ...m,
-          card: cardMap.get(m.cardId),
-          ownerCount: ownershipCounts.get(m.cardId) ?? 0,
-          weeklyScans: weeklyScanCounts.get(m.cardId) ?? 0,
-        }));
-
-      const allEnrichedMovers = [...enrichedGainers, ...enrichedDecliners];
-      allEnrichedMovers.sort((a, b) => Math.abs(b.pctChange) - Math.abs(a.pctChange));
-      const biggestMover = allEnrichedMovers.length > 0 ? allEnrichedMovers[0] : null;
-      const hottestPlayer = enrichedMomentum.length > 0 ? enrichedMomentum[0].playerName : (trendingWithCards.length > 0 ? trendingWithCards[0].playerName : null);
+      const topComposite = hotMarkets[0];
 
       res.json({
         marketPulse: {
-          totalSignals: allSignals.length,
-          buySignals: buySignals.length,
-          sellSignals: sellSignals.length,
-          biggestMover: biggestMover ? {
-            playerName: biggestMover.playerName,
-            pctChange: biggestMover.pctChange,
-          } : null,
-          hottestPlayer,
+          totalPlayers: players.length,
+          playersWithSignals: withScores.length,
+          buyCount: buyOpportunities.length,
+          sellCount: sellWarnings.length,
+          topPlayer: topComposite ? { name: topComposite.playerName, composite: topComposite.composite, sport: topComposite.sport } : null,
+          sportBreakdown: sportCounts,
+          verdictBreakdown: verdictCounts,
         },
-        opportunities: buySignals.map(enrichSignal),
-        risks: sellSignals.map(enrichSignal),
-        holds: holdSignals.map(enrichSignal),
-        priceMovers: { gainers: enrichedGainers, decliners: enrichedDecliners },
-        communityMomentum: enrichedMomentum,
-        trending: trendingWithCards,
+        hotMarkets,
+        coolingMarkets,
+        buyOpportunities,
+        sellWarnings,
+        speculativePlays,
+        hottestByTemp,
       });
     } catch (error) {
       console.error("[Alpha] Feed error:", error);
