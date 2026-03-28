@@ -62,6 +62,13 @@ function recordPriceObservation(data: {
   source?: string;
 }) {
   if (!data.priceEstimate || data.priceEstimate <= 0) return;
+  
+  // Sanity check: flag suspiciously high prices with low evidence
+  if (data.priceEstimate > 10000 && (!data.soldCount || data.soldCount <= 1) && data.confidence !== "high") {
+    console.warn(`[PriceObs] REJECTED observation: $${data.priceEstimate} for "${data.playerName}" with ${data.soldCount || 0} sales and ${data.confidence} confidence — likely hallucinated`);
+    return;
+  }
+  
   storage.insertPriceObservation({
     cardId: data.cardId ?? null,
     playerName: data.playerName ?? null,

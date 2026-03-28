@@ -677,7 +677,8 @@ async function aggregateInternalMetrics(playerName: string): Promise<Partial<Mar
         .from(cardPriceObservations)
         .where(and(
           sql`lower(player_name) = ${normalizedName}`,
-          gt(cardPriceObservations.createdAt, thirtyDaysAgo)
+          gt(cardPriceObservations.createdAt, thirtyDaysAgo),
+          sql`price_estimate < 50000`
         )),
 
       db.select({
@@ -698,7 +699,8 @@ async function aggregateInternalMetrics(playerName: string): Promise<Partial<Mar
         .where(and(
           sql`lower(player_name) = ${normalizedName}`,
           gt(cardPriceObservations.createdAt, sixtyDaysAgo),
-          lt(cardPriceObservations.createdAt, thirtyDaysAgo)
+          lt(cardPriceObservations.createdAt, thirtyDaysAgo),
+          sql`price_estimate < 50000`
         )),
     ]);
 
