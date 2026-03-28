@@ -1009,9 +1009,16 @@ SEARCH STRATEGY:
 PRICING RULES:
 - Report ACTUAL recent sold prices, not deflated estimates
 - If recent solds show a range (e.g., $400-$600), report the market midpoint ($500), not the low end
-- Numbered rookie parallels of top draft picks are typically high-value cards — price accordingly
 - Lower-tier grading companies (BCCG, CGC) are worth less than PSA/BGS
 - ACCURACY matters more than caution. Users rely on these values for investment decisions.
+
+CRITICAL — PLAYER PERFORMANCE MATTERS:
+- A numbered parallel of a BUST or underperforming player is worth FAR LESS than the same parallel of a star
+- Example: A /2 National Treasures RPA of a QB who lost his starting job might sell for $200-$1000, NOT $10,000+
+- The card's rarity ALONE does not determine value — demand driven by player performance is the primary driver
+- Always factor in whether the player is currently a star, a role player, injured, or a bust
+- If you cannot find ACTUAL sold listings for this specific card, set confidence to "low" and be conservative
+- NEVER extrapolate from other players' card prices for the same parallel — a Patrick Mahomes /2 and a Trey Lance /2 are vastly different values
 
 Return ONLY a JSON object:
 {
@@ -1049,6 +1056,13 @@ You MUST return an estimatedValue if you find ANY price information.`;
           const parsed = JSON.parse(jsonMatch[0]);
           if (parsed.estimatedValue && parsed.estimatedValue > 0) {
             let finalValue = parsed.estimatedValue;
+            
+            // SANITY CHECK: Flag suspiciously high values with low evidence
+            if (finalValue > 5000 && (parsed.salesFound || 0) <= 1 && parsed.confidence !== "high") {
+              console.warn(`[Price Lookup] SANITY WARNING: $${finalValue} with only ${parsed.salesFound} sales and ${parsed.confidence} confidence for ${card.title}. Marking as low confidence.`);
+              parsed.confidence = "low";
+              parsed.details = (parsed.details || "") + " [Warning: High estimated value with limited sales evidence. Verify manually.]";
+            }
             
             // RAW CARD CORRECTION: Use raw-specific price when available
             if (isRaw) {
