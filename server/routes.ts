@@ -4545,6 +4545,10 @@ Sitemap: ${origin}/sitemap.xml
       try {
         const scanPlayerName = result.scan?.cardIdentification?.playerName;
         const scanSport = result.scan?.cardIdentification?.sport;
+        const scanVariation = result.scan?.cardIdentification?.variation || result.scan?.cardIdentification?.parallel;
+        const scanIsLowPop = scanVariation ? /\/\s*\d{1,2}\b/.test(scanVariation) : false;
+        const scanSoldCount = result.pricing?.soldCount ?? result.pricing?.medianPrice ? 1 : 0;
+        const scanTriangulationUsed = scanIsLowPop && scanSoldCount === 0;
         if (scanPlayerName && scanSport) {
           const { getPlayerDemandContext } = await import("./demandTierEngine");
           const ctx = await getPlayerDemandContext(scanPlayerName, scanSport);
@@ -4556,6 +4560,8 @@ Sitemap: ${origin}/sitemap.xml
               careerStage: ctx.careerStage,
               sport: ctx.sport,
               percentile: ctx.percentileInSport,
+              triangulationUsed: scanTriangulationUsed,
+              ceilingApplied: false,
             };
           }
         }

@@ -221,6 +221,13 @@ DEMAND-ADJUSTED scarcity premiums (apply to the NEAREST parallel comp, NOT from 
 - CITE which specific comp(s) you used and what multiplier you applied in the notes field.`;
 }
 
+const CEILING_MULTIPLIERS: Record<DemandTier, number> = {
+  1: Infinity,
+  2: Infinity,
+  3: 3.0,
+  4: 2.0,
+};
+
 export function applyCeilingCheck(
   estimatedPrice: number,
   nearestCompPrice: number,
@@ -231,14 +238,18 @@ export function applyCeilingCheck(
     return { price: estimatedPrice, wasCapped: false };
   }
 
-  const ceilingMultiplier = tier === 3 ? 3.0 : 2.0;
+  const ceilingMultiplier = CEILING_MULTIPLIERS[tier];
+  if (!isFinite(ceilingMultiplier)) {
+    return { price: estimatedPrice, wasCapped: false };
+  }
+
   const ceiling = nearestCompPrice * ceilingMultiplier;
 
   if (estimatedPrice > ceiling) {
     return {
       price: Math.round(ceiling),
       wasCapped: true,
-      capReason: `Tier ${tier} ceiling: capped at ${ceilingMultiplier}x nearest comp ($${nearestCompPrice})`,
+      capReason: `Tier ${tier} ceiling: capped at ${ceilingMultiplier}x nearest comp ($${nearestCompPrice.toFixed(2)})`,
     };
   }
 

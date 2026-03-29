@@ -407,6 +407,16 @@ type CardScanResult = {
     aiEstimate?: AIPriceEstimate;
   };
   queryHash: string;
+  demandTier?: {
+    tier: number;
+    label: string;
+    demandScore: number;
+    careerStage: string;
+    sport: string;
+    percentile: number;
+    triangulationUsed: boolean;
+    ceilingApplied: boolean;
+  } | null;
   usage: {
     scansToday: number;
     dailyLimit: number;
@@ -2390,6 +2400,10 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                         <p className="text-sm text-muted-foreground pt-2 border-t">
                           {scanResult.pricing.marketAssessment}
                         </p>
+
+                        {scanResult.demandTier && scanResult.demandTier.triangulationUsed && (
+                          <DemandTierBadge tier={scanResult.demandTier} />
+                        )}
                         
                         {/* Recent Sales List */}
                         {scanResult.pricing.recentSales.length > 0 && (
