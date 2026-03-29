@@ -126,9 +126,58 @@ function percentileToTier(percentile: number): DemandTier {
   return 4;
 }
 
+export interface DemandTierHints {
+  isRookie?: boolean;
+  set?: string;
+  year?: number;
+  variation?: string;
+  marketDesirability?: string;
+}
+
+const PREMIUM_SETS = /\b(national treasures|flawless|immaculate|noir|one and one|eminence|logoman)\b/i;
+const HIGH_END_SETS = /\b(prizm|select|optic|spectra|obsidian|chronicles|mosaic|topps chrome)\b/i;
+
+function estimateDemandFromHints(hints: DemandTierHints | undefined, sport: string): { score: number; stage: string; reason: string } {
+  if (!hints) return { score: 40, stage: "UNKNOWN", reason: "no hints" };
+
+  let score = 40;
+  let stage = "UNKNOWN";
+  const reasons: string[] = [];
+
+  if (hints.isRookie) {
+    score += 15;
+    stage = "RISING";
+    reasons.push("rookie");
+  }
+
+  if (hints.set && PREMIUM_SETS.test(hints.set)) {
+    score += 10;
+    reasons.push("premium set");
+  } else if (hints.set && HIGH_END_SETS.test(hints.set)) {
+    score += 5;
+    reasons.push("high-end set");
+  }
+
+  const currentYear = new Date().getFullYear();
+  if (hints.year && hints.year >= currentYear - 1) {
+    score += 5;
+    reasons.push("current year");
+  }
+
+  if (hints.marketDesirability === "high" || hints.marketDesirability === "very-high") {
+    score += 10;
+    reasons.push(`desirability: ${hints.marketDesirability}`);
+  }
+
+  score = Math.min(score, 75);
+
+  return { score, stage, reason: reasons.join(", ") || "default" };
+}
+
 export async function getPlayerDemandContext(
   playerName: string,
-  sport: string
+  sport: string,
+  hints?: DemandTierHints
 ): Promise<PlayerDemandContext> {
   const normalizedSport = sport.toLowerCase();
   const playerKey = `${normalizedSport}:${playerName.toLowerCase().replace(/[^a-z0-9]/g, "")}`;
@@ -142,13 +191,20 @@ export async function getPlayerDemandContext(
   const cacheRow = rows[0];
 
   if (!cacheRow || !cacheRow.outlookJson) {
+    const hintResult = estimateDemandFromHints(hints, normalizedSport);
+    const sportScores = await getSportDemandDistribution(normalizedSport);
+    const percentile = sportScores.length > 1
+      ? computePercentileInSport(hintResult.score, sportScores)
+      : 50;
+    const tier = percentileToTier(percentile);
+    console.log(`[DemandTier] No cache for ${playerName} (${normalizedSport}). Hint-based: score=${hintResult.score}, tier=${tier}, reason="${hintResult.reason}"`);
     return {
-      tier: 3,
-      tierLabel: TIER_LABELS[3],
-      demandScore: 40,
-      careerStage: "UNKNOWN",
+      tier,
+      tierLabel: TIER_LABELS[tier],
+      demandScore: hintResult.score,
+      careerStage: hintResult.stage,
       sport: normalizedSport,
-      percentileInSport: 50,
+      percentileInSport: percentile,
       isFromCache: false,
     };
   }

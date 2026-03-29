@@ -597,7 +597,14 @@ export async function scanCardWithPricing(
     try {
       scanDemandContext = await getPlayerDemandContext(
         scan.cardIdentification.playerName,
-        scan.cardIdentification.sport || "football"
+        scan.cardIdentification.sport || "football",
+        {
+          isRookie: scan.cardIdentification.isRookie || undefined,
+          set: scan.cardIdentification.setName || undefined,
+          year: scan.cardIdentification.year || undefined,
+          variation: scanVariation || undefined,
+          marketDesirability: scan.marketContext?.desirability || undefined,
+        }
       );
       if (scanDemandContext) {
         scanDemandTierPrompt = buildDemandAdjustedMultiplierPrompt(scanDemandContext);

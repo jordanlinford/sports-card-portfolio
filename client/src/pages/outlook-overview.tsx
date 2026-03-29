@@ -865,6 +865,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
 
   const analyzeMutation = useMutation({
     mutationFn: async () => {
+      const scanId = scanResult?.scan?.cardIdentification;
+      const scanMarket = scanResult?.scan?.marketContext;
       const data = await apiRequest("POST", "/api/outlook/quick-analyze", {
         title,
         year: year || undefined,
@@ -875,8 +877,10 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         grader: grader || undefined,
         imagePath: imagePath || undefined,
         scanHistoryId: currentScanHistoryId || undefined,
-        sport: sport || undefined,
+        sport: sport || scanId?.sport || undefined,
         playerName: title || undefined,
+        isRookie: scanId?.isRookie || undefined,
+        marketDesirability: scanMarket?.desirability || undefined,
       });
       return data;
     },

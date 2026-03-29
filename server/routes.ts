@@ -3350,7 +3350,7 @@ Sitemap: ${origin}/sitemap.xml
   app.post("/api/outlook/quick-analyze", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { title, year, set, cardNumber, variation, grade, grader, imagePath, sport, scanHistoryId, playerName: reqPlayerName } = req.body;
+      const { title, year, set, cardNumber, variation, grade, grader, imagePath, sport, scanHistoryId, playerName: reqPlayerName, isRookie, marketDesirability } = req.body;
 
       if (!title) {
         return res.status(400).json({ message: "Card title is required" });
@@ -3489,7 +3489,14 @@ Sitemap: ${origin}/sitemap.xml
       let demandTierPrompt = "";
       if (qaNeedsTriangulationForTier || /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(qaVariationForTier)) {
         const tierSport = detectedSport || sport || "football";
-        demandContext = await getPlayerDemandContext(effectivePlayerName, tierSport);
+        const demandHints = {
+          isRookie: isRookie === true || undefined,
+          set: set || undefined,
+          year: year ? parseInt(year) : undefined,
+          variation: variation || undefined,
+          marketDesirability: marketDesirability || undefined,
+        };
+        demandContext = await getPlayerDemandContext(effectivePlayerName, tierSport, demandHints);
         demandTierPrompt = buildDemandAdjustedMultiplierPrompt(demandContext);
         console.log(`[Quick Analyze] Demand tier: ${demandContext.tier} (${demandContext.tierLabel}) for ${effectivePlayerName} in ${tierSport}, demand=${demandContext.demandScore}, percentile=${demandContext.percentileInSport}`);
       }
