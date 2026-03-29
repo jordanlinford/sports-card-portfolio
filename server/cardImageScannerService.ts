@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import * as ebayComps from "./ebayCompsService";
 import { fetchGeminiMarketData } from "./outlookEngine";
+import { getPlayerDemandContext, buildDemandAdjustedMultiplierPrompt, applyCeilingCheck } from "./demandTierEngine";
 import type { EbayComp } from "@shared/schema";
 
 const gemini = new GoogleGenAI({
@@ -575,16 +576,35 @@ export async function scanCardWithPricing(
   // Try Gemini with Google Search grounding first (primary source)
   console.log("[CardScanner] Fetching market data via Gemini grounded search");
   
+  const scanVariation = scan.cardIdentification.variation || scan.cardIdentification.parallel;
+  const scanIsLowPop = scanVariation ? /\/\s*\d{1,2}\b/.test(scanVariation) : false;
+  let scanDemandContext: Awaited<ReturnType<typeof getPlayerDemandContext>> | null = null;
+  let scanDemandTierPrompt: string | undefined;
+  if (scanIsLowPop && scan.cardIdentification.playerName) {
+    try {
+      scanDemandContext = await getPlayerDemandContext(
+        scan.cardIdentification.playerName,
+        scan.cardIdentification.sport || "football"
+      );
+      if (scanDemandContext) {
+        scanDemandTierPrompt = buildDemandAdjustedMultiplierPrompt(scanDemandContext);
+        console.log(`[CardScanner] Demand tier: ${scanDemandContext.tierLabel} (Tier ${scanDemandContext.tier})`);
+      }
+    } catch (tierErr) {
+      console.warn("[CardScanner] Demand tier lookup failed:", tierErr);
+    }
+  }
+
   try {
     const geminiData = await fetchGeminiMarketData({
       title: searchQuery,
       playerName: scan.cardIdentification.playerName,
       year: scan.cardIdentification.year,
       set: scan.cardIdentification.setName,
-      variation: scan.cardIdentification.variation || scan.cardIdentification.parallel,
+      variation: scanVariation,
       grade: scan.gradeEstimate.grade,
       grader: scan.gradeEstimate.gradingCompany,
-    });
+    }, scanDemandTierPrompt ? { demandTierPrompt: scanDemandTierPrompt } : undefined);
     
     if (geminiData && geminiData.avgPrice > 0) {
       console.log(`[CardScanner] Gemini found ${geminiData.soldCount} sales, avg $${geminiData.avgPrice}`);
@@ -622,6 +642,23 @@ export async function scanCardWithPricing(
         liquidityScore = 1;
       }
       
+      let finalPrice = geminiData.avgPrice;
+      let finalMin = geminiData.minPrice;
+      let finalMax = geminiData.maxPrice;
+      if (scanDemandContext && scanDemandContext.tier >= 3 && geminiData.soldCount === 0 && finalPrice > 0) {
+        const ceilingResult = applyCeilingCheck(finalPrice, finalPrice, scanDemandContext.tier, geminiData.soldCount);
+        if (ceilingResult.wasCapped) {
+          console.warn(`[CardScanner] DEMAND CEILING: ${ceilingResult.capReason}`);
+          finalPrice = ceilingResult.price;
+          finalMin = finalMin ? Math.round(finalPrice * 0.6) : null;
+          finalMax = finalMax ? Math.round(finalPrice * 1.5) : null;
+        }
+      }
+
+      const finalPriceRange = finalMin && finalMax
+        ? `$${finalMin.toFixed(2)} - $${finalMax.toFixed(2)}`
+        : `~$${finalPrice.toFixed(2)}`;
+
       return {
         scan,
         searchQuery: normalized.canonicalQuery,
@@ -630,14 +667,14 @@ export async function scanCardWithPricing(
           isFetching: false,
           isAIEstimate: false,
           soldCount: geminiData.soldCount,
-          medianPrice: geminiData.avgPrice,
-          minPrice: geminiData.minPrice,
-          maxPrice: geminiData.maxPrice,
+          medianPrice: finalPrice,
+          minPrice: finalMin,
+          maxPrice: finalMax,
           trendSlope: null,
           volatility: null,
           liquidity: liquidityScore,
           recentSales: [],
-          priceRange,
+          priceRange: finalPriceRange,
           marketAssessment,
         },
         queryHash: normalized.queryHash,

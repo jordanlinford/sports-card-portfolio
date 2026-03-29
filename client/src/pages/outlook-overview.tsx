@@ -111,7 +111,16 @@ function OutlookSkeleton() {
   );
 }
 
-function DemandTierBadge({ tier }: { tier: NonNullable<QuickAnalyzeResult['demandTier']> }) {
+type DemandTierDisplay = {
+  tier: number;
+  label: string;
+  sport: string;
+  percentile: number;
+  triangulationUsed: boolean;
+  ceilingApplied: boolean;
+};
+
+function DemandTierBadge({ tier }: { tier: DemandTierDisplay }) {
   const tierConfig: Record<number, { color: string; bg: string; label: string; desc: string }> = {
     1: { color: "text-green-700 dark:text-green-400", bg: "bg-green-100 dark:bg-green-900/30", label: "Tier 1", desc: "Elite demand" },
     2: { color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/30", label: "Tier 2", desc: "Strong demand" },
