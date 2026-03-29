@@ -3926,14 +3926,24 @@ Sitemap: ${origin}/sitemap.xml
 
       // DEMAND TIER CEILING CHECK: For Tier 3/4 players with triangulated (0 comp) prices,
       // cap the estimated value to prevent inflated estimates for low-demand players.
+      // Use independent comp sources as ceiling anchor (cross-product, legacy, low-pop fallback)
+      // rather than the unified estimate itself which may be the value being capped.
       let demandCeilingApplied = false;
       let demandCeilingReason = "";
+      const triangulationUsed = demandContext !== null && qaIsLowPop && compCount === 0;
       if (demandContext && demandContext.tier >= 3 && marketValue && marketValue > 0 && compCount === 0) {
-        const nearestComp = unifiedResult?.market?.avgPrice || priceData.estimatedValue || 0;
-        if (nearestComp > 0) {
-          const ceilingResult = applyCeilingCheck(marketValue, nearestComp, demandContext.tier, compCount);
+        const independentAnchors = [
+          lowPopFallbackPrice,
+          specCrossProduct?.avgPrice,
+          priceData.estimatedValue,
+        ].filter((v): v is number => typeof v === 'number' && v > 0);
+        const anchorPrice = independentAnchors.length > 0
+          ? independentAnchors.reduce((a, b) => a + b, 0) / independentAnchors.length
+          : 0;
+        if (anchorPrice > 0) {
+          const ceilingResult = applyCeilingCheck(marketValue, anchorPrice, demandContext.tier, compCount);
           if (ceilingResult.wasCapped) {
-            console.warn(`[Quick Analyze] DEMAND CEILING: ${ceilingResult.capReason}. Was $${marketValue}, now $${ceilingResult.price}`);
+            console.warn(`[Quick Analyze] DEMAND CEILING: ${ceilingResult.capReason}. Was $${marketValue}, anchor $${anchorPrice.toFixed(2)} (from ${independentAnchors.length} source(s)), now $${ceilingResult.price}`);
             marketValue = ceilingResult.price;
             priceMin = Math.round(marketValue * 0.6);
             priceMax = Math.round(marketValue * 1.5);
@@ -4169,6 +4179,7 @@ Sitemap: ${origin}/sitemap.xml
           sport: demandContext.sport,
           percentile: demandContext.percentileInSport,
           isFromCache: demandContext.isFromCache,
+          triangulationUsed,
           ceilingApplied: demandCeilingApplied,
           ceilingReason: demandCeilingReason || undefined,
         } : null,
@@ -4530,12 +4541,35 @@ Sitemap: ${origin}/sitemap.xml
 
       const remainingScans = dailyLimit - scansToday - 1;
       
+      let scanDemandTier = null;
+      try {
+        const scanPlayerName = result.scan?.cardIdentification?.playerName;
+        const scanSport = result.scan?.cardIdentification?.sport;
+        if (scanPlayerName && scanSport) {
+          const { getPlayerDemandContext } = await import("./demandTierEngine");
+          const ctx = await getPlayerDemandContext(scanPlayerName, scanSport);
+          if (ctx) {
+            scanDemandTier = {
+              tier: ctx.tier,
+              label: ctx.tierLabel,
+              demandScore: ctx.demandScore,
+              careerStage: ctx.careerStage,
+              sport: ctx.sport,
+              percentile: ctx.percentileInSport,
+            };
+          }
+        }
+      } catch (tierErr) {
+        console.warn("[Card Scan] Demand tier lookup failed:", tierErr);
+      }
+
       res.json({
         success: result.scan.success,
         scan: result.scan,
         searchQuery: result.searchQuery,
         pricing: result.pricing,
         queryHash: result.queryHash,
+        demandTier: scanDemandTier,
         usage: {
           scansToday: scansToday + 1,
           dailyLimit,

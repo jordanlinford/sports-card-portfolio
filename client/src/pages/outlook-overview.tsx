@@ -298,6 +298,7 @@ type QuickAnalyzeResult = {
     sport: string;
     percentile: number;
     isFromCache: boolean;
+    triangulationUsed: boolean;
     ceilingApplied: boolean;
     ceilingReason?: string;
   } | null;
@@ -2737,7 +2738,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   showDetailedSignals={result.isPro}
                 />
 
-                {result.demandTier && (
+                {result.demandTier && result.demandTier.triangulationUsed && (
                   <DemandTierBadge tier={result.demandTier} />
                 )}
 

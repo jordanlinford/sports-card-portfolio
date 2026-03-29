@@ -258,7 +258,8 @@ export async function fetchGeminiMarketData(card: {
   grader?: string | null;
 }, options?: { demandTierPrompt?: string }): Promise<GeminiMarketData | null> {
   // Check cache first
-  const tierSuffix = options?.demandTierPrompt ? "|tier" : "";
+  const tierMatch = options?.demandTierPrompt?.match(/Tier (\d)/);
+  const tierSuffix = tierMatch ? `|t${tierMatch[1]}` : "";
   const cacheKey = getGeminiCacheKey(card) + tierSuffix;
   const cached = geminiMarketCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < GEMINI_CACHE_TTL_MS) {
@@ -803,7 +804,8 @@ export async function fetchUnifiedCardAnalysis(card: {
   grade?: string | null;
   grader?: string | null;
 }, options?: { demandTierPrompt?: string }): Promise<UnifiedCardAnalysis | null> {
-  const tierSuffix = options?.demandTierPrompt ? `|tier` : "";
+  const tierMatch = options?.demandTierPrompt?.match(/Tier (\d)/);
+  const tierSuffix = tierMatch ? `|t${tierMatch[1]}` : "";
   const cacheKey = "unified|" + getGeminiCacheKey(card) + tierSuffix;
   const cached = unifiedAnalysisCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < UNIFIED_CACHE_TTL_MS) {
