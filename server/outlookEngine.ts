@@ -202,6 +202,18 @@ export function getGeminiCacheKey(card: {
   grade?: string | null;
   grader?: string | null;
 }): string {
+  const hasStructuredFields = card.playerName && card.set;
+  if (hasStructuredFields) {
+    const parts = [
+      (card.playerName || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
+      card.year?.toString() || "",
+      (card.set || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
+      (card.variation || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
+      (card.grade || "").toLowerCase().trim(),
+      (card.grader || "").toLowerCase().trim(),
+    ];
+    return parts.join("|");
+  }
   const parts = [
     card.title.toLowerCase().trim(),
     card.year?.toString() || "",

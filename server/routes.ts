@@ -3350,7 +3350,7 @@ Sitemap: ${origin}/sitemap.xml
   app.post("/api/outlook/quick-analyze", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { title, year, set, cardNumber, variation, grade, grader, imagePath, sport, scanHistoryId } = req.body;
+      const { title, year, set, cardNumber, variation, grade, grader, imagePath, sport, scanHistoryId, playerName: reqPlayerName } = req.body;
 
       if (!title) {
         return res.status(400).json({ message: "Card title is required" });
@@ -3470,10 +3470,11 @@ Sitemap: ${origin}/sitemap.xml
               ? "football"
               : undefined
       );
+      const effectivePlayerName = reqPlayerName || title;
       const [unifiedResult, priceData, qaMonthlyPriceHistory, specCrossProduct] = await Promise.all([
         fetchUnifiedCardAnalysis({
           title,
-          playerName: title,
+          playerName: effectivePlayerName,
           year: year ? parseInt(year) : undefined,
           set: set || undefined,
           variation: variation || undefined,
