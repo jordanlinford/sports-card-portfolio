@@ -436,14 +436,19 @@ Direct sales of this exact card are rare. Search in this order and use your mark
 ${vs.join("\n")}
 4. If still no data, search: "${playerSearchStandalone} ${yearStrStandalone} sold eBay" for any recent sales
 
-CRITICAL SCARCITY PRICING RULES for /${pn || 1} cards:
-- A /${pn || 1} is an ULTRA-RARE "whale" card. It is NOT comparable to common retail parallels.
-- If you find /99 comps at $X, a /${pn || 1} is typically 10-30x that value, NOT 1-2x.
-- Typical scarcity multipliers from base/common parallels: /99 = 5-10x base, /49 = 2-3x /99, /25 = 2-3x /49, /10 = 2-3x /25, /5 = 2x /10, /2 = 2-3x /5, 1/1 = 2-5x /2.
-- For star/elite players (franchise QBs, MVP candidates, top rookies), /1-/5 cards in premium sets regularly sell for $500-$5000+.
-- Do NOT anchor to the base card price. A /2 card of a franchise QB is a $500+ card, not an $85 card.
-- When no exact comps exist, TRIANGULATE UP from the highest-numbered parallel you can find, applying appropriate scarcity premiums.
-Cite which comps or knowledge you used in the notes field.`;
+SCARCITY PRICING RULES for /${pn || 1} cards:
+- A /${pn || 1} is scarcer than higher-numbered parallels, but scarcity premiums are MODEST — do NOT stack multipliers.
+- REALISTIC scarcity premiums (apply to the NEAREST parallel comp you can find, NOT from base):
+  - /99 → /49: multiply by 1.5-2x
+  - /49 → /25: multiply by 1.5-2x
+  - /25 → /10: multiply by 1.5-2.5x
+  - /10 → /5: multiply by 1.3-2x
+  - /5 → /2: multiply by 1.3-1.8x
+  - /2 → 1/1: multiply by 1.5-3x
+- ALWAYS triangulate from the CLOSEST available parallel, not from base or /99. If you have a /25 comp, go /25 → /10 → /5, NOT /99 → /5.
+- REALITY CHECK: After triangulating, ask yourself "would a real collector pay this much for this player's card?" Scarcity alone does not create value — demand matters more. A /5 auto of a non-HOF player is NOT a $2,000 card just because it's /5.
+- For veteran/established (non-rookie) players, the scarcity premium is LOWER because demand is thinner. Use the low end of the multiplier ranges.
+- CITE which specific comp(s) you used and what multiplier you applied in the notes field.`;
     }
 
     return `\nNUMBERED CARD FALLBACK (/${pn} — ${pn} copies exist):
@@ -1027,14 +1032,19 @@ Direct sales of this exact card are rare. Search in this order and use your mark
 ${verticalSearches.join("\n")}
 4. If still no data: "${playerSearch} ${yearStr} sold eBay" for any recent sales of this player
 
-CRITICAL SCARCITY PRICING RULES for /${popNumber || 1} cards:
-- A /${popNumber || 1} is an ULTRA-RARE "whale" card. It is NOT comparable to common retail parallels.
-- If you find /99 comps at $X, a /${popNumber || 1} is typically 10-30x that value, NOT 1-2x.
-- Typical scarcity multipliers from base/common parallels: /99 = 5-10x base, /49 = 2-3x /99, /25 = 2-3x /49, /10 = 2-3x /25, /5 = 2x /10, /2 = 2-3x /5, 1/1 = 2-5x /2.
-- For star/elite players (franchise QBs, MVP candidates, top rookies), /1-/5 cards in premium sets regularly sell for $500-$5000+.
-- Do NOT anchor to the base card price. A /2 Snakeskin Prizm of a franchise QB is a $500+ card, not an $85 card.
-- When no exact comps exist, TRIANGULATE UP from the highest-numbered parallel you can find, applying appropriate scarcity premiums.
-Cite which comps or market knowledge you used in the notes field.`;
+SCARCITY PRICING RULES for /${popNumber || 1} cards:
+- A /${popNumber || 1} is scarcer than higher-numbered parallels, but scarcity premiums are MODEST — do NOT stack multipliers.
+- REALISTIC scarcity premiums (apply to the NEAREST parallel comp you can find, NOT from base):
+  - /99 → /49: multiply by 1.5-2x
+  - /49 → /25: multiply by 1.5-2x
+  - /25 → /10: multiply by 1.5-2.5x
+  - /10 → /5: multiply by 1.3-2x
+  - /5 → /2: multiply by 1.3-1.8x
+  - /2 → 1/1: multiply by 1.5-3x
+- ALWAYS triangulate from the CLOSEST available parallel, not from base or /99. If you have a /25 comp, go /25 → /10 → /5, NOT /99 → /5.
+- REALITY CHECK: After triangulating, ask yourself "would a real collector pay this much for this player's card?" If the answer seems high, it probably is. Altuve /5 auto is not $2,000+ — it's more like $400-800.
+- For veteran/established (non-rookie) players, the scarcity premium is LOWER because demand is thinner. Use the low end of the multiplier ranges.
+- CITE which specific comp(s) you used and what multiplier you applied in the notes field.`;
     }
 
     return `\nNUMBERED CARD FALLBACK (/${popNumber} — ${popNumber} copies exist):
