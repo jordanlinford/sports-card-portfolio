@@ -1667,6 +1667,8 @@ export async function fetchMonthlyPriceHistory(params: {
 
   const searchDescription = parts.join(" ");
 
+  const isPlayerLevelRequest = !params.year && !params.setName && !params.variation && !params.grade;
+
   const now = new Date();
   const months: string[] = [];
   for (let i = 17; i >= 0; i--) {
@@ -1675,7 +1677,7 @@ export async function fetchMonthlyPriceHistory(params: {
   }
 
   try {
-    console.log(`[MonthlyPrice] Fetching 18-month history for: ${searchDescription}`);
+    console.log(`[MonthlyPrice] Fetching 18-month history for: ${searchDescription} (playerLevel: ${isPlayerLevelRequest})`);
 
     const geminiCallWithRetry = async (callFn: () => Promise<any>, label: string, maxRetries = 2): Promise<any> => {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1697,11 +1699,15 @@ export async function fetchMonthlyPriceHistory(params: {
     const autoTrendNote = isAutoTrend && params.setName
       ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING: This is an autograph from "${params.setName}". Autograph values vary enormously by product line. A Mosaic auto ($20-$500) is NOT a National Treasures auto ($500-$10,000+). ONLY report prices for autos from "${params.setName}" — include the set name in your searches.`
       : "";
+    const playerLevelNote = isPlayerLevelRequest
+      ? `\nPLAYER MARKET OVERVIEW: This is a player-level market trend request. Focus on the player's MOST COMMONLY TRADED cards — typically raw, ungraded base rookie cards from mainstream products (Prizm, Donruss, Mosaic, Topps Chrome, Bowman, etc.). Do NOT use rare inserts, SSPs, numbered parallels, autographs, or premium cards — those represent niche submarkets, not the player's overall market. The goal is to show the general direction of this player's card market as a whole. Look for their most liquid, high-volume base cards.`
+      : "";
     const researchPrompt = `Search eBay for recent sold listings of this sports card and tell me what prices it has been selling for:
 
 ${searchDescription}${isRawTrend ? " raw" : ""}
 ${rawTrendNote}
 ${autoTrendNote}
+${playerLevelNote}
 
 Look up eBay sold/completed listings prices${isRawTrend ? " for RAW/UNGRADED copies only" : ""}, 130point.com, and any other price references you can find.
 
