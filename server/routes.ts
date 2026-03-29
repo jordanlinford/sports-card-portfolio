@@ -3540,6 +3540,51 @@ Sitemap: ${origin}/sitemap.xml
       ]);
       console.log(`[Quick Analyze] Parallel fetch completed in ${Date.now() - startTime}ms`);
 
+      if (demandContext && !demandContext.isFromCache && specCrossProduct && specCrossProduct.notes) {
+        const cpNotes = specCrossProduct.notes;
+        const newHints: any = {};
+        let needsRescore = false;
+
+        const draftMatch = cpNotes.match(/(\d+)(?:st|nd|rd|th)\s+overall\s+pick/i) || cpNotes.match(/drafted?\s+#?(\d+)\s+overall/i) || cpNotes.match(/(\d+)(?:st|nd|rd|th)\s+pick/i);
+        if (draftMatch) {
+          const pos = parseInt(draftMatch[1]);
+          if (pos <= 15) { newHints.draftPosition = pos; needsRescore = true; }
+        }
+
+        if (/hall\s+of\s+fame|hof\b|hall[\s-]+of[\s-]+fam/i.test(cpNotes)) {
+          newHints.isHallOfFamer = true;
+          needsRescore = true;
+        }
+        if (/all[\s-]+star|pro[\s-]+bowl|all[\s-]+pro|mvp\b/i.test(cpNotes)) {
+          newHints.isAllStar = true;
+          needsRescore = true;
+        }
+        if (/ELITE/i.test(cpNotes)) {
+          if (!newHints.isHallOfFamer && !newHints.draftPosition) {
+            newHints.isAllStar = true;
+            needsRescore = true;
+          }
+        }
+
+        if (needsRescore) {
+          const tierSport = detectedSport || sport || "football";
+          const updatedHints = {
+            isRookie: (isRookie === true || isRookie === "true") || undefined,
+            set: set || undefined,
+            year: year ? parseInt(year) : undefined,
+            variation: variation || undefined,
+            marketDesirability: marketDesirability || undefined,
+            ...newHints,
+          };
+          const rescored = await getPlayerDemandContext(effectivePlayerName, tierSport, updatedHints);
+          if (rescored.demandScore > demandContext.demandScore) {
+            console.log(`[Quick Analyze] DEMAND TIER RESCORE: Cross-product revealed ${Object.keys(newHints).join(", ")}. Score ${demandContext.demandScore} → ${rescored.demandScore}, Tier ${demandContext.tier} → ${rescored.tier}`);
+            demandContext = rescored;
+            demandTierPrompt = buildDemandAdjustedMultiplierPrompt(demandContext);
+          }
+        }
+      }
+
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
       // Compute deterministic signals from legacy price data
@@ -3669,6 +3714,23 @@ Sitemap: ${origin}/sitemap.xml
           priceMin = unifiedMin || marketValue * 0.7;
           priceMax = unifiedMax || marketValue * 1.5;
           compCount = unifiedResult.market.soldCount;
+
+          if (qaIsLowPop && unifiedResult.market.soldCount <= 2 && specCrossProduct && specCrossProduct.avgPrice > 0) {
+            const cpRatio = specCrossProduct.avgPrice / marketValue;
+            if (cpRatio >= 5 && marketValue > 0) {
+              const blended = Math.round(marketValue * 0.25 + specCrossProduct.avgPrice * 0.75);
+              console.warn(`[Quick Analyze] LOW-COMP CROSS-PRODUCT OVERRIDE: Unified $${marketValue} (${compCount} comps) vs CrossProduct $${specCrossProduct.avgPrice} (${cpRatio.toFixed(1)}x higher). Unified comp likely wrong card. Blending → $${blended}`);
+              marketValue = blended;
+              priceMin = Math.round(specCrossProduct.minPrice || blended * 0.6);
+              priceMax = Math.round(specCrossProduct.maxPrice || blended * 1.5);
+            } else if (cpRatio >= 3 && marketValue > 0) {
+              const blended = Math.round(marketValue * 0.4 + specCrossProduct.avgPrice * 0.6);
+              console.warn(`[Quick Analyze] LOW-COMP CROSS-PRODUCT ADJUSTMENT: Unified $${marketValue} (${compCount} comps) vs CrossProduct $${specCrossProduct.avgPrice} (${cpRatio.toFixed(1)}x higher). Adjusting → $${blended}`);
+              marketValue = blended;
+              priceMin = Math.round(Math.min(unifiedMin || marketValue * 0.6, specCrossProduct.minPrice || marketValue * 0.6));
+              priceMax = Math.round(Math.max(unifiedMax || marketValue * 1.5, specCrossProduct.maxPrice || marketValue * 1.5));
+            }
+          }
 
           // ULTRA-LOW-POP SCARCITY FLOOR: For /1-/5 cards with 0 real comps, Gemini often
           // under-values because it can't find exact sales and anchors to common parallels.

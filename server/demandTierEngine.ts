@@ -132,6 +132,9 @@ export interface DemandTierHints {
   year?: number;
   variation?: string;
   marketDesirability?: string;
+  draftPosition?: number;
+  isHallOfFamer?: boolean;
+  isAllStar?: boolean;
 }
 
 const PREMIUM_SETS = /\b(national treasures|flawless|immaculate|noir|one and one|eminence|logoman)\b/i;
@@ -169,7 +172,28 @@ function estimateDemandFromHints(hints: DemandTierHints | undefined, sport: stri
     reasons.push(`desirability: ${hints.marketDesirability}`);
   }
 
-  score = Math.min(score, 75);
+  if (hints.draftPosition && hints.draftPosition <= 5) {
+    score += 20;
+    stage = "RISING";
+    reasons.push(`#${hints.draftPosition} overall pick`);
+  } else if (hints.draftPosition && hints.draftPosition <= 15) {
+    score += 10;
+    stage = stage === "UNKNOWN" ? "RISING" : stage;
+    reasons.push(`lottery pick #${hints.draftPosition}`);
+  }
+
+  if (hints.isHallOfFamer) {
+    score += 20;
+    stage = "LEGEND";
+    reasons.push("Hall of Famer");
+  }
+
+  if (hints.isAllStar) {
+    score += 12;
+    reasons.push("All-Star/Pro Bowl");
+  }
+
+  score = Math.min(score, 95);
 
   return { score, stage, reason: reasons.join(", ") || "default" };
 }
