@@ -1890,6 +1890,7 @@ export default function PlayerOutlookPage() {
             playerRequest={{
               playerName: outlookData.player.name,
               sport: outlookData.player.sport || sport,
+              isPlayerLevel: true,
             }}
           />
 
