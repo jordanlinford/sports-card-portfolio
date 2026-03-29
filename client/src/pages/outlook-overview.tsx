@@ -715,6 +715,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [variation, setVariation] = useState("");
   const [grade, setGrade] = useState("");
   const [grader, setGrader] = useState("");
+  const [sport, setSport] = useState("");
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -874,6 +875,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         grader: grader || undefined,
         imagePath: imagePath || undefined,
         scanHistoryId: currentScanHistoryId || undefined,
+        sport: sport || undefined,
+        playerName: title || undefined,
       });
       return data;
     },
@@ -1264,6 +1267,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     setGrade(card.grade || "");
     setGrader(card.grader || "");
     setCardNumber(card.cardNumber || "");
+    setSport(card.sport || "");
     setResult(null);
     setShowForm(true);
     setInputMode("manual");
@@ -1497,6 +1501,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         setVariation(card.parallel || card.variation || "");
         setGrade(gradeInfo.grade || "");
         setGrader(gradeInfo.gradingCompany || (gradeInfo.appearsToBe === "raw" ? "raw" : ""));
+        setSport(card.sport || "");
         
         toast({
           title: "Card identified!",
@@ -1616,6 +1621,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
     setVariation(card.parallel || card.variation || "");
     setGrade(gradeInfo.grade || "");
     setGrader(gradeInfo.gradingCompany || (gradeInfo.appearsToBe === "raw" ? "raw" : ""));
+    setSport(card.sport || "");
     
     // Preserve the scanned image for the manual form
     if (scanPreviewUrl) {

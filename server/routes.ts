@@ -3689,6 +3689,24 @@ Sitemap: ${origin}/sitemap.xml
             }
           }
 
+          // LOW-POP CROSS-PRODUCT SANITY CHECK: When a very low pop card (/1-/5) has 0 sold comps,
+          // Gemini often anchors on the WRONG comparable (e.g., RPA /99 instead of the correct insert /49).
+          // If cross-product fallback data is available and shows a much lower price, cap the estimate.
+          // This prevents inflated values when the AI confuses card types within the same product.
+          if (qaIsVeryLowPop && unifiedResult.market.soldCount === 0 && specCrossProduct && specCrossProduct.avgPrice > 0) {
+            const popMatch = qaVariation.match(/\/\s*(\d+)/);
+            const popNum = popMatch ? parseInt(popMatch[1]) : 5;
+            const tierNum = demandContext?.tier ?? 3;
+            const maxScarcityMult = tierNum <= 1 ? 8 : tierNum === 2 ? 5 : tierNum === 3 ? 3.5 : 2.5;
+            const crossProductCeiling = Math.round(specCrossProduct.avgPrice * maxScarcityMult);
+            if (marketValue > crossProductCeiling) {
+              console.warn(`[Quick Analyze] LOW-POP CROSS-PRODUCT CAP (Tier ${tierNum}): Unified $${marketValue} exceeds ${maxScarcityMult}x cross-product $${specCrossProduct.avgPrice} ceiling of $${crossProductCeiling}. Capping.`);
+              marketValue = crossProductCeiling;
+              priceMin = Math.round(specCrossProduct.avgPrice * (maxScarcityMult * 0.6));
+              priceMax = Math.round(specCrossProduct.avgPrice * (maxScarcityMult * 1.4));
+            }
+          }
+
           // RAW LOW-POP CONTAMINATION CHECK: For raw numbered cards (/6-/49), real raw sales are
           // extremely rare, so Gemini often returns PSA10/PSA9 prices as "raw" prices.
           // A raw card CANNOT cost more than its PSA 9 grade — if it does, the price is contaminated.
@@ -3710,6 +3728,18 @@ Sitemap: ${origin}/sitemap.xml
                 ? Math.round(psa9Price * 0.75 * 100) / 100
                 : Math.round(correctedRaw * 1.5 * 100) / 100;
             }
+          }
+
+          // LOW-POP ZERO-COMP DISCOUNT: Even for /1-/49 cards, 0 sold comps means the AI is guessing.
+          // Apply a moderate haircut (less aggressive than the 50% for normal cards) since
+          // low-pop cards have inherent scarcity value but the exact price is still uncertain.
+          if ((qaIsVeryLowPop || qaIsLowPop) && unifiedResult.market.soldCount === 0 && marketValue > 0) {
+            const discount = qaIsVeryLowPop ? 0.75 : 0.70;
+            const originalVal = marketValue;
+            marketValue = Math.round(marketValue * discount);
+            priceMin = Math.round((priceMin || marketValue * 0.7) * discount);
+            priceMax = Math.round((priceMax || marketValue * 1.5) * discount);
+            console.log(`[Quick Analyze] LOW-POP ZERO-COMP DISCOUNT: $${originalVal} → $${marketValue} (${Math.round((1 - discount) * 100)}% haircut — 0 sold comps, AI estimate only)`);
           }
         } else {
           // soldCount=0 — Gemini is estimating with NO actual sales data.
