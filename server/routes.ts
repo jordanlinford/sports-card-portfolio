@@ -3730,16 +3730,30 @@ Sitemap: ${origin}/sitemap.xml
             }
           }
 
-          // LOW-POP ZERO-COMP DISCOUNT: Even for /1-/49 cards, 0 sold comps means the AI is guessing.
-          // Apply a moderate haircut (less aggressive than the 50% for normal cards) since
-          // low-pop cards have inherent scarcity value but the exact price is still uncertain.
+          // LOW-POP ZERO-COMP ANCHOR CHECK: When unified has 0 sold comps, BOTH sources
+          // are estimating with no real transaction data. Use the LOWER of unified vs legacy
+          // as the conservative anchor, then apply a moderate discount since even the lower
+          // estimate may be inflated (AI anchoring on wrong card type is common for inserts).
           if ((qaIsVeryLowPop || qaIsLowPop) && unifiedResult.market.soldCount === 0 && marketValue > 0) {
-            const discount = qaIsVeryLowPop ? 0.75 : 0.70;
-            const originalVal = marketValue;
-            marketValue = Math.round(marketValue * discount);
-            priceMin = Math.round((priceMin || marketValue * 0.7) * discount);
-            priceMax = Math.round((priceMax || marketValue * 1.5) * discount);
-            console.log(`[Quick Analyze] LOW-POP ZERO-COMP DISCOUNT: $${originalVal} → $${marketValue} (${Math.round((1 - discount) * 100)}% haircut — 0 sold comps, AI estimate only)`);
+            const legacyPrice = priceData?.pricePoints?.length > 0
+              ? priceData.pricePoints.reduce((sum: number, p: any) => sum + (p.price || 0), 0) / priceData.pricePoints.length
+              : null;
+            if (legacyPrice && legacyPrice > 0) {
+              const lowerEstimate = Math.min(marketValue, legacyPrice);
+              const higherEstimate = Math.max(marketValue, legacyPrice);
+              const conservativeBlend = Math.round(lowerEstimate * 0.7 + higherEstimate * 0.3);
+              console.warn(`[Quick Analyze] LOW-POP ZERO-COMP ANCHOR: Unified $${marketValue} vs legacy $${Math.round(legacyPrice)} (0 real comps). Using conservative blend (70% lower / 30% higher) → $${conservativeBlend}`);
+              marketValue = conservativeBlend;
+              priceMin = Math.round(lowerEstimate * 0.7);
+              priceMax = Math.round(higherEstimate * 0.8);
+            } else {
+              const discount = qaIsVeryLowPop ? 0.65 : 0.60;
+              const originalVal = marketValue;
+              marketValue = Math.round(marketValue * discount);
+              priceMin = Math.round(marketValue * 0.7);
+              priceMax = Math.round(originalVal * 0.8);
+              console.log(`[Quick Analyze] LOW-POP ZERO-COMP DISCOUNT: $${originalVal} → $${marketValue} (${Math.round((1 - discount) * 100)}% haircut — 0 sold comps, no legacy anchor)`);
+            }
           }
         } else {
           // soldCount=0 — Gemini is estimating with NO actual sales data.
