@@ -3490,7 +3490,7 @@ Sitemap: ${origin}/sitemap.xml
       if (qaNeedsTriangulationForTier || /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(qaVariationForTier)) {
         const tierSport = detectedSport || sport || "football";
         const demandHints = {
-          isRookie: isRookie === true || undefined,
+          isRookie: (isRookie === true || isRookie === "true") || undefined,
           set: set || undefined,
           year: year ? parseInt(year) : undefined,
           variation: variation || undefined,

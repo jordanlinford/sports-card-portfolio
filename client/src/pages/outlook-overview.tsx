@@ -865,8 +865,8 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
 
   const analyzeMutation = useMutation({
     mutationFn: async () => {
-      const scanId = scanResult?.scan?.cardIdentification;
-      const scanMarket = scanResult?.scan?.marketContext;
+      const scanId = scanIdentifyResult?.scan?.cardIdentification || scanResult?.scan?.cardIdentification;
+      const scanMarket = scanIdentifyResult?.scan?.marketContext || scanResult?.scan?.marketContext;
       const data = await apiRequest("POST", "/api/outlook/quick-analyze", {
         title,
         year: year || undefined,
