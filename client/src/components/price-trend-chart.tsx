@@ -42,7 +42,6 @@ interface PlayerPriceRequest {
   variation?: string;
   grade?: string;
   grader?: string;
-  isPlayerLevel?: boolean;
 }
 
 function formatMonth(month: string): string {
@@ -147,8 +146,7 @@ export function PriceTrendChart({
   const fetchMutation = useMutation({
     mutationFn: async () => {
       if (!playerRequest) throw new Error("No player request provided");
-      const { isPlayerLevel, ...apiParams } = playerRequest;
-      return await apiRequest("POST", "/api/player-outlook/price-history", apiParams);
+      return await apiRequest("POST", "/api/player-outlook/price-history", playerRequest);
     },
     onSuccess: (data: MonthlyPriceHistory) => {
       setHistory(data);
@@ -240,8 +238,6 @@ export function PriceTrendChart({
   ];
   const xInterval = computeXAxisInterval(chartData.length);
 
-  const isPlayerLevel = playerRequest?.isPlayerLevel === true;
-
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -249,17 +245,11 @@ export function PriceTrendChart({
           <div>
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              {isPlayerLevel ? "Sample Card Trend" : "Price Trend"}
+              Price Trend
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-0.5">
               {subtitle || history.cardDescription || "Recent sold prices from market data"}
             </p>
-            {isPlayerLevel && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3 shrink-0" />
-                Based on one representative card — not the player's overall market
-              </p>
-            )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className={getConfidenceColor(history.confidence)}>

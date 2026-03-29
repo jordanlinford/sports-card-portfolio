@@ -1700,14 +1700,26 @@ export async function fetchMonthlyPriceHistory(params: {
       ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING: This is an autograph from "${params.setName}". Autograph values vary enormously by product line. A Mosaic auto ($20-$500) is NOT a National Treasures auto ($500-$10,000+). ONLY report prices for autos from "${params.setName}" — include the set name in your searches.`
       : "";
     const playerLevelNote = isPlayerLevelRequest
-      ? `\nPLAYER MARKET OVERVIEW: This is a player-level market trend request. Focus on the player's MOST COMMONLY TRADED cards — typically raw, ungraded base rookie cards from mainstream products (Prizm, Donruss, Mosaic, Topps Chrome, Bowman, etc.). Do NOT use rare inserts, SSPs, numbered parallels, autographs, or premium cards — those represent niche submarkets, not the player's overall market. The goal is to show the general direction of this player's card market as a whole. Look for their most liquid, high-volume base cards.`
+      ? `\nPLAYER MARKET OVERVIEW: This is a player-level market trend request. I need the OVERALL market trend for this player's cards as a whole — not any single specific card. Look at the broad range of this player's cards being sold (base, parallels, inserts, rookies, etc.) and report what the AVERAGE selling prices have been across all their cards. The goal is to answer: "Is this player's card market overall trending up, down, or flat?" Think of it as the aggregate average sale price across all of their cards each month.`
       : "";
-    const researchPrompt = `Search eBay for recent sold listings of this sports card and tell me what prices it has been selling for:
+    const researchPrompt = isPlayerLevelRequest
+      ? `Search eBay for recent sold listings of ${params.playerName} sports cards (${params.sport}) and tell me what the OVERALL market trend looks like.
+${playerLevelNote}
+
+Look up eBay sold/completed listings for "${params.playerName}" cards across ALL products and types. Also check 130point.com and any other price references.
+
+Tell me:
+1. What are ${params.playerName}'s cards selling for on average on eBay right now? Include a mix of base, parallels, inserts — the whole market.
+2. What were average prices 6 months ago? 12 months ago? 18 months ago?
+3. Is the overall player card market trending up, down, or stable?
+4. What is the typical price range across their cards (common cards vs premium)?
+
+Give me as many specific sold prices with dates as you can find across different card types. The goal is to capture the player's entire card market direction.`
+      : `Search eBay for recent sold listings of this sports card and tell me what prices it has been selling for:
 
 ${searchDescription}${isRawTrend ? " raw" : ""}
 ${rawTrendNote}
 ${autoTrendNote}
-${playerLevelNote}
 
 Look up eBay sold/completed listings prices${isRawTrend ? " for RAW/UNGRADED copies only" : ""}, 130point.com, and any other price references you can find.
 
@@ -1740,12 +1752,15 @@ Give me as many specific sold prices with dates as you can find. Even a few data
     }
 
     // STEP 2: Ask Gemini to extract structured data from the research (no search needed)
-    const extractPrompt = `You are a sports card price analyst. Based on the research below about "${searchDescription}", create a monthly price chart.
+    const extractTaskDescription = isPlayerLevelRequest
+      ? `This is a PLAYER-LEVEL market overview. The avgPrice each month should represent the AVERAGE selling price across ALL of ${params.playerName}'s cards (base, parallels, inserts, rookies combined) — not any single card. Think of it as: if you averaged every ${params.playerName} card sold that month, what would the average sale price be?`
+      : `Create a JSON object with estimated average prices for each month. Use the sold prices and trends mentioned in the research to estimate realistic monthly averages. If the research mentions a price at a specific date, use that as the anchor for that month. For months without direct data, estimate based on the overall trend direction.`;
+    const extractPrompt = `You are a sports card price analyst. Based on the research below about "${isPlayerLevelRequest ? params.playerName + " cards overall" : searchDescription}", create a monthly price chart.
 
 RESEARCH DATA:
 ${researchText}
 
-TASK: Create a JSON object with estimated average prices for each month. Use the sold prices and trends mentioned in the research to estimate realistic monthly averages. If the research mentions a price at a specific date, use that as the anchor for that month. For months without direct data, estimate based on the overall trend direction.
+TASK: ${extractTaskDescription}
 
 IMPORTANT: Every month MUST have a non-zero price estimate. Even if exact data is sparse, use the known prices to extrapolate reasonable estimates for all months. Cards always have some value.
 
@@ -1763,7 +1778,7 @@ Rules:
 - Every month must have avgPrice > 0 — extrapolate from known data points
 - salesCount = number of actual sales you found data for that month (0 if estimated)
 - confidence: HIGH if 8+ months anchored to real data, MEDIUM for 4-7, LOW for fewer
-- Prices should vary naturally month to month based on the trend described`;
+- Prices should vary naturally month to month based on the trend described${isPlayerLevelRequest ? "\n- notes should describe the player's overall card market trend, not any specific card" : ""}`;
 
     const extractResponse = await geminiCallWithRetry(
       () => gemini.models.generateContent({
@@ -1889,7 +1904,7 @@ Rules:
     const result: MonthlyPriceHistory = {
       playerName: params.playerName,
       sport: params.sport,
-      cardDescription: searchDescription,
+      cardDescription: isPlayerLevelRequest ? `${params.playerName} — overall card market` : searchDescription,
       dataPoints: filledPoints,
       confidence: computedConfidence as "HIGH" | "MEDIUM" | "LOW",
       notes: parsed.notes || (!hasAnySales ? "No actual sales data found — prices are estimates only." : (realDataMonths < 6 ? `Based on ${realDataMonths} months of data with interpolation.` : "")),
