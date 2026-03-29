@@ -4013,11 +4013,12 @@ Sitemap: ${origin}/sitemap.xml
             dataSource: "gemini_unified",
           } : null,
           gradedEstimates: qaIsRaw && marketValue ? (() => {
-            // Cross-validation: PSA graded prices MUST be >= raw value.
-            // If Gemini returns graded prices lower than raw, it found comps
-            // for a completely different (cheaper) version of the card.
-            // This is especially common for low-pop numbered cards (/1-/5)
-            // where no graded comps exist and Gemini confuses the search.
+            const isLowPop = variation && /\/([1-9]|1[0-5])(?:\s|$|[^0-9])/.test(variation);
+            if (isLowPop) {
+              console.log(`[GradedMatrix] Suppressing graded matrix for low-pop card: ${variation}`);
+              return null;
+            }
+
             let psa9 = unifiedResult?.market.psa9Price ?? null;
             let psa10 = unifiedResult?.market.psa10Price ?? null;
 
@@ -4030,16 +4031,17 @@ Sitemap: ${origin}/sitemap.xml
               psa10 = null;
             }
 
-            if (psa9 || psa10) {
-              return { psa9, psa10 };
+            if (psa9 !== null && psa9 > marketValue * 5) {
+              console.warn(`[GradedMatrix] PSA 9 (${psa9}) is ${(psa9/marketValue).toFixed(1)}x raw (${marketValue}) — likely wrong comps. Capping at 3x.`);
+              psa9 = Math.round(marketValue * 3);
+            }
+            if (psa10 !== null && psa10 > marketValue * 8) {
+              console.warn(`[GradedMatrix] PSA 10 (${psa10}) is ${(psa10/marketValue).toFixed(1)}x raw (${marketValue}) — likely wrong comps. Capping at 5x.`);
+              psa10 = Math.round(marketValue * 5);
             }
 
-            // For very low-pop numbered cards (/1 through /5), graded comps
-            // virtually never exist — nobody grades these. Hide the matrix.
-            const isVeryLowPop = variation && /\/[1-5](?:\s|$|[^0-9])/.test(variation);
-            if (isVeryLowPop) {
-              console.log(`[GradedMatrix] Suppressing graded matrix for very low-pop card: ${variation}`);
-              return null;
+            if (psa9 || psa10) {
+              return { psa9, psa10 };
             }
 
             const estPsa9 = Math.round(marketValue * 2);
