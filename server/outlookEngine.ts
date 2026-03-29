@@ -515,7 +515,7 @@ GRADED PRICE PRIORITY RULES:
 3. If you must estimate graded value with no real data: PSA 9 ≈ 1.5-3x raw, PSA 10 ≈ 3-6x raw for most cards. Only popular base cards of elite active stars can have higher premiums. Retired players and niche players get modest premiums (PSA 9 ≈ 1.5-2x, PSA 10 ≈ 2-3x).
 4. psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps you found seem lower than raw, they may be for a different card variation — find better comps.
 5. rawPrice should reflect ONLY ungraded/raw copies. For RAW cards, avgPrice must also be raw-only — never blend graded sales into avgPrice when the card being valued is raw.
-6. CRITICAL: For numbered cards /15 and under, return null for BOTH psa9Price and psa10Price. Nobody grades cards with print runs this small — graded comps do not exist and estimates are meaningless.
+6. For numbered cards /15 and under, graded comps for the EXACT card almost never exist. Search for graded sales of OTHER low-numbered autos from the SAME player (e.g., /25, /49 parallels graded PSA 9/10) and use those as comparables. If nothing exists, use conservative multipliers (PSA 9 ≈ 1.3-1.5x raw, PSA 10 ≈ 1.5-2x raw) since scarcity is already priced into the raw value.
 
 Liquidity guidelines:
 - HIGH: 15+ sales per month, sells almost daily
@@ -1185,7 +1185,7 @@ GRADED PRICE PRIORITY RULES:
 2. Only fall back to multipliers if you found ZERO PSA 10 or PSA 9 sold listings after genuinely searching. Multipliers are a last resort, not a default.
 3. Fallback multipliers (use ONLY when no real data exists): PSA 9 ≈ 1.5-3x raw, PSA 10 ≈ 3-6x raw for most cards. Only popular base cards of elite active stars (e.g. Wemby, Ohtani Prizm base) can have 10-30x graded premiums. Retired players, niche players, and numbered parallels (/25 and under) almost never have significant graded premiums because nobody grades them.
 4. psa9Price and psa10Price must ALWAYS be higher than rawPrice. If graded comps are lower than raw, those are a different cheaper card — use multiplier fallback.
-5. CRITICAL: For numbered cards /15 and under, return null for BOTH psa9Price and psa10Price. Nobody grades cards with print runs this small — graded comps do not exist and estimates would be meaningless.
+5. For numbered cards /15 and under, graded comps for the EXACT card almost never exist. Instead, search for graded sales of OTHER low-numbered autos from the SAME player and set (e.g., /10, /25, /49 parallels graded PSA 9/10). Use those as comparables to estimate a graded premium. If no graded comps of ANY parallel of this player exist, use conservative multipliers (PSA 9 ≈ 1.3-1.5x raw, PSA 10 ≈ 1.5-2x raw) since the scarcity is already priced into the raw value.
 6. For retired or non-star players, graded premiums are modest (PSA 9 ≈ 1.5-2x, PSA 10 ≈ 2-3x). Do NOT apply star-player multipliers to retired/niche players.
 If player is injured or lost starting role, reflect this in momentum and verdict.
 Be specific with numbers — if you find 19 sold listings, say 19.

@@ -4013,12 +4013,6 @@ Sitemap: ${origin}/sitemap.xml
             dataSource: "gemini_unified",
           } : null,
           gradedEstimates: qaIsRaw && marketValue ? (() => {
-            const isLowPop = variation && /\/([1-9]|1[0-5])(?:\s|$|[^0-9])/.test(variation);
-            if (isLowPop) {
-              console.log(`[GradedMatrix] Suppressing graded matrix for low-pop card: ${variation}`);
-              return null;
-            }
-
             let psa9 = unifiedResult?.market.psa9Price ?? null;
             let psa10 = unifiedResult?.market.psa10Price ?? null;
 
@@ -4042,6 +4036,14 @@ Sitemap: ${origin}/sitemap.xml
 
             if (psa9 || psa10) {
               return { psa9, psa10 };
+            }
+
+            const isLowPop = variation && /\/([1-9]|1[0-5])(?:\s|$|[^0-9])/.test(variation);
+            if (isLowPop) {
+              const estPsa9 = Math.round(marketValue * 1.3);
+              const estPsa10 = Math.round(marketValue * 1.8);
+              console.log(`[GradedMatrix] Low-pop card ${variation}: using conservative estimates PSA9=$${estPsa9}, PSA10=$${estPsa10}`);
+              return { psa9: estPsa9, psa10: estPsa10, estimated: true, lowPop: true };
             }
 
             const estPsa9 = Math.round(marketValue * 2);

@@ -7,6 +7,7 @@ interface GradedValueMatrixProps {
   psa9Price: number | null;
   psa10Price: number | null;
   estimated?: boolean;
+  lowPop?: boolean;
 }
 
 const GRADING_COST = {
@@ -75,7 +76,7 @@ const VERDICT_STYLES = {
   },
 };
 
-export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated }: GradedValueMatrixProps) {
+export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, lowPop }: GradedValueMatrixProps) {
   if (!psa9Price && !psa10Price) return null;
   if (rawValue <= 0) return null;
 
@@ -146,7 +147,12 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated }
         </div>
 
         <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground/60 leading-tight">
-          {estimated ? (
+          {lowPop ? (
+            <>
+              <Calculator className="h-3 w-3 shrink-0 mt-0.5" />
+              <span>Low print run card — graded comps for this exact card are extremely rare. Estimates based on comparable parallels from this player. Grading a low-pop card adds authentication value but the premium over raw is modest since scarcity is already priced in. (~${GRADING_COST.regular}/card grading cost).</span>
+            </>
+          ) : estimated ? (
             <>
               <Calculator className="h-3 w-3 shrink-0 mt-0.5" />
               <span>Graded values estimated using typical raw-to-graded multipliers (no graded sold data found). Based on PSA standard grading (~${GRADING_COST.regular}/card). Actual values vary by card condition, market timing, and grading outcome. Not guaranteed.</span>
