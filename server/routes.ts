@@ -4541,7 +4541,7 @@ Sitemap: ${origin}/sitemap.xml
 
       const remainingScans = dailyLimit - scansToday - 1;
       
-      const scanDemandTier = (result as any).demandTierResult || null;
+      const scanDemandTier = result.demandTierResult || null;
 
       res.json({
         success: result.scan.success,

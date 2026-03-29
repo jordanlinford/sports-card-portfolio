@@ -455,6 +455,18 @@ async function getGeminiPriceEstimate(scan: CardScanResult): Promise<AIPriceEsti
   }
 }
 
+export interface ScanDemandTierResult {
+  tier: number;
+  label: string;
+  demandScore: number;
+  careerStage: string;
+  sport: string;
+  percentile: number;
+  triangulationUsed: boolean;
+  ceilingApplied: boolean;
+  ceilingReason?: string;
+}
+
 export interface CardScanWithPricingResult {
   scan: CardScanResult;
   searchQuery: string;
@@ -480,6 +492,7 @@ export interface CardScanWithPricingResult {
     aiEstimate?: AIPriceEstimate;
   };
   queryHash: string;
+  demandTierResult?: ScanDemandTierResult | null;
 }
 
 export async function scanCardWithPricing(

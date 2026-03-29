@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { playerOutlookCache } from "@shared/schema";
-import { isNotNull, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 export type DemandTier = 1 | 2 | 3 | 4;
 
