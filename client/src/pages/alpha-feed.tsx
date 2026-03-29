@@ -358,6 +358,15 @@ export default function AlphaFeedPage() {
     }
   }, []);
 
+  const { data: unfilteredFeed } = useQuery<FeedData>({
+    queryKey: ["/api/alpha/feed"],
+    queryFn: async () => {
+      const res = await fetch("/api/alpha/feed");
+      if (!res.ok) throw new Error("Failed to fetch feed");
+      return res.json();
+    },
+  });
+
   const queryKey = sportFilter ? ["/api/alpha/feed", sportFilter] : ["/api/alpha/feed"];
   const { data: feedData, isLoading: feedLoading, isError: feedError } = useQuery<FeedData>({
     queryKey,
@@ -379,7 +388,7 @@ export default function AlphaFeedPage() {
 
   const hasAnyData = hotMarkets.length > 0 || buyOpportunities.length > 0 || sellWarnings.length > 0 || speculativePlays.length > 0 || hottestByTemp.length > 0;
 
-  const availableSports = pulse?.sportBreakdown ? Object.keys(pulse.sportBreakdown).sort() : [];
+  const availableSports = unfilteredFeed?.marketPulse?.sportBreakdown ? Object.keys(unfilteredFeed.marketPulse.sportBreakdown).sort() : [];
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
