@@ -1497,11 +1497,14 @@ export async function getPlayerOutlook(
   }
   
   if (hasZeroMarketData && (zeroDataCooldownExpired || isOldPrompt)) {
-    console.log(`[PlayerOutlook] Cache has zero market data for ${playerName} (${isOldPrompt ? 'old prompt v' + cachedPromptVersion : 'cooldown expired'}), refreshing async`);
-    generateFreshOutlook(playerName, sport, playerKey).catch(err => {
-      console.error(`[PlayerOutlook] Background refresh failed:`, err);
-    });
-    return { ...cachedOutlook!, cacheStatus: "stale" };
+    console.log(`[PlayerOutlook] Cache has zero market data for ${playerName} (${isOldPrompt ? 'old prompt v' + cachedPromptVersion : 'cooldown expired'}), refreshing synchronously (zero data not useful to serve)`);
+    try {
+      const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
+      return { ...freshOutlook, cacheStatus: "miss" };
+    } catch (err) {
+      console.error(`[PlayerOutlook] Sync refresh failed for ${playerName}, serving stale:`, err);
+      return { ...cachedOutlook!, cacheStatus: "stale" };
+    }
   }
 
   if (hasZeroMarketData && !zeroDataCooldownExpired) {
