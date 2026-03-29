@@ -429,7 +429,10 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
     }
 
     if (is1of1 || isLowPopStandalone) {
-      const demandPrompt = options?.demandTierPrompt || "";
+      const demandPrompt = options?.demandTierPrompt || `\nDEMAND CONTEXT: No player demand data available. Use conservative multipliers:
+- Apply moderate scarcity multipliers (1.5-2.5x base value) unless this player is a proven elite name
+- If the player has minimal market presence, cap multiplier at 1.5x
+- When in doubt, price LOWER — it is better to undervalue than overvalue with no demand signal.`;
       return `\nLOW-POP CARD (${is1of1 ? "1/1 — only 1 exists" : `/${pn} — only ${pn} copies exist`}):
 Direct sales of this exact card are rare. Search in this order and use your market knowledge to value it:
 
@@ -978,7 +981,10 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
   const playerSearch = card.playerName || card.title;
   const yearStr = card.year || "";
   const setStr = card.set || "";
-  const unifiedDemandTierPrompt = options?.demandTierPrompt || "";
+  const unifiedDemandTierPrompt = options?.demandTierPrompt || (needsTriangulation ? `\nDEMAND CONTEXT: No player demand data available. Use conservative multipliers:
+- Apply moderate scarcity multipliers (1.5-2.5x base value) unless this player is a proven elite name
+- If the player has minimal market presence, cap multiplier at 1.5x
+- When in doubt, price LOWER — it is better to undervalue than overvalue with no demand signal.` : "");
 
   function buildTriangulationInstructions(): string {
     if (!needsTriangulation) return "";
