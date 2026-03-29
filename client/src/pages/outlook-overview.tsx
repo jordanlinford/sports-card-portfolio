@@ -132,7 +132,12 @@ function DemandTierBadge({ tier }: { tier: DemandTierDisplay }) {
     <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${config.bg} text-sm mt-2`} data-testid="demand-tier-badge">
       <span className={`font-semibold ${config.color}`}>{config.label}</span>
       <span className="text-muted-foreground">—</span>
-      <span className="text-muted-foreground">{config.desc} (top {Math.round(100 - tier.percentile)}% in {tier.sport})</span>
+      <span className="text-muted-foreground">
+        {config.desc} ({tier.percentile >= 50 
+          ? `top ${Math.round(100 - tier.percentile)}% in ${tier.sport}`
+          : `${Math.round(tier.percentile)}th percentile in ${tier.sport}`
+        })
+      </span>
       {tier.ceilingApplied && (
         <span className="text-xs text-muted-foreground italic ml-auto">Price capped</span>
       )}

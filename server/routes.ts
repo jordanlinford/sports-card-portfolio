@@ -3461,14 +3461,20 @@ Sitemap: ${origin}/sitemap.xml
       const startTime = Date.now();
       const { fetchMonthlyPriceHistory, fetchLowPopFallbackPrice, fetchCrossProductFallbackPrice } = await import("./outlookEngine");
       const playerNameForSearch = (title || "").split(/\s+/).slice(0, 3).join(" ");
+      const setLower = (set || "").toLowerCase();
+      const titleLower = (title || "").toLowerCase();
       const detectedSport = sport || (
-        /\b(prizm|select|mosaic|hoops|court kings|flux|illusions|recon)\b/i.test(set || "")
+        /\b(prizm|select|mosaic|hoops|court kings|flux|illusions|recon)\b/i.test(setLower)
           ? "basketball"
-          : /\b(topps|bowman|gypsy queen|heritage|stadium club|chrome|sapphire)\b/i.test(set || "")
+          : /\b(topps|bowman|gypsy queen|heritage|stadium club|chrome|sapphire|diamond kings|donruss baseball)\b/i.test(setLower)
             ? "baseball"
-            : /\b(score|gridiron|absolute|certified|limited|luminance|zenith|elite|prestige|wild card)\b/i.test(set || "")
+            : /\b(score|gridiron|absolute|certified|limited|luminance|zenith|elite|prestige|wild card|playbook)\b/i.test(setLower)
               ? "football"
-              : undefined
+              : /\b(topps soccer|prizm premier|donruss soccer|select premier|panini fifa|world cup|champions league|la liga|premier league|serie a|bundesliga)\b/i.test(setLower + " " + titleLower)
+                ? "soccer"
+                : /\b(upper deck hockey|sp authentic|young guns|o-pee-chee|artifacts|ice|allure|trilogy|synergy|nhl)\b/i.test(setLower + " " + titleLower)
+                  ? "hockey"
+                  : undefined
       );
       const effectivePlayerName = reqPlayerName || title;
       
