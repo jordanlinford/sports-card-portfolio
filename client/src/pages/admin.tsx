@@ -1052,7 +1052,7 @@ function OutlookSEOTab() {
 
   const deleteOutlookMutation = useMutation({
     mutationFn: async (playerKey: string) => {
-      return await apiRequest("DELETE", `/api/admin/outlook/${encodeURIComponent(playerKey)}`);
+      return await apiRequest("POST", `/api/admin/outlook/delete`, { playerKey });
     },
     onSuccess: (_data: any, playerKey: string) => {
       refetch();

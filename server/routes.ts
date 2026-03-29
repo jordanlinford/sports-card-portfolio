@@ -7264,23 +7264,28 @@ RULES:
   });
 
   // Admin: Delete a player outlook cache entry
-  app.delete("/api/admin/outlook/:playerKey", isAuthenticated, isAdmin, async (req: any, res) => {
+  app.post("/api/admin/outlook/delete", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const { playerKey } = req.params;
-      const decodedKey = decodeURIComponent(playerKey);
+      const { playerKey } = req.body;
+      if (!playerKey || typeof playerKey !== "string") {
+        return res.status(400).json({ message: "playerKey is required" });
+      }
       
-      const cached = await storage.getCachedPlayerOutlook(decodedKey);
+      const cached = await storage.getCachedPlayerOutlook(playerKey);
       if (!cached) {
         return res.status(404).json({ message: "Player outlook not found in cache" });
       }
       
-      await storage.deletePlayerOutlookByKey(decodedKey);
+      await storage.deletePlayerOutlookByKey(playerKey);
       
-      console.log(`[Admin] Deleted player outlook cache: ${decodedKey} (${cached.playerName}, ${cached.sport})`);
+      const { invalidateLeaderboardCache } = await import("./leaderboardEngine");
+      invalidateLeaderboardCache();
+      
+      console.log(`[Admin] Deleted player outlook cache: ${playerKey} (${cached.playerName}, ${cached.sport}) — leaderboard cache cleared`);
       
       res.json({
         success: true,
-        deleted: decodedKey,
+        deleted: playerKey,
         playerName: cached.playerName,
         sport: cached.sport,
       });

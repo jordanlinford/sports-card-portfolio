@@ -122,12 +122,19 @@ app.use((req, res, next) => {
         // One-time cleanup: remove misclassified player outlook cache entries
         try {
           const { storage } = await import("./storage");
+          const { invalidateLeaderboardCache } = await import("./leaderboardEngine");
           const misclassifiedKeys = ["football:konnergriffin"];
+          let deleted = 0;
           for (const key of misclassifiedKeys) {
-            await storage.deletePlayerOutlookByKey(key);
+            const entry = await storage.getCachedPlayerOutlook(key);
+            if (entry) {
+              await storage.deletePlayerOutlookByKey(key);
+              deleted++;
+            }
           }
-          if (misclassifiedKeys.length > 0) {
-            console.log(`[Cleanup] Removed ${misclassifiedKeys.length} misclassified player outlook cache entries`);
+          if (deleted > 0) {
+            invalidateLeaderboardCache();
+            console.log(`[Cleanup] Removed ${deleted} misclassified player outlook cache entries, leaderboard cache cleared`);
           }
         } catch (cleanupErr) {
           console.error("[Cleanup] Failed to clean misclassified entries:", cleanupErr);
