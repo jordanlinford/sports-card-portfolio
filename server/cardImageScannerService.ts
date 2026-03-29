@@ -645,13 +645,20 @@ export async function scanCardWithPricing(
       let finalPrice = geminiData.avgPrice;
       let finalMin = geminiData.minPrice;
       let finalMax = geminiData.maxPrice;
+      let scanCeilingApplied = false;
+      let scanCeilingReason = "";
       if (scanDemandContext && scanDemandContext.tier >= 3 && geminiData.soldCount === 0 && finalPrice > 0) {
-        const ceilingResult = applyCeilingCheck(finalPrice, finalPrice, scanDemandContext.tier, geminiData.soldCount);
+        const baseCompAnchor = geminiData.minPrice && geminiData.minPrice > 0
+          ? geminiData.minPrice
+          : finalPrice * 0.5;
+        const ceilingResult = applyCeilingCheck(finalPrice, baseCompAnchor, scanDemandContext.tier, geminiData.soldCount);
         if (ceilingResult.wasCapped) {
-          console.warn(`[CardScanner] DEMAND CEILING: ${ceilingResult.capReason}`);
+          console.warn(`[CardScanner] DEMAND CEILING: ${ceilingResult.capReason}. Was $${finalPrice}, anchor $${baseCompAnchor.toFixed(2)}, now $${ceilingResult.price}`);
           finalPrice = ceilingResult.price;
-          finalMin = finalMin ? Math.round(finalPrice * 0.6) : null;
-          finalMax = finalMax ? Math.round(finalPrice * 1.5) : null;
+          finalMin = Math.round(finalPrice * 0.6);
+          finalMax = Math.round(finalPrice * 1.5);
+          scanCeilingApplied = true;
+          scanCeilingReason = ceilingResult.capReason || "";
         }
       }
 
@@ -678,6 +685,17 @@ export async function scanCardWithPricing(
           marketAssessment,
         },
         queryHash: normalized.queryHash,
+        demandTierResult: scanDemandContext ? {
+          tier: scanDemandContext.tier,
+          label: scanDemandContext.tierLabel,
+          demandScore: scanDemandContext.demandScore,
+          careerStage: scanDemandContext.careerStage,
+          sport: scanDemandContext.sport,
+          percentile: scanDemandContext.percentileInSport,
+          triangulationUsed: scanIsLowPop && geminiData.soldCount === 0,
+          ceilingApplied: scanCeilingApplied,
+          ceilingReason: scanCeilingReason || undefined,
+        } : null,
       };
     }
   } catch (error) {
