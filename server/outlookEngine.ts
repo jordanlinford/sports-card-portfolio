@@ -256,9 +256,10 @@ export async function fetchGeminiMarketData(card: {
   variation?: string | null;
   grade?: string | null;
   grader?: string | null;
-}): Promise<GeminiMarketData | null> {
+}, options?: { demandTierPrompt?: string }): Promise<GeminiMarketData | null> {
   // Check cache first
-  const cacheKey = getGeminiCacheKey(card);
+  const tierSuffix = options?.demandTierPrompt ? "|tier" : "";
+  const cacheKey = getGeminiCacheKey(card) + tierSuffix;
   const cached = geminiMarketCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < GEMINI_CACHE_TTL_MS) {
     if (!('monthlySalesVolume' in cached.data)) {
@@ -427,6 +428,7 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
     }
 
     if (is1of1 || isLowPopStandalone) {
+      const demandPrompt = options?.demandTierPrompt || "";
       return `\nLOW-POP CARD (${is1of1 ? "1/1 — only 1 exists" : `/${pn} — only ${pn} copies exist`}):
 Direct sales of this exact card are rare. Search in this order and use your market knowledge to value it:
 
@@ -435,20 +437,7 @@ Direct sales of this exact card are rare. Search in this order and use your mark
 3. Search for higher-numbered parallels of THIS SAME PLAYER from the same set:
 ${vs.join("\n")}
 4. If still no data, search: "${playerSearchStandalone} ${yearStrStandalone} sold eBay" for any recent sales
-
-SCARCITY PRICING RULES for /${pn || 1} cards:
-- A /${pn || 1} is scarcer than higher-numbered parallels, but scarcity premiums are MODEST — do NOT stack multipliers.
-- REALISTIC scarcity premiums (apply to the NEAREST parallel comp you can find, NOT from base):
-  - /99 → /49: multiply by 1.5-2x
-  - /49 → /25: multiply by 1.5-2x
-  - /25 → /10: multiply by 1.5-2.5x
-  - /10 → /5: multiply by 1.3-2x
-  - /5 → /2: multiply by 1.3-1.8x
-  - /2 → 1/1: multiply by 1.5-3x
-- ALWAYS triangulate from the CLOSEST available parallel, not from base or /99. If you have a /25 comp, go /25 → /10 → /5, NOT /99 → /5.
-- REALITY CHECK: After triangulating, ask yourself "would a real collector pay this much for this player's card?" Scarcity alone does not create value — demand matters more. A /5 auto of a non-HOF player is NOT a $2,000 card just because it's /5.
-- For veteran/established (non-rookie) players, the scarcity premium is LOWER because demand is thinner. Use the low end of the multiplier ranges.
-- CITE which specific comp(s) you used and what multiplier you applied in the notes field.`;
+${demandPrompt}`;
     }
 
     return `\nNUMBERED CARD FALLBACK (/${pn} — ${pn} copies exist):
@@ -813,8 +802,9 @@ export async function fetchUnifiedCardAnalysis(card: {
   variation?: string | null;
   grade?: string | null;
   grader?: string | null;
-}): Promise<UnifiedCardAnalysis | null> {
-  const cacheKey = "unified|" + getGeminiCacheKey(card);
+}, options?: { demandTierPrompt?: string }): Promise<UnifiedCardAnalysis | null> {
+  const tierSuffix = options?.demandTierPrompt ? `|tier` : "";
+  const cacheKey = "unified|" + getGeminiCacheKey(card) + tierSuffix;
   const cached = unifiedAnalysisCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < UNIFIED_CACHE_TTL_MS) {
     console.log(`[Unified Analysis] Cache hit for: ${card.title} (${Math.round((Date.now() - cached.cachedAt) / 1000 / 60)}min old)`);
@@ -986,6 +976,7 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
   const playerSearch = card.playerName || card.title;
   const yearStr = card.year || "";
   const setStr = card.set || "";
+  const unifiedDemandTierPrompt = options?.demandTierPrompt || "";
 
   function buildTriangulationInstructions(): string {
     if (!needsTriangulation) return "";
@@ -1023,6 +1014,7 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
     }
 
     if (is1of1 || isLowPop) {
+      const demandPrompt = unifiedDemandTierPrompt || "";
       return `\nLOW-POP CARD (${is1of1 ? "1/1 — only 1 exists" : `/${popNumber} — only ${popNumber} copies exist`}):
 Direct sales of this exact card are rare. Search in this order and use your market knowledge to value it:
 
@@ -1031,20 +1023,7 @@ Direct sales of this exact card are rare. Search in this order and use your mark
 3. Search for higher-numbered parallels of THIS SAME PLAYER from the same set:
 ${verticalSearches.join("\n")}
 4. If still no data: "${playerSearch} ${yearStr} sold eBay" for any recent sales of this player
-
-SCARCITY PRICING RULES for /${popNumber || 1} cards:
-- A /${popNumber || 1} is scarcer than higher-numbered parallels, but scarcity premiums are MODEST — do NOT stack multipliers.
-- REALISTIC scarcity premiums (apply to the NEAREST parallel comp you can find, NOT from base):
-  - /99 → /49: multiply by 1.5-2x
-  - /49 → /25: multiply by 1.5-2x
-  - /25 → /10: multiply by 1.5-2.5x
-  - /10 → /5: multiply by 1.3-2x
-  - /5 → /2: multiply by 1.3-1.8x
-  - /2 → 1/1: multiply by 1.5-3x
-- ALWAYS triangulate from the CLOSEST available parallel, not from base or /99. If you have a /25 comp, go /25 → /10 → /5, NOT /99 → /5.
-- REALITY CHECK: After triangulating, ask yourself "would a real collector pay this much for this player's card?" If the answer seems high, it probably is. Altuve /5 auto is not $2,000+ — it's more like $400-800.
-- For veteran/established (non-rookie) players, the scarcity premium is LOWER because demand is thinner. Use the low end of the multiplier ranges.
-- CITE which specific comp(s) you used and what multiplier you applied in the notes field.`;
+${demandPrompt}`;
     }
 
     return `\nNUMBERED CARD FALLBACK (/${popNumber} — ${popNumber} copies exist):

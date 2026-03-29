@@ -111,6 +111,26 @@ function OutlookSkeleton() {
   );
 }
 
+function DemandTierBadge({ tier }: { tier: NonNullable<QuickAnalyzeResult['demandTier']> }) {
+  const tierConfig: Record<number, { color: string; bg: string; label: string; desc: string }> = {
+    1: { color: "text-green-700 dark:text-green-400", bg: "bg-green-100 dark:bg-green-900/30", label: "Tier 1", desc: "Elite demand" },
+    2: { color: "text-blue-700 dark:text-blue-400", bg: "bg-blue-100 dark:bg-blue-900/30", label: "Tier 2", desc: "Strong demand" },
+    3: { color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-100 dark:bg-yellow-900/30", label: "Tier 3", desc: "Moderate demand" },
+    4: { color: "text-red-700 dark:text-red-400", bg: "bg-red-100 dark:bg-red-900/30", label: "Tier 4", desc: "Low demand" },
+  };
+  const config = tierConfig[tier.tier] || tierConfig[3];
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${config.bg} text-sm mt-2`} data-testid="demand-tier-badge">
+      <span className={`font-semibold ${config.color}`}>{config.label}</span>
+      <span className="text-muted-foreground">—</span>
+      <span className="text-muted-foreground">{config.desc} (top {Math.round(100 - tier.percentile)}% in {tier.sport})</span>
+      {tier.ceilingApplied && (
+        <span className="text-xs text-muted-foreground italic ml-auto">Price capped</span>
+      )}
+    </div>
+  );
+}
+
 // Comps & Confidence Panel Component - simplified to hide technical details
 function CompsConfidencePanel({ 
   comps, 
@@ -269,6 +289,17 @@ type QuickAnalyzeResult = {
     cardDescription: string;
     playerName: string;
     sport: string;
+  } | null;
+  demandTier?: {
+    tier: number;
+    label: string;
+    demandScore: number;
+    careerStage: string;
+    sport: string;
+    percentile: number;
+    isFromCache: boolean;
+    ceilingApplied: boolean;
+    ceilingReason?: string;
   } | null;
   isPro: boolean;
 };
@@ -2705,6 +2736,10 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   cardImageUrl={previewUrl}
                   showDetailedSignals={result.isPro}
                 />
+
+                {result.demandTier && (
+                  <DemandTierBadge tier={result.demandTier} />
+                )}
 
                 {result.market.isRaw && result.market.gradedEstimates && (result.market.gradedEstimates.psa9 || result.market.gradedEstimates.psa10) && result.market.value && (
                   <GradedValueMatrix

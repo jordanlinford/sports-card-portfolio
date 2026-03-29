@@ -3471,6 +3471,23 @@ Sitemap: ${origin}/sitemap.xml
               : undefined
       );
       const effectivePlayerName = reqPlayerName || title;
+      
+      const { getPlayerDemandContext, buildDemandAdjustedMultiplierPrompt, applyCeilingCheck } = await import("./demandTierEngine");
+      const qaVariationForTier = variation || "";
+      const qaIsNumberedForTier = /\/\d+/.test(qaVariationForTier);
+      const qaPopMatchForTier = qaVariationForTier.match(/\/\s*(\d+)/);
+      const qaPopNumForTier = qaPopMatchForTier ? parseInt(qaPopMatchForTier[1]) : null;
+      const qaNeedsTriangulationForTier = qaPopNumForTier !== null && qaPopNumForTier <= 49;
+      
+      let demandContext: Awaited<ReturnType<typeof getPlayerDemandContext>> | null = null;
+      let demandTierPrompt = "";
+      if (qaNeedsTriangulationForTier || /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(qaVariationForTier)) {
+        const tierSport = detectedSport || sport || "football";
+        demandContext = await getPlayerDemandContext(effectivePlayerName, tierSport);
+        demandTierPrompt = buildDemandAdjustedMultiplierPrompt(demandContext);
+        console.log(`[Quick Analyze] Demand tier: ${demandContext.tier} (${demandContext.tierLabel}) for ${effectivePlayerName} in ${tierSport}, demand=${demandContext.demandScore}, percentile=${demandContext.percentileInSport}`);
+      }
+      
       const [unifiedResult, priceData, qaMonthlyPriceHistory, specCrossProduct] = await Promise.all([
         fetchUnifiedCardAnalysis({
           title,
@@ -3480,7 +3497,7 @@ Sitemap: ${origin}/sitemap.xml
           variation: variation || undefined,
           grade: grade || undefined,
           grader: grader || undefined,
-        }),
+        }, demandTierPrompt ? { demandTierPrompt } : undefined),
         lookupEnhancedCardPrice({
           title,
           set: set || undefined,
@@ -3642,15 +3659,24 @@ Sitemap: ${origin}/sitemap.xml
 
           // ULTRA-LOW-POP SCARCITY FLOOR: For /1-/5 cards with 0 real comps, Gemini often
           // under-values because it can't find exact sales and anchors to common parallels.
-          // Apply a minimum scarcity multiplier based on what a /99 of this player would sell for.
+          // Apply a minimum scarcity multiplier ADJUSTED BY DEMAND TIER.
+          // Tier 1-2 players get meaningful floors; Tier 3-4 get minimal/no floor.
           if (qaIsVeryLowPop && unifiedResult.market.soldCount === 0 && marketValue > 0) {
             const popMatch = qaVariation.match(/\/\s*(\d+)/);
             const popNum = popMatch ? parseInt(popMatch[1]) : 5;
-            // Minimum floor: /2 should be at least 5x the avg, /5 at least 3x
-            // This catches cases where Gemini returns $85 for a /2 that should be $500+
-            const scarcityFloor = popNum <= 2 ? marketValue * 5 : popNum <= 3 ? marketValue * 4 : popNum <= 5 ? marketValue * 3 : marketValue * 2;
+            const tierNum = demandContext?.tier ?? 2;
+            const floorMultipliers: Record<number, Record<string, number>> = {
+              1: { "2": 5, "3": 4, "5": 3, "default": 2 },
+              2: { "2": 3, "3": 2.5, "5": 2, "default": 1.5 },
+              3: { "2": 1.5, "3": 1.3, "5": 1.2, "default": 1.1 },
+              4: { "2": 1.2, "3": 1.1, "5": 1.05, "default": 1.0 },
+            };
+            const tierFloors = floorMultipliers[tierNum] || floorMultipliers[2];
+            const floorKey = popNum <= 2 ? "2" : popNum <= 3 ? "3" : popNum <= 5 ? "5" : "default";
+            const floorMult = tierFloors[floorKey];
+            const scarcityFloor = marketValue * floorMult;
             if (marketValue < 200 && scarcityFloor > marketValue) {
-              console.warn(`[Quick Analyze] SCARCITY FLOOR: /${popNum} card estimated at $${marketValue} with 0 comps — applying ${popNum <= 2 ? "5x" : popNum <= 3 ? "4x" : "3x"} scarcity floor → $${scarcityFloor}`);
+              console.warn(`[Quick Analyze] SCARCITY FLOOR (Tier ${tierNum}): /${popNum} card estimated at $${marketValue} with 0 comps — applying ${floorMult}x floor → $${Math.round(scarcityFloor)}`);
               marketValue = Math.round(scarcityFloor);
               priceMin = Math.round(marketValue * 0.6);
               priceMax = Math.round(marketValue * 2);
@@ -3898,6 +3924,25 @@ Sitemap: ${origin}/sitemap.xml
         signals.confidenceReason = `Card identity incomplete — missing ${missingFields}. Price may not reflect this specific card.`;
       }
 
+      // DEMAND TIER CEILING CHECK: For Tier 3/4 players with triangulated (0 comp) prices,
+      // cap the estimated value to prevent inflated estimates for low-demand players.
+      let demandCeilingApplied = false;
+      let demandCeilingReason = "";
+      if (demandContext && demandContext.tier >= 3 && marketValue && marketValue > 0 && compCount === 0) {
+        const nearestComp = unifiedResult?.market?.avgPrice || priceData.estimatedValue || 0;
+        if (nearestComp > 0) {
+          const ceilingResult = applyCeilingCheck(marketValue, nearestComp, demandContext.tier, compCount);
+          if (ceilingResult.wasCapped) {
+            console.warn(`[Quick Analyze] DEMAND CEILING: ${ceilingResult.capReason}. Was $${marketValue}, now $${ceilingResult.price}`);
+            marketValue = ceilingResult.price;
+            priceMin = Math.round(marketValue * 0.6);
+            priceMax = Math.round(marketValue * 1.5);
+            demandCeilingApplied = true;
+            demandCeilingReason = ceilingResult.capReason || "";
+          }
+        }
+      }
+
       const matchConfidence = priceData.matchConfidence;
       
       // Determine final action — prefer unified verdict with deterministic guardrails
@@ -4116,6 +4161,17 @@ Sitemap: ${origin}/sitemap.xml
           lowPopFallbackSelected,
           finalSource: unifiedResult?.market?.avgPrice > 0 ? "unified" : (lowPopFallbackSelected ? "lowpop_fallback" : "legacy"),
         } : undefined,
+        demandTier: demandContext ? {
+          tier: demandContext.tier,
+          label: demandContext.tierLabel,
+          demandScore: demandContext.demandScore,
+          careerStage: demandContext.careerStage,
+          sport: demandContext.sport,
+          percentile: demandContext.percentileInSport,
+          isFromCache: demandContext.isFromCache,
+          ceilingApplied: demandCeilingApplied,
+          ceilingReason: demandCeilingReason || undefined,
+        } : null,
         generatedAt: new Date().toISOString(),
         isPro,
       });
