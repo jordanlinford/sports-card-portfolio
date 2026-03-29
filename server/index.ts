@@ -118,6 +118,20 @@ app.use((req, res, next) => {
         startHiddenGemsRefreshJob();
         
         log("All routes registered successfully");
+        
+        // One-time cleanup: remove misclassified player outlook cache entries
+        try {
+          const { storage } = await import("./storage");
+          const misclassifiedKeys = ["football:konnergriffin"];
+          for (const key of misclassifiedKeys) {
+            await storage.deletePlayerOutlookByKey(key);
+          }
+          if (misclassifiedKeys.length > 0) {
+            console.log(`[Cleanup] Removed ${misclassifiedKeys.length} misclassified player outlook cache entries`);
+          }
+        } catch (cleanupErr) {
+          console.error("[Cleanup] Failed to clean misclassified entries:", cleanupErr);
+        }
       } catch (err) {
         console.error("Failed to initialize routes:", err);
       }

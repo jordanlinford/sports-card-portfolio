@@ -2748,6 +2748,13 @@ export class DatabaseStorage implements IStorage {
     return cached;
   }
 
+  async deletePlayerOutlookByKey(playerKey: string): Promise<boolean> {
+    const result = await db
+      .delete(playerOutlookCache)
+      .where(eq(playerOutlookCache.playerKey, playerKey));
+    return true;
+  }
+
   async getPublicPlayerOutlookBySlug(sport: string, slug: string): Promise<PlayerOutlookCache | undefined> {
     const [cached] = await db
       .select()
