@@ -380,6 +380,26 @@ function normalizeSportForLegends(sport: string): string {
   return mapping[sportLower] || sportLower;
 }
 
+function normalizeSportName(sport: string): string {
+  const sportLower = sport.toLowerCase().trim();
+  const mapping: Record<string, string> = {
+    "nfl": "football",
+    "nba": "basketball",
+    "mlb": "baseball",
+    "nhl": "hockey",
+    "football": "football",
+    "basketball": "basketball",
+    "baseball": "baseball",
+    "hockey": "hockey",
+    "soccer": "soccer",
+    "mls": "soccer",
+    "premier league": "soccer",
+    "la liga": "soccer",
+    "epl": "soccer",
+  };
+  return mapping[sportLower] || sportLower;
+}
+
 // Check if player is a known legend
 function isKnownLegend(playerName: string, sport: string): boolean {
   const normalizedName = playerName.toLowerCase().trim();
@@ -488,6 +508,7 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
   aiCareerStage?: string;
   aiRookieYear?: number;
   aiPosition?: string;
+  aiDetectedSport?: string;
 }> {
   // First check if this is a known legend - override everything
   if (isKnownLegend(playerName, sport)) {
@@ -504,8 +525,10 @@ async function getPlayerNewsSignals(playerName: string, sport: string): Promise<
   let lastError: Error | null = null;
   const currentYear = new Date().getFullYear();
   
+  const sportHint = sport === "auto" ? "athlete" : `${sport} player`;
+  
   // Use Gemini with Google Search grounding for accurate, current news
-  const searchPrompt = `Search for the latest news about ${playerName} ${sport} player in ${currentYear}.
+  const searchPrompt = `Search for the latest news about ${playerName} ${sportHint} in ${currentYear}.
 
 Focus on finding:
 1. Current team and roster status (starter, backup, injured reserve, depth chart position)
@@ -513,6 +536,7 @@ Focus on finding:
 3. Role changes (lost starting job, promoted to starter, traded, released)
 4. Any injuries, surgeries, or health concerns
 5. Career status (active, retired, hall of fame, deceased)
+6. What sport/league they actually play in (NFL, NBA, MLB, NHL, soccer, etc.)
 
 Return ONLY a JSON object with these exact fields:
 {
@@ -525,8 +549,11 @@ Return ONLY a JSON object with these exact fields:
   "careerStage": "<ROOKIE | YEAR_2 | YEAR_3 | YEAR_4 | PRIME | VETERAN | AGING | UNKNOWN>",
   "rookieYear": <year they were drafted or debuted professionally, or null if unknown>,
   "position": "<their primary position, e.g. QB, RB, WR, C, PG, SG, SF, PF, SS, OF, SP, etc.>",
+  "sport": "<the sport/league this player actually plays: football | baseball | basketball | hockey | soccer>",
   "details": "<brief summary of current situation>"
 }
+
+IMPORTANT: The "sport" field must reflect the player's ACTUAL sport based on your research. For example, if asked about a baseball player but sport was passed as "football", return "baseball".
 
 Role status rules:
 - STAR: MVP candidate, All-Star/All-Pro, franchise player, #1 draft pick, generational talent, top prospect, face of the franchise
@@ -619,8 +646,9 @@ BUST CLARIFICATION:
           const aiCareerStage = parsed.careerStage || undefined;
           const aiRookieYear = parsed.rookieYear && typeof parsed.rookieYear === "number" ? parsed.rookieYear : undefined;
           const aiPosition = parsed.position || undefined;
+          const aiDetectedSport = parsed.sport ? normalizeSportName(parsed.sport) : undefined;
           
-          console.log(`[PlayerOutlook] News for ${playerName}: ${newsCount} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}, career: ${careerStatus}, aiStage: ${aiCareerStage || "none"}, rookieYear: ${aiRookieYear || "none"}, position: ${aiPosition || "none"} → stage=${detectedStage || "none"}`);
+          console.log(`[PlayerOutlook] News for ${playerName}: ${newsCount} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}, career: ${careerStatus}, aiStage: ${aiCareerStage || "none"}, rookieYear: ${aiRookieYear || "none"}, position: ${aiPosition || "none"}, aiSport: ${aiDetectedSport || "none"} → stage=${detectedStage || "none"}`);
           
           return { 
             momentum, 
@@ -633,6 +661,7 @@ BUST CLARIFICATION:
             aiCareerStage,
             aiRookieYear,
             aiPosition,
+            aiDetectedSport,
           };
         } catch (parseError) {
           console.error(`[PlayerOutlook] Failed to parse news JSON (attempt ${attempt}):`, responseText.substring(0, 200));
@@ -1460,13 +1489,30 @@ export async function getPlayerOutlook(
   request: PlayerOutlookRequest,
   options?: { forceRefresh?: boolean }
 ): Promise<PlayerOutlookResponse> {
-  const { playerName, sport = "football", contextCard } = request;
-  const playerKey = normalizePlayerKey(sport, playerName);
+  const { playerName, contextCard } = request;
+  const sport = request.sport ? normalizeSportName(request.sport) : "auto";
+  let playerKey = normalizePlayerKey(sport, playerName);
   
   // Ensure registry is fully loaded from database before lookups
   await ensureRegistryLoaded();
   
   console.log(`[PlayerOutlook] Generating outlook for: ${playerName} (${sport})`);
+  
+  // When sport is "auto", try to find an existing cache entry under any known sport
+  let resolvedSport = sport;
+  if (sport === "auto") {
+    const knownSports = ["football", "baseball", "basketball", "hockey", "soccer"];
+    for (const s of knownSports) {
+      const testKey = normalizePlayerKey(s, playerName);
+      const { outlook: testOutlook } = await getCachedOutlook(testKey);
+      if (testOutlook) {
+        console.log(`[PlayerOutlook] Auto-detect: found cached entry for ${playerName} under "${s}"`);
+        resolvedSport = s;
+        playerKey = testKey;
+        break;
+      }
+    }
+  }
   
   // Check cache first
   const { outlook: cachedOutlook, isStale, cacheRecord } = await getCachedOutlook(playerKey);
@@ -1474,7 +1520,7 @@ export async function getPlayerOutlook(
   // Force refresh mode: always generate fresh (used by prewarm job)
   if (options?.forceRefresh) {
     console.log(`[PlayerOutlook] Force refresh requested for ${playerName}`);
-    const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
+    const freshOutlook = await generateFreshOutlook(playerName, resolvedSport, playerKey);
     return { ...freshOutlook, cacheStatus: "miss" };
   }
   
@@ -1499,7 +1545,7 @@ export async function getPlayerOutlook(
   if (hasZeroMarketData && (zeroDataCooldownExpired || isOldPrompt)) {
     console.log(`[PlayerOutlook] Cache has zero market data for ${playerName} (${isOldPrompt ? 'old prompt v' + cachedPromptVersion : 'cooldown expired'}), refreshing synchronously (zero data not useful to serve)`);
     try {
-      const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
+      const freshOutlook = await generateFreshOutlook(playerName, resolvedSport, playerKey);
       return { ...freshOutlook, cacheStatus: "miss" };
     } catch (err) {
       console.error(`[PlayerOutlook] Sync refresh failed for ${playerName}, serving stale:`, err);
@@ -1515,7 +1561,7 @@ export async function getPlayerOutlook(
   if (cachedOutlook && isStale) {
     console.log(`[PlayerOutlook] Cache HIT (stale) for ${playerName}, refreshing async`);
     
-    generateFreshOutlook(playerName, sport, playerKey).catch(err => {
+    generateFreshOutlook(playerName, resolvedSport, playerKey).catch(err => {
       console.error(`[PlayerOutlook] Background refresh failed:`, err);
     });
     
@@ -1524,7 +1570,7 @@ export async function getPlayerOutlook(
   
   // Cache miss - generate fresh
   console.log(`[PlayerOutlook] Cache MISS for ${playerName}, generating fresh`);
-  const freshOutlook = await generateFreshOutlook(playerName, sport, playerKey);
+  const freshOutlook = await generateFreshOutlook(playerName, resolvedSport, playerKey);
   return { ...freshOutlook, cacheStatus: "miss" };
 }
 
@@ -1539,7 +1585,19 @@ async function generateFreshOutlook(
   const internalMetricsPromise = aggregateInternalMetrics(playerName);
   
   // Step 1b: Fetch news signals (blocks until complete — classification + narrative depend on this)
-  const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus, aiCareerStage, aiRookieYear, aiPosition } = await getPlayerNewsSignals(playerName, sport);
+  const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus, aiCareerStage, aiRookieYear, aiPosition, aiDetectedSport } = await getPlayerNewsSignals(playerName, sport);
+  
+  // Sport correction: if AI detected a different sport than what was passed, correct it
+  let effectiveSport = sport;
+  if (aiDetectedSport && aiDetectedSport !== sport && sport !== aiDetectedSport) {
+    const normalizedPassed = normalizeSportName(sport);
+    const normalizedDetected = normalizeSportName(aiDetectedSport);
+    if (normalizedPassed !== normalizedDetected) {
+      console.log(`[PlayerOutlook] SPORT CORRECTION: ${playerName} was passed as "${sport}" but AI detected "${aiDetectedSport}" → using "${normalizedDetected}"`);
+      effectiveSport = normalizedDetected;
+      playerKey = normalizePlayerKey(effectiveSport, playerName);
+    }
+  }
   
   // Step 2: Run classification engine (depends on news signals)
   // Priority for career stage: detectedStage (BUST/RETIRED/HOF from careerStatus) > aiCareerStage (from Gemini) > inferCareerStage
@@ -1558,7 +1616,7 @@ async function generateFreshOutlook(
   
   const classificationInput: ClassificationInput = {
     playerName,
-    sport,
+    sport: effectiveSport,
     recentMomentum: momentum,
     newsHype,
     careerStage: resolvedCareerStage,
@@ -1575,7 +1633,7 @@ async function generateFreshOutlook(
   // Step 3: Generate AI narrative
   const { playerInfo, thesis, marketRealityCheck, verdict, confidence, dataQuality, marketDataConfidence, newsCoverageConfidence, aiDetectedCareerStatus, peakTiming, tieredRecommendations } = await generatePlayerOutlookAI(
     playerName,
-    sport,
+    effectiveSport,
     classification,
     snippets,
     teamContextWithTeam
@@ -1685,7 +1743,7 @@ async function generateFreshOutlook(
       console.log(`[PlayerOutlook] Registry override: ${playerName} stage ${classification.stage} → ${registryStage}`);
       const correctedInput: ClassificationInput = {
         playerName,
-        sport,
+        sport: effectiveSport,
         recentMomentum: momentum,
         newsHype,
         careerStage: registryStage,
@@ -1708,7 +1766,7 @@ async function generateFreshOutlook(
       
       const correctedInput: ClassificationInput = {
         playerName,
-        sport,
+        sport: effectiveSport,
         recentMomentum: momentum,
         newsHype,
         careerStage: correctedStage,
@@ -1730,7 +1788,7 @@ async function generateFreshOutlook(
   }
   
   // Step 4: Get exposure recommendations
-  const exposures = getExposureRecommendations(finalClassification, sport, playerName);
+  const exposures = getExposureRecommendations(finalClassification, effectiveSport, playerName);
   
   // Step 5: Build snapshot (use finalClassification which may have been corrected by AI)
   // Note: Temperature may be adjusted later for verdict consistency
@@ -1745,7 +1803,7 @@ async function generateFreshOutlook(
   };
   
   // Step 6: Calculate valuation using heuristic model
-  const valuation = calculateValuation(sport, finalClassification, verdict.modifier);
+  const valuation = calculateValuation(effectiveSport, finalClassification, verdict.modifier);
   
   // Step 6.5: Await market data + internal metrics (started in Step 1)
   const [marketData, internalMetrics] = await Promise.all([marketDataPromise, internalMetricsPromise]);
@@ -1807,7 +1865,7 @@ async function generateFreshOutlook(
     playerName,
     stage: enrichedPlayerInfo.stage || finalClassification.stage,
     position: enrichedPlayerInfo.position,
-    sport,
+    sport: effectiveSport,
     team: enrichedPlayerInfo.team,
     roleTier,
     roleStabilityScore: roleStabilityScore > 0 ? roleStabilityScore : 50,
@@ -1996,10 +2054,10 @@ async function generateFreshOutlook(
   };
   
   // Step 10: Save to cache (use finalClassification which includes market-derived temperature)
-  await saveToCache(playerKey, sport, playerName, finalClassification, response);
+  await saveToCache(playerKey, effectiveSport, playerName, finalClassification, response);
   
   return response;
 }
 
 // Export for testing
-export { normalizePlayerKey, getTtlMs };
+export { normalizePlayerKey, getTtlMs, normalizeSportName };

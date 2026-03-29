@@ -155,7 +155,7 @@ async function executeToolCall(
     case "get_player_outlook": {
       const outlook = await getPlayerOutlook({
         playerName: args.playerName,
-        sport: args.sport || "football",
+        sport: args.sport || undefined,
       });
       return {
         playerName: args.playerName,
@@ -171,7 +171,7 @@ async function executeToolCall(
     }
 
     case "get_player_news": {
-      const news = await fetchPlayerNews(args.playerName, args.sport || "football");
+      const news = await fetchPlayerNews(args.playerName, args.sport || "auto");
       return {
         playerName: args.playerName,
         momentum: news.momentum,

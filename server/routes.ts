@@ -5119,7 +5119,7 @@ Sitemap: ${origin}/sitemap.xml
       
       const outlook = await getPlayerOutlook({
         playerName: playerName.trim(),
-        sport: sport || "football", // Default to football
+        sport: sport || undefined,
         contextCard,
       });
 
