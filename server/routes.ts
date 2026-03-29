@@ -3754,12 +3754,39 @@ Sitemap: ${origin}/sitemap.xml
               priceMin = Math.round(lowerEstimate * 0.7);
               priceMax = Math.round(higherEstimate * 0.8);
             } else {
-              const discount = qaIsVeryLowPop ? 0.65 : 0.60;
+              const activeListings = unifiedResult.market.activeListing || 0;
+              const crossProductPrice = specCrossProduct?.avgPrice || 0;
+              const crossProductCorroborates = crossProductPrice > 0 && 
+                crossProductPrice >= marketValue * 0.4 && crossProductPrice <= marketValue * 3;
+
+              let discount: number;
+              let discountReason: string;
+              if (activeListings >= 3 && crossProductCorroborates) {
+                discount = qaIsVeryLowPop ? 0.85 : 0.80;
+                discountReason = `${activeListings} active listings + cross-product $${crossProductPrice} corroborate`;
+              } else if (activeListings >= 2 || crossProductCorroborates) {
+                discount = qaIsVeryLowPop ? 0.78 : 0.75;
+                discountReason = activeListings >= 2 
+                  ? `${activeListings} active listings provide partial validation`
+                  : `cross-product $${crossProductPrice} corroborates`;
+              } else if (activeListings >= 1) {
+                discount = qaIsVeryLowPop ? 0.72 : 0.68;
+                discountReason = `${activeListings} active listing — mild validation`;
+              } else {
+                discount = qaIsVeryLowPop ? 0.65 : 0.60;
+                discountReason = "no active listings, no legacy anchor";
+              }
+
               const originalVal = marketValue;
-              marketValue = Math.round(marketValue * discount);
+              if (crossProductCorroborates && crossProductPrice > marketValue) {
+                const blended = Math.round(marketValue * 0.6 + crossProductPrice * 0.4);
+                marketValue = Math.round(blended * discount);
+              } else {
+                marketValue = Math.round(marketValue * discount);
+              }
               priceMin = Math.round(marketValue * 0.7);
-              priceMax = Math.round(originalVal * 0.8);
-              console.log(`[Quick Analyze] LOW-POP ZERO-COMP DISCOUNT: $${originalVal} → $${marketValue} (${Math.round((1 - discount) * 100)}% haircut — 0 sold comps, no legacy anchor)`);
+              priceMax = Math.round(originalVal * (discount > 0.75 ? 1.1 : 0.8));
+              console.log(`[Quick Analyze] LOW-POP ZERO-COMP DISCOUNT: $${originalVal} → $${marketValue} (${Math.round((1 - discount) * 100)}% haircut — ${discountReason})`);
             }
           }
         } else {
