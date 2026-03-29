@@ -7263,6 +7263,33 @@ RULES:
     }
   });
 
+  // Admin: Delete a player outlook cache entry
+  app.delete("/api/admin/outlook/:playerKey", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { playerKey } = req.params;
+      const decodedKey = decodeURIComponent(playerKey);
+      
+      const cached = await storage.getCachedPlayerOutlook(decodedKey);
+      if (!cached) {
+        return res.status(404).json({ message: "Player outlook not found in cache" });
+      }
+      
+      await storage.deletePlayerOutlookByKey(decodedKey);
+      
+      console.log(`[Admin] Deleted player outlook cache: ${decodedKey} (${cached.playerName}, ${cached.sport})`);
+      
+      res.json({
+        success: true,
+        deleted: decodedKey,
+        playerName: cached.playerName,
+        sport: cached.sport,
+      });
+    } catch (error) {
+      console.error("Error deleting player outlook:", error);
+      res.status(500).json({ message: "Failed to delete player outlook" });
+    }
+  });
+
   // Admin: Seed public outlooks for a list of top players
   app.post("/api/admin/outlook/seed", isAuthenticated, isAdmin, async (req: any, res) => {
     try {

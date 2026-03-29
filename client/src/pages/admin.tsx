@@ -1050,6 +1050,19 @@ function OutlookSEOTab() {
     },
   });
 
+  const deleteOutlookMutation = useMutation({
+    mutationFn: async (playerKey: string) => {
+      return await apiRequest("DELETE", `/api/admin/outlook/${encodeURIComponent(playerKey)}`);
+    },
+    onSuccess: (_data: any, playerKey: string) => {
+      refetch();
+      toast({ title: "Player outlook deleted", description: playerKey });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleSeedTopAthletes = async () => {
     setSeeding(true);
     setSeedResults(null);
@@ -1193,6 +1206,19 @@ function OutlookSEOTab() {
                           </Button>
                         </a>
                       )}
+                      <Button 
+                        size="icon" 
+                        variant="ghost"
+                        onClick={() => {
+                          if (confirm(`Delete cached outlook for ${entry.playerName} (${entry.sport})?`)) {
+                            deleteOutlookMutation.mutate(entry.playerKey);
+                          }
+                        }}
+                        disabled={deleteOutlookMutation.isPending}
+                        data-testid={`button-delete-outlook-${entry.playerKey}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   </div>
                 ))}
