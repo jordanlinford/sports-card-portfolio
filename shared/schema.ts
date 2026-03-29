@@ -2725,3 +2725,32 @@ export const insertSignalFeedbackSchema = createInsertSchema(signalFeedback).omi
 });
 export type InsertSignalFeedback = z.infer<typeof insertSignalFeedbackSchema>;
 export type SignalFeedback = typeof signalFeedback.$inferSelect;
+
+export const compObservations = pgTable("comp_observations", {
+  id: serial("id").primaryKey(),
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  sport: varchar("sport", { length: 50 }),
+  setName: varchar("set_name", { length: 255 }),
+  year: integer("year"),
+  variation: varchar("variation", { length: 255 }),
+  grade: varchar("grade", { length: 50 }),
+  price: real("price").notNull(),
+  source: varchar("source", { length: 50 }).notNull(),
+  soldDate: timestamp("sold_date"),
+  observedAt: timestamp("observed_at").defaultNow().notNull(),
+  cardDescription: text("card_description"),
+  isExactMatch: boolean("is_exact_match").default(false),
+  searchQuery: text("search_query"),
+  printRun: integer("print_run"),
+}, (table) => [
+  index("idx_comp_player").on(table.playerName),
+  index("idx_comp_player_set").on(table.playerName, table.setName, table.year),
+  index("idx_comp_observed").on(table.observedAt),
+]);
+
+export const insertCompObservationSchema = createInsertSchema(compObservations).omit({
+  id: true,
+  observedAt: true,
+});
+export type InsertCompObservation = z.infer<typeof insertCompObservationSchema>;
+export type CompObservation = typeof compObservations.$inferSelect;

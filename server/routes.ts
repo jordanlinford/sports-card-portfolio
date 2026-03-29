@@ -109,6 +109,171 @@ function recordInterestEvent(data: {
 }
 
 // ============================================================================
+// Historical Comp Accumulation — stores every comp found to build pricing DB
+// ============================================================================
+
+async function storeCompObservations(data: {
+  playerName: string;
+  sport: string | null;
+  setName: string | null;
+  year: number | null;
+  variation: string | null;
+  grade: string | null;
+  unifiedResult: any;
+  priceData: any;
+  crossProduct: any;
+  marketValue: number | null;
+  compCount: number;
+  searchQuery: string;
+}) {
+  const observations: any[] = [];
+  const playerName = data.playerName;
+  if (!playerName) return;
+
+  if (data.unifiedResult && data.unifiedResult.market) {
+    const m = data.unifiedResult.market;
+    if (m.avgPrice > 0) {
+      observations.push({
+        playerName,
+        sport: data.sport,
+        setName: data.setName,
+        year: data.year,
+        variation: data.variation,
+        grade: data.grade,
+        price: m.avgPrice,
+        source: "unified",
+        isExactMatch: (m.soldCount || 0) > 0,
+        searchQuery: data.searchQuery,
+        cardDescription: `Avg from ${m.soldCount || 0} sold comps`,
+      });
+    }
+    if (m.minPrice > 0 && m.minPrice !== m.avgPrice) {
+      observations.push({
+        playerName,
+        sport: data.sport,
+        setName: data.setName,
+        year: data.year,
+        variation: data.variation,
+        grade: data.grade,
+        price: m.minPrice,
+        source: "unified_min",
+        isExactMatch: (m.soldCount || 0) > 0,
+        searchQuery: data.searchQuery,
+        cardDescription: "Min comp price",
+      });
+    }
+    if (m.maxPrice > 0 && m.maxPrice !== m.avgPrice) {
+      observations.push({
+        playerName,
+        sport: data.sport,
+        setName: data.setName,
+        year: data.year,
+        variation: data.variation,
+        grade: data.grade,
+        price: m.maxPrice,
+        source: "unified_max",
+        isExactMatch: (m.soldCount || 0) > 0,
+        searchQuery: data.searchQuery,
+        cardDescription: "Max comp price",
+      });
+    }
+    if (m.psa9Price > 0) {
+      observations.push({
+        playerName,
+        sport: data.sport,
+        setName: data.setName,
+        year: data.year,
+        variation: data.variation,
+        grade: "PSA 9",
+        price: m.psa9Price,
+        source: "unified_graded",
+        isExactMatch: true,
+        searchQuery: data.searchQuery,
+        cardDescription: "PSA 9 comp",
+      });
+    }
+    if (m.psa10Price > 0) {
+      observations.push({
+        playerName,
+        sport: data.sport,
+        setName: data.setName,
+        year: data.year,
+        variation: data.variation,
+        grade: "PSA 10",
+        price: m.psa10Price,
+        source: "unified_graded",
+        isExactMatch: true,
+        searchQuery: data.searchQuery,
+        cardDescription: "PSA 10 comp",
+      });
+    }
+  }
+
+  if (data.priceData && data.priceData.pricePoints && data.priceData.pricePoints.length > 0) {
+    for (const pp of data.priceData.pricePoints.slice(0, 20)) {
+      if (pp.price > 0) {
+        let soldDate: Date | null = null;
+        if (pp.date) {
+          const parsed = new Date(pp.date);
+          if (!isNaN(parsed.getTime())) soldDate = parsed;
+        }
+        observations.push({
+          playerName,
+          sport: data.sport,
+          setName: data.setName,
+          year: data.year,
+          variation: data.variation,
+          grade: data.grade,
+          price: pp.price,
+          source: "legacy",
+          soldDate,
+          isExactMatch: true,
+          searchQuery: data.searchQuery,
+          cardDescription: pp.source || "Legacy price point",
+        });
+      }
+    }
+  }
+
+  if (data.crossProduct && data.crossProduct.avgPrice > 0) {
+    observations.push({
+      playerName,
+      sport: data.sport,
+      setName: data.setName,
+      year: data.year,
+      variation: data.variation,
+      grade: data.grade,
+      price: data.crossProduct.avgPrice,
+      source: "cross_product",
+      isExactMatch: false,
+      searchQuery: data.searchQuery,
+      cardDescription: data.crossProduct.notes ? data.crossProduct.notes.substring(0, 200) : "Cross-product fallback",
+    });
+  }
+
+  if (data.marketValue && data.marketValue > 0) {
+    observations.push({
+      playerName,
+      sport: data.sport,
+      setName: data.setName,
+      year: data.year,
+      variation: data.variation,
+      grade: data.grade,
+      price: data.marketValue,
+      source: "final_estimate",
+      isExactMatch: data.compCount > 0,
+      searchQuery: data.searchQuery,
+      cardDescription: `Final estimate (${data.compCount} comps)`,
+    });
+  }
+
+  if (observations.length > 0) {
+    console.log(`[CompStore] Storing ${observations.length} comp observations for "${playerName}"`);
+    await storage.insertCompObservations(observations);
+  }
+}
+
+// ============================================================================
 // Free User Cost Safeguards
 // ============================================================================
 
@@ -3540,6 +3705,21 @@ Sitemap: ${origin}/sitemap.xml
       ]);
       console.log(`[Quick Analyze] Parallel fetch completed in ${Date.now() - startTime}ms`);
 
+      let historicalComps: any[] = [];
+      try {
+        historicalComps = await storage.getCompObservations(
+          effectivePlayerName,
+          set || undefined,
+          year ? parseInt(year) : undefined,
+          variation || undefined
+        );
+        if (historicalComps.length > 0) {
+          console.log(`[Quick Analyze] Found ${historicalComps.length} historical comps for "${effectivePlayerName}" in DB`);
+        }
+      } catch (hcErr) {
+        console.error("[Quick Analyze] Historical comp lookup error:", hcErr);
+      }
+
       if (demandContext && !demandContext.isFromCache && specCrossProduct && specCrossProduct.notes) {
         const cpNotes = specCrossProduct.notes;
         const newHints: any = {};
@@ -3909,6 +4089,50 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // HISTORICAL COMP ANCHOR: When we have no current comps but have stored historical data,
+      // use those as a validation anchor to catch AI hallucinations.
+      const historicalExactComps = historicalComps.filter(c => 
+        c.isExactMatch && 
+        c.source !== "final_estimate" && 
+        c.source !== "unified_min" && 
+        c.source !== "unified_max" && 
+        c.source !== "cross_product"
+      );
+      const dedupedPrices = [...new Set(historicalExactComps.map(c => c.price))].filter(p => p > 0);
+      const historicalAnchorPrices = dedupedPrices.sort((a, b) => a - b);
+      if (historicalAnchorPrices.length >= 2 && compCount === 0 && marketValue && marketValue > 0) {
+        const mid = Math.floor(historicalAnchorPrices.length / 2);
+        const historicalMedian = historicalAnchorPrices.length % 2 === 0
+          ? (historicalAnchorPrices[mid - 1] + historicalAnchorPrices[mid]) / 2
+          : historicalAnchorPrices[mid];
+        const ratio = marketValue / historicalMedian;
+        if (ratio > 3) {
+          const anchored = Math.round(historicalMedian * 1.5 * 100) / 100;
+          console.log(`[Quick Analyze] HISTORICAL ANCHOR: Current $${marketValue} is ${ratio.toFixed(1)}x historical median $${historicalMedian.toFixed(2)} from ${historicalAnchorPrices.length} stored comps. Capping to $${anchored}`);
+          marketValue = anchored;
+          priceMin = Math.round(historicalMedian * 0.7);
+          priceMax = Math.round(historicalMedian * 2.5);
+        } else if (ratio < 0.3) {
+          const anchored = Math.round(historicalMedian * 0.6 * 100) / 100;
+          console.log(`[Quick Analyze] HISTORICAL ANCHOR: Current $${marketValue} is only ${(ratio * 100).toFixed(0)}% of historical median $${historicalMedian.toFixed(2)}. Raising floor to $${anchored}`);
+          marketValue = anchored;
+          priceMin = Math.round(historicalMedian * 0.4);
+          priceMax = Math.round(historicalMedian * 1.5);
+        }
+      }
+      
+      if ((!marketValue || marketValue <= 0) && historicalAnchorPrices.length >= 2) {
+        const mid = Math.floor(historicalAnchorPrices.length / 2);
+        const historicalMedian = historicalAnchorPrices.length % 2 === 0
+          ? (historicalAnchorPrices[mid - 1] + historicalAnchorPrices[mid]) / 2
+          : historicalAnchorPrices[mid];
+        marketValue = Math.round(historicalMedian * 100) / 100;
+        priceMin = Math.round(historicalMedian * 0.6);
+        priceMax = Math.round(historicalMedian * 1.5);
+        compCount = 0;
+        console.log(`[Quick Analyze] HISTORICAL RESCUE: No current pricing available. Using historical median $${marketValue} from ${historicalAnchorPrices.length} stored comps`);
+      }
+
       // CROSS-PRODUCT FALLBACK: Use the pre-fetched result (ran in parallel with main calls).
       // Applied when there are NO real comps from any source.
       const legacyPricePoints = priceData.pricePoints || [];
@@ -4186,6 +4410,21 @@ Sitemap: ${origin}/sitemap.xml
         metadata: { title, year, set, action: finalAction, marketValue },
         req,
       });
+
+      storeCompObservations({
+        playerName: effectivePlayerName,
+        sport: detectedSport || sport || null,
+        setName: set || null,
+        year: year ? parseInt(year) : null,
+        variation: variation || null,
+        grade: grade || null,
+        unifiedResult,
+        priceData,
+        crossProduct: specCrossProduct,
+        marketValue,
+        compCount,
+        searchQuery: title,
+      }).catch(err => console.error("[CompStore] Error:", err));
 
       const totalTime = Date.now() - startTime;
       console.log(`[Quick Analyze] Complete in ${totalTime}ms | ${title} | ${finalAction} | $${marketValue}`);

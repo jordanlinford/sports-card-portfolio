@@ -2303,12 +2303,13 @@ export function detectCareerStage(card: Card): string {
     return isRookieCard ? "ROOKIE" : "RISING";
   } else if (yearsAgo <= 5) {
     return "RISING";
+  } else if (yearsAgo <= 8) {
+    return "PRIME";
   } else if (yearsAgo <= 12) {
     return "ELITE";
   } else if (yearsAgo <= 20) {
     return "VETERAN";
   } else {
-    // Could be retired or legend - check for indicators
     if (titleLower.includes("hof") || titleLower.includes("hall of fame") || 
         titleLower.includes("legend") || titleLower.includes("goat")) {
       return "LEGEND";
@@ -2347,10 +2348,11 @@ export function computeAction(
 ): ActionDecision {
   const reasons: string[] = [];
   
-  // Calculate card age for vintage detection
   const currentYear = new Date().getFullYear();
   const cardAge = cardYear ? currentYear - cardYear : 0;
-  const isVintage = cardAge >= 25;
+  const isVintage = cardAge >= 20;
+  
+  const isTrendUnavailable = trendScore === 5 && liquidityScore < 4;
   
   // LITTLE_VALUE: Low quality + low demand + low value
   if (qualityScore < 30 && demandScore < 30 && (marketValue === null || marketValue < 10)) {
@@ -2379,11 +2381,14 @@ export function computeAction(
     return { action: "LEGACY_HOLD", reasons };
   }
   
-  // LONG_HOLD: Retired/legend + low volatility + decent demand (may be modern or pre-vintage)
   if ((careerStage === "RETIRED" || careerStage === "LEGEND") && 
-      volatilityScore <= 4 && demandScore >= 40) {
+      volatilityScore <= 6 && demandScore >= 35) {
     reasons.push(`${careerStage} player with established legacy`);
-    reasons.push("Stable price history with low volatility");
+    if (volatilityScore <= 4) {
+      reasons.push("Stable price history with low volatility");
+    } else {
+      reasons.push("Acceptable price variance for established player");
+    }
     if (careerStage === "LEGEND") reasons.push("Hall of Fame premium applies");
     return { action: "LONG_HOLD", reasons };
   }
@@ -2413,15 +2418,16 @@ export function computeAction(
     return { action: "BUY", reasons };
   }
   
-  // Also BUY for undervalued quality
   if (qualityScore >= 70 && demandScore >= 50 && momentumScore >= 50) {
     reasons.push("Premium card with strong fundamentals");
     reasons.push("Solid demand and positive momentum");
     return { action: "BUY", reasons };
   }
   
-  // MONITOR: Default - not clearly a buy or sell
-  // Determine the specific MONITOR reason based on available signals
+  if (isTrendUnavailable) {
+    return computeContextualVerdict(qualityScore, demandScore, marketValue, careerStage, cardAge);
+  }
+  
   let monitorReason: MonitorReason = "NEUTRAL";
   
   // UNSTABLE_PRICING: High volatility + decent liquidity (lots of data, just all over the place)
@@ -2457,11 +2463,78 @@ export function computeAction(
     return { action: "MONITOR", reasons, monitorReason };
   }
   
-  // NEUTRAL: Generic fallback
   reasons.push("Mixed signals—no clear buy or sell case");
   if (volatilityScore >= 5) reasons.push("Some price variance present");
   if (momentumScore >= 40 && momentumScore <= 60) reasons.push("Momentum is flat");
   
+  return { action: "MONITOR", reasons, monitorReason };
+}
+
+function computeContextualVerdict(
+  qualityScore: number,
+  demandScore: number,
+  marketValue: number | null,
+  careerStage: string | null | undefined,
+  cardAge: number
+): ActionDecision {
+  const reasons: string[] = [];
+  
+  const contextScore = (qualityScore * 0.45) + (demandScore * 0.55);
+  
+  const isYoungPlayer = careerStage === "ROOKIE" || careerStage === "RISING";
+  const isPrimePlayer = careerStage === "PRIME" || careerStage === "ELITE";
+  const isEstablished = careerStage === "RETIRED" || careerStage === "LEGEND" || careerStage === "VETERAN";
+  const hasSignificantValue = marketValue !== null && marketValue >= 25;
+  
+  if (isEstablished && cardAge >= 20) {
+    if (hasSignificantValue) {
+      reasons.push("Established player with meaningful card value");
+      reasons.push("Limited market data — hold for long-term collector demand");
+      if (careerStage === "LEGEND") reasons.push("Hall of Fame status supports floor");
+      return { action: "LONG_HOLD", reasons };
+    }
+  }
+  
+  if (contextScore >= 60 && isYoungPlayer) {
+    reasons.push("High-quality young player card");
+    reasons.push("Strong demand profile suggests upside potential");
+    if (hasSignificantValue) reasons.push("Market value supports investment thesis");
+    reasons.push("Limited comps — position sizing accordingly");
+    return { action: "BUY", reasons };
+  }
+  
+  if (contextScore >= 55 && isPrimePlayer && hasSignificantValue) {
+    reasons.push("Quality card of established player in their prime");
+    reasons.push("Demand fundamentals are solid");
+    reasons.push("Thin market data — buy with patience");
+    return { action: "BUY", reasons };
+  }
+  
+  if (contextScore >= 50 && hasSignificantValue && demandScore >= 40) {
+    reasons.push("Decent card quality with positive demand indicators");
+    reasons.push("Limited sales data — price discovery still in progress");
+    if (isYoungPlayer) reasons.push("Young player upside adds optionality");
+    return { action: "BUY", reasons };
+  }
+  
+  if (qualityScore >= 50 || demandScore >= 45) {
+    const monitorReason: MonitorReason = "DATA_UNCERTAIN";
+    reasons.push("Solid card but too few comps for a confident call");
+    if (isYoungPlayer) reasons.push("Young player — worth watching for breakout");
+    if (isPrimePlayer) reasons.push("Prime career window — could move on performance");
+    reasons.push("Watch for more sales to confirm direction");
+    return { action: "MONITOR", reasons, monitorReason };
+  }
+  
+  if (marketValue !== null && marketValue < 10 && qualityScore < 40) {
+    reasons.push("Low card quality and minimal market value");
+    reasons.push("Limited collector interest expected");
+    return { action: "LITTLE_VALUE", reasons };
+  }
+  
+  const monitorReason: MonitorReason = "DATA_UNCERTAIN";
+  reasons.push("Insufficient market data for a confident recommendation");
+  reasons.push("Card fundamentals don't strongly favor buy or sell");
   return { action: "MONITOR", reasons, monitorReason };
 }
 

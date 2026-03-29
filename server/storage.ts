@@ -124,6 +124,9 @@ import {
   signalFeedback,
   type SignalFeedback,
   type InsertSignalFeedback,
+  compObservations,
+  type CompObservation,
+  type InsertCompObservation,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
@@ -459,6 +462,11 @@ export interface IStorage {
   upsertSignalFeedback(data: InsertSignalFeedback): Promise<SignalFeedback>;
   getSignalFeedbackCounts(signalId: number): Promise<{ useful: number; notUseful: number }>;
   getUserSignalFeedback(signalId: number, userId: string): Promise<SignalFeedback | undefined>;
+
+  // Comp Observations
+  insertCompObservations(data: InsertCompObservation[]): Promise<void>;
+  getCompObservations(playerName: string, setName?: string, year?: number, variation?: string): Promise<CompObservation[]>;
+  getRecentCompCount(playerName: string, setName?: string, maxAgeDays?: number): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4053,6 +4061,56 @@ export class DatabaseStorage implements IStorage {
       scanCount: r.scanCount,
       totalMomentum: r.totalMomentum,
     }));
+  }
+
+  async insertCompObservations(data: InsertCompObservation[]): Promise<void> {
+    if (data.length === 0) return;
+    const validData = data.filter(d => d.playerName && d.price > 0);
+    if (validData.length === 0) return;
+    
+    try {
+      const batchSize = 50;
+      for (let i = 0; i < validData.length; i += batchSize) {
+        const batch = validData.slice(i, i + batchSize);
+        await db.insert(compObservations).values(batch);
+      }
+    } catch (error) {
+      console.error("[CompObservations] Error inserting:", error);
+    }
+  }
+
+  async getCompObservations(playerName: string, setName?: string, year?: number, variation?: string): Promise<CompObservation[]> {
+    const normalizedName = playerName.trim().toLowerCase().replace(/[^a-z\s]/g, '');
+    const conditions = [sql`lower(trim(${compObservations.playerName})) = ${normalizedName}`];
+    if (setName) conditions.push(ilike(compObservations.setName, `%${setName}%`));
+    if (year) conditions.push(eq(compObservations.year, year));
+    if (variation) conditions.push(ilike(compObservations.variation, `%${variation}%`));
+    
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
+    conditions.push(sql`${compObservations.observedAt} >= ${cutoff}`);
+    
+    return await db.select()
+      .from(compObservations)
+      .where(and(...conditions))
+      .orderBy(desc(compObservations.observedAt))
+      .limit(100);
+  }
+
+  async getRecentCompCount(playerName: string, setName?: string, maxAgeDays: number = 30): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - maxAgeDays);
+    
+    const conditions = [
+      ilike(compObservations.playerName, playerName),
+      sql`${compObservations.observedAt} >= ${cutoff}`,
+    ];
+    if (setName) conditions.push(ilike(compObservations.setName, `%${setName}%`));
+    
+    const [result] = await db.select({ count: sql<number>`count(*)` })
+      .from(compObservations)
+      .where(and(...conditions));
+    return Number(result?.count || 0);
   }
 }
 
