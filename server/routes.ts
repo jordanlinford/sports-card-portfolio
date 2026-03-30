@@ -457,13 +457,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   await ensureDefaultPromoCodes();
 
   // ONE-TIME STARTUP CACHE CLEANUP: clear stale low-pop card caches so validation kicks in
+  // Clears ALL cached unified analyses since old entries won't have the lowPopValidated flag
   try {
     const { pool } = await import("./db");
     const delResult = await pool.query(
-      "DELETE FROM unified_analysis_cache WHERE cache_key ILIKE '%luka%' OR cache_key ILIKE '%doncic%'"
+      "DELETE FROM unified_analysis_cache"
     );
     if (delResult.rowCount && delResult.rowCount > 0) {
-      console.log(`[Startup] Cleared ${delResult.rowCount} stale Luka cache entries from unified_analysis_cache`);
+      console.log(`[Startup] Cleared ${delResult.rowCount} stale entries from unified_analysis_cache`);
     }
   } catch (e: any) {
     console.warn(`[Startup] Cache cleanup failed (non-critical): ${e.message}`);
@@ -3908,7 +3909,7 @@ Sitemap: ${origin}/sitemap.xml
           priceMax = unifiedMax || marketValue * 1.5;
           compCount = unifiedResult.market.soldCount;
 
-          if (qaIsLowPop && unifiedResult.market.soldCount <= 2 && specCrossProduct && specCrossProduct.avgPrice > 0) {
+          if (qaIsLowPop && unifiedResult.market.soldCount <= 2 && specCrossProduct && specCrossProduct.avgPrice > 0 && !unifiedResult?.lowPopValidated) {
             const cpRatio = specCrossProduct.avgPrice / marketValue;
             if (cpRatio >= 5 && marketValue > 0) {
               const blended = Math.round(marketValue * 0.25 + specCrossProduct.avgPrice * 0.75);
@@ -3973,7 +3974,8 @@ Sitemap: ${origin}/sitemap.xml
           // extremely rare, so Gemini often returns PSA10/PSA9 prices as "raw" prices.
           // A raw card CANNOT cost more than its PSA 9 grade — if it does, the price is contaminated.
           // Not applied to 1/1 cards since those are unique and may be priced above PSA9.
-          if (qaIsRaw && qaIsLowPop && !qaIs1of1) {
+          // SKIP if unified analysis was already validated by low-pop validation call.
+          if (qaIsRaw && qaIsLowPop && !qaIs1of1 && !unifiedResult?.lowPopValidated) {
             const psa9Price = unifiedResult.market.psa9Price ?? null;
             const psa10Price = unifiedResult.market.psa10Price ?? null;
             // Use PSA9 as primary anchor, PSA10 as fallback (raw is ~30% of PSA10 for premium numbered cards)
@@ -3996,7 +3998,8 @@ Sitemap: ${origin}/sitemap.xml
           // are estimating with no real transaction data. Use the LOWER of unified vs legacy
           // as the conservative anchor, then apply a moderate discount since even the lower
           // estimate may be inflated (AI anchoring on wrong card type is common for inserts).
-          if ((qaIsVeryLowPop || qaIsLowPop) && unifiedResult.market.soldCount === 0 && marketValue > 0) {
+          // SKIP if unified analysis was already validated by low-pop validation call.
+          if ((qaIsVeryLowPop || qaIsLowPop) && unifiedResult.market.soldCount === 0 && marketValue > 0 && !unifiedResult?.lowPopValidated) {
             const legacyPrice = priceData?.pricePoints?.length > 0
               ? priceData.pricePoints.reduce((sum: number, p: any) => sum + (p.price || 0), 0) / priceData.pricePoints.length
               : null;
@@ -4154,10 +4157,12 @@ Sitemap: ${origin}/sitemap.xml
       let unifiedZeroCompEstimate = (unifiedResult && unifiedResult.market.avgPrice > 0 && (unifiedResult.market.soldCount || 0) === 0)
         ? ((qaIsRaw ? unifiedResult.market.rawPrice : null) ?? unifiedResult.market.avgPrice)
         : null;
-      if (unifiedZeroCompEstimate && unifiedZeroCompEstimate > 0) {
+      if (unifiedZeroCompEstimate && unifiedZeroCompEstimate > 0 && !unifiedResult?.lowPopValidated) {
         const originalEstimate = unifiedZeroCompEstimate;
         unifiedZeroCompEstimate = Math.round(unifiedZeroCompEstimate * 0.5 * 100) / 100;
         console.log(`[Quick Analyze] ZERO-COMP DISCOUNT: Unified estimate $${originalEstimate} → $${unifiedZeroCompEstimate} (50% haircut — no sold comps means BIN anchor risk)`);
+      } else if (unifiedResult?.lowPopValidated) {
+        console.log(`[Quick Analyze] ZERO-COMP DISCOUNT SKIPPED: Unified was already validated by low-pop validation ($${unifiedZeroCompEstimate})`);
       }
       if (!hasAnyRealComps && !qaIs1of1 && !qaIsVeryLowPop && !qaIsSSP) {
         const preExisting = marketValue || 0;

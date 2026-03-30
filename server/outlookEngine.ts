@@ -808,6 +808,7 @@ export interface UnifiedCardAnalysis {
     supplyNote: string;
     estimatedPopulation?: number;
   };
+  lowPopValidated?: boolean;
   dataSource: "gemini_unified";
 }
 
@@ -1384,6 +1385,7 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
             }
 
             // LOW-POP PRICE VALIDATION for unified pipeline
+            let lowPopWasValidated = false;
             if ((isLowPop || is1of1) && correctedAvg > 0) {
               try {
                 const validationPrompt = `You are a sports card pricing expert. What is the current market value (raw/ungraded) of this card?
@@ -1425,6 +1427,7 @@ Return ONLY this JSON:
                       correctedAvg = val.validatedPrice;
                       correctedMin = val.validatedMin || val.validatedPrice * 0.6;
                       correctedMax = val.validatedMax || val.validatedPrice * 1.5;
+                      lowPopWasValidated = true;
                       if (finalPsa9 && finalPsa9 < correctedAvg) {
                         finalPsa9 = Math.round(correctedAvg * 1.3);
                       }
@@ -1474,6 +1477,7 @@ Return ONLY this JSON:
                 detailedAnalysis: analysis.detailedAnalysis || "",
                 keyBullets: Array.isArray(analysis.keyBullets) ? analysis.keyBullets : (Array.isArray(analysis.verdictReasons) ? analysis.verdictReasons : []),
               },
+              lowPopValidated: lowPopWasValidated || undefined,
               dataSource: "gemini_unified",
             };
 
