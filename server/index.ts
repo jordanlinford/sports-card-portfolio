@@ -119,25 +119,24 @@ app.use((req, res, next) => {
         
         log("All routes registered successfully");
         
-        // One-time cleanup: remove misclassified player outlook cache entries
         try {
-          const { storage } = await import("./storage");
+          const { db: appDb } = await import("./db");
+          const { playerOutlookCache: poc } = await import("@shared/schema");
           const { invalidateLeaderboardCache } = await import("./leaderboardEngine");
-          const misclassifiedKeys = ["football:konnergriffin"];
-          let deleted = 0;
-          for (const key of misclassifiedKeys) {
-            const entry = await storage.getCachedPlayerOutlook(key);
-            if (entry) {
-              await storage.deletePlayerOutlookByKey(key);
-              deleted++;
-            }
-          }
-          if (deleted > 0) {
+          const { sql } = await import("drizzle-orm");
+          const fixed = await appDb.execute(sql`
+            UPDATE player_outlook_cache 
+            SET sport = split_part(player_key, ':', 1)
+            WHERE sport != split_part(player_key, ':', 1)
+              AND player_key LIKE '%:%'
+          `);
+          const fixedCount = (fixed as any).rowCount || 0;
+          if (fixedCount > 0) {
             invalidateLeaderboardCache();
-            console.log(`[Cleanup] Removed ${deleted} misclassified player outlook cache entries, leaderboard cache cleared`);
+            console.log(`[Cleanup] Fixed sport on ${fixedCount} player outlook cache entries from playerKey prefix`);
           }
         } catch (cleanupErr) {
-          console.error("[Cleanup] Failed to clean misclassified entries:", cleanupErr);
+          console.error("[Cleanup] Sport sync failed:", cleanupErr);
         }
       } catch (err) {
         console.error("Failed to initialize routes:", err);

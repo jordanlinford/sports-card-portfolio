@@ -257,6 +257,23 @@ export async function getLeaderboard(
         break;
     }
 
+    const classification = row.classificationJson as any;
+    const stage = classification?.stage || "";
+    const injuryStatus = classification?.injuryStatus || outlook.injuryStatus || "";
+    const careerStatus = classification?.careerStatus || "";
+    const isInjured = /INJURED|OUT|ACL|TORN|SURGERY|IR\b/i.test(injuryStatus) || /INJURED/i.test(careerStatus);
+    const isRetired = /RETIRED|BUST|INACTIVE|FREE_AGENT_UNSIGNED/i.test(stage) || /RETIRED|BUST/i.test(careerStatus);
+    const isAging = /AGING|VETERAN/i.test(stage);
+    const verdict = outlook.investmentCall?.verdict || "";
+    const isAvoid = /AVOID/i.test(verdict);
+
+    if (type === "best") {
+      if (isInjured) score *= 0.6;
+      if (isRetired) score *= 0.5;
+      else if (isAging) score *= 0.85;
+      if (isAvoid) score *= 0.7;
+    }
+
     scored.push({
       score,
       playerName: row.playerName,

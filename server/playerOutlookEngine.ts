@@ -304,6 +304,8 @@ async function saveToCache(
     .onConflictDoUpdate({
       target: playerOutlookCache.playerKey,
       set: {
+        sport,
+        playerName,
         classificationJson: classification,
         outlookJson: outlookWithVersion,
         temperature: classification.baseTemperature,
