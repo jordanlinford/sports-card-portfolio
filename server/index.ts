@@ -121,9 +121,51 @@ app.use((req, res, next) => {
         
         try {
           const { db: appDb } = await import("./db");
-          const { playerOutlookCache: poc } = await import("@shared/schema");
           const { invalidateLeaderboardCache } = await import("./leaderboardEngine");
           const { sql } = await import("drizzle-orm");
+
+          const sportCorrections: Record<string, string> = {
+            "jacksonchourio": "baseball",
+            "laminyamal": "soccer",
+            "lamineyamal": "soccer",
+            "haaland": "soccer",
+            "erlinghaaland": "soccer",
+            "davidbeckham": "soccer",
+            "ovechkin": "hockey",
+            "alexanderovechkin": "hockey",
+            "hughes": "hockey",
+            "jackhughes": "hockey",
+            "konnergriffin": "baseball",
+          };
+          
+          let keyFixCount = 0;
+          for (const [nameKey, correctSport] of Object.entries(sportCorrections)) {
+            const wrongKeys = await appDb.execute(sql`
+              SELECT player_key FROM player_outlook_cache 
+              WHERE player_key LIKE ${'%:' + nameKey}
+                AND player_key NOT LIKE ${correctSport + ':%'}
+            `);
+            const rows = (wrongKeys as any).rows || (wrongKeys as any);
+            if (rows && rows.length > 0) {
+              for (const row of rows) {
+                const oldKey = row.player_key;
+                const newKey = correctSport + ':' + nameKey;
+                const existing = await appDb.execute(sql`SELECT 1 FROM player_outlook_cache WHERE player_key = ${newKey}`);
+                const existingRows = (existing as any).rows || (existing as any);
+                if (existingRows && existingRows.length > 0) {
+                  await appDb.execute(sql`DELETE FROM player_outlook_cache WHERE player_key = ${oldKey}`);
+                } else {
+                  await appDb.execute(sql`
+                    UPDATE player_outlook_cache 
+                    SET player_key = ${newKey}, sport = ${correctSport}
+                    WHERE player_key = ${oldKey}
+                  `);
+                }
+                keyFixCount++;
+              }
+            }
+          }
+
           const fixed = await appDb.execute(sql`
             UPDATE player_outlook_cache 
             SET sport = split_part(player_key, ':', 1)
@@ -131,9 +173,23 @@ app.use((req, res, next) => {
               AND player_key LIKE '%:%'
           `);
           const fixedCount = (fixed as any).rowCount || 0;
-          if (fixedCount > 0) {
+          
+          const dupes = await appDb.execute(sql`
+            DELETE FROM player_outlook_cache
+            WHERE player_key IN (
+              SELECT p1.player_key
+              FROM player_outlook_cache p1
+              JOIN player_outlook_cache p2 
+                ON lower(replace(p1.player_name, ' ', '')) = lower(replace(p2.player_name, ' ', ''))
+                AND p1.player_key != p2.player_key
+              WHERE p1.updated_at < p2.updated_at
+            )
+          `);
+          const dupeCount = (dupes as any).rowCount || 0;
+
+          if (fixedCount > 0 || dupeCount > 0 || keyFixCount > 0) {
             invalidateLeaderboardCache();
-            console.log(`[Cleanup] Fixed sport on ${fixedCount} player outlook cache entries from playerKey prefix`);
+            console.log(`[Cleanup] Fixed ${fixedCount} sport mismatches, ${keyFixCount} wrong-sport keys, removed ${dupeCount} duplicates`);
           }
         } catch (cleanupErr) {
           console.error("[Cleanup] Sport sync failed:", cleanupErr);
