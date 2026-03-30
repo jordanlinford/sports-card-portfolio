@@ -322,7 +322,27 @@ REFRACTOR EXCLUSION RULE: ANY listing with "Silver", "Prizm Prizm", "Refractor",
 Search specifically: "${card.playerName || card.title} ${card.year || ""} Prizm base" — the paper base sells at a MUCH LOWER price than any chrome/refractor version.
 For common players and bench players, the Prizm paper base sells for under $5.`
       : card.variation && card.variation.toLowerCase() !== "base"
-        ? `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`
+        ? (() => {
+            const vl = (card.variation || "").toLowerCase();
+            const isNamedPremiumParallel = /\b(rare\s*gold|gold\s*refractor|atomic\s*refractor|x[- ]?fractor|red\s*refractor|black\s*refractor|blue\s*refractor|green\s*refractor|gold\s*chrome|blue\s*chrome|purple\s*chrome|refractor|gold|silver|ruby|emerald|sapphire|diamond|bronze|copper|platinum|red|blue|green|purple|orange|pink|black|white\s*sparkle|rainbow|tie[- ]?dye|camo|mosaic|peacock|nebula|pulsar|reactive|flash|fluorescent|speckle|holo|holographic|hyper|cosmic|electric|neon|wave|swirl|starburst|prizm|circles|concentric|checkerboard|variation|sp\b|short\s*print)\b/i.test(vl);
+            const isVintageInsert = /\b(finest|refractor|chrome|topps\s*chrome|stadium\s*club|metal\s*universe|ultra|flair|e[- ]?x|skybox|fleer|mainstays|sterling|uncommon|rare|masters|power\s*zone|franchise)\b/i.test(vl) || 
+              (card.year && card.year <= 2005 && /\b(finest|refractor|chrome|stadium\s*club|metal|ultra|flair|e[- ]?x|skybox|fleer)\b/i.test(card.set || ""));
+            if (isNamedPremiumParallel || isVintageInsert) {
+              return `\n⚠️ NAMED PARALLEL/INSERT — CRITICAL PRICE SEPARATION:
+This card is a "${card.variation}" version — this is a DISTINCT, PREMIUM product that sells at a DIFFERENT (typically HIGHER) price than the standard base card.
+PARALLEL PRICING RULES:
+1. Search SPECIFICALLY for: "${searchDescription}" — the variation name "${card.variation}" MUST appear in every comp listing title.
+2. DO NOT use base card prices as comps. A "${card.variation}" version and the base version are COMPLETELY DIFFERENT products at COMPLETELY DIFFERENT price tiers.
+3. For vintage sets (1990s-2000s): parallels like "Refractor", "Rare Gold", "Atomic Refractor", "Gold", etc. are often 2-10x MORE valuable than the base card. Some vintage refractors/gold parallels are extremely scarce and command significant premiums.
+4. If you cannot find exact "${card.variation}" comps, note this in your response and set confidence to "LOW" — do NOT fall back to base card prices and call it the same card.
+5. Check the card's FULL title and set context: "${card.set || ""}" + "${card.variation}" — every word matters for identifying the correct product.
+Search queries to try:
+- "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation} sold eBay"
+- "${card.playerName || card.title} ${card.set || ""} ${card.variation} PSA sold eBay"
+- "${card.playerName || card.title} ${card.variation} ${card.year || ""} sold eBay"`;
+            }
+            return `\nNote: This is a ${card.variation} parallel — search for this specific variation, not the base version.`;
+          })()
         : "");
 
   const hasMissingDetails = !card.set || !card.variation;
