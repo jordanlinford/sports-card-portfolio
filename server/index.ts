@@ -108,6 +108,26 @@ app.use((req, res, next) => {
           await setupVite(httpServer, app);
         }
         
+        // Auto-seed player outlooks if cache is nearly empty
+        try {
+          const { db: seedDb } = await import("./db");
+          const { sql: seedSql } = await import("drizzle-orm");
+          const countResult = await seedDb.execute(seedSql`SELECT count(*) as cnt FROM player_outlook_cache`);
+          const cachedCount = parseInt((countResult as any).rows?.[0]?.cnt || "0");
+          if (cachedCount < 20) {
+            console.log(`[AutoSeed] Only ${cachedCount} players cached, starting background seed...`);
+            const { seedPlayerOutlooks } = await import("./hiddenGemsService");
+            const { getPlayerOutlook } = await import("./playerOutlookEngine");
+            seedPlayerOutlooks(getPlayerOutlook, 100).then(result => {
+              console.log(`[AutoSeed] Complete: ${result.analyzed} analyzed, ${result.failed} failed`);
+            }).catch(err => {
+              console.error("[AutoSeed] Error:", err);
+            });
+          }
+        } catch (seedErr) {
+          console.error("[AutoSeed] Failed:", seedErr);
+        }
+
         // Start the nightly prewarm job for eBay comps cache
         startPrewarmJob();
         
