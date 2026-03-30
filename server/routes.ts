@@ -456,6 +456,19 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Ensure default promo codes exist
   await ensureDefaultPromoCodes();
 
+  // ONE-TIME STARTUP CACHE CLEANUP: clear stale low-pop card caches so validation kicks in
+  try {
+    const { pool } = await import("./db");
+    const delResult = await pool.query(
+      "DELETE FROM unified_analysis_cache WHERE cache_key ILIKE '%luka%' OR cache_key ILIKE '%doncic%'"
+    );
+    if (delResult.rowCount && delResult.rowCount > 0) {
+      console.log(`[Startup] Cleared ${delResult.rowCount} stale Luka cache entries from unified_analysis_cache`);
+    }
+  } catch (e: any) {
+    console.warn(`[Startup] Cache cleanup failed (non-critical): ${e.message}`);
+  }
+
   // Helper to get origin URL (prefer HTTPS and deployment domain)
   const getOriginUrl = (req: any) => {
     const host = process.env.REPLIT_DEPLOYMENT_DOMAIN || req.headers.host;
