@@ -205,18 +205,22 @@ export async function getLeaderboard(
     });
   }
 
-  if (type === "best") {
-    scored.sort((a, b) => b.score - a.score);
-  } else if (type === "hype") {
-    scored.sort((a, b) => b.score - a.score);
-  } else {
-    scored.sort((a, b) => b.score - a.score);
+  scored.sort((a, b) => b.score - a.score);
+
+  const deduped: ScoredEntry[] = [];
+  const seenPlayers = new Set<string>();
+  for (const entry of scored) {
+    const normalizedName = entry.playerName.toLowerCase().trim();
+    if (seenPlayers.has(normalizedName)) continue;
+    seenPlayers.add(normalizedName);
+    deduped.push(entry);
   }
 
-  const totalPlayers = scored.length;
-  const sortedScores = scored.map(s => s.score).sort((a, b) => a - b);
+  const dedupedScored = deduped;
+  const totalPlayers = dedupedScored.length;
+  const sortedScores = dedupedScored.map(s => s.score).sort((a, b) => a - b);
 
-  const entries: LeaderboardEntry[] = scored.slice(0, limit).map((s, i) => {
+  const entries: LeaderboardEntry[] = dedupedScored.slice(0, limit).map((s, i) => {
     const investmentVerdict = s.outlook.investmentCall?.verdict || "HOLD_CORE";
     const { verdict, label } = mapVerdict(investmentVerdict as InvestmentVerdict);
     const met = s.outlook.marketMetrics;
