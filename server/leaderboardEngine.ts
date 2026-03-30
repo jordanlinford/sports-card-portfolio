@@ -272,10 +272,48 @@ export async function getLeaderboard(
 
   const deduped: ScoredEntry[] = [];
   const seenPlayers = new Set<string>();
+  const seenFuzzy = new Map<string, string>();
+  
+  const fuzzyKey = (name: string): string => {
+    return name.toLowerCase().trim()
+      .replace(/[^a-z ]/g, "")
+      .replace(/\s+/g, " ")
+      .split(" ")
+      .map(w => w.length <= 2 ? w : w.replace(/[aeiou]/g, ""))
+      .join(" ");
+  };
+  
+  const isSimilar = (a: string, b: string): boolean => {
+    if (a === b) return true;
+    const shorter = a.length < b.length ? a : b;
+    const longer = a.length < b.length ? b : a;
+    if (longer.startsWith(shorter) && longer.length - shorter.length <= 3) return true;
+    if (shorter.length >= 4 && longer.includes(shorter)) return true;
+    let mismatches = 0;
+    const minLen = Math.min(a.length, b.length);
+    for (let i = 0; i < minLen; i++) {
+      if (a[i] !== b[i]) mismatches++;
+    }
+    mismatches += Math.abs(a.length - b.length);
+    return mismatches <= 2 && minLen >= 5;
+  };
+  
   for (const entry of scored) {
     const normalizedName = entry.playerName.toLowerCase().trim();
     if (seenPlayers.has(normalizedName)) continue;
+    
+    const fk = fuzzyKey(normalizedName);
+    let isDupe = false;
+    for (const [existingFk, existingName] of seenFuzzy) {
+      if (isSimilar(fk, existingFk) || isSimilar(normalizedName, existingName)) {
+        isDupe = true;
+        break;
+      }
+    }
+    if (isDupe) continue;
+    
     seenPlayers.add(normalizedName);
+    seenFuzzy.set(fk, normalizedName);
     deduped.push(entry);
   }
 
