@@ -655,6 +655,67 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
               finalPsa10 = Math.round(correctedAvg * 6);
             }
 
+            // LOW-POP PRICE VALIDATION: For /25 and under, do a second Gemini call
+            // without search grounding to validate the estimate using Gemini's built-in knowledge
+            if ((isLowPopStandalone || is1of1) && correctedAvg > 0) {
+              try {
+                const validationPrompt = `You are a sports card pricing expert. What is the current market value (raw/ungraded) of this card?
+
+Card: ${searchDescription}
+${is1of1 ? "This is a 1/1 — only 1 copy exists." : `This is numbered /${pn} — only ${pn} copies exist.`}
+
+My initial search found an average price of $${correctedAvg.toFixed(2)} with a range of $${correctedMin.toFixed?.(2) || correctedMin} - $${correctedMax.toFixed?.(2) || correctedMax}.
+
+Does this price seem accurate for this card's rarity and this player's market? Consider:
+- The player's star power and card demand
+- The print run (/${pn || 1}) and how rare that makes it
+- The product/set tier (premium vs budget)
+- Recent comparable sales you know about
+
+Return ONLY this JSON:
+{
+  "validatedPrice": <your best estimate for raw market value>,
+  "validatedMin": <low end of range>,
+  "validatedMax": <high end of range>,
+  "originalWasAccurate": true/false,
+  "reasoning": "brief explanation"
+}`;
+                
+                const validationResponse = await gemini.models.generateContent({
+                  model: "gemini-2.5-flash",
+                  contents: validationPrompt,
+                });
+                
+                let valText = validationResponse.text || "";
+                valText = valText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+                const valMatch = valText.match(/\{[\s\S]*\}/);
+                if (valMatch) {
+                  const val = JSON.parse(valMatch[0]);
+                  if (val.validatedPrice && typeof val.validatedPrice === "number" && val.validatedPrice > 0) {
+                    const ratio = val.validatedPrice / correctedAvg;
+                    if (ratio > 2) {
+                      console.warn(`[OutlookEngine] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search result $${correctedAvg} (${ratio.toFixed(1)}x higher). Reason: ${val.reasoning}. Adopting validated price.`);
+                      correctedAvg = val.validatedPrice;
+                      correctedMin = val.validatedMin || val.validatedPrice * 0.6;
+                      correctedMax = val.validatedMax || val.validatedPrice * 1.5;
+                      if (finalPsa9 && finalPsa9 < correctedAvg) {
+                        finalPsa9 = Math.round(correctedAvg * 1.3);
+                      }
+                      if (finalPsa10 && finalPsa10 < correctedAvg) {
+                        finalPsa10 = Math.round(correctedAvg * 1.8);
+                      }
+                    } else if (ratio < 0.5) {
+                      console.log(`[OutlookEngine] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search $${correctedAvg} — search was HIGHER. Keeping search price (conservative).`);
+                    } else {
+                      console.log(`[OutlookEngine] LOW-POP VALIDATION: Gemini confirms ~$${val.validatedPrice} vs search $${correctedAvg} — prices aligned.`);
+                    }
+                  }
+                }
+              } catch (valErr: any) {
+                console.warn(`[OutlookEngine] LOW-POP VALIDATION failed (non-critical): ${valErr.message}`);
+              }
+            }
+
             const marketData: GeminiMarketData = {
               soldCount: parsed.soldCount || 0,
               avgPrice: correctedAvg,
@@ -1320,6 +1381,66 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
             if (finalPsa10 && correctedAvg > 0 && finalPsa10 > correctedAvg * 8) {
               console.warn(`[Unified Analysis] PSA 10 ($${finalPsa10}) unrealistically high vs raw ($${correctedAvg}) — capping at 6x`);
               finalPsa10 = Math.round(correctedAvg * 6);
+            }
+
+            // LOW-POP PRICE VALIDATION for unified pipeline
+            if ((isLowPop || is1of1) && correctedAvg > 0) {
+              try {
+                const validationPrompt = `You are a sports card pricing expert. What is the current market value (raw/ungraded) of this card?
+
+Card: ${searchDescription}
+${is1of1 ? "This is a 1/1 — only 1 copy exists." : `This is numbered /${popNumber} — only ${popNumber} copies exist.`}
+
+My initial search found an average price of $${correctedAvg.toFixed(2)} with a range of $${correctedMin.toFixed?.(2) || correctedMin} - $${correctedMax.toFixed?.(2) || correctedMax}.
+
+Does this price seem accurate for this card's rarity and this player's market? Consider:
+- The player's star power and card demand
+- The print run (/${popNumber || 1}) and how rare that makes it
+- The product/set tier (premium vs budget)
+- Recent comparable sales you know about
+
+Return ONLY this JSON:
+{
+  "validatedPrice": <your best estimate for raw market value>,
+  "validatedMin": <low end of range>,
+  "validatedMax": <high end of range>,
+  "originalWasAccurate": true/false,
+  "reasoning": "brief explanation"
+}`;
+                
+                const validationResponse = await gemini.models.generateContent({
+                  model: "gemini-2.5-flash",
+                  contents: validationPrompt,
+                });
+                
+                let valText = validationResponse.text || "";
+                valText = valText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+                const valMatch = valText.match(/\{[\s\S]*\}/);
+                if (valMatch) {
+                  const val = JSON.parse(valMatch[0]);
+                  if (val.validatedPrice && typeof val.validatedPrice === "number" && val.validatedPrice > 0) {
+                    const ratio = val.validatedPrice / correctedAvg;
+                    if (ratio > 2) {
+                      console.warn(`[Unified Analysis] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search result $${correctedAvg} (${ratio.toFixed(1)}x higher). Reason: ${val.reasoning}. Adopting validated price.`);
+                      correctedAvg = val.validatedPrice;
+                      correctedMin = val.validatedMin || val.validatedPrice * 0.6;
+                      correctedMax = val.validatedMax || val.validatedPrice * 1.5;
+                      if (finalPsa9 && finalPsa9 < correctedAvg) {
+                        finalPsa9 = Math.round(correctedAvg * 1.3);
+                      }
+                      if (finalPsa10 && finalPsa10 < correctedAvg) {
+                        finalPsa10 = Math.round(correctedAvg * 1.8);
+                      }
+                    } else if (ratio < 0.5) {
+                      console.log(`[Unified Analysis] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search $${correctedAvg} — search was HIGHER. Keeping search price.`);
+                    } else {
+                      console.log(`[Unified Analysis] LOW-POP VALIDATION: Gemini confirms ~$${val.validatedPrice} vs search $${correctedAvg} — prices aligned.`);
+                    }
+                  }
+                }
+              } catch (valErr: any) {
+                console.warn(`[Unified Analysis] LOW-POP VALIDATION failed (non-critical): ${valErr.message}`);
+              }
             }
 
             const result: UnifiedCardAnalysis = {
