@@ -54,6 +54,7 @@ import ToppsTakeoverPage from "@/pages/topps-takeover";
 import BreakAuditorPage from "@/pages/break-auditor";
 import AlphaFeedPage from "@/pages/alpha-feed";
 import MarketLeaderboardPage from "@/pages/market-leaderboard";
+import PublicIntelPage from "@/pages/public-intel";
 import { TrialBanner } from "@/components/trial-banner";
 import { GoogleLinkBanner } from "@/components/google-link-banner";
 import { BatchAnalysisBanner } from "@/components/batch-analysis-banner";
@@ -84,6 +85,7 @@ function Router() {
       <Route path="/hidden-gems" component={HiddenGemsPage} />
       <Route path="/leaderboards" component={LeaderboardsPage} />
       <Route path="/market-leaderboard" component={MarketLeaderboardPage} />
+      <Route path="/intel" component={PublicIntelPage} />
       <Route path="/market/topps-takeover" component={ToppsTakeoverPage} />
       <Route path="/alpha" component={AlphaFeedPage} />
       <Route path="/outlook" component={OutlookOverviewPage} />
