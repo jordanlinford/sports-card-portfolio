@@ -43,6 +43,7 @@ type LeaderboardEntry = {
   marketQuality: number;
   slug?: string;
   percentile?: string;
+  marketDescriptor?: string;
 };
 
 type LeaderboardResponse = {
@@ -128,7 +129,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
 
   return (
     <div className="space-y-1" data-testid="leaderboard-entries">
-      <div className="hidden md:grid grid-cols-[40px_1fr_60px_80px_70px_100px_120px_120px_70px_60px] gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+      <div className="hidden md:grid grid-cols-[40px_1fr_60px_80px_70px_100px_120px_160px_70px_60px] gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
         <span>#</span>
         <span>Player</span>
         <span>Sport</span>
@@ -136,7 +137,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
         <span>Pctile</span>
         <span>Phase</span>
         <span>Verdict</span>
-        <span>Key Signal</span>
+        <span>Structure</span>
         <span>7d</span>
         <span>Avg</span>
       </div>
@@ -150,7 +151,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
         return (
           <Link key={`${entry.playerName}-${entry.sport}`} href={playerPath}>
             <div
-              className="grid grid-cols-[40px_1fr_60px_80px] md:grid-cols-[40px_1fr_60px_80px_70px_100px_120px_120px_70px_60px] gap-2 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer items-center"
+              className="grid grid-cols-[40px_1fr_60px_80px] md:grid-cols-[40px_1fr_60px_80px_70px_100px_120px_160px_70px_60px] gap-2 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer items-center"
               data-testid={`row-leaderboard-${entry.rank}`}
             >
               <span className={getRankDisplay(entry.rank)}>{entry.rank}</span>
@@ -192,8 +193,8 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
                 </Badge>
               </span>
 
-              <span className="hidden md:block text-xs text-muted-foreground truncate" data-testid={`text-signal-${entry.rank}`}>
-                {entry.keySignal}
+              <span className="hidden md:block text-[10px] text-muted-foreground truncate italic" data-testid={`text-structure-${entry.rank}`}>
+                {entry.marketDescriptor || entry.keySignal}
               </span>
 
               <span className={`hidden md:block text-xs font-medium tabular-nums ${

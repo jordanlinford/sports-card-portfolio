@@ -1,0 +1,139 @@
+Yes — this is the right direction.
+
+The key constraint is the one buried in the middle:
+
+Question	Why it matters
+Can you compute tiers from your own observation layer?	If yes, this becomes a defensible internal advantage
+Do you need Gemini to return tiers?	If yes, you are making the most important part of the product dependent on an external model output
+
+My view: do not make tier structure depend on Gemini if you can avoid it.
+
+What matters structurally
+
+You already have two different problems:
+
+Problem	Best solution
+Current leaderboard needs more context now	Add a fast label layer
+Product needs a better long-term market model	Build tiering from your own data
+
+So the right answer is not either/or. It is phased.
+
+Best path
+Phase 1: ship the simple label now
+
+Add one descriptor per player market such as:
+
+Example label	Meaning
+Broad-based demand	Strength across the market
+High-end led	Gains concentrated in premium segment
+Low-end heavy	Retail-led move, weaker conviction
+Mixed market	No clean alignment across segments
+Exhaustion risk	Strength is narrow and fading
+
+Why this is the right first move:
+
+Benefit	Reason
+Fast	No major UI rebuild
+Improves trust	Explains why a player is ranked high
+Helps Reddit defensibility	Gives you a cleaner narrative
+Bridges to future tier model	Same concept, lighter implementation
+Phase 2: build true 3-tier market segmentation from your own comp data
+
+This is the strategic move.
+
+Do not use fixed dollar tiers. Use percentile bands within each player market.
+
+A clean starting model:
+
+Tier	Suggested definition
+Low/Base	bottom 60% of sales prices
+Mid-tier	next 30%
+High-end	top 10%
+
+Then for each tier compute:
+
+Metric	Purpose
+Avg sale price trend	Direction
+Sales count / velocity	Demand
+Listings-to-sales ratio	Supply pressure
+Volatility	Stability
+Sell-through / liquidity proxy	Ease of exit
+
+That gives you a real market structure view rather than one blended average.
+
+Why this should come from your own data
+Reason	Implication
+You control methodology	More explainable
+You can recompute historically	Better backtesting
+You are not dependent on Gemini formatting	More stable pipeline
+It becomes proprietary product logic	More defensible moat
+
+Gemini can still help with:
+
+card/entity normalization
+comp grouping
+narrative explanation
+
+But the market structure math should be yours.
+
+What I would not do
+
+I would not jump straight to full 3-column leaderboard UI yet.
+
+Why:
+
+Risk	Why
+UI complexity	Leaderboard gets harder to scan
+Data immaturity	If tier logic is noisy, the UI exposes it
+Misleading confidence	Fancy layout before strong tier math can hurt trust
+
+First prove the tier model in the backend. Then expose it selectively.
+
+Recommended sequence
+Step	Action
+1	Add a one-line market descriptor to leaderboard entries
+2	Compute tier buckets from historical comp observations offline
+3	Validate on 20–30 player markets you know well
+4	Add a hidden/internal tier-debug view
+5	Only then promote tier columns or expandable tier detail in UI
+The actual product insight
+
+Your leaderboard should answer two separate questions:
+
+Question	Current answer	Better answer
+Which player markets are strongest right now?	Score / phase / verdict	Keep this
+Where inside that market is the strength happening?	Not answered	Add descriptor, then tiers
+
+That second layer is where the system becomes hard to dismiss.
+
+My recommendation
+
+Choose this:
+
+Choice	Recommendation
+Simple label approach	Yes, now
+Full 3-tier system	Yes, next
+Keep as later-only plan	No
+
+So the correct product path is:
+
+ship the simple label now
+build the full tier engine from your own observation data
+expose tier detail after the backend is trustworthy
+
+A strong first label set would be:
+
+Label	Trigger idea
+Broad-based demand	all tiers improving
+Premium-led breakout	high-end strongest
+Retail-led momentum	low/base strongest
+Narrow market strength	only one tier moving
+Mixed / fragmented	tiers disagree
+Exhaustion risk	high-end weakening while overall score still elevated
+
+If you want, I can turn this into a precise implementation spec with:
+
+tier bucket logic
+capital concentration formula
+label rules
+and how it should appear on the leaderboard.

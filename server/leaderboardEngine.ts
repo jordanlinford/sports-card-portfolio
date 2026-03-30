@@ -22,7 +22,70 @@ export type LeaderboardEntry = {
   marketQuality: number;
   slug?: string;
   percentile?: string;
+  marketDescriptor?: string;
 };
+
+function classifyMarketStructure(signals: MarketSignals, phase: string): string {
+  const { demandScore, momentumScore, liquidityScore, hypeScore, volatilityScore, supplyPressureScore } = signals;
+  const derived = signals.derivedMetrics;
+  const mq = derived?.marketQuality ?? 50;
+  const priceTrend = derived?.priceTrend ?? 0;
+  const volumeTrend = derived?.volumeTrend ?? 1;
+
+  if (hypeScore > 70 && momentumScore > 60 && (mq < 45 || volatilityScore < 40)) {
+    return "Hype-driven, thin liquidity";
+  }
+
+  if (hypeScore > 65 && momentumScore > 55 && demandScore > 55) {
+    return "Momentum-heavy, watch for exhaustion";
+  }
+
+  if (demandScore > 65 && momentumScore > 55 && liquidityScore > 50 && hypeScore < 45) {
+    return "Broad-based demand";
+  }
+
+  if (demandScore > 60 && hypeScore < 40 && liquidityScore > 45 && momentumScore < 50) {
+    return "Steady accumulation";
+  }
+
+  if (momentumScore > 65 && demandScore > 55 && liquidityScore > 50 && hypeScore < 55) {
+    return "Strong momentum, healthy market";
+  }
+
+  if (phase === "Exhaustion" || (momentumScore < 35 && hypeScore > 50 && priceTrend < 0)) {
+    return "Exhaustion risk";
+  }
+
+  if (phase === "Decline" || (priceTrend < -0.1 && momentumScore < 40)) {
+    return "Declining, watch for bottom";
+  }
+
+  if (demandScore > 55 && hypeScore < 35 && momentumScore > 45 && phase === "Accumulation") {
+    return "Early accumulation phase";
+  }
+
+  if (demandScore > 50 && liquidityScore > 55 && volatilityScore > 55 && supplyPressureScore > 50) {
+    return "Healthy market structure";
+  }
+
+  if (liquidityScore < 35 && demandScore > 50) {
+    return "Demand present, low liquidity";
+  }
+
+  if (volatilityScore < 35) {
+    return "High volatility, unstable pricing";
+  }
+
+  if (supplyPressureScore < 35 && demandScore > 45) {
+    return "Supply-constrained market";
+  }
+
+  if (mq > 60 && demandScore > 50) {
+    return "Solid fundamentals";
+  }
+
+  return "Mixed signals";
+}
 
 type CachedLeaderboard = {
   entries: LeaderboardEntry[];
@@ -237,12 +300,14 @@ export async function getLeaderboard(
     const pctRaw = computePercentile(s.score, sortedScores);
     const pctLabel = formatPercentile(pctRaw);
 
+    const phaseLabel = s.phase !== "UNKNOWN" ? s.phase.charAt(0) + s.phase.slice(1).toLowerCase() : "";
+
     return {
       rank: i + 1,
       playerName: s.playerName,
       sport: s.sport,
       score: Math.round(s.score),
-      phase: s.phase !== "UNKNOWN" ? s.phase.charAt(0) + s.phase.slice(1).toLowerCase() : "",
+      phase: phaseLabel,
       verdict,
       verdictLabel: label,
       keySignal: getKeySignal(s.signals, type),
@@ -252,6 +317,7 @@ export async function getLeaderboard(
       marketQuality: mq,
       slug: s.slug,
       percentile: pctLabel,
+      marketDescriptor: classifyMarketStructure(s.signals, phaseLabel),
     };
   });
 
