@@ -600,6 +600,18 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
                 correctedAvg = parsed.rawPrice;
                 correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
                 correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
+              } else if (isLowPopStandalone || is1of1) {
+                // LOW-POP CARDS: Skip raw contamination corrections — price spread is legitimately wide
+                // for /25 and under. The "min" is almost certainly from a different parallel or wrong comp.
+                // Trust Gemini's avgPrice for these cards since manual triangulation is how they're priced.
+                if (parsed.rawPrice && parsed.rawPrice > 0) {
+                  console.log(`[OutlookEngine] LOW-POP RAW CARD (/${pn}): Using Gemini rawPrice $${parsed.rawPrice} — skipping contamination correction`);
+                  correctedAvg = parsed.rawPrice;
+                  correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.6;
+                  correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
+                } else {
+                  console.log(`[OutlookEngine] LOW-POP RAW CARD (/${pn}): Trusting Gemini avgPrice $${correctedAvg} — skipping contamination correction`);
+                }
               } else {
                 if (isPSA9Contaminated(correctedAvg)) {
                   const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
@@ -1245,6 +1257,17 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
                 correctedAvg = parsed.market.rawPrice;
                 correctedMin = parsed.market.rawMinPrice || parsed.market.rawPrice * 0.7;
                 correctedMax = parsed.market.rawMaxPrice || parsed.market.rawPrice * 1.5;
+              } else if (isLowPop || is1of1) {
+                // LOW-POP CARDS: Skip raw contamination corrections — price spread is legitimately wide
+                // for /25 and under. Trust Gemini's price for these since they're triangulated.
+                if (parsed.market.rawPrice && parsed.market.rawPrice > 0) {
+                  console.log(`[Unified Analysis] LOW-POP RAW CARD (/${popNumber}): Using rawPrice $${parsed.market.rawPrice} — skipping contamination correction`);
+                  correctedAvg = parsed.market.rawPrice;
+                  correctedMin = parsed.market.rawMinPrice || parsed.market.rawPrice * 0.6;
+                  correctedMax = parsed.market.rawMaxPrice || parsed.market.rawPrice * 1.5;
+                } else {
+                  console.log(`[Unified Analysis] LOW-POP RAW CARD (/${popNumber}): Trusting avgPrice $${correctedAvg} — skipping contamination correction`);
+                }
               } else {
                 const psa10 = parsePrice(parsed.market.psa10Price);
                 if (isPSA9Contaminated(correctedAvg)) {
