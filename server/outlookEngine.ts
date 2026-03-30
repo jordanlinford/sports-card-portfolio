@@ -595,11 +595,34 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
               const isPSA9Contaminated = (price: number) => psa9 && psa9 > 0 && price >= psa9 * 0.8;
 
               if (parsed.rawPrice && parsed.rawPrice > 0 && !isPSA9Contaminated(parsed.rawPrice)) {
-                // Gemini provided explicit raw pricing and it passes the sanity check — use it
-                console.log(`[OutlookEngine] RAW CARD: Using Gemini rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg})`);
-                correctedAvg = parsed.rawPrice;
-                correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
-                correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
+                const rawEqualsAvg = Math.abs(parsed.rawPrice - parsed.avgPrice) < 1;
+                const zeroComps = (parsed.soldCount || 0) === 0;
+                if (rawEqualsAvg && zeroComps && parsed.rawPrice > 30) {
+                  console.warn(`[OutlookEngine] RAW SUSPECT: rawPrice ($${parsed.rawPrice}) = avgPrice with 0 sold comps — Gemini may be echoing a blended/graded estimate. Checking graded anchors...`);
+                  if (psa9 && psa9 > 0 && parsed.rawPrice >= psa9 * 0.6) {
+                    const derivedRaw = Math.round(psa9 * 0.4 * 100) / 100;
+                    console.warn(`[OutlookEngine] RAW SUSPECT CONFIRMED: rawPrice $${parsed.rawPrice} is ≥60% of PSA 9 $${psa9} → deriving raw: $${derivedRaw}`);
+                    correctedAvg = derivedRaw;
+                    correctedMin = Math.round(psa9 * 0.25 * 100) / 100;
+                    correctedMax = Math.round(psa9 * 0.55 * 100) / 100;
+                  } else if (psa10 && psa10 > 0 && parsed.rawPrice >= psa10 * 0.5) {
+                    const derivedRaw = Math.round(psa10 * 0.2 * 100) / 100;
+                    console.warn(`[OutlookEngine] RAW SUSPECT CONFIRMED: rawPrice $${parsed.rawPrice} is ≥50% of PSA 10 $${psa10} → deriving raw: $${derivedRaw}`);
+                    correctedAvg = derivedRaw;
+                    correctedMin = Math.round(psa10 * 0.12 * 100) / 100;
+                    correctedMax = Math.round(psa10 * 0.3 * 100) / 100;
+                  } else {
+                    console.log(`[OutlookEngine] RAW CARD: rawPrice $${parsed.rawPrice} = avgPrice with 0 comps but no graded anchor to correct from — using as-is`);
+                    correctedAvg = parsed.rawPrice;
+                    correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
+                    correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
+                  }
+                } else {
+                  console.log(`[OutlookEngine] RAW CARD: Using Gemini rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg})`);
+                  correctedAvg = parsed.rawPrice;
+                  correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
+                  correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
+                }
               } else if (isLowPopStandalone || is1of1) {
                 // LOW-POP CARDS: Skip raw contamination corrections — price spread is legitimately wide
                 // for /25 and under. The "min" is almost certainly from a different parallel or wrong comp.
@@ -613,11 +636,18 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
                   console.log(`[OutlookEngine] LOW-POP RAW CARD (/${pn}): Trusting Gemini avgPrice $${correctedAvg} — skipping contamination correction`);
                 }
               } else {
-                if (isPSA9Contaminated(correctedAvg)) {
-                  const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
-                  console.warn(`[OutlookEngine] RAW CONTAMINATION DETECTED: avg $${correctedAvg} is ≥80% of psa9 $${psa9} → using min-based raw estimate $${newAvg}`);
-                  correctedAvg = newAvg;
-                  correctedMax = Math.round(correctedMin * 1.8 * 100) / 100;
+                if (psa9 && psa9 > 0 && correctedAvg >= psa9 * 0.6) {
+                  const derivedRaw = Math.round(psa9 * 0.4 * 100) / 100;
+                  console.warn(`[OutlookEngine] RAW CONTAMINATION DETECTED: avg $${correctedAvg} is ≥60% of psa9 $${psa9} → deriving raw from PSA 9: $${derivedRaw}`);
+                  correctedAvg = derivedRaw;
+                  correctedMin = Math.round(psa9 * 0.25 * 100) / 100;
+                  correctedMax = Math.round(psa9 * 0.55 * 100) / 100;
+                } else if (psa10 && psa10 > 0 && !psa9 && correctedAvg >= psa10 * 0.5) {
+                  const derivedRaw = Math.round(psa10 * 0.2 * 100) / 100;
+                  console.warn(`[OutlookEngine] RAW CONTAMINATION (PSA10 anchor): avg $${correctedAvg} is ≥50% of psa10 $${psa10} → deriving raw: $${derivedRaw}`);
+                  correctedAvg = derivedRaw;
+                  correctedMin = Math.round(psa10 * 0.12 * 100) / 100;
+                  correctedMax = Math.round(psa10 * 0.3 * 100) / 100;
                 } else if (!psa9 && !psa10 && correctedMin > 0 && correctedAvg > correctedMin * 2) {
                   const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
                   console.warn(`[OutlookEngine] RAW NO-ANCHOR CORRECTION: avg $${correctedAvg} is ${(correctedAvg / correctedMin).toFixed(1)}x min $${correctedMin} with no graded anchor — likely blended. Correcting to $${newAvg}`);

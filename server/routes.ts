@@ -3872,17 +3872,33 @@ Sitemap: ${origin}/sitemap.xml
         const geminiPrice = unifiedResult.market.avgPrice;
         const geminiMin = unifiedResult.market.minPrice;
         const geminiMax = unifiedResult.market.maxPrice;
+        const geminiComps = unifiedResult.market.soldCount || 0;
         
         marketValue = geminiPrice;
         priceMin = geminiMin || geminiPrice * 0.7;
         priceMax = geminiMax || geminiPrice * 1.5;
-        compCount = unifiedResult.market.soldCount;
+        compCount = geminiComps;
 
-        // Log cross-product comparison for diagnostics (never overrides Gemini price)
-        if (specCrossProduct && specCrossProduct.avgPrice > 0) {
+        // ZERO-COMP CROSS-PRODUCT CHECK: When Gemini has 0 comps and CrossProduct disagrees
+        // by >3x, Gemini is likely estimating from graded/blended prices while CrossProduct
+        // (which asks a more focused question) is more accurate for the raw value.
+        if (geminiComps === 0 && qaIsRaw && specCrossProduct && specCrossProduct.avgPrice > 0) {
+          const cpRatio = geminiPrice / specCrossProduct.avgPrice;
+          if (cpRatio > 3) {
+            console.warn(`[Quick Analyze] ZERO-COMP OVERRIDE: Gemini $${geminiPrice} (0 comps) is ${cpRatio.toFixed(1)}x CrossProduct $${specCrossProduct.avgPrice} for raw card — Gemini likely blended graded prices. Using CrossProduct.`);
+            marketValue = specCrossProduct.avgPrice;
+            priceMin = specCrossProduct.minPrice || specCrossProduct.avgPrice * 0.7;
+            priceMax = specCrossProduct.maxPrice || specCrossProduct.avgPrice * 1.5;
+          } else if (cpRatio > 2) {
+            console.log(`[Quick Analyze] ZERO-COMP WARNING: Gemini $${geminiPrice} (0 comps) is ${cpRatio.toFixed(1)}x CrossProduct $${specCrossProduct.avgPrice} — monitoring`);
+          }
+        }
+
+        // Log cross-product comparison for diagnostics
+        if (specCrossProduct && specCrossProduct.avgPrice > 0 && geminiComps > 0) {
           const cpRatio = specCrossProduct.avgPrice / geminiPrice;
           if (cpRatio > 3 || cpRatio < 0.33) {
-            console.log(`[Quick Analyze] DIAGNOSTIC: CrossProduct $${specCrossProduct.avgPrice} vs Gemini $${geminiPrice} (${cpRatio.toFixed(1)}x diff) — using Gemini price`);
+            console.log(`[Quick Analyze] DIAGNOSTIC: CrossProduct $${specCrossProduct.avgPrice} vs Gemini $${geminiPrice} (${cpRatio.toFixed(1)}x diff) — using Gemini price (has ${geminiComps} comps)`);
           }
         }
 
@@ -3891,7 +3907,7 @@ Sitemap: ${origin}/sitemap.xml
           console.log(`[Quick Analyze] Gemini graded prices: PSA 9 $${unifiedResult.market.psa9Price}, PSA 10 $${unifiedResult.market.psa10Price || "N/A"}`);
         }
 
-        console.log(`[Quick Analyze] GEMINI-FIRST: Using Gemini price $${geminiPrice} (range $${priceMin}-$${priceMax}, ${compCount} comps). Analysis runs independently.`);
+        console.log(`[Quick Analyze] GEMINI-FIRST: Using Gemini price $${marketValue} (range $${priceMin}-$${priceMax}, ${compCount} comps). Analysis runs independently.`);
       }
 
       // FALLBACK: When Gemini returned no usable price, use legacy sources
