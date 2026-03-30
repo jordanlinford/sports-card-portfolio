@@ -1704,12 +1704,20 @@ export async function fetchCrossProductFallbackPrice(card: {
     else serialPremium = `This is a numbered parallel but highly numbered. Price similarly to a ${baseLabel}.`;
   }
 
+  const isNamedParallel = /\b(rare\s*gold|gold\s*refractor|atomic|refractor|chrome|gold|silver|ruby|emerald|sapphire|diamond|platinum|red|blue|green|purple|orange|pink|black|holo|holographic|hyper|prismatic|tie[- ]?dye|camo|mosaic|peacock|nebula|pulsar|wave|swirl|x[- ]?fractor)\b/i.test(variation);
+  const isVintage = year && parseInt(String(year)) <= 2005;
+
   const searchQueries = isAuto ? [
     `"${player} ${year} ${sport} auto sold eBay"`,
     `"${player} ${year} autograph sold eBay"`,
     `"${player} ${year} Donruss auto sold eBay"`,
     `"${player} ${year} Prizm auto sold eBay"`,
     `"${player} ${year} Select auto sold eBay"`,
+  ] : isNamedParallel || (set && variation) ? [
+    `"${player} ${year} ${set} ${variation} sold eBay"`,
+    `"${player} ${year} ${variation} sold eBay"`,
+    `"${player} ${year} ${set} sold eBay"`,
+    `"${player} ${year} ${sport} card sold eBay"`,
   ] : [
     `"${player} ${year} ${sport} card sold eBay"`,
     `"${player} ${year} ${set || "Prizm"} sold eBay"`,
@@ -1728,11 +1736,26 @@ export async function fetchCrossProductFallbackPrice(card: {
     ? `For ${sport} rookies in products like Donruss, Score, Chronicles, Illusions: base autos typically range $5-$30 depending on player tier; premium numbered parallels go higher`
     : `For ${sport} rookies: base cards typically sell $0.50-$5. Non-auto numbered parallels (/99) sell $3-$15, (/25) sell $8-$30, (/10) sell $15-$60 depending on player tier. Do NOT use autograph prices as a baseline for non-auto parallels.`;
 
+  const namedParallelNote = isNamedParallel ? `
+NAMED PARALLEL — CRITICAL:
+This card is a "${variation}" version. This is a DISTINCT parallel that sells at a DIFFERENT price than the base card.
+- You MUST search for the "${variation}" version specifically — do NOT use base card prices.
+- Named parallels like Refractor, Rare Gold, Gold, Silver, etc. are often 2-10x MORE valuable than the base.
+${isVintage ? `- This is a VINTAGE card (${year}). 1990s-2000s parallels like Refractors and Gold parallels from sets like Finest, Chrome, Stadium Club are highly sought after by collectors and often command significant premiums, especially in high grades (PSA 10).` : ""}
+` : isVintage ? `
+VINTAGE CARD CONTEXT:
+This is a vintage card from ${year}. Vintage cards (1990s-2000s) have different market dynamics than modern cards:
+- Hall of Famers and iconic players command premiums that modern rookies don't
+- Named subsets and inserts (e.g., Finest Refractor, Metal Universe, Flair Showcase) can be highly valuable
+- Condition matters enormously — PSA 10 vintage cards can be worth 3-10x a PSA 9
+- Do NOT apply modern rookie pricing formulas. Search specifically for this exact card.
+` : "";
+
   const prompt = `You are a sports card pricing expert. I need a realistic market value estimate for a ${sport} card:
 
 CARD: "${cardDesc}"
 Card Type: ${serialLabel} ${cardTypeLabel}${isAuto ? "" : " (NOT an autograph)"}
-
+${namedParallelNote}
 PLAYER TIER ASSESSMENT (DO THIS FIRST):
 Before estimating price, assess this player's actual market demand tier. Search for who "${player}" is:
 - What round were they drafted? What pick? (1st round picks = high demand, 3rd+ round = low-mid demand)
