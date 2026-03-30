@@ -1,0 +1,165 @@
+Where you will get attacked (and why)
+1. Konner Griffin at #1
+
+Likely comment:
+
+“How is a prospect #1 over Ohtani/Witt?”
+
+What’s happening:
+
+Your model is picking up early capital inflow
+Reddit thinks in proven value + track record
+
+Reality:
+
+You’re right mechanically
+They’re right contextually
+
+This is your biggest credibility risk.
+
+2. Kenneth Walker III at #2
+
+Likely comment:
+
+“RBs don’t hold value long term”
+
+Underlying issue:
+
+Your model is short-term demand driven
+Football collectors think in career arc depreciation curves
+3. Duplicate Shohei Ohtani entries (6 and 9)
+
+This is a real problem.
+
+Likely comment:
+
+“Why is Ohtani both BUY and TRADE?”
+
+This instantly creates:
+
+confusion
+distrust
+“this model is broken” reactions
+
+Even if it’s:
+
+different cards
+different phases
+
+You’re not explaining that.
+
+4. Lamine Yamal = TRADE
+
+This will get pushback.
+
+Why:
+
+He’s a hype-driven global asset
+Soccer market = momentum-heavy
+
+Your model likely sees:
+
+overheating / exhaustion signals
+
+Collectors see:
+
+generational upside
+
+This creates friction.
+
+5. Lack of card specificity (big issue)
+
+Right now you’re ranking:
+
+players
+
+But markets operate on:
+
+specific cards (sets, parallels, grades)
+
+Likely comment:
+
+“Which cards? Base? Chrome? /10? PSA 10?”
+
+Without this, your list feels:
+
+abstract
+less actionable
+easier to dismiss
+6. “Best Markets” language
+
+This is subtle but important.
+
+It implies:
+
+high certainty
+broad accuracy
+
+But your model is:
+
+probabilistic
+context-dependent
+
+This opens you up to:
+
+“This isn’t accurate”
+
+The real problem (root cause)
+
+You’re mixing two different layers:
+
+Layer	What you’re doing	What users expect
+Market signal	Demand, liquidity, phase	✔ correct
+Investment decision	BUY / HOLD / TRADE	⚠ needs context
+
+The second layer is where people will argue.
+
+How to make this defensible fast (without rebuilding everything)
+1. Clarify unit of analysis
+
+Change mentally (and eventually in UI):
+
+Player → “player market trend”
+
+Even better later:
+
+Card-level
+
+2. Fix Ohtani duplication immediately
+
+This is non-negotiable.
+
+Either:
+
+merge
+or label:
+“Ohtani (low-end)”
+“Ohtani (high-end)”
+3. Add implicit context in comments (for Reddit)
+
+When challenged, respond like:
+
+“This is picking up short-term demand shifts, not long-term holds”
+“Prospects rank high because they’re in early capital inflow phases”
+“This isn’t saying ‘best players’, it’s ‘where money is moving right now’”
+
+That reframes everything.
+
+4. Rename in your head (important positioning)
+
+Instead of:
+
+“Best Markets”
+
+Think:
+
+“Where capital is flowing right now”
+
+That’s actually what your model is doing.
+
+Final assessment
+Question	Answer
+Is the list wrong?	No
+Is it fully defensible as-is?	No
+Will Reddit challenge it?	100%
+Can you defend it if you explain correctly?	Yes
