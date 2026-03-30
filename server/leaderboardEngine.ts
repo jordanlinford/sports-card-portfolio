@@ -292,6 +292,13 @@ export async function getLeaderboard(
     if (met?.avgSoldPrice7d && met?.avgSoldPrice && met.avgSoldPrice > 0) {
       const delta = ((met.avgSoldPrice7d - met.avgSoldPrice) / met.avgSoldPrice) * 100;
       trend7d = `${delta >= 0 ? "+" : ""}${Math.round(delta)}%`;
+    } else if (met?.priceTrend && met.priceTrend !== 0) {
+      const pct = Math.round(met.priceTrend * 100);
+      trend7d = `${pct >= 0 ? "+" : ""}${pct}%`;
+    } else if (s.signals.derivedMetrics?.priceTrend && s.signals.derivedMetrics.priceTrend !== 0) {
+      const derived = s.signals.derivedMetrics.priceTrend;
+      const pct = Math.round((derived - 1) * 100);
+      trend7d = `${pct >= 0 ? "+" : ""}${pct}%`;
     }
 
     const avgPrice = met?.avgSoldPrice ? `$${met.avgSoldPrice.toFixed(0)}` : "";
