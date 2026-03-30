@@ -1436,8 +1436,10 @@ Return ONLY this JSON:
                       }
                     } else if (ratio < 0.5) {
                       console.log(`[Unified Analysis] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search $${correctedAvg} — search was HIGHER. Keeping search price.`);
+                      lowPopWasValidated = true;
                     } else {
                       console.log(`[Unified Analysis] LOW-POP VALIDATION: Gemini confirms ~$${val.validatedPrice} vs search $${correctedAvg} — prices aligned.`);
+                      lowPopWasValidated = true;
                     }
                   }
                 }

@@ -3873,6 +3873,7 @@ Sitemap: ${origin}/sitemap.xml
       let priceMax = filteredPriceData.max;
       let compCount = priceData.salesFound;
       const qaIsRaw = isRawCardCheck(grade, grader);
+      const skipLowPopAdjustments = !!unifiedResult?.lowPopValidated;
       
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
         // Trust unified Gemini result when: real comps found, rare cards (1/1, low-pop), OR SSP/premium inserts
@@ -3909,7 +3910,12 @@ Sitemap: ${origin}/sitemap.xml
           priceMax = unifiedMax || marketValue * 1.5;
           compCount = unifiedResult.market.soldCount;
 
-          if (qaIsLowPop && unifiedResult.market.soldCount <= 2 && specCrossProduct && specCrossProduct.avgPrice > 0 && !unifiedResult?.lowPopValidated) {
+          // LOW-POP VALIDATED: When the unified analysis already ran a second Gemini validation
+          // call and confirmed/corrected the price, trust it completely. Skip ALL downstream
+          // adjustments (contamination checks, zero-comp discounts, cross-product overrides, etc.)
+          if (skipLowPopAdjustments) {
+            console.log(`[Quick Analyze] LOW-POP VALIDATED: Trusting Gemini-validated price $${marketValue} (range $${priceMin}-$${priceMax}). Skipping all downstream adjustments.`);
+          } else if (qaIsLowPop && unifiedResult.market.soldCount <= 2 && specCrossProduct && specCrossProduct.avgPrice > 0) {
             const cpRatio = specCrossProduct.avgPrice / marketValue;
             if (cpRatio >= 5 && marketValue > 0) {
               const blended = Math.round(marketValue * 0.25 + specCrossProduct.avgPrice * 0.75);
@@ -3930,7 +3936,7 @@ Sitemap: ${origin}/sitemap.xml
           // under-values because it can't find exact sales and anchors to common parallels.
           // Apply a minimum scarcity multiplier ADJUSTED BY DEMAND TIER.
           // Tier 1-2 players get meaningful floors; Tier 3-4 get minimal/no floor.
-          if (qaIsVeryLowPop && unifiedResult.market.soldCount === 0 && marketValue > 0) {
+          if (!skipLowPopAdjustments && qaIsVeryLowPop && unifiedResult.market.soldCount === 0 && marketValue > 0) {
             const popMatch = qaVariation.match(/\/\s*(\d+)/);
             const popNum = popMatch ? parseInt(popMatch[1]) : 5;
             const tierNum = demandContext?.tier ?? 2;
@@ -3956,7 +3962,7 @@ Sitemap: ${origin}/sitemap.xml
           // Gemini often anchors on the WRONG comparable (e.g., RPA /99 instead of the correct insert /49).
           // If cross-product fallback data is available and shows a much lower price, cap the estimate.
           // This prevents inflated values when the AI confuses card types within the same product.
-          if (qaIsVeryLowPop && unifiedResult.market.soldCount === 0 && specCrossProduct && specCrossProduct.avgPrice > 0) {
+          if (!skipLowPopAdjustments && qaIsVeryLowPop && unifiedResult.market.soldCount === 0 && specCrossProduct && specCrossProduct.avgPrice > 0) {
             const popMatch = qaVariation.match(/\/\s*(\d+)/);
             const popNum = popMatch ? parseInt(popMatch[1]) : 5;
             const tierNum = demandContext?.tier ?? 3;
@@ -3974,8 +3980,7 @@ Sitemap: ${origin}/sitemap.xml
           // extremely rare, so Gemini often returns PSA10/PSA9 prices as "raw" prices.
           // A raw card CANNOT cost more than its PSA 9 grade — if it does, the price is contaminated.
           // Not applied to 1/1 cards since those are unique and may be priced above PSA9.
-          // SKIP if unified analysis was already validated by low-pop validation call.
-          if (qaIsRaw && qaIsLowPop && !qaIs1of1 && !unifiedResult?.lowPopValidated) {
+          if (!skipLowPopAdjustments && qaIsRaw && qaIsLowPop && !qaIs1of1) {
             const psa9Price = unifiedResult.market.psa9Price ?? null;
             const psa10Price = unifiedResult.market.psa10Price ?? null;
             // Use PSA9 as primary anchor, PSA10 as fallback (raw is ~30% of PSA10 for premium numbered cards)
@@ -3998,8 +4003,7 @@ Sitemap: ${origin}/sitemap.xml
           // are estimating with no real transaction data. Use the LOWER of unified vs legacy
           // as the conservative anchor, then apply a moderate discount since even the lower
           // estimate may be inflated (AI anchoring on wrong card type is common for inserts).
-          // SKIP if unified analysis was already validated by low-pop validation call.
-          if ((qaIsVeryLowPop || qaIsLowPop) && unifiedResult.market.soldCount === 0 && marketValue > 0 && !unifiedResult?.lowPopValidated) {
+          if (!skipLowPopAdjustments && (qaIsVeryLowPop || qaIsLowPop) && unifiedResult.market.soldCount === 0 && marketValue > 0) {
             const legacyPrice = priceData?.pricePoints?.length > 0
               ? priceData.pricePoints.reduce((sum: number, p: any) => sum + (p.price || 0), 0) / priceData.pricePoints.length
               : null;
@@ -4157,11 +4161,11 @@ Sitemap: ${origin}/sitemap.xml
       let unifiedZeroCompEstimate = (unifiedResult && unifiedResult.market.avgPrice > 0 && (unifiedResult.market.soldCount || 0) === 0)
         ? ((qaIsRaw ? unifiedResult.market.rawPrice : null) ?? unifiedResult.market.avgPrice)
         : null;
-      if (unifiedZeroCompEstimate && unifiedZeroCompEstimate > 0 && !unifiedResult?.lowPopValidated) {
+      if (unifiedZeroCompEstimate && unifiedZeroCompEstimate > 0 && !skipLowPopAdjustments) {
         const originalEstimate = unifiedZeroCompEstimate;
         unifiedZeroCompEstimate = Math.round(unifiedZeroCompEstimate * 0.5 * 100) / 100;
         console.log(`[Quick Analyze] ZERO-COMP DISCOUNT: Unified estimate $${originalEstimate} → $${unifiedZeroCompEstimate} (50% haircut — no sold comps means BIN anchor risk)`);
-      } else if (unifiedResult?.lowPopValidated) {
+      } else if (skipLowPopAdjustments) {
         console.log(`[Quick Analyze] ZERO-COMP DISCOUNT SKIPPED: Unified was already validated by low-pop validation ($${unifiedZeroCompEstimate})`);
       }
       if (!hasAnyRealComps && !qaIs1of1 && !qaIsVeryLowPop && !qaIsSSP) {
