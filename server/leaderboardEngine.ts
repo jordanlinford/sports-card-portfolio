@@ -300,19 +300,38 @@ export async function getLeaderboard(
       .join(" ");
   };
   
+  const editDistance = (a: string, b: string): number => {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    const matrix: number[][] = [];
+    for (let i = 0; i <= a.length; i++) matrix[i] = [i];
+    for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost);
+      }
+    }
+    return matrix[a.length][b.length];
+  };
+
   const isSimilar = (a: string, b: string): boolean => {
     if (a === b) return true;
     const shorter = a.length < b.length ? a : b;
     const longer = a.length < b.length ? b : a;
     if (longer.startsWith(shorter) && longer.length - shorter.length <= 3) return true;
     if (shorter.length >= 4 && longer.includes(shorter)) return true;
-    let mismatches = 0;
-    const minLen = Math.min(a.length, b.length);
-    for (let i = 0; i < minLen; i++) {
-      if (a[i] !== b[i]) mismatches++;
+    if (shorter.length >= 5 && editDistance(a, b) <= 2) return true;
+    const wordsA = a.split(" ").filter(Boolean);
+    const wordsB = b.split(" ").filter(Boolean);
+    if (wordsA.length === wordsB.length && wordsA.length >= 2) {
+      let wordMatches = 0;
+      for (let i = 0; i < wordsA.length; i++) {
+        if (wordsA[i] === wordsB[i] || editDistance(wordsA[i], wordsB[i]) <= 1) wordMatches++;
+      }
+      if (wordMatches === wordsA.length) return true;
     }
-    mismatches += Math.abs(a.length - b.length);
-    return mismatches <= 2 && minLen >= 5;
+    return false;
   };
   
   for (const entry of scored) {
