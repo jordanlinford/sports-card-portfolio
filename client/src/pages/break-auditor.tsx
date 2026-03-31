@@ -153,7 +153,7 @@ export default function BreakAuditorPage() {
     setResult(null);
 
     try {
-      const response = await apiRequest("POST", "/api/market/break-audit", {
+      const data = await apiRequest("POST", "/api/market/break-audit", {
         sport,
         product: selectedProduct,
         pricePerSlot: parseFloat(pricePerSlot),
@@ -161,7 +161,6 @@ export default function BreakAuditorPage() {
         teams: teams ? teams.split(",").map(t => t.trim()).filter(Boolean) : [],
       });
       
-      const data = await response.json();
       setResult(data);
     } catch (err: any) {
       setError(err.message || "Failed to analyze break. Please try again.");
