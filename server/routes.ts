@@ -9750,13 +9750,15 @@ Return ONLY valid JSON, no markdown.`;
       });
 
       const text = result.text || "";
-      const jsonMatch = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      const cleanedText = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const jsonExtract = cleanedText.match(/\{[\s\S]*\}/);
       
       let parsed;
       try {
-        parsed = JSON.parse(jsonMatch);
-      } catch {
-        console.error("[BreakAuditor] Failed to parse Gemini response:", text.substring(0, 500));
+        if (!jsonExtract) throw new Error("No JSON object found in response");
+        parsed = JSON.parse(jsonExtract[0]);
+      } catch (parseErr: any) {
+        console.error("[BreakAuditor] Failed to parse Gemini response:", parseErr.message, text.substring(0, 500));
         return res.status(500).json({ error: "Failed to parse analysis results" });
       }
 
