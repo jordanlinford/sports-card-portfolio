@@ -2688,62 +2688,26 @@ Sitemap: ${origin}/sitemap.xml
         console.log(`[Outlook 2.0] Recomputed action with Gemini liquidity: ${recomputedAction} (was ${originalAction})`);
       }
 
-      const { isOneOfOneCard } = await import("./priceService");
-      const cardVariation = card.variation || "";
-      const is1of1 = isOneOfOneCard({ title: card.title, variation: cardVariation, serialNumber: (card as any).serialNumber });
-      const isLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(cardVariation);
-
-      let marketValue = priceData.estimatedValue;
-      let priceMin = filteredPriceData.min;
-      let priceMax = filteredPriceData.max;
-      let compCount = priceData.salesFound;
+      // GEMINI-DIRECT PRICING: Trust Gemini, fallback to legacy only when Gemini has no price
+      let marketValue: number | null = null;
+      let priceMin: number | null = null;
+      let priceMax: number | null = null;
+      let compCount = 0;
 
       if (geminiMarketData && geminiMarketData.avgPrice > 0) {
-        if (geminiMarketData.soldCount > 0 || is1of1 || isLowPop) {
-          if (is1of1 || isLowPop) console.log(`[Outlook 2.0] 1/1 or low-pop card detected — trusting Gemini valuation: $${geminiMarketData.avgPrice}`);
-          if ((is1of1 || isLowPop) && marketValue && marketValue > geminiMarketData.avgPrice * 2) {
-            console.warn(`[Outlook 2.0] Price service value ($${marketValue}) is >2x Gemini ($${geminiMarketData.avgPrice}) for 1/1 card — using Gemini`);
-          }
-          marketValue = geminiMarketData.avgPrice;
-          priceMin = geminiMarketData.minPrice;
-          priceMax = geminiMarketData.maxPrice;
-          compCount = geminiMarketData.soldCount;
-          if (marketValue && priceMin != null && priceMin < marketValue * 0.15) {
-            priceMin = Math.round(marketValue * 0.6);
-          }
-        }
+        marketValue = geminiMarketData.avgPrice;
+        priceMin = geminiMarketData.minPrice;
+        priceMax = geminiMarketData.maxPrice;
+        compCount = geminiMarketData.soldCount;
+        console.log(`[Outlook 2.0] GEMINI-DIRECT: Using $${marketValue} (${compCount} comps). No corrections applied.`);
       }
 
-      // CROSS-VALIDATION (DIAGNOSTIC ONLY — never overrides Gemini price)
-      if (pricePointsForSchema.length > 0 && !is1of1 && !isLowPop) {
-        const ppPrices = pricePointsForSchema.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
-        if (ppPrices.length >= 2 && marketValue && marketValue > 0) {
-          const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
-          const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
-          const ratio = marketValue / ppMedian;
-          const geminiSoldCount = geminiMarketData?.soldCount ?? 0;
-          
-          if (ratio > 2.5) {
-            console.log(`[Outlook 2.0] CROSS-VALIDATION (diagnostic): Gemini $${marketValue} (${geminiSoldCount} comps) is ${ratio.toFixed(1)}x legacy median $${ppMedian.toFixed(2)} (${ppPrices.length} legacy comps). Using Gemini price.`);
-          }
-        }
-      }
-
-      const outlookTrendHasRealSales = monthlyPriceHistory?.hasAnySales === true;
-      if (monthlyPriceHistory && monthlyPriceHistory.dataPoints && monthlyPriceHistory.dataPoints.length > 0 && outlookTrendHasRealSales) {
-        const recentPoints = monthlyPriceHistory.dataPoints.slice(-3);
-        const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
-        if (recentAvg > 0 && (!marketValue || marketValue <= 0)) {
-          console.log(`[Outlook 2.0] PRICE-TREND FALLBACK: No market value, using trend avg $${recentAvg.toFixed(2)}`);
-          marketValue = Math.round(recentAvg * 100) / 100;
-          const allPrices = monthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-          if (allPrices.length > 0) { priceMin = Math.min(...allPrices); priceMax = Math.max(...allPrices); }
-        } else if (recentAvg > 0 && marketValue && marketValue > 0) {
-          const ratio = marketValue / recentAvg;
-          if (ratio < 0.33 || ratio > 3) console.log(`[Outlook 2.0] PRICE-TREND INFO: Gemini $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Trusting Gemini.`);
-        }
-      } else if (monthlyPriceHistory && !outlookTrendHasRealSales) {
-        console.log(`[Outlook 2.0] PRICE-TREND: Skipping — trend data has NO real sales (all salesCount=0)`);
+      if (!marketValue || marketValue <= 0) {
+        marketValue = priceData.estimatedValue;
+        priceMin = filteredPriceData.min;
+        priceMax = filteredPriceData.max;
+        compCount = priceData.salesFound;
+        console.log(`[Outlook 2.0] FALLBACK: Using legacy price $${marketValue}`);
       }
 
       let finalAction = signals.action;
@@ -2925,7 +2889,7 @@ Sitemap: ${origin}/sitemap.xml
     if (!job) return;
 
     const { computeAllSignals, generateOutlookExplanation, fetchPlayerNews, fetchGeminiMarketData, fetchMonthlyPriceHistory, computeAction } = await import("./outlookEngine");
-    const { lookupEnhancedCardPrice, isOneOfOneCard } = await import("./priceService");
+    const { lookupEnhancedCardPrice } = await import("./priceService");
 
     for (const card of cards) {
       if (job.shouldStop) break;
@@ -3002,35 +2966,23 @@ Sitemap: ${origin}/sitemap.xml
           signals.actionReasons = recomputedReasons;
         }
 
-        const cardVariation = card.variation || "";
-        const is1of1 = isOneOfOneCard({ title: card.title, variation: cardVariation, serialNumber: (card as any).serialNumber });
-        const isLowPop = /\/\s*[1-9]\b|\/\s*[1-4]\d\b/.test(cardVariation);
-
-        let marketValue = priceData.estimatedValue;
-        let priceMin = priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map((p: any) => p.price)) : null;
-        let priceMax = priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map((p: any) => p.price)) : null;
-        let compCount = priceData.pricePoints.length;
+        let marketValue: number | null = null;
+        let priceMin: number | null = null;
+        let priceMax: number | null = null;
+        let compCount = 0;
 
         if (geminiMarketData && geminiMarketData.avgPrice > 0) {
-          if (geminiMarketData.soldCount > 0 || is1of1 || isLowPop) {
-            marketValue = geminiMarketData.avgPrice;
-            compCount = geminiMarketData.soldCount;
-            if (geminiMarketData.lowPrice) priceMin = geminiMarketData.lowPrice;
-            if (geminiMarketData.highPrice) priceMax = geminiMarketData.highPrice;
-          }
+          marketValue = geminiMarketData.avgPrice;
+          compCount = geminiMarketData.soldCount;
+          if (geminiMarketData.lowPrice) priceMin = geminiMarketData.lowPrice;
+          if (geminiMarketData.highPrice) priceMax = geminiMarketData.highPrice;
         }
 
-        if (priceData.pricePoints.length > 0 && !is1of1 && !isLowPop) {
-          const ppPrices = priceData.pricePoints.map((p: any) => p.price).filter((p: number) => typeof p === 'number' && p > 0);
-          if (ppPrices.length >= 2 && marketValue && marketValue > 0) {
-            const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
-            const ppMedian = sortedPrices[Math.floor(sortedPrices.length / 2)];
-            const batchRatio = marketValue / ppMedian;
-            const batchGeminiComps = geminiMarketData?.soldCount ?? 0;
-            if (batchRatio > 2.5) {
-              console.log(`[Batch Outlook] CROSS-VALIDATION (diagnostic): Gemini $${marketValue} (${batchGeminiComps} comps) is ${batchRatio.toFixed(1)}x legacy median $${ppMedian.toFixed(2)}. Using Gemini price.`);
-            }
-          }
+        if (!marketValue || marketValue <= 0) {
+          marketValue = priceData.estimatedValue;
+          priceMin = priceData.pricePoints.length > 0 ? Math.min(...priceData.pricePoints.map((p: any) => p.price)) : null;
+          priceMax = priceData.pricePoints.length > 0 ? Math.max(...priceData.pricePoints.map((p: any) => p.price)) : null;
+          compCount = priceData.pricePoints.length;
         }
 
         let finalAction = signals.action;
@@ -3648,7 +3600,7 @@ Sitemap: ${origin}/sitemap.xml
       );
       const effectivePlayerName = reqPlayerName || title;
       
-      const { getPlayerDemandContext, buildDemandAdjustedMultiplierPrompt, applyCeilingCheck } = await import("./demandTierEngine");
+      const { getPlayerDemandContext, buildDemandAdjustedMultiplierPrompt } = await import("./demandTierEngine");
       const qaVariationForTier = variation || "";
       const qaIsNumberedForTier = /\/\d+/.test(qaVariationForTier);
       const qaPopMatchForTier = qaVariationForTier.match(/\/\s*(\d+)/);
@@ -3858,167 +3810,104 @@ Sitemap: ${origin}/sitemap.xml
       const qaSspPattern = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|uptown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
       const qaIsSSP = qaSspPattern.test(qaVariationLower) || qaSspPattern.test(qaSetLower);
       
-      // Determine market value: prefer unified Gemini data, fall back to legacy
-      let marketValue = priceData.estimatedValue;
-      let priceMin = filteredPriceData.min;
-      let priceMax = filteredPriceData.max;
-      let compCount = priceData.salesFound;
+      // ===== GEMINI-DIRECT PRICING =====
+      // Gemini's price is the source of truth. No corrections, no overrides, no second-guessing.
+      // Fallback sources (cross-product, historical) are ONLY used when Gemini returns NO price.
       const qaIsRaw = isRawCardCheck(grade, grader);
-      
-      // GEMINI-FIRST PRICING: When Gemini returns a result, trust it as the price source.
-      // Analysis logic (verdicts, signals, etc.) runs independently and doesn't modify the price.
-      // Fallback to legacy/cross-product only when Gemini has NO result at all.
+      let marketValue: number | null = null;
+      let priceMin: number | null = null;
+      let priceMax: number | null = null;
+      let compCount = 0;
+      let pricingSource = "none";
+
+      // TIER 1: Gemini price — use directly, no modifications
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
-        const geminiPrice = unifiedResult.market.avgPrice;
-        const geminiMin = unifiedResult.market.minPrice;
-        const geminiMax = unifiedResult.market.maxPrice;
-        const geminiComps = unifiedResult.market.soldCount || 0;
-        
-        marketValue = geminiPrice;
-        priceMin = geminiMin || geminiPrice * 0.7;
-        priceMax = geminiMax || geminiPrice * 1.5;
-        compCount = geminiComps;
+        marketValue = unifiedResult.market.avgPrice;
+        priceMin = unifiedResult.market.minPrice || marketValue * 0.7;
+        priceMax = unifiedResult.market.maxPrice || marketValue * 1.5;
+        compCount = unifiedResult.market.soldCount || 0;
+        pricingSource = "gemini";
 
-        // ZERO-COMP CROSS-PRODUCT CHECK: When Gemini has 0 comps and CrossProduct disagrees
-        // by >3x, Gemini is likely estimating from graded/blended prices while CrossProduct
-        // (which asks a more focused question) is more accurate for the raw value.
-        if (geminiComps === 0 && qaIsRaw && specCrossProduct && specCrossProduct.avgPrice > 0) {
-          const cpRatio = geminiPrice / specCrossProduct.avgPrice;
-          if (cpRatio > 3) {
-            console.warn(`[Quick Analyze] ZERO-COMP OVERRIDE: Gemini $${geminiPrice} (0 comps) is ${cpRatio.toFixed(1)}x CrossProduct $${specCrossProduct.avgPrice} for raw card — Gemini likely blended graded prices. Using CrossProduct.`);
-            marketValue = specCrossProduct.avgPrice;
-            priceMin = specCrossProduct.minPrice || specCrossProduct.avgPrice * 0.7;
-            priceMax = specCrossProduct.maxPrice || specCrossProduct.avgPrice * 1.5;
-          } else if (cpRatio > 2) {
-            console.log(`[Quick Analyze] ZERO-COMP WARNING: Gemini $${geminiPrice} (0 comps) is ${cpRatio.toFixed(1)}x CrossProduct $${specCrossProduct.avgPrice} — monitoring`);
-          }
-        }
-
-        // Log cross-product comparison for diagnostics
-        if (specCrossProduct && specCrossProduct.avgPrice > 0 && geminiComps > 0) {
-          const cpRatio = specCrossProduct.avgPrice / geminiPrice;
-          if (cpRatio > 3 || cpRatio < 0.33) {
-            console.log(`[Quick Analyze] DIAGNOSTIC: CrossProduct $${specCrossProduct.avgPrice} vs Gemini $${geminiPrice} (${cpRatio.toFixed(1)}x diff) — using Gemini price (has ${geminiComps} comps)`);
-          }
-        }
-
-        // For graded cards, also trust Gemini's graded prices directly
         if (unifiedResult.market.psa9Price && unifiedResult.market.psa9Price > 0) {
           console.log(`[Quick Analyze] Gemini graded prices: PSA 9 $${unifiedResult.market.psa9Price}, PSA 10 $${unifiedResult.market.psa10Price || "N/A"}`);
         }
 
-        console.log(`[Quick Analyze] GEMINI-FIRST: Using Gemini price $${marketValue} (range $${priceMin}-$${priceMax}, ${compCount} comps). Analysis runs independently.`);
+        console.log(`[Quick Analyze] GEMINI-DIRECT: Using Gemini price $${marketValue} (range $${priceMin}-$${priceMax}, ${compCount} comps). No corrections applied.`);
       }
 
-      // FALLBACK: When Gemini returned no usable price, use legacy sources
-      if (!unifiedResult || unifiedResult.market.avgPrice <= 0) {
-        // Try cross-product fallback
-        if (specCrossProduct && specCrossProduct.avgPrice > 0 && (!marketValue || marketValue <= 0)) {
-          console.log(`[Quick Analyze] CROSS-PRODUCT FALLBACK: No Gemini result. Using $${specCrossProduct.avgPrice} (range $${specCrossProduct.minPrice}-$${specCrossProduct.maxPrice})`);
+      // TIER 2: Cross-product fallback — only when Gemini has NO price
+      if (!marketValue || marketValue <= 0) {
+        if (specCrossProduct && specCrossProduct.avgPrice > 0) {
           marketValue = specCrossProduct.avgPrice;
-          priceMin = specCrossProduct.minPrice;
-          priceMax = specCrossProduct.maxPrice;
-          compCount = 0;
+          priceMin = specCrossProduct.minPrice || specCrossProduct.avgPrice * 0.7;
+          priceMax = specCrossProduct.maxPrice || specCrossProduct.avgPrice * 1.5;
+          pricingSource = "cross_product";
+          console.log(`[Quick Analyze] FALLBACK (Tier 2): Cross-product $${marketValue} (range $${priceMin}-$${priceMax})`);
         }
 
-        // Try low-pop triangulation for /1-/5 and 1/1 cards
-        if ((qaIs1of1 || qaIsVeryLowPop) && (!marketValue || marketValue <= 0)) {
-          console.log(`[Quick Analyze] LOW-POP FALLBACK: No Gemini result for ${qaIs1of1 ? "1/1" : "very low-pop"} card. Attempting triangulation...`);
+        if ((!marketValue || marketValue <= 0) && (qaIs1of1 || qaIsVeryLowPop)) {
           try {
             const fallbackResult = await fetchLowPopFallbackPrice({
-              title,
-              playerName: title,
-              year: year || undefined,
-              set: set || undefined,
-              variation: variation || undefined,
-              grade: grade || undefined,
+              title, playerName: title,
+              year: year || undefined, set: set || undefined,
+              variation: variation || undefined, grade: grade || undefined,
               grader: grader || undefined,
             });
             if (fallbackResult && fallbackResult.avgPrice > 0) {
-              console.log(`[Quick Analyze] LOW-POP FALLBACK: Using triangulated $${fallbackResult.avgPrice} (range $${fallbackResult.minPrice}-$${fallbackResult.maxPrice})`);
               marketValue = fallbackResult.avgPrice;
               priceMin = fallbackResult.minPrice;
               priceMax = fallbackResult.maxPrice;
+              pricingSource = "low_pop_triangulation";
+              console.log(`[Quick Analyze] FALLBACK (Tier 2): Low-pop triangulation $${marketValue}`);
             }
           } catch (fallbackError: any) {
-            console.warn(`[Quick Analyze] LOW-POP FALLBACK: Error: ${fallbackError.message}`);
+            console.warn(`[Quick Analyze] Low-pop fallback error: ${fallbackError.message}`);
           }
         }
       }
 
-      // HISTORICAL RESCUE: When ALL sources failed, use stored historical comps as last resort
-      const historicalExactComps = historicalComps.filter(c => 
-        c.isExactMatch && 
-        c.source !== "final_estimate" && 
-        c.source !== "unified_min" && 
-        c.source !== "unified_max" && 
-        c.source !== "cross_product"
-      );
-      const dedupedPrices = [...new Set(historicalExactComps.map(c => c.price))].filter(p => p > 0);
-      const historicalAnchorPrices = dedupedPrices.sort((a, b) => a - b);
-      if ((!marketValue || marketValue <= 0) && historicalAnchorPrices.length >= 2) {
-        const mid = Math.floor(historicalAnchorPrices.length / 2);
-        const historicalMedian = historicalAnchorPrices.length % 2 === 0
-          ? (historicalAnchorPrices[mid - 1] + historicalAnchorPrices[mid]) / 2
-          : historicalAnchorPrices[mid];
-        marketValue = Math.round(historicalMedian * 100) / 100;
-        priceMin = Math.round(historicalMedian * 0.6);
-        priceMax = Math.round(historicalMedian * 1.5);
-        compCount = 0;
-        console.log(`[Quick Analyze] HISTORICAL RESCUE: No current pricing available. Using historical median $${marketValue} from ${historicalAnchorPrices.length} stored comps`);
-      }
+      // TIER 3: Historical comps rescue — only when Tiers 1 & 2 both failed
+      if (!marketValue || marketValue <= 0) {
+        const historicalExactComps = historicalComps.filter(c =>
+          c.isExactMatch &&
+          c.source !== "final_estimate" &&
+          c.source !== "unified_min" &&
+          c.source !== "unified_max" &&
+          c.source !== "cross_product"
+        );
+        const dedupedPrices = [...new Set(historicalExactComps.map(c => c.price))].filter(p => p > 0);
+        const historicalAnchorPrices = dedupedPrices.sort((a, b) => a - b);
+        if (historicalAnchorPrices.length >= 2) {
+          const mid = Math.floor(historicalAnchorPrices.length / 2);
+          const historicalMedian = historicalAnchorPrices.length % 2 === 0
+            ? (historicalAnchorPrices[mid - 1] + historicalAnchorPrices[mid]) / 2
+            : historicalAnchorPrices[mid];
+          marketValue = Math.round(historicalMedian * 100) / 100;
+          priceMin = Math.round(historicalMedian * 0.6);
+          priceMax = Math.round(historicalMedian * 1.5);
+          pricingSource = "historical";
+          console.log(`[Quick Analyze] FALLBACK (Tier 3): Historical median $${marketValue} from ${historicalAnchorPrices.length} stored comps`);
+        }
 
-      // qaIsRaw defined earlier (before unified result block)
-
-      // CROSS-VALIDATION against legacy price points (DIAGNOSTIC ONLY — never overrides Gemini price)
-      const ppForValidation = priceData.pricePoints || [];
-      if (ppForValidation.length > 0 && !qaIs1of1 && !qaIsLowPop && !qaIsSSP) {
-        const ppPrices = ppForValidation.map((pp: any) => pp.price).filter((p: number) => typeof p === 'number' && p > 0);
-        if (ppPrices.length >= 2 && marketValue && marketValue > 0) {
-          const sortedPrices = [...ppPrices].sort((a: number, b: number) => a - b);
-          const mid = Math.floor(sortedPrices.length / 2);
-          const ppMedian = sortedPrices.length % 2 === 0
-            ? (sortedPrices[mid - 1] + sortedPrices[mid]) / 2
-            : sortedPrices[mid];
-          
-          const ratio = marketValue / ppMedian;
-          const geminiCompCount = unifiedResult?.market.soldCount ?? 0;
-          
-          if (ratio > 2.5) {
-            console.log(`[Quick Analyze] CROSS-VALIDATION (diagnostic): Gemini $${marketValue} (${geminiCompCount} comps) is ${ratio.toFixed(1)}x legacy median $${ppMedian.toFixed(2)} (${ppPrices.length} legacy comps). Using Gemini price.`);
-          }
+        if ((!marketValue || marketValue <= 0) && priceData.estimatedValue && priceData.estimatedValue > 0) {
+          marketValue = priceData.estimatedValue;
+          priceMin = filteredPriceData.min;
+          priceMax = filteredPriceData.max;
+          compCount = priceData.salesFound;
+          pricingSource = "legacy";
+          console.log(`[Quick Analyze] FALLBACK (Tier 3): Legacy price $${marketValue}`);
         }
       }
-      
-      // PRICE-TREND COMPARISON (DIAGNOSTIC + FALLBACK ONLY)
-      // Only used to set marketValue when Gemini didn't return a price.
-      // When Gemini returned a price, trend data is logged for info but never overrides.
-      const trendHasRealSales = qaMonthlyPriceHistory?.hasAnySales === true;
-      if (qaMonthlyPriceHistory && qaMonthlyPriceHistory.dataPoints && qaMonthlyPriceHistory.dataPoints.length > 0 && trendHasRealSales) {
-        const recentPoints = qaMonthlyPriceHistory.dataPoints.slice(-3);
-        const recentAvg = recentPoints.reduce((sum: number, p: any) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
 
-        if (recentAvg > 0) {
-          if (!marketValue || marketValue <= 0) {
-            console.log(`[Quick Analyze] PRICE-TREND FALLBACK: No market value, using trend avg $${recentAvg.toFixed(2)}`);
-            marketValue = Math.round(recentAvg * 100) / 100;
-            const allPrices = qaMonthlyPriceHistory.dataPoints.map((p: any) => p.avgPrice || 0).filter((p: number) => p > 0);
-            if (allPrices.length > 0) {
-              priceMin = Math.min(...allPrices);
-              priceMax = Math.max(...allPrices);
-            }
-          } else {
-            const ratio = marketValue / recentAvg;
-            if (ratio < 0.33 || ratio > 3) {
-              console.log(`[Quick Analyze] PRICE-TREND (diagnostic): current $${marketValue} differs from trend avg $${recentAvg.toFixed(2)} (ratio ${ratio.toFixed(2)}). Using Gemini price.`);
-            }
-          }
+      // DIAGNOSTIC LOGGING — informational only, never changes the price
+      if (specCrossProduct && specCrossProduct.avgPrice > 0 && marketValue && marketValue > 0 && pricingSource === "gemini") {
+        const cpRatio = specCrossProduct.avgPrice / marketValue;
+        if (cpRatio > 3 || cpRatio < 0.33) {
+          console.log(`[Quick Analyze] DIAGNOSTIC ONLY: CrossProduct $${specCrossProduct.avgPrice} vs Gemini $${marketValue} (${cpRatio.toFixed(1)}x diff) — using Gemini price, no override.`);
         }
-      } else if (qaMonthlyPriceHistory && !trendHasRealSales) {
-        console.log(`[Quick Analyze] PRICE-TREND: Skipping — trend data has NO real sales (all salesCount=0)`);
       }
 
-      // SPECIFICITY GUARD
+      // SPECIFICITY GUARD — affects confidence label, never the price
       const hasMissingDetails = !set || !variation;
       if (hasMissingDetails && marketValue && marketValue > 5) {
         const missingFields = [!set ? "set" : null, !variation ? "variation/parallel" : null].filter(Boolean).join(" and ");
@@ -4026,32 +3915,9 @@ Sitemap: ${origin}/sitemap.xml
         signals.confidenceReason = `Card identity incomplete — missing ${missingFields}. Price may not reflect this specific card.`;
       }
 
-      // DEMAND TIER CEILING CHECK: Only applies when Gemini didn't return a price (fallback sources).
-      // When Gemini returned a result, we trust its price — demand context is used for analysis only.
-      let demandCeilingApplied = false;
-      let demandCeilingReason = "";
       const triangulationUsed = demandContext !== null && qaIsLowPop && compCount === 0;
-      const geminiHadPrice = unifiedResult && unifiedResult.market.avgPrice > 0;
-      if (!geminiHadPrice && demandContext && demandContext.tier >= 3 && marketValue && marketValue > 0 && compCount === 0) {
-        const independentAnchors = [
-          specCrossProduct?.avgPrice,
-          priceData.estimatedValue,
-        ].filter((v): v is number => typeof v === 'number' && v > 0);
-        const anchorPrice = independentAnchors.length > 0
-          ? independentAnchors.reduce((a, b) => a + b, 0) / independentAnchors.length
-          : 0;
-        if (anchorPrice > 0) {
-          const ceilingResult = applyCeilingCheck(marketValue, anchorPrice, demandContext.tier, compCount);
-          if (ceilingResult.wasCapped) {
-            console.warn(`[Quick Analyze] DEMAND CEILING: ${ceilingResult.capReason}. Was $${marketValue}, anchor $${anchorPrice.toFixed(2)} (from ${independentAnchors.length} source(s)), now $${ceilingResult.price}`);
-            marketValue = ceilingResult.price;
-            priceMin = Math.round(marketValue * 0.6);
-            priceMax = Math.round(marketValue * 1.5);
-            demandCeilingApplied = true;
-            demandCeilingReason = ceilingResult.capReason || "";
-          }
-        }
-      }
+      const demandCeilingApplied = false;
+      const demandCeilingReason = "";
 
       const matchConfidence = priceData.matchConfidence;
       
@@ -4184,26 +4050,8 @@ Sitemap: ${origin}/sitemap.xml
             dataSource: "gemini_unified",
           } : null,
           gradedEstimates: qaIsRaw && marketValue ? (() => {
-            let psa9 = unifiedResult?.market.psa9Price ?? null;
-            let psa10 = unifiedResult?.market.psa10Price ?? null;
-
-            if (psa9 !== null && psa9 < marketValue) {
-              console.warn(`[GradedMatrix] PSA 9 (${psa9}) < raw (${marketValue}) — wrong card comps detected. Clearing.`);
-              psa9 = null;
-            }
-            if (psa10 !== null && psa10 < marketValue) {
-              console.warn(`[GradedMatrix] PSA 10 (${psa10}) < raw (${marketValue}) — wrong card comps detected. Clearing.`);
-              psa10 = null;
-            }
-
-            if (psa9 !== null && psa9 > marketValue * 5) {
-              console.warn(`[GradedMatrix] PSA 9 (${psa9}) is ${(psa9/marketValue).toFixed(1)}x raw (${marketValue}) — likely wrong comps. Capping at 3x.`);
-              psa9 = Math.round(marketValue * 3);
-            }
-            if (psa10 !== null && psa10 > marketValue * 8) {
-              console.warn(`[GradedMatrix] PSA 10 (${psa10}) is ${(psa10/marketValue).toFixed(1)}x raw (${marketValue}) — likely wrong comps. Capping at 5x.`);
-              psa10 = Math.round(marketValue * 5);
-            }
+            const psa9 = unifiedResult?.market.psa9Price ?? null;
+            const psa10 = unifiedResult?.market.psa10Price ?? null;
 
             if (psa9 || psa10) {
               return { psa9, psa10 };
@@ -4213,7 +4061,6 @@ Sitemap: ${origin}/sitemap.xml
             if (isLowPop) {
               const estPsa9 = Math.round(marketValue * 1.3);
               const estPsa10 = Math.round(marketValue * 1.8);
-              console.log(`[GradedMatrix] Low-pop card ${variation}: using conservative estimates PSA9=$${estPsa9}, PSA10=$${estPsa10}`);
               return { psa9: estPsa9, psa10: estPsa10, estimated: true, lowPop: true };
             }
 
@@ -4281,7 +4128,7 @@ Sitemap: ${origin}/sitemap.xml
           unifiedPrice: unifiedResult?.market?.avgPrice || null,
           legacyPrice: priceData.estimatedValue || null,
           legacyComps: priceData.salesFound || 0,
-          finalSource: unifiedResult?.market?.avgPrice > 0 ? "gemini" : (specCrossProduct?.avgPrice ? "cross_product" : "legacy"),
+          finalSource: pricingSource,
         } : undefined,
         demandTier: demandContext ? {
           tier: demandContext.tier,
