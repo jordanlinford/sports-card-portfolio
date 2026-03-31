@@ -602,168 +602,28 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
           if (typeof parsed.soldCount === "number" && typeof parsed.avgPrice === "number") {
             console.log(`[OutlookEngine] Found market data: ${parsed.soldCount} sold, avg $${parsed.avgPrice}`);
             
+            // GEMINI-DIRECT: Trust Gemini's pricing with no corrections
             let correctedAvg = parsed.avgPrice || 0;
-            let correctedMin = parsed.minPrice || parsed.avgPrice * 0.8;
-            let correctedMax = parsed.maxPrice || parsed.avgPrice * 1.2;
-            
-            // RAW CARD CORRECTION: Use raw-specific prices when available for raw cards
-            if (isRaw) {
-              const psa9 = parsePrice(parsed.psa9Price);
-              const psa10 = parsePrice(parsed.psa10Price);
+            let correctedMin = parsed.minPrice || correctedAvg;
+            let correctedMax = parsed.maxPrice || correctedAvg;
 
-              // Helper: is this price contaminated by graded sales?
-              const isPSA9Contaminated = (price: number) => psa9 && psa9 > 0 && price >= psa9 * 0.8;
-
-              if (parsed.rawPrice && parsed.rawPrice > 0 && !isPSA9Contaminated(parsed.rawPrice)) {
-                const rawEqualsAvg = Math.abs(parsed.rawPrice - parsed.avgPrice) < 1;
-                const zeroComps = (parsed.soldCount || 0) === 0;
-                if (rawEqualsAvg && zeroComps && parsed.rawPrice > 30) {
-                  console.warn(`[OutlookEngine] RAW SUSPECT: rawPrice ($${parsed.rawPrice}) = avgPrice with 0 sold comps — Gemini may be echoing a blended/graded estimate. Checking graded anchors...`);
-                  if (psa9 && psa9 > 0 && parsed.rawPrice >= psa9 * 0.6) {
-                    const derivedRaw = Math.round(psa9 * 0.4 * 100) / 100;
-                    console.warn(`[OutlookEngine] RAW SUSPECT CONFIRMED: rawPrice $${parsed.rawPrice} is ≥60% of PSA 9 $${psa9} → deriving raw: $${derivedRaw}`);
-                    correctedAvg = derivedRaw;
-                    correctedMin = Math.round(psa9 * 0.25 * 100) / 100;
-                    correctedMax = Math.round(psa9 * 0.55 * 100) / 100;
-                  } else if (psa10 && psa10 > 0 && parsed.rawPrice >= psa10 * 0.5) {
-                    const derivedRaw = Math.round(psa10 * 0.2 * 100) / 100;
-                    console.warn(`[OutlookEngine] RAW SUSPECT CONFIRMED: rawPrice $${parsed.rawPrice} is ≥50% of PSA 10 $${psa10} → deriving raw: $${derivedRaw}`);
-                    correctedAvg = derivedRaw;
-                    correctedMin = Math.round(psa10 * 0.12 * 100) / 100;
-                    correctedMax = Math.round(psa10 * 0.3 * 100) / 100;
-                  } else {
-                    console.log(`[OutlookEngine] RAW CARD: rawPrice $${parsed.rawPrice} = avgPrice with 0 comps but no graded anchor to correct from — using as-is`);
-                    correctedAvg = parsed.rawPrice;
-                    correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
-                    correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
-                  }
-                } else {
-                  console.log(`[OutlookEngine] RAW CARD: Using Gemini rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg})`);
-                  correctedAvg = parsed.rawPrice;
-                  correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.7;
-                  correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
-                }
-              } else if (isLowPopStandalone || is1of1) {
-                // LOW-POP CARDS: Skip raw contamination corrections — price spread is legitimately wide
-                // for /25 and under. The "min" is almost certainly from a different parallel or wrong comp.
-                // Trust Gemini's avgPrice for these cards since manual triangulation is how they're priced.
-                if (parsed.rawPrice && parsed.rawPrice > 0) {
-                  console.log(`[OutlookEngine] LOW-POP RAW CARD (/${pn}): Using Gemini rawPrice $${parsed.rawPrice} — skipping contamination correction`);
-                  correctedAvg = parsed.rawPrice;
-                  correctedMin = parsed.rawMinPrice || parsed.rawPrice * 0.6;
-                  correctedMax = parsed.rawMaxPrice || parsed.rawPrice * 1.5;
-                } else {
-                  console.log(`[OutlookEngine] LOW-POP RAW CARD (/${pn}): Trusting Gemini avgPrice $${correctedAvg} — skipping contamination correction`);
-                }
-              } else {
-                if (psa9 && psa9 > 0 && correctedAvg >= psa9 * 0.6) {
-                  const derivedRaw = Math.round(psa9 * 0.4 * 100) / 100;
-                  console.warn(`[OutlookEngine] RAW CONTAMINATION DETECTED: avg $${correctedAvg} is ≥60% of psa9 $${psa9} → deriving raw from PSA 9: $${derivedRaw}`);
-                  correctedAvg = derivedRaw;
-                  correctedMin = Math.round(psa9 * 0.25 * 100) / 100;
-                  correctedMax = Math.round(psa9 * 0.55 * 100) / 100;
-                } else if (psa10 && psa10 > 0 && !psa9 && correctedAvg >= psa10 * 0.5) {
-                  const derivedRaw = Math.round(psa10 * 0.2 * 100) / 100;
-                  console.warn(`[OutlookEngine] RAW CONTAMINATION (PSA10 anchor): avg $${correctedAvg} is ≥50% of psa10 $${psa10} → deriving raw: $${derivedRaw}`);
-                  correctedAvg = derivedRaw;
-                  correctedMin = Math.round(psa10 * 0.12 * 100) / 100;
-                  correctedMax = Math.round(psa10 * 0.3 * 100) / 100;
-                } else if (!psa9 && !psa10 && correctedMin > 0 && correctedAvg > correctedMin * 2) {
-                  const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
-                  console.warn(`[OutlookEngine] RAW NO-ANCHOR CORRECTION: avg $${correctedAvg} is ${(correctedAvg / correctedMin).toFixed(1)}x min $${correctedMin} with no graded anchor — likely blended. Correcting to $${newAvg}`);
-                  correctedAvg = newAvg;
-                  correctedMax = Math.round(correctedMin * 2 * 100) / 100;
-                } else if (parsed.rawPrice && parsed.rawPrice > 0) {
-                  console.warn(`[OutlookEngine] RAW CARD: rawPrice $${parsed.rawPrice} looks contaminated (psa9 $${psa9}), using avgPrice $${correctedAvg} instead`);
-                }
-              }
+            // For raw cards, prefer rawPrice when Gemini provides it
+            if (isRaw && parsed.rawPrice && parsed.rawPrice > 0) {
+              console.log(`[OutlookEngine] GEMINI-DIRECT: Using rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg}). No corrections applied.`);
+              correctedAvg = parsed.rawPrice;
+              correctedMin = parsed.rawMinPrice || parsed.minPrice || correctedAvg;
+              correctedMax = parsed.rawMaxPrice || parsed.maxPrice || correctedAvg;
+            } else {
+              console.log(`[OutlookEngine] GEMINI-DIRECT: Using avgPrice $${correctedAvg}. No corrections applied.`);
             }
             
+            // GEMINI-DIRECT: Trust Gemini's graded prices, only fix obvious data errors (PSA 9/10 inversion)
             let finalPsa9 = parsePrice(parsed.psa9Price);
             let finalPsa10 = parsePrice(parsed.psa10Price);
 
             if (finalPsa9 && finalPsa10 && finalPsa9 > finalPsa10) {
               console.warn(`[OutlookEngine] GRADED PRICE INVERSION: PSA 9 ($${finalPsa9}) > PSA 10 ($${finalPsa10}) — swapping`);
               [finalPsa9, finalPsa10] = [finalPsa10, finalPsa9];
-            }
-
-            if (finalPsa9 && correctedAvg > 0 && finalPsa9 < correctedAvg * 0.8) {
-              console.warn(`[OutlookEngine] PSA 9 ($${finalPsa9}) suspiciously below raw ($${correctedAvg}) — adjusting to 1.5x raw`);
-              finalPsa9 = Math.round(correctedAvg * 1.5);
-            }
-            if (finalPsa10 && correctedAvg > 0 && finalPsa10 < correctedAvg) {
-              console.warn(`[OutlookEngine] PSA 10 ($${finalPsa10}) below raw ($${correctedAvg}) — adjusting to 2x raw`);
-              finalPsa10 = Math.round(correctedAvg * 2);
-            }
-
-            if (finalPsa9 && correctedAvg > 0 && finalPsa9 > correctedAvg * 5) {
-              console.warn(`[OutlookEngine] PSA 9 ($${finalPsa9}) unrealistically high vs raw ($${correctedAvg}) — capping at 3.5x`);
-              finalPsa9 = Math.round(correctedAvg * 3.5);
-            }
-            if (finalPsa10 && correctedAvg > 0 && finalPsa10 > correctedAvg * 8) {
-              console.warn(`[OutlookEngine] PSA 10 ($${finalPsa10}) unrealistically high vs raw ($${correctedAvg}) — capping at 6x`);
-              finalPsa10 = Math.round(correctedAvg * 6);
-            }
-
-            // LOW-POP PRICE VALIDATION: For /25 and under, do a second Gemini call
-            // without search grounding to validate the estimate using Gemini's built-in knowledge
-            if ((isLowPopStandalone || is1of1) && correctedAvg > 0) {
-              try {
-                const validationPrompt = `You are a sports card pricing expert. What is the current market value (raw/ungraded) of this card?
-
-Card: ${searchDescription}
-${is1of1 ? "This is a 1/1 — only 1 copy exists." : `This is numbered /${pn} — only ${pn} copies exist.`}
-
-My initial search found an average price of $${correctedAvg.toFixed(2)} with a range of $${correctedMin.toFixed?.(2) || correctedMin} - $${correctedMax.toFixed?.(2) || correctedMax}.
-
-Does this price seem accurate for this card's rarity and this player's market? Consider:
-- The player's star power and card demand
-- The print run (/${pn || 1}) and how rare that makes it
-- The product/set tier (premium vs budget)
-- Recent comparable sales you know about
-
-Return ONLY this JSON:
-{
-  "validatedPrice": <your best estimate for raw market value>,
-  "validatedMin": <low end of range>,
-  "validatedMax": <high end of range>,
-  "originalWasAccurate": true/false,
-  "reasoning": "brief explanation"
-}`;
-                
-                const validationResponse = await gemini.models.generateContent({
-                  model: "gemini-2.5-flash",
-                  contents: validationPrompt,
-                });
-                
-                let valText = validationResponse.text || "";
-                valText = valText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
-                const valMatch = valText.match(/\{[\s\S]*\}/);
-                if (valMatch) {
-                  const val = JSON.parse(valMatch[0]);
-                  if (val.validatedPrice && typeof val.validatedPrice === "number" && val.validatedPrice > 0) {
-                    const ratio = val.validatedPrice / correctedAvg;
-                    if (ratio > 2) {
-                      console.warn(`[OutlookEngine] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search result $${correctedAvg} (${ratio.toFixed(1)}x higher). Reason: ${val.reasoning}. Adopting validated price.`);
-                      correctedAvg = val.validatedPrice;
-                      correctedMin = val.validatedMin || val.validatedPrice * 0.6;
-                      correctedMax = val.validatedMax || val.validatedPrice * 1.5;
-                      if (finalPsa9 && finalPsa9 < correctedAvg) {
-                        finalPsa9 = Math.round(correctedAvg * 1.3);
-                      }
-                      if (finalPsa10 && finalPsa10 < correctedAvg) {
-                        finalPsa10 = Math.round(correctedAvg * 1.8);
-                      }
-                    } else if (ratio < 0.5) {
-                      console.log(`[OutlookEngine] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search $${correctedAvg} — search was HIGHER. Keeping search price (conservative).`);
-                    } else {
-                      console.log(`[OutlookEngine] LOW-POP VALIDATION: Gemini confirms ~$${val.validatedPrice} vs search $${correctedAvg} — prices aligned.`);
-                    }
-                  }
-                }
-              } catch (valErr: any) {
-                console.warn(`[OutlookEngine] LOW-POP VALIDATION failed (non-critical): ${valErr.message}`);
-              }
             }
 
             const marketData: GeminiMarketData = {
@@ -1246,21 +1106,17 @@ Report whatever comps you find from these broader searches.
 
 ZERO COMPS: If you STILL find NO completed sales after broadening searches, set soldCount to 0 and confidence to "LOW". However, you MUST STILL provide your best market estimate for avgPrice, rawPrice, minPrice, and maxPrice — NEVER return 0 or null for avgPrice. This is mandatory. Use this hierarchy:
 
-STEP 1 — ASSESS PLAYER DEMAND TIER (do this FIRST for zero-comp cards):
-Before estimating any price, figure out WHO this player is:
-- What round/pick were they drafted? (1st round = high demand, 4th+ round = low demand)
-- What position? (QB/WR/RB = high demand. TE/OL/K/P/DL/DB = low demand in card market)
-- Are they a starter, backup, or rotational player?
-- Popular franchise or rebuilding team?
-This determines the CEILING for your estimate. A late-round TE on a bad team does NOT have cards worth $50-100 in any non-auto parallel.
+STEP 1 — ACTIVE LISTINGS (PRIMARY for zero-comp cards): Search eBay for CURRENT active listings of this EXACT card. Active BIN prices from real sellers are the BEST available signal when no completed sales exist. If multiple sellers are listing the card at similar prices, that IS the market price — use the LOWEST active BIN as your avgPrice estimate. For brand-new releases where no completed sales exist yet, active listings ARE the market.
 
-STEP 2 — PLAYER'S OTHER SOLD CARDS: Search for the SAME player's recently sold cards in any product to understand their market tier (e.g. "${card.playerName || card.title} ${card.year || "2025"} ${card.sport || "football"} card sold eBay"). Apply a scarcity premium for the specific variation/numbering based on your market knowledge.
+STEP 2 — PLAYER'S OTHER SOLD CARDS: Search for the SAME player's recently sold cards in any product to understand their market tier (e.g. "${card.playerName || card.title} ${card.year || "2025"} ${card.sport || "football"} card sold eBay"). Use this to validate your active listing estimate. Apply a scarcity premium for the specific variation/numbering based on your market knowledge.
 
-STEP 3 — COMPARABLE PLAYERS: Search for COMPARABLE players at the same demand tier (same draft round, position, similar hype level) in similar products. Use their sold prices as comps.
+STEP 3 — PRICE LIKE A DEALER: If you were a card dealer, what would you price this card at TODAY? Consider: the player's hype and demand, the specific parallel/variation, the product/set tier, and similar cards you know about. Think like an expert card dealer, not a cautious algorithm.
 
-STEP 4 — ACTIVE LISTINGS (supplementary only): Search eBay for current active listings. Record the count in activeListing. BUT: active BIN prices are ASKING prices, NOT market value. Sellers routinely list cards at 2-5x what they actually sell for. Use active listings only as a CEILING reference, not as your estimate. If the only data you have is a $80 BIN listing, the card is likely worth $20-40 (50% or less of BIN).
+STEP 4 — COMPARABLE PLAYERS: Search for COMPARABLE players at the same demand tier in similar products. Use their sold prices as a cross-reference.
 
 NOTE: For low-demand players (late-round picks, non-skill positions, backups on bad teams), even /25 non-auto parallels typically sell for $5-$25. Do NOT inflate estimates just because a card is numbered — the player's actual demand matters more than scarcity alone.
+
+NEW RELEASE RULE: For products released within the LAST 30 DAYS, completed sales data will be very thin or nonexistent. For new releases, active listing prices from real sellers ARE the best pricing signal available. Do NOT apply aggressive discounts to active listing prices for new releases — sellers are pricing based on real-time market demand. Use the lower end of active listings as your estimate.
 
 Return ONLY a JSON object with this EXACT structure:
 {
@@ -1354,48 +1210,19 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
           const parsed = JSON.parse(jsonMatch[0]);
 
           if (parsed.market && typeof parsed.market.avgPrice === "number") {
+            // GEMINI-DIRECT: Trust Gemini's pricing with no corrections
             let correctedAvg = parsed.market.avgPrice || 0;
-            let correctedMin = parsed.market.minPrice || correctedAvg * 0.8;
-            let correctedMax = parsed.market.maxPrice || correctedAvg * 1.2;
+            let correctedMin = parsed.market.minPrice || correctedAvg;
+            let correctedMax = parsed.market.maxPrice || correctedAvg;
 
-            if (isRaw) {
-              const psa9 = parsePrice(parsed.market.psa9Price);
-              // Helper: is this price contaminated by graded sales?
-              const isPSA9Contaminated = (price: number) => psa9 && psa9 > 0 && price >= psa9 * 0.8;
-
-              if (parsed.market.rawPrice && parsed.market.rawPrice > 0 && !isPSA9Contaminated(parsed.market.rawPrice)) {
-                // Gemini provided explicit raw pricing and it passes the sanity check — use it
-                console.log(`[Unified Analysis] RAW CARD: Using rawPrice $${parsed.market.rawPrice} (overall avg was $${correctedAvg})`);
-                correctedAvg = parsed.market.rawPrice;
-                correctedMin = parsed.market.rawMinPrice || parsed.market.rawPrice * 0.7;
-                correctedMax = parsed.market.rawMaxPrice || parsed.market.rawPrice * 1.5;
-              } else if (isLowPop || is1of1) {
-                // LOW-POP CARDS: Skip raw contamination corrections — price spread is legitimately wide
-                // for /25 and under. Trust Gemini's price for these since they're triangulated.
-                if (parsed.market.rawPrice && parsed.market.rawPrice > 0) {
-                  console.log(`[Unified Analysis] LOW-POP RAW CARD (/${popNumber}): Using rawPrice $${parsed.market.rawPrice} — skipping contamination correction`);
-                  correctedAvg = parsed.market.rawPrice;
-                  correctedMin = parsed.market.rawMinPrice || parsed.market.rawPrice * 0.6;
-                  correctedMax = parsed.market.rawMaxPrice || parsed.market.rawPrice * 1.5;
-                } else {
-                  console.log(`[Unified Analysis] LOW-POP RAW CARD (/${popNumber}): Trusting avgPrice $${correctedAvg} — skipping contamination correction`);
-                }
-              } else {
-                const psa10 = parsePrice(parsed.market.psa10Price);
-                if (isPSA9Contaminated(correctedAvg)) {
-                  const newAvg = Math.round(correctedMin * 1.25 * 100) / 100;
-                  console.warn(`[Unified Analysis] RAW CONTAMINATION DETECTED: avg $${correctedAvg} is ≥80% of psa9 $${psa9} → using min-based raw estimate $${newAvg}`);
-                  correctedAvg = newAvg;
-                  correctedMax = Math.round(correctedMin * 1.8 * 100) / 100;
-                } else if (!psa9 && !psa10 && correctedMin > 0 && correctedAvg > correctedMin * 2) {
-                  const newAvg = Math.round(correctedMin * 1.3 * 100) / 100;
-                  console.warn(`[Unified Analysis] RAW NO-ANCHOR CORRECTION: avg $${correctedAvg} is ${(correctedAvg / correctedMin).toFixed(1)}x min $${correctedMin} with no graded anchor — likely blended. Correcting to $${newAvg}`);
-                  correctedAvg = newAvg;
-                  correctedMax = Math.round(correctedMin * 2 * 100) / 100;
-                } else if (parsed.market.rawPrice && parsed.market.rawPrice > 0) {
-                  console.warn(`[Unified Analysis] rawPrice $${parsed.market.rawPrice} looks contaminated (psa9 $${psa9}), using avgPrice $${correctedAvg} instead`);
-                }
-              }
+            // For raw cards, prefer rawPrice when Gemini provides it
+            if (isRaw && parsed.market.rawPrice && parsed.market.rawPrice > 0) {
+              console.log(`[Unified Analysis] GEMINI-DIRECT: Using rawPrice $${parsed.market.rawPrice} (overall avg was $${correctedAvg}). No corrections applied.`);
+              correctedAvg = parsed.market.rawPrice;
+              correctedMin = parsed.market.rawMinPrice || parsed.market.minPrice || correctedAvg;
+              correctedMax = parsed.market.rawMaxPrice || parsed.market.maxPrice || correctedAvg;
+            } else {
+              console.log(`[Unified Analysis] GEMINI-DIRECT: Using avgPrice $${correctedAvg}. No corrections applied.`);
             }
 
             const player = parsed.player || {};
@@ -1408,94 +1235,13 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
 
             const analysis = parsed.analysis || {};
 
+            // GEMINI-DIRECT: Trust Gemini's graded prices, only fix obvious data errors (PSA 9/10 inversion)
             let finalPsa9 = parsePrice(parsed.market.psa9Price);
             let finalPsa10 = parsePrice(parsed.market.psa10Price);
 
             if (finalPsa9 && finalPsa10 && finalPsa9 > finalPsa10) {
               console.warn(`[Unified Analysis] GRADED PRICE INVERSION: PSA 9 ($${finalPsa9}) > PSA 10 ($${finalPsa10}) — swapping`);
               [finalPsa9, finalPsa10] = [finalPsa10, finalPsa9];
-            }
-
-            if (finalPsa9 && correctedAvg > 0 && finalPsa9 < correctedAvg * 0.8) {
-              console.warn(`[Unified Analysis] PSA 9 ($${finalPsa9}) suspiciously below raw ($${correctedAvg}) — adjusting to 1.5x raw`);
-              finalPsa9 = Math.round(correctedAvg * 1.5);
-            }
-            if (finalPsa10 && correctedAvg > 0 && finalPsa10 < correctedAvg) {
-              console.warn(`[Unified Analysis] PSA 10 ($${finalPsa10}) below raw ($${correctedAvg}) — adjusting to 2x raw`);
-              finalPsa10 = Math.round(correctedAvg * 2);
-            }
-
-            if (finalPsa9 && correctedAvg > 0 && finalPsa9 > correctedAvg * 5) {
-              console.warn(`[Unified Analysis] PSA 9 ($${finalPsa9}) unrealistically high vs raw ($${correctedAvg}) — capping at 3.5x`);
-              finalPsa9 = Math.round(correctedAvg * 3.5);
-            }
-            if (finalPsa10 && correctedAvg > 0 && finalPsa10 > correctedAvg * 8) {
-              console.warn(`[Unified Analysis] PSA 10 ($${finalPsa10}) unrealistically high vs raw ($${correctedAvg}) — capping at 6x`);
-              finalPsa10 = Math.round(correctedAvg * 6);
-            }
-
-            // LOW-POP PRICE VALIDATION for unified pipeline
-            let lowPopWasValidated = false;
-            if ((isLowPop || is1of1) && correctedAvg > 0) {
-              try {
-                const validationPrompt = `You are a sports card pricing expert. What is the current market value (raw/ungraded) of this card?
-
-Card: ${searchDescription}
-${is1of1 ? "This is a 1/1 — only 1 copy exists." : `This is numbered /${popNumber} — only ${popNumber} copies exist.`}
-
-My initial search found an average price of $${correctedAvg.toFixed(2)} with a range of $${correctedMin.toFixed?.(2) || correctedMin} - $${correctedMax.toFixed?.(2) || correctedMax}.
-
-Does this price seem accurate for this card's rarity and this player's market? Consider:
-- The player's star power and card demand
-- The print run (/${popNumber || 1}) and how rare that makes it
-- The product/set tier (premium vs budget)
-- Recent comparable sales you know about
-
-Return ONLY this JSON:
-{
-  "validatedPrice": <your best estimate for raw market value>,
-  "validatedMin": <low end of range>,
-  "validatedMax": <high end of range>,
-  "originalWasAccurate": true/false,
-  "reasoning": "brief explanation"
-}`;
-                
-                const validationResponse = await gemini.models.generateContent({
-                  model: "gemini-2.5-flash",
-                  contents: validationPrompt,
-                });
-                
-                let valText = validationResponse.text || "";
-                valText = valText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
-                const valMatch = valText.match(/\{[\s\S]*\}/);
-                if (valMatch) {
-                  const val = JSON.parse(valMatch[0]);
-                  if (val.validatedPrice && typeof val.validatedPrice === "number" && val.validatedPrice > 0) {
-                    const ratio = val.validatedPrice / correctedAvg;
-                    if (ratio > 2) {
-                      console.warn(`[Unified Analysis] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search result $${correctedAvg} (${ratio.toFixed(1)}x higher). Reason: ${val.reasoning}. Adopting validated price.`);
-                      correctedAvg = val.validatedPrice;
-                      correctedMin = val.validatedMin || val.validatedPrice * 0.6;
-                      correctedMax = val.validatedMax || val.validatedPrice * 1.5;
-                      lowPopWasValidated = true;
-                      if (finalPsa9 && finalPsa9 < correctedAvg) {
-                        finalPsa9 = Math.round(correctedAvg * 1.3);
-                      }
-                      if (finalPsa10 && finalPsa10 < correctedAvg) {
-                        finalPsa10 = Math.round(correctedAvg * 1.8);
-                      }
-                    } else if (ratio < 0.5) {
-                      console.log(`[Unified Analysis] LOW-POP VALIDATION: Gemini says $${val.validatedPrice} vs search $${correctedAvg} — search was HIGHER. Keeping search price.`);
-                      lowPopWasValidated = true;
-                    } else {
-                      console.log(`[Unified Analysis] LOW-POP VALIDATION: Gemini confirms ~$${val.validatedPrice} vs search $${correctedAvg} — prices aligned.`);
-                      lowPopWasValidated = true;
-                    }
-                  }
-                }
-              } catch (valErr: any) {
-                console.warn(`[Unified Analysis] LOW-POP VALIDATION failed (non-critical): ${valErr.message}`);
-              }
             }
 
             const result: UnifiedCardAnalysis = {
@@ -1529,7 +1275,7 @@ Return ONLY this JSON:
                 detailedAnalysis: analysis.detailedAnalysis || "",
                 keyBullets: Array.isArray(analysis.keyBullets) ? analysis.keyBullets : (Array.isArray(analysis.verdictReasons) ? analysis.verdictReasons : []),
               },
-              lowPopValidated: lowPopWasValidated || undefined,
+              lowPopValidated: undefined,
               dataSource: "gemini_unified",
             };
 
