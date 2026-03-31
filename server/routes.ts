@@ -3823,8 +3823,8 @@ Sitemap: ${origin}/sitemap.xml
       // TIER 1: Gemini price — use directly, no modifications
       if (unifiedResult && unifiedResult.market.avgPrice > 0) {
         marketValue = unifiedResult.market.avgPrice;
-        priceMin = unifiedResult.market.minPrice || marketValue * 0.7;
-        priceMax = unifiedResult.market.maxPrice || marketValue * 1.5;
+        priceMin = unifiedResult.market.minPrice || null;
+        priceMax = unifiedResult.market.maxPrice || null;
         compCount = unifiedResult.market.soldCount || 0;
         pricingSource = "gemini";
 
@@ -3839,8 +3839,8 @@ Sitemap: ${origin}/sitemap.xml
       if (!marketValue || marketValue <= 0) {
         if (specCrossProduct && specCrossProduct.avgPrice > 0) {
           marketValue = specCrossProduct.avgPrice;
-          priceMin = specCrossProduct.minPrice || specCrossProduct.avgPrice * 0.7;
-          priceMax = specCrossProduct.maxPrice || specCrossProduct.avgPrice * 1.5;
+          priceMin = specCrossProduct.minPrice || null;
+          priceMax = specCrossProduct.maxPrice || null;
           pricingSource = "cross_product";
           console.log(`[Quick Analyze] FALLBACK (Tier 2): Cross-product $${marketValue} (range $${priceMin}-$${priceMax})`);
         }
@@ -4055,13 +4055,6 @@ Sitemap: ${origin}/sitemap.xml
 
             if (psa9 || psa10) {
               return { psa9, psa10 };
-            }
-
-            const isLowPop = variation && /\/([1-9]|1[0-5])(?:\s|$|[^0-9])/.test(variation);
-            if (isLowPop) {
-              const estPsa9 = Math.round(marketValue * 1.3);
-              const estPsa10 = Math.round(marketValue * 1.8);
-              return { psa9: estPsa9, psa10: estPsa10, estimated: true, lowPop: true };
             }
 
             const estPsa9 = Math.round(marketValue * 2);
