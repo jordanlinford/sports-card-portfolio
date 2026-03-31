@@ -9637,7 +9637,7 @@ Use these player tiers to inform which teams carry the most value — FRANCHISE_
       let recentAnalysisContext = "";
       try {
         const recentAnalyses = await db.execute(sql`
-          SELECT c.player_name, c.year, c.card_set, c.estimated_value, c.sport
+          SELECT c.player_name, c.year, c.set, c.estimated_value, c.sport
           FROM cards c
           WHERE LOWER(c.sport) = ${sportLower}
             AND c.estimated_value IS NOT NULL
@@ -9647,7 +9647,7 @@ Use these player tiers to inform which teams carry the most value — FRANCHISE_
         `);
         if (recentAnalyses.rows && recentAnalyses.rows.length > 0) {
           const cardLines = recentAnalyses.rows
-            .map((r: any) => `  ${r.player_name} - ${r.year || ""} ${r.card_set || ""}: $${Number(r.estimated_value).toFixed(0)}`)
+            .map((r: any) => `  ${r.player_name} - ${r.year || ""} ${r.set || ""}: $${Number(r.estimated_value).toFixed(0)}`)
             .join("\n");
           recentAnalysisContext = `
 INTERNAL CARD VALUE DATA (top valued ${sport} cards in our database):
@@ -9745,7 +9745,7 @@ Return ONLY valid JSON, no markdown.`;
         contents: prompt,
         config: {
           temperature: 0.3,
-          maxOutputTokens: 4096,
+          maxOutputTokens: 16384,
         },
       });
 
