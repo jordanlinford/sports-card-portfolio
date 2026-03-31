@@ -291,7 +291,7 @@ export async function fetchGeminiMarketData(card: {
   const isNumbered = card.variation ? /\/\d+/.test(card.variation) : false;
   const variationLowerStandalone = (card.variation || "").toLowerCase().trim();
   const setLowerStandalone = (card.set || "").toLowerCase();
-  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|mojo|downtown|uptown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
+  const sspPatternStandalone = /\b(zebra|tiger\s*stripe|color\s*blast|shock|shimmer|sparkle|glitter|mojo|downtown|uptown|kaboom|disco\s*ball|case\s*hit|ssp|gold\s*vinyl|black\s*gold|neon\s*green|scope|velocity|hyper|astral|galactic|lava|magma|snakeskin|marble|leopard|cheetah|camo|wave|ice|crystal|cracked\s*ice|lazer|laser|fast\s*break|choice|fotl|first\s*off\s*the\s*line|the\s*man|warp\s*speed|interstellar|eye\s*of\s*the\s*tiger|supernova|magician|phenomenon|street\s*art|art\s*deco|aurora|ascension|wood|silk|sapphire|platinum|vintage\s*stock|clear|superfractor)\b/i;
   const isPremiumUnnumberedStandalone = !isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
   const isPremiumNumberedStandalone = isNumbered && (sspPatternStandalone.test(variationLowerStandalone) || sspPatternStandalone.test(setLowerStandalone));
   const isOpticSetStandalone = /\boptic\b/i.test(card.set || "");
@@ -324,7 +324,7 @@ For common players and bench players, the Prizm paper base sells for under $5.`
       : card.variation && card.variation.toLowerCase() !== "base"
         ? (() => {
             const vl = (card.variation || "").toLowerCase();
-            const isNamedPremiumParallel = /\b(rare\s*gold|gold\s*refractor|atomic\s*refractor|x[- ]?fractor|red\s*refractor|black\s*refractor|blue\s*refractor|green\s*refractor|gold\s*chrome|blue\s*chrome|purple\s*chrome|refractor|gold|silver|ruby|emerald|sapphire|diamond|bronze|copper|platinum|red|blue|green|purple|orange|pink|black|white\s*sparkle|rainbow|tie[- ]?dye|camo|mosaic|peacock|nebula|pulsar|reactive|flash|fluorescent|speckle|holo|holographic|hyper|cosmic|electric|neon|wave|swirl|starburst|prizm|circles|concentric|checkerboard|variation|sp\b|short\s*print)\b/i.test(vl);
+            const isNamedPremiumParallel = /\b(rare\s*gold|gold\s*refractor|atomic\s*refractor|x[- ]?fractor|red\s*refractor|black\s*refractor|blue\s*refractor|green\s*refractor|gold\s*chrome|blue\s*chrome|purple\s*chrome|refractor|gold|silver|ruby|emerald|sapphire|diamond|bronze|copper|platinum|burgundy|red|blue|green|purple|orange|pink|black|white|chrome|sparkle|shimmer|glitter|speckle|holo|holographic|hyper|cosmic|electric|neon|rainbow|tie[- ]?dye|camo|mosaic|peacock|nebula|pulsar|reactive|flash|fluorescent|wave|swirl|starburst|prizm|circles|concentric|checkerboard|variation|sp\b|short\s*print)\b/i.test(vl);
             const isVintageInsert = /\b(finest|refractor|chrome|topps\s*chrome|stadium\s*club|metal\s*universe|ultra|flair|e[- ]?x|skybox|fleer|mainstays|sterling|uncommon|rare|masters|power\s*zone|franchise)\b/i.test(vl) || 
               (card.year && card.year <= 2005 && /\b(finest|refractor|chrome|stadium\s*club|metal|ultra|flair|e[- ]?x|skybox|fleer)\b/i.test(card.set || ""));
             if (isNamedPremiumParallel || isVintageInsert) {
@@ -1704,7 +1704,7 @@ export async function fetchCrossProductFallbackPrice(card: {
     else serialPremium = `This is a numbered parallel but highly numbered. Price similarly to a ${baseLabel}.`;
   }
 
-  const isNamedParallel = /\b(rare\s*gold|gold\s*refractor|atomic|refractor|chrome|gold|silver|ruby|emerald|sapphire|diamond|platinum|red|blue|green|purple|orange|pink|black|holo|holographic|hyper|prismatic|tie[- ]?dye|camo|mosaic|peacock|nebula|pulsar|wave|swirl|x[- ]?fractor)\b/i.test(variation);
+  const isNamedParallel = /\b(rare\s*gold|gold\s*refractor|atomic|refractor|chrome|gold|silver|ruby|emerald|sapphire|diamond|platinum|burgundy|red|blue|green|purple|orange|pink|black|white|sparkle|shimmer|glitter|holo|holographic|hyper|prismatic|tie[- ]?dye|camo|mosaic|peacock|nebula|pulsar|wave|swirl|x[- ]?fractor)\b/i.test(variation);
   const isVintage = year && parseInt(String(year)) <= 2005;
 
   const searchQueries = isAuto ? [
