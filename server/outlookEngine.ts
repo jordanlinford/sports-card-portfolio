@@ -513,6 +513,12 @@ PRICING RULES — RECENCY IS KING:
 - CRITICAL: For numbered cards, ONLY use comps with the SAME print run. A /50 Gold and a /399 Yellow Holo are DIFFERENT parallels at DIFFERENT price points — never mix them.
 - When in doubt: "What would this card sell for if I listed it on eBay today?" — that is your avgPrice
 
+COMP VALIDATION (CRITICAL — do this for EVERY comp you use):
+- Before using ANY search result as a comp, verify the listing title contains the EXACT variation name "${card.variation || "Base"}"
+- A "base" or "refractor" listing is NOT a comp for a "${card.variation || ""}" parallel — these are completely different cards at completely different price points
+- If you searched for "${card.variation || ""}" but the results show base cards, silver prizms, or other variations, those are NOT valid comps — discard them
+- Premium parallels (Burgundy Sparkle, Shimmer, Mojo, Color Blast, etc.) of star rookies often sell for 3-10x more than base cards — if your estimate seems close to base card prices, you are probably using wrong comps
+
 Also estimate the PSA grading supply trend for this card — is the graded population stable, growing, or surging?
 
 Return ONLY a JSON object with these exact fields:
@@ -1055,9 +1061,13 @@ Do ALL of the following in this single search:
 1. MARKET PRICING (MOST IMPORTANT — get this right):
    Search eBay completed/sold listings for this EXACT card. Run BOTH sub-searches:
 
-   1a. RAW/UNGRADED prices — ALWAYS include the specific variation in your search:
+   1a. RAW/UNGRADED prices — ALWAYS include the specific variation in your search. Try ALL of these searches:
    - "${unifiedSearchDescription} sold eBay"
-   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold eBay"${isOpticSet ? `
+   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold eBay"
+   - "${card.playerName || card.title} ${card.variation || ""} sold completed"
+   - "${card.playerName || card.title} ${card.variation || ""} eBay sold price"
+   - "ebay.com ${card.playerName || card.title} ${card.variation || ""} sold"
+   - Also try price tracking sites: "${card.playerName || card.title} ${card.year || ""} ${card.variation || ""} price" on sites like 130point.com, mavin.io, or pricecharting.com${isOpticSet ? `
    - OPTIC-SPECIFIC SEARCH (mandatory): "${card.playerName || card.title} ${card.year || ""} Optic ${card.variation || ""} sold eBay"
    - Also try: "Donruss Optic ${card.variation || ""} ${card.playerName || card.title} sold"
    - VERIFY every comp has "Optic" in the listing — base Donruss is a different, cheaper product` : ""}
@@ -1093,6 +1103,14 @@ PRICING RULES:
 - CRITICAL: Only price the EXACT card described. Different sets, years, and variations have VASTLY different values
 - CRITICAL: For numbered cards, ONLY use comps with the SAME print run. A /50 Gold and a /399 Yellow Holo are DIFFERENT parallels at DIFFERENT price points — never mix them
 - When in doubt, ask yourself: "If I searched eBay sold listings for this exact card right now, what would the typical recent sale price be?" — that is your avgPrice
+
+COMP VALIDATION (CRITICAL — do this for EVERY comp you use):
+- Before using ANY search result as a comp, verify the listing title contains the EXACT variation name "${card.variation || "Base"}"
+- A "base" or "refractor" listing is NOT a comp for a "${card.variation || ""}" parallel — these are completely different cards at completely different price points
+- If you searched for "${card.variation || ""}" but the results show base cards, silver prizms, or other variations, those are NOT valid comps — discard them
+- Burgundy Sparkle ≠ Base. Gold ≠ Silver. Mojo ≠ Refractor. Each parallel has its OWN market price
+- If your search returns 5 results but only 1 actually matches the correct variation, use ONLY that 1 result
+- Premium parallels (Burgundy Sparkle, Shimmer, Mojo, Color Blast, etc.) of star rookies often sell for 3-10x more than base cards — if your estimate seems close to base card prices, you are probably using wrong comps
 
 SEARCH BROADENING: If your first search finds 0 completed sales, try broader queries:
 - Drop ONLY generic descriptive words like "holo", "insert" from the search
