@@ -1023,18 +1023,31 @@ ${searchHints}
 ${specificityWarning}
 ${rawGradeWarning}
 
-SEARCH STRATEGY:
-1. Search eBay sold/completed listings for this EXACT card (player + year + set + variation + grade)
-2. Try queries like: "${card.title} ${card.year || ""} ${card.set || ""} ${variationStr} ${isRaw ? "raw" : gradeString} sold"
-3. Check 130point.com, PSA card facts, and card pricing sites for recent sales data
-4. For numbered parallels (/10, /25, /50): These are RARE and command premium prices — do not confuse with base cards
-5. CRITICAL: Only price the EXACT card described — different sets/years/variations of the same player have VASTLY different values
+SEARCH STRATEGY — Try ALL of these searches:
+1. "${card.title} ${card.year || ""} ${card.set || ""} ${variationStr} ${isRaw ? "raw" : gradeString} sold eBay"
+2. "${card.title} ${variationStr} sold completed"
+3. "${card.title} ${variationStr} eBay sold price"
+4. "ebay.com ${card.title} ${variationStr} sold"
+5. Also try price tracking sites: "${card.title} ${card.year || ""} ${variationStr} price" on 130point.com, mavin.io, or pricecharting.com
+6. For numbered parallels (/10, /25, /50): These are RARE and command premium prices — do not confuse with base cards
+7. CRITICAL: Only price the EXACT card described — different sets/years/variations of the same player have VASTLY different values
+
+COMP VALIDATION (CRITICAL — do this for EVERY comp you use):
+- Before using ANY search result as a comp, verify the listing title contains the EXACT variation name "${variationStr}"
+- A "base" or "refractor" listing is NOT a comp for a "${variationStr}" parallel — these are completely different cards at completely different price points
+- If you searched for "${variationStr}" but the results show base cards, silver prizms, or other variations, those are NOT valid comps — discard them
+- Premium parallels (Burgundy Sparkle, Shimmer, Mojo, Color Blast, etc.) of star rookies often sell for 3-10x more than base cards — if your estimate seems close to base card prices, you are probably using wrong comps
 
 PRICING RULES:
 - Report ACTUAL recent sold prices, not deflated estimates
 - If recent solds show a range (e.g., $400-$600), report the market midpoint ($500), not the low end
 - Lower-tier grading companies (BCCG, CGC) are worth less than PSA/BGS
 - ACCURACY matters more than caution. Users rely on these values for investment decisions.
+
+ZERO COMPS: If you find NO completed sales, set salesFound to 0 and confidence to "low". However, STILL provide your best market estimate — NEVER return null for estimatedValue. Use this approach:
+- Search eBay for CURRENT active listings of this EXACT card. Active BIN prices from real sellers are the BEST signal when no completed sales exist. If multiple sellers list at similar prices, that IS the market price — use the LOWEST active BIN as your estimate.
+- For brand-new releases (last 30 days), active listing prices ARE the market. Do NOT apply aggressive discounts to active listing prices for new releases.
+- If no active listings exist either, use the player's market tier + this card's scarcity to estimate from comparable sold cards.
 
 CRITICAL — PLAYER STATUS & PERFORMANCE MATTERS:
 - A numbered parallel of a BUST or underperforming player is worth FAR LESS than the same parallel of a star
@@ -1097,19 +1110,10 @@ You MUST return an estimatedValue if you find ANY price information.`;
               parsed.details = (parsed.details || "") + " [Warning: No direct sales found for this exact card. Estimate based on comparable cards — verify manually.]";
             }
             
-            // RAW CARD CORRECTION: Use raw-specific price when available
-            if (isRaw) {
-              if (parsed.rawPrice && parsed.rawPrice > 0) {
-                console.log(`[Price Lookup] RAW CARD: Using rawPrice $${parsed.rawPrice} (overall est was $${finalValue})`);
-                finalValue = parsed.rawPrice;
-              } else if (parsed.minPrice && parsed.minPrice > 0) {
-                const ratio = finalValue / parsed.minPrice;
-                if (ratio > 2) {
-                  const corrected = Math.round(parsed.minPrice * 1.3 * 100) / 100;
-                  console.warn(`[Price Lookup] RAW CORRECTION: est $${finalValue} is ${ratio.toFixed(1)}x min $${parsed.minPrice}. Using $${corrected}`);
-                  finalValue = corrected;
-                }
-              }
+            // GEMINI-DIRECT: For raw cards, prefer rawPrice when Gemini provides it
+            if (isRaw && parsed.rawPrice && parsed.rawPrice > 0) {
+              console.log(`[Price Lookup] GEMINI-DIRECT: Using rawPrice $${parsed.rawPrice} (overall est was $${finalValue}). No corrections applied.`);
+              finalValue = parsed.rawPrice;
             }
             
             return {
