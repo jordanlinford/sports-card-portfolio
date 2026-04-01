@@ -4729,8 +4729,7 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       if (history.hasAnySales === false) {
-        console.log(`[PriceHistory] Suppressing chart for ${playerName} — all data points have 0 sales (fabricated)`);
-        return res.status(404).json({ message: "No real sales data available for price history chart" });
+        console.log(`[PriceHistory] Serving estimated chart for ${playerName} — no confirmed sales data (confidence: LOW)`);
       }
 
       res.json(history);
