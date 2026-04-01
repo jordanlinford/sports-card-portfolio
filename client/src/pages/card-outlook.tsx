@@ -299,12 +299,27 @@ export default function CardOutlookPage() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
     },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to add card to display case.",
-        variant: "destructive",
-      });
+    onError: (error: Error) => {
+      const msg = error.message || "";
+      if (msg.includes("409") || msg.toLowerCase().includes("already")) {
+        toast({
+          title: "Already in this case",
+          description: "This card is already in the selected display case.",
+          variant: "destructive",
+        });
+      } else if (msg.includes("401") || msg.includes("403")) {
+        toast({
+          title: "Session expired",
+          description: "Please sign in again and retry.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add card to display case. Please try again.",
+          variant: "destructive",
+        });
+      }
     },
   });
 

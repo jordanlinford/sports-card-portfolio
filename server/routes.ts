@@ -1876,6 +1876,19 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
       }
 
+      const existingCards = await storage.getCards(displayCaseId);
+      const isDuplicate = existingCards.some(c => {
+        const titleMatch = c.title?.toLowerCase() === parsed.data.title?.toLowerCase();
+        const setMatch = (c.set || "").toLowerCase() === (parsed.data.set || "").toLowerCase();
+        const yearMatch = (c.year ?? null) === (parsed.data.year ?? null);
+        const gradeMatch = (c.grade || "").toLowerCase() === (parsed.data.grade || "").toLowerCase();
+        const variationMatch = (c.variation || "").toLowerCase() === (parsed.data.variation || "").toLowerCase();
+        return titleMatch && setMatch && yearMatch && gradeMatch && variationMatch;
+      });
+      if (isDuplicate) {
+        return res.status(409).json({ message: "This card is already in this display case." });
+      }
+
       const card = await storage.createCard(displayCaseId, parsed.data);
       
       logActivity("card_add", {
