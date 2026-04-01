@@ -8161,6 +8161,43 @@ RULES:
     }
   });
 
+  app.patch("/api/cards/:id/identity", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.id);
+      const userId = req.user.claims.sub;
+      const { variation, set: cardSet } = req.body;
+
+      if (isNaN(cardId)) {
+        return res.status(400).json({ message: "Invalid card ID" });
+      }
+
+      const card = await storage.getCard(cardId);
+      if (!card) {
+        return res.status(404).json({ message: "Card not found" });
+      }
+
+      const displayCase = await storage.getDisplayCase(card.displayCaseId);
+      if (!displayCase || displayCase.userId !== userId) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      const updates: Record<string, any> = {};
+      if (variation !== undefined) updates.variation = variation;
+      if (cardSet !== undefined) updates.set = cardSet;
+
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ message: "No fields to update" });
+      }
+
+      const updatedCard = await storage.updateCard(cardId, updates);
+      console.log(`[Card Identity] User ${userId} updated card ${cardId}: ${JSON.stringify(updates)}`);
+      res.json(updatedCard);
+    } catch (error) {
+      console.error("Error updating card identity:", error);
+      res.status(500).json({ message: "Failed to update card identity" });
+    }
+  });
+
   // Badge and Prestige routes
   app.get("/api/badges", async (req, res) => {
     try {

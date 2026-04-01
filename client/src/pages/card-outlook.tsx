@@ -31,6 +31,9 @@ import {
   Plus,
   Trophy,
   Eye,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import {
   LineChart,
@@ -43,7 +46,8 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -270,7 +274,23 @@ export default function CardOutlookPage() {
   const [showMatchSamplesModal, setShowMatchSamplesModal] = useState(false);
   const [selectedCaseId, setSelectedCaseId] = useState<string>("");
   const [reconciledPrice, setReconciledPrice] = useState<number | null>(null);
+  const [editingVariation, setEditingVariation] = useState(false);
+  const [variationDraft, setVariationDraft] = useState("");
   const { toast } = useToast();
+
+  const updateIdentityMutation = useMutation({
+    mutationFn: async (data: { variation?: string; set?: string }) => {
+      return await apiRequest("PATCH", `/api/cards/${cardId}/identity`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cards", cardId, "outlook"] });
+      setEditingVariation(false);
+      toast({ title: "Updated", description: "Card variation updated. Re-run analysis to get updated pricing." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update card variation.", variant: "destructive" });
+    },
+  });
 
   const { data: outlook, isLoading, error } = useQuery<OutlookData>({
     queryKey: ["/api/cards", cardId, "outlook-v2"],
@@ -531,6 +551,49 @@ export default function CardOutlookPage() {
                 <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mb-3">
                   {outlook.card.year && <span>{outlook.card.year}</span>}
                   {outlook.card.set && <span>{outlook.card.set}</span>}
+                  {outlook.card.variation && !editingVariation && (
+                    <span className="inline-flex items-center gap-1">
+                      {outlook.card.variation}
+                      {isAuthenticated && (
+                        <button
+                          onClick={() => { setVariationDraft(outlook.card.variation || ""); setEditingVariation(true); }}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          data-testid="button-edit-variation"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      )}
+                    </span>
+                  )}
+                  {editingVariation && (
+                    <span className="inline-flex items-center gap-1">
+                      <Input
+                        value={variationDraft}
+                        onChange={(e) => setVariationDraft(e.target.value)}
+                        className="h-6 text-xs w-40"
+                        data-testid="input-variation"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") updateIdentityMutation.mutate({ variation: variationDraft });
+                          if (e.key === "Escape") setEditingVariation(false);
+                        }}
+                      />
+                      <button
+                        onClick={() => updateIdentityMutation.mutate({ variation: variationDraft })}
+                        className="text-green-500 hover:text-green-600"
+                        data-testid="button-save-variation"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setEditingVariation(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                        data-testid="button-cancel-variation"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  )}
                   {outlook.card.grade && (
                     <Badge variant="outline" className="text-xs">{outlook.card.grade}</Badge>
                   )}

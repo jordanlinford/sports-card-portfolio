@@ -1330,33 +1330,6 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
               [finalPsa9, finalPsa10] = [finalPsa10, finalPsa9];
             }
 
-            const narrativeText = (analysis.detailedAnalysis || "") + " " + (analysis.shortSummary || "");
-            const narrativePriceMatch = narrativeText.match(/\$([0-9,]+)\s*[-–—to]+\s*\$([0-9,]+)/g);
-            if (narrativePriceMatch && needsTriangulation && correctedAvg > 0) {
-              const allRanges: Array<{low: number; high: number; mid: number}> = [];
-              for (const rangeStr of narrativePriceMatch) {
-                const nums = rangeStr.match(/\$([0-9,]+)/g);
-                if (nums && nums.length >= 2) {
-                  const low = parseFloat(nums[0].replace(/[$,]/g, ""));
-                  const high = parseFloat(nums[1].replace(/[$,]/g, ""));
-                  if (low > 0 && high > 0 && high >= low) {
-                    allRanges.push({ low, high, mid: (low + high) / 2 });
-                  }
-                }
-              }
-              if (allRanges.length > 0) {
-                const primaryRange = allRanges[0];
-                const narrativeMid = primaryRange.mid;
-                const ratio = correctedAvg / narrativeMid;
-                if (ratio > 1.8 || ratio < 0.55) {
-                  console.log(`[Unified Analysis] NARRATIVE OVERRIDE (1/1 or low-pop): Structured avgPrice $${correctedAvg} vs narrative range $${primaryRange.low}-$${primaryRange.high} (mid $${narrativeMid}). Ratio ${ratio.toFixed(2)}x — using narrative midpoint.`);
-                  correctedAvg = Math.round(narrativeMid);
-                  correctedMin = primaryRange.low;
-                  correctedMax = primaryRange.high;
-                }
-              }
-            }
-
             const result: UnifiedCardAnalysis = {
               market: {
                 soldCount: parsed.market.soldCount || 0,
