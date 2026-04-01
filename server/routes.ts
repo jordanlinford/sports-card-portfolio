@@ -2793,6 +2793,16 @@ Sitemap: ${origin}/sitemap.xml
         cardUpdate.estimatedValue = marketValue;
         cardUpdate.valueUpdatedAt = new Date();
       }
+      if (geminiMarketData?.correctedIdentity) {
+        if (geminiMarketData.correctedIdentity.variation) {
+          cardUpdate.variation = geminiMarketData.correctedIdentity.variation;
+          console.log(`[Outlook 2.0] Identity correction: variation "${card.variation}" → "${geminiMarketData.correctedIdentity.variation}"`);
+        }
+        if (geminiMarketData.correctedIdentity.set) {
+          cardUpdate.set = geminiMarketData.correctedIdentity.set;
+          console.log(`[Outlook 2.0] Identity correction: set "${card.set}" → "${geminiMarketData.correctedIdentity.set}"`);
+        }
+      }
       await storage.updateCard(cardId, cardUpdate);
 
       cardAnalysisJobs.set(jobKey, "complete");

@@ -753,6 +753,10 @@ export interface UnifiedCardAnalysis {
     estimatedPopulation?: number;
   };
   lowPopValidated?: boolean;
+  correctedIdentity?: {
+    variation?: string;
+    set?: string;
+  };
   dataSource: "gemini_unified";
 }
 
@@ -1173,6 +1177,11 @@ NOTE: For low-demand players (late-round picks, non-skill positions, backups on 
 
 NEW RELEASE RULE: For products released within the LAST 30 DAYS, completed sales data will be very thin or nonexistent. For new releases, active listing prices from real sellers ARE the best pricing signal available. Do NOT apply aggressive discounts to active listing prices for new releases — sellers are pricing based on real-time market demand. Use the lower end of active listings as your estimate.
 
+5. IDENTITY VERIFICATION: The card is stored as Variation: "${card.variation || "Base"}". As you search eBay and price this card, verify whether this variation name is CORRECT.
+   - If you determine the actual parallel/variation is DIFFERENT from "${card.variation || "Base"}" (e.g., stored as "Gold Vinyl 1/1" but it's actually a "Green Pulsar 1/1"), include a "correctedIdentity" field with the corrected variation.
+   - Common misidentifications: wrong parallel name (e.g., "Gold Vinyl" vs "Green Pulsar"), wrong insert name, wrong set name.
+   - ONLY include correctedIdentity if you are CONFIDENT the stored variation is wrong. If it looks correct, omit the field entirely.
+
 Return ONLY a JSON object with this EXACT structure:
 {
   "market": {
@@ -1209,6 +1218,9 @@ Return ONLY a JSON object with this EXACT structure:
     "supplyGrowth": "stable" | "growing" | "surging",
     "supplyNote": "<short explanation of supply trend, e.g. 'PSA 10 pop at 1,200 and climbing fast' or 'Low submission volume keeps supply tight'>",
     "estimatedPopulation": <estimated PSA population count for top grade, or null if unknown>
+  },
+  "correctedIdentity": {
+    "variation": "<corrected variation/parallel name — ONLY if stored variation is wrong, otherwise omit this entire object>"
   }
 }
 
@@ -1386,6 +1398,20 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
                 supplyNote: parsed.supply.supplyNote || "",
                 estimatedPopulation: typeof parsed.supply.estimatedPopulation === "number" ? parsed.supply.estimatedPopulation : undefined,
               };
+            }
+
+            if (parsed.correctedIdentity && typeof parsed.correctedIdentity === "object") {
+              const ci: any = {};
+              if (parsed.correctedIdentity.variation && typeof parsed.correctedIdentity.variation === "string" && parsed.correctedIdentity.variation.trim()) {
+                ci.variation = parsed.correctedIdentity.variation.trim();
+              }
+              if (parsed.correctedIdentity.set && typeof parsed.correctedIdentity.set === "string" && parsed.correctedIdentity.set.trim()) {
+                ci.set = parsed.correctedIdentity.set.trim();
+              }
+              if (Object.keys(ci).length > 0) {
+                result.correctedIdentity = ci;
+                console.log(`[Unified Analysis] Identity correction detected for "${card.title}": stored="${card.variation}" → corrected="${ci.variation || "(unchanged)"}"`);
+              }
             }
 
             unifiedAnalysisCache.set(cacheKey, { data: result, cachedAt: Date.now() });
