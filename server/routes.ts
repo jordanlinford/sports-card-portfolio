@@ -4397,9 +4397,10 @@ Sitemap: ${origin}/sitemap.xml
         confident: !!ci.setName && ci.setName !== "Unknown",
         reason: (!ci.setName || ci.setName === "Unknown") ? "Set name could not be determined" : undefined,
       };
+      const variationIsBase = !ci.variation || ci.variation === "Base";
       fieldConfidence.variation = {
-        confident: !!ci.variation && ci.variation !== "Base" && overallConf === "high",
-        reason: !ci.variation ? "Parallel/variation not identified — may be base" : (overallConf !== "high" ? "Variation identified but with lower confidence" : undefined),
+        confident: variationIsBase ? (overallConf !== "low") : (overallConf === "high"),
+        reason: !ci.variation ? "Parallel/variation not identified — may be base" : (ci.variation === "Base" && overallConf === "low") ? "Base identification with low confidence — check if this has a parallel" : (overallConf !== "high" ? "Variation identified but with lower confidence" : undefined),
       };
       fieldConfidence.cardNumber = {
         confident: !!ci.cardNumber,

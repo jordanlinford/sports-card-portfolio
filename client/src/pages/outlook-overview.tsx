@@ -1212,7 +1212,6 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         if (scanData.scan?.success) {
           const card = scanData.scan.cardIdentification;
           const gradeInfo = scanData.scan.gradeEstimate;
-          const hasUncertain = scanData.uncertainFields && scanData.uncertainFields.length > 0;
           setBatchScannedCards(prev => prev.map((c, idx) => idx === i ? {
             ...c,
             playerName: card.playerName || "Unknown",
@@ -1872,7 +1871,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                         id={id}
                         value={value}
                         onChange={(e) => handleFieldChange(stateField, e.target.value)}
-                        className={isUncertain ? "border-amber-500/50 bg-amber-500/5" : ""}
+                        className={isUncertain ? "border-amber-500/50 bg-amber-500/5" : fc?.confident ? "opacity-70" : ""}
                         placeholder={isUncertain ? (fc?.reason || "Needs your input") : undefined}
                         data-testid={testId}
                       />
