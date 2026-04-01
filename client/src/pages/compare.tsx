@@ -192,6 +192,29 @@ const GRADE_SCORES: Record<string, number> = {
   "raw": 30,
 };
 
+const RISK_SCORES: Record<string, number> = { LOW: 20, MEDIUM: 10, HIGH: -5 };
+const VOLATILITY_SCORES: Record<string, number> = { LOW: 15, MEDIUM: 5, HIGH: -10 };
+const CONFIDENCE_SCORES: Record<string, number> = { HIGH: 15, MEDIUM: 5, MID: 5, LOW: -5 };
+
+function getMarketSignalBonus(outlook: PlayerOutlookResponse): number {
+  let bonus = 0;
+  const snap = outlook.snapshot;
+  const ms = outlook.marketSignals;
+
+  if (ms?.composite) bonus += (ms.composite - 50) * 0.3;
+  if (ms?.confidenceScore) bonus += (ms.confidenceScore - 50) * 0.15;
+  if (ms?.demandScore) bonus += (ms.demandScore - 50) * 0.1;
+
+  const risk = String(snap?.risk || "").toUpperCase();
+  bonus += RISK_SCORES[risk] ?? 0;
+  const vol = String(snap?.volatility || "").toUpperCase();
+  bonus += VOLATILITY_SCORES[vol] ?? 0;
+  const conf = String(snap?.confidence || outlook.investmentCall?.confidence || "").toUpperCase();
+  bonus += CONFIDENCE_SCORES[conf] ?? 0;
+
+  return bonus;
+}
+
 function comparePlayers(player1: PlayerOutlookResponse | null, player2: PlayerOutlookResponse | null): {
   betterPlayer: "left" | "right" | "equal" | null;
   reason: string;
@@ -204,17 +227,16 @@ function comparePlayers(player1: PlayerOutlookResponse | null, player2: PlayerOu
   const temp1 = player1.snapshot?.temperature;
   const temp2 = player2.snapshot?.temperature;
   
-  // Calculate composite score: verdict (85%) + momentum/temperature (15%)
-  // Verdict scores: 5-100, Temperature bonus: 0-20 (scaled to ~15% impact)
   const verdictScore1 = getVerdictScore(verdict1);
   const verdictScore2 = getVerdictScore(verdict2);
-  const tempBonus1 = getTemperatureScore(temp1) * 0.75; // Scale ±20 to ±15 (max 15% of 100)
-  const tempBonus2 = getTemperatureScore(temp2) * 0.75;
+  const tempBonus1 = getTemperatureScore(temp1) * 0.5;
+  const tempBonus2 = getTemperatureScore(temp2) * 0.5;
+  const signalBonus1 = getMarketSignalBonus(player1);
+  const signalBonus2 = getMarketSignalBonus(player2);
   
-  const compositeScore1 = verdictScore1 + tempBonus1;
-  const compositeScore2 = verdictScore2 + tempBonus2;
+  const compositeScore1 = verdictScore1 + tempBonus1 + signalBonus1;
+  const compositeScore2 = verdictScore2 + tempBonus2 + signalBonus2;
   
-  // Determine investment type for context
   const getInvestmentType = (verdict?: string, temp?: string): string => {
     if (verdict === "TRADE_THE_HYPE" || temp === "HOT") return "Momentum Play";
     if (verdict === "ACCUMULATE" || verdict === "SPECULATIVE_SUPPRESSED") return "Value Play";
@@ -227,51 +249,72 @@ function comparePlayers(player1: PlayerOutlookResponse | null, player2: PlayerOu
   const type1 = getInvestmentType(verdict1, temp1);
   const type2 = getInvestmentType(verdict2, temp2);
   
-  // Generate contextual reason
   const generateReason = (winner: PlayerOutlookResponse, loser: PlayerOutlookResponse, winnerType: string): string => {
     const winnerName = winner.player?.name;
     const loserName = loser.player?.name;
     const winnerVerdict = winner.investmentCall?.verdict;
     const loserVerdict = loser.investmentCall?.verdict;
+    const winnerSnap = winner.snapshot;
+    const loserSnap = loser.snapshot;
     
-    // Hot momentum vs uncertain role
     if (winnerVerdict === "TRADE_THE_HYPE" && loserVerdict === "HOLD_ROLE_RISK") {
       return `${winnerName} has proven momentum and market demand, while ${loserName}'s role remains uncertain`;
     }
-    // Hot momentum vs speculative
     if (winnerVerdict === "TRADE_THE_HYPE" && loserVerdict?.includes("SPECULATIVE")) {
       return `${winnerName} has established value at current highs, while ${loserName} is still speculative`;
     }
-    // Value play wins
+
+    if (winnerVerdict === loserVerdict) {
+      const winnerRisk = String(winnerSnap?.risk || "").toUpperCase();
+      const loserRisk = String(loserSnap?.risk || "").toUpperCase();
+      const winnerVol = String(winnerSnap?.volatility || "").toUpperCase();
+      const loserVol = String(loserSnap?.volatility || "").toUpperCase();
+      
+      if ((RISK_SCORES[winnerRisk] ?? 0) > (RISK_SCORES[loserRisk] ?? 0)) {
+        return `${winnerName} carries lower risk with a more stable market profile`;
+      }
+      if ((VOLATILITY_SCORES[winnerVol] ?? 0) > (VOLATILITY_SCORES[loserVol] ?? 0)) {
+        return `${winnerName} has lower volatility, making it a safer investment`;
+      }
+      const winnerMs = winner.marketSignals;
+      const loserMs = loser.marketSignals;
+      if (winnerMs?.composite && loserMs?.composite && winnerMs.composite > loserMs.composite) {
+        return `${winnerName} has a stronger overall market score (${Math.round(winnerMs.composite)} vs ${Math.round(loserMs.composite)})`;
+      }
+      return `${winnerName} has better market fundamentals overall`;
+    }
+
     if (winnerType === "Value Play") {
       return `${winnerName} offers better value entry point with stronger fundamentals`;
     }
-    // Momentum play wins
     if (winnerType === "Momentum Play") {
       return `${winnerName} has stronger market momentum and proven demand`;
     }
-    // Default
     return `${winnerName} has a stronger investment outlook`;
   };
   
-  if (compositeScore1 > compositeScore2) {
+  const CLOSE_THRESHOLD = 3;
+  const diff = compositeScore1 - compositeScore2;
+  
+  if (Math.abs(diff) < CLOSE_THRESHOLD) {
+    return { 
+      betterPlayer: "equal", 
+      reason: "Both players have similar investment outlooks — consider other factors like personal portfolio fit",
+      investmentType: { left: type1, right: type2 }
+    };
+  } else if (diff > 0) {
     return { 
       betterPlayer: "left", 
       reason: generateReason(player1, player2, type1),
       investmentType: { left: type1, right: type2 }
     };
-  } else if (compositeScore2 > compositeScore1) {
+  } else {
     return { 
       betterPlayer: "right", 
       reason: generateReason(player2, player1, type2),
       investmentType: { left: type1, right: type2 }
     };
   }
-  return { 
-    betterPlayer: "equal", 
-    reason: "Both players have similar investment outlooks",
-    investmentType: { left: type1, right: type2 }
-  };
 }
 
 interface ComparisonPlayer {
