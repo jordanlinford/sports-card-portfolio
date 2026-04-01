@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Heart, DollarSign, Eye, LayoutGrid, Trophy } from "lucide-react";
+import { Heart, DollarSign, Eye, LayoutGrid, Trophy, TrendingUp } from "lucide-react";
 
 type LeaderboardEntry = {
   id: number;
@@ -18,11 +18,13 @@ type LeaderboardEntry = {
 type LikeEntry = LeaderboardEntry & { likeCount: number };
 type ValueEntry = LeaderboardEntry & { totalValue: number };
 type ViewEntry = LeaderboardEntry & { viewCount: number };
+type PoundForPoundEntry = LeaderboardEntry & { avgValue: number; bestCardName: string | null };
 
 type LeaderboardsData = {
   topLikes: LikeEntry[];
   topValue: ValueEntry[];
   mostViewed: ViewEntry[];
+  poundForPound: PoundForPoundEntry[];
 };
 
 function getRankStyle(rank: number) {
@@ -63,14 +65,18 @@ function LeaderboardSection({
   iconColor,
   entries,
   renderMetric,
+  renderSubtext,
   testIdPrefix,
+  emptyMessage,
 }: {
   title: string;
   icon: typeof Heart;
   iconColor: string;
   entries: LeaderboardEntry[];
   renderMetric: (entry: any) => string;
+  renderSubtext?: (entry: any) => string | null;
   testIdPrefix: string;
+  emptyMessage?: string;
 }) {
   if (entries.length === 0) {
     return (
@@ -85,7 +91,7 @@ function LeaderboardSection({
               <LayoutGrid className="h-6 w-6 text-muted-foreground" />
             </div>
             <p className="text-sm text-muted-foreground" data-testid={`text-empty-${testIdPrefix}`}>
-              No public display cases yet
+              {emptyMessage || "No public display cases yet"}
             </p>
           </div>
         </CardContent>
@@ -137,9 +143,16 @@ function LeaderboardSection({
                   <Badge variant="secondary" className="text-xs no-default-hover-elevate" data-testid={`badge-cards-${testIdPrefix}-${entry.id}`}>
                     {entry.cardCount} cards
                   </Badge>
-                  <span className="text-sm font-semibold min-w-[3rem] text-right" data-testid={`text-metric-${testIdPrefix}-${entry.id}`}>
-                    {renderMetric(entry)}
-                  </span>
+                  <div className="text-right min-w-[3rem]">
+                    <span className="text-sm font-semibold block" data-testid={`text-metric-${testIdPrefix}-${entry.id}`}>
+                      {renderMetric(entry)}
+                    </span>
+                    {renderSubtext && renderSubtext(entry) && (
+                      <span className="text-[10px] text-muted-foreground block truncate max-w-[8rem]" data-testid={`text-subtext-${testIdPrefix}-${entry.id}`}>
+                        {renderSubtext(entry)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             </Link>
@@ -189,13 +202,14 @@ export default function Leaderboards() {
             <h1 className="text-3xl font-bold" data-testid="text-leaderboards-title">Leaderboards</h1>
           </div>
           <p className="text-muted-foreground" data-testid="text-leaderboards-description">
-            Top display cases ranked by likes, value, and views
+            Top display cases ranked by likes, value, views, and quality
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {isLoading ? (
             <>
+              <LeaderboardSkeleton />
               <LeaderboardSkeleton />
               <LeaderboardSkeleton />
               <LeaderboardSkeleton />
@@ -225,6 +239,16 @@ export default function Leaderboards() {
                 entries={data?.mostViewed || []}
                 renderMetric={(e: any) => formatCount(e.viewCount)}
                 testIdPrefix="views"
+              />
+              <LeaderboardSection
+                title="Pound for Pound"
+                icon={TrendingUp}
+                iconColor="text-purple-500"
+                entries={data?.poundForPound || []}
+                renderMetric={(e: PoundForPoundEntry) => `${formatDollarValue(e.avgValue)}/card`}
+                renderSubtext={(e: PoundForPoundEntry) => e.bestCardName ? `Best: ${e.bestCardName}` : null}
+                testIdPrefix="p4p"
+                emptyMessage="Not enough cases with 5+ valued cards yet"
               />
             </>
           )}

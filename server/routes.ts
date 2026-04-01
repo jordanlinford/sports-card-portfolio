@@ -1055,12 +1055,13 @@ Sitemap: ${origin}/sitemap.xml
 
   app.get("/api/leaderboards", async (req, res) => {
     try {
-      const [topLikes, topValue, mostViewed] = await Promise.all([
+      const [topLikes, topValue, mostViewed, poundForPound] = await Promise.all([
         storage.getTopLikedDisplayCases(5),
         storage.getTopValueDisplayCases(5),
         storage.getMostViewedDisplayCases(5),
+        storage.getPoundForPoundDisplayCases(5, 5),
       ]);
-      res.json({ topLikes, topValue, mostViewed });
+      res.json({ topLikes, topValue, mostViewed, poundForPound });
     } catch (error) {
       console.error("Error fetching leaderboards:", error);
       res.status(500).json({ message: "Failed to fetch leaderboards" });

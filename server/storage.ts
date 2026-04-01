@@ -224,6 +224,7 @@ export interface IStorage {
   getTopLikedDisplayCases(limit?: number): Promise<{ id: number; name: string; ownerName: string; ownerImage: string | null; likeCount: number; cardCount: number; theme: string }[]>;
   getTopValueDisplayCases(limit?: number): Promise<{ id: number; name: string; ownerName: string; ownerImage: string | null; totalValue: number; cardCount: number; theme: string }[]>;
   getMostViewedDisplayCases(limit?: number): Promise<{ id: number; name: string; ownerName: string; ownerImage: string | null; viewCount: number; cardCount: number; theme: string }[]>;
+  getPoundForPoundDisplayCases(limit?: number, minCards?: number): Promise<{ id: number; name: string; ownerName: string; ownerImage: string | null; avgValue: number; cardCount: number; theme: string; bestCardName: string | null }[]>;
 
   // Admin operations
   getAllUsers(): Promise<User[]>;
@@ -1535,6 +1536,49 @@ export class DatabaseStorage implements IStorage {
       if (cardCount === 0) return null;
       const ownerName = owner?.handle ? `@${owner.handle}` : owner ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous" : "Anonymous";
       return { id: r.id, name: r.name, ownerName, ownerImage: owner?.profileImageUrl || null, viewCount: r.viewCount, cardCount, theme: r.theme || "classic" };
+    }));
+
+    return enriched.filter((e): e is NonNullable<typeof e> => e !== null).slice(0, limit);
+  }
+
+  async getPoundForPoundDisplayCases(limit: number = 5, minCards: number = 5): Promise<{ id: number; name: string; ownerName: string; ownerImage: string | null; avgValue: number; cardCount: number; theme: string; bestCardName: string | null }[]> {
+    const results = await db
+      .select({
+        id: displayCases.id,
+        name: displayCases.name,
+        theme: displayCases.theme,
+        userId: displayCases.userId,
+        avgValue: sql<number>`avg(coalesce(${cards.estimatedValue}, ${cards.purchasePrice}))::numeric`,
+        cardCount: sql<number>`count(${cards.id})::int`,
+        valuedCardCount: sql<number>`count(case when ${cards.estimatedValue} is not null or ${cards.purchasePrice} is not null then 1 end)::int`,
+      })
+      .from(displayCases)
+      .innerJoin(cards, eq(cards.displayCaseId, displayCases.id))
+      .where(eq(displayCases.isPublic, true))
+      .groupBy(displayCases.id)
+      .having(sql`count(case when ${cards.estimatedValue} is not null or ${cards.purchasePrice} is not null then 1 end) >= ${minCards}`)
+      .orderBy(sql`avg(coalesce(${cards.estimatedValue}, ${cards.purchasePrice})) DESC`)
+      .limit(limit * 2);
+
+    const enriched = await Promise.all(results.map(async (r) => {
+      const [owner] = await db.select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl }).from(users).where(eq(users.id, r.userId));
+      const [bestCard] = await db
+        .select({ title: cards.title })
+        .from(cards)
+        .where(eq(cards.displayCaseId, r.id))
+        .orderBy(sql`coalesce(${cards.estimatedValue}, ${cards.purchasePrice}) DESC NULLS LAST`)
+        .limit(1);
+      const ownerName = owner?.handle ? `@${owner.handle}` : owner ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous" : "Anonymous";
+      return {
+        id: r.id,
+        name: r.name,
+        ownerName,
+        ownerImage: owner?.profileImageUrl || null,
+        avgValue: Math.round(Number(r.avgValue) * 100) / 100,
+        cardCount: r.cardCount,
+        theme: r.theme || "classic",
+        bestCardName: bestCard?.title || null,
+      };
     }));
 
     return enriched.filter((e): e is NonNullable<typeof e> => e !== null).slice(0, limit);
