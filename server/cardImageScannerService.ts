@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import * as ebayComps from "./ebayCompsService";
 import { fetchGeminiMarketData } from "./outlookEngine";
-import { getPlayerDemandContext, buildDemandAdjustedMultiplierPrompt, applyCeilingCheck } from "./demandTierEngine";
+import { getPlayerDemandContext, applyCeilingCheck } from "./demandTierEngine";
 import type { EbayComp } from "@shared/schema";
 
 const gemini = new GoogleGenAI({
@@ -637,7 +637,6 @@ export async function scanCardWithPricing(
   const scanVariation = scan.cardIdentification.variation || scan.cardIdentification.parallel;
   const scanIsLowPop = scanVariation ? /\/\s*\d{1,2}\b/.test(scanVariation) : false;
   let scanDemandContext: Awaited<ReturnType<typeof getPlayerDemandContext>> | null = null;
-  let scanDemandTierPrompt: string | undefined;
   if (scanIsLowPop && scan.cardIdentification.playerName) {
     try {
       scanDemandContext = await getPlayerDemandContext(
@@ -652,7 +651,6 @@ export async function scanCardWithPricing(
         }
       );
       if (scanDemandContext) {
-        scanDemandTierPrompt = buildDemandAdjustedMultiplierPrompt(scanDemandContext);
         console.log(`[CardScanner] Demand tier: ${scanDemandContext.tierLabel} (Tier ${scanDemandContext.tier})`);
       }
     } catch (tierErr) {
@@ -669,7 +667,7 @@ export async function scanCardWithPricing(
       variation: scanVariation,
       grade: scan.gradeEstimate.grade,
       grader: scan.gradeEstimate.gradingCompany,
-    }, scanDemandTierPrompt ? { demandTierPrompt: scanDemandTierPrompt } : undefined);
+    });
     
     if (geminiData && geminiData.avgPrice > 0) {
       console.log(`[CardScanner] Gemini found ${geminiData.soldCount} sales, avg $${geminiData.avgPrice}`);

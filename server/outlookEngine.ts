@@ -1012,10 +1012,7 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
   const playerSearch = card.playerName || card.title;
   const yearStr = card.year || "";
   const setStr = card.set || "";
-  const unifiedDemandTierPrompt = options?.demandTierPrompt || (needsTriangulation ? `\nDEMAND CONTEXT: No player demand data available. Use conservative multipliers:
-- Apply moderate scarcity multipliers (1.5-2.5x base value) unless this player is a proven elite name
-- If the player has minimal market presence, cap multiplier at 1.5x
-- When in doubt, price LOWER — it is better to undervalue than overvalue with no demand signal.` : "");
+  const unifiedDemandTierPrompt = "";
 
   function buildTriangulationInstructions(): string {
     if (!needsTriangulation) return "";
@@ -1053,16 +1050,21 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
     }
 
     if (is1of1 || isLowPop) {
-      const demandPrompt = unifiedDemandTierPrompt || "";
       return `\nLOW-POP CARD (${is1of1 ? "1/1 — only 1 exists" : `/${popNumber} — only ${popNumber} copies exist`}):
-Direct sales of this exact card are rare. Search in this order and use your market knowledge to value it:
+Search for this card's actual market value. Trust what the market says — do NOT inflate prices with multiplier math.
 
 1. Search for this exact card: "${playerSearch} ${yearStr} ${setStr} ${is1of1 ? "1/1" : `/${popNumber}`} sold eBay"
-2. Search for this player's market: "${playerSearch} sold eBay" — understand what this player's cards typically command
-3. Search for higher-numbered parallels of THIS SAME PLAYER from the same set:
+2. Search for this player's overall market: "${playerSearch} ${yearStr} sold eBay"
+3. If no exact sales found, check nearby parallels for context:
 ${verticalSearches.join("\n")}
-4. If still no data: "${playerSearch} ${yearStr} sold eBay" for any recent sales of this player
-${demandPrompt}`;
+
+CRITICAL PRICING RULES FOR LOW-POP CARDS:
+- If you find an actual sold listing for this exact card, USE THAT PRICE. Do not adjust it.
+- If no exact sales exist, estimate based on what this PLAYER'S cards actually sell for — not abstract multiplier math.
+- A 1/1 of a low-demand player is NOT automatically worth thousands. Many 1/1 cards sell for $20-$200.
+- Scarcity only creates value when there are buyers competing. For most players, 1/1 premiums are modest (2-5x the base parallel).
+- NEVER chain multipliers up from base (e.g., "base is $5, /99 is $10, /49 is $20, /25 is $40, /10 is $100, 1/1 is $300"). This creates fantasy prices.
+- Your estimate should reflect what a REAL buyer would actually pay on eBay TODAY.`;
     }
 
     return `\nNUMBERED CARD FALLBACK (/${popNumber} — ${popNumber} copies exist):
@@ -1246,11 +1248,13 @@ GRADED PRICE PRIORITY RULES:
 If player is injured or lost starting role, reflect this in momentum and verdict.
 Be specific with numbers — if you find 19 sold listings, say 19.
 ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
-- avgPrice MUST be your best triangulated estimate, even with 0 direct comps
-- Do NOT default to null/0 — use parallel comp multipliers to estimate
-- In notes, explain your triangulation: which parallel comps you found, what multiplier you applied
-- Confidence should be "LOW" if based entirely on multipliers, "MEDIUM" if you found nearby parallel sales
-- The analysis and verdict should still be given based on the estimated value — treat the triangulated price as real for investment analysis` : ""}`;
+- avgPrice MUST be your best estimate of what this card would actually sell for on eBay today
+- Do NOT default to null/0 — provide your best estimate based on market knowledge
+- If you find actual sold listings for this exact card, use those prices directly
+- If no exact sales exist, estimate conservatively based on what this player's cards actually sell for
+- Do NOT chain multipliers up from base price — this creates artificially inflated estimates
+- Many 1/1 cards sell for $20-$200 depending on the player. Only elite players command $1,000+ for 1/1 cards.
+- Confidence should be "LOW" if based on estimates, "MEDIUM" if you found actual sales` : ""}`;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {

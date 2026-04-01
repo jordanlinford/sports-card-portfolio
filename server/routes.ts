@@ -3633,7 +3633,7 @@ Sitemap: ${origin}/sitemap.xml
       );
       const effectivePlayerName = reqPlayerName || title;
       
-      const { getPlayerDemandContext, buildDemandAdjustedMultiplierPrompt } = await import("./demandTierEngine");
+      const { getPlayerDemandContext } = await import("./demandTierEngine");
       const qaVariationForTier = variation || "";
       const qaIsNumberedForTier = /\/\d+/.test(qaVariationForTier);
       const qaPopMatchForTier = qaVariationForTier.match(/\/\s*(\d+)/);
@@ -3641,7 +3641,6 @@ Sitemap: ${origin}/sitemap.xml
       const qaNeedsTriangulationForTier = qaPopNumForTier !== null && qaPopNumForTier <= 49;
       
       let demandContext: Awaited<ReturnType<typeof getPlayerDemandContext>> | null = null;
-      let demandTierPrompt = "";
       if (qaNeedsTriangulationForTier || /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(qaVariationForTier)) {
         const tierSport = detectedSport || sport || "football";
         const demandHints = {
@@ -3652,7 +3651,6 @@ Sitemap: ${origin}/sitemap.xml
           marketDesirability: marketDesirability || undefined,
         };
         demandContext = await getPlayerDemandContext(effectivePlayerName, tierSport, demandHints);
-        demandTierPrompt = buildDemandAdjustedMultiplierPrompt(demandContext);
         console.log(`[Quick Analyze] Demand tier: ${demandContext.tier} (${demandContext.tierLabel}) for ${effectivePlayerName} in ${tierSport}, demand=${demandContext.demandScore}, percentile=${demandContext.percentileInSport}`);
       }
       
@@ -3665,7 +3663,7 @@ Sitemap: ${origin}/sitemap.xml
           variation: variation || undefined,
           grade: grade || undefined,
           grader: grader || undefined,
-        }, demandTierPrompt ? { demandTierPrompt } : undefined),
+        }),
         lookupEnhancedCardPrice({
           title,
           set: set || undefined,
@@ -3750,7 +3748,7 @@ Sitemap: ${origin}/sitemap.xml
           if (rescored.demandScore > demandContext.demandScore) {
             console.log(`[Quick Analyze] DEMAND TIER RESCORE: Cross-product revealed ${Object.keys(newHints).join(", ")}. Score ${demandContext.demandScore} → ${rescored.demandScore}, Tier ${demandContext.tier} → ${rescored.tier}`);
             demandContext = rescored;
-            demandTierPrompt = buildDemandAdjustedMultiplierPrompt(demandContext);
+            // Demand tier recorded for diagnostics only — no longer injected into Gemini prompt
           }
         }
       }
