@@ -76,16 +76,17 @@ function getVerdictBadge(verdict: string) {
   switch (verdict) {
     case "BUY":
     case "ACCUMULATE":
-      return { label: verdict === "BUY" ? "Buy" : "Accumulate", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" };
+      return { label: "Accumulate", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" };
     case "HOLD_CORE":
       return { label: "Hold Core", className: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30" };
+    case "HOLD":
     case "MONITOR":
-      return { label: "Monitor", className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30" };
+      return { label: "Hold", className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30" };
     case "TRADE_THE_HYPE":
       return { label: "Trade Hype", className: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30" };
     case "AVOID":
     case "SELL":
-      return { label: verdict === "SELL" ? "Sell" : "Avoid", className: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30" };
+      return { label: "Avoid", className: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30" };
     case "SPECULATIVE_FLYER":
       return { label: "Speculative", className: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30" };
     default:

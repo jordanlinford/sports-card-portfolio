@@ -10279,11 +10279,27 @@ Return ONLY valid JSON, no markdown.`;
         return map[s.toLowerCase()] || s.toLowerCase();
       };
 
+      const INVESTMENT_TO_LEGACY: Record<string, string> = {
+        ACCUMULATE: "ACCUMULATE",
+        HOLD_CORE: "HOLD_CORE",
+        TRADE_THE_HYPE: "TRADE_THE_HYPE",
+        AVOID_NEW_MONEY: "AVOID",
+        AVOID_STRUCTURAL: "AVOID",
+        SPECULATIVE_FLYER: "SPECULATIVE_FLYER",
+        HOLD_ROLE_RISK: "HOLD",
+        HOLD_INJURY_CONTINGENT: "HOLD",
+      };
+      const LEGACY_TO_INVESTMENT: Record<string, string> = {
+        BUY: "ACCUMULATE",
+        MONITOR: "HOLD_CORE",
+        AVOID: "AVOID",
+      };
+
       const players = allOutlooks
         .filter(o => {
           if (!o.outlookJson) return false;
           const oj = o.outlookJson as any;
-          if (!oj.verdict?.action) return false;
+          if (!oj.investmentCall?.verdict && !oj.verdict?.action) return false;
           if (sportFilter && normSport(o.sport) !== sportFilter) return false;
           return true;
         })
@@ -10299,14 +10315,20 @@ Return ONLY valid JSON, no markdown.`;
           const phase = ms.phase ?? null;
           const sampleFactor = ms.derivedMetrics?.sampleFactor ?? 0;
 
+          const investmentVerdict = oj.investmentCall?.verdict;
+          const legacyVerdict = oj.verdict?.action;
+          const verdict = investmentVerdict
+            ? (INVESTMENT_TO_LEGACY[investmentVerdict] || investmentVerdict)
+            : (LEGACY_TO_INVESTMENT[legacyVerdict] || legacyVerdict || "HOLD_CORE");
+
           return {
             playerKey: o.playerKey,
             playerName: o.playerName,
             sport: normSport(o.sport),
             temperature: o.temperature,
             viewCount: o.viewCount,
-            verdict: oj.verdict?.action,
-            verdictSummary: oj.verdict?.summary || null,
+            verdict,
+            verdictSummary: oj.investmentCall?.reasoning || oj.verdict?.summary || null,
             composite,
             demand,
             momentum,
@@ -10330,12 +10352,12 @@ Return ONLY valid JSON, no markdown.`;
         .slice(0, 8);
 
       const buyOpportunities = players
-        .filter(p => ["BUY", "ACCUMULATE", "HOLD_CORE"].includes(p.verdict))
+        .filter(p => ["ACCUMULATE", "HOLD_CORE"].includes(p.verdict))
         .sort((a, b) => (b.composite ?? 50) - (a.composite ?? 50))
         .slice(0, 10);
 
       const sellWarnings = players
-        .filter(p => ["AVOID", "SELL", "TRADE_THE_HYPE"].includes(p.verdict))
+        .filter(p => ["AVOID", "TRADE_THE_HYPE"].includes(p.verdict))
         .sort((a, b) => (a.composite ?? 50) - (b.composite ?? 50))
         .slice(0, 10);
 
