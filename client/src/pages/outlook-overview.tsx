@@ -350,6 +350,7 @@ type ScanIdentifyResult = {
       parallel: string | null;
       isRookie: boolean;
       sport: string;
+      photoVariation: string | null;
     };
     gradeEstimate: {
       appearsToBe: "graded" | "raw";
@@ -391,6 +392,7 @@ type CardScanResult = {
       parallel: string | null;
       isRookie: boolean;
       sport: string;
+      photoVariation: string | null;
     };
     gradeEstimate: {
       appearsToBe: "graded" | "raw";
@@ -1912,6 +1914,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                           {s}
                         </button>
                       ))}
+                    </div>
+                  )}
+                  {scanIdentifyResult.scan?.cardIdentification?.photoVariation && (
+                    <div className="flex items-center gap-1.5 mt-1" data-testid="photo-variation-badge">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        📷 {scanIdentifyResult.scan.cardIdentification.photoVariation} variation
+                      </span>
                     </div>
                   )}
                 </div>

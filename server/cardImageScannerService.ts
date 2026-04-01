@@ -22,6 +22,7 @@ export interface CardScanResult {
     cardNumber: string | null;
     variation: string | null;
     parallel: string | null;
+    photoVariation: string | null;
     isRookie: boolean;
     sport: "football" | "basketball" | "baseball" | "hockey" | "soccer" | "unknown";
   };
@@ -54,6 +55,13 @@ PARALLEL IDENTIFICATION GUIDE (look at border color/pattern):
 - Topps Chrome parallels: Base, Refractor, Pink Refractor, Gold Refractor, Superfractor (Chrome Superfractors are /1, but other sets like Stadium Club label their top parallels "Superfractor" with different print runs — always read the actual stamp)
 - Donruss parallels: Base, Rated Rookie, Press Proof, Holo, Elite Series
 - Select parallels: Base, Silver, Concourse, Premier Level, Tie-Dye, Zebra, Disco, Gold (/10)
+
+PHOTO VARIATION IDENTIFICATION — CRITICAL:
+Some card sets (especially Donruss, Donruss Optic, Topps, Bowman) have MULTIPLE PHOTO VARIATIONS of the same card — for example, a "Pitching" variation and a "Batting" variation, or "Throwing" vs "Running". These photo variations are DIFFERENT CARDS with DIFFERENT VALUES, even though they share the same parallel and print run.
+- If you can identify the photo action (pitching, batting, throwing, running, dribbling, shooting, etc.), include it in a separate "photoVariation" field.
+- DO NOT mix photo variation info into the "variation" field — the variation field is ONLY for parallels (Gold, Silver, Orange Prizm, etc.) and serial numbering.
+- Example: A 2018 Donruss Optic Ohtani Orange Prizm /199 exists in BOTH a Pitching and Batting version. If you see the player in a pitching pose, set photoVariation to "Pitching". If batting, set photoVariation to "Batting".
+- If no distinct photo variation exists or you cannot determine it, set photoVariation to null.
 
 CHROME/REFLECTIVE INSERT IDENTIFICATION — CRITICAL:
 Many insert subsets are INHERENTLY chrome/reflective/shiny by design. Their BASE version already looks like a refractor or Silver Prizm. Do NOT assume "Silver Prizm" just because the card is shiny/reflective. Examples of inherently chrome/reflective inserts:
@@ -89,7 +97,8 @@ Return a JSON object with EXACTLY this structure (no markdown, just pure JSON):
   "year": 2025,
   "setName": "Exact product name (e.g., 'Prizm', 'Prizm Draft Picks', 'Select', 'Donruss', 'Topps Chrome')",
   "cardNumber": "Card number if visible (e.g., '123')",
-  "variation": "The EXACT parallel/variation name matching how it's listed on eBay (e.g., 'Gold Prizm /10', 'Silver Prizm', 'Hyper Prizm', 'Red White Blue', 'Downtown'). Include serial numbering if visible (e.g., '/10', '/25', '/50'). Use 'Base' for no parallel.",
+  "variation": "The EXACT parallel/variation name matching how it's listed on eBay (e.g., 'Gold Prizm /10', 'Silver Prizm', 'Hyper Prizm', 'Red White Blue', 'Downtown'). Include serial numbering if visible (e.g., '/10', '/25', '/50'). Use 'Base' for no parallel. Do NOT include photo variation info here.",
+  "photoVariation": "The photo/pose variation if applicable (e.g., 'Pitching', 'Batting', 'Throwing', 'Running'). null if not applicable or unknown.",
   "isRookie": true or false,
   "sport": "football" | "basketball" | "baseball" | "hockey" | "soccer",
   "appearsToBe": "graded" | "raw",
@@ -176,6 +185,7 @@ export async function scanCardImage(
         },
       ],
       config: {
+        temperature: 0.2,
         tools: [{ googleSearch: {} }],
       },
     });
@@ -195,6 +205,7 @@ export async function scanCardImage(
           cardNumber: null,
           variation: null,
           parallel: null,
+          photoVariation: null,
           isRookie: false,
           sport: "unknown",
         },
@@ -218,12 +229,35 @@ export async function scanCardImage(
     
     let variation = parsed.variation || null;
     let parallel = parsed.parallel || null;
+    let photoVariation = parsed.photoVariation || null;
     if (parallel && (!variation || variation.toLowerCase() === "base")) {
       variation = parallel;
     } else if (parallel && variation && !variation.toLowerCase().includes(parallel.toLowerCase())) {
       variation = `${variation} ${parallel}`.trim();
     }
     
+    if (variation) {
+      const explicitPhotoPattern = /\b(pitching|batting|throwing|running|fielding|dribbling|shooting|passing|catching|sliding|swinging|dunking)\s+(variation|version|pose|photo|image)\b/gi;
+      const explicitMatch = variation.match(explicitPhotoPattern);
+      if (explicitMatch && !photoVariation) {
+        photoVariation = explicitMatch[0].replace(/\s+(variation|version|pose|photo|image)/i, "").trim();
+        photoVariation = photoVariation.charAt(0).toUpperCase() + photoVariation.slice(1).toLowerCase();
+      }
+      variation = variation.replace(explicitPhotoPattern, "").replace(/[.\-,]\s*$/g, "").replace(/\s{2,}/g, " ").trim();
+
+      if (!photoVariation) {
+        const standaloneCheck = /^(pitching|batting|throwing|fielding|dribbling|shooting|sliding|swinging|dunking)$/i;
+        if (standaloneCheck.test(variation.trim())) {
+          photoVariation = variation.trim().charAt(0).toUpperCase() + variation.trim().slice(1).toLowerCase();
+          variation = "";
+        }
+      }
+
+      if (!variation || variation.toLowerCase() === "base") {
+        variation = "Base";
+      }
+    }
+
     const hasSerialNumber = /\/\d+/.test(variation || "") || (parsed.cardNumber && /\/\d+/.test(parsed.cardNumber));
     const falseSpLabels = /\b(super\s*short\s*print|short\s*print|ssp|sp)\b/i;
     
@@ -242,6 +276,10 @@ export async function scanCardImage(
     parallel = sanitizeSpLabel(parallel, "parallel");
     if (parallel === "Base") parallel = null;
     
+    if (photoVariation) {
+      console.log(`[CardScanner] Photo variation detected: "${photoVariation}"`);
+    }
+
     return {
       success: true,
       confidence: parsed.confidence || "medium",
@@ -252,6 +290,7 @@ export async function scanCardImage(
         cardNumber: parsed.cardNumber || null,
         variation,
         parallel,
+        photoVariation,
         isRookie: parsed.isRookie || false,
         sport: parsed.sport || "unknown",
       },
@@ -280,6 +319,7 @@ export async function scanCardImage(
         cardNumber: null,
         variation: null,
         parallel: null,
+        photoVariation: null,
         isRookie: false,
         sport: "unknown",
       },
@@ -321,6 +361,10 @@ export function buildSearchQueryFromScan(scan: CardScanResult): string {
     parts.push(scan.cardIdentification.variation);
   }
   
+  if (scan.cardIdentification.photoVariation) {
+    parts.push(scan.cardIdentification.photoVariation);
+  }
+
   if (scan.cardIdentification.cardNumber) {
     parts.push(`#${scan.cardIdentification.cardNumber}`);
   }
@@ -386,6 +430,7 @@ async function getGeminiPriceEstimate(scan: CardScanResult): Promise<AIPriceEsti
       scan.cardIdentification.cardNumber ? `Card #: ${scan.cardIdentification.cardNumber}` : null,
       scan.cardIdentification.variation ? `Variation: ${scan.cardIdentification.variation}` : null,
       scan.cardIdentification.parallel ? `Parallel: ${scan.cardIdentification.parallel}` : null,
+      scan.cardIdentification.photoVariation ? `Photo Variation: ${scan.cardIdentification.photoVariation} (this is a distinct version — search for "${scan.cardIdentification.photoVariation}" specifically)` : null,
       scan.cardIdentification.isRookie ? "Rookie Card: Yes" : null,
       `Rarity: ${scan.marketContext.rarity}`,
     ].filter(Boolean).join("\n");
