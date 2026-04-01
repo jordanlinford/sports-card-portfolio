@@ -367,6 +367,7 @@ The FULL set name is "${card.set}". Every word matters — each word identifies 
 - ALL price fields (raw, PSA 9, PSA 10) must come from "${card.set}" comps ONLY — never mix comps from the base brand.`
     : "";
 
+  const gradeLabelStandalone = !isRaw && card.grade ? `${card.grader || "PSA"} ${card.grade}` : "";
   const rawGradeWarning = isRaw
     ? `\nRAW CARD — CRITICAL PRICING RULES:
 This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and graded prices:
@@ -383,6 +384,14 @@ Use your knowledge of the sports card hobby to make this determination. Do NOT r
 6. Use the MEDIAN of the raw sales you find — do NOT skew low or high. Report it accurately.
 7. If you cannot find raw sales, set rawPrice to null and soldCount to 0.
 VIOLATION: An avgPrice or rawPrice that includes graded sale prices is WRONG and misleads collectors.`
+    : !isRaw && card.grade ? `\nGRADED CARD — CRITICAL PRICING RULES:
+This card is GRADED: ${gradeLabelStandalone}. The avgPrice MUST reflect the value of THIS GRADED card, not the raw version.
+1. Search for "${searchDescription} ${gradeLabelStandalone} sold eBay" to find completed sales of this exact graded card.
+2. avgPrice, minPrice, maxPrice MUST reflect completed sales of ${gradeLabelStandalone} copies. Do NOT use raw/ungraded sale prices in avgPrice.
+3. ALSO search for raw sales separately and put those in rawPrice, rawMinPrice, rawMaxPrice.
+4. psa9Price and psa10Price should still be filled from their respective grade searches.
+5. If you cannot find ${gradeLabelStandalone} sold comps specifically, use the closest available graded comps and note this in the notes field.
+VIOLATION: An avgPrice based on raw/ungraded sales when the card is graded ${gradeLabelStandalone} is WRONG and misleads collectors.`
     : "";
 
   const isAutoCardStandalone = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
@@ -613,14 +622,33 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
             let correctedMin = parsed.minPrice || correctedAvg;
             let correctedMax = parsed.maxPrice || correctedAvg;
 
-            // For raw cards, prefer rawPrice when Gemini provides it
             if (isRaw && parsed.rawPrice && parsed.rawPrice > 0) {
-              console.log(`[OutlookEngine] GEMINI-DIRECT: Using rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg}). No corrections applied.`);
+              console.log(`[OutlookEngine] GEMINI-DIRECT: Raw card — using rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg}).`);
               correctedAvg = parsed.rawPrice;
               correctedMin = parsed.rawMinPrice || parsed.minPrice || correctedAvg;
               correctedMax = parsed.rawMaxPrice || parsed.maxPrice || correctedAvg;
+            } else if (!isRaw && card.grade) {
+              const gradeLower = (card.grade || "").toLowerCase().trim();
+              const gradeNum = parseFloat(gradeLower);
+              let gradedPrice: number | null = null;
+              if (gradeNum >= 9.5 || gradeLower === "gem mint" || gradeLower === "pristine") {
+                gradedPrice = parsePrice(parsed.psa10Price);
+              } else if (gradeNum >= 9 || gradeLower === "mint") {
+                gradedPrice = parsePrice(parsed.psa9Price);
+              } else if (gradeNum >= 8) {
+                const p9 = parsePrice(parsed.psa9Price);
+                if (p9) gradedPrice = Math.round(p9 * 0.6);
+              }
+              if (gradedPrice && gradedPrice > 0) {
+                console.log(`[OutlookEngine] GEMINI-DIRECT: Graded card (${card.grade}) — using graded price $${gradedPrice} (raw avgPrice was $${correctedAvg}).`);
+                correctedAvg = gradedPrice;
+                correctedMin = Math.round(gradedPrice * 0.85);
+                correctedMax = Math.round(gradedPrice * 1.2);
+              } else {
+                console.log(`[OutlookEngine] GEMINI-DIRECT: Graded card but no graded price available — using avgPrice $${correctedAvg}.`);
+              }
             } else {
-              console.log(`[OutlookEngine] GEMINI-DIRECT: Using avgPrice $${correctedAvg}. No corrections applied.`);
+              console.log(`[OutlookEngine] GEMINI-DIRECT: Using avgPrice $${correctedAvg}.`);
             }
             
             // GEMINI-DIRECT: Trust Gemini's graded prices, only fix obvious data errors (PSA 9/10 inversion)
@@ -928,6 +956,7 @@ The FULL set name is "${card.set}". Every word matters — each word identifies 
   const hasPatchUnified = /patch|mem|memorabilia|relic|jersey/i.test(card.variation || "") || /patch|mem|memorabilia|relic|jersey/i.test(card.title || "");
   const unifiedSearchDescription = [card.year, card.set, card.playerName || card.title, card.variation].filter(Boolean).join(" ");
 
+  const gradeLabel = !isRaw && card.grade ? `${card.grader || "PSA"} ${card.grade}` : "";
   const rawGradeWarning = isRaw
     ? `\nRAW CARD — CRITICAL PRICING RULES:
 This card is RAW (ungraded). Follow these rules EXACTLY — do not mix raw and graded prices:
@@ -944,6 +973,14 @@ Use your knowledge of the sports card hobby to make this determination. Do NOT r
 6. Use the MEDIAN of the raw sales you find — do NOT skew low or high. Report it accurately.
 7. If you cannot find raw sales, set market.rawPrice to null and market.soldCount to 0.
 VIOLATION: A market.avgPrice or market.rawPrice that includes graded sale prices is WRONG and misleads collectors.`
+    : !isRaw && card.grade ? `\nGRADED CARD — CRITICAL PRICING RULES:
+This card is GRADED: ${gradeLabel}. The market.avgPrice MUST reflect the value of THIS GRADED card, not the raw version.
+1. Search for "${unifiedSearchDescription} ${gradeLabel} sold eBay" to find completed sales of this exact graded card.
+2. market.avgPrice, market.minPrice, market.maxPrice MUST reflect completed sales of ${gradeLabel} copies. Do NOT use raw/ungraded sale prices in market.avgPrice.
+3. ALSO search for raw sales separately and put those in market.rawPrice, market.rawMinPrice, market.rawMaxPrice.
+4. psa9Price and psa10Price should still be filled from their respective grade searches.
+5. If you cannot find ${gradeLabel} sold comps specifically, use the closest available graded comps and note this in the notes field.
+VIOLATION: A market.avgPrice based on raw/ungraded sales when the card is graded ${gradeLabel} is WRONG and misleads collectors.`
     : "";
   const autoCardWarning = isAutoCard && card.set
     ? `\nAUTOGRAPH CARD — PRODUCT-SPECIFIC PRICING REQUIRED:
@@ -1233,14 +1270,33 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
             let correctedMin = parsed.market.minPrice || correctedAvg;
             let correctedMax = parsed.market.maxPrice || correctedAvg;
 
-            // For raw cards, prefer rawPrice when Gemini provides it
             if (isRaw && parsed.market.rawPrice && parsed.market.rawPrice > 0) {
-              console.log(`[Unified Analysis] GEMINI-DIRECT: Using rawPrice $${parsed.market.rawPrice} (overall avg was $${correctedAvg}). No corrections applied.`);
+              console.log(`[Unified Analysis] GEMINI-DIRECT: Raw card — using rawPrice $${parsed.market.rawPrice} (overall avg was $${correctedAvg}).`);
               correctedAvg = parsed.market.rawPrice;
               correctedMin = parsed.market.rawMinPrice || parsed.market.minPrice || correctedAvg;
               correctedMax = parsed.market.rawMaxPrice || parsed.market.maxPrice || correctedAvg;
+            } else if (!isRaw && card.grade) {
+              const gradeLower = (card.grade || "").toLowerCase().trim();
+              const gradeNum = parseFloat(gradeLower);
+              let gradedPrice: number | null = null;
+              if (gradeNum >= 9.5 || gradeLower === "gem mint" || gradeLower === "pristine") {
+                gradedPrice = parsePrice(parsed.market.psa10Price);
+              } else if (gradeNum >= 9 || gradeLower === "mint") {
+                gradedPrice = parsePrice(parsed.market.psa9Price);
+              } else if (gradeNum >= 8) {
+                const p9 = parsePrice(parsed.market.psa9Price);
+                if (p9) gradedPrice = Math.round(p9 * 0.6);
+              }
+              if (gradedPrice && gradedPrice > 0) {
+                console.log(`[Unified Analysis] GEMINI-DIRECT: Graded card (${card.grade}) — using graded price $${gradedPrice} (raw avgPrice was $${correctedAvg}).`);
+                correctedAvg = gradedPrice;
+                correctedMin = Math.round(gradedPrice * 0.85);
+                correctedMax = Math.round(gradedPrice * 1.2);
+              } else {
+                console.log(`[Unified Analysis] GEMINI-DIRECT: Graded card but no graded price available — using avgPrice $${correctedAvg}.`);
+              }
             } else {
-              console.log(`[Unified Analysis] GEMINI-DIRECT: Using avgPrice $${correctedAvg}. No corrections applied.`);
+              console.log(`[Unified Analysis] GEMINI-DIRECT: Using avgPrice $${correctedAvg}.`);
             }
 
             const player = parsed.player || {};
