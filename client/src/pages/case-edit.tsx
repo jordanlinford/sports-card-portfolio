@@ -227,6 +227,9 @@ export default function CaseEdit() {
   const [scanPreviewUrl, setScanPreviewUrl] = useState<string | null>(null);
   const [scanConfidence, setScanConfidence] = useState<"high" | "medium" | "low" | null>(null);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const [scanFieldConfidence, setScanFieldConfidence] = useState<Record<string, { confident: boolean; reason?: string }> | null>(null);
+  const [scanUncertainFields, setScanUncertainFields] = useState<string[]>([]);
+  const [scanParallelSuggestions, setScanParallelSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -737,10 +740,16 @@ export default function CaseEdit() {
         setDuplicateCheckTitle(card.playerName || "");
         
         setScanConfidence(response.scan.confidence || "medium");
+        setScanFieldConfidence(response.fieldConfidence || null);
+        setScanUncertainFields(response.uncertainFields || []);
+        setScanParallelSuggestions(response.parallelSuggestions || []);
         
+        const uncertainCount = (response.uncertainFields || []).length;
         toast({
           title: "Card identified",
-          description: "Review and adjust the details, then add to your collection.",
+          description: uncertainCount > 0
+            ? `Review the details below — ${uncertainCount} field${uncertainCount !== 1 ? "s" : ""} need your attention.`
+            : "Review and adjust the details, then add to your collection.",
         });
       } else {
         toast({
@@ -778,7 +787,10 @@ export default function CaseEdit() {
     setScanPreviewUrl(null);
     setScanConfirmed(false);
     setScanConfidence(null);
-    setAddCardMode("scan"); // Default back to scan mode
+    setScanFieldConfidence(null);
+    setScanUncertainFields([]);
+    setScanParallelSuggestions([]);
+    setAddCardMode("scan");
     setDuplicateCheckTitle("");
   };
 
@@ -1387,45 +1399,64 @@ export default function CaseEdit() {
 
                       {/* Show scan result confidence badge when scanned */}
                       {addCardMode === "scan" && scanConfidence && scanPreviewUrl && (
-                        <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                          <img 
-                            src={scanPreviewUrl} 
-                            alt="Scanned card" 
-                            className="w-16 h-22 object-contain rounded-md border"
-                          />
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                              <span className="font-medium text-sm">Card Identified</span>
-                              <Badge 
-                                variant="secondary" 
-                                className={
-                                  scanConfidence === "high" ? "bg-green-500/10 text-green-600" :
-                                  scanConfidence === "medium" ? "bg-yellow-500/10 text-yellow-600" :
-                                  "bg-red-500/10 text-red-600"
-                                }
-                              >
-                                {scanConfidence.toUpperCase()}
-                              </Badge>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
+                            <img 
+                              src={scanPreviewUrl} 
+                              alt="Scanned card" 
+                              className="w-16 h-22 object-contain rounded-md border"
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                                <span className="font-medium text-sm">Card Identified</span>
+                                <Badge 
+                                  variant="secondary" 
+                                  className={
+                                    scanConfidence === "high" ? "bg-green-500/10 text-green-600" :
+                                    scanConfidence === "medium" ? "bg-yellow-500/10 text-yellow-600" :
+                                    "bg-red-500/10 text-red-600"
+                                  }
+                                >
+                                  {scanConfidence.toUpperCase()}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {scanUncertainFields.length > 0
+                                  ? `${scanUncertainFields.length} field${scanUncertainFields.length !== 1 ? "s" : ""} marked for review below`
+                                  : "Review the details below and adjust if needed"}
+                              </p>
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              Review the details below and adjust if needed
-                            </p>
+                            <Button 
+                              type="button"
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setScanConfidence(null);
+                                setScanPreviewUrl(null);
+                                setPreviewUrl(null);
+                                setSelectedFile(null);
+                                setScanFieldConfidence(null);
+                                setScanUncertainFields([]);
+                                setScanParallelSuggestions([]);
+                                cardForm.reset();
+                              }}
+                            >
+                              Rescan
+                            </Button>
                           </div>
-                          <Button 
-                            type="button"
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => {
-                              setScanConfidence(null);
-                              setScanPreviewUrl(null);
-                              setPreviewUrl(null);
-                              setSelectedFile(null);
-                              cardForm.reset();
-                            }}
-                          >
-                            Rescan
-                          </Button>
+                          {scanUncertainFields.length > 0 && (
+                            <div className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/20" data-testid="notice-scan-uncertain">
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                              <p className="text-xs text-muted-foreground">
+                                <span className="font-medium text-amber-600 dark:text-amber-400">Needs review: </span>
+                                {scanUncertainFields.map(f => {
+                                  const labels: Record<string, string> = { playerName: "Player Name", year: "Year", setName: "Set", variation: "Variation", cardNumber: "Card #", grade: "Grade", grader: "Grader" };
+                                  return labels[f] || f;
+                                }).join(", ")}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1821,14 +1852,35 @@ export default function CaseEdit() {
                         name="variation"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Variation (optional)</FormLabel>
+                            <FormLabel className="flex items-center gap-1.5">
+                              Variation (optional)
+                              {addCardMode === "scan" && scanFieldConfidence?.variation && !scanFieldConfidence.variation.confident && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                            </FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="Cracked Ice 1/10"
                                 {...field}
+                                className={addCardMode === "scan" && scanFieldConfidence?.variation && !scanFieldConfidence.variation.confident ? "border-amber-500/50 bg-amber-500/5" : ""}
                                 data-testid="input-card-variation"
                               />
                             </FormControl>
+                            {addCardMode === "scan" && scanFieldConfidence?.variation && !scanFieldConfidence.variation.confident && scanFieldConfidence.variation.reason && (
+                              <p className="text-xs text-amber-600 dark:text-amber-400">{scanFieldConfidence.variation.reason}</p>
+                            )}
+                            {addCardMode === "scan" && scanParallelSuggestions.length > 0 && scanFieldConfidence?.variation && !scanFieldConfidence.variation.confident && (
+                              <div className="flex flex-wrap gap-1 mt-1" data-testid="parallel-suggestions-case">
+                                {scanParallelSuggestions.map(s => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => cardForm.setValue("variation", s)}
+                                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${field.value === s ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}
+                                  >
+                                    {s}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}

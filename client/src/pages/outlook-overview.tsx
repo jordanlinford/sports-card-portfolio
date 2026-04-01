@@ -334,6 +334,8 @@ type AIPriceEstimate = {
 };
 
 // Type for scan-identify-only result (no pricing, faster)
+type FieldConfidenceInfo = { confident: boolean; reason?: string };
+
 type ScanIdentifyResult = {
   success: boolean;
   scan: {
@@ -363,6 +365,9 @@ type ScanIdentifyResult = {
     rawAnalysis: string;
     error?: string;
   };
+  fieldConfidence?: Record<string, FieldConfidenceInfo>;
+  uncertainFields?: string[];
+  parallelSuggestions?: string[];
   usage: {
     scansToday: number;
     dailyLimit: number;
@@ -688,6 +693,17 @@ type BatchScannedCard = {
   status: "pending" | "processing" | "done" | "failed";
   error?: string;
   scanHistoryId?: number;
+  fieldConfidence?: Record<string, FieldConfidenceInfo>;
+  uncertainFields?: string[];
+  parallelSuggestions?: string[];
+  isRecovering?: boolean;
+  partialData?: {
+    playerName?: string;
+    year?: string | null;
+    set?: string | null;
+    variation?: string | null;
+    confidence?: string | null;
+  };
 };
 
 function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boolean; userCases: DisplayCase[]; isPro: boolean }) {
@@ -1196,6 +1212,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         if (scanData.scan?.success) {
           const card = scanData.scan.cardIdentification;
           const gradeInfo = scanData.scan.gradeEstimate;
+          const hasUncertain = scanData.uncertainFields && scanData.uncertainFields.length > 0;
           setBatchScannedCards(prev => prev.map((c, idx) => idx === i ? {
             ...c,
             playerName: card.playerName || "Unknown",
@@ -1209,13 +1226,26 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
             confidence: scanData.scan.confidence ?? null,
             status: "done",
             scanHistoryId: scanData.scanHistoryId,
+            fieldConfidence: scanData.fieldConfidence,
+            uncertainFields: scanData.uncertainFields,
+            parallelSuggestions: scanData.parallelSuggestions,
           } : c));
           successCount++;
         } else {
+          const partialCard = scanData.scan?.cardIdentification;
           setBatchScannedCards(prev => prev.map((c, idx) => idx === i ? {
             ...c,
             status: "failed",
-            error: "Could not identify card",
+            error: scanData.scan?.error || "Could not identify card",
+            partialData: partialCard ? {
+              playerName: partialCard.playerName !== "Unknown" ? partialCard.playerName : undefined,
+              year: partialCard.year ? String(partialCard.year) : null,
+              set: partialCard.setName !== "Unknown" ? partialCard.setName : null,
+              variation: partialCard.variation || null,
+              confidence: scanData.scan?.confidence || null,
+            } : undefined,
+            fieldConfidence: scanData.fieldConfidence,
+            uncertainFields: scanData.uncertainFields,
           } : c));
           failCount++;
         }
@@ -1801,65 +1831,110 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                 </Badge>
               </div>
 
-              {/* Editable fields */}
+              {scanIdentifyResult.uncertainFields && scanIdentifyResult.uncertainFields.length > 0 && (
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20" data-testid="notice-uncertain-fields">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <span className="font-medium text-amber-600 dark:text-amber-400">Some fields need your review: </span>
+                    <span className="text-muted-foreground">
+                      {scanIdentifyResult.uncertainFields.map(f => {
+                        const labels: Record<string, string> = { playerName: "Player Name", year: "Year", setName: "Set", variation: "Variation", cardNumber: "Card #", grade: "Grade", grader: "Grader" };
+                        return labels[f] || f;
+                      }).join(", ")}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Editable fields with confidence indicators */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-title">Player Name *</Label>
-                  <Input
-                    id="confirm-title"
-                    value={title}
-                    onChange={(e) => handleFieldChange("title", e.target.value)}
-                    className={scanIdentifyResult.scan.confidence === "low" ? "border-yellow-500" : ""}
-                    data-testid="input-confirm-title"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-year">Year</Label>
-                  <Input
-                    id="confirm-year"
-                    value={year}
-                    onChange={(e) => handleFieldChange("year", e.target.value)}
-                    data-testid="input-confirm-year"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-set">Set</Label>
-                  <Input
-                    id="confirm-set"
-                    value={set}
-                    onChange={(e) => handleFieldChange("set", e.target.value)}
-                    data-testid="input-confirm-set"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-cardNumber">Card #</Label>
-                  <Input
-                    id="confirm-cardNumber"
-                    value={cardNumber}
-                    onChange={(e) => handleFieldChange("cardNumber", e.target.value)}
-                    data-testid="input-confirm-card-number"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-variation">Variation / Parallel</Label>
+                {[
+                  { id: "confirm-title", label: "Player Name *", field: "playerName", value: title, stateField: "title", testId: "input-confirm-title" },
+                  { id: "confirm-year", label: "Year", field: "year", value: year, stateField: "year", testId: "input-confirm-year" },
+                  { id: "confirm-set", label: "Set", field: "setName", value: set, stateField: "set", testId: "input-confirm-set" },
+                  { id: "confirm-cardNumber", label: "Card #", field: "cardNumber", value: cardNumber, stateField: "cardNumber", testId: "input-confirm-card-number" },
+                ].map(({ id, label, field, value, stateField, testId }) => {
+                  const fc = scanIdentifyResult.fieldConfidence?.[field];
+                  const isUncertain = fc && !fc.confident;
+                  return (
+                    <div className="space-y-1" key={id}>
+                      <Label htmlFor={id} className="flex items-center gap-1.5">
+                        {label}
+                        {isUncertain && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                        {fc?.confident && <Check className="h-3 w-3 text-green-500" />}
+                      </Label>
+                      <Input
+                        id={id}
+                        value={value}
+                        onChange={(e) => handleFieldChange(stateField, e.target.value)}
+                        className={isUncertain ? "border-amber-500/50 bg-amber-500/5" : ""}
+                        placeholder={isUncertain ? (fc?.reason || "Needs your input") : undefined}
+                        data-testid={testId}
+                      />
+                      {isUncertain && fc?.reason && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">{fc.reason}</p>
+                      )}
+                    </div>
+                  );
+                })}
+
+                <div className="space-y-1">
+                  <Label htmlFor="confirm-variation" className="flex items-center gap-1.5">
+                    Variation / Parallel
+                    {scanIdentifyResult.fieldConfidence?.variation && !scanIdentifyResult.fieldConfidence.variation.confident && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                    {scanIdentifyResult.fieldConfidence?.variation?.confident && <Check className="h-3 w-3 text-green-500" />}
+                  </Label>
                   <Input
                     id="confirm-variation"
                     value={variation}
                     onChange={(e) => handleFieldChange("variation", e.target.value)}
+                    className={scanIdentifyResult.fieldConfidence?.variation && !scanIdentifyResult.fieldConfidence.variation.confident ? "border-amber-500/50 bg-amber-500/5" : ""}
+                    placeholder={scanIdentifyResult.fieldConfidence?.variation && !scanIdentifyResult.fieldConfidence.variation.confident ? (scanIdentifyResult.fieldConfidence.variation.reason || "Which parallel?") : undefined}
                     data-testid="input-confirm-variation"
                   />
+                  {scanIdentifyResult.fieldConfidence?.variation && !scanIdentifyResult.fieldConfidence.variation.confident && scanIdentifyResult.fieldConfidence.variation.reason && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">{scanIdentifyResult.fieldConfidence.variation.reason}</p>
+                  )}
+                  {scanIdentifyResult.parallelSuggestions && scanIdentifyResult.parallelSuggestions.length > 0 && scanIdentifyResult.fieldConfidence?.variation && !scanIdentifyResult.fieldConfidence.variation.confident && (
+                    <div className="flex flex-wrap gap-1 mt-1" data-testid="parallel-suggestions">
+                      {scanIdentifyResult.parallelSuggestions.map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => handleFieldChange("variation", s)}
+                          className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${variation === s ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}
+                          data-testid={`suggestion-${s.replace(/\s+/g, "-").toLowerCase()}`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-grade">Grade</Label>
+
+                <div className="space-y-1">
+                  <Label htmlFor="confirm-grade" className="flex items-center gap-1.5">
+                    Grade
+                    {scanIdentifyResult.fieldConfidence?.grade && !scanIdentifyResult.fieldConfidence.grade.confident && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                    {scanIdentifyResult.fieldConfidence?.grade?.confident && <Check className="h-3 w-3 text-green-500" />}
+                  </Label>
                   <Input
                     id="confirm-grade"
                     value={grade}
                     onChange={(e) => handleFieldChange("grade", e.target.value)}
+                    className={scanIdentifyResult.fieldConfidence?.grade && !scanIdentifyResult.fieldConfidence.grade.confident ? "border-amber-500/50 bg-amber-500/5" : ""}
                     data-testid="input-confirm-grade"
                   />
+                  {scanIdentifyResult.fieldConfidence?.grade && !scanIdentifyResult.fieldConfidence.grade.confident && scanIdentifyResult.fieldConfidence.grade.reason && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">{scanIdentifyResult.fieldConfidence.grade.reason}</p>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-grader">Grading Company</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="confirm-grader" className="flex items-center gap-1.5">
+                    Grading Company
+                    {scanIdentifyResult.fieldConfidence?.grader && !scanIdentifyResult.fieldConfidence.grader.confident && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                    {scanIdentifyResult.fieldConfidence?.grader?.confident && <Check className="h-3 w-3 text-green-500" />}
+                  </Label>
                   <Select value={grader} onValueChange={(val) => handleFieldChange("grader", val)}>
                     <SelectTrigger data-testid="select-confirm-grader">
                       <SelectValue placeholder="Select grader" />
@@ -2945,7 +3020,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
             {batchScannedCards.map((card, idx) => (
               <div 
                 key={idx} 
-                className={`flex items-center gap-3 p-3 rounded-lg border ${
+                className={`rounded-lg border ${
                   card.status === "processing" ? "border-primary/50 bg-primary/5" :
                   card.status === "failed" ? "border-red-500/30 bg-red-500/5" :
                   card.status === "done" ? "border-border bg-card" :
@@ -2953,84 +3028,257 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                 }`}
                 data-testid={`batch-card-${idx}`}
               >
-                {card.imageUrl ? (
-                  <img 
-                    src={card.imageUrl} 
-                    alt={card.playerName} 
-                    className="w-12 h-16 object-contain rounded-md border flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-12 h-16 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
-                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate" data-testid={`batch-card-name-${idx}`}>
-                    {card.status === "done" ? card.playerName : card.status === "failed" ? "Scan Failed" : `Card ${idx + 1}`}
-                  </p>
-                  {card.status === "done" && (
-                    <p className="text-xs text-muted-foreground truncate">
-                      {[card.year, card.set, card.variation].filter(Boolean).join(" · ")}
-                      {card.grade && ` — ${card.grade}`}
-                    </p>
+                <div className="flex items-center gap-3 p-3">
+                  {card.imageUrl ? (
+                    <img 
+                      src={card.imageUrl} 
+                      alt={card.playerName} 
+                      className="w-12 h-16 object-contain rounded-md border flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-12 h-16 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
+                      <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                    </div>
                   )}
-                  {card.status === "failed" && card.error && (
-                    <p className="text-xs text-red-500">{card.error}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate" data-testid={`batch-card-name-${idx}`}>
+                      {card.status === "done" ? card.playerName : card.status === "failed" ? (card.partialData?.playerName || "Scan Failed") : `Card ${idx + 1}`}
+                    </p>
+                    {card.status === "done" && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[card.year, card.set, card.variation].filter(Boolean).join(" · ")}
+                        {card.grade && ` — ${card.grade}`}
+                      </p>
+                    )}
+                    {card.status === "done" && card.uncertainFields && card.uncertainFields.length > 0 && (
+                      <p className="text-xs text-amber-500 flex items-center gap-1 mt-0.5">
+                        <AlertTriangle className="h-3 w-3" />
+                        {card.uncertainFields.length} field{card.uncertainFields.length !== 1 ? "s" : ""} need review
+                      </p>
+                    )}
+                    {card.status === "failed" && card.partialData && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[card.partialData.year, card.partialData.set, card.partialData.variation].filter(Boolean).join(" · ") || "Partial data recovered"}
+                      </p>
+                    )}
+                    {card.status === "failed" && !card.partialData && card.error && (
+                      <p className="text-xs text-red-500">{card.error}</p>
+                    )}
+                    {card.status === "processing" && (
+                      <p className="text-xs text-primary flex items-center gap-1">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Identifying...
+                      </p>
+                    )}
+                    {card.status === "pending" && (
+                      <p className="text-xs text-muted-foreground">Waiting...</p>
+                    )}
+                  </div>
+                  {card.status === "done" && card.confidence && (
+                    <Badge 
+                      variant="secondary" 
+                      className={`shrink-0 text-xs ${
+                        card.confidence === "high" ? "bg-green-500/10 text-green-600 dark:text-green-400" :
+                        card.confidence === "medium" ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
+                        "bg-red-500/10 text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {card.confidence === "high" ? "High" : card.confidence === "medium" ? "Med" : "Low"}
+                    </Badge>
+                  )}
+                  {card.status === "done" && !batchProcessing && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      {card.uncertainFields && card.uncertainFields.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-amber-600"
+                          onClick={() => {
+                            setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, isRecovering: !c.isRecovering } : c));
+                          }}
+                          data-testid={`batch-card-fix-${idx}`}
+                        >
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Fix
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => handleBatchCardAnalyze(card)}
+                        data-testid={`batch-card-analyze-${idx}`}
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Analyze
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setBatchSingleAddCard(card)}
+                        data-testid={`batch-card-add-${idx}`}
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  )}
+                  {card.status === "done" && batchProcessing && (
+                    <Check className="h-4 w-4 text-green-500 shrink-0" />
+                  )}
+                  {card.status === "failed" && !batchProcessing && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-amber-600"
+                      onClick={() => {
+                        setBatchScannedCards(prev => prev.map((c, i) => i === idx ? {
+                          ...c,
+                          isRecovering: !c.isRecovering,
+                          playerName: c.partialData?.playerName || c.playerName,
+                          year: c.partialData?.year || c.year,
+                          set: c.partialData?.set || c.set,
+                          variation: c.partialData?.variation || c.variation,
+                        } : c));
+                      }}
+                      data-testid={`batch-card-recover-${idx}`}
+                    >
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                      Recover
+                    </Button>
+                  )}
+                  {card.status === "failed" && batchProcessing && (
+                    <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
                   )}
                   {card.status === "processing" && (
-                    <p className="text-xs text-primary flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Identifying...
-                    </p>
-                  )}
-                  {card.status === "pending" && (
-                    <p className="text-xs text-muted-foreground">Waiting...</p>
+                    <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
                   )}
                 </div>
-                {card.status === "done" && card.confidence && (
-                  <Badge 
-                    variant="secondary" 
-                    className={`shrink-0 text-xs ${
-                      card.confidence === "high" ? "bg-green-500/10 text-green-600 dark:text-green-400" :
-                      card.confidence === "medium" ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" :
-                      "bg-red-500/10 text-red-600 dark:text-red-400"
-                    }`}
-                  >
-                    {card.confidence === "high" ? "High" : card.confidence === "medium" ? "Med" : "Low"}
-                  </Badge>
-                )}
-                {card.status === "done" && !batchProcessing && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => handleBatchCardAnalyze(card)}
-                      data-testid={`batch-card-analyze-${idx}`}
-                    >
-                      <Sparkles className="h-3 w-3 mr-1" />
-                      Analyze
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setBatchSingleAddCard(card)}
-                      data-testid={`batch-card-add-${idx}`}
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add
-                    </Button>
+
+                {card.isRecovering && !batchProcessing && (
+                  <div className="px-3 pb-3 pt-1 border-t border-dashed space-y-3" data-testid={`batch-card-recovery-${idx}`}>
+                    <p className="text-xs text-muted-foreground">Fill in the missing details to recover this card:</p>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs flex items-center gap-1">
+                          Player Name
+                          {card.fieldConfidence?.playerName && !card.fieldConfidence.playerName.confident && <AlertTriangle className="h-2.5 w-2.5 text-amber-500" />}
+                        </Label>
+                        <Input
+                          value={card.playerName || ""}
+                          onChange={(e) => setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, playerName: e.target.value } : c))}
+                          className={`h-8 text-xs ${card.fieldConfidence?.playerName && !card.fieldConfidence.playerName.confident ? "border-amber-500/50 bg-amber-500/5" : ""}`}
+                          placeholder="Player name"
+                          data-testid={`batch-recovery-player-${idx}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Year</Label>
+                        <Input
+                          value={card.year || ""}
+                          onChange={(e) => setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, year: e.target.value } : c))}
+                          className={`h-8 text-xs ${card.fieldConfidence?.year && !card.fieldConfidence.year.confident ? "border-amber-500/50 bg-amber-500/5" : ""}`}
+                          placeholder="Year"
+                          data-testid={`batch-recovery-year-${idx}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Set</Label>
+                        <Input
+                          value={card.set || ""}
+                          onChange={(e) => setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, set: e.target.value } : c))}
+                          className={`h-8 text-xs ${card.fieldConfidence?.setName && !card.fieldConfidence.setName.confident ? "border-amber-500/50 bg-amber-500/5" : ""}`}
+                          placeholder="Set name"
+                          data-testid={`batch-recovery-set-${idx}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Variation</Label>
+                        <Input
+                          value={card.variation || ""}
+                          onChange={(e) => setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, variation: e.target.value } : c))}
+                          className={`h-8 text-xs ${card.fieldConfidence?.variation && !card.fieldConfidence.variation.confident ? "border-amber-500/50 bg-amber-500/5" : ""}`}
+                          placeholder="Variation / Parallel"
+                          data-testid={`batch-recovery-variation-${idx}`}
+                        />
+                        {card.parallelSuggestions && card.parallelSuggestions.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {card.parallelSuggestions.slice(0, 6).map(s => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, variation: s } : c))}
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full border transition-colors ${card.variation === s ? "bg-primary text-primary-foreground border-primary" : "bg-muted/50 text-muted-foreground border-border hover:bg-muted"}`}
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Grade</Label>
+                        <Input
+                          value={card.grade || ""}
+                          onChange={(e) => setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, grade: e.target.value } : c))}
+                          className="h-8 text-xs"
+                          placeholder="Grade"
+                          data-testid={`batch-recovery-grade-${idx}`}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Card #</Label>
+                        <Input
+                          value={card.cardNumber || ""}
+                          onChange={(e) => setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, cardNumber: e.target.value } : c))}
+                          className="h-8 text-xs"
+                          placeholder="Card number"
+                          data-testid={`batch-recovery-cardnumber-${idx}`}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={!card.playerName?.trim()}
+                        onClick={() => {
+                          setBatchScannedCards(prev => prev.map((c, i) => i === idx ? {
+                            ...c,
+                            status: "done" as const,
+                            isRecovering: false,
+                            error: undefined,
+                            confidence: "medium",
+                          } : c));
+                          toast({ title: "Card recovered", description: `${card.playerName} saved with your corrections.` });
+                        }}
+                        data-testid={`batch-recovery-save-${idx}`}
+                      >
+                        <Check className="h-3 w-3 mr-1" />
+                        Save
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setBatchScannedCards(prev => prev.map((c, i) => i === idx ? { ...c, isRecovering: false } : c))}
+                        data-testid={`batch-recovery-cancel-${idx}`}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => handleBatchCardAnalyze(card)}
+                        data-testid={`batch-recovery-analyze-${idx}`}
+                      >
+                        <Sparkles className="h-3 w-3 mr-1" />
+                        Analyze Instead
+                      </Button>
+                    </div>
                   </div>
-                )}
-                {card.status === "done" && batchProcessing && (
-                  <Check className="h-4 w-4 text-green-500 shrink-0" />
-                )}
-                {card.status === "failed" && (
-                  <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
-                )}
-                {card.status === "processing" && (
-                  <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
                 )}
               </div>
             ))}

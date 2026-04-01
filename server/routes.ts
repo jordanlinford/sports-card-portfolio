@@ -4380,11 +4380,67 @@ Sitemap: ${origin}/sitemap.xml
       }
 
       const remainingScans = dailyLimit - scansToday - 1;
-      
+
+      const fieldConfidence: Record<string, { confident: boolean; reason?: string }> = {};
+      const ci = scanResult.cardIdentification;
+      const overallConf = scanResult.confidence;
+
+      fieldConfidence.playerName = {
+        confident: !!ci.playerName && ci.playerName !== "Unknown",
+        reason: (!ci.playerName || ci.playerName === "Unknown") ? "Could not read player name from image" : undefined,
+      };
+      fieldConfidence.year = {
+        confident: ci.year !== null && ci.year !== undefined,
+        reason: ci.year == null ? "Year not visible on card" : undefined,
+      };
+      fieldConfidence.setName = {
+        confident: !!ci.setName && ci.setName !== "Unknown",
+        reason: (!ci.setName || ci.setName === "Unknown") ? "Set name could not be determined" : undefined,
+      };
+      fieldConfidence.variation = {
+        confident: !!ci.variation && ci.variation !== "Base" && overallConf === "high",
+        reason: !ci.variation ? "Parallel/variation not identified — may be base" : (overallConf !== "high" ? "Variation identified but with lower confidence" : undefined),
+      };
+      fieldConfidence.cardNumber = {
+        confident: !!ci.cardNumber,
+        reason: !ci.cardNumber ? "Card number not visible" : undefined,
+      };
+      fieldConfidence.grade = {
+        confident: scanResult.gradeEstimate.appearsToBe === "graded" ? !!scanResult.gradeEstimate.grade : true,
+        reason: (scanResult.gradeEstimate.appearsToBe === "graded" && !scanResult.gradeEstimate.grade) ? "Graded card detected but grade not readable" : undefined,
+      };
+      fieldConfidence.grader = {
+        confident: scanResult.gradeEstimate.appearsToBe === "graded" ? !!scanResult.gradeEstimate.gradingCompany : true,
+        reason: (scanResult.gradeEstimate.appearsToBe === "graded" && !scanResult.gradeEstimate.gradingCompany) ? "Grading company not identified" : undefined,
+      };
+
+      const uncertainFields = Object.entries(fieldConfidence).filter(([, v]) => !v.confident).map(([k]) => k);
+
+      const parallelSuggestions: string[] = [];
+      if (!fieldConfidence.variation.confident && ci.setName && ci.setName !== "Unknown") {
+        const setLower = ci.setName.toLowerCase();
+        if (setLower.includes("prizm")) {
+          parallelSuggestions.push("Base", "Silver Prizm", "Red Prizm /299", "Blue Prizm /199", "Green Prizm", "Pink Prizm", "Orange Prizm /49", "Gold Prizm /10", "Black Prizm /1", "Mojo", "Hyper Prizm", "Disco", "Camo");
+        } else if (setLower.includes("chrome") || setLower.includes("finest")) {
+          parallelSuggestions.push("Base", "Refractor", "Pink Refractor", "Gold Refractor /50", "Orange Refractor /25", "Red Refractor /5", "Superfractor /1");
+        } else if (setLower.includes("select")) {
+          parallelSuggestions.push("Base", "Silver", "Concourse", "Premier Level", "Tie-Dye", "Zebra", "Disco", "Gold /10");
+        } else if (setLower.includes("donruss")) {
+          parallelSuggestions.push("Base", "Rated Rookie", "Press Proof", "Holo", "Elite Series");
+        } else if (setLower.includes("optic")) {
+          parallelSuggestions.push("Base", "Holo", "Pink", "Blue /49", "Red /99", "Orange /199", "Green /5", "Gold /10", "Black /1");
+        } else {
+          parallelSuggestions.push("Base", "Refractor", "Holo", "Numbered", "Short Print");
+        }
+      }
+
       res.json({
         success: scanResult.success,
         scan: scanResult,
         scanHistoryId,
+        fieldConfidence,
+        uncertainFields,
+        parallelSuggestions,
         usage: {
           scansToday: scansToday + 1,
           dailyLimit,
