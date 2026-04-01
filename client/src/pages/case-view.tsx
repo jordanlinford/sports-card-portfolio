@@ -247,6 +247,7 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
               src={card.imagePath || undefined}
               alt={card.title}
               className="absolute inset-0 w-full h-full object-contain"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
             />
           </div>
           <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent pointer-events-none" />

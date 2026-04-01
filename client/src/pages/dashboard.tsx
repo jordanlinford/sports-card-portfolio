@@ -124,12 +124,12 @@ function DisplayCaseCard({ displayCase }: { displayCase: DisplayCaseWithCards })
                       src={card.imagePath}
                       alt={card.title}
                       className="w-full h-full object-cover"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; if (e.currentTarget.nextElementSibling) (e.currentTarget.nextElementSibling as HTMLElement).style.display = 'flex'; }}
                     />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-muted">
-                      <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
-                    </div>
-                  )}
+                  ) : null}
+                  <div className="w-full h-full flex items-center justify-center bg-muted" style={{ display: card.imagePath ? 'none' : 'flex' }}>
+                    <ImageIcon className="h-6 w-6 text-muted-foreground/30" />
+                  </div>
                 </div>
               ))}
               {previewImages.length < 4 &&

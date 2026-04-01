@@ -380,12 +380,15 @@ export default function AnalyticsPage() {
                         <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
                           {index + 1}
                         </div>
-                        <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0">
-                          <img 
-                            src={card.imagePath} 
-                            alt={card.title}
-                            className="w-full h-full object-cover"
-                          />
+                        <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0 bg-muted">
+                          {card.imagePath ? (
+                            <img 
+                              src={card.imagePath} 
+                              alt={card.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : null}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{card.title}</p>
@@ -424,12 +427,15 @@ export default function AnalyticsPage() {
                         className="flex items-center gap-3 p-2 rounded-md bg-muted/50"
                         data-testid={`value-change-${card.id}`}
                       >
-                        <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0">
-                          <img 
-                            src={card.imagePath} 
-                            alt={card.title}
-                            className="w-full h-full object-cover"
-                          />
+                        <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0 bg-muted">
+                          {card.imagePath ? (
+                            <img 
+                              src={card.imagePath} 
+                              alt={card.title}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : null}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{card.title}</p>

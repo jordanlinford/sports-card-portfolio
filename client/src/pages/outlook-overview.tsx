@@ -3388,12 +3388,20 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
             src={card.imagePath.startsWith('/objects/') ? card.imagePath : `/objects/${card.imagePath}`}
             alt={card.title}
             className="h-full w-full object-contain"
+            onError={(e) => {
+              const target = e.currentTarget;
+              target.style.display = 'none';
+              const fallback = target.nextElementSibling;
+              if (fallback) (fallback as HTMLElement).style.display = 'flex';
+            }}
           />
-        ) : (
-          <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">
-            No Image
-          </div>
-        )}
+        ) : null}
+        <div 
+          className="h-full w-full flex items-center justify-center text-muted-foreground"
+          style={{ display: card.imagePath ? 'none' : 'flex' }}
+        >
+          <ImageIcon className="h-6 w-6 opacity-30" />
+        </div>
         {isBigMover && isPro && (
           <div className="absolute top-1 right-1 bg-purple-500 rounded-full p-0.5">
             <Zap className="h-2.5 w-2.5 text-white" />
