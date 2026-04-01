@@ -10008,6 +10008,40 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  app.patch("/api/scan-history/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const id = parseInt(req.params.id);
+
+      if (isNaN(id)) {
+        return res.status(400).json({ message: "Invalid scan history ID" });
+      }
+
+      const { playerName, year, setName, variation, grade, grader, sport, cardNumber, scanConfidence } = req.body;
+
+      const updated = await storage.updateScanHistoryMetadata(id, userId, {
+        playerName: playerName || undefined,
+        year: year ? parseInt(String(year)) : undefined,
+        setName: setName || undefined,
+        variation: variation || undefined,
+        grade: grade || undefined,
+        grader: grader || undefined,
+        sport: sport || undefined,
+        cardNumber: cardNumber || undefined,
+        scanConfidence: scanConfidence || undefined,
+      });
+
+      if (!updated) {
+        return res.status(404).json({ message: "Scan history record not found" });
+      }
+
+      res.json({ success: true, record: updated });
+    } catch (error) {
+      console.error("Error updating scan history:", error);
+      res.status(500).json({ message: "Failed to update scan history" });
+    }
+  });
+
   app.delete("/api/scan-history/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;

@@ -427,6 +427,7 @@ export interface IStorage {
   deleteScanHistory(id: number, userId: string): Promise<void>;
   getScanHistoryByIds(ids: number[], userId: string): Promise<ScanHistory[]>;
   updateScanHistoryAnalysis(id: number, userId: string, marketValue: number | null, action: string | null): Promise<ScanHistory | undefined>;
+  updateScanHistoryMetadata(id: number, userId: string, data: { playerName?: string; year?: number | null; setName?: string; variation?: string; grade?: string; grader?: string; sport?: string; cardNumber?: string; scanConfidence?: string }): Promise<ScanHistory | undefined>;
 
   // Pop Report History operations
   insertPopSnapshots(snapshots: InsertPopHistory[]): Promise<PopHistory[]>;
@@ -3491,6 +3492,36 @@ export class DatabaseStorage implements IStorage {
     const [record] = await db
       .update(scanHistory)
       .set({ marketValue, action })
+      .where(and(eq(scanHistory.id, id), eq(scanHistory.userId, userId)))
+      .returning();
+    return record;
+  }
+
+  async updateScanHistoryMetadata(id: number, userId: string, data: {
+    playerName?: string;
+    year?: number | null;
+    setName?: string;
+    variation?: string;
+    grade?: string;
+    grader?: string;
+    sport?: string;
+    cardNumber?: string;
+    scanConfidence?: string;
+  }): Promise<ScanHistory | undefined> {
+    const updateFields: Record<string, any> = {};
+    if (data.playerName !== undefined) updateFields.playerName = data.playerName;
+    if (data.year !== undefined) updateFields.year = data.year;
+    if (data.setName !== undefined) updateFields.setName = data.setName;
+    if (data.variation !== undefined) updateFields.variation = data.variation;
+    if (data.grade !== undefined) updateFields.grade = data.grade;
+    if (data.grader !== undefined) updateFields.grader = data.grader;
+    if (data.sport !== undefined) updateFields.sport = data.sport;
+    if (data.cardNumber !== undefined) updateFields.cardNumber = data.cardNumber;
+    if (data.scanConfidence !== undefined) updateFields.scanConfidence = data.scanConfidence;
+    if (Object.keys(updateFields).length === 0) return undefined;
+    const [record] = await db
+      .update(scanHistory)
+      .set(updateFields)
       .where(and(eq(scanHistory.id, id), eq(scanHistory.userId, userId)))
       .returning();
     return record;

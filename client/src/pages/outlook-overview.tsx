@@ -1237,6 +1237,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
             ...c,
             status: "failed",
             error: scanData.scan?.error || "Could not identify card",
+            scanHistoryId: scanData.scanHistoryId,
+            playerName: partialCard?.playerName !== "Unknown" ? (partialCard?.playerName || c.playerName) : c.playerName,
+            year: partialCard?.year ? String(partialCard.year) : c.year,
+            set: partialCard?.setName !== "Unknown" ? (partialCard?.setName || c.set) : c.set,
+            variation: partialCard?.variation || c.variation,
             partialData: partialCard ? {
               playerName: partialCard.playerName !== "Unknown" ? partialCard.playerName : undefined,
               year: partialCard.year ? String(partialCard.year) : null,
@@ -3243,7 +3248,24 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                         size="sm"
                         className="h-7 text-xs"
                         disabled={!card.playerName?.trim()}
-                        onClick={() => {
+                        onClick={async () => {
+                          if (card.scanHistoryId) {
+                            try {
+                              await apiRequest("PATCH", `/api/scan-history/${card.scanHistoryId}`, {
+                                playerName: card.playerName || undefined,
+                                year: card.year || undefined,
+                                setName: card.set || undefined,
+                                variation: card.variation || undefined,
+                                grade: card.grade || undefined,
+                                grader: card.grader || undefined,
+                                sport: card.sport || undefined,
+                                cardNumber: card.cardNumber || undefined,
+                                scanConfidence: "medium",
+                              });
+                            } catch (err) {
+                              console.error("Failed to persist recovery:", err);
+                            }
+                          }
                           setBatchScannedCards(prev => prev.map((c, i) => i === idx ? {
                             ...c,
                             status: "done" as const,
@@ -3251,6 +3273,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                             error: undefined,
                             confidence: "medium",
                           } : c));
+                          queryClient.invalidateQueries({ queryKey: ['/api/scan-history'] });
                           toast({ title: "Card recovered", description: `${card.playerName} saved with your corrections.` });
                         }}
                         data-testid={`batch-recovery-save-${idx}`}
