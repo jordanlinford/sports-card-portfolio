@@ -3261,7 +3261,16 @@ Sitemap: ${origin}/sitemap.xml
           },
           action: outlook.action,
           actionReasons: isPro ? outlook.actionReasons : null,
-          careerStage: outlook.careerStageAuto,
+          careerStage: (() => {
+            if (card.playerName) {
+              const { lookupPlayer, mapRegistryStage } = require("./playerRegistry");
+              const reg = lookupPlayer(card.playerName);
+              if (reg.found && reg.entry) {
+                return mapRegistryStage(reg.entry.careerStage);
+              }
+            }
+            return outlook.careerStageAuto;
+          })(),
           confidence: {
             level: outlook.dataConfidence,
             reason: isPro ? outlook.confidenceReason : null,

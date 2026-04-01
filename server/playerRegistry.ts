@@ -240,16 +240,17 @@ export function mapRegistryRoleTier(registryRoleTier: string): "FRANCHISE_CORE" 
   return mapping[registryRoleTier] || "UNKNOWN";
 }
 
-export function mapRegistryStage(registryStage: string): "ROOKIE" | "YEAR_2" | "PRIME" | "VETERAN" | "AGING" | "UNKNOWN" {
-  const mapping: Record<string, "ROOKIE" | "YEAR_2" | "PRIME" | "VETERAN" | "AGING" | "UNKNOWN"> = {
+export function mapRegistryStage(registryStage: string): string {
+  const mapping: Record<string, string> = {
     "ROOKIE": "ROOKIE",
     "YEAR_2": "YEAR_2",
     "PRIME": "PRIME",
     "VETERAN": "VETERAN",
     "AGING": "AGING",
-    "RETIRED_HOF": "VETERAN",
-    "BUST": "PRIME",
-    "PROSPECT": "ROOKIE", // Legacy support for old data
+    "RETIRED_HOF": "LEGEND",
+    "RETIRED": "RETIRED",
+    "BUST": "BUST",
+    "PROSPECT": "ROOKIE",
   };
   
   return mapping[registryStage] || "UNKNOWN";

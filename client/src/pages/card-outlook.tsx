@@ -534,7 +534,19 @@ export default function CardOutlookPage() {
                   )}
                   {outlook.careerStage && outlook.careerStage !== "UNKNOWN" && (
                     <Badge variant="secondary" className="text-xs" data-testid="badge-career-stage">
-                      {outlook.careerStage}
+                      {({
+                        LEGEND: "Legend",
+                        RETIRED: "Retired",
+                        RETIRED_HOF: "Legend",
+                        ROOKIE: "Rookie",
+                        YEAR_2: "2nd Year",
+                        PRIME: "Prime",
+                        VETERAN: "Veteran",
+                        AGING: "Aging",
+                        RISING: "Rising",
+                        ELITE: "Elite",
+                        BUST: "Bust",
+                      } as Record<string, string>)[outlook.careerStage] || outlook.careerStage}
                     </Badge>
                   )}
                   {outlook.bigMover?.flag && (
@@ -662,11 +674,15 @@ export default function CardOutlookPage() {
             }}
             autoLoad={true}
             onPriceLoaded={(latestPrice) => {
-              const currentDisplay = displayPrice;
-              if (currentDisplay && latestPrice > 0) {
-                const ratio = currentDisplay / latestPrice;
-                if (ratio < 0.25 || ratio > 4) {
+              if (latestPrice > 0) {
+                const currentDisplay = displayPrice;
+                if (!currentDisplay) {
                   setReconciledPrice(latestPrice);
+                } else {
+                  const ratio = currentDisplay / latestPrice;
+                  if (ratio < 0.25 || ratio > 4) {
+                    setReconciledPrice(latestPrice);
+                  }
                 }
               }
             }}
