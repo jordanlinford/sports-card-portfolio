@@ -340,14 +340,23 @@ export function ComparisonPriceTrendChart({
     setIsLoading(true);
     setError(null);
     try {
-      const [h1, h2] = await Promise.all([
+      const [r1, r2] = await Promise.allSettled([
         apiRequest("POST", "/api/player-outlook/price-history", player1Request),
         apiRequest("POST", "/api/player-outlook/price-history", player2Request),
       ]);
-      setHistory1(h1 as MonthlyPriceHistory);
-      setHistory2(h2 as MonthlyPriceHistory);
+      const h1 = r1.status === "fulfilled" ? (r1.value as MonthlyPriceHistory) : null;
+      const h2 = r2.status === "fulfilled" ? (r2.value as MonthlyPriceHistory) : null;
+      setHistory1(h1);
+      setHistory2(h2);
+      if (!h1 && !h2) {
+        setError("Price history data isn't available for these players right now. Try again later.");
+      } else if (!h1) {
+        setError(`Price data unavailable for ${player1Name} — showing ${player2Name} only`);
+      } else if (!h2) {
+        setError(`Price data unavailable for ${player2Name} — showing ${player1Name} only`);
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to load price history");
+      setError("Failed to load price history. Try again later.");
     } finally {
       setIsLoading(false);
     }
@@ -374,7 +383,7 @@ export function ComparisonPriceTrendChart({
     );
   }
 
-  if (!history1 || !history2) {
+  if (!history1 && !history2) {
     return (
       <Card>
         <CardHeader className="pb-2">
@@ -410,30 +419,33 @@ export function ComparisonPriceTrendChart({
     );
   }
 
+  const hasPlayer1 = history1 && history1.dataPoints.length > 0;
+  const hasPlayer2 = history2 && history2.dataPoints.length > 0;
+
   const allMonths = new Set<string>();
-  history1.dataPoints.forEach((dp) => allMonths.add(dp.month));
-  history2.dataPoints.forEach((dp) => allMonths.add(dp.month));
+  if (hasPlayer1) history1.dataPoints.forEach((dp) => allMonths.add(dp.month));
+  if (hasPlayer2) history2.dataPoints.forEach((dp) => allMonths.add(dp.month));
   const sortedMonths = Array.from(allMonths).sort();
 
-  const p1Map = new Map(history1.dataPoints.map((dp) => [dp.month, dp.avgPrice]));
-  const p2Map = new Map(history2.dataPoints.map((dp) => [dp.month, dp.avgPrice]));
+  const p1Map = hasPlayer1 ? new Map(history1.dataPoints.map((dp) => [dp.month, dp.avgPrice])) : new Map();
+  const p2Map = hasPlayer2 ? new Map(history2.dataPoints.map((dp) => [dp.month, dp.avgPrice])) : new Map();
 
   const chartData = sortedMonths.map((month) => ({
     month: formatMonth(month),
-    [player1Name]: p1Map.get(month) || 0,
-    [player2Name]: p2Map.get(month) || 0,
+    ...(hasPlayer1 ? { [player1Name]: p1Map.get(month) || 0 } : {}),
+    ...(hasPlayer2 ? { [player2Name]: p2Map.get(month) || 0 } : {}),
   }));
 
   const allPrices = [
-    ...history1.dataPoints.map((dp) => dp.avgPrice),
-    ...history2.dataPoints.map((dp) => dp.avgPrice),
+    ...(hasPlayer1 ? history1.dataPoints.map((dp) => dp.avgPrice) : []),
+    ...(hasPlayer2 ? history2.dataPoints.map((dp) => dp.avgPrice) : []),
   ].filter((p) => p > 0);
 
   const minPrice = allPrices.length > 0 ? Math.min(...allPrices) : 0;
   const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) : 0;
 
-  const change1 = computePercentChange(history1.dataPoints);
-  const change2 = computePercentChange(history2.dataPoints);
+  const change1 = hasPlayer1 ? computePercentChange(history1.dataPoints) : 0;
+  const change2 = hasPlayer2 ? computePercentChange(history2.dataPoints) : 0;
 
   const xInterval = computeXAxisInterval(chartData.length);
 
@@ -452,30 +464,34 @@ export function ComparisonPriceTrendChart({
             <p className="text-xs text-muted-foreground mt-0.5">18-month price history overlay</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge
-              variant="outline"
-              className={
-                change1 >= 0
-                  ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
-                  : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
-              }
-            >
-              <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: CHART_COLORS.player1 }} />
-              <TrendIcon1 className="h-3 w-3 mr-0.5" />
-              {change1 >= 0 ? "+" : ""}{change1.toFixed(1)}%
-            </Badge>
-            <Badge
-              variant="outline"
-              className={
-                change2 >= 0
-                  ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
-                  : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
-              }
-            >
-              <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: CHART_COLORS.player2 }} />
-              <TrendIcon2 className="h-3 w-3 mr-0.5" />
-              {change2 >= 0 ? "+" : ""}{change2.toFixed(1)}%
-            </Badge>
+            {hasPlayer1 && (
+              <Badge
+                variant="outline"
+                className={
+                  change1 >= 0
+                    ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                    : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                }
+              >
+                <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: CHART_COLORS.player1 }} />
+                <TrendIcon1 className="h-3 w-3 mr-0.5" />
+                {change1 >= 0 ? "+" : ""}{change1.toFixed(1)}%
+              </Badge>
+            )}
+            {hasPlayer2 && (
+              <Badge
+                variant="outline"
+                className={
+                  change2 >= 0
+                    ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                    : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+                }
+              >
+                <div className="w-2 h-2 rounded-full mr-1" style={{ backgroundColor: CHART_COLORS.player2 }} />
+                <TrendIcon2 className="h-3 w-3 mr-0.5" />
+                {change2 >= 0 ? "+" : ""}{change2.toFixed(1)}%
+              </Badge>
+            )}
           </div>
         </div>
       </CardHeader>
@@ -504,28 +520,35 @@ export function ComparisonPriceTrendChart({
               <Legend
                 wrapperStyle={{ fontSize: 12 }}
               />
-              <Line
-                type="monotone"
-                dataKey={player1Name}
-                stroke={CHART_COLORS.player1}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, fill: CHART_COLORS.player1, stroke: "hsl(var(--background))", strokeWidth: 2 }}
-              />
-              <Line
-                type="monotone"
-                dataKey={player2Name}
-                stroke={CHART_COLORS.player2}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, fill: CHART_COLORS.player2, stroke: "hsl(var(--background))", strokeWidth: 2 }}
-              />
+              {hasPlayer1 && (
+                <Line
+                  type="monotone"
+                  dataKey={player1Name}
+                  stroke={CHART_COLORS.player1}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, fill: CHART_COLORS.player1, stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                />
+              )}
+              {hasPlayer2 && (
+                <Line
+                  type="monotone"
+                  dataKey={player2Name}
+                  stroke={CHART_COLORS.player2}
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 4, fill: CHART_COLORS.player2, stroke: "hsl(var(--background))", strokeWidth: 2 }}
+                />
+              )}
             </LineChart>
           </ResponsiveContainer>
         </div>
+        {error && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">{error}</p>
+        )}
         <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
-          {history1.notes && <p className="flex-1">{player1Name}: {history1.notes}</p>}
-          {history2.notes && <p className="flex-1">{player2Name}: {history2.notes}</p>}
+          {hasPlayer1 && history1.notes && <p className="flex-1">{player1Name}: {history1.notes}</p>}
+          {hasPlayer2 && history2.notes && <p className="flex-1">{player2Name}: {history2.notes}</p>}
         </div>
       </CardContent>
     </Card>
