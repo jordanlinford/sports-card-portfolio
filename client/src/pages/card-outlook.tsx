@@ -281,6 +281,19 @@ export default function CardOutlookPage() {
     },
   });
 
+  const [wasPending, setWasPending] = useState(false);
+
+  useEffect(() => {
+    const currentlyPending = (outlook as any)?.isPending === true;
+    if (currentlyPending) {
+      setWasPending(true);
+    } else if (wasPending && outlook && !currentlyPending) {
+      setWasPending(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cards"] });
+    }
+  }, [outlook, wasPending]);
+
   const { data: displayCases } = useQuery<DisplayCase[]>({
     queryKey: ["/api/display-cases"],
     enabled: isAuthenticated && showAddToCaseModal,
