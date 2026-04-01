@@ -155,7 +155,7 @@ export const cards = pgTable("cards", {
   eraPrestige: varchar("era_prestige", { length: 50 }),
   franchiseHeat: varchar("franchise_heat", { length: 20 }),
   // Cached outlook data
-  outlookAction: varchar("outlook_action", { length: 10 }),
+  outlookAction: varchar("outlook_action", { length: 20 }),
   outlookUpsideScore: integer("outlook_upside_score"),
   outlookRiskScore: integer("outlook_risk_score"),
   outlookConfidenceScore: integer("outlook_confidence_score"),
