@@ -53,6 +53,10 @@ function formatCurrency(value: number): string {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function getEffectiveValue(card: CardType): number {
+  return card.manualValue ?? card.estimatedValue ?? 0;
+}
+
 function ValueChangeIndicator({ current, previous }: { current: number | null; previous: number | null }) {
   if (!current || !previous || previous === 0) return null;
   
@@ -372,9 +376,10 @@ export default function AnalyticsPage() {
                 {analytics.topCards.length > 0 ? (
                   <div className="space-y-3">
                     {analytics.topCards.map((card, index) => (
-                      <div 
+                      <Link 
                         key={card.id}
-                        className="flex items-center gap-3 p-2 rounded-md bg-muted/50"
+                        href={`/card/${card.id}/outlook`}
+                        className="flex items-center gap-3 p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
                         data-testid={`top-card-${card.id}`}
                       >
                         <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-sm font-medium">
@@ -391,16 +396,14 @@ export default function AnalyticsPage() {
                           ) : null}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{card.title}</p>
-                          {card.set && (
-                            <p className="text-xs text-muted-foreground truncate">{card.set}</p>
-                          )}
+                          <p className="font-medium truncate">{card.playerName || card.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{[card.year, card.set, card.variation].filter(Boolean).join(" · ")}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">{formatCurrency(card.estimatedValue || 0)}</p>
-                          <ValueChangeIndicator current={card.estimatedValue} previous={card.previousValue} />
+                          <p className="font-semibold">{formatCurrency(getEffectiveValue(card))}</p>
+                          <ValueChangeIndicator current={getEffectiveValue(card)} previous={card.previousValue} />
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 ) : (
@@ -422,9 +425,10 @@ export default function AnalyticsPage() {
                 {analytics.recentValueChanges.length > 0 ? (
                   <div className="space-y-3">
                     {analytics.recentValueChanges.map((card) => (
-                      <div 
+                      <Link 
                         key={card.id}
-                        className="flex items-center gap-3 p-2 rounded-md bg-muted/50"
+                        href={`/card/${card.id}/outlook`}
+                        className="flex items-center gap-3 p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
                         data-testid={`value-change-${card.id}`}
                       >
                         <div className="w-10 h-14 rounded overflow-hidden flex-shrink-0 bg-muted">
@@ -438,17 +442,17 @@ export default function AnalyticsPage() {
                           ) : null}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{card.title}</p>
+                          <p className="font-medium truncate">{card.playerName || card.title}</p>
                           <p className="text-xs text-muted-foreground truncate">{card.displayCaseName}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">{formatCurrency(card.estimatedValue || 0)}</p>
+                          <p className="font-semibold">{formatCurrency(getEffectiveValue(card))}</p>
                           <div className="flex items-center gap-1 justify-end">
                             <span className="text-xs text-muted-foreground">was {formatCurrency(card.previousValue || 0)}</span>
-                            <ValueChangeIndicator current={card.estimatedValue} previous={card.previousValue} />
+                            <ValueChangeIndicator current={getEffectiveValue(card)} previous={card.previousValue} />
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 ) : (
