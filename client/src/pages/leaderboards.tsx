@@ -147,11 +147,14 @@ function LeaderboardSection({
                     <span className="text-sm font-semibold block" data-testid={`text-metric-${testIdPrefix}-${entry.id}`}>
                       {renderMetric(entry)}
                     </span>
-                    {renderSubtext && renderSubtext(entry) && (
-                      <span className="text-[10px] text-muted-foreground block truncate max-w-[8rem]" data-testid={`text-subtext-${testIdPrefix}-${entry.id}`}>
-                        {renderSubtext(entry)}
-                      </span>
-                    )}
+                    {(() => {
+                      const sub = renderSubtext?.(entry);
+                      return sub ? (
+                        <span className="text-[10px] text-muted-foreground block truncate max-w-[8rem]" data-testid={`text-subtext-${testIdPrefix}-${entry.id}`}>
+                          {sub}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
               </div>
