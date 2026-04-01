@@ -10274,6 +10274,7 @@ Return ONLY valid JSON, no markdown.`;
         .from(playerOutlookCache)
         .where(isNotNull(playerOutlookCache.outlookJson));
 
+      const VALID_SPORTS = new Set(["football", "basketball", "baseball", "hockey", "soccer"]);
       const normSport = (s: string) => {
         const map: Record<string, string> = { nba: "basketball", nfl: "football", mlb: "baseball", nhl: "hockey", mls: "soccer" };
         return map[s.toLowerCase()] || s.toLowerCase();
@@ -10300,7 +10301,9 @@ Return ONLY valid JSON, no markdown.`;
           if (!o.outlookJson) return false;
           const oj = o.outlookJson as any;
           if (!oj.investmentCall?.verdict && !oj.verdict?.action) return false;
-          if (sportFilter && normSport(o.sport) !== sportFilter) return false;
+          const ns = normSport(o.sport);
+          if (!VALID_SPORTS.has(ns)) return false;
+          if (sportFilter && ns !== sportFilter) return false;
           return true;
         })
         .map(o => {

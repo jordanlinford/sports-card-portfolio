@@ -1590,15 +1590,39 @@ async function generateFreshOutlook(
   const { momentum, newsHype, snippets, detectedStage, roleStatus, injuryStatus, aiCareerStage, aiRookieYear, aiPosition, aiDetectedSport } = await getPlayerNewsSignals(playerName, sport);
   
   // Sport correction: if AI detected a different sport than what was passed, correct it
+  const SUPPORTED_SPORTS = new Set(["football", "basketball", "baseball", "hockey", "soccer"]);
   let effectiveSport = sport;
   if (aiDetectedSport && aiDetectedSport !== sport && sport !== aiDetectedSport) {
     const normalizedPassed = normalizeSportName(sport);
     const normalizedDetected = normalizeSportName(aiDetectedSport);
-    if (normalizedPassed !== normalizedDetected) {
+    if (normalizedPassed !== normalizedDetected && SUPPORTED_SPORTS.has(normalizedDetected)) {
       console.log(`[PlayerOutlook] SPORT CORRECTION: ${playerName} was passed as "${sport}" but AI detected "${aiDetectedSport}" → using "${normalizedDetected}"`);
       effectiveSport = normalizedDetected;
       playerKey = normalizePlayerKey(effectiveSport, playerName);
+    } else if (!SUPPORTED_SPORTS.has(normalizedDetected)) {
+      console.log(`[PlayerOutlook] UNSUPPORTED SPORT: ${playerName} detected as "${aiDetectedSport}" which is not a supported card sport — keeping "${sport}"`);
     }
+  }
+
+  // Cross-sport legend check: if player is a known legend in a DIFFERENT sport, correct the sport
+  if (SUPPORTED_SPORTS.has(effectiveSport)) {
+    const nameLower = playerName.toLowerCase().trim();
+    for (const [legendSport, legends] of Object.entries(KNOWN_LEGENDS)) {
+      if (legendSport === effectiveSport) continue;
+      if (legends.some(l => nameLower.includes(l) || l.includes(nameLower))) {
+        console.log(`[PlayerOutlook] CROSS-SPORT LEGEND FIX: ${playerName} is a ${legendSport} legend, was stored as "${effectiveSport}" → correcting to "${legendSport}"`);
+        effectiveSport = legendSport;
+        playerKey = normalizePlayerKey(effectiveSport, playerName);
+        break;
+      }
+    }
+  }
+
+  // Final sport validation: ensure effectiveSport is supported
+  const normalizedEffective = normalizeSportName(effectiveSport);
+  if (!SUPPORTED_SPORTS.has(normalizedEffective)) {
+    console.log(`[PlayerOutlook] SPORT VALIDATION FAIL: ${playerName} has unsupported sport "${effectiveSport}" after all corrections — defaulting to "football"`);
+    effectiveSport = "football";
   }
   
   // Step 2: Run classification engine (depends on news signals)

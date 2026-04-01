@@ -193,10 +193,13 @@ export async function getLeaderboard(
     slug?: string;
   };
 
+  const VALID_SPORTS = new Set(["football", "basketball", "baseball", "hockey", "soccer"]);
   const scored: ScoredEntry[] = [];
 
   for (const row of rows) {
-    if (sport !== "all" && row.sport.toLowerCase() !== sport.toLowerCase()) continue;
+    const rowSport = row.sport.toLowerCase();
+    if (!VALID_SPORTS.has(rowSport)) continue;
+    if (sport !== "all" && rowSport !== sport.toLowerCase()) continue;
 
     const outlook = row.outlookJson as PlayerOutlookResponse;
     if (!outlook) continue;
@@ -466,9 +469,11 @@ export async function getPlayerPercentiles(playerKey?: string): Promise<Map<stri
     quality: number;
   };
 
+  const VALID_SPORTS_PCT = new Set(["football", "basketball", "baseball", "hockey", "soccer"]);
   const players: PlayerScore[] = [];
 
   for (const row of rows) {
+    if (!VALID_SPORTS_PCT.has(row.sport.toLowerCase())) continue;
     const outlook = row.outlookJson as PlayerOutlookResponse;
     if (!outlook) continue;
 
