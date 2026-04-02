@@ -1151,6 +1151,13 @@ STEP 4 — COMPARABLE PLAYERS: Search for COMPARABLE players at the same demand 
 
 NOTE: For low-demand players (late-round picks, non-skill positions, backups on bad teams), even /25 non-auto parallels typically sell for $5-$25. Do NOT inflate estimates just because a card is numbered — the player's actual demand matters more than scarcity alone.
 
+GRADED CARD WITH NO GRADED COMPS: If the card is graded but you found ZERO graded sold listings, you MUST still estimate the graded value properly:
+- Search for RAW sales of this EXACT card. If raw copies are selling for $X, the PSA 10 of a desirable rookie/star card is typically worth 2-5x the raw price. For elite players with high demand, the multiplier can be even higher.
+- NEVER estimate the graded value at or barely above the raw price. A PSA 10 of a desirable card ALWAYS commands a significant premium over raw.
+- Example: If raw copies of a Cooper Flagg Team Color Border sell for $400, the PSA 10 should be estimated at $1,200-$2,000, NOT $500.
+- Use active graded listings as your PRIMARY signal. If someone has a PSA 10 listed for $1,800 and there are similar listings at $1,500-$2,000, that IS the market.
+- Your avgPrice for a graded card must reflect the GRADED value, not a slight markup over raw.
+
 NEW RELEASE RULE: For products released within the LAST 30 DAYS, completed sales data will be very thin or nonexistent. For new releases, active listing prices from real sellers ARE the best pricing signal available. Do NOT apply aggressive discounts to active listing prices for new releases — sellers are pricing based on real-time market demand. Use the lower end of active listings as your estimate.
 
 5. IDENTITY VERIFICATION: The card is stored as Variation: "${card.variation || "Base"}". As you search eBay and price this card, verify whether this variation name is CORRECT.
