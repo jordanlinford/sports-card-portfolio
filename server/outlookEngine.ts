@@ -617,39 +617,11 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
           if (typeof parsed.soldCount === "number" && typeof parsed.avgPrice === "number") {
             console.log(`[OutlookEngine] Found market data: ${parsed.soldCount} sold, avg $${parsed.avgPrice}`);
             
-            // GEMINI-DIRECT: Trust Gemini's pricing with no corrections
             let correctedAvg = parsed.avgPrice || 0;
             let correctedMin = parsed.minPrice || correctedAvg;
             let correctedMax = parsed.maxPrice || correctedAvg;
 
-            if (isRaw && parsed.rawPrice && parsed.rawPrice > 0) {
-              console.log(`[OutlookEngine] GEMINI-DIRECT: Raw card — using rawPrice $${parsed.rawPrice} (overall avg was $${correctedAvg}).`);
-              correctedAvg = parsed.rawPrice;
-              correctedMin = parsed.rawMinPrice || parsed.minPrice || correctedAvg;
-              correctedMax = parsed.rawMaxPrice || parsed.maxPrice || correctedAvg;
-            } else if (!isRaw && card.grade) {
-              const gradeLower = (card.grade || "").toLowerCase().trim();
-              const gradeNum = parseFloat(gradeLower);
-              let gradedPrice: number | null = null;
-              if (gradeNum >= 9.5 || gradeLower === "gem mint" || gradeLower === "pristine") {
-                gradedPrice = parsePrice(parsed.psa10Price);
-              } else if (gradeNum >= 9 || gradeLower === "mint") {
-                gradedPrice = parsePrice(parsed.psa9Price);
-              } else if (gradeNum >= 8) {
-                const p9 = parsePrice(parsed.psa9Price);
-                if (p9) gradedPrice = Math.round(p9 * 0.6);
-              }
-              if (gradedPrice && gradedPrice > 0) {
-                console.log(`[OutlookEngine] GEMINI-DIRECT: Graded card (${card.grade}) — using graded price $${gradedPrice} (raw avgPrice was $${correctedAvg}).`);
-                correctedAvg = gradedPrice;
-                correctedMin = Math.round(gradedPrice * 0.85);
-                correctedMax = Math.round(gradedPrice * 1.2);
-              } else {
-                console.log(`[OutlookEngine] GEMINI-DIRECT: Graded card but no graded price available — using avgPrice $${correctedAvg}.`);
-              }
-            } else {
-              console.log(`[OutlookEngine] GEMINI-DIRECT: Using avgPrice $${correctedAvg}.`);
-            }
+            console.log(`[OutlookEngine] GEMINI-DIRECT: Using Gemini's avgPrice $${correctedAvg} directly (grade: ${isRaw ? "RAW" : card.grade || "Unknown"}).`);
             
             // GEMINI-DIRECT: Trust Gemini's graded prices, only fix obvious data errors (PSA 9/10 inversion)
             let finalPsa9 = parsePrice(parsed.psa9Price);
@@ -1102,23 +1074,25 @@ ${triangulationInstructions}
 Do ALL of the following in this single search:
 
 1. MARKET PRICING (MOST IMPORTANT — get this right):
-   Search eBay completed/sold listings for this EXACT card. Run BOTH sub-searches:
+   Search eBay completed/sold listings for this EXACT card AS DESCRIBED above (including its grade: ${isRaw ? "RAW/ungraded" : (card.grade || "Unknown")}).
+   
+   YOUR SINGLE MOST IMPORTANT JOB: Find what THIS SPECIFIC CARD sells for. The avgPrice field must be the price for THIS card in THIS condition.
+   ${isRaw ? `This is a RAW (ungraded) card. Search for raw/ungraded sales only for avgPrice.` : `This is a GRADED card (${card.grade}${card.grader ? ` by ${card.grader}` : ""}). The avgPrice MUST reflect the graded price, not the raw price.`}
 
-   1a. RAW/UNGRADED prices — ALWAYS include the specific variation in your search. Try ALL of these searches:
-   - "${unifiedSearchDescription} sold eBay"
-   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""} sold eBay"
-   - "${card.playerName || card.title} ${card.variation || ""} sold completed"
-   - "${card.playerName || card.title} ${card.variation || ""} eBay sold price"
-   - "ebay.com ${card.playerName || card.title} ${card.variation || ""} sold"
+   Try ALL of these searches:
+   - "${unifiedSearchDescription}${!isRaw ? ` ${card.grade}` : ""} sold eBay"
+   - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation || ""}${!isRaw ? ` ${card.grade}` : ""} sold eBay"
+   - "${card.playerName || card.title} ${card.variation || ""}${!isRaw ? ` ${card.grade}` : ""} sold completed"
+   - "${card.playerName || card.title} ${card.variation || ""}${!isRaw ? ` ${card.grade}` : ""} eBay sold price"
    - Also try price tracking sites: "${card.playerName || card.title} ${card.year || ""} ${card.variation || ""} price" on sites like 130point.com, mavin.io, or pricecharting.com${isOpticSet ? `
    - OPTIC-SPECIFIC SEARCH (mandatory): "${card.playerName || card.title} ${card.year || ""} Optic ${card.variation || ""} sold eBay"
    - Also try: "Donruss Optic ${card.variation || ""} ${card.playerName || card.title} sold"
    - VERIFY every comp has "Optic" in the listing — base Donruss is a different, cheaper product` : ""}
    - Prioritize the MOST RECENT sales (last 14 days > last 30 days > last 60 days)
-   - avgPrice = what it realistically sells for TODAY based on recent completed sales
+   - avgPrice = what THIS SPECIFIC CARD (in this exact grade/condition) realistically sells for TODAY
    - CRITICAL: rawPrice must be for THIS EXACT variation, not a base/silver version
 
-   1b. GRADED prices — search these SEPARATELY, do not skip:
+   Also search for graded price references (even if this card is raw):
    - "${unifiedSearchDescription} PSA 10 sold eBay"
    - "${unifiedSearchDescription} PSA 9 sold eBay"
    - "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} PSA 10 sold"
@@ -1281,39 +1255,11 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
           const parsed = JSON.parse(jsonMatch[0]);
 
           if (parsed.market && typeof parsed.market.avgPrice === "number") {
-            // GEMINI-DIRECT: Trust Gemini's pricing with no corrections
             let correctedAvg = parsed.market.avgPrice || 0;
             let correctedMin = parsed.market.minPrice || correctedAvg;
             let correctedMax = parsed.market.maxPrice || correctedAvg;
 
-            if (isRaw && parsed.market.rawPrice && parsed.market.rawPrice > 0) {
-              console.log(`[Unified Analysis] GEMINI-DIRECT: Raw card — using rawPrice $${parsed.market.rawPrice} (overall avg was $${correctedAvg}).`);
-              correctedAvg = parsed.market.rawPrice;
-              correctedMin = parsed.market.rawMinPrice || parsed.market.minPrice || correctedAvg;
-              correctedMax = parsed.market.rawMaxPrice || parsed.market.maxPrice || correctedAvg;
-            } else if (!isRaw && card.grade) {
-              const gradeLower = (card.grade || "").toLowerCase().trim();
-              const gradeNum = parseFloat(gradeLower);
-              let gradedPrice: number | null = null;
-              if (gradeNum >= 9.5 || gradeLower === "gem mint" || gradeLower === "pristine") {
-                gradedPrice = parsePrice(parsed.market.psa10Price);
-              } else if (gradeNum >= 9 || gradeLower === "mint") {
-                gradedPrice = parsePrice(parsed.market.psa9Price);
-              } else if (gradeNum >= 8) {
-                const p9 = parsePrice(parsed.market.psa9Price);
-                if (p9) gradedPrice = Math.round(p9 * 0.6);
-              }
-              if (gradedPrice && gradedPrice > 0) {
-                console.log(`[Unified Analysis] GEMINI-DIRECT: Graded card (${card.grade}) — using graded price $${gradedPrice} (raw avgPrice was $${correctedAvg}).`);
-                correctedAvg = gradedPrice;
-                correctedMin = Math.round(gradedPrice * 0.85);
-                correctedMax = Math.round(gradedPrice * 1.2);
-              } else {
-                console.log(`[Unified Analysis] GEMINI-DIRECT: Graded card but no graded price available — using avgPrice $${correctedAvg}.`);
-              }
-            } else {
-              console.log(`[Unified Analysis] GEMINI-DIRECT: Using avgPrice $${correctedAvg}.`);
-            }
+            console.log(`[Unified Analysis] GEMINI-DIRECT: Using Gemini's avgPrice $${correctedAvg} directly (grade: ${isRaw ? "RAW" : card.grade || "Unknown"}).`);
 
             const player = parsed.player || {};
             let momentum: "up" | "flat" | "down" = player.momentum || "flat";
