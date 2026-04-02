@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import * as ebayComps from "./ebayCompsService";
 import { fetchGeminiMarketData } from "./outlookEngine";
-import { getPlayerDemandContext, applyCeilingCheck } from "./demandTierEngine";
+import { getPlayerDemandContext } from "./demandTierEngine";
 import type { EbayComp } from "@shared/schema";
 
 const gemini = new GoogleGenAI({
@@ -705,25 +705,9 @@ export async function scanCardWithPricing(
         liquidityScore = 1;
       }
       
-      let finalPrice = geminiData.avgPrice;
-      let finalMin = geminiData.minPrice;
-      let finalMax = geminiData.maxPrice;
-      let scanCeilingApplied = false;
-      let scanCeilingReason = "";
-      if (scanDemandContext && scanDemandContext.tier >= 3 && geminiData.soldCount === 0 && finalPrice > 0) {
-        const baseCompAnchor = geminiData.minPrice && geminiData.minPrice > 0
-          ? geminiData.minPrice
-          : finalPrice * 0.5;
-        const ceilingResult = applyCeilingCheck(finalPrice, baseCompAnchor, scanDemandContext.tier, geminiData.soldCount);
-        if (ceilingResult.wasCapped) {
-          console.warn(`[CardScanner] DEMAND CEILING: ${ceilingResult.capReason}. Was $${finalPrice}, anchor $${baseCompAnchor.toFixed(2)}, now $${ceilingResult.price}`);
-          finalPrice = ceilingResult.price;
-          finalMin = Math.round(finalPrice * 0.6);
-          finalMax = Math.round(finalPrice * 1.5);
-          scanCeilingApplied = true;
-          scanCeilingReason = ceilingResult.capReason || "";
-        }
-      }
+      const finalPrice = geminiData.avgPrice;
+      const finalMin = geminiData.minPrice;
+      const finalMax = geminiData.maxPrice;
 
       const finalPriceRange = finalMin && finalMax
         ? `$${finalMin.toFixed(2)} - $${finalMax.toFixed(2)}`
@@ -756,8 +740,8 @@ export async function scanCardWithPricing(
           sport: scanDemandContext.sport,
           percentile: scanDemandContext.percentileInSport,
           triangulationUsed: scanIsLowPop && geminiData.soldCount === 0,
-          ceilingApplied: scanCeilingApplied,
-          ceilingReason: scanCeilingReason || undefined,
+          ceilingApplied: false,
+          ceilingReason: undefined,
         } : null,
       };
     }
