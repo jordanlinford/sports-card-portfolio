@@ -1196,7 +1196,7 @@ function buildVariationSearchTerm(card: CardInfo): { term: string; excludeTerms:
   // Detect auto/memorabilia cards (highest priority - these are premium)
   // Check both variation AND set name for auto indicators (e.g., "Donruss Signature Series" has auto in set name)
   const combinedText = `${variation} ${setLower}`;
-  const hasAuto = /\b(auto|autograph|signature|signed)\b/.test(combinedText);
+  const hasAuto = /\b(auto|autographs?|signatures?|signed)\b/.test(combinedText);
   const hasPatch = /\b(patch|relic|jersey|memorabilia|game.?used|player.?worn)\b/.test(combinedText);
   const hasRPA = /\brpa\b/.test(combinedText) || (hasAuto && hasPatch);
   
