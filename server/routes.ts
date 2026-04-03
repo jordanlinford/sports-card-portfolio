@@ -3930,23 +3930,11 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      // ZERO-COMP SANITY CHECK: When Gemini found 0 sold comps and CrossProduct disagrees significantly,
-      // CrossProduct may be more reliable since it uses broader player-level market data
-      if (specCrossProduct && specCrossProduct.avgPrice > 0 && marketValue && marketValue > 0 && pricingSource === "gemini" && compCount === 0) {
-        const cpRatio = specCrossProduct.avgPrice / marketValue;
-        if (cpRatio >= 2) {
-          console.log(`[Quick Analyze] ZERO-COMP UPGRADE: CrossProduct $${specCrossProduct.avgPrice} is ${cpRatio.toFixed(1)}x higher than Gemini $${marketValue} (0 sold comps). Using CrossProduct as floor.`);
-          marketValue = specCrossProduct.avgPrice;
-          priceMin = specCrossProduct.minPrice || Math.round(specCrossProduct.avgPrice * 0.75);
-          priceMax = specCrossProduct.maxPrice || Math.round(specCrossProduct.avgPrice * 1.3);
-          pricingSource = "gemini_cp_floor";
-        } else if (cpRatio > 3 || cpRatio < 0.33) {
-          console.log(`[Quick Analyze] DIAGNOSTIC ONLY: CrossProduct $${specCrossProduct.avgPrice} vs Gemini $${marketValue} (${cpRatio.toFixed(1)}x diff, 0 comps) — using Gemini price.`);
-        }
-      } else if (specCrossProduct && specCrossProduct.avgPrice > 0 && marketValue && marketValue > 0 && pricingSource === "gemini") {
+      // DIAGNOSTIC LOGGING — informational only, never changes the price
+      if (specCrossProduct && specCrossProduct.avgPrice > 0 && marketValue && marketValue > 0 && pricingSource === "gemini") {
         const cpRatio = specCrossProduct.avgPrice / marketValue;
         if (cpRatio > 3 || cpRatio < 0.33) {
-          console.log(`[Quick Analyze] DIAGNOSTIC ONLY: CrossProduct $${specCrossProduct.avgPrice} vs Gemini $${marketValue} (${cpRatio.toFixed(1)}x diff) — using Gemini price, no override.`);
+          console.log(`[Quick Analyze] DIAGNOSTIC ONLY: CrossProduct $${specCrossProduct.avgPrice} vs Gemini $${marketValue} (${cpRatio.toFixed(1)}x diff, ${compCount} comps) — using Gemini price, no override.`);
         }
       }
 
