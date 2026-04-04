@@ -149,7 +149,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 20; // v20: Simplified market data prompt + retry on available:false + bypass cooldown for old prompts
+const PROMPT_VERSION = 21; // v21: AI returns correctName to fix player name typos in cache
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -1099,6 +1099,7 @@ Examples:
 RESPOND IN EXACTLY THIS JSON FORMAT:
 {
   "playerInfo": {
+    "correctName": "<the player's correct full name with proper spelling and capitalization, e.g. 'Rome Odunze' not 'Roma Odunze'>",
     "position": "<position if known, or 'Unknown'>",
     "team": "<current team if known, or 'Unknown'>",
     "rookieYear": <year as number or null>,
@@ -1405,9 +1406,12 @@ TONE ENFORCEMENT:
       }
     }
     
+    const aiCorrectedName = parsed.playerInfo?.correctName?.trim();
+    const displayName = aiCorrectedName && aiCorrectedName.includes(" ") ? aiCorrectedName : playerName;
+
     return {
       playerInfo: {
-        name: playerName,
+        name: displayName,
         sport,
         position: parsed.playerInfo?.position || classification.position || "Unknown",
         team: parsed.playerInfo?.team || classification.team || "Unknown",
@@ -2080,7 +2084,14 @@ async function generateFreshOutlook(
   };
   
   // Step 10: Save to cache (use finalClassification which includes market-derived temperature)
-  await saveToCache(playerKey, effectiveSport, playerName, finalClassification, response);
+  // Use AI-corrected name if available (fixes typos like "Roma Anthony" → "Rome Anthony")
+  const correctedName = enrichedPlayerInfo.name && enrichedPlayerInfo.name.trim().includes(" ")
+    ? enrichedPlayerInfo.name.trim()
+    : playerName;
+  if (correctedName !== playerName) {
+    console.log(`[PlayerOutlook] Name correction: "${playerName}" → "${correctedName}"`);
+  }
+  await saveToCache(playerKey, effectiveSport, correctedName, finalClassification, response);
   
   return response;
 }
