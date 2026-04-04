@@ -44,6 +44,8 @@ import {
   History,
   ArrowLeft,
   Zap,
+  Sprout,
+  Info,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
@@ -320,6 +322,12 @@ function PlayerHeader({ player, snapshot, marketPhase }: { player: PlayerOutlook
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
+        {player.stage === "PROSPECT" && (
+          <Badge className="bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 gap-1 border border-amber-300 dark:border-amber-600" data-testid="badge-prospect">
+            <Sprout className="h-3 w-3" />
+            Prospect
+          </Badge>
+        )}
         {marketPhase && marketPhase !== "UNKNOWN" && (
           <Badge className={`${getMarketPhaseColor(marketPhase)} gap-1`} data-testid="badge-market-phase">
             <BarChart3 className="h-3 w-3" />
@@ -344,6 +352,14 @@ function PlayerHeader({ player, snapshot, marketPhase }: { player: PlayerOutlook
         </Badge>
       </div>
     </div>
+    {player.stage === "PROSPECT" && (
+      <div className="flex items-start gap-2 mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800" data-testid="prospect-disclaimer">
+        <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+        <p className="text-sm text-amber-700 dark:text-amber-400">
+          This player has not yet debuted in the major leagues. Market signals reflect prospect hype and draft speculation, not proven professional performance. Higher risk than established players.
+        </p>
+      </div>
+    )}
   );
 }
 
@@ -1875,7 +1891,8 @@ export default function PlayerOutlookPage() {
           
           <AdvisorSnapshot 
             advisor={advisorOutlook} 
-            playerName={outlookData.player.name} 
+            playerName={outlookData.player.name}
+            playerStage={outlookData.player.stage}
           />
 
           {portfolioContext && portfolioContext.cardCount > 0 && (

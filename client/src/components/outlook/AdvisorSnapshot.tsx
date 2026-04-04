@@ -70,9 +70,10 @@ function getPercentileColor(label: string, inverted: boolean = false): string {
 interface AdvisorSnapshotProps {
   advisor: AdvisorOutlook;
   playerName: string;
+  playerStage?: string;
 }
 
-export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
+export function AdvisorSnapshot({ advisor, playerName, playerStage }: AdvisorSnapshotProps) {
   const v = getVerdictStyles(advisor.verdict);
   const [openSection, setOpenSection] = useState<string | null>(null);
 
@@ -108,6 +109,12 @@ export function AdvisorSnapshot({ advisor, playerName }: AdvisorSnapshotProps) {
         </div>
 
         <div className="px-5 pb-5 space-y-4">
+          {playerStage === "PROSPECT" && (
+            <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400" data-testid="prospect-caveat">
+              <AlertCircle className="h-3 w-3 shrink-0" />
+              <span>Pre-debut prospect — signals based on hype, not MLB/NFL/NBA performance</span>
+            </div>
+          )}
           {advisor.decisions && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="section-decisions">
               <DecisionCard

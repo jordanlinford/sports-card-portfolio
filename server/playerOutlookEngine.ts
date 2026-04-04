@@ -149,7 +149,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 21; // v21: AI returns correctName to fix player name typos in cache
+const PROMPT_VERSION = 22; // v22: PROSPECT stage for pre-debut players (hasDebuted field, draft vs debut distinction)
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -548,8 +548,9 @@ Return ONLY a JSON object with these exact fields:
   "roleStatus": "<STAR | STARTER | BACKUP | INJURED_RESERVE | ROTATIONAL | UNCERTAIN | OUT_OF_LEAGUE | UNKNOWN>",
   "injuryStatus": "<HEALTHY | INJURED | RECOVERING | UNKNOWN>",
   "careerStatus": "<ACTIVE | RETIRED | RETIRED_HOF | DECEASED | BUST | UNKNOWN>",
-  "careerStage": "<ROOKIE | YEAR_2 | YEAR_3 | YEAR_4 | PRIME | VETERAN | AGING | UNKNOWN>",
-  "rookieYear": <year they were drafted or debuted professionally, or null if unknown>,
+  "careerStage": "<PROSPECT | ROOKIE | YEAR_2 | YEAR_3 | YEAR_4 | PRIME | VETERAN | AGING | UNKNOWN>",
+  "rookieYear": <year they first debuted in the major/top league (NOT draft year), or null if unknown>,
+  "hasDebuted": <true if they have played at least one game in the major/top league (MLB/NFL/NBA/NHL/top-flight soccer), false if still in minors/college/academy/pre-draft>,
   "position": "<their primary position, e.g. QB, RB, WR, C, PG, SG, SF, PF, SS, OF, SP, etc.>",
   "sport": "<the sport/league this player actually plays: football | baseball | basketball | hockey | soccer>",
   "details": "<brief summary of current situation>"
@@ -566,15 +567,18 @@ Role status rules:
 - OUT_OF_LEAGUE: Released, cut, waived, unsigned free agent, not on any roster
 - UNCERTAIN: Role unclear or in flux
 
-Career stage rules (based on YEARS in the league, not age):
-- ROOKIE: First professional season (drafted or debuted this year ${currentYear})
-- YEAR_2: Second professional season (drafted/debuted ${currentYear - 1})
-- YEAR_3: Third professional season (drafted/debuted ${currentYear - 2})
-- YEAR_4: Fourth professional season (drafted/debuted ${currentYear - 3})
+Career stage rules (based on YEARS IN THE MAJOR/TOP LEAGUE, not age or draft year):
+- PROSPECT: Has NOT yet debuted in the major/top league (still in minors, college, academy, or pre-draft). Use this for players drafted but still in minor leagues (e.g., MLB minor leaguers, NBA G-League, etc.)
+- ROOKIE: First professional season IN THE MAJOR LEAGUE (debuted this year ${currentYear})
+- YEAR_2: Second season in the major league (debuted ${currentYear - 1})
+- YEAR_3: Third season in the major league (debuted ${currentYear - 2})
+- YEAR_4: Fourth season in the major league (debuted ${currentYear - 3})
 - PRIME: Established player in their best years (typically years 4-10 in the league)
 - VETERAN: Experienced player past prime but still productive (typically 10+ years)
 - AGING: Late career, declining production, retirement approaching
 - UNKNOWN: Cannot determine career stage
+
+CRITICAL DISTINCTION: "Drafted" does NOT mean "debuted". A player drafted in 2023 who is still in the minor leagues in ${currentYear} is a PROSPECT, NOT YEAR_3. Only count years from their actual major league debut.
 
 Career status rules:
 - ACTIVE: Currently playing professionally (includes starters, backups, practice squad, injured reserve - anyone on a roster)
@@ -645,12 +649,18 @@ BUST CLARIFICATION:
           // Analyze team context from snippets
           const teamContext = analyzeTeamContext(snippets, undefined);
           
-          const aiCareerStage = parsed.careerStage || undefined;
+          let aiCareerStage = parsed.careerStage || undefined;
           const aiRookieYear = parsed.rookieYear && typeof parsed.rookieYear === "number" ? parsed.rookieYear : undefined;
           const aiPosition = parsed.position || undefined;
           const aiDetectedSport = parsed.sport ? normalizeSportName(parsed.sport) : undefined;
+          const aiHasDebuted = parsed.hasDebuted;
           
-          console.log(`[PlayerOutlook] News for ${playerName}: ${newsCount} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}, career: ${careerStatus}, aiStage: ${aiCareerStage || "none"}, rookieYear: ${aiRookieYear || "none"}, position: ${aiPosition || "none"}, aiSport: ${aiDetectedSport || "none"} → stage=${detectedStage || "none"}`);
+          if (aiHasDebuted === false && aiCareerStage !== "PROSPECT") {
+            console.log(`[PlayerOutlook] Overriding career stage to PROSPECT for ${playerName}: hasDebuted=false, was ${aiCareerStage}`);
+            aiCareerStage = "PROSPECT";
+          }
+          
+          console.log(`[PlayerOutlook] News for ${playerName}: ${newsCount} articles, momentum: ${momentum}, role: ${parsed.roleStatus}, injury: ${parsed.injuryStatus}, career: ${careerStatus}, aiStage: ${aiCareerStage || "none"}, rookieYear: ${aiRookieYear || "none"}, hasDebuted: ${aiHasDebuted}, position: ${aiPosition || "none"}, aiSport: ${aiDetectedSport || "none"} → stage=${detectedStage || "none"}`);
           
           return { 
             momentum, 
@@ -1054,7 +1064,7 @@ Output format rules:
 CURRENT DATE: December ${currentYear}
 
 PLAYER DATA (from our classification engine - TRUST THIS OVER YOUR TRAINING DATA):
-- Career Stage: ${classification.stage}${classification.rookieYear ? ` (Drafted/Rookie Year: ${classification.rookieYear}, now in year ${yearsInLeague} of career)` : ""}
+- Career Stage: ${classification.stage}${classification.stage === "PROSPECT" ? " (PRE-DEBUT — has NOT yet played in the major/top league. All market activity is based on prospect hype and draft speculation, not proven professional performance.)" : classification.rookieYear ? ` (Debuted: ${classification.rookieYear}, now in year ${yearsInLeague} of career)` : ""}
 - Position: ${classification.position || "Unknown"}
 - Team: ${classification.team || "Unknown"}
 - Market Temperature: ${classification.baseTemperature}
@@ -1635,7 +1645,7 @@ async function generateFreshOutlook(
   let resolvedCareerStage: PlayerStage | undefined = detectedStage;
   if (!resolvedCareerStage && aiCareerStage) {
     const validStages: Record<string, PlayerStage> = {
-      "ROOKIE": "ROOKIE", "YEAR_2": "YEAR_2", "YEAR_3": "YEAR_3", "YEAR_4": "YEAR_4",
+      "PROSPECT": "PROSPECT", "ROOKIE": "ROOKIE", "YEAR_2": "YEAR_2", "YEAR_3": "YEAR_3", "YEAR_4": "YEAR_4",
       "PRIME": "PRIME", "VETERAN": "VETERAN", "AGING": "AGING",
     };
     resolvedCareerStage = validStages[aiCareerStage.toUpperCase()];
@@ -1686,9 +1696,10 @@ async function generateFreshOutlook(
     console.log(`[PlayerOutlook] Player "${playerName}" found in registry - applying authoritative data`);
     const entry = registryResult.entry;
     
-    // Apply registry career stage (authoritative)
+    // Apply registry career stage (authoritative) — but preserve PROSPECT if AI detected pre-debut
     if (entry.careerStage) {
       const stageMap: Record<string, PlayerStage> = {
+        "PROSPECT": "PROSPECT",
         "ROOKIE": "ROOKIE",
         "YEAR_2": "YEAR_2",
         "YEAR_3": "YEAR_3",
@@ -1702,7 +1713,11 @@ async function generateFreshOutlook(
       };
       const mappedStage = stageMap[entry.careerStage];
       if (mappedStage) {
-        enrichedPlayerInfo.stage = mappedStage;
+        if (resolvedCareerStage === "PROSPECT" && mappedStage !== "PROSPECT") {
+          console.log(`[PlayerOutlook] PROSPECT guardrail: AI detected pre-debut for ${playerName}, preserving PROSPECT over registry stage "${mappedStage}"`);
+        } else {
+          enrichedPlayerInfo.stage = mappedStage;
+        }
       }
     }
     
@@ -1731,6 +1746,7 @@ async function generateFreshOutlook(
     
     // Re-run classification with registry stage for correct investment signals
     const registryStageMap: Record<string, PlayerStage> = {
+      "PROSPECT": "PROSPECT",
       "ROOKIE": "ROOKIE",
       "YEAR_2": "YEAR_2",
       "YEAR_3": "YEAR_3",
@@ -1767,6 +1783,12 @@ async function generateFreshOutlook(
         registryStage = aiUpper as PlayerStage;
         enrichedPlayerInfo.stage = aiUpper as PlayerStage;
       }
+    }
+    // PROSPECT guardrail: if AI detected pre-debut, preserve PROSPECT for re-classification too
+    if (resolvedCareerStage === "PROSPECT" && registryStage && registryStage !== "PROSPECT") {
+      console.log(`[PlayerOutlook] PROSPECT guardrail (reclass): preserving PROSPECT over registry "${registryStage}" for ${playerName}`);
+      registryStage = "PROSPECT";
+      enrichedPlayerInfo.stage = "PROSPECT";
     }
     
     if (registryStage && registryStage !== classification.stage) {
