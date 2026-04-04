@@ -201,6 +201,9 @@ export async function getLeaderboard(
     if (!VALID_SPORTS.has(rowSport)) continue;
     if (sport !== "all" && rowSport !== sport.toLowerCase()) continue;
 
+    const playerNameTrimmed = (row.playerName || "").trim();
+    if (!playerNameTrimmed.includes(" ")) continue;
+
     const outlook = row.outlookJson as PlayerOutlookResponse;
     if (!outlook) continue;
 
