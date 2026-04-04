@@ -24,6 +24,7 @@ import {
   Zap,
   Minus,
   BarChart3,
+  Clock,
 } from "lucide-react";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
@@ -51,7 +52,26 @@ type LeaderboardResponse = {
   sport: string;
   entries: LeaderboardEntry[];
   generatedAt: string;
+  dataFreshness?: {
+    oldestUpdate: string;
+    newestUpdate: string;
+    totalPlayers: number;
+  };
 };
+
+function formatTimeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHrs = Math.floor(diffMins / 60);
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays === 1) return "1 day ago";
+  return `${diffDays} days ago`;
+}
 
 type TabType = "best" | "hype" | "emerging";
 
@@ -294,12 +314,17 @@ export default function MarketLeaderboardPage() {
               </div>
               <p className="text-xs text-muted-foreground">
                 {TABS.find(t => t.id === activeTab)?.description}
-                {data?.generatedAt && (
-                  <span className="ml-2">
-                    · Updated {new Date(data.generatedAt).toLocaleTimeString()}
-                  </span>
-                )}
               </p>
+              {data?.dataFreshness && (
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-1" data-testid="text-data-freshness">
+                  <Clock className="h-3 w-3" />
+                  <span>
+                    Data updated {formatTimeAgo(data.dataFreshness.newestUpdate)}
+                  </span>
+                  <span className="text-muted-foreground/50">·</span>
+                  <span>{data.dataFreshness.totalPlayers} players tracked</span>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="px-2 sm:px-6">
               <LeaderboardTable entries={entries} isLoading={isLoading} />

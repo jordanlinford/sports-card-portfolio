@@ -88,7 +88,7 @@ function classifyMarketStructure(signals: MarketSignals, phase: string): string 
 }
 
 type CachedLeaderboard = {
-  entries: LeaderboardEntry[];
+  result: LeaderboardResult;
   generatedAt: number;
 };
 
@@ -167,15 +167,24 @@ function mapVerdict(verdict: InvestmentVerdict): { verdict: string; label: strin
   }
 }
 
+export type LeaderboardResult = {
+  entries: LeaderboardEntry[];
+  dataFreshness: {
+    oldestUpdate: string;
+    newestUpdate: string;
+    totalPlayers: number;
+  };
+};
+
 export async function getLeaderboard(
   type: LeaderboardType,
   sport: string = "all",
   limit: number = 25,
-): Promise<LeaderboardEntry[]> {
+): Promise<LeaderboardResult> {
   const cacheKey = `${type}:${sport}:${limit}`;
   const cached = leaderboardCache.get(cacheKey);
   if (cached && Date.now() - cached.generatedAt < CACHE_TTL_MS) {
-    return cached.entries;
+    return cached.result;
   }
 
   const rows = await db
@@ -196,7 +205,15 @@ export async function getLeaderboard(
   const VALID_SPORTS = new Set(["football", "basketball", "baseball", "hockey", "soccer"]);
   const scored: ScoredEntry[] = [];
 
+  let oldestUpdate: Date | null = null;
+  let newestUpdate: Date | null = null;
+
   for (const row of rows) {
+    const rowUpdated = row.updatedAt ? new Date(row.updatedAt) : null;
+    if (rowUpdated) {
+      if (!oldestUpdate || rowUpdated < oldestUpdate) oldestUpdate = rowUpdated;
+      if (!newestUpdate || rowUpdated > newestUpdate) newestUpdate = rowUpdated;
+    }
     const rowSport = row.sport.toLowerCase();
     if (!VALID_SPORTS.has(rowSport)) continue;
     if (sport !== "all" && rowSport !== sport.toLowerCase()) continue;
@@ -408,8 +425,17 @@ export async function getLeaderboard(
     };
   });
 
-  leaderboardCache.set(cacheKey, { entries, generatedAt: Date.now() });
-  return entries;
+  const result: LeaderboardResult = {
+    entries,
+    dataFreshness: {
+      oldestUpdate: oldestUpdate?.toISOString() || new Date().toISOString(),
+      newestUpdate: newestUpdate?.toISOString() || new Date().toISOString(),
+      totalPlayers: totalPlayers,
+    },
+  };
+
+  leaderboardCache.set(cacheKey, { result, generatedAt: Date.now() });
+  return result;
 }
 
 export function invalidateLeaderboardCache() {

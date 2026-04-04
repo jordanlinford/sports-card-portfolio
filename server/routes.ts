@@ -1079,8 +1079,8 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(400).json({ message: "Invalid type. Use: best, hype, emerging" });
       }
 
-      const entries = await getLeaderboard(type as any, sport, limit);
-      res.json({ type, sport, entries, generatedAt: new Date().toISOString() });
+      const result = await getLeaderboard(type as any, sport, limit);
+      res.json({ type, sport, entries: result.entries, dataFreshness: result.dataFreshness, generatedAt: new Date().toISOString() });
     } catch (error) {
       console.error("Error fetching market leaderboard:", error);
       res.status(500).json({ message: "Failed to fetch market leaderboard" });
