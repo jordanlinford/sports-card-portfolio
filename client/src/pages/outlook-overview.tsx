@@ -1529,6 +1529,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         setCurrentScanHistoryId(response.scanHistoryId);
       }
       
+      // Preserve scan image for display in results
+      setPreviewUrl(previewDataUrl);
+      
       // Auto-populate form fields from scan result for editing
       if (response.scan?.success) {
         const card = response.scan.cardIdentification;

@@ -294,72 +294,74 @@ function PlayerHeader({ player, snapshot, marketPhase }: { player: PlayerOutlook
   const initials = player.name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-4" data-testid="player-header">
-      <Avatar className="h-16 w-16 border-2 border-primary/20">
-        {imageData?.imageUrl && (
-          <AvatarImage src={imageData.imageUrl} alt={player.name} />
-        )}
-        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-xl font-bold text-primary">
-          {initials}
-        </AvatarFallback>
-      </Avatar>
-      <div className="flex-1">
-        <h1 className="text-2xl font-bold" data-testid="text-player-name">{player.name}</h1>
-        <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
-          <span>{player.sport.toUpperCase()}</span>
-          {player.position && player.position.toUpperCase() !== "UNKNOWN" && (
-            <><span className="text-border">|</span><span>{player.position}</span></>
+    <>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4" data-testid="player-header">
+        <Avatar className="h-16 w-16 border-2 border-primary/20">
+          {imageData?.imageUrl && (
+            <AvatarImage src={imageData.imageUrl} alt={player.name} />
           )}
-          {player.team && player.team.toUpperCase() !== "UNKNOWN" && (
-            <><span className="text-border">|</span><span>{player.team}</span></>
+          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-xl font-bold text-primary">
+            {initials}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold" data-testid="text-player-name">{player.name}</h1>
+          <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
+            <span>{player.sport.toUpperCase()}</span>
+            {player.position && player.position.toUpperCase() !== "UNKNOWN" && (
+              <><span className="text-border">|</span><span>{player.position}</span></>
+            )}
+            {player.team && player.team.toUpperCase() !== "UNKNOWN" && (
+              <><span className="text-border">|</span><span>{player.team}</span></>
+            )}
+            {player.stage && player.stage.toUpperCase() !== "UNKNOWN" && (
+              <><span className="text-border">|</span><span>{player.stage.replace("_", " ")}</span></>
+            )}
+            {player.inferred && (
+              <Badge variant="outline" className="text-xs">Inferred</Badge>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {player.stage === "PROSPECT" && (
+            <Badge className="bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 gap-1 border border-amber-300 dark:border-amber-600" data-testid="badge-prospect">
+              <Sprout className="h-3 w-3" />
+              Prospect
+            </Badge>
           )}
-          {player.stage && player.stage.toUpperCase() !== "UNKNOWN" && (
-            <><span className="text-border">|</span><span>{player.stage.replace("_", " ")}</span></>
+          {marketPhase && marketPhase !== "UNKNOWN" && (
+            <Badge className={`${getMarketPhaseColor(marketPhase)} gap-1`} data-testid="badge-market-phase">
+              <BarChart3 className="h-3 w-3" />
+              {formatMarketPhase(marketPhase)}
+            </Badge>
           )}
-          {player.inferred && (
-            <Badge variant="outline" className="text-xs">Inferred</Badge>
-          )}
+          <Badge className={`${getTemperatureColor(snapshot.temperature)} gap-1`} data-testid="badge-temperature">
+            {getTemperatureIcon(snapshot.temperature)}
+            {snapshot.temperature}
+          </Badge>
+          <Badge className={`${getVolatilityColor(snapshot.volatility)} gap-1`} data-testid="badge-volatility">
+            <Activity className="h-3 w-3" />
+            {snapshot.volatility} Vol
+          </Badge>
+          <Badge className={`${getRiskColor(snapshot.risk)} gap-1`} data-testid="badge-risk">
+            <AlertTriangle className="h-3 w-3" />
+            {snapshot.risk} Risk
+          </Badge>
+          <Badge variant="outline" className="gap-1" data-testid="badge-horizon">
+            <Clock className="h-3 w-3" />
+            {snapshot.horizon} Term
+          </Badge>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        {player.stage === "PROSPECT" && (
-          <Badge className="bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400 gap-1 border border-amber-300 dark:border-amber-600" data-testid="badge-prospect">
-            <Sprout className="h-3 w-3" />
-            Prospect
-          </Badge>
-        )}
-        {marketPhase && marketPhase !== "UNKNOWN" && (
-          <Badge className={`${getMarketPhaseColor(marketPhase)} gap-1`} data-testid="badge-market-phase">
-            <BarChart3 className="h-3 w-3" />
-            {formatMarketPhase(marketPhase)}
-          </Badge>
-        )}
-        <Badge className={`${getTemperatureColor(snapshot.temperature)} gap-1`} data-testid="badge-temperature">
-          {getTemperatureIcon(snapshot.temperature)}
-          {snapshot.temperature}
-        </Badge>
-        <Badge className={`${getVolatilityColor(snapshot.volatility)} gap-1`} data-testid="badge-volatility">
-          <Activity className="h-3 w-3" />
-          {snapshot.volatility} Vol
-        </Badge>
-        <Badge className={`${getRiskColor(snapshot.risk)} gap-1`} data-testid="badge-risk">
-          <AlertTriangle className="h-3 w-3" />
-          {snapshot.risk} Risk
-        </Badge>
-        <Badge variant="outline" className="gap-1" data-testid="badge-horizon">
-          <Clock className="h-3 w-3" />
-          {snapshot.horizon} Term
-        </Badge>
-      </div>
-    </div>
-    {player.stage === "PROSPECT" && (
-      <div className="flex items-start gap-2 mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800" data-testid="prospect-disclaimer">
-        <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-        <p className="text-sm text-amber-700 dark:text-amber-400">
-          This player has not yet debuted in the major leagues. Market signals reflect prospect hype and draft speculation, not proven professional performance. Higher risk than established players.
-        </p>
-      </div>
-    )}
+      {player.stage === "PROSPECT" && (
+        <div className="flex items-start gap-2 mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800" data-testid="prospect-disclaimer">
+          <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            This player has not yet debuted in the major leagues. Market signals reflect prospect hype and draft speculation, not proven professional performance. Higher risk than established players.
+          </p>
+        </div>
+      )}
+    </>
   );
 }
 
