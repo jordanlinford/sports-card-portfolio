@@ -4040,16 +4040,54 @@ Sitemap: ${origin}/sitemap.xml
         console.log(`[Quick Analyze] LITTLE_VALUE floor applied: no price data — defaulting to ~$1 estimate`);
       }
 
-      // Use unified explanation directly (no separate AI call needed!)
-      const explanation = unifiedResult ? {
-        short: unifiedResult.analysis.shortSummary,
-        long: unifiedResult.analysis.detailedAnalysis,
-        bullets: unifiedResult.analysis.keyBullets,
-      } : {
-        short: `${finalAction} recommendation based on available market data.`,
-        long: `Analysis based on ${compCount} comparable sales. ${finalActionReasons.join(". ")}.`,
-        bullets: finalActionReasons,
-      };
+      // Use unified explanation, but align narrative with final verdict if guardrails changed it
+      let explanation: { short: string; long: string; bullets: string[] };
+      if (unifiedResult) {
+        const originalVerdict = unifiedResult.analysis.verdict;
+        const verdictWasOverridden = originalVerdict !== finalAction;
+        
+        if (verdictWasOverridden) {
+          const verdictLabels: Record<string, string> = {
+            BUY: "buy", MONITOR: "monitor", WATCH: "watch", SELL: "sell",
+            LONG_HOLD: "long-term hold", LEGACY_HOLD: "legacy hold",
+            LITTLE_VALUE: "low value", WATCH_LIST: "watch"
+          };
+          const actionLabel = verdictLabels[finalAction] || finalAction.toLowerCase();
+          const overrideReason = finalActionReasons[0] || "Market conditions warrant caution.";
+          
+          let adjustedShort = unifiedResult.analysis.shortSummary;
+          const buyPhrases = /\b(strong\s+['"]?buy['"]?\s+opportunity|presents?\s+a\s+['"]?buy['"]?|is\s+a\s+buy|clear\s+buy|recommend\s+buying|should\s+buy|great\s+buy)\b/gi;
+          adjustedShort = adjustedShort.replace(buyPhrases, `presents a '${actionLabel}' opportunity`);
+          if (/\bbuy\b/i.test(adjustedShort) && (finalAction === "WATCH" || finalAction === "MONITOR")) {
+            adjustedShort = adjustedShort.replace(/\bbuy\b/gi, actionLabel);
+          }
+          
+          let adjustedLong = unifiedResult.analysis.detailedAnalysis;
+          adjustedLong = adjustedLong.replace(buyPhrases, `presents a '${actionLabel}' opportunity`);
+          
+          const adjustedBullets = [...unifiedResult.analysis.keyBullets];
+          adjustedBullets.unshift(overrideReason);
+          
+          explanation = {
+            short: adjustedShort,
+            long: adjustedLong,
+            bullets: adjustedBullets,
+          };
+          console.log(`[Quick Analyze] Explanation adjusted: original verdict ${originalVerdict} → final ${finalAction}`);
+        } else {
+          explanation = {
+            short: unifiedResult.analysis.shortSummary,
+            long: unifiedResult.analysis.detailedAnalysis,
+            bullets: unifiedResult.analysis.keyBullets,
+          };
+        }
+      } else {
+        explanation = {
+          short: `${finalAction} recommendation based on available market data.`,
+          long: `Analysis based on ${compCount} comparable sales. ${finalActionReasons.join(". ")}.`,
+          bullets: finalActionReasons,
+        };
+      }
 
       await storage.recordOutlookUsage(userId, 'quick', undefined, title);
 
