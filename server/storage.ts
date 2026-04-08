@@ -129,7 +129,7 @@ import {
   type InsertCompObservation,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, asc, and, or, ilike, inArray, sql, isNull } from "drizzle-orm";
+import { eq, desc, asc, and, or, ilike, inArray, sql, isNull, isNotNull, gt } from "drizzle-orm";
 
 // Random handle generator for new users
 const adjectives = [
@@ -429,6 +429,7 @@ export interface IStorage {
   getScanHistoryByIds(ids: number[], userId: string): Promise<ScanHistory[]>;
   updateScanHistoryAnalysis(id: number, userId: string, marketValue: number | null, action: string | null): Promise<ScanHistory | undefined>;
   updateScanHistoryMetadata(id: number, userId: string, data: { playerName?: string; year?: number | null; setName?: string; variation?: string; grade?: string; grader?: string; sport?: string; cardNumber?: string; scanConfidence?: string }): Promise<ScanHistory | undefined>;
+  findRecentScanPrice(playerName: string, year: number | null, variation: string | null, userId: string): Promise<{ marketValue: number; createdAt: Date } | null>;
 
   // Pop Report History operations
   insertPopSnapshots(snapshots: InsertPopHistory[]): Promise<PopHistory[]>;
@@ -3569,6 +3570,46 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(scanHistory.id, id), eq(scanHistory.userId, userId)))
       .returning();
     return record;
+  }
+
+  async findRecentScanPrice(playerName: string, year: number | null, variation: string | null, userId: string): Promise<{ marketValue: number; createdAt: Date } | null> {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const conditions = [
+      eq(scanHistory.userId, userId),
+      isNotNull(scanHistory.marketValue),
+      gt(scanHistory.marketValue, 0),
+      gt(scanHistory.createdAt, sevenDaysAgo),
+    ];
+    
+    const playerNorm = playerName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const rows = await db
+      .select({ marketValue: scanHistory.marketValue, createdAt: scanHistory.createdAt, playerName: scanHistory.playerName, year: scanHistory.year, variation: scanHistory.variation })
+      .from(scanHistory)
+      .where(and(...conditions))
+      .orderBy(desc(scanHistory.createdAt))
+      .limit(20);
+    
+    const variationNorm = (variation || "").toLowerCase().replace(/[^a-z0-9\/]/g, "").trim();
+    
+    for (const row of rows) {
+      const rowPlayerNorm = (row.playerName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (rowPlayerNorm !== playerNorm) continue;
+      if (year && row.year && row.year !== year) continue;
+      if (year && !row.year) continue;
+      const rowVarNorm = (row.variation || "").toLowerCase().replace(/[^a-z0-9\/]/g, "").trim();
+      if (!variationNorm && !rowVarNorm) {
+        if (row.marketValue && row.marketValue > 0) {
+          return { marketValue: row.marketValue, createdAt: row.createdAt };
+        }
+        continue;
+      }
+      if (!variationNorm || !rowVarNorm) continue;
+      if (rowVarNorm !== variationNorm) continue;
+      if (row.marketValue && row.marketValue > 0) {
+        return { marketValue: row.marketValue, createdAt: row.createdAt };
+      }
+    }
+    return null;
   }
 
   // Pop Report History operations

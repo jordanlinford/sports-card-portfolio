@@ -3938,6 +3938,40 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // PRICE CONSISTENCY ANCHOR — stabilize results across repeated scans
+      // If we have a recent scan for the same card, check if the new price is wildly different
+      if (marketValue && marketValue > 0 && effectivePlayerName) {
+        try {
+          const anchor = await storage.findRecentScanPrice(
+            effectivePlayerName,
+            year ? parseInt(year) : null,
+            variation || null,
+            userId
+          );
+          if (anchor && anchor.marketValue > 0) {
+            const ratio = marketValue / anchor.marketValue;
+            const ageMinutes = Math.round((Date.now() - anchor.createdAt.getTime()) / 1000 / 60);
+            if (ratio > 3 || ratio < 0.33) {
+              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, anchor ${ageMinutes}min old) — using anchored price for consistency`);
+              marketValue = anchor.marketValue;
+              priceMin = Math.round(anchor.marketValue * 0.85);
+              priceMax = Math.round(anchor.marketValue * 1.15);
+              pricingSource = pricingSource + "_anchored";
+            } else if (ratio > 2 || ratio < 0.5) {
+              const blended = Math.round((marketValue * 0.4 + anchor.marketValue * 0.6) * 100) / 100;
+              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff) — blending to $${blended}`);
+              marketValue = blended;
+              if (priceMin) priceMin = Math.round(Math.min(priceMin, anchor.marketValue * 0.85));
+              if (priceMax) priceMax = Math.round(Math.max(priceMax, anchor.marketValue * 1.15));
+            } else {
+              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} consistent with recent $${anchor.marketValue} (${ratio.toFixed(1)}x) — no adjustment needed`);
+            }
+          }
+        } catch (anchorErr) {
+          console.warn("[Quick Analyze] Price anchor lookup error:", anchorErr);
+        }
+      }
+
       // SPECIFICITY GUARD — affects confidence label, never the price
       const hasMissingDetails = !set || !variation;
       if (hasMissingDetails && marketValue && marketValue > 5) {

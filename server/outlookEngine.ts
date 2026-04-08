@@ -192,7 +192,20 @@ interface GeminiMarketCache {
 const geminiMarketCache = new Map<string, GeminiMarketCache>();
 const GEMINI_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-// Generate cache key from card attributes
+function normalizeSetName(setName: string): string {
+  let s = setName.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+  s = s.replace(/\b(panini|topps|upper\s*deck|leaf|bowman|fleer)\b/g, "").trim();
+  s = s.replace(/\b(baseball|football|basketball|hockey|soccer|wrestling)\b/g, "").trim();
+  s = s.replace(/\s+/g, "");
+  return s;
+}
+
+function normalizeVariation(variation: string): string {
+  let v = variation.toLowerCase().replace(/[^a-z0-9\/\s]/g, "").trim();
+  v = v.replace(/\s+/g, "");
+  return v;
+}
+
 export function getGeminiCacheKey(card: {
   title: string;
   playerName?: string | null;
@@ -207,8 +220,8 @@ export function getGeminiCacheKey(card: {
     const parts = [
       (card.playerName || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
       card.year?.toString() || "",
-      (card.set || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
-      (card.variation || "").toLowerCase().replace(/[^a-z0-9]/g, ""),
+      normalizeSetName(card.set || ""),
+      normalizeVariation(card.variation || ""),
       (card.grade || "").toLowerCase().trim(),
       (card.grader || "").toLowerCase().trim(),
     ];
@@ -217,8 +230,8 @@ export function getGeminiCacheKey(card: {
   const parts = [
     card.title.toLowerCase().trim(),
     card.year?.toString() || "",
-    (card.set || "").toLowerCase().trim(),
-    (card.variation || "").toLowerCase().trim(),
+    normalizeSetName(card.set || ""),
+    normalizeVariation(card.variation || ""),
     (card.grade || "").toLowerCase().trim(),
     (card.grader || "").toLowerCase().trim(),
   ];
