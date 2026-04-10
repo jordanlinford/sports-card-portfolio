@@ -3938,6 +3938,17 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // ZERO-COMP CONSERVATISM — when Gemini found no completed sales,
+      // it likely relied on active BIN listings which are typically inflated 30-50%.
+      // Apply a discount to bring the estimate closer to reality.
+      if (marketValue && marketValue > 0 && compCount === 0 && pricingSource === "gemini") {
+        const originalValue = marketValue;
+        marketValue = Math.round(marketValue * 0.7);
+        if (priceMin) priceMin = Math.round(priceMin * 0.7);
+        if (priceMax) priceMax = Math.round(priceMax * 0.85);
+        console.log(`[Quick Analyze] ZERO-COMP DISCOUNT: No completed sales found — discounting from $${originalValue} to $${marketValue} (0.7x) to account for BIN listing inflation`);
+      }
+
       // PRICE CONSISTENCY ANCHOR — stabilize results across repeated scans
       // If we have a recent scan for the same card, check if the new price is wildly different
       if (marketValue && marketValue > 0 && effectivePlayerName) {
@@ -3951,15 +3962,22 @@ Sitemap: ${origin}/sitemap.xml
           if (anchor && anchor.marketValue > 0) {
             const ratio = marketValue / anchor.marketValue;
             const ageMinutes = Math.round((Date.now() - anchor.createdAt.getTime()) / 1000 / 60);
-            if (ratio > 3 || ratio < 0.33) {
-              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, anchor ${ageMinutes}min old) — using anchored price for consistency`);
+
+            // When the new result has zero sold comps but the anchor exists,
+            // the anchor is more trustworthy — use tighter thresholds
+            const highThreshold = compCount === 0 ? 1.5 : 3;
+            const midThreshold = compCount === 0 ? 1.3 : 2;
+
+            if (ratio > highThreshold || ratio < (1 / highThreshold)) {
+              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, anchor ${ageMinutes}min old, newComps=${compCount}) — using anchored price for consistency`);
               marketValue = anchor.marketValue;
               priceMin = Math.round(anchor.marketValue * 0.85);
               priceMax = Math.round(anchor.marketValue * 1.15);
               pricingSource = pricingSource + "_anchored";
-            } else if (ratio > 2 || ratio < 0.5) {
-              const blended = Math.round((marketValue * 0.4 + anchor.marketValue * 0.6) * 100) / 100;
-              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff) — blending to $${blended}`);
+            } else if (ratio > midThreshold || ratio < (1 / midThreshold)) {
+              const anchorWeight = compCount === 0 ? 0.8 : 0.6;
+              const blended = Math.round((marketValue * (1 - anchorWeight) + anchor.marketValue * anchorWeight) * 100) / 100;
+              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, newComps=${compCount}) — blending to $${blended} (anchor weight ${anchorWeight})`);
               marketValue = blended;
               if (priceMin) priceMin = Math.round(Math.min(priceMin, anchor.marketValue * 0.85));
               if (priceMax) priceMax = Math.round(Math.max(priceMax, anchor.marketValue * 1.15));
