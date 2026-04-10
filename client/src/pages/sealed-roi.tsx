@@ -39,6 +39,7 @@ import { hasProAccess, type User } from "@shared/schema";
 interface HitBreakdownItem {
   cardType: string;
   odds: string;
+  isCaseHit?: boolean;
   estimatedRawValue: number;
   estimatedRawMin: number;
   estimatedRawMax: number;
@@ -48,6 +49,7 @@ interface HitBreakdownItem {
   gradingRecommendation: "GRADE_IT" | "SELL_RAW" | "HOLD";
   gradingRationale: string;
   playerExample: string;
+  exampleImageUrl?: string;
 }
 
 interface StarRookie {
@@ -62,6 +64,7 @@ interface StarRookie {
 interface SealedProductResult {
   productName: string;
   sport: string;
+  productImageUrl?: string;
   boxCost: number;
   configuration: string;
   releaseDate: string;
@@ -546,6 +549,46 @@ export default function SealedRoiPage() {
   );
 }
 
+function ProductImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className={`flex items-center justify-center bg-muted rounded-lg ${className || ""}`}>
+        <Package className="h-12 w-12 text-muted-foreground/30" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`object-contain rounded-lg bg-muted ${className || ""}`}
+      onError={() => setFailed(true)}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+    />
+  );
+}
+
+function HitImage({ src, alt }: { src?: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) return null;
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-16 h-20 object-contain rounded border bg-muted flex-shrink-0"
+      onError={() => setFailed(true)}
+      loading="lazy"
+      referrerPolicy="no-referrer"
+    />
+  );
+}
+
 function ProductResults({ result, isPro }: { result: SealedProductResult; isPro: boolean }) {
   return (
     <div className="space-y-4" data-testid="card-results">
@@ -576,28 +619,41 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <DollarSign className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-xl font-bold" data-testid="text-box-cost">${result.boxCost?.toFixed(0) || "N/A"}</p>
-              <p className="text-xs text-muted-foreground">Box Cost</p>
-            </div>
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <TrendingUp className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-xl font-bold" data-testid="text-ev">${result.expectedValue?.toFixed(0) || "N/A"}</p>
-              <p className="text-xs text-muted-foreground">Expected Value</p>
-            </div>
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <BarChart3 className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-              <p className={`text-xl font-bold ${result.evRatio >= 1 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-ev-ratio">
-                {result.evRatio?.toFixed(2) || "N/A"}x
-              </p>
-              <p className="text-xs text-muted-foreground">EV Ratio</p>
-            </div>
-            <div className="text-center p-3 bg-muted rounded-lg">
-              <Award className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-              <p className="text-xl font-bold" data-testid="text-quality-score">{result.qualityScore}</p>
-              <p className="text-xs text-muted-foreground">Quality Score</p>
+          <div className="flex gap-4 mb-4">
+            {result.productImageUrl && (
+              <div className="flex-shrink-0">
+                <ProductImage
+                  src={result.productImageUrl}
+                  alt={result.productName}
+                  className="w-28 h-28 sm:w-36 sm:h-36"
+                />
+              </div>
+            )}
+            <div className="flex-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <DollarSign className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xl font-bold" data-testid="text-box-cost">${result.boxCost?.toFixed(0) || "N/A"}</p>
+                  <p className="text-xs text-muted-foreground">Box Cost</p>
+                </div>
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <TrendingUp className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xl font-bold" data-testid="text-ev">${result.expectedValue?.toFixed(0) || "N/A"}</p>
+                  <p className="text-xs text-muted-foreground">Expected Value</p>
+                </div>
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <BarChart3 className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                  <p className={`text-xl font-bold ${result.evRatio >= 1 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-ev-ratio">
+                    {result.evRatio?.toFixed(2) || "N/A"}x
+                  </p>
+                  <p className="text-xs text-muted-foreground">EV Ratio</p>
+                </div>
+                <div className="text-center p-3 bg-muted rounded-lg">
+                  <Award className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-xl font-bold" data-testid="text-quality-score">{result.qualityScore}</p>
+                  <p className="text-xs text-muted-foreground">Quality Score</p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -628,49 +684,58 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
                 <CardDescription>Key hits, their odds, values, and whether grading is worthwhile</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left py-2 pr-2 font-medium text-muted-foreground">Card Type</th>
-                        <th className="text-left py-2 pr-2 font-medium text-muted-foreground">Odds</th>
-                        <th className="text-right py-2 pr-2 font-medium text-muted-foreground">Raw Value</th>
-                        <th className="text-right py-2 pr-2 font-medium text-muted-foreground">Graded (PSA 10)</th>
-                        <th className="text-center py-2 font-medium text-muted-foreground">Recommendation</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.hitBreakdown.map((hit, i) => (
-                        <tr key={i} className="border-b last:border-0" data-testid={`row-hit-${i}`}>
-                          <td className="py-3 pr-2">
+                <div className="space-y-3">
+                  {result.hitBreakdown.map((hit, i) => (
+                    <div
+                      key={i}
+                      className={`p-3 rounded-lg border ${hit.isCaseHit ? "border-yellow-500/50 bg-yellow-500/5" : ""}`}
+                      data-testid={`row-hit-${i}`}
+                    >
+                      <div className="flex gap-3">
+                        <HitImage src={hit.exampleImageUrl} alt={hit.cardType} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            {hit.isCaseHit && (
+                              <Badge variant="outline" className="bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30 gap-1 text-xs" data-testid={`badge-case-hit-${i}`}>
+                                <Star className="h-3 w-3 fill-yellow-500" />
+                                Case Hit
+                              </Badge>
+                            )}
                             <p className="font-medium">{hit.cardType}</p>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                            <span>{hit.odds}</span>
                             {hit.playerExample && (
-                              <p className="text-xs text-muted-foreground">e.g. {hit.playerExample}</p>
+                              <>
+                                <span>·</span>
+                                <span>e.g. {hit.playerExample}</span>
+                              </>
                             )}
-                          </td>
-                          <td className="py-3 pr-2 text-muted-foreground">{hit.odds}</td>
-                          <td className="py-3 pr-2 text-right">
-                            <p className="font-medium">${hit.estimatedRawValue?.toFixed(0)}</p>
-                            {hit.estimatedRawMin !== undefined && hit.estimatedRawMax !== undefined && (
-                              <p className="text-xs text-muted-foreground">${hit.estimatedRawMin?.toFixed(0)} - ${hit.estimatedRawMax?.toFixed(0)}</p>
-                            )}
-                          </td>
-                          <td className="py-3 pr-2 text-right">
-                            <p className="font-medium">${hit.estimatedGradedValue?.toFixed(0)}</p>
-                            {hit.estimatedGradedMin !== undefined && hit.estimatedGradedMax !== undefined && (
-                              <p className="text-xs text-muted-foreground">${hit.estimatedGradedMin?.toFixed(0)} - ${hit.estimatedGradedMax?.toFixed(0)}</p>
-                            )}
-                          </td>
-                          <td className="py-3 text-center">
+                          </div>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Raw: </span>
+                              <span className="font-medium">${hit.estimatedRawValue?.toFixed(0)}</span>
+                              {hit.estimatedRawMin !== undefined && hit.estimatedRawMax !== undefined && (
+                                <span className="text-xs text-muted-foreground ml-1">(${hit.estimatedRawMin?.toFixed(0)}-${hit.estimatedRawMax?.toFixed(0)})</span>
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">PSA 10: </span>
+                              <span className="font-medium">${hit.estimatedGradedValue?.toFixed(0)}</span>
+                              {hit.estimatedGradedMin !== undefined && hit.estimatedGradedMax !== undefined && (
+                                <span className="text-xs text-muted-foreground ml-1">(${hit.estimatedGradedMin?.toFixed(0)}-${hit.estimatedGradedMax?.toFixed(0)})</span>
+                              )}
+                            </div>
                             <GradingBadge recommendation={hit.gradingRecommendation} />
-                            {hit.gradingRationale && (
-                              <p className="text-xs text-muted-foreground mt-1 max-w-[150px] mx-auto">{hit.gradingRationale}</p>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          </div>
+                          {hit.gradingRationale && (
+                            <p className="text-xs text-muted-foreground mt-1">{hit.gradingRationale}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>

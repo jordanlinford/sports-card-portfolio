@@ -10151,6 +10151,7 @@ Research using Google Search and return a JSON object with this EXACT structure:
 {
   "productName": "Full product name",
   "sport": "${sport}",
+  "productImageUrl": "URL of an image of the sealed hobby box from the manufacturer or a major retailer (e.g. Panini, Topps, Upper Deck official product shots, or from Blowout Cards, Steel City Collectibles, DA Card World). Use actual product photography, not placeholder images.",
   "boxCost": <current hobby box market price in dollars>,
   "configuration": "e.g. 12 packs, 12 cards per pack, 2 autos, 1 mem per box",
   "releaseDate": "Month Year or approximate",
@@ -10161,6 +10162,7 @@ Research using Google Search and return a JSON object with this EXACT structure:
     {
       "cardType": "e.g. Base Auto, Prizm Silver, Patch Auto /25, RPA /99",
       "odds": "e.g. 1:12 packs, 2 per box, 1 per case",
+      "isCaseHit": <true if this is a case hit (typically 1 per case or rarer — premium hits like RPA /25, Logoman, Flawless patches, Kaboom, Downtown, etc.) — false otherwise>,
       "estimatedRawValue": <dollar value raw>,
       "estimatedRawMin": <low end estimate>,
       "estimatedRawMax": <high end estimate>,
@@ -10169,7 +10171,8 @@ Research using Google Search and return a JSON object with this EXACT structure:
       "estimatedGradedMax": <high end graded>,
       "gradingRecommendation": "GRADE_IT" or "SELL_RAW" or "HOLD",
       "gradingRationale": "Brief reason - e.g. 'PSA 10 commands 3x premium on star rookies'",
-      "playerExample": "Key player this hit type is most valuable for"
+      "playerExample": "Key player this hit type is most valuable for",
+      "exampleImageUrl": "URL of a real example image of this card type from eBay, COMC, or a card database. Use actual card photos showing the specific insert/parallel/auto type. Leave empty string if not found."
     }
   ],
   "starRookies": [
