@@ -1,0 +1,27 @@
+If almost every product is showing a positive return, the model is currently a "hype engine," not an investment tool. In the current market, 80-90% of sealed wax is a net-loss proposition the moment the shrink wrap is torn.
+The math is likely failing because it’s capturing "Asking Prices" or "Ceiling Outcomes" rather than "Realized Liquidity."
+Here is the direct diagnostic and the required fixes to bring the EV back to reality:
+1. The "Survivor Bias" Error
+Your current Step 1 is likely pulling data for the best cards (the "Key Hits") and multiplying them by their odds, but it is ignoring the Value Floor.
+• The Problem: Most packs contain "base" or "low-end inserts" that have a market value of near-zero ($0.05 - $0.25). If your EV calculation ignores the 95% of the box that is "trash," the math stays artificially high.
+• The Fix: You must factor in Transaction Friction. Any card with a market value under $5.00 should be treated as $0 in the EV calculation. Why? Because after eBay fees, shipping, and time, you cannot reliably liquidate it for a profit.
+2. The "Mean vs. Median" Trap
+If a box has one $10,000 "case hit" and 999 boxes have $20 worth of cards, the Mean EV looks great, but the Median experience is a total loss.
+• The Problem: Using a simple average of hit values overstates the reality for the average buyer.
+• The Fix: Switch to a Weighted Median EV. Heavily discount "one-of-one" or "super-short-print" (SSP) values in the general EV. Those should contribute to the Hit Ceiling Score, not the EV Ratio. The EV Ratio should represent what a user is likely to pull, not what they dream of pulling.
+3. "Asking" vs. "Sold" Data
+• The Problem: Your data source might be scraping active listings. Sellers can ask $100 for a card all day; it doesn't mean it sells.
+• The Fix: Tighten the API parameters to Last 5 Comp Sales (Sold/Completed) only. If the system can't find 3+ sold comps in the last 90 days, the value of that hit must be aggressively hair-cut (by 50%+) due to illiquidity.
+4. Adjust the EV Ratio Thresholds
+Your current "Positive EV" threshold is too low.
+• Current: Above 1.10x → Positive.
+• Reality: Because of the 13-15% selling fees on platforms like eBay/COMC, a 1.10x return is actually a Break Even at best.
+• New Proposed Thresholds:
+• Negative EV: Below 0.95x
+• Speculative/Neutral: 0.95x to 1.25x
+• Positive EV: Above 1.25x (This is the "Black Swan" territory where the box is actually undervalued).
+5. The "Bulk" Fallacy
+Are you counting the value of "Base Rookies"?
+• The Correction: In the "Junk Slabs" era, base rookies of even top players (Caleb Williams, Victor Wembanyama) have seen massive supply spikes. Unless it's a high-end brand (e.g., Prizm, Optic, Chrome) and the card is likely to gem, base paper cards should carry $0 weight in a professional ROI model.
+Immediate Action: Run a test on a notorious "value-sink" product—like 2023 Panini Prizm Draft Picks or any Opening Day product. If the system gives those a "Positive" or even "Break Even" rating, your scraper is grabbing "Estimated" values instead of "Hard Cash" values.
+Which specific products are giving you these "Positive" readings? Let's deconstruct one.

@@ -10026,26 +10026,30 @@ Return ONLY valid JSON, no markdown.`;
       const cached = sealedProductCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < SEALED_CACHE_TTL) {
         const cachedResult = JSON.parse(JSON.stringify(cached.data));
-        if (boxCost && cachedResult.expectedValue) {
+        if (boxCost) {
           cachedResult.boxCost = boxCost;
-          cachedResult.evRatio = cachedResult.expectedValue / boxCost;
+          const ev = cachedResult.expectedValue || 0;
+          const ceilEV = cachedResult.caseHitCeilingEV || 0;
           const isNew = cachedResult.releaseRecency === "new_release";
+          cachedResult.evRatio = boxCost > 0 ? Math.round((ev / boxCost) * 100) / 100 : 0;
           if (isNew) {
-            cachedResult.roiVerdict = cachedResult.evRatio < 0.85 ? "NEGATIVE_EV" : "WAIT";
-          } else if (cachedResult.evRatio > 1.10) {
+            cachedResult.roiVerdict = cachedResult.evRatio < 0.95 ? "NEGATIVE_EV" : "WAIT";
+          } else if (cachedResult.evRatio >= 1.25) {
             cachedResult.roiVerdict = "POSITIVE_EV";
-          } else if (cachedResult.evRatio < 0.85) {
-            cachedResult.roiVerdict = "NEGATIVE_EV";
+          } else if (cachedResult.evRatio >= 0.95) {
+            cachedResult.roiVerdict = "SPECULATIVE";
           } else {
-            cachedResult.roiVerdict = "BREAK_EVEN";
+            cachedResult.roiVerdict = "NEGATIVE_EV";
           }
           const verdictLabels: Record<string, string> = {
-            POSITIVE_EV: "positive expected value",
-            NEGATIVE_EV: "negative expected value",
-            BREAK_EVEN: "roughly break-even",
-            WAIT: "uncertain — prices are still settling",
+            POSITIVE_EV: "genuinely positive expected value — rare for sealed wax",
+            NEGATIVE_EV: "negative expected value after fees and liquidity adjustments",
+            SPECULATIVE: "speculative — marginally close to break-even after fees, but not clearly profitable",
+            WAIT: "uncertain — prices are still settling on this new release",
           };
-          cachedResult.verdictExplanation = `At a box cost of $${boxCost.toFixed(0)}, this product has an EV ratio of ${cachedResult.evRatio.toFixed(2)}x, indicating ${verdictLabels[cachedResult.roiVerdict] || cachedResult.roiVerdict}. Expected value is $${cachedResult.expectedValue?.toFixed(0) || "N/A"}.`;
+          cachedResult.verdictExplanation = `At $${boxCost.toFixed(0)}, this box has a fee-adjusted EV of $${ev.toFixed(0)} (${cachedResult.evRatio.toFixed(2)}x). ${verdictLabels[cachedResult.roiVerdict] || cachedResult.roiVerdict}. ${
+            ceilEV > 0 ? `Case hits add $${ceilEV.toFixed(0)} ceiling EV (not included in base ratio).` : ""
+          } Values reflect median sold prices minus 13% eBay fees and shipping.`;
         }
         if (!isPro) {
           cachedResult.hitBreakdown = [];
@@ -10129,7 +10133,8 @@ ${cardLines}`;
 
       const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-      const prompt = `You are a sealed hobby box ROI analyst for sports card collectors. Today is ${currentDate}.
+      const prompt = `You are a brutally honest sealed hobby box ROI analyst. Today is ${currentDate}.
+You understand that 80-90% of sealed wax is net-negative EV once fees and liquidity are factored in. Your job is to give collectors the hard truth, not hype.
 
 Analyze this sealed hobby box product:
 - Product: ${product}
@@ -10141,6 +10146,12 @@ ${playerDataContext}
 ${recentCardContext}
 
 ${detailLevel}
+
+CRITICAL PRICING RULES — USE SOLD/COMPLETED DATA ONLY:
+1. For every hit value, use RECENT SOLD/COMPLETED listings from eBay (last 90 days). Do NOT use active/asking prices.
+2. If you cannot find 3+ sold comps for a hit type in the last 90 days, that hit is ILLIQUID — set its value to 50% of the lowest asking price.
+3. Base cards and common inserts are worth $0 in the EV calculation. Even base rookies of star players (unless from premium brands like Prizm/Optic/Chrome Silver+) should be $0 because after eBay fees (13%), shipping ($1-4), and time, they cannot be liquidated profitably.
+4. Use MEDIAN sold prices, not mean. One outlier sale should not inflate the estimate.
 
 IMPORTANT - NEW RELEASE VOLATILITY DETECTION:
 Determine if this product was released within the last 30 days from today (${currentDate}).
@@ -10162,17 +10173,19 @@ Research using Google Search and return a JSON object with this EXACT structure:
     {
       "cardType": "e.g. Base Auto, Prizm Silver, Patch Auto /25, RPA /99",
       "odds": "e.g. 1:12 packs, 2 per box, 1 per case",
+      "perBoxOdds": <decimal probability of pulling this in ONE hobby box — e.g. 2.0 for "2 per box", 0.5 for "1 per 2 boxes", 0.083 for "1 per case (12 boxes)">,
       "isCaseHit": <true if this is a case hit (typically 1 per case or rarer — premium hits like RPA /25, Logoman, Flawless patches, Kaboom, Downtown, etc.) — false otherwise>,
-      "estimatedRawValue": <dollar value raw>,
-      "estimatedRawMin": <low end estimate>,
-      "estimatedRawMax": <high end estimate>,
-      "estimatedGradedValue": <PSA 10 or BGS 9.5 value>,
-      "estimatedGradedMin": <low end graded>,
-      "estimatedGradedMax": <high end graded>,
+      "soldComps": <number of recent sold/completed listings found — 0 if only active listings>,
+      "estimatedRawValue": <MEDIAN sold price raw — NOT asking price>,
+      "estimatedRawMin": <low end of sold range>,
+      "estimatedRawMax": <high end of sold range>,
+      "estimatedGradedValue": <PSA 10 or BGS 9.5 MEDIAN sold value>,
+      "estimatedGradedMin": <low end graded sold>,
+      "estimatedGradedMax": <high end graded sold>,
       "gradingRecommendation": "GRADE_IT" or "SELL_RAW" or "HOLD",
-      "gradingRationale": "Brief reason - e.g. 'PSA 10 commands 3x premium on star rookies'",
+      "gradingRationale": "Brief reason",
       "playerExample": "Key player this hit type is most valuable for",
-      "exampleImageUrl": "URL of a real example image of this card type from eBay, COMC, or a card database. Use actual card photos showing the specific insert/parallel/auto type. Leave empty string if not found."
+      "exampleImageUrl": "URL of a real example image of this card type from eBay, COMC, or a card database. Use actual card photos. Leave empty string if not found."
     }
   ],
   "starRookies": [
@@ -10185,10 +10198,10 @@ Research using Google Search and return a JSON object with this EXACT structure:
       "outlook": "Brief outlook on this player's card value trajectory"
     }
   ],
-  "expectedValue": <total expected value of opening one hobby box based on hit odds and values>,
-  "evRatio": <expectedValue / boxCost, e.g. 0.85 means 85 cents per dollar spent>,
-  "roiVerdict": "POSITIVE_EV" or "NEGATIVE_EV" or "BREAK_EVEN" or "WAIT",
-  "verdictExplanation": "2-3 sentence explanation of the verdict",
+  "expectedValue": <DO NOT calculate this — the backend will compute it from hitBreakdown using perBoxOdds and adjusted values>,
+  "evRatio": 0,
+  "roiVerdict": "NEGATIVE_EV",
+  "verdictExplanation": "",
   "qualityScore": <1-100 score factoring cost efficiency, hit ceiling, rookie depth, gradability>,
   "qualityBreakdown": {
     "costEfficiency": <1-100>,
@@ -10200,15 +10213,13 @@ Research using Google Search and return a JSON object with this EXACT structure:
 }
 
 RULES:
-- hitBreakdown should list the 5-10 most impactful hit types (autos, patches, key parallels, numbered cards) — skip base cards and common inserts
-- starRookies should list the 3-5 most valuable rookies in the product
-- expectedValue = sum of (each hit type's avg value × probability of pulling it in one box)
-- evRatio = expectedValue / boxCost
-- roiVerdict: POSITIVE_EV if evRatio > 1.10, NEGATIVE_EV if evRatio < 0.85, BREAK_EVEN if 0.85-1.10, WAIT if new_release and evRatio is in BREAK_EVEN or marginal POSITIVE_EV range
+- hitBreakdown: list the 5-10 most impactful hit types (autos, patches, key parallels, numbered cards). Skip base cards and common inserts entirely — they contribute $0.
+- starRookies: the 3-5 most valuable rookies in the product
+- perBoxOdds MUST be a decimal. Examples: "2 per box" = 2.0, "1 per box" = 1.0, "1 per 2 boxes" = 0.5, "1:24 packs in a 24-pack box" = 1.0, "1 per case (12 boxes)" = 0.083
+- soldComps: honest count. If you only found asking prices, set to 0. The backend will haircut illiquid values.
 - qualityScore weights: costEfficiency 30%, hitCeiling 25%, rookieClassDepth 25%, gradability 20%
-- Be honest about values — most hobby boxes are negative EV. Only mark POSITIVE_EV if the math truly works.
-- For grading recommendations: GRADE_IT if graded value > raw value × 1.5 AND graded value > $50, SELL_RAW if grading premium is minimal, HOLD if the card might appreciate
-- Use the internal card value data above to calibrate your estimates
+- Most hobby boxes are NEGATIVE EV. Be honest. The system will compute EV/verdict from the math.
+- For grading: GRADE_IT if graded value > raw value × 1.5 AND graded value > $50, SELL_RAW if grading premium is minimal, HOLD if the card might appreciate
 
 Return ONLY valid JSON, no markdown.`;
 
@@ -10244,73 +10255,119 @@ Return ONLY valid JSON, no markdown.`;
         parsed.qualityScore = Math.round(qb.costEfficiency * 0.30 + qb.hitCeiling * 0.25 + qb.rookieClassDepth * 0.25 + qb.gradability * 0.20);
       }
 
-      if (parsed.releaseRecency === "new_release" && parsed.expectedValue) {
-        let hasMinValues = false;
-        if (Array.isArray(parsed.hitBreakdown)) {
-          for (const hit of parsed.hitBreakdown) {
-            if (hit.estimatedRawMin !== undefined && hit.estimatedRawMin !== null && hit.estimatedRawValue) {
-              hasMinValues = true;
-              break;
-            }
+      // ===== REALISTIC EV ENGINE =====
+      // Computes EV from scratch using the hit breakdown, applying real-world corrections.
+      // This overrides whatever Gemini provided for expectedValue/evRatio/roiVerdict.
+
+      const EBAY_FEE_RATE = 0.13;
+      const SHIPPING_COST = 1.50;
+      const LIQUIDATION_FLOOR = 5.00;
+      const ILLIQUID_HAIRCUT = 0.50;
+      const ILLIQUID_COMP_THRESHOLD = 3;
+      const isNewRelease = parsed.releaseRecency === "new_release";
+
+      let totalEV = 0;
+      let caseHitCeilingEV = 0;
+      let hitDebugLines: string[] = [];
+
+      if (Array.isArray(parsed.hitBreakdown)) {
+        for (const hit of parsed.hitBreakdown) {
+          let rawVal = hit.estimatedRawValue || 0;
+          const perBox = hit.perBoxOdds ?? 0;
+          const soldComps = hit.soldComps ?? 0;
+          const isCaseHit = hit.isCaseHit === true;
+
+          // FIX 1: Transaction friction — cards under $5 are worth $0 after fees
+          if (rawVal < LIQUIDATION_FLOOR) {
+            hit._adjustedValue = 0;
+            hit._adjustmentReason = "Below $5 liquidation floor";
+            hitDebugLines.push(`  ${hit.cardType}: $${rawVal} → $0 (below liquidation floor)`);
+            continue;
           }
-        }
-        if (hasMinValues && Array.isArray(parsed.hitBreakdown)) {
-          let minRatio = 0;
-          let count = 0;
-          for (const hit of parsed.hitBreakdown) {
-            if (hit.estimatedRawMin && hit.estimatedRawValue && hit.estimatedRawValue > 0) {
-              minRatio += hit.estimatedRawMin / hit.estimatedRawValue;
-              count++;
-            }
+
+          // FIX 3: Illiquidity haircut — if <3 sold comps, slash by 50%
+          if (soldComps < ILLIQUID_COMP_THRESHOLD) {
+            const before = rawVal;
+            rawVal = rawVal * ILLIQUID_HAIRCUT;
+            hit._adjustmentReason = `Illiquid (${soldComps} comps) → 50% haircut`;
+            hitDebugLines.push(`  ${hit.cardType}: $${before} → $${rawVal.toFixed(0)} (illiquidity haircut, ${soldComps} comps)`);
           }
-          const avgMinRatio = count > 0 ? minRatio / count : 0.7;
-          parsed.expectedValue = parsed.expectedValue * avgMinRatio;
-        } else {
-          parsed.expectedValue = parsed.expectedValue * 0.7;
+
+          // New release additional conservatism
+          if (isNewRelease) {
+            const before = rawVal;
+            rawVal = rawVal * 0.7;
+            hitDebugLines.push(`  ${hit.cardType}: $${before.toFixed(0)} → $${rawVal.toFixed(0)} (new release 30% discount)`);
+          }
+
+          // Apply eBay fee deduction (13% + shipping) — this is what the collector actually nets
+          const netAfterFees = Math.max(0, rawVal * (1 - EBAY_FEE_RATE) - SHIPPING_COST);
+          hit._adjustedValue = netAfterFees;
+
+          // FIX 2: Case hits contribute to Hit Ceiling score, not main EV
+          // They're too rare to affect median box experience
+          if (isCaseHit && perBox < 0.2) {
+            caseHitCeilingEV += netAfterFees * perBox;
+            hitDebugLines.push(`  ${hit.cardType}: $${netAfterFees.toFixed(0)} × ${perBox} = $${(netAfterFees * perBox).toFixed(2)} → CEILING ONLY (case hit)`);
+          } else {
+            const contribution = netAfterFees * perBox;
+            totalEV += contribution;
+            hitDebugLines.push(`  ${hit.cardType}: $${netAfterFees.toFixed(0)} net × ${perBox}/box = $${contribution.toFixed(2)} EV contribution`);
+          }
         }
       }
 
-      const canonicalCost = parsed.boxCost || 1;
-      if (parsed.expectedValue) {
-        parsed.evRatio = parsed.expectedValue / canonicalCost;
-      }
-      const isNewRelease = parsed.releaseRecency === "new_release";
-      if (isNewRelease) {
-        if (parsed.evRatio < 0.85) {
-          parsed.roiVerdict = "NEGATIVE_EV";
+      console.log(`[SealedROI] EV Engine breakdown for ${parsed.productName}:`);
+      hitDebugLines.forEach(line => console.log(line));
+      console.log(`[SealedROI] Liquidatable EV: $${totalEV.toFixed(2)}, Case hit ceiling EV: $${caseHitCeilingEV.toFixed(2)}`);
+
+      parsed.expectedValue = Math.round(totalEV * 100) / 100;
+      parsed.caseHitCeilingEV = Math.round(caseHitCeilingEV * 100) / 100;
+
+      // FIX 4: Realistic EV thresholds that account for fees
+      function computeVerdictAndRatio(ev: number, cost: number, isNew: boolean) {
+        const ratio = cost > 0 ? ev / cost : 0;
+        let verdict: string;
+        if (isNew) {
+          verdict = ratio < 0.95 ? "NEGATIVE_EV" : "WAIT";
+        } else if (ratio >= 1.25) {
+          verdict = "POSITIVE_EV";
+        } else if (ratio >= 0.95) {
+          verdict = "SPECULATIVE";
         } else {
-          parsed.roiVerdict = "WAIT";
+          verdict = "NEGATIVE_EV";
         }
-      } else if (parsed.evRatio > 1.10) {
-        parsed.roiVerdict = "POSITIVE_EV";
-      } else if (parsed.evRatio < 0.85) {
-        parsed.roiVerdict = "NEGATIVE_EV";
-      } else {
-        parsed.roiVerdict = "BREAK_EVEN";
+
+        const verdictLabels: Record<string, string> = {
+          POSITIVE_EV: "genuinely positive expected value — rare for sealed wax",
+          NEGATIVE_EV: "negative expected value after fees and liquidity adjustments",
+          SPECULATIVE: "speculative — marginally close to break-even after fees, but not clearly profitable",
+          WAIT: "uncertain — prices are still settling on this new release",
+        };
+
+        const explanation = `At $${cost.toFixed(0)}, this box has a fee-adjusted EV of $${ev.toFixed(0)} (${ratio.toFixed(2)}x). ${verdictLabels[verdict] || verdict}. ${
+          caseHitCeilingEV > 0 ? `Case hits add $${caseHitCeilingEV.toFixed(0)} ceiling EV (not included in base ratio — those are lottery outcomes).` : ""
+        } Values reflect median sold prices minus 13% eBay fees and shipping.`;
+
+        return { ratio: Math.round(ratio * 100) / 100, verdict, explanation };
       }
+
+      const canonicalCost = parsed.boxCost || 1;
+      const baseResult = computeVerdictAndRatio(totalEV, canonicalCost, isNewRelease);
+      parsed.evRatio = baseResult.ratio;
+      parsed.roiVerdict = baseResult.verdict;
+      parsed.verdictExplanation = baseResult.explanation;
+
+      console.log(`[SealedROI] Final: EV=$${totalEV.toFixed(0)}, Cost=$${canonicalCost}, Ratio=${baseResult.ratio}x, Verdict=${baseResult.verdict}`);
 
       sealedProductCache.set(cacheKey, { data: JSON.parse(JSON.stringify(parsed)), timestamp: Date.now() });
 
       if (boxCost) {
         parsed.boxCost = boxCost;
-        parsed.evRatio = parsed.expectedValue / boxCost;
-        const isNew = parsed.releaseRecency === "new_release";
-        if (isNew) {
-          parsed.roiVerdict = parsed.evRatio < 0.85 ? "NEGATIVE_EV" : "WAIT";
-        } else if (parsed.evRatio > 1.10) {
-          parsed.roiVerdict = "POSITIVE_EV";
-        } else if (parsed.evRatio < 0.85) {
-          parsed.roiVerdict = "NEGATIVE_EV";
-        } else {
-          parsed.roiVerdict = "BREAK_EVEN";
-        }
-        const verdictLabels: Record<string, string> = {
-          POSITIVE_EV: "positive expected value",
-          NEGATIVE_EV: "negative expected value",
-          BREAK_EVEN: "roughly break-even",
-          WAIT: "uncertain — prices are still settling",
-        };
-        parsed.verdictExplanation = `At a box cost of $${boxCost.toFixed(0)}, this product has an EV ratio of ${parsed.evRatio.toFixed(2)}x, indicating ${verdictLabels[parsed.roiVerdict] || parsed.roiVerdict}. Expected value is $${parsed.expectedValue?.toFixed(0) || "N/A"}.`;
+        const userResult = computeVerdictAndRatio(totalEV, boxCost, isNewRelease);
+        parsed.evRatio = userResult.ratio;
+        parsed.roiVerdict = userResult.verdict;
+        parsed.verdictExplanation = userResult.explanation;
       }
 
       if (!isPro) {

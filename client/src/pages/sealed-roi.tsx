@@ -75,7 +75,7 @@ interface SealedProductResult {
   starRookies: StarRookie[];
   expectedValue: number;
   evRatio: number;
-  roiVerdict: "POSITIVE_EV" | "NEGATIVE_EV" | "BREAK_EVEN" | "WAIT";
+  roiVerdict: "POSITIVE_EV" | "NEGATIVE_EV" | "BREAK_EVEN" | "SPECULATIVE" | "WAIT";
   verdictExplanation: string;
   qualityScore: number;
   qualityBreakdown: {
@@ -85,6 +85,7 @@ interface SealedProductResult {
     gradability: number;
   };
   marketContext: string;
+  caseHitCeilingEV?: number;
 }
 
 interface ComparisonResult {
@@ -163,6 +164,7 @@ function VerdictBadge({ verdict }: { verdict: string }) {
   const config: Record<string, { color: string; icon: typeof TrendingUp; label: string }> = {
     POSITIVE_EV: { color: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30", icon: CheckCircle2, label: "Positive EV" },
     NEGATIVE_EV: { color: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30", icon: XCircle, label: "Negative EV" },
+    SPECULATIVE: { color: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30", icon: AlertTriangle, label: "Speculative" },
     BREAK_EVEN: { color: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30", icon: Scale, label: "Break Even" },
     WAIT: { color: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30", icon: Pause, label: "Wait" },
   };
@@ -654,10 +656,21 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
                   <p className="text-xs text-muted-foreground">Quality Score</p>
                 </div>
               </div>
+              {result.caseHitCeilingEV != null && result.caseHitCeilingEV > 0 && (
+                <div className="flex items-center gap-2 p-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg text-sm" data-testid="text-ceiling-ev">
+                  <Star className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                  <span className="text-muted-foreground">Case hit ceiling adds</span>
+                  <span className="font-semibold text-yellow-600 dark:text-yellow-400">${result.caseHitCeilingEV.toFixed(0)}</span>
+                  <span className="text-muted-foreground text-xs">(lottery outcomes — not in base EV)</span>
+                </div>
+              )}
             </div>
           </div>
 
-          <p className="text-sm mb-3" data-testid="text-verdict-explanation">{result.verdictExplanation}</p>
+          <div className="p-3 bg-muted/50 rounded-lg mb-3">
+            <p className="text-sm" data-testid="text-verdict-explanation">{result.verdictExplanation}</p>
+            <p className="text-xs text-muted-foreground mt-1 italic">EV reflects median sold prices minus 13% eBay fees and shipping. Cards under $5 are zeroed out (unliquidatable).</p>
+          </div>
 
           {result.keyRookieClass && (
             <div className="flex items-start gap-2 p-2 bg-muted/50 rounded-lg">
