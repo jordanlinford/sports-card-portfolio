@@ -312,6 +312,8 @@ export default function ScanHistoryPage() {
     if (scan.grader) params.set("grader", scan.grader);
     if (scan.cardNumber) params.set("cardNumber", scan.cardNumber);
     if (scan.imagePath) params.set("imagePath", scan.imagePath);
+    if (scan.sport) params.set("sport", scan.sport);
+    params.set("scanHistoryId", String(scan.id));
     params.set("from", "scan-history");
     navigate(`/outlook?${params.toString()}`);
   };

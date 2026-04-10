@@ -834,10 +834,14 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
       if (sp.get("grade")) setGrade(sp.get("grade")!);
       if (sp.get("grader")) setGrader(sp.get("grader")!);
       if (sp.get("cardNumber")) setCardNumber(sp.get("cardNumber")!);
+      if (sp.get("sport")) setSport(sp.get("sport")!);
       if (sp.get("imagePath")) {
         const path = sp.get("imagePath")!;
         setImagePath(path);
         setPreviewUrl(path);
+      }
+      if (sp.get("scanHistoryId")) {
+        setCurrentScanHistoryId(parseInt(sp.get("scanHistoryId")!));
       }
       setShowForm(true);
       setInputMode("manual");
