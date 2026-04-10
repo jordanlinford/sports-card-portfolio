@@ -9975,6 +9975,489 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  // ============================================================================
+  // Sealed Product ROI Calculator
+  // ============================================================================
+
+  const sealedProductCache = new Map<string, { data: any; timestamp: number }>();
+  const SEALED_CACHE_TTL = 6 * 60 * 60 * 1000;
+
+  app.post("/api/market/sealed-product-roi", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { z } = await import("zod");
+      const sealedRoiSchema = z.object({
+        sport: z.string().min(1),
+        product: z.string().min(1),
+        boxCost: z.coerce.number().positive().optional(),
+      });
+      const parseResult = sealedRoiSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid input", details: parseResult.error.flatten().fieldErrors });
+      }
+      const { sport, product, boxCost } = parseResult.data;
+
+      const dbUser = await storage.getUser(userId);
+      const isPro = dbUser ? hasProAccess(dbUser) : false;
+
+      const cacheKey = `${sport.toLowerCase()}-${product.toLowerCase().replace(/\s+/g, "-")}`;
+      const cached = sealedProductCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < SEALED_CACHE_TTL) {
+        const cachedResult = JSON.parse(JSON.stringify(cached.data));
+        if (boxCost && cachedResult.expectedValue) {
+          cachedResult.boxCost = boxCost;
+          cachedResult.evRatio = cachedResult.expectedValue / boxCost;
+          const isNew = cachedResult.releaseRecency === "new_release";
+          if (isNew) {
+            cachedResult.roiVerdict = cachedResult.evRatio < 0.85 ? "NEGATIVE_EV" : "WAIT";
+          } else if (cachedResult.evRatio > 1.10) {
+            cachedResult.roiVerdict = "POSITIVE_EV";
+          } else if (cachedResult.evRatio < 0.85) {
+            cachedResult.roiVerdict = "NEGATIVE_EV";
+          } else {
+            cachedResult.roiVerdict = "BREAK_EVEN";
+          }
+          const verdictLabels: Record<string, string> = {
+            POSITIVE_EV: "positive expected value",
+            NEGATIVE_EV: "negative expected value",
+            BREAK_EVEN: "roughly break-even",
+            WAIT: "uncertain — prices are still settling",
+          };
+          cachedResult.verdictExplanation = `At a box cost of $${boxCost.toFixed(0)}, this product has an EV ratio of ${cachedResult.evRatio.toFixed(2)}x, indicating ${verdictLabels[cachedResult.roiVerdict] || cachedResult.roiVerdict}. Expected value is $${cachedResult.expectedValue?.toFixed(0) || "N/A"}.`;
+        }
+        if (!isPro) {
+          cachedResult.hitBreakdown = [];
+          cachedResult.starRookies = [];
+        }
+        return res.json(cachedResult);
+      }
+
+      const sportLower = sport.toLowerCase();
+      const { SPORT_FRAMEWORKS } = await import("./playerClassificationEngine");
+      const framework = SPORT_FRAMEWORKS[sportLower] || SPORT_FRAMEWORKS["football"];
+      const checklistContext = framework ? `
+INTERNAL CHECKLIST DATA for ${sport}:
+- Premium targets: ${framework.premium.join(", ")}
+- Growth targets: ${framework.growth.join(", ")}
+- Core targets: ${framework.core.join(", ")}
+- Speculative targets: ${framework.speculative.join(", ")}` : "";
+
+      let playerDataContext = "";
+      try {
+        const registryPlayers = await db.select({
+          playerName: playerRegistry.playerName,
+          roleTier: playerRegistry.roleTier,
+          careerStage: playerRegistry.careerStage,
+          positionGroup: playerRegistry.positionGroup,
+        }).from(playerRegistry).where(eq(playerRegistry.sport, sportLower)).limit(80);
+
+        if (registryPlayers.length > 0) {
+          const tierGroups: Record<string, string[]> = {};
+          for (const p of registryPlayers) {
+            const tier = p.roleTier || "UNKNOWN";
+            if (!tierGroups[tier]) tierGroups[tier] = [];
+            tierGroups[tier].push(`${p.playerName} (${p.positionGroup || "?"}, ${p.careerStage || "?"})`);
+          }
+          const tierSummary = Object.entries(tierGroups)
+            .map(([tier, players]) => `  ${tier}: ${players.slice(0, 12).join(", ")}${players.length > 12 ? ` (+${players.length - 12} more)` : ""}`)
+            .join("\n");
+          playerDataContext = `
+PLAYER REGISTRY (${registryPlayers.length} ${sport} players):
+${tierSummary}`;
+        }
+      } catch (e) {
+        console.warn("[SealedROI] Could not load player registry:", e);
+      }
+
+      let recentCardContext = "";
+      try {
+        const recentCards = await db.execute(sql`
+          SELECT c.player_name, c.year, c.set, c.estimated_value, c.sport
+          FROM cards c
+          WHERE LOWER(c.sport) = ${sportLower}
+            AND c.estimated_value IS NOT NULL
+            AND c.estimated_value > 0
+          ORDER BY c.estimated_value DESC
+          LIMIT 25
+        `);
+        if (recentCards.rows && recentCards.rows.length > 0) {
+          const cardLines = recentCards.rows
+            .map((r: any) => `  ${r.player_name} - ${r.year || ""} ${r.set || ""}: $${Number(r.estimated_value).toFixed(0)}`)
+            .join("\n");
+          recentCardContext = `
+CARD VALUE DATA (top ${sport} cards in database):
+${cardLines}`;
+        }
+      } catch (e) {
+        console.warn("[SealedROI] Could not load card values:", e);
+      }
+
+      const detailLevel = isPro
+        ? "Provide the FULL detailed breakdown including all hits, all star rookies (up to 5), and detailed grading recommendations for each hit."
+        : "Provide a summary-level analysis. Include the top 3 hits, top 2 star rookies, and the overall ROI verdict. Skip detailed grading recommendations.";
+
+      const { GoogleGenAI } = await import("@google/genai");
+      const gemini = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+        httpOptions: {
+          apiVersion: "",
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
+        },
+      });
+
+      const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+      const prompt = `You are a sealed hobby box ROI analyst for sports card collectors. Today is ${currentDate}.
+
+Analyze this sealed hobby box product:
+- Product: ${product}
+- Sport: ${sport}
+${boxCost ? `- User-provided box cost: $${boxCost}` : "- Research the current market price for this hobby box"}
+
+${checklistContext}
+${playerDataContext}
+${recentCardContext}
+
+${detailLevel}
+
+IMPORTANT - NEW RELEASE VOLATILITY DETECTION:
+Determine if this product was released within the last 30 days from today (${currentDate}).
+- If yes: set releaseRecency to "new_release", use CONSERVATIVE (lower-bound) value estimates for all hits, include wider min/max ranges, and note any "week-1 premium" patterns (e.g., "Prizm rookies typically settle 30-50% below week-1 prices within 60 days").
+- If no: set releaseRecency to "established" and use standard market value estimates.
+
+Research using Google Search and return a JSON object with this EXACT structure:
+{
+  "productName": "Full product name",
+  "sport": "${sport}",
+  "boxCost": <current hobby box market price in dollars>,
+  "configuration": "e.g. 12 packs, 12 cards per pack, 2 autos, 1 mem per box",
+  "releaseDate": "Month Year or approximate",
+  "releaseRecency": "new_release" or "established",
+  "volatilityNote": "Only if new_release - note about price settling patterns, otherwise empty string",
+  "keyRookieClass": "Brief description of the rookie class strength (e.g. 'Strong class led by Caleb Williams, Jayden Daniels')",
+  "hitBreakdown": [
+    {
+      "cardType": "e.g. Base Auto, Prizm Silver, Patch Auto /25, RPA /99",
+      "odds": "e.g. 1:12 packs, 2 per box, 1 per case",
+      "estimatedRawValue": <dollar value raw>,
+      "estimatedRawMin": <low end estimate>,
+      "estimatedRawMax": <high end estimate>,
+      "estimatedGradedValue": <PSA 10 or BGS 9.5 value>,
+      "estimatedGradedMin": <low end graded>,
+      "estimatedGradedMax": <high end graded>,
+      "gradingRecommendation": "GRADE_IT" or "SELL_RAW" or "HOLD",
+      "gradingRationale": "Brief reason - e.g. 'PSA 10 commands 3x premium on star rookies'",
+      "playerExample": "Key player this hit type is most valuable for"
+    }
+  ],
+  "starRookies": [
+    {
+      "playerName": "Player Name",
+      "position": "QB/WR/etc",
+      "team": "NFL Team",
+      "currentRawValue": <estimated raw base rookie value>,
+      "currentGradedValue": <PSA 10 value>,
+      "outlook": "Brief outlook on this player's card value trajectory"
+    }
+  ],
+  "expectedValue": <total expected value of opening one hobby box based on hit odds and values>,
+  "evRatio": <expectedValue / boxCost, e.g. 0.85 means 85 cents per dollar spent>,
+  "roiVerdict": "POSITIVE_EV" or "NEGATIVE_EV" or "BREAK_EVEN" or "WAIT",
+  "verdictExplanation": "2-3 sentence explanation of the verdict",
+  "qualityScore": <1-100 score factoring cost efficiency, hit ceiling, rookie depth, gradability>,
+  "qualityBreakdown": {
+    "costEfficiency": <1-100>,
+    "hitCeiling": <1-100>,
+    "rookieClassDepth": <1-100>,
+    "gradability": <1-100>
+  },
+  "marketContext": "Brief current market conditions note"
+}
+
+RULES:
+- hitBreakdown should list the 5-10 most impactful hit types (autos, patches, key parallels, numbered cards) — skip base cards and common inserts
+- starRookies should list the 3-5 most valuable rookies in the product
+- expectedValue = sum of (each hit type's avg value × probability of pulling it in one box)
+- evRatio = expectedValue / boxCost
+- roiVerdict: POSITIVE_EV if evRatio > 1.10, NEGATIVE_EV if evRatio < 0.85, BREAK_EVEN if 0.85-1.10, WAIT if new_release and evRatio is in BREAK_EVEN or marginal POSITIVE_EV range
+- qualityScore weights: costEfficiency 30%, hitCeiling 25%, rookieClassDepth 25%, gradability 20%
+- Be honest about values — most hobby boxes are negative EV. Only mark POSITIVE_EV if the math truly works.
+- For grading recommendations: GRADE_IT if graded value > raw value × 1.5 AND graded value > $50, SELL_RAW if grading premium is minimal, HOLD if the card might appreciate
+- Use the internal card value data above to calibrate your estimates
+
+Return ONLY valid JSON, no markdown.`;
+
+      const result = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+          temperature: 0.3,
+          maxOutputTokens: 16384,
+          tools: [{ googleSearch: {} }],
+        },
+      });
+
+      const text = result.text || "";
+      const cleanedText = text.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+      const jsonExtract = cleanedText.match(/\{[\s\S]*\}/);
+
+      let parsed;
+      try {
+        if (!jsonExtract) throw new Error("No JSON object found in response");
+        parsed = JSON.parse(jsonExtract[0]);
+      } catch (parseErr: any) {
+        console.error("[SealedROI] Failed to parse Gemini response:", parseErr.message, text.substring(0, 500));
+        return res.status(500).json({ error: "Failed to parse analysis results" });
+      }
+
+      if (!parsed.releaseRecency) parsed.releaseRecency = "established";
+      if (!parsed.qualityBreakdown) {
+        parsed.qualityBreakdown = { costEfficiency: 50, hitCeiling: 50, rookieClassDepth: 50, gradability: 50 };
+      }
+      if (!parsed.qualityScore) {
+        const qb = parsed.qualityBreakdown;
+        parsed.qualityScore = Math.round(qb.costEfficiency * 0.30 + qb.hitCeiling * 0.25 + qb.rookieClassDepth * 0.25 + qb.gradability * 0.20);
+      }
+
+      if (parsed.releaseRecency === "new_release" && parsed.expectedValue) {
+        let hasMinValues = false;
+        if (Array.isArray(parsed.hitBreakdown)) {
+          for (const hit of parsed.hitBreakdown) {
+            if (hit.estimatedRawMin !== undefined && hit.estimatedRawMin !== null && hit.estimatedRawValue) {
+              hasMinValues = true;
+              break;
+            }
+          }
+        }
+        if (hasMinValues && Array.isArray(parsed.hitBreakdown)) {
+          let minRatio = 0;
+          let count = 0;
+          for (const hit of parsed.hitBreakdown) {
+            if (hit.estimatedRawMin && hit.estimatedRawValue && hit.estimatedRawValue > 0) {
+              minRatio += hit.estimatedRawMin / hit.estimatedRawValue;
+              count++;
+            }
+          }
+          const avgMinRatio = count > 0 ? minRatio / count : 0.7;
+          parsed.expectedValue = parsed.expectedValue * avgMinRatio;
+        } else {
+          parsed.expectedValue = parsed.expectedValue * 0.7;
+        }
+      }
+
+      const canonicalCost = parsed.boxCost || 1;
+      if (parsed.expectedValue) {
+        parsed.evRatio = parsed.expectedValue / canonicalCost;
+      }
+      const isNewRelease = parsed.releaseRecency === "new_release";
+      if (isNewRelease) {
+        if (parsed.evRatio < 0.85) {
+          parsed.roiVerdict = "NEGATIVE_EV";
+        } else {
+          parsed.roiVerdict = "WAIT";
+        }
+      } else if (parsed.evRatio > 1.10) {
+        parsed.roiVerdict = "POSITIVE_EV";
+      } else if (parsed.evRatio < 0.85) {
+        parsed.roiVerdict = "NEGATIVE_EV";
+      } else {
+        parsed.roiVerdict = "BREAK_EVEN";
+      }
+
+      sealedProductCache.set(cacheKey, { data: JSON.parse(JSON.stringify(parsed)), timestamp: Date.now() });
+
+      if (boxCost) {
+        parsed.boxCost = boxCost;
+        parsed.evRatio = parsed.expectedValue / boxCost;
+        const isNew = parsed.releaseRecency === "new_release";
+        if (isNew) {
+          parsed.roiVerdict = parsed.evRatio < 0.85 ? "NEGATIVE_EV" : "WAIT";
+        } else if (parsed.evRatio > 1.10) {
+          parsed.roiVerdict = "POSITIVE_EV";
+        } else if (parsed.evRatio < 0.85) {
+          parsed.roiVerdict = "NEGATIVE_EV";
+        } else {
+          parsed.roiVerdict = "BREAK_EVEN";
+        }
+        const verdictLabels: Record<string, string> = {
+          POSITIVE_EV: "positive expected value",
+          NEGATIVE_EV: "negative expected value",
+          BREAK_EVEN: "roughly break-even",
+          WAIT: "uncertain — prices are still settling",
+        };
+        parsed.verdictExplanation = `At a box cost of $${boxCost.toFixed(0)}, this product has an EV ratio of ${parsed.evRatio.toFixed(2)}x, indicating ${verdictLabels[parsed.roiVerdict] || parsed.roiVerdict}. Expected value is $${parsed.expectedValue?.toFixed(0) || "N/A"}.`;
+      }
+
+      if (!isPro) {
+        parsed.hitBreakdown = [];
+        parsed.starRookies = [];
+      }
+
+      res.json(parsed);
+    } catch (error) {
+      console.error("[SealedROI] Error:", error);
+      res.status(500).json({ error: "Failed to analyze sealed product" });
+    }
+  });
+
+  app.post("/api/market/sealed-product-compare", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(userId);
+      const isPro = user ? hasProAccess(user) : false;
+
+      const { z } = await import("zod");
+      const compareSchema = z.object({
+        productA: z.object({
+          productName: z.string(),
+          sport: z.string().optional(),
+          boxCost: z.number(),
+          expectedValue: z.number(),
+          evRatio: z.number(),
+          qualityScore: z.number().optional().default(50),
+          qualityBreakdown: z.object({
+            costEfficiency: z.number(),
+            hitCeiling: z.number(),
+            rookieClassDepth: z.number(),
+            gradability: z.number(),
+          }).optional(),
+          hitBreakdown: z.array(z.any()).optional(),
+          starRookies: z.array(z.any()).optional(),
+          releaseRecency: z.string().optional(),
+          configuration: z.string().optional(),
+          roiVerdict: z.string().optional(),
+        }),
+        productB: z.object({
+          productName: z.string(),
+          sport: z.string().optional(),
+          boxCost: z.number(),
+          expectedValue: z.number(),
+          evRatio: z.number(),
+          qualityScore: z.number().optional().default(50),
+          qualityBreakdown: z.object({
+            costEfficiency: z.number(),
+            hitCeiling: z.number(),
+            rookieClassDepth: z.number(),
+            gradability: z.number(),
+          }).optional(),
+          hitBreakdown: z.array(z.any()).optional(),
+          starRookies: z.array(z.any()).optional(),
+          releaseRecency: z.string().optional(),
+          configuration: z.string().optional(),
+          roiVerdict: z.string().optional(),
+        }),
+      });
+
+      const parseResult = compareSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid comparison data", details: parseResult.error.flatten().fieldErrors });
+      }
+
+      let { productA, productB } = parseResult.data;
+
+      const enrichFromCache = (p: typeof productA) => {
+        const productKey = `${p.productName || ""}`.toLowerCase().replace(/\s+/g, "-");
+        const sportKey = `${p.sport || ""}`.toLowerCase().replace(/\s+/g, "-");
+        const fullKey = sportKey ? `${sportKey}-${productKey}` : productKey;
+        for (const [cacheKey, cached] of sealedProductCache.entries()) {
+          const nameMatch = cached.data?.productName?.toLowerCase() === p.productName?.toLowerCase();
+          const sportMatch = !p.sport || cached.data?.sport?.toLowerCase() === p.sport?.toLowerCase();
+          if ((cacheKey === fullKey) || (nameMatch && sportMatch)) {
+            if ((!p.hitBreakdown || p.hitBreakdown.length === 0) && cached.data.hitBreakdown) {
+              p.hitBreakdown = JSON.parse(JSON.stringify(cached.data.hitBreakdown));
+            }
+            if ((!p.starRookies || p.starRookies.length === 0) && cached.data.starRookies) {
+              p.starRookies = JSON.parse(JSON.stringify(cached.data.starRookies));
+            }
+            if (!p.qualityBreakdown && cached.data.qualityBreakdown) {
+              p.qualityBreakdown = JSON.parse(JSON.stringify(cached.data.qualityBreakdown));
+            }
+            break;
+          }
+        }
+        return p;
+      };
+
+      productA = enrichFromCache(productA);
+      productB = enrichFromCache(productB);
+
+      const computeMetrics = (p: typeof productA) => {
+        const maxHit = p.hitBreakdown?.reduce((max: number, h: any) => Math.max(max, h.estimatedRawMax || h.estimatedRawValue || 0), 0) || 0;
+        const rookieCount = p.starRookies?.length || 0;
+        const totalHits = p.hitBreakdown?.length || 1;
+        const gradableHits = p.hitBreakdown?.filter((h: any) => h.gradingRecommendation === "GRADE_IT").length || 0;
+
+        const costEfficiency = Math.min(100, Math.round((p.evRatio / 1.5) * 100));
+        const hitCeiling = Math.min(100, Math.round((maxHit / 5000) * 100));
+        const rookieDepth = Math.min(100, Math.round((rookieCount / 5) * 100));
+        const gradability = Math.min(100, Math.round((gradableHits / totalHits) * 100));
+
+        const score = Math.round(costEfficiency * 0.30 + hitCeiling * 0.25 + rookieDepth * 0.25 + gradability * 0.20);
+
+        return { score, maxHit, rookieCount, gradableHits, qualityBreakdown: { costEfficiency, hitCeiling, rookieClassDepth: rookieDepth, gradability } };
+      };
+
+      const metricsA = computeMetrics(productA);
+      const metricsB = computeMetrics(productB);
+
+      const scoreA = metricsA.score;
+      const scoreB = metricsB.score;
+
+      let winner: "A" | "B" | "TIE" = "TIE";
+      if (scoreA > scoreB + 5) winner = "A";
+      else if (scoreB > scoreA + 5) winner = "B";
+
+      let recommendation = "";
+      if (winner === "A") {
+        recommendation = `${productA.productName} is the better buy. It offers ${scoreA > scoreB + 15 ? "significantly" : "slightly"} better overall value with a Quality Score of ${scoreA} vs ${scoreB}.`;
+      } else if (winner === "B") {
+        recommendation = `${productB.productName} is the better buy. It offers ${scoreB > scoreA + 15 ? "significantly" : "slightly"} better overall value with a Quality Score of ${scoreB} vs ${scoreA}.`;
+      } else {
+        recommendation = `Both products are closely matched with Quality Scores of ${scoreA} and ${scoreB}. Choose based on which rookie class or hit type appeals to you more.`;
+      }
+
+      const stripDetailedFields = (p: any) => {
+        const { hitBreakdown, starRookies, ...rest } = p;
+        return rest;
+      };
+
+      const responseA: any = {
+        ...productA,
+        computedQualityScore: scoreA,
+        qualityBreakdown: isPro ? metricsA.qualityBreakdown : undefined,
+        maxHitValue: metricsA.maxHit,
+        rookieCount: metricsA.rookieCount,
+        gradableHits: metricsA.gradableHits,
+      };
+      const responseB: any = {
+        ...productB,
+        computedQualityScore: scoreB,
+        qualityBreakdown: isPro ? metricsB.qualityBreakdown : undefined,
+        maxHitValue: metricsB.maxHit,
+        rookieCount: metricsB.rookieCount,
+        gradableHits: metricsB.gradableHits,
+      };
+
+      res.json({
+        productA: isPro ? responseA : stripDetailedFields(responseA),
+        productB: isPro ? responseB : stripDetailedFields(responseB),
+        winner,
+        recommendation,
+      });
+    } catch (error) {
+      console.error("[SealedCompare] Error:", error);
+      res.status(500).json({ error: "Failed to compare products" });
+    }
+  });
+
   // Legacy break/split endpoints - disabled (regulatory compliance)
   app.get("/api/breaks", (_req, res) => {
     res.status(410).json({ error: "Box break hosting has been discontinued. Use the Break Value Auditor instead.", redirect: "/market/break-auditor" });

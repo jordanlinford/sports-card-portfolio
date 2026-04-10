@@ -224,7 +224,7 @@ export function Navigation() {
                     size="sm" 
                     className={cn(
                       "gap-1",
-                      isActiveSection(["/outlook", "/hidden-gems", "/scan-history", "/market", "/market-leaderboard"]) && "bg-accent"
+                      isActiveSection(["/outlook", "/hidden-gems", "/scan-history", "/market", "/market-leaderboard", "/market/sealed-roi"]) && "bg-accent"
                     )}
                     data-testid="nav-market"
                   >
@@ -272,6 +272,12 @@ export function Navigation() {
                     <Link href="/market/break-auditor" className="flex items-center gap-2 cursor-pointer" data-testid="nav-break-auditor">
                       <Package className="h-4 w-4" />
                       Break Value Auditor
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/market/sealed-roi" className="flex items-center gap-2 cursor-pointer" data-testid="nav-sealed-roi">
+                      <Target className="h-4 w-4" />
+                      Sealed Product ROI
                     </Link>
                   </DropdownMenuItem>
                   {isAuthenticated && user && (
@@ -669,6 +675,12 @@ export function Navigation() {
                   <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/market/break-auditor") && "bg-accent")} data-testid="nav-break-auditor-mobile">
                     <Package className="h-4 w-4" />
                     Break Value Auditor
+                  </Button>
+                </Link>
+                <Link href="/market/sealed-roi" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/market/sealed-roi") && "bg-accent")} data-testid="nav-sealed-roi-mobile">
+                    <Target className="h-4 w-4" />
+                    Sealed Product ROI
                   </Button>
                 </Link>
                 {isAuthenticated && user && (

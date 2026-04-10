@@ -34,6 +34,7 @@ The application features a full-stack TypeScript architecture. The frontend uses
 - **Recommendation Engines**: Next Buys Recommendation Engine (balanced, investment-focused), Dual-Source Hidden Gems (AI and community signals, including Soccer with World Cup focus, **engine-enriched** with Market Scoring Engine composite/conviction/percentile data, blended ranking, AI-vs-engine conflict detection and override), and Portfolio Alpha Benchmark.
 - **SEO & Public Pages**: Public landing pages for podcasts, Pro trials, and a Topps Takeover SEO page with live player signals.
 - **Break Value Auditor**: AI-powered EV analysis for break slot value evaluation.
+- **Sealed Product ROI Calculator**: AI-powered sealed hobby box analysis at `/market/sealed-roi`. Analyzes hit breakdown (autos, patches, numbered parallels) with odds and values, grading recommendations (PSA 10/BGS 9.5 vs raw), star rookie spotlight, quality score breakdown (cost efficiency, hit ceiling, rookie depth, gradability), and new release volatility detection. Head-to-head comparison mode lets users compare two products side-by-side with computed quality scores. Curated product catalog for Football, Basketball, Baseball, Hockey (current + previous year). Pro/Free gating: free users get summary verdict, Pro gets full breakdown. In-memory cache with 6-hour TTL. Endpoints: POST `/api/market/sealed-product-roi`, POST `/api/market/sealed-product-compare`.
 
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM.
