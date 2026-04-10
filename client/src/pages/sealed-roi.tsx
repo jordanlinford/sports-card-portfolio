@@ -100,63 +100,118 @@ const SPORTS = [
   { value: "basketball", label: "Basketball (NBA)" },
   { value: "baseball", label: "Baseball (MLB)" },
   { value: "hockey", label: "Hockey (NHL)" },
+  { value: "soccer", label: "Soccer / Football" },
 ];
 
-const SEALED_PRODUCTS: Record<string, Array<{ name: string; msrp: number }>> = {
+const BOX_TYPES = [
+  { value: "all", label: "All Types" },
+  { value: "hobby", label: "Hobby" },
+  { value: "retail", label: "Retail / Blaster / Mega" },
+];
+
+const SEALED_PRODUCTS: Record<string, Array<{ name: string; msrp: number; type: string }>> = {
   football: [
-    { name: "2025 Panini Prizm Football Hobby", msrp: 450 },
-    { name: "2025 Panini Select Football Hobby", msrp: 400 },
-    { name: "2025 Panini Donruss Optic Football Hobby", msrp: 300 },
-    { name: "2025 Panini Contenders Football Hobby", msrp: 350 },
-    { name: "2025 Panini Mosaic Football Hobby", msrp: 250 },
-    { name: "2025 Panini National Treasures Football Hobby", msrp: 850 },
-    { name: "2025 Panini Immaculate Football Hobby", msrp: 700 },
-    { name: "2024 Panini Prizm Football Hobby", msrp: 400 },
-    { name: "2024 Panini Select Football Hobby", msrp: 375 },
-    { name: "2024 Panini Donruss Optic Football Hobby", msrp: 275 },
-    { name: "2024 Panini Contenders Football Hobby", msrp: 325 },
-    { name: "2024 Panini National Treasures Football Hobby", msrp: 800 },
-    { name: "2024 Panini Flawless Football Hobby", msrp: 3500 },
+    { name: "2025 Panini Prizm Football Hobby", msrp: 450, type: "hobby" },
+    { name: "2025 Panini Select Football Hobby", msrp: 400, type: "hobby" },
+    { name: "2025 Panini Donruss Optic Football Hobby", msrp: 300, type: "hobby" },
+    { name: "2025 Panini Contenders Football Hobby", msrp: 350, type: "hobby" },
+    { name: "2025 Panini Mosaic Football Hobby", msrp: 250, type: "hobby" },
+    { name: "2025 Panini National Treasures Football Hobby", msrp: 850, type: "hobby" },
+    { name: "2025 Panini Immaculate Football Hobby", msrp: 700, type: "hobby" },
+    { name: "2025 Panini Prizm Football Blaster", msrp: 40, type: "retail" },
+    { name: "2025 Panini Prizm Football Mega Box", msrp: 80, type: "retail" },
+    { name: "2025 Panini Prizm Football Retail Hanger", msrp: 15, type: "retail" },
+    { name: "2025 Panini Prizm Football Cello/Fat Pack", msrp: 10, type: "retail" },
+    { name: "2025 Panini Select Football Blaster", msrp: 35, type: "retail" },
+    { name: "2025 Panini Select Football Mega Box", msrp: 70, type: "retail" },
+    { name: "2025 Panini Donruss Football Blaster", msrp: 30, type: "retail" },
+    { name: "2025 Panini Donruss Football Mega Box", msrp: 55, type: "retail" },
+    { name: "2025 Panini Mosaic Football Blaster", msrp: 35, type: "retail" },
+    { name: "2025 Panini Mosaic Football Mega Box", msrp: 65, type: "retail" },
+    { name: "2024 Panini Prizm Football Hobby", msrp: 400, type: "hobby" },
+    { name: "2024 Panini Select Football Hobby", msrp: 375, type: "hobby" },
+    { name: "2024 Panini Donruss Optic Football Hobby", msrp: 275, type: "hobby" },
+    { name: "2024 Panini Contenders Football Hobby", msrp: 325, type: "hobby" },
+    { name: "2024 Panini National Treasures Football Hobby", msrp: 800, type: "hobby" },
+    { name: "2024 Panini Flawless Football Hobby", msrp: 3500, type: "hobby" },
+    { name: "2024 Panini Prizm Football Blaster", msrp: 35, type: "retail" },
+    { name: "2024 Panini Prizm Football Mega Box", msrp: 75, type: "retail" },
+    { name: "2024 Panini Select Football Blaster", msrp: 30, type: "retail" },
   ],
   basketball: [
-    { name: "2025-26 Panini Prizm Basketball Hobby", msrp: 500 },
-    { name: "2025-26 Panini Select Basketball Hobby", msrp: 450 },
-    { name: "2025-26 Panini Donruss Optic Basketball Hobby", msrp: 350 },
-    { name: "2025-26 Panini Contenders Basketball Hobby", msrp: 400 },
-    { name: "2025-26 Panini National Treasures Basketball Hobby", msrp: 900 },
-    { name: "2025-26 Panini Mosaic Basketball Hobby", msrp: 300 },
-    { name: "2024-25 Panini Prizm Basketball Hobby", msrp: 450 },
-    { name: "2024-25 Panini Select Basketball Hobby", msrp: 400 },
-    { name: "2024-25 Panini Donruss Optic Basketball Hobby", msrp: 300 },
-    { name: "2024-25 Panini Contenders Basketball Hobby", msrp: 375 },
-    { name: "2024-25 Panini National Treasures Basketball Hobby", msrp: 850 },
-    { name: "2024-25 Panini Immaculate Basketball Hobby", msrp: 750 },
+    { name: "2025-26 Panini Prizm Basketball Hobby", msrp: 500, type: "hobby" },
+    { name: "2025-26 Panini Select Basketball Hobby", msrp: 450, type: "hobby" },
+    { name: "2025-26 Panini Donruss Optic Basketball Hobby", msrp: 350, type: "hobby" },
+    { name: "2025-26 Panini Contenders Basketball Hobby", msrp: 400, type: "hobby" },
+    { name: "2025-26 Panini National Treasures Basketball Hobby", msrp: 900, type: "hobby" },
+    { name: "2025-26 Panini Mosaic Basketball Hobby", msrp: 300, type: "hobby" },
+    { name: "2025-26 Panini Prizm Basketball Blaster", msrp: 40, type: "retail" },
+    { name: "2025-26 Panini Prizm Basketball Mega Box", msrp: 80, type: "retail" },
+    { name: "2025-26 Panini Prizm Basketball Retail Hanger", msrp: 15, type: "retail" },
+    { name: "2025-26 Panini Select Basketball Blaster", msrp: 35, type: "retail" },
+    { name: "2025-26 Panini Select Basketball Mega Box", msrp: 70, type: "retail" },
+    { name: "2025-26 Panini Donruss Basketball Blaster", msrp: 30, type: "retail" },
+    { name: "2025-26 Panini Mosaic Basketball Blaster", msrp: 35, type: "retail" },
+    { name: "2024-25 Panini Prizm Basketball Hobby", msrp: 450, type: "hobby" },
+    { name: "2024-25 Panini Select Basketball Hobby", msrp: 400, type: "hobby" },
+    { name: "2024-25 Panini Donruss Optic Basketball Hobby", msrp: 300, type: "hobby" },
+    { name: "2024-25 Panini Contenders Basketball Hobby", msrp: 375, type: "hobby" },
+    { name: "2024-25 Panini National Treasures Basketball Hobby", msrp: 850, type: "hobby" },
+    { name: "2024-25 Panini Immaculate Basketball Hobby", msrp: 750, type: "hobby" },
+    { name: "2024-25 Panini Prizm Basketball Blaster", msrp: 35, type: "retail" },
+    { name: "2024-25 Panini Prizm Basketball Mega Box", msrp: 75, type: "retail" },
   ],
   baseball: [
-    { name: "2025 Topps Chrome Baseball Hobby", msrp: 300 },
-    { name: "2025 Topps Series 1 Baseball Hobby", msrp: 200 },
-    { name: "2025 Topps Series 2 Baseball Hobby", msrp: 200 },
-    { name: "2025 Bowman Chrome Baseball Hobby", msrp: 350 },
-    { name: "2025 Topps Sterling Baseball Hobby", msrp: 500 },
-    { name: "2025 Topps Inception Baseball Hobby", msrp: 250 },
-    { name: "2025 Panini Prizm Baseball Hobby", msrp: 300 },
-    { name: "2024 Topps Chrome Baseball Hobby", msrp: 275 },
-    { name: "2024 Bowman Chrome Baseball Hobby", msrp: 325 },
-    { name: "2024 Topps Series 1 Baseball Hobby", msrp: 175 },
-    { name: "2024 Topps Series 2 Baseball Hobby", msrp: 175 },
-    { name: "2024 Topps Sterling Baseball Hobby", msrp: 450 },
-    { name: "2024 Panini Prizm Baseball Hobby", msrp: 275 },
+    { name: "2025 Topps Chrome Baseball Hobby", msrp: 300, type: "hobby" },
+    { name: "2025 Topps Series 1 Baseball Hobby", msrp: 200, type: "hobby" },
+    { name: "2025 Topps Series 2 Baseball Hobby", msrp: 200, type: "hobby" },
+    { name: "2025 Bowman Chrome Baseball Hobby", msrp: 350, type: "hobby" },
+    { name: "2025 Topps Sterling Baseball Hobby", msrp: 500, type: "hobby" },
+    { name: "2025 Topps Inception Baseball Hobby", msrp: 250, type: "hobby" },
+    { name: "2025 Panini Prizm Baseball Hobby", msrp: 300, type: "hobby" },
+    { name: "2025 Topps Series 1 Baseball Blaster", msrp: 30, type: "retail" },
+    { name: "2025 Topps Series 1 Baseball Mega Box", msrp: 50, type: "retail" },
+    { name: "2025 Topps Series 1 Baseball Hanger", msrp: 12, type: "retail" },
+    { name: "2025 Topps Chrome Baseball Blaster", msrp: 40, type: "retail" },
+    { name: "2025 Topps Chrome Baseball Mega Box", msrp: 70, type: "retail" },
+    { name: "2025 Bowman Baseball Blaster", msrp: 35, type: "retail" },
+    { name: "2025 Bowman Baseball Mega Box", msrp: 60, type: "retail" },
+    { name: "2024 Topps Chrome Baseball Hobby", msrp: 275, type: "hobby" },
+    { name: "2024 Bowman Chrome Baseball Hobby", msrp: 325, type: "hobby" },
+    { name: "2024 Topps Series 1 Baseball Hobby", msrp: 175, type: "hobby" },
+    { name: "2024 Topps Series 2 Baseball Hobby", msrp: 175, type: "hobby" },
+    { name: "2024 Topps Sterling Baseball Hobby", msrp: 450, type: "hobby" },
+    { name: "2024 Panini Prizm Baseball Hobby", msrp: 275, type: "hobby" },
+    { name: "2024 Topps Chrome Baseball Blaster", msrp: 35, type: "retail" },
+    { name: "2024 Topps Series 1 Baseball Blaster", msrp: 25, type: "retail" },
   ],
   hockey: [
-    { name: "2025-26 Upper Deck Series 1 Hockey Hobby", msrp: 200 },
-    { name: "2025-26 Upper Deck Series 2 Hockey Hobby", msrp: 200 },
-    { name: "2025-26 Upper Deck Artifacts Hockey Hobby", msrp: 250 },
-    { name: "2025-26 Upper Deck SP Authentic Hockey Hobby", msrp: 350 },
-    { name: "2024-25 Upper Deck Series 1 Hockey Hobby", msrp: 175 },
-    { name: "2024-25 Upper Deck Series 2 Hockey Hobby", msrp: 175 },
-    { name: "2024-25 Upper Deck Artifacts Hockey Hobby", msrp: 225 },
-    { name: "2024-25 Upper Deck SP Authentic Hockey Hobby", msrp: 325 },
-    { name: "2024-25 Upper Deck The Cup Hockey Hobby", msrp: 750 },
+    { name: "2025-26 Upper Deck Series 1 Hockey Hobby", msrp: 200, type: "hobby" },
+    { name: "2025-26 Upper Deck Series 2 Hockey Hobby", msrp: 200, type: "hobby" },
+    { name: "2025-26 Upper Deck Artifacts Hockey Hobby", msrp: 250, type: "hobby" },
+    { name: "2025-26 Upper Deck SP Authentic Hockey Hobby", msrp: 350, type: "hobby" },
+    { name: "2025-26 Upper Deck Series 1 Hockey Blaster", msrp: 30, type: "retail" },
+    { name: "2025-26 Upper Deck Series 1 Hockey Mega Box", msrp: 55, type: "retail" },
+    { name: "2025-26 Upper Deck Series 1 Hockey Retail Tin", msrp: 25, type: "retail" },
+    { name: "2024-25 Upper Deck Series 1 Hockey Hobby", msrp: 175, type: "hobby" },
+    { name: "2024-25 Upper Deck Series 2 Hockey Hobby", msrp: 175, type: "hobby" },
+    { name: "2024-25 Upper Deck Artifacts Hockey Hobby", msrp: 225, type: "hobby" },
+    { name: "2024-25 Upper Deck SP Authentic Hockey Hobby", msrp: 325, type: "hobby" },
+    { name: "2024-25 Upper Deck The Cup Hockey Hobby", msrp: 750, type: "hobby" },
+    { name: "2024-25 Upper Deck Series 1 Hockey Blaster", msrp: 25, type: "retail" },
+    { name: "2024-25 Upper Deck Series 2 Hockey Blaster", msrp: 25, type: "retail" },
+  ],
+  soccer: [
+    { name: "2025 Panini Prizm FIFA Club World Cup Soccer Hobby", msrp: 350, type: "hobby" },
+    { name: "2025 Topps Chrome UEFA Champions League Soccer Hobby", msrp: 300, type: "hobby" },
+    { name: "2025 Panini Select FIFA Soccer Hobby", msrp: 400, type: "hobby" },
+    { name: "2025 Topps Merlin Heritage Soccer Hobby", msrp: 250, type: "hobby" },
+    { name: "2025 Panini Prizm FIFA Club World Cup Soccer Blaster", msrp: 35, type: "retail" },
+    { name: "2025 Panini Prizm FIFA Club World Cup Soccer Mega Box", msrp: 65, type: "retail" },
+    { name: "2024-25 Topps Chrome UEFA Champions League Soccer Hobby", msrp: 275, type: "hobby" },
+    { name: "2024 Panini Prizm World Cup Soccer Hobby", msrp: 350, type: "hobby" },
+    { name: "2024 Panini Prizm Premier League Soccer Hobby", msrp: 300, type: "hobby" },
+    { name: "2024 Panini Prizm Premier League Soccer Blaster", msrp: 30, type: "retail" },
   ],
 };
 
@@ -216,6 +271,7 @@ function QualityBar({ label, value, maxValue = 100 }: { label: string; value: nu
 export default function SealedRoiPage() {
   const { isAuthenticated } = useAuth();
   const [sport, setSport] = useState("");
+  const [boxType, setBoxType] = useState("all");
   const [product, setProduct] = useState("");
   const [customProduct, setCustomProduct] = useState("");
   const [boxCost, setBoxCost] = useState("");
@@ -225,6 +281,7 @@ export default function SealedRoiPage() {
 
   const [compareMode, setCompareMode] = useState(false);
   const [sportB, setSportB] = useState("");
+  const [boxTypeB, setBoxTypeB] = useState("all");
   const [productB, setProductB] = useState("");
   const [customProductB, setCustomProductB] = useState("");
   const [boxCostB, setBoxCostB] = useState("");
@@ -351,7 +408,7 @@ export default function SealedRoiPage() {
               <Card data-testid="card-product-input">
                 <CardHeader>
                   <CardTitle className="text-lg">Product Details</CardTitle>
-                  <CardDescription>Select a sealed hobby box to analyze</CardDescription>
+                  <CardDescription>Select a sealed product to analyze</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -363,6 +420,20 @@ export default function SealedRoiPage() {
                       <SelectContent>
                         {SPORTS.map(s => (
                           <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Box Type</Label>
+                    <Select value={boxType} onValueChange={(v) => { setBoxType(v); setProduct(""); }}>
+                      <SelectTrigger data-testid="select-box-type">
+                        <SelectValue placeholder="All types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {BOX_TYPES.map(t => (
+                          <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -381,17 +452,19 @@ export default function SealedRoiPage() {
                         <SelectValue placeholder="Select product" />
                       </SelectTrigger>
                       <SelectContent>
-                        {sport && SEALED_PRODUCTS[sport]?.map(p => (
-                          <SelectItem key={p.name} value={p.name}>
-                            {p.name} (~${p.msrp})
-                          </SelectItem>
-                        ))}
+                        {sport && SEALED_PRODUCTS[sport]
+                          ?.filter(p => boxType === "all" || p.type === boxType)
+                          .map(p => (
+                            <SelectItem key={p.name} value={p.name}>
+                              {p.name} (~${p.msrp})
+                            </SelectItem>
+                          ))}
                         <SelectItem value="custom">Other (custom entry)</SelectItem>
                       </SelectContent>
                     </Select>
                     {product === "custom" && (
                       <Input
-                        placeholder="e.g. 2025 Panini Prizm Football Hobby"
+                        placeholder="e.g. 2025 Panini Prizm Football Blaster"
                         value={customProduct}
                         onChange={(e) => setCustomProduct(e.target.value)}
                         data-testid="input-custom-product"
@@ -522,6 +595,8 @@ export default function SealedRoiPage() {
           <CompareView
             sport={sport}
             setSport={setSport}
+            boxType={boxType}
+            setBoxType={setBoxType}
             product={product}
             setProduct={setProduct}
             customProduct={customProduct}
@@ -530,6 +605,8 @@ export default function SealedRoiPage() {
             setBoxCost={setBoxCost}
             sportB={sportB}
             setSportB={setSportB}
+            boxTypeB={boxTypeB}
+            setBoxTypeB={setBoxTypeB}
             productB={productB}
             setProductB={setProductB}
             customProductB={customProductB}
@@ -854,6 +931,8 @@ function ProductSelector({
   label,
   sport,
   setSport,
+  boxType,
+  setBoxType,
   product,
   setProduct,
   customProduct,
@@ -865,6 +944,8 @@ function ProductSelector({
   label: string;
   sport: string;
   setSport: (v: string) => void;
+  boxType: string;
+  setBoxType: (v: string) => void;
   product: string;
   setProduct: (v: string) => void;
   customProduct: string;
@@ -894,6 +975,20 @@ function ProductSelector({
         </div>
 
         <div className="space-y-2">
+          <Label>Box Type</Label>
+          <Select value={boxType} onValueChange={(v) => { setBoxType(v); setProduct(""); }}>
+            <SelectTrigger data-testid={`select-box-type-${testIdSuffix}`}>
+              <SelectValue placeholder="All types" />
+            </SelectTrigger>
+            <SelectContent>
+              {BOX_TYPES.map(t => (
+                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
           <Label>Product</Label>
           <Select value={product} onValueChange={(v) => {
             setProduct(v);
@@ -906,17 +1001,19 @@ function ProductSelector({
               <SelectValue placeholder="Select product" />
             </SelectTrigger>
             <SelectContent>
-              {sport && SEALED_PRODUCTS[sport]?.map(p => (
-                <SelectItem key={p.name} value={p.name}>
-                  {p.name} (~${p.msrp})
-                </SelectItem>
-              ))}
+              {sport && SEALED_PRODUCTS[sport]
+                ?.filter(p => boxType === "all" || p.type === boxType)
+                .map(p => (
+                  <SelectItem key={p.name} value={p.name}>
+                    {p.name} (~${p.msrp})
+                  </SelectItem>
+                ))}
               <SelectItem value="custom">Other (custom entry)</SelectItem>
             </SelectContent>
           </Select>
           {product === "custom" && (
             <Input
-              placeholder="e.g. 2025 Panini Prizm Football Hobby"
+              placeholder="e.g. 2025 Panini Prizm Football Blaster"
               value={customProduct}
               onChange={(e) => setCustomProduct(e.target.value)}
               data-testid={`input-custom-product-${testIdSuffix}`}
@@ -942,15 +1039,17 @@ function ProductSelector({
 }
 
 function CompareView({
-  sport, setSport, product, setProduct, customProduct, setCustomProduct, boxCost, setBoxCost,
-  sportB, setSportB, productB, setProductB, customProductB, setCustomProductB, boxCostB, setBoxCostB,
+  sport, setSport, boxType, setBoxType, product, setProduct, customProduct, setCustomProduct, boxCost, setBoxCost,
+  sportB, setSportB, boxTypeB, setBoxTypeB, productB, setProductB, customProductB, setCustomProductB, boxCostB, setBoxCostB,
   isAuthenticated, isPro, isComparing, error, comparisonResult, resultA, resultB, onCompare,
 }: {
   sport: string; setSport: (v: string) => void;
+  boxType: string; setBoxType: (v: string) => void;
   product: string; setProduct: (v: string) => void;
   customProduct: string; setCustomProduct: (v: string) => void;
   boxCost: string; setBoxCost: (v: string) => void;
   sportB: string; setSportB: (v: string) => void;
+  boxTypeB: string; setBoxTypeB: (v: string) => void;
   productB: string; setProductB: (v: string) => void;
   customProductB: string; setCustomProductB: (v: string) => void;
   boxCostB: string; setBoxCostB: (v: string) => void;
@@ -973,6 +1072,8 @@ function CompareView({
           label="Product A"
           sport={sport}
           setSport={setSport}
+          boxType={boxType}
+          setBoxType={setBoxType}
           product={product}
           setProduct={setProduct}
           customProduct={customProduct}
@@ -985,6 +1086,8 @@ function CompareView({
           label="Product B"
           sport={sportB}
           setSport={setSportB}
+          boxType={boxTypeB}
+          setBoxType={setBoxTypeB}
           product={productB}
           setProduct={setProductB}
           customProduct={customProductB}
