@@ -9970,7 +9970,20 @@ Return ONLY valid JSON, no markdown.`;
       let parsed;
       try {
         if (!jsonExtract) throw new Error("No JSON object found in response");
-        parsed = JSON.parse(jsonExtract[0]);
+        let jsonStr = jsonExtract[0];
+        try {
+          parsed = JSON.parse(jsonStr);
+        } catch {
+          jsonStr = jsonStr
+            .replace(/,\s*([}\]])/g, "$1")
+            .replace(/\/\/[^\n]*/g, "")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')
+            .replace(/:\s*'([^']*)'/g, ': "$1"')
+            .replace(/\n/g, " ")
+            .replace(/\t/g, " ");
+          parsed = JSON.parse(jsonStr);
+        }
       } catch (parseErr: any) {
         console.error("[BreakAuditor] Failed to parse Gemini response:", parseErr.message, text.substring(0, 500));
         return res.status(500).json({ error: "Failed to parse analysis results" });
@@ -10240,10 +10253,49 @@ Return ONLY valid JSON, no markdown.`;
       let parsed;
       try {
         if (!jsonExtract) throw new Error("No JSON object found in response");
-        parsed = JSON.parse(jsonExtract[0]);
+        let jsonStr = jsonExtract[0];
+        try {
+          parsed = JSON.parse(jsonStr);
+        } catch {
+          jsonStr = jsonStr
+            .replace(/,\s*([}\]])/g, "$1")
+            .replace(/\/\/[^\n]*/g, "")
+            .replace(/\/\*[\s\S]*?\*\//g, "")
+            .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')
+            .replace(/:\s*'([^']*)'/g, ': "$1"')
+            .replace(/\n/g, " ")
+            .replace(/\t/g, " ");
+          try {
+            parsed = JSON.parse(jsonStr);
+          } catch {
+            const innerMatch = cleanedText.match(/\{[^{}]*("productName"|"sport"|"boxCost")[\s\S]*\}/);
+            if (innerMatch) {
+              let repaired = innerMatch[0]
+                .replace(/,\s*([}\]])/g, "$1")
+                .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":');
+              parsed = JSON.parse(repaired);
+            } else {
+              throw new Error("Could not extract valid JSON after repair attempts");
+            }
+          }
+        }
       } catch (parseErr: any) {
-        console.error("[SealedROI] Failed to parse Gemini response:", parseErr.message, text.substring(0, 500));
-        return res.status(500).json({ error: "Failed to parse analysis results" });
+        console.error("[SealedROI] Parse attempt 1 failed:", parseErr.message, "Retrying with JSON-only prompt...");
+        try {
+          const retryResult = await gemini.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: `Fix this malformed JSON and return ONLY valid JSON, no markdown, no explanation:\n${text.substring(0, 12000)}`,
+            config: { temperature: 0, maxOutputTokens: 16384 },
+          });
+          const retryText = (retryResult.text || "").replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+          const retryMatch = retryText.match(/\{[\s\S]*\}/);
+          if (!retryMatch) throw new Error("No JSON in retry response");
+          parsed = JSON.parse(retryMatch[0]);
+          console.log("[SealedROI] Retry parse succeeded");
+        } catch (retryErr: any) {
+          console.error("[SealedROI] Retry also failed:", retryErr.message);
+          return res.status(500).json({ error: "Failed to parse analysis results" });
+        }
       }
 
       if (!parsed.releaseRecency) parsed.releaseRecency = "established";
