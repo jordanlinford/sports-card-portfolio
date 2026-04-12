@@ -45,13 +45,20 @@ const CARD_SCAN_PROMPT = `You are an expert sports card identifier. Use your kno
 
 CRITICAL: Look at the PHYSICAL CARD carefully:
 - Read ALL text on the card (player name, team, set logos, card number, serial numbering)
-- Examine the BORDER COLOR and PATTERN to determine the exact parallel (Gold borders = Gold Prizm, Silver shimmer = Silver Prizm, Rainbow = Hyper Prizm, etc.)
+- Examine the BORDER COLOR and PATTERN to determine the exact parallel (Gold borders = Gold Prizm, Silver shimmer = Silver Prizm, etc.). Be extremely careful distinguishing similar-looking parallels — see the PARALLEL IDENTIFICATION GUIDE below.
 - Check for "RC" or "Rookie" logos
 - Look at the BACK of the card if visible for set name, card number, and serial numbering
 - Use web search to cross-reference what you see with actual card checklists and eBay listings
 
 PARALLEL IDENTIFICATION GUIDE (look at border color/pattern):
 - Prizm parallels: Base (no color), Silver (silver shimmer), Red (/299), Blue (/199), Green, Pink, Orange (/49), Gold (/10), Black (/1), Gold Vinyl (/5), Mojo, Hyper, Camo, Snakeskin, Disco, Tiger, Marble, Nebula, Cosmic
+- Prizm Draft Picks SPECIFIC parallels (these are DISTINCT — do NOT confuse them):
+  * "Purple Wave" = purple-tinted card with HORIZONTAL WAVE/LINE PATTERN across the surface. This is NOT "Hyper Prizm".
+  * "Purple Pulsar" = purple-tinted card with a STARBURST/PULSAR shimmer effect radiating from center. This is NOT "Hyper Prizm" or "Purple Wave".
+  * "Hyper Prizm" = rainbow/multicolor PRIZMATIC shimmer effect (shifts multiple colors at different angles). NOT the same as Purple Wave or Purple Pulsar.
+  * "Red Wave", "Blue Wave", "Green Wave" = same horizontal wave pattern but in different base colors.
+  * Each of these parallels has a COMPLETELY DIFFERENT market value (e.g. Purple Wave ~$25 vs Hyper Prizm ~$150+). Getting this wrong means a 5-10x pricing error.
+- CRITICAL: If the card has a PURPLE tint with HORIZONTAL LINES/WAVES, it is "Purple Wave" — search eBay for "[player] Prizm Draft Picks Purple Wave" to confirm before labeling it "Hyper Prizm".
 - Topps Chrome parallels: Base, Refractor, Pink Refractor, Gold Refractor, Superfractor (Chrome Superfractors are /1, but other sets like Stadium Club label their top parallels "Superfractor" with different print runs — always read the actual stamp)
 - Donruss parallels: Base, Rated Rookie, Press Proof, Holo, Elite Series
 - Select parallels: Base, Silver, Concourse, Premier Level, Tie-Dye, Zebra, Disco, Gold (/10)
