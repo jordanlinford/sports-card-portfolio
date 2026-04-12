@@ -1760,6 +1760,8 @@ ${searchDescription}${isRawTrend ? " raw" : ""}
 ${rawTrendNote}
 ${autoTrendNote}
 
+CRITICAL — EXACT PARALLEL MATCHING: You MUST only report prices for this EXACT card variant. Different parallels of the same card have VASTLY different values (e.g. "Hyper Prizm" at $150+ vs "Purple Wave" at $25). If the variation name contains multiple terms (like "Hyper Prizm purple wave"), search for the FULL variation name as one unit. Do NOT substitute a different parallel's prices. If you cannot find sold data for this exact variant, say so — do NOT use a different parallel's prices as a substitute.
+
 Look up eBay sold/completed listings prices${isRawTrend ? " for RAW/UNGRADED copies only" : ""}, 130point.com, and any other price references you can find.
 
 Tell me:

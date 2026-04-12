@@ -408,7 +408,7 @@ export default function CardOutlookPage() {
     const sorted = [...validPrices].sort((a, b) => a - b);
     const ppMedian = sorted[Math.floor(sorted.length / 2)];
     const ratio = mv / ppMedian;
-    if (ratio < 0.33 || ratio > 3) {
+    if (ratio < 0.33) {
       return Math.round(ppMedian * 100) / 100;
     }
     return mv;

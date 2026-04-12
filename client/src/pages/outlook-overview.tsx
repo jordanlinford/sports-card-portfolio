@@ -716,13 +716,15 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [trendCorrectedValue, setTrendCorrectedValue] = useState<number | null>(null);
   const handleTrendPriceLoaded = useCallback((trendAvg: number) => {
     const currentValue = result?.market?.value;
+    if ((!currentValue || currentValue === 0) && trendAvg > 0) {
+      setTrendCorrectedValue(trendAvg);
+      return;
+    }
     if (currentValue && currentValue > 0 && trendAvg > 0) {
       const ratio = currentValue / trendAvg;
-      if (ratio < 0.5 || ratio > 2) {
+      if (ratio < 0.5) {
         setTrendCorrectedValue(trendAvg);
       }
-    } else if ((!currentValue || currentValue === 0) && trendAvg > 0) {
-      setTrendCorrectedValue(trendAvg);
     }
   }, [result?.market?.value]);
   const [scanResult, setScanResult] = useState<CardScanResult | null>(null);
