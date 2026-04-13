@@ -17,6 +17,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   History,
   Trash2,
   Loader2,
@@ -33,10 +41,13 @@ import {
   FolderPlus,
   RefreshCw,
   Crown,
+  Plus,
+  FolderOpen,
+  Check,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { ScanHistory } from "@shared/schema";
+import type { ScanHistory, DisplayCase } from "@shared/schema";
 
 const PAGE_SIZE = 20;
 
@@ -272,6 +283,8 @@ export default function ScanHistoryPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(0);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [selectedScan, setSelectedScan] = useState<ScanHistory | null>(null);
 
   const offset = page * PAGE_SIZE;
 
@@ -283,6 +296,45 @@ export default function ScanHistoryPage() {
       return res.json();
     },
     enabled: !!user,
+  });
+
+  const { data: displayCases } = useQuery<DisplayCase[]>({
+    queryKey: ['/api/display-cases'],
+    enabled: !!user && addDialogOpen,
+  });
+
+  const addToExistingMutation = useMutation({
+    mutationFn: async ({ caseId, scan }: { caseId: number; scan: ScanHistory }) => {
+      const title = [scan.playerName, scan.year, scan.setName].filter(Boolean).join(" ");
+      await apiRequest("POST", `/api/display-cases/${caseId}/cards`, {
+        title: title || "Unknown Card",
+        playerName: scan.playerName || null,
+        year: scan.year ? Number(scan.year) : null,
+        set: scan.setName || null,
+        variation: scan.variation || null,
+        grade: scan.grade || null,
+        grader: scan.grader === "raw" ? null : (scan.grader || null),
+        cardNumber: scan.cardNumber || null,
+        sport: scan.sport || null,
+        imagePath: scan.imagePath || null,
+        estimatedValue: scan.marketValue || null,
+        cardCategory: "sports" as const,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/display-cases'] });
+      setAddDialogOpen(false);
+      setSelectedScan(null);
+      toast({ title: "Card added", description: "Added to your collection." });
+    },
+    onError: (err: any) => {
+      const msg = err?.message || "";
+      if (msg.includes("409") || msg.includes("already") || msg.includes("duplicate")) {
+        toast({ title: "Already added", description: "This card is already in that collection." });
+      } else {
+        toast({ title: "Error", description: "Failed to add card.", variant: "destructive" });
+      }
+    },
   });
 
   const deleteMutation = useMutation({
@@ -319,6 +371,13 @@ export default function ScanHistoryPage() {
   };
 
   const handleAddToCollection = (scan: ScanHistory) => {
+    setSelectedScan(scan);
+    setAddDialogOpen(true);
+  };
+
+  const handleCreateNewWithCard = () => {
+    if (!selectedScan) return;
+    const scan = selectedScan;
     const params = new URLSearchParams();
     if (scan.playerName) params.set("playerName", scan.playerName);
     if (scan.year) params.set("year", String(scan.year));
@@ -331,6 +390,8 @@ export default function ScanHistoryPage() {
     if (scan.imagePath) params.set("imagePath", scan.imagePath);
     if (scan.marketValue != null) params.set("estimatedValue", String(scan.marketValue));
     params.set("from", "scan-history");
+    setAddDialogOpen(false);
+    setSelectedScan(null);
     navigate(`/cases/new?${params.toString()}`);
   };
 
@@ -468,6 +529,71 @@ export default function ScanHistoryPage() {
           )}
         </>
       )}
+
+      <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) setSelectedScan(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add to Collection</DialogTitle>
+            <DialogDescription>
+              {selectedScan ? (
+                <>Add <span className="font-medium">{[selectedScan.year, selectedScan.setName, selectedScan.playerName].filter(Boolean).join(" ")}</span> to a collection</>
+              ) : "Choose a collection"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start gap-3 h-12"
+              onClick={handleCreateNewWithCard}
+              data-testid="button-create-new-case"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
+                <Plus className="h-4 w-4 text-primary" />
+              </div>
+              <span className="font-medium">Create New Collection</span>
+            </Button>
+
+            {displayCases && displayCases.length > 0 && (
+              <>
+                <div className="relative py-2">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">or add to existing</span>
+                  </div>
+                </div>
+                <ScrollArea className="max-h-64">
+                  <div className="space-y-1">
+                    {displayCases.map((dc) => (
+                      <Button
+                        key={dc.id}
+                        variant="ghost"
+                        className="w-full justify-start gap-3 h-11"
+                        disabled={addToExistingMutation.isPending}
+                        onClick={() => selectedScan && addToExistingMutation.mutate({ caseId: dc.id, scan: selectedScan })}
+                        data-testid={`button-add-to-case-${dc.id}`}
+                      >
+                        <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="truncate text-left flex-1">{dc.name}</span>
+                        {addToExistingMutation.isPending && addToExistingMutation.variables?.caseId === dc.id && (
+                          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </>
+            )}
+
+            {displayCases && displayCases.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                No collections yet. Create your first one above.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
