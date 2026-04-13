@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -33,7 +33,10 @@ import {
   XCircle,
   Pause,
   Trophy,
+  Share2,
+  Check,
 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { hasProAccess, type User } from "@shared/schema";
 
 interface HitBreakdownItem {
@@ -86,6 +89,7 @@ interface SealedProductResult {
   };
   marketContext: string;
   caseHitCeilingEV?: number;
+  shareId?: string;
 }
 
 interface ComparisonResult {
@@ -628,6 +632,12 @@ export default function SealedRoiPage() {
   );
 }
 
+function proxyImageUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("/")) return url;
+  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+}
+
 function ProductImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
   const [failed, setFailed] = useState(false);
 
@@ -641,12 +651,11 @@ function ProductImage({ src, alt, className }: { src?: string; alt: string; clas
 
   return (
     <img
-      src={src}
+      src={proxyImageUrl(src)}
       alt={alt}
       className={`object-contain rounded-lg bg-muted ${className || ""}`}
       onError={() => setFailed(true)}
       loading="lazy"
-      referrerPolicy="no-referrer"
     />
   );
 }
@@ -658,13 +667,38 @@ function HitImage({ src, alt }: { src?: string; alt: string }) {
 
   return (
     <img
-      src={src}
+      src={proxyImageUrl(src)}
       alt={alt}
       className="w-16 h-20 object-contain rounded border bg-muted flex-shrink-0"
       onError={() => setFailed(true)}
       loading="lazy"
-      referrerPolicy="no-referrer"
     />
+  );
+}
+
+function ShareButton({ shareId }: { shareId?: string }) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  if (!shareId) return null;
+
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/market/sealed-roi/shared/${shareId}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      toast({ title: "Link copied", description: "Share link copied to clipboard." });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: "Share link", description: shareUrl });
+    }
+  };
+
+  return (
+    <Button variant="outline" size="sm" onClick={handleShare} data-testid="button-share-analysis">
+      {copied ? <Check className="h-3.5 w-3.5 mr-1.5" /> : <Share2 className="h-3.5 w-3.5 mr-1.5" />}
+      {copied ? "Copied" : "Share"}
+    </Button>
   );
 }
 
@@ -694,7 +728,10 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
               <CardTitle className="text-xl" data-testid="text-product-name">{result.productName}</CardTitle>
               <CardDescription>{result.configuration}</CardDescription>
             </div>
-            <VerdictBadge verdict={result.roiVerdict} />
+            <div className="flex items-center gap-2">
+              <ShareButton shareId={result.shareId} />
+              <VerdictBadge verdict={result.roiVerdict} />
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -1303,6 +1340,71 @@ function CompareView({
               </CardContent>
             </Card>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SharedSealedRoiPage({ shareId }: { shareId: string }) {
+  const [result, setResult] = useState<SealedProductResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch(`/api/market/sealed-product-roi/shared/${shareId}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error("Not found");
+        return res.json();
+      })
+      .then((data) => {
+        setResult(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError("This shared analysis was not found or has expired.");
+        setLoading(false);
+      });
+  }, [shareId]);
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <Package className="h-6 w-6" />
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Sealed Product Analysis</h1>
+        </div>
+        <p className="text-muted-foreground text-sm">
+          Shared analysis from Sports Card Portfolio
+        </p>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {error && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Package className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
+            <h3 className="text-lg font-semibold mb-2">Analysis Not Found</h3>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <Button asChild variant="outline">
+              <Link href="/market/sealed-roi">Run Your Own Analysis</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {result && <ProductResults result={result} isPro={true} />}
+
+      {result && (
+        <div className="mt-6 text-center">
+          <Button asChild data-testid="button-try-yourself">
+            <Link href="/market/sealed-roi">Run Your Own Analysis</Link>
+          </Button>
         </div>
       )}
     </div>

@@ -10007,11 +10007,60 @@ Return ONLY valid JSON, no markdown.`;
   });
 
   // ============================================================================
+  // Image Proxy for external URLs (prevents CORS/referrer blocking)
+  // ============================================================================
+
+  app.get("/api/image-proxy", async (req, res) => {
+    try {
+      const url = req.query.url as string;
+      if (!url || typeof url !== "string") {
+        return res.status(400).json({ error: "Missing url parameter" });
+      }
+      try { new URL(url); } catch { return res.status(400).json({ error: "Invalid URL" }); }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; CardPortfolio/1.0)",
+          "Accept": "image/*",
+        },
+      });
+      clearTimeout(timeout);
+
+      if (!response.ok) {
+        return res.status(response.status).json({ error: "Failed to fetch image" });
+      }
+
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      if (!contentType.startsWith("image/")) {
+        return res.status(400).json({ error: "Not an image" });
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.set({
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400",
+        "Content-Length": String(buffer.length),
+      });
+      res.send(buffer);
+    } catch (error: any) {
+      if (error.name === "AbortError") {
+        return res.status(504).json({ error: "Image fetch timeout" });
+      }
+      res.status(500).json({ error: "Failed to proxy image" });
+    }
+  });
+
   // Sealed Product ROI Calculator
   // ============================================================================
 
   const sealedProductCache = new Map<string, { data: any; timestamp: number }>();
   const SEALED_CACHE_TTL = 6 * 60 * 60 * 1000;
+  const sealedShareStore = new Map<string, { data: any; createdAt: number }>();
+  const SEALED_SHARE_TTL = 7 * 24 * 60 * 60 * 1000;
 
   app.post("/api/market/sealed-product-roi", isAuthenticated, async (req: any, res) => {
     try {
@@ -10064,6 +10113,11 @@ Return ONLY valid JSON, no markdown.`;
             ceilEV > 0 ? `Case hits add $${ceilEV.toFixed(0)} ceiling EV (not included in base ratio).` : ""
           } Values reflect median sold prices minus 13% eBay fees and shipping.`;
         }
+        const cacheShareId = crypto.randomUUID().slice(0, 8);
+        const cacheShareData = JSON.parse(JSON.stringify(cachedResult));
+        sealedShareStore.set(cacheShareId, { data: cacheShareData, createdAt: Date.now() });
+        cachedResult.shareId = cacheShareId;
+
         if (!isPro) {
           cachedResult.hitBreakdown = [];
           cachedResult.starRookies = [];
@@ -10422,6 +10476,11 @@ Return ONLY valid JSON, no markdown.`;
         parsed.verdictExplanation = userResult.explanation;
       }
 
+      const shareId = crypto.randomUUID().slice(0, 8);
+      const shareData = JSON.parse(JSON.stringify(parsed));
+      sealedShareStore.set(shareId, { data: shareData, createdAt: Date.now() });
+      parsed.shareId = shareId;
+
       if (!isPro) {
         parsed.hitBreakdown = [];
         parsed.starRookies = [];
@@ -10431,6 +10490,23 @@ Return ONLY valid JSON, no markdown.`;
     } catch (error) {
       console.error("[SealedROI] Error:", error);
       res.status(500).json({ error: "Failed to analyze sealed product" });
+    }
+  });
+
+  app.get("/api/market/sealed-product-roi/shared/:shareId", async (req, res) => {
+    try {
+      const { shareId } = req.params;
+      const shared = sealedShareStore.get(shareId);
+      if (!shared) {
+        return res.status(404).json({ error: "Shared analysis not found or expired" });
+      }
+      if (Date.now() - shared.createdAt > SEALED_SHARE_TTL) {
+        sealedShareStore.delete(shareId);
+        return res.status(404).json({ error: "Shared analysis expired" });
+      }
+      res.json(shared.data);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shared analysis" });
     }
   });
 

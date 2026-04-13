@@ -52,7 +52,7 @@ import ScanHistoryPage from "@/pages/scan-history";
 import LeaderboardsPage from "@/pages/leaderboards";
 import ToppsTakeoverPage from "@/pages/topps-takeover";
 import BreakAuditorPage from "@/pages/break-auditor";
-import SealedRoiPage from "@/pages/sealed-roi";
+import SealedRoiPage, { SharedSealedRoiPage } from "@/pages/sealed-roi";
 import AlphaFeedPage from "@/pages/alpha-feed";
 import MarketLeaderboardPage from "@/pages/market-leaderboard";
 import PublicIntelPage from "@/pages/public-intel";
@@ -81,6 +81,7 @@ function Router() {
       <Route path="/outlook/:sport/:slug" component={PublicPlayerOutlookPage} />
       <Route path="/market/break-auditor" component={BreakAuditorPage} />
       <Route path="/market/sealed-roi" component={SealedRoiPage} />
+      <Route path="/market/sealed-roi/shared/:shareId">{(params: any) => <SharedSealedRoiPage shareId={params.shareId} />}</Route>
       <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
       <Route path="/compare" component={ComparePage} />
       <Route path="/podcast" component={PodcastLanding} />
