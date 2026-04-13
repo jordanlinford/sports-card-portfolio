@@ -645,6 +645,34 @@ The "completed sales only" rule applies when completed sales EXIST. When soldCou
               [finalPsa9, finalPsa10] = [finalPsa10, finalPsa9];
             }
 
+            if (isRaw && finalPsa9 && correctedAvg > finalPsa9) {
+              const rawPriceField = parsePrice(parsed.rawPrice);
+              console.warn(`[OutlookEngine] RAW PRICE CONTAMINATION: avgPrice $${correctedAvg} > PSA 9 $${finalPsa9} for raw card. rawPrice=$${rawPriceField ?? "null"}`);
+              if (rawPriceField && rawPriceField < finalPsa9) {
+                correctedAvg = rawPriceField;
+                correctedMin = parsePrice(parsed.rawMinPrice) || Math.round(rawPriceField * 0.7);
+                correctedMax = parsePrice(parsed.rawMaxPrice) || Math.round(rawPriceField * 1.3);
+              } else {
+                correctedAvg = Math.round(finalPsa9 * 0.55);
+                correctedMin = Math.round(correctedAvg * 0.7);
+                correctedMax = Math.round(correctedAvg * 1.4);
+              }
+              console.log(`[OutlookEngine] RAW FIX: Corrected to $${correctedAvg}`);
+            } else if (isRaw && finalPsa10 && !finalPsa9 && correctedAvg > finalPsa10 * 0.7) {
+              const rawPriceField = parsePrice(parsed.rawPrice);
+              console.warn(`[OutlookEngine] RAW PRICE CONTAMINATION (psa10-only): avgPrice $${correctedAvg} near/above PSA 10 $${finalPsa10}`);
+              if (rawPriceField && rawPriceField < finalPsa10 * 0.5) {
+                correctedAvg = rawPriceField;
+                correctedMin = Math.round(rawPriceField * 0.7);
+                correctedMax = Math.round(rawPriceField * 1.3);
+              } else {
+                correctedAvg = Math.round(finalPsa10 * 0.3);
+                correctedMin = Math.round(correctedAvg * 0.7);
+                correctedMax = Math.round(correctedAvg * 1.4);
+              }
+              console.log(`[OutlookEngine] RAW FIX: Corrected to $${correctedAvg}`);
+            }
+
             const marketData: GeminiMarketData = {
               soldCount: parsed.soldCount || 0,
               avgPrice: correctedAvg,
@@ -1291,13 +1319,45 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
 
             const analysis = parsed.analysis || {};
 
-            // GEMINI-DIRECT: Trust Gemini's graded prices, only fix obvious data errors (PSA 9/10 inversion)
             let finalPsa9 = parsePrice(parsed.market.psa9Price);
             let finalPsa10 = parsePrice(parsed.market.psa10Price);
 
             if (finalPsa9 && finalPsa10 && finalPsa9 > finalPsa10) {
               console.warn(`[Unified Analysis] GRADED PRICE INVERSION: PSA 9 ($${finalPsa9}) > PSA 10 ($${finalPsa10}) — swapping`);
               [finalPsa9, finalPsa10] = [finalPsa10, finalPsa9];
+            }
+
+            if (isRaw && finalPsa9 && correctedAvg > finalPsa9) {
+              const rawPriceField = parsePrice(parsed.market.rawPrice);
+              const rawMinField = parsePrice(parsed.market.rawMinPrice);
+              const rawMaxField = parsePrice(parsed.market.rawMaxPrice);
+              console.warn(`[Unified Analysis] RAW PRICE CONTAMINATION: avgPrice $${correctedAvg} > PSA 9 $${finalPsa9} for raw card "${card.title}". rawPrice field=$${rawPriceField ?? "null"}`);
+              if (rawPriceField && rawPriceField < finalPsa9) {
+                correctedAvg = rawPriceField;
+                correctedMin = rawMinField || Math.round(rawPriceField * 0.7);
+                correctedMax = rawMaxField || Math.round(rawPriceField * 1.3);
+                console.log(`[Unified Analysis] RAW FIX: Using rawPrice field $${correctedAvg} (min=$${correctedMin}, max=$${correctedMax})`);
+              } else {
+                const derivedRaw = Math.round(finalPsa9 * 0.55);
+                correctedAvg = derivedRaw;
+                correctedMin = Math.round(derivedRaw * 0.7);
+                correctedMax = Math.round(derivedRaw * 1.4);
+                console.log(`[Unified Analysis] RAW FIX: Derived from PSA 9 ($${finalPsa9} × 0.55) = $${correctedAvg} (min=$${correctedMin}, max=$${correctedMax})`);
+              }
+            } else if (isRaw && finalPsa10 && !finalPsa9 && correctedAvg > finalPsa10 * 0.7) {
+              const rawPriceField = parsePrice(parsed.market.rawPrice);
+              console.warn(`[Unified Analysis] RAW PRICE CONTAMINATION (psa10-only): avgPrice $${correctedAvg} near/above PSA 10 $${finalPsa10} for raw card "${card.title}"`);
+              if (rawPriceField && rawPriceField < finalPsa10 * 0.5) {
+                correctedAvg = rawPriceField;
+                correctedMin = Math.round(rawPriceField * 0.7);
+                correctedMax = Math.round(rawPriceField * 1.3);
+              } else {
+                const derivedRaw = Math.round(finalPsa10 * 0.3);
+                correctedAvg = derivedRaw;
+                correctedMin = Math.round(derivedRaw * 0.7);
+                correctedMax = Math.round(derivedRaw * 1.4);
+              }
+              console.log(`[Unified Analysis] RAW FIX: Corrected to $${correctedAvg}`);
             }
 
             const result: UnifiedCardAnalysis = {
