@@ -149,7 +149,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
 
   return (
     <div className="space-y-1" data-testid="leaderboard-entries">
-      <div className="hidden md:grid grid-cols-[40px_1fr_60px_80px_70px_100px_120px_160px_70px_60px] gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+      <div className="hidden lg:grid grid-cols-[40px_1fr_60px_80px_70px_100px_120px_160px_70px_60px] gap-2 px-3 py-2 text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
         <span>#</span>
         <span>Player</span>
         <span>Sport</span>
@@ -171,7 +171,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
         return (
           <Link key={`${entry.playerName}-${entry.sport}`} href={playerPath}>
             <div
-              className="grid grid-cols-[40px_1fr_60px_80px] md:grid-cols-[40px_1fr_60px_80px_70px_100px_120px_160px_70px_60px] gap-2 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer items-center"
+              className="grid grid-cols-[40px_1fr_60px_80px] lg:grid-cols-[40px_1fr_60px_80px_70px_100px_120px_160px_70px_60px] gap-2 px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer items-center"
               data-testid={`row-leaderboard-${entry.rank}`}
             >
               <span className={getRankDisplay(entry.rank)}>{entry.rank}</span>
@@ -188,13 +188,13 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
                 {entry.score}
               </span>
 
-              <span className={`hidden md:block text-[10px] font-medium ${
+              <span className={`hidden lg:block text-[10px] font-medium ${
                 entry.percentile?.startsWith("Top") ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
               }`} data-testid={`text-pctile-${entry.rank}`}>
                 {entry.percentile || "—"}
               </span>
 
-              <span className="hidden md:block">
+              <span className="hidden lg:block">
                 {entry.phase && (
                   <Badge variant="outline" className="text-[10px]">
                     {entry.phase}
@@ -202,7 +202,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
                 )}
               </span>
 
-              <span className="hidden md:flex items-center gap-1">
+              <span className="hidden lg:flex items-center gap-1">
                 <Badge className={`text-[10px] ${verdictStyle.bg} ${verdictStyle.text} border-0`}>
                   {verdictStyle.icon}
                   <span className="ml-0.5">
@@ -213,11 +213,11 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
                 </Badge>
               </span>
 
-              <span className="hidden md:block text-[10px] text-muted-foreground truncate italic" data-testid={`text-structure-${entry.rank}`}>
+              <span className="hidden lg:block text-[10px] text-muted-foreground truncate italic" data-testid={`text-structure-${entry.rank}`}>
                 {entry.marketDescriptor || entry.keySignal}
               </span>
 
-              <span className={`hidden md:block text-xs font-medium tabular-nums ${
+              <span className={`hidden lg:block text-xs font-medium tabular-nums ${
                 entry.trend7d.startsWith("+") ? "text-green-600 dark:text-green-400" :
                 entry.trend7d.startsWith("-") ? "text-red-600 dark:text-red-400" :
                 "text-muted-foreground"
@@ -225,7 +225,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
                 {entry.trend7d || "—"}
               </span>
 
-              <span className="hidden md:block text-xs text-muted-foreground tabular-nums">
+              <span className="hidden lg:block text-xs text-muted-foreground tabular-nums">
                 {entry.avgPrice || "—"}
               </span>
             </div>
