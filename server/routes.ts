@@ -3941,12 +3941,17 @@ Sitemap: ${origin}/sitemap.xml
       // ZERO-COMP CONSERVATISM — when Gemini found no completed sales,
       // it likely relied on active BIN listings which are typically inflated 30-50%.
       // Apply a discount to bring the estimate closer to reality.
-      if (marketValue && marketValue > 0 && compCount === 0 && pricingSource === "gemini") {
+      // EXCEPTION: Skip for low-pop numbered cards (/25 and under) where zero comps are expected due to rarity.
+      const lowPopMatch = variation ? variation.match(/\/\s*(\d+)\b/) : null;
+      const isLowPopCard = lowPopMatch && parseInt(lowPopMatch[1]) <= 25;
+      if (marketValue && marketValue > 0 && compCount === 0 && pricingSource === "gemini" && !isLowPopCard) {
         const originalValue = marketValue;
         marketValue = Math.round(marketValue * 0.7);
         if (priceMin) priceMin = Math.round(priceMin * 0.7);
         if (priceMax) priceMax = Math.round(priceMax * 0.85);
         console.log(`[Quick Analyze] ZERO-COMP DISCOUNT: No completed sales found — discounting from $${originalValue} to $${marketValue} (0.7x) to account for BIN listing inflation`);
+      } else if (marketValue && marketValue > 0 && compCount === 0 && pricingSource === "gemini" && isLowPopCard) {
+        console.log(`[Quick Analyze] ZERO-COMP DISCOUNT SKIPPED: Low-pop card (${variation}) — zero comps expected for rare numbered parallels. Using Gemini estimate $${marketValue} directly.`);
       }
 
       // PRICE CONSISTENCY ANCHOR — stabilize results across repeated scans
@@ -3965,8 +3970,9 @@ Sitemap: ${origin}/sitemap.xml
 
             // When the new result has zero sold comps but the anchor exists,
             // the anchor is more trustworthy — use tighter thresholds
-            const highThreshold = compCount === 0 ? 1.5 : 3;
-            const midThreshold = compCount === 0 ? 1.3 : 2;
+            // EXCEPTION: For low-pop cards (/25 and under), use normal thresholds since zero comps are expected
+            const highThreshold = compCount === 0 && !isLowPopCard ? 1.5 : 3;
+            const midThreshold = compCount === 0 && !isLowPopCard ? 1.3 : 2;
 
             if (ratio > highThreshold || ratio < (1 / highThreshold)) {
               console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, anchor ${ageMinutes}min old, newComps=${compCount}) — using anchored price for consistency`);
