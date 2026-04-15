@@ -122,7 +122,7 @@ export function PriceTrendChart({
   autoLoad?: boolean;
   subtitle?: string;
   preloadedData?: MonthlyPriceHistory | null;
-  onPriceLoaded?: (latestPrice: number) => void;
+  onPriceLoaded?: (latestPrice: number, hasRealSales?: boolean) => void;
 }) {
   const [history, setHistory] = useState<MonthlyPriceHistory | null>(preloadedData || null);
   const [hasTriggeredAutoLoad, setHasTriggeredAutoLoad] = useState(false);
@@ -137,8 +137,9 @@ export function PriceTrendChart({
     if (history && history.dataPoints && history.dataPoints.length > 0 && onPriceLoaded) {
       const recentPoints = history.dataPoints.slice(-3);
       const recentAvg = recentPoints.reduce((sum, p) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
+      const hasRealSales = history.dataPoints.some(p => (p.salesCount || 0) > 0);
       if (recentAvg > 0) {
-        onPriceLoaded(Math.round(recentAvg * 100) / 100);
+        onPriceLoaded(Math.round(recentAvg * 100) / 100, hasRealSales);
       }
     }
   }, [history, onPriceLoaded]);

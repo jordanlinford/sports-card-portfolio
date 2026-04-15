@@ -714,8 +714,11 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [inputMode, setInputMode] = useState<"manual" | "scan">("manual");
   const [result, setResult] = useState<QuickAnalyzeResult | null>(null);
   const [trendCorrectedValue, setTrendCorrectedValue] = useState<number | null>(null);
-  const handleTrendPriceLoaded = useCallback((trendAvg: number) => {
+  const handleTrendPriceLoaded = useCallback((trendAvg: number, hasRealSales?: boolean) => {
     const currentValue = result?.market?.value;
+    if (!hasRealSales && currentValue && currentValue > 0) {
+      return;
+    }
     if (currentValue && currentValue > 0 && trendAvg > 0) {
       const ratio = currentValue / trendAvg;
       if (ratio < 0.5 || ratio > 2) {

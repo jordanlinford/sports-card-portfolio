@@ -749,8 +749,8 @@ export default function CardOutlookPage() {
               grade: outlook.card.grade,
             }}
             autoLoad={true}
-            onPriceLoaded={(latestPrice) => {
-              if (latestPrice > 0) {
+            onPriceLoaded={(latestPrice, hasRealSales) => {
+              if (latestPrice > 0 && hasRealSales) {
                 const currentDisplay = displayPrice;
                 if (!currentDisplay) {
                   setReconciledPrice(latestPrice);
