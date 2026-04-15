@@ -3970,25 +3970,30 @@ Sitemap: ${origin}/sitemap.xml
 
             // When the new result has zero sold comps but the anchor exists,
             // the anchor is more trustworthy — use tighter thresholds
-            // EXCEPTION: For low-pop cards (/25 and under), use normal thresholds since zero comps are expected
-            const highThreshold = compCount === 0 && !isLowPopCard ? 1.5 : 3;
-            const midThreshold = compCount === 0 && !isLowPopCard ? 1.3 : 2;
-
-            if (ratio > highThreshold || ratio < (1 / highThreshold)) {
-              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, anchor ${ageMinutes}min old, newComps=${compCount}) — using anchored price for consistency`);
-              marketValue = anchor.marketValue;
-              priceMin = Math.round(anchor.marketValue * 0.85);
-              priceMax = Math.round(anchor.marketValue * 1.15);
-              pricingSource = pricingSource + "_anchored";
-            } else if (ratio > midThreshold || ratio < (1 / midThreshold)) {
-              const anchorWeight = compCount === 0 ? 0.8 : 0.6;
-              const blended = Math.round((marketValue * (1 - anchorWeight) + anchor.marketValue * anchorWeight) * 100) / 100;
-              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, newComps=${compCount}) — blending to $${blended} (anchor weight ${anchorWeight})`);
-              marketValue = blended;
-              if (priceMin) priceMin = Math.round(Math.min(priceMin, anchor.marketValue * 0.85));
-              if (priceMax) priceMax = Math.round(Math.max(priceMax, anchor.marketValue * 1.15));
+            // EXCEPTION: For low-pop cards (/25 and under), skip anchoring entirely —
+            // these cards have volatile prices and old anchors from buggy estimates shouldn't poison new results
+            if (isLowPopCard) {
+              console.log(`[Quick Analyze] PRICE ANCHOR SKIPPED: Low-pop card (${variation}) — anchor $${anchor.marketValue} ignored, using fresh Gemini estimate $${marketValue}`);
             } else {
-              console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} consistent with recent $${anchor.marketValue} (${ratio.toFixed(1)}x) — no adjustment needed`);
+              const highThreshold = compCount === 0 ? 1.5 : 3;
+              const midThreshold = compCount === 0 ? 1.3 : 2;
+
+              if (ratio > highThreshold || ratio < (1 / highThreshold)) {
+                console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, anchor ${ageMinutes}min old, newComps=${compCount}) — using anchored price for consistency`);
+                marketValue = anchor.marketValue;
+                priceMin = Math.round(anchor.marketValue * 0.85);
+                priceMax = Math.round(anchor.marketValue * 1.15);
+                pricingSource = pricingSource + "_anchored";
+              } else if (ratio > midThreshold || ratio < (1 / midThreshold)) {
+                const anchorWeight = compCount === 0 ? 0.8 : 0.6;
+                const blended = Math.round((marketValue * (1 - anchorWeight) + anchor.marketValue * anchorWeight) * 100) / 100;
+                console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} vs recent $${anchor.marketValue} (${ratio.toFixed(1)}x diff, newComps=${compCount}) — blending to $${blended} (anchor weight ${anchorWeight})`);
+                marketValue = blended;
+                if (priceMin) priceMin = Math.round(Math.min(priceMin, anchor.marketValue * 0.85));
+                if (priceMax) priceMax = Math.round(Math.max(priceMax, anchor.marketValue * 1.15));
+              } else {
+                console.log(`[Quick Analyze] PRICE ANCHOR: New $${marketValue} consistent with recent $${anchor.marketValue} (${ratio.toFixed(1)}x) — no adjustment needed`);
+              }
             }
           }
         } catch (anchorErr) {
