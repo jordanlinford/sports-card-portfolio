@@ -478,14 +478,27 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
 - Apply moderate scarcity multipliers (1.5-2.5x base value) unless this player is a proven elite name
 - If the player has minimal market presence, cap multiplier at 1.5x
 - When in doubt, price LOWER — it is better to undervalue than overvalue with no demand signal.`;
+      const isInsertParallel = variationBaseName && /downtown|kaboom|color.?blast|disco|stained.?glass|warp.?speed|uptown|aurora|street.?art|the.?man|mojo|tiger|zebra/i.test(variationBaseName);
+      const insertBaseName = isInsertParallel ? variationBaseName.replace(/\b(gold|silver|red|blue|green|purple|orange|pink|black|white|neon|holo|shimmer|sparkle|mojo)\b/gi, "").replace(/\s+/g, " ").trim() : "";
+      const insertBaseSearch = insertBaseName && insertBaseName !== variationBaseName
+        ? `\n5. CRITICAL — Search for the BASE (unnumbered) version of this insert: "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} ${insertBaseName} sold eBay"
+   The base insert establishes a FLOOR price. The numbered ${variationBaseName} parallel should be worth SIGNIFICANTLY more than the base insert (typically 5-20x for /10 of a premium insert of a star player).`
+        : "";
       return `\nLOW-POP CARD (${is1of1 ? "1/1 — only 1 exists" : `/${pn} — only ${pn} copies exist`}):
-Direct sales of this exact card are rare. Search in this order and use your market knowledge to value it:
+Direct sales of this exact card are extremely rare. Use ALL available knowledge — eBay sold data, auction house records, and your training data about card market values — to estimate the value.
 
 1. Search for this exact card: "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} ${is1of1 ? "1/1" : `/${pn}`} sold eBay"
 2. Search for this player's market floor: "${playerSearchStandalone} sold eBay" — understand what this player's cards typically command
 3. Search for higher-numbered parallels of THIS SAME card type (including the insert/parallel name):
 ${vs.join("\n")}
-4. If still no data, search: "${playerSearchStandalone} ${yearStrStandalone} sold eBay" for any recent sales
+4. If still no data, search: "${playerSearchStandalone} ${yearStrStandalone} sold eBay" for any recent sales${insertBaseSearch}
+
+CRITICAL FOR ULTRA-RARE CARDS (/${pn} or fewer):
+- If zero or very few eBay sold comps exist for this exact card, you MUST still provide your best market value estimate using your full knowledge of this card's value in the sports card market.
+- Consider: what do auction houses, price guides, and collector forums indicate this card is worth?
+- A /10 parallel of a premium insert (Downtown, Kaboom, etc.) of a star player is an elite collectible — price accordingly.
+- Do NOT default to a low value just because eBay sold comps are sparse. Rare cards often sell through auction houses, private sales, or rarely appear on eBay.
+- Your avgPrice should reflect what a knowledgeable buyer would pay TODAY, using ALL your market knowledge — not just the few eBay comps you can find.
 ${demandPrompt}`;
     }
 
@@ -1069,21 +1082,29 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
     }
 
     if (is1of1 || isLowPop) {
+      const isInsertParallelU = variationBaseNameU && /downtown|kaboom|color.?blast|disco|stained.?glass|warp.?speed|uptown|aurora|street.?art|the.?man|mojo|tiger|zebra/i.test(variationBaseNameU);
+      const insertBaseNameU = isInsertParallelU ? variationBaseNameU.replace(/\b(gold|silver|red|blue|green|purple|orange|pink|black|white|neon|holo|shimmer|sparkle|mojo)\b/gi, "").replace(/\s+/g, " ").trim() : "";
+      const insertBaseSearchU = insertBaseNameU && insertBaseNameU !== variationBaseNameU
+        ? `\n5. CRITICAL — Search for the BASE (unnumbered) version of this insert: "${playerSearch} ${yearStr} ${setStr} ${insertBaseNameU} sold eBay"
+   The base insert establishes a FLOOR price. The numbered ${variationBaseNameU} parallel should be worth SIGNIFICANTLY more than the base insert (typically 5-20x for /10 of a premium insert of a star player).`
+        : "";
       return `\nLOW-POP CARD (${is1of1 ? "1/1 — only 1 exists" : `/${popNumber} — only ${popNumber} copies exist`}):
-Search for this card's actual market value. Trust what the market says — do NOT inflate prices with multiplier math.
+Direct sales of this exact card are extremely rare. Use ALL available knowledge — eBay sold data, auction house records, and your training data about card market values — to estimate the value.
 
 1. Search for this exact card: "${playerSearch} ${yearStr} ${triangSearch} ${is1of1 ? "1/1" : `/${popNumber}`} sold eBay"
 2. Search for this player's overall market: "${playerSearch} ${yearStr} sold eBay"
 3. If no exact sales found, check nearby parallels of THIS SAME card type (including the insert/parallel name):
 ${verticalSearches.join("\n")}
+4. If still no data, search: "${playerSearch} ${yearStr} sold eBay" for any recent sales${insertBaseSearchU}
 
-CRITICAL PRICING RULES FOR LOW-POP CARDS:
-- If you find an actual sold listing for this exact card, USE THAT PRICE. Do not adjust it.
-- If no exact sales exist, estimate based on what this PLAYER'S cards actually sell for — not abstract multiplier math.
-- A 1/1 of a low-demand player is NOT automatically worth thousands. Many 1/1 cards sell for $20-$200.
-- Scarcity only creates value when there are buyers competing. For most players, 1/1 premiums are modest (2-5x the base parallel).
-- NEVER chain multipliers up from base (e.g., "base is $5, /99 is $10, /49 is $20, /25 is $40, /10 is $100, 1/1 is $300"). This creates fantasy prices.
-- Your estimate should reflect what a REAL buyer would actually pay on eBay TODAY.`;
+CRITICAL FOR ULTRA-RARE CARDS (/${popNumber} or fewer):
+- If zero or very few eBay sold comps exist, you MUST still provide your best market value estimate using ALL your knowledge.
+- Consider auction house records, price guides, and collector market knowledge — not just eBay.
+- A /10 or fewer of a premium insert (Downtown, Kaboom, etc.) of a star player is an elite collectible — price accordingly.
+- Do NOT default to a low value just because eBay sold comps are sparse.
+- If you find an actual sold listing for this exact card, USE THAT PRICE.
+- If no exact sales exist, estimate based on what this PLAYER'S premium cards actually sell for.
+- Your avgPrice should reflect what a knowledgeable buyer would pay TODAY.`;
     }
 
     return `\nNUMBERED CARD FALLBACK (/${popNumber} — ${popNumber} copies exist):
