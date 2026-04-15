@@ -24,7 +24,12 @@ export function setupGoogleAuth(app: Express) {
     ? `https://${domain}/api/auth/google/callback`
     : "http://localhost:5000/api/auth/google/callback";
 
-  const productionCallbackURL = process.env.GOOGLE_CALLBACK_URL || fallbackCallbackURL;
+  const isProduction = !!process.env.REPLIT_DEPLOYMENT_DOMAIN;
+  const productionCallbackURL = isProduction
+    ? (process.env.GOOGLE_CALLBACK_URL || fallbackCallbackURL)
+    : fallbackCallbackURL;
+
+  console.log(`[GoogleAuth] Using callback URL: ${productionCallbackURL} (${isProduction ? 'production' : 'development'})`);
 
   const strategy = new GoogleStrategy(
     {
