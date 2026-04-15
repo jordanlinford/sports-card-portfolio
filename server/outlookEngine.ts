@@ -435,6 +435,9 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
   const playerSearchStandalone = card.playerName || card.title;
   const yearStrStandalone = card.year || "";
   const setStrStandalone = card.set || "";
+  const variationBaseName = card.variation ? card.variation.replace(/\/\s*\d+/g, "").replace(/\s+/g, " ").trim() : "";
+  const triangSearchStandalone = variationBaseName && variationBaseName.toLowerCase() !== "base"
+    ? `${setStrStandalone} ${variationBaseName}` : setStrStandalone;
   const pn = popNumberStandalone;
 
   function buildStandaloneTriangulation(): string {
@@ -442,32 +445,32 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
 
     const vs: string[] = [];
     if (is1of1 || (pn && pn <= 5)) {
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /10 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /25 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /50 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /10 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /25 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /50 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /99 sold eBay"`);
     } else if (pn && pn <= 10) {
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /25 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /25 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /49 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /99 sold eBay"`);
     } else if (pn && pn <= 25) {
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /49 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} base sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /49 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /99 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} base sold eBay"`);
     } else if (pn && pn <= 75) {
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /149 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /199 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} base sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /99 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /149 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /199 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} base sold eBay"`);
     } else if (pn && pn <= 199) {
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /249 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /299 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /399 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} base sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /249 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /299 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /399 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} base sold eBay"`);
     } else if (pn && pn > 199) {
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /99 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /199 sold eBay"`);
-      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} base sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /99 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /199 sold eBay"`);
+      vs.push(`   - "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} base sold eBay"`);
     }
 
     if (is1of1 || isLowPopStandalone) {
@@ -478,9 +481,9 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
       return `\nLOW-POP CARD (${is1of1 ? "1/1 — only 1 exists" : `/${pn} — only ${pn} copies exist`}):
 Direct sales of this exact card are rare. Search in this order and use your market knowledge to value it:
 
-1. Search for this exact card: "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} ${is1of1 ? "1/1" : `/${pn}`} sold eBay"
+1. Search for this exact card: "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} ${is1of1 ? "1/1" : `/${pn}`} sold eBay"
 2. Search for this player's market floor: "${playerSearchStandalone} sold eBay" — understand what this player's cards typically command
-3. Search for higher-numbered parallels of THIS SAME PLAYER from the same set:
+3. Search for higher-numbered parallels of THIS SAME card type (including the insert/parallel name):
 ${vs.join("\n")}
 4. If still no data, search: "${playerSearchStandalone} ${yearStrStandalone} sold eBay" for any recent sales
 ${demandPrompt}`;
@@ -489,7 +492,7 @@ ${demandPrompt}`;
     return `\nNUMBERED CARD FALLBACK (/${pn} — ${pn} copies exist):
 If you find ZERO completed sold listings for the exact /${pn} parallel, use this triangulation approach:
 
-1. FIRST: Search hard for this exact card: "${playerSearchStandalone} ${yearStrStandalone} ${setStrStandalone} /${pn} sold eBay"
+1. FIRST: Search hard for this exact card: "${playerSearchStandalone} ${yearStrStandalone} ${triangSearchStandalone} /${pn} sold eBay"
 2. If 0 exact comps found, search for ADJACENT numbered parallels from the SAME set to estimate value:
 ${vs.join("\n")}
 3. Use scarcity logic to adjust: fewer copies = higher value. A /${pn} card is scarcer than higher-numbered parallels.
@@ -1025,6 +1028,9 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
   const playerSearch = card.playerName || card.title;
   const yearStr = card.year || "";
   const setStr = card.set || "";
+  const variationBaseNameU = card.variation ? card.variation.replace(/\/\s*\d+/g, "").replace(/\s+/g, " ").trim() : "";
+  const triangSearch = variationBaseNameU && variationBaseNameU.toLowerCase() !== "base"
+    ? `${setStr} ${variationBaseNameU}` : setStr;
   const unifiedDemandTierPrompt = "";
 
   function buildTriangulationInstructions(): string {
@@ -1032,43 +1038,43 @@ CRITICAL: If you find a real sold listing for this specific card, use that price
 
     const verticalSearches: string[] = [];
     if (is1of1 || (popNumber && popNumber <= 5)) {
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /10 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /25 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /50 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /49 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /75 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /99 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /10 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /25 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /50 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /49 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /75 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /99 sold eBay"`);
     } else if (popNumber && popNumber <= 10) {
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /25 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /49 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /99 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /25 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /49 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /99 sold eBay"`);
     } else if (popNumber && popNumber <= 25) {
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /49 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /99 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} base sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /49 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /99 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} base sold eBay"`);
     } else if (popNumber && popNumber <= 75) {
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /99 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /149 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /199 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} base sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /99 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /149 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /199 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} base sold eBay"`);
     } else if (popNumber && popNumber <= 199) {
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /249 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /299 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /399 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} base sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /249 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /299 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /399 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} base sold eBay"`);
     } else if (popNumber && popNumber > 199) {
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /99 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} /199 sold eBay"`);
-      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${setStr} base sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /99 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} /199 sold eBay"`);
+      verticalSearches.push(`- Search: "${playerSearch} ${yearStr} ${triangSearch} base sold eBay"`);
     }
 
     if (is1of1 || isLowPop) {
       return `\nLOW-POP CARD (${is1of1 ? "1/1 — only 1 exists" : `/${popNumber} — only ${popNumber} copies exist`}):
 Search for this card's actual market value. Trust what the market says — do NOT inflate prices with multiplier math.
 
-1. Search for this exact card: "${playerSearch} ${yearStr} ${setStr} ${is1of1 ? "1/1" : `/${popNumber}`} sold eBay"
+1. Search for this exact card: "${playerSearch} ${yearStr} ${triangSearch} ${is1of1 ? "1/1" : `/${popNumber}`} sold eBay"
 2. Search for this player's overall market: "${playerSearch} ${yearStr} sold eBay"
-3. If no exact sales found, check nearby parallels for context:
+3. If no exact sales found, check nearby parallels of THIS SAME card type (including the insert/parallel name):
 ${verticalSearches.join("\n")}
 
 CRITICAL PRICING RULES FOR LOW-POP CARDS:
@@ -1083,7 +1089,7 @@ CRITICAL PRICING RULES FOR LOW-POP CARDS:
     return `\nNUMBERED CARD FALLBACK (/${popNumber} — ${popNumber} copies exist):
 If you find ZERO completed sold listings for the exact /${popNumber} parallel, use this triangulation approach:
 
-1. FIRST: Search hard for this exact card: "${playerSearch} ${yearStr} ${setStr} /${popNumber} sold eBay"
+1. FIRST: Search hard for this exact card: "${playerSearch} ${yearStr} ${triangSearch} /${popNumber} sold eBay"
 2. If 0 exact comps found, search for ADJACENT numbered parallels from the SAME set to estimate value:
 ${verticalSearches.join("\n")}
 3. Use scarcity logic to adjust: fewer copies = higher value. A /${popNumber} card is scarcer than higher-numbered parallels.
