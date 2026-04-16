@@ -79,6 +79,7 @@ function Router() {
       <Route path="/support" component={SupportPage} />
       <Route path="/player-outlook" component={PlayerOutlookPage} />
       <Route path="/outlook/:sport/:slug" component={PublicPlayerOutlookPage} />
+      <Route path="/market" component={MarketLeaderboardPage} />
       <Route path="/market/break-auditor" component={BreakAuditorPage} />
       <Route path="/market/sealed-roi" component={SealedRoiPage} />
       <Route path="/market/sealed-roi/shared/:shareId">{(params: any) => <SharedSealedRoiPage shareId={params.shareId} />}</Route>
