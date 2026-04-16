@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Navigation } from "@/components/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,7 +94,6 @@ export default function Settings() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
-        <Navigation />
         <main className="max-w-2xl mx-auto px-4 py-8">
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -108,7 +106,6 @@ export default function Settings() {
   if (!user) {
     return (
       <div className="min-h-screen bg-background">
-        <Navigation />
         <main className="max-w-2xl mx-auto px-4 py-8">
           <Card>
             <CardContent className="py-12 text-center">
@@ -125,7 +122,6 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
       <main className="max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6" data-testid="text-settings-title">Settings</h1>
 

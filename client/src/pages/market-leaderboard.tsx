@@ -26,7 +26,6 @@ import {
   BarChart3,
   Clock,
 } from "lucide-react";
-import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 
 type LeaderboardEntry = {
@@ -262,7 +261,6 @@ export default function MarketLeaderboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
       <main className="container mx-auto px-4 py-6 max-w-5xl">
         <div className="space-y-6">
           <div>
