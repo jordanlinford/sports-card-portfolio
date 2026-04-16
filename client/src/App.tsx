@@ -78,6 +78,7 @@ function Router() {
       <Route path="/blog/:slug" component={BlogPostPage} />
       <Route path="/support" component={SupportPage} />
       <Route path="/player-outlook" component={PlayerOutlookPage} />
+      <Route path="/players" component={PlayerOutlookPage} />
       <Route path="/outlook/:sport/:slug" component={PublicPlayerOutlookPage} />
       <Route path="/market" component={MarketLeaderboardPage} />
       <Route path="/market/break-auditor" component={BreakAuditorPage} />
