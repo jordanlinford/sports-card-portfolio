@@ -296,6 +296,23 @@ export default function MessagesPage() {
     }
   }, [params.conversationId]);
 
+  // On desktop, auto-select the first conversation so the right panel isn't
+  // an empty grey area on initial load.
+  useEffect(() => {
+    if (
+      !params.conversationId &&
+      selectedConversation === null &&
+      conversations &&
+      conversations.length > 0 &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 768px)").matches
+    ) {
+      const first = conversations[0];
+      setSelectedConversation(first.id);
+      setLocation(`/messages/${first.id}`, { replace: true });
+    }
+  }, [conversations, params.conversationId, selectedConversation, setLocation]);
+
   if (authLoading) {
     return (
       <div className="container max-w-4xl mx-auto py-8 px-4">
