@@ -172,4 +172,82 @@ export function setupGoogleAuth(app: Express) {
   });
 
   console.log("[GoogleAuth] Google OAuth strategy registered");
+
+  // QA LOGIN BYPASS — lets automated QA agents log in as a designated test user
+  // without going through Google's 2FA flow. Gated by QA_LOGIN_TOKEN secret.
+  // Usage:
+  //   POST /api/auth/qa-login
+  //   Header: x-qa-token: <QA_LOGIN_TOKEN>
+  //   (or JSON body: { "token": "<QA_LOGIN_TOKEN>" })
+  app.post("/api/auth/qa-login", async (req, res) => {
+    try {
+      const expected = process.env.QA_LOGIN_TOKEN;
+      if (!expected) {
+        return res.status(503).json({ error: "QA login not configured" });
+      }
+
+      const provided =
+        (req.headers["x-qa-token"] as string | undefined) ||
+        (typeof req.body === "object" && req.body && (req.body as any).token) ||
+        (typeof req.query.token === "string" ? req.query.token : undefined);
+
+      if (!provided || provided !== expected) {
+        return res.status(401).json({ error: "unauthorized" });
+      }
+
+      const qaEmail = "qa-test@sportscardportfolio.io";
+      let user = await storage.getUserByEmail(qaEmail);
+
+      if (!user) {
+        const { randomUUID } = await import("crypto");
+        const newUserId = randomUUID();
+        const result = await storage.upsertUser({
+          id: newUserId,
+          email: qaEmail,
+          firstName: "QA",
+          lastName: "Tester",
+          profileImageUrl: "",
+        });
+        user = result.user;
+        console.log(`[QA Login] Created QA test user: ${user.id}`);
+      }
+
+      const sessionUser = {
+        claims: { sub: user.id },
+        authProvider: "qa" as const,
+      };
+
+      req.session.regenerate((regenerateErr) => {
+        if (regenerateErr) {
+          console.error("[QA Login] Session regeneration error:", regenerateErr);
+          return res.status(500).json({ error: "session_error" });
+        }
+
+        req.login(sessionUser, (loginErr) => {
+          if (loginErr) {
+            console.error("[QA Login] req.login error:", loginErr);
+            return res.status(500).json({ error: "login_error" });
+          }
+
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              console.error("[QA Login] Session save error:", saveErr);
+              return res.status(500).json({ error: "session_save_error" });
+            }
+            console.log(`[QA Login] QA user ${user!.id} signed in`);
+            res.json({
+              ok: true,
+              userId: user!.id,
+              email: user!.email,
+            });
+          });
+        });
+      });
+    } catch (err: any) {
+      console.error("[QA Login] Unexpected error:", err);
+      res.status(500).json({ error: "internal_error" });
+    }
+  });
+
+  console.log("[QA Login] POST /api/auth/qa-login endpoint registered");
 }
