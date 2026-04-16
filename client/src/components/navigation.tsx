@@ -393,7 +393,7 @@ export function Navigation() {
                     >
                       <MessageSquare className="h-4 w-4" />
                       Messages
-                      {unreadCount?.count && unreadCount.count > 0 && (
+                      {(unreadCount?.count ?? 0) > 0 && (
                         <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
                           {unreadCount.count > 9 ? "9+" : unreadCount.count}
                         </span>
@@ -412,7 +412,7 @@ export function Navigation() {
                       <Link href="/messages" className="flex items-center gap-2 cursor-pointer">
                         <MessageSquare className="h-4 w-4" />
                         Chats
-                        {unreadCount?.count && unreadCount.count > 0 && (
+                        {(unreadCount?.count ?? 0) > 0 && (
                           <Badge variant="default" className="ml-auto text-xs">{unreadCount.count}</Badge>
                         )}
                       </Link>
@@ -754,7 +754,7 @@ export function Navigation() {
                       <Button variant="ghost" className={cn("w-full justify-start gap-3", isActive("/messages") && "bg-accent")}>
                         <MessageSquare className="h-4 w-4" />
                         Chats
-                        {unreadCount?.count && unreadCount.count > 0 && (
+                        {(unreadCount?.count ?? 0) > 0 && (
                           <Badge variant="default" className="ml-auto text-xs">{unreadCount.count}</Badge>
                         )}
                       </Button>
