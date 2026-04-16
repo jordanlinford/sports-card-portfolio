@@ -1,5 +1,19 @@
 import type { PlayerOutlookResponse, AdvisorVerdict, AdvisorConfidence, AdvisorHorizon } from "@shared/schema";
 
+/**
+ * Truncate text at a word boundary, appending an ellipsis only when
+ * truncation actually occurs. Prevents the mid-word cutoffs like
+ * "prices haven't ca" that users saw previously.
+ */
+function truncateAtWordBoundary(text: string, maxChars: number): string {
+  if (!text) return text;
+  if (text.length <= maxChars) return text;
+  const slice = text.substring(0, maxChars);
+  const lastSpace = slice.lastIndexOf(" ");
+  const cutoff = lastSpace > maxChars * 0.6 ? lastSpace : maxChars;
+  return slice.substring(0, cutoff).replace(/[\s,;:.!?-]+$/, "") + "…";
+}
+
 export interface SSRAdvisorOutlook {
   verdict: AdvisorVerdict;
   verdictLabel: string;
@@ -108,14 +122,14 @@ function extractTopReasons(outlook: PlayerOutlookResponse): [string, string, str
   if (call?.whyBullets) {
     for (const b of call.whyBullets) {
       if (b && b.length > 5) {
-        reasons.push(b.length > 100 ? b.substring(0, 97) + "..." : b);
+        reasons.push(truncateAtWordBoundary(b, 280));
       }
     }
   }
   
   for (const t of thesis.slice(0, 3 - reasons.length)) {
     if (t && t.length > 10) {
-      reasons.push(t.length > 100 ? t.substring(0, 97) + "..." : t);
+      reasons.push(truncateAtWordBoundary(t, 280));
     }
   }
   
