@@ -241,7 +241,7 @@ export function Navigation() {
                   <DropdownMenuItem asChild>
                     <Link href="/outlook" className="flex items-center gap-2 cursor-pointer">
                       <Zap className="h-4 w-4" />
-                      Market Outlook
+                      Card Analysis
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -254,12 +254,6 @@ export function Navigation() {
                     <Link href="/hidden-gems" className="flex items-center gap-2 cursor-pointer">
                       <Gem className="h-4 w-4" />
                       Hidden Gems
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/outlook" className="flex items-center gap-2 cursor-pointer">
-                      <Lightbulb className="h-4 w-4" />
-                      Card Analysis
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
