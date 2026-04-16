@@ -123,6 +123,7 @@ function Router() {
           <Route path="/messages" component={MessagesPage} />
           <Route path="/messages/:conversationId" component={MessagesPage} />
           <Route path="/settings" component={SettingsPage} />
+          <Route path="/portfolio" component={PortfolioOutlookPage} />
           <Route path="/portfolio/outlook" component={PortfolioOutlookPage} />
           <Route path="/portfolio/next-buys" component={NextBuysPage} />
           <Route path="/search" component={SearchPage} />
