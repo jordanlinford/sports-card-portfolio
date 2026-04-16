@@ -368,14 +368,16 @@ function normalizeGrader(grader: string | null, grade: string | null = null): st
 }
 
 export async function buildPortfolioProfile(userId: string): Promise<PortfolioProfile> {
-  const userCards = await db
+  const rawCards = await db
     .select({
       id: cards.id,
       title: cards.title,
+      imagePath: cards.imagePath,
       playerName: cards.playerName,
       sport: cards.sport,
       position: cards.position,
       estimatedValue: cards.estimatedValue,
+      manualValue: cards.manualValue,
       grader: cards.grader,
       grade: cards.grade,
       isRookie: cards.isRookie,
@@ -392,6 +394,28 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
     .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
     .leftJoin(cardOutlooks, eq(cards.id, cardOutlooks.cardId))
     .where(eq(displayCases.userId, userId));
+
+  // Deduplicate cards that appear in multiple display cases (same imagePath) so
+  // this matches the analytics page. For duplicates, keep the entry with the
+  // highest effective value. Effective value prefers manualValue over
+  // estimatedValue, matching /api/analytics logic.
+  const effectiveValue = (c: typeof rawCards[0]) =>
+    c.manualValue ?? c.estimatedValue ?? 0;
+
+  const dedupMap = new Map<string, typeof rawCards[0]>();
+  for (const card of rawCards) {
+    const key = card.imagePath || `id:${card.id}`;
+    const existing = dedupMap.get(key);
+    if (!existing || effectiveValue(card) > effectiveValue(existing)) {
+      dedupMap.set(key, card);
+    }
+  }
+  const userCards = Array.from(dedupMap.values()).map((c) => ({
+    ...c,
+    // Downstream code reads estimatedValue; collapse manual override into it
+    // so dedup + manual-value precedence flows through every aggregation.
+    estimatedValue: effectiveValue(c),
+  }));
 
   const cardCount = userCards.length;
   const totalValue = userCards.reduce((sum, card) => sum + (card.estimatedValue || 0), 0);
