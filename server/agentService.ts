@@ -7,6 +7,66 @@ import { getActiveHiddenGems } from "./hiddenGemsService";
 import { getMarketBenchmarks } from "./marketBenchmarkService";
 import type { Response } from "express";
 
+/**
+ * Convert a snake_case or lower-case enum value into a human-readable label
+ * so the AI model never sees raw enums (prevents leaked strings like
+ * 'strong_sell' in the user-facing response).
+ */
+function formatEnum(value: string | null | undefined): string {
+  if (!value) return "";
+  return String(value)
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatSignalType(value: string | null | undefined): string {
+  const map: Record<string, string> = {
+    buy: "Buy",
+    strong_buy: "Strong Buy",
+    sell: "Sell",
+    strong_sell: "Strong Sell",
+    hold: "Hold",
+  };
+  if (!value) return "";
+  const key = String(value).toLowerCase();
+  return map[key] || formatEnum(value);
+}
+
+/**
+ * Post-process the AI model's final text so any raw enum values that leaked
+ * through (e.g., 'strong_sell', "hold_core", TRADE_THE_HYPE) are shown to the
+ * user as human-readable phrases.
+ */
+function humanizeResponse(text: string): string {
+  if (!text) return text;
+  const enumMap: Record<string, string> = {
+    strong_buy: "Strong Buy",
+    strong_sell: "Strong Sell",
+    hold_core: "Hold Core",
+    trade_the_hype: "Trade the Hype",
+    speculative_flyer: "Speculative Flyer",
+    accumulate: "Accumulate",
+  };
+
+  let out = text;
+
+  // Quoted enum values: 'strong_sell' or "strong_sell"
+  out = out.replace(/(['"`])([a-z][a-z0-9]*(?:_[a-z0-9]+)+)\1/g, (_m, q, val) => {
+    const key = val.toLowerCase();
+    return enumMap[key] || formatEnum(val);
+  });
+
+  // Bare UPPER_SNAKE_CASE tokens (e.g., TRADE_THE_HYPE) likely from schemas
+  out = out.replace(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/g, (val) => {
+    const key = val.toLowerCase();
+    return enumMap[key] || formatEnum(val);
+  });
+
+  return out;
+}
+
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY || process.env.GEMINI_API_KEY || "",
   httpOptions: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
@@ -375,9 +435,9 @@ async function executeToolCall(
         relevantSignals.slice(0, 20).map(async (s) => {
           const card = s.cardId ? await storage.getCard(s.cardId) : null;
           return {
-            signalType: s.signalType,
+            signal: formatSignalType(s.signalType),
             alphaScore: s.alphaScore,
-            confidence: s.confidence,
+            confidence: formatEnum(s.confidence),
             playerName: s.playerName || card?.playerName,
             cardTitle: s.cardTitle || card?.title,
             drivers: s.drivers,
@@ -391,9 +451,9 @@ async function executeToolCall(
         })
       );
 
-      const buyCount = signalCards.filter(s => s.signalType === "buy" || s.signalType === "strong_buy").length;
-      const sellCount = signalCards.filter(s => s.signalType === "sell" || s.signalType === "strong_sell").length;
-      const holdCount = signalCards.filter(s => s.signalType === "hold").length;
+      const buyCount = signalCards.filter(s => s.signal === "Buy" || s.signal === "Strong Buy").length;
+      const sellCount = signalCards.filter(s => s.signal === "Sell" || s.signal === "Strong Sell").length;
+      const holdCount = signalCards.filter(s => s.signal === "Hold").length;
 
       return {
         totalSignals: signalCards.length,
@@ -486,7 +546,8 @@ The user's ID is: ${userId}`;
 
       if (functionCalls.length === 0) {
         const textPart = parts.find((p: Record<string, unknown>) => p.text);
-        const finalText = (textPart as { text?: string })?.text || "Analysis complete. No specific recommendations at this time.";
+        const rawText = (textPart as { text?: string })?.text || "Analysis complete. No specific recommendations at this time.";
+        const finalText = humanizeResponse(rawText);
 
         sendSSE(res, { status: "step", message: "Synthesizing findings..." });
         sendSSE(res, {
