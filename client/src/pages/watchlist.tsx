@@ -75,6 +75,15 @@ const LAUNCH_PLAYERS = [
   { name: "Russell Wilson", sport: "football" },
 ];
 
+function formatEnumLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  return String(value)
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function getVerdictIcon(verdict: PlayerVerdict) {
   switch (verdict) {
     case "BUY": return <ShoppingCart className="h-4 w-4" />;
@@ -211,11 +220,11 @@ function AlertsBanner({ alerts }: { alerts: WatchlistAlert[] }) {
                     {alert.verdictChanged && (
                       <div className="flex items-center gap-1">
                         <Badge className={`${getVerdictColor(alert.previousVerdict as PlayerVerdict)} text-[10px] px-1.5 py-0`}>
-                          {alert.previousVerdict}
+                          {formatEnumLabel(alert.previousVerdict)}
                         </Badge>
                         <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
                         <Badge className={`${getVerdictColor(alert.currentVerdict as PlayerVerdict)} text-[10px] px-1.5 py-0`}>
-                          {alert.currentVerdict}
+                          {formatEnumLabel(alert.currentVerdict)}
                         </Badge>
                       </div>
                     )}
@@ -223,12 +232,12 @@ function AlertsBanner({ alerts }: { alerts: WatchlistAlert[] }) {
                       <div className="flex items-center gap-1">
                         <Badge className={`${getTemperatureColor(alert.previousTemperature as MarketTemperature)} text-[10px] px-1.5 py-0`}>
                           {getTemperatureIcon(alert.previousTemperature as MarketTemperature)}
-                          {alert.previousTemperature}
+                          {formatEnumLabel(alert.previousTemperature)}
                         </Badge>
                         <ArrowRightLeft className="h-3 w-3 text-muted-foreground" />
                         <Badge className={`${getTemperatureColor(alert.currentTemperature as MarketTemperature)} text-[10px] px-1.5 py-0`}>
                           {getTemperatureIcon(alert.currentTemperature as MarketTemperature)}
-                          {alert.currentTemperature}
+                          {formatEnumLabel(alert.currentTemperature)}
                         </Badge>
                       </div>
                     )}
@@ -323,18 +332,18 @@ function PlayerWatchlistItem({
               {item.verdictAtAdd && (
                 <Badge className={`${getVerdictColor(item.verdictAtAdd as PlayerVerdict)} flex items-center gap-1`}>
                   {getVerdictIcon(item.verdictAtAdd as PlayerVerdict)}
-                  {item.verdictAtAdd}
+                  {formatEnumLabel(item.verdictAtAdd)}
                 </Badge>
               )}
               {item.actionAtAdd && (
                 <Badge variant="secondary" className="text-xs">
-                  {item.actionAtAdd}
+                  {formatEnumLabel(item.actionAtAdd)}
                 </Badge>
               )}
               {item.temperatureAtAdd && (
                 <Badge className={`${getTemperatureColor(item.temperatureAtAdd as MarketTemperature)} flex items-center gap-1 text-xs`}>
                   {getTemperatureIcon(item.temperatureAtAdd as MarketTemperature)}
-                  {item.temperatureAtAdd}
+                  {formatEnumLabel(item.temperatureAtAdd)}
                 </Badge>
               )}
             </div>
