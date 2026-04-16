@@ -553,9 +553,25 @@ The user's ID is: ${userId}`;
 
 function extractTitle(text: string): string {
   const lines = text.split("\n").filter((l) => l.trim());
-  const firstLine = lines[0] || "Portfolio Analysis";
+  const firstLine = lines[0] || "";
   const cleaned = firstLine.replace(/^[#*]+\s*/, "").trim();
-  return cleaned.length > 80 ? cleaned.slice(0, 77) + "..." : cleaned;
+
+  // If the first line is short enough AND reads like a heading (not a long
+  // running sentence), use it directly. Otherwise fall back to a generic
+  // title and let the description carry the full content. This avoids the
+  // mid-sentence "..." cutoffs users were seeing.
+  if (cleaned && cleaned.length <= 80) {
+    return cleaned.replace(/[.,;:]+$/, "");
+  }
+
+  const lower = text.toLowerCase();
+  if (lower.includes("risk") || lower.includes("sell") || lower.includes("warning")) {
+    return "Portfolio Risk Update";
+  }
+  if (lower.includes("buy") || lower.includes("opportunit")) {
+    return "Portfolio Opportunities";
+  }
+  return "Portfolio Analysis";
 }
 
 function extractAlpha(text: string): string | null {
