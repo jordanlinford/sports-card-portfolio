@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,8 @@ import {
   CreditCard,
   Lightbulb,
   BookOpen,
+  Share2,
+  Check,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -731,10 +733,14 @@ function getCardValueScore(card: ComparisonCard): number | null {
 
 function CardComparisonSummary({ 
   leftCard, 
-  rightCard 
+  rightCard,
+  onShare,
+  shareCopied,
 }: { 
   leftCard: ComparisonCard; 
   rightCard: ComparisonCard;
+  onShare?: () => void;
+  shareCopied?: boolean;
 }) {
   const leftValue = getCardValueScore(leftCard);
   const rightValue = getCardValueScore(rightCard);
@@ -815,8 +821,20 @@ function CardComparisonSummary({
 
   return (
     <Card className="mt-8">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
         <CardTitle>Card Comparison Summary</CardTitle>
+        {onShare && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            onClick={onShare}
+            data-testid="button-share-card-comparison"
+          >
+            {shareCopied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+            {shareCopied ? "Copied" : "Share"}
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20" data-testid="better-card-verdict">
@@ -888,8 +906,16 @@ export default function ComparePage() {
   
   const [narrative, setNarrative] = useState<ComparisonNarrative | null>(null);
   const [isLoadingNarrative, setIsLoadingNarrative] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const didAutoRunRef = useRef(false);
 
-  // Deep-link support: /compare?tab=cards&card1=[cardId]
+  const SPORT_VALUES = new Set(SPORTS.map(s => s.value));
+  const normalizeSport = (s: string | null) => (s && SPORT_VALUES.has(s) ? s : null);
+
+  // Deep-link support:
+  //   /compare?player1=NAME&sport1=football&player2=NAME&sport2=football
+  //   /compare?tab=cards&card1=[cardId]
+  //   /compare?tab=cards&card1Player=NAME&card1Sport=...&card1Year=...&card1Set=...&card1Tier=...&card1Grade=...&card2Player=...
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
@@ -897,17 +923,52 @@ export default function ComparePage() {
     const card1Param = params.get("card1");
     const player1Param = params.get("player1");
     const player2Param = params.get("player2");
+    const sport1Param = normalizeSport(params.get("sport1"));
+    const sport2Param = normalizeSport(params.get("sport2"));
+
+    const card1Player = params.get("card1Player");
+    const card2Player = params.get("card2Player");
+
     if (tabParam === "cards" || tabParam === "players") {
       setActiveTab(tabParam);
-    } else if ((player1Param || player2Param) && !card1Param) {
+    } else if ((player1Param || player2Param) && !card1Param && !card1Player && !card2Player) {
       setActiveTab("players");
     }
     if (player1Param) {
-      setLeftPlayer(p => ({ ...p, name: player1Param }));
+      setLeftPlayer(p => ({ ...p, name: player1Param, sport: sport1Param ?? p.sport }));
+    } else if (sport1Param) {
+      setLeftPlayer(p => ({ ...p, sport: sport1Param }));
     }
     if (player2Param) {
-      setRightPlayer(p => ({ ...p, name: player2Param }));
+      setRightPlayer(p => ({ ...p, name: player2Param, sport: sport2Param ?? p.sport }));
+    } else if (sport2Param) {
+      setRightPlayer(p => ({ ...p, sport: sport2Param }));
     }
+
+    // Card raw-field deep-link (no DB lookup needed)
+    if (card1Player) {
+      setLeftCard(c => ({
+        ...c,
+        playerName: card1Player,
+        sport: normalizeSport(params.get("card1Sport")) ?? c.sport,
+        year: params.get("card1Year") ?? c.year,
+        setName: params.get("card1Set") ?? c.setName,
+        tier: params.get("card1Tier") ?? c.tier,
+        grade: params.get("card1Grade") ?? c.grade,
+      }));
+    }
+    if (card2Player) {
+      setRightCard(c => ({
+        ...c,
+        playerName: card2Player,
+        sport: normalizeSport(params.get("card2Sport")) ?? c.sport,
+        year: params.get("card2Year") ?? c.year,
+        setName: params.get("card2Set") ?? c.setName,
+        tier: params.get("card2Tier") ?? c.tier,
+        grade: params.get("card2Grade") ?? c.grade,
+      }));
+    }
+
     if (card1Param && isAuthenticated) {
       const cardId = parseInt(card1Param, 10);
       if (!Number.isNaN(cardId)) {
@@ -934,6 +995,124 @@ export default function ComparePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
+
+  // Auto-run comparison when both sides arrive pre-filled from a shared URL.
+  // Guarded by a ref so it only fires once per page load.
+  useEffect(() => {
+    if (didAutoRunRef.current) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const hasPlayerDeepLink = !!(params.get("player1") && params.get("player2"));
+    const hasCardDeepLink = !!(
+      (params.get("card1Player") && params.get("card2Player")) ||
+      params.get("card1")
+    );
+
+    if (
+      activeTab === "players" &&
+      hasPlayerDeepLink &&
+      leftPlayer.name &&
+      rightPlayer.name &&
+      !leftPlayer.outlook &&
+      !rightPlayer.outlook &&
+      !leftPlayer.isLoading &&
+      !rightPlayer.isLoading
+    ) {
+      didAutoRunRef.current = true;
+      analyzeLeftMutation.mutate();
+      analyzeRightMutation.mutate();
+      return;
+    }
+
+    if (
+      activeTab === "cards" &&
+      hasCardDeepLink &&
+      leftCard.playerName &&
+      rightCard.playerName &&
+      leftCard.tier &&
+      rightCard.tier &&
+      leftCard.grade &&
+      rightCard.grade &&
+      !leftCard.outlook &&
+      !rightCard.outlook &&
+      !leftCard.isLoading &&
+      !rightCard.isLoading
+    ) {
+      didAutoRunRef.current = true;
+      analyzeLeftCardMutation.mutate();
+      analyzeRightCardMutation.mutate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeTab,
+    leftPlayer.name, leftPlayer.sport, leftPlayer.outlook, leftPlayer.isLoading,
+    rightPlayer.name, rightPlayer.sport, rightPlayer.outlook, rightPlayer.isLoading,
+    leftCard.playerName, leftCard.tier, leftCard.grade, leftCard.outlook, leftCard.isLoading,
+    rightCard.playerName, rightCard.tier, rightCard.grade, rightCard.outlook, rightCard.isLoading,
+  ]);
+
+  // Push shareable URL once both sides of a comparison have rendered results.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    // Wipe the params we own so we don't leak stale state across tab switches.
+    [
+      "tab", "player1", "player2", "sport1", "sport2",
+      "card1", "card2",
+      "card1Player", "card1Sport", "card1Year", "card1Set", "card1Tier", "card1Grade",
+      "card2Player", "card2Sport", "card2Year", "card2Set", "card2Tier", "card2Grade",
+    ].forEach(k => url.searchParams.delete(k));
+
+    if (activeTab === "players" && leftPlayer.outlook && rightPlayer.outlook) {
+      url.searchParams.set("player1", leftPlayer.name);
+      url.searchParams.set("sport1", leftPlayer.sport);
+      url.searchParams.set("player2", rightPlayer.name);
+      url.searchParams.set("sport2", rightPlayer.sport);
+    } else if (activeTab === "cards" && leftCard.outlook && rightCard.outlook) {
+      url.searchParams.set("tab", "cards");
+      url.searchParams.set("card1Player", leftCard.playerName);
+      url.searchParams.set("card1Sport", leftCard.sport);
+      if (leftCard.year) url.searchParams.set("card1Year", leftCard.year);
+      if (leftCard.setName) url.searchParams.set("card1Set", leftCard.setName);
+      url.searchParams.set("card1Tier", leftCard.tier);
+      url.searchParams.set("card1Grade", leftCard.grade);
+      url.searchParams.set("card2Player", rightCard.playerName);
+      url.searchParams.set("card2Sport", rightCard.sport);
+      if (rightCard.year) url.searchParams.set("card2Year", rightCard.year);
+      if (rightCard.setName) url.searchParams.set("card2Set", rightCard.setName);
+      url.searchParams.set("card2Tier", rightCard.tier);
+      url.searchParams.set("card2Grade", rightCard.grade);
+    } else {
+      return; // Nothing to share yet — leave the URL untouched.
+    }
+    window.history.replaceState({}, "", url.toString());
+  }, [
+    activeTab,
+    leftPlayer.outlook, leftPlayer.name, leftPlayer.sport,
+    rightPlayer.outlook, rightPlayer.name, rightPlayer.sport,
+    leftCard.outlook, leftCard.playerName, leftCard.sport, leftCard.year, leftCard.setName, leftCard.tier, leftCard.grade,
+    rightCard.outlook, rightCard.playerName, rightCard.sport, rightCard.year, rightCard.setName, rightCard.tier, rightCard.grade,
+  ]);
+
+  const handleShare = async () => {
+    if (typeof window === "undefined") return;
+    const shareUrl = window.location.href;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+      toast({
+        title: "Link copied",
+        description: "Share this URL to show this exact comparison.",
+      });
+    } catch {
+      toast({
+        title: "Couldn't copy link",
+        description: shareUrl,
+        variant: "destructive",
+      });
+    }
+  };
 
   const analyzeLeftMutation = useMutation({
     mutationFn: async () => {
@@ -1173,8 +1352,18 @@ export default function ComparePage() {
 
           {leftPlayer.outlook && rightPlayer.outlook && (
             <Card className="mt-8">
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
                 <CardTitle>Comparison Summary</CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={handleShare}
+                  data-testid="button-share-comparison"
+                >
+                  {shareCopied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
+                  {shareCopied ? "Copied" : "Share"}
+                </Button>
               </CardHeader>
               <CardContent>
                 {(() => {
@@ -1486,7 +1675,7 @@ export default function ComparePage() {
 
           {leftCard.outlook && rightCard.outlook && (
             <>
-              <CardComparisonSummary leftCard={leftCard} rightCard={rightCard} />
+              <CardComparisonSummary leftCard={leftCard} rightCard={rightCard} onShare={handleShare} shareCopied={shareCopied} />
               <div className="mt-6">
                 <ComparisonPriceTrendChart
                   player1Request={{
