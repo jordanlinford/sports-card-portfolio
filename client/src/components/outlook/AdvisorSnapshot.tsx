@@ -364,7 +364,7 @@ function MarketDataContent({ advisor }: { advisor: AdvisorOutlook }) {
                 data-testid="text-internal-avg"
               >
                 <span>{advisor.shortTermTrend.internalAvgPrice} internal avg</span>
-                {advisor.shortTermTrend.internalVsMarketDeltaPct !== undefined && Math.abs(advisor.shortTermTrend.internalVsMarketDeltaPct) >= 25 && (
+                {advisor.shortTermTrend.internalVsMarketDeltaPct !== undefined && Math.abs(advisor.shortTermTrend.internalVsMarketDeltaPct) > 20 && (
                   <Badge
                     variant={advisor.shortTermTrend.internalVsMarketDeltaPct > 0 ? "default" : "destructive"}
                     className="text-[10px] px-1.5 py-0 h-4"

@@ -1031,7 +1031,7 @@ export function CardDetailModal({
                         {olderDate && newerDate && olderDate !== newerDate && ` · ${olderDate}–${newerDate}`}
                         {olderDate && newerDate && olderDate === newerDate && ` · ${newerDate}`}
                       </span>
-                      {delta !== null && Math.abs(delta) >= 5 && (
+                      {delta !== null && Math.abs(delta) > 20 && (
                         <Badge
                           variant={delta > 0 ? "default" : "destructive"}
                           className="gap-1 text-xs"
