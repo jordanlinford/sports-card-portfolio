@@ -1032,16 +1032,30 @@ function PortfolioContextPanel({ data, verdict }: { data: PortfolioContextProps;
 interface ConfidenceBreakdownProps {
   investmentCall?: InvestmentCall;
   evidence: PlayerOutlookResponse["evidence"];
+  generatedAt?: string;
+  cacheStatus?: string;
 }
 
-function ConfidenceBreakdownPanel({ investmentCall, evidence }: ConfidenceBreakdownProps) {
+function downgradeConfidence(level: string, steps: number): "HIGH" | "MEDIUM" | "LOW" {
+  const ladder = ["LOW", "MEDIUM", "HIGH"];
+  const idx = Math.max(0, ladder.indexOf(level));
+  return ladder[Math.max(0, idx - steps)] as "HIGH" | "MEDIUM" | "LOW";
+}
+
+function ConfidenceBreakdownPanel({ investmentCall, evidence, generatedAt, cacheStatus }: ConfidenceBreakdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   
-  // Use Gemini-provided confidence assessments (not threshold-based calculations)
-  const analysisConfidence = investmentCall?.confidence || "MEDIUM";
-  const dataQuality = evidence?.dataQuality || "MEDIUM";
-  const marketDataConfidence = evidence?.marketDataConfidence || "MEDIUM";
-  const newsCoverageConfidence = evidence?.newsCoverageConfidence || "MEDIUM";
+  // Compute staleness from generatedAt — stale data should not display as HIGH confidence
+  const ageHours = generatedAt ? (Date.now() - new Date(generatedAt).getTime()) / (1000 * 60 * 60) : 0;
+  const ageDays = ageHours / 24;
+  // 0 steps if <2 days, 1 step if 2-7 days, 2 steps if >7 days (or cacheStatus=stale)
+  const stalenessPenalty = ageDays > 7 || cacheStatus === "stale" ? 2 : ageDays > 2 ? 1 : 0;
+  
+  // Use Gemini-provided confidence assessments, downgraded by staleness
+  const analysisConfidence = downgradeConfidence(investmentCall?.confidence || "MEDIUM", stalenessPenalty);
+  const dataQuality = downgradeConfidence(evidence?.dataQuality || "MEDIUM", stalenessPenalty);
+  const marketDataConfidence = downgradeConfidence(evidence?.marketDataConfidence || "MEDIUM", stalenessPenalty);
+  const newsCoverageConfidence = downgradeConfidence(evidence?.newsCoverageConfidence || "MEDIUM", stalenessPenalty);
   
   const getConfidenceColor = (level: string) => {
     switch (level) {
@@ -1975,6 +1989,8 @@ export default function PlayerOutlookPage() {
           <ConfidenceBreakdownPanel 
             investmentCall={outlookData.investmentCall}
             evidence={outlookData.evidence}
+            generatedAt={outlookData.generatedAt}
+            cacheStatus={outlookData.cacheStatus}
           />
           
           {/* Outlook history - track verdict changes over time */}
