@@ -375,6 +375,33 @@ interface PlayerOutlookRefreshEntry {
   viewCount: number;
   lastFetchedAt: Date | null;
   temperature: string | null;
+  isTruncated?: boolean;
+}
+
+/**
+ * Detects player outlook entries whose summary text fields appear to have
+ * been cut off mid-word by an old maxOutputTokens limit. A clean summary
+ * ends with terminal punctuation (./!/?/"/)/digit). If the trimmed last
+ * character is a letter (/[a-zA-Z]$/), we treat it as truncated and force
+ * regeneration on the next prewarm pass regardless of cache freshness.
+ */
+function isOutlookTruncated(outlook: any): boolean {
+  if (!outlook || typeof outlook !== "object") return false;
+  const candidates: string[] = [];
+  // Likely truncation victims (free-form Gemini text)
+  if (typeof outlook?.verdict?.summary === "string") candidates.push(outlook.verdict.summary);
+  if (typeof outlook?.investmentCall?.advisorTake === "string") candidates.push(outlook.investmentCall.advisorTake);
+  if (typeof outlook?.investmentCall?.oneLineRationale === "string") candidates.push(outlook.investmentCall.oneLineRationale);
+  if (Array.isArray(outlook?.thesis) && outlook.thesis.length > 0) {
+    const last = outlook.thesis[outlook.thesis.length - 1];
+    if (typeof last === "string") candidates.push(last);
+  }
+  for (const text of candidates) {
+    const trimmed = text.trim();
+    if (trimmed.length === 0) continue;
+    if (/[a-zA-Z]$/.test(trimmed)) return true;
+  }
+  return false;
 }
 
 /**
@@ -451,6 +478,7 @@ async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshE
           lastFetchedAt: playerOutlookCache.lastFetchedAt,
           temperature: playerOutlookCache.temperature,
           viewCount: playerOutlookCache.viewCount,
+          outlookJson: playerOutlookCache.outlookJson,
         })
         .from(playerOutlookCache)
         .where(
@@ -459,9 +487,34 @@ async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshE
             sql`${playerOutlookCache.lastFetchedAt} IS NOT NULL AND ${playerOutlookCache.lastFetchedAt} >= ${stalenessCutoff}`
           )
         )
-        .orderBy(...rankOrder)
-        .limit(remaining);
+        .orderBy(...rankOrder);
 
+      // Pass A: force-include any fresh entries with truncated summary text
+      // (cut off mid-word by the old maxOutputTokens limit). These bypass the
+      // "fresh = skip" rule because their cached output is unusable.
+      let truncatedCount = 0;
+      for (const r of freshRows) {
+        if (results.length >= MAX_PLAYER_OUTLOOKS_PER_RUN) break;
+        if (seenKeys.has(r.playerKey)) continue;
+        if (!isOutlookTruncated(r.outlookJson)) continue;
+        seenKeys.add(r.playerKey);
+        truncatedCount++;
+        results.push({
+          playerName: r.playerName,
+          sport: r.sport,
+          playerKey: r.playerKey,
+          isBigMover: r.temperature === "HOT",
+          viewCount: r.viewCount,
+          lastFetchedAt: r.lastFetchedAt,
+          temperature: r.temperature,
+          isTruncated: true,
+        });
+      }
+      if (truncatedCount > 0) {
+        console.log(`[Prewarm:Outlook] Force-included ${truncatedCount} fresh entries with truncated summaries`);
+      }
+
+      // Pass B: fill remaining slots with non-truncated fresh high-value pages
       for (const r of freshRows) {
         if (results.length >= MAX_PLAYER_OUTLOOKS_PER_RUN) break;
         if (seenKeys.has(r.playerKey)) continue;
@@ -477,7 +530,7 @@ async function getPublicPlayerOutlooksToRefresh(): Promise<PlayerOutlookRefreshE
         });
       }
 
-      console.log(`[Prewarm:Outlook] Filled ${results.length - staleCount} remaining slots with fresh high-value pages`);
+      console.log(`[Prewarm:Outlook] Filled ${results.length - staleCount} remaining slots with fresh high-value pages (incl. ${truncatedCount} truncated)`);
     }
 
     const bigMoverCount = results.filter(r => r.isBigMover).length;
