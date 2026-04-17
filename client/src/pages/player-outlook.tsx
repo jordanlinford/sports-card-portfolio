@@ -102,6 +102,7 @@ function getVerdictIcon(verdict: PlayerVerdict) {
     case "BUY": return <ShoppingCart className="h-5 w-5" />;
     case "MONITOR": return <Eye className="h-5 w-5" />;
     case "AVOID": return <Ban className="h-5 w-5" />;
+    case "WATCH": return <Eye className="h-5 w-5" />;
     default: return null;
   }
 }
@@ -111,6 +112,7 @@ function getVerdictColor(verdict: PlayerVerdict) {
     case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
     case "MONITOR": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
     case "AVOID": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
+    case "WATCH": return "bg-muted text-muted-foreground border-border";
     default: return "bg-muted text-muted-foreground";
   }
 }
@@ -627,6 +629,9 @@ function ThesisCard({ thesis }: { thesis: string[] }) {
 }
 
 function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["verdict"]; confidence: string }) {
+  const isInsufficientData = verdict.action === "WATCH" && typeof verdict.modifier === "string" && verdict.modifier.toLowerCase().includes("insufficient");
+  const verdictLabel = isInsufficientData ? "Watching" : formatEnumLabel(verdict.action);
+  const verdictTooltip = isInsufficientData ? "Not enough sales data for a confident signal yet." : undefined;
   return (
     <Card className={`border-2 ${getVerdictColor(verdict.action)}`} data-testid="card-verdict">
       <CardHeader className="pb-3">
@@ -640,13 +645,16 @@ function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap" title={verdictTooltip}>
           <div className={`p-3 rounded-lg ${getVerdictColor(verdict.action)}`}>
             {getVerdictIcon(verdict.action)}
           </div>
-          <span className="text-3xl font-bold" data-testid="text-verdict-action">{formatEnumLabel(verdict.action)}</span>
+          <span className="text-3xl font-bold" data-testid="text-verdict-action">{verdictLabel}</span>
           {verdict.modifier && (
-            <Badge className={`${getModifierColor(verdict.modifier)} text-sm`} data-testid="badge-verdict-modifier">
+            <Badge
+              className={`${isInsufficientData ? "bg-muted text-muted-foreground border-border" : getModifierColor(verdict.modifier)} text-sm`}
+              data-testid="badge-verdict-modifier"
+            >
               {verdict.modifier}
             </Badge>
           )}

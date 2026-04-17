@@ -1158,6 +1158,7 @@ export const PLAYER_VERDICT = {
   BUY: "BUY",
   MONITOR: "MONITOR",
   AVOID: "AVOID",
+  WATCH: "WATCH",
 } as const;
 export type PlayerVerdict = keyof typeof PLAYER_VERDICT;
 
@@ -1181,6 +1182,7 @@ export const VERDICT_MODIFIER = {
   VALUE: "Value",
   LONG_TERM: "Long-Term",
   LATE_CYCLE: "Late Cycle",
+  INSUFFICIENT_DATA: "Insufficient data",
 } as const;
 export type VerdictModifier = typeof VERDICT_MODIFIER[keyof typeof VERDICT_MODIFIER];
 

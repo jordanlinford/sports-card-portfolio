@@ -2090,6 +2090,21 @@ async function generateFreshOutlook(
   snapshot.confidence = marketResult.confidence;
   finalClassification.baseTemperature = marketResult.temperature;
   
+  // Step 8.6: Insufficient-data verdict override (Fix C)
+  // When we have almost no internal holdings AND no real comp data, downgrade to WATCH
+  // so the UI doesn't render a confident-sounding verdict (e.g. SPECULATIVE_FLYER) on noise.
+  const internalObsCount = marketMetrics.internalObservationCount ?? 0;
+  const compsAvailable = evidence.compsSummary?.available !== false;
+  const compsSoldCount = evidence.compsSummary?.soldCount ?? 0;
+  const lowDataQuality = evidence.dataQuality === "LOW";
+  const insufficientData = internalObsCount < 3 && (!compsAvailable || lowDataQuality || compsSoldCount === 0);
+  if (insufficientData) {
+    console.log(`[PlayerOutlook] Insufficient data override for ${playerName}: internalObs=${internalObsCount}, compsAvailable=${compsAvailable}, soldCount=${compsSoldCount}, dataQuality=${evidence.dataQuality}`);
+    verdict.action = "WATCH" as PlayerVerdict;
+    verdict.modifier = VERDICT_MODIFIER.INSUFFICIENT_DATA as VerdictModifier;
+    verdict.summary = "Not enough sales data for a confident signal yet. Monitor for more comps before acting.";
+  }
+  
   // Step 9: Build response
   const response: PlayerOutlookResponse = {
     player: enrichedPlayerInfo,
