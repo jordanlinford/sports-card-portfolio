@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, Filter, ImageIcon, ArrowLeft, ExternalLink } from "lucide-react";
-import { Link } from "wouter";
+import { Search, Filter, ImageIcon, ArrowLeft, ExternalLink, Tag } from "lucide-react";
+import { Link, useSearch } from "wouter";
 import { hasProAccess } from "@shared/schema";
 import type { Card as CardType } from "@shared/schema";
 import { CardDetailModal } from "@/components/card-detail-modal";
@@ -34,6 +34,11 @@ export default function SearchPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedCard, setSelectedCard] = useState<SearchResult | null>(null);
   const [activeQuery, setActiveQuery] = useState("");
+  const searchString = useSearch();
+  const untaggedMode = useMemo(() => {
+    const params = new URLSearchParams(searchString);
+    return params.get("filter") === "untagged";
+  }, [searchString]);
 
   const { data: user } = useQuery<{ subscriptionStatus: string }>({
     queryKey: ["/api/auth/user"],
@@ -48,12 +53,13 @@ export default function SearchPage() {
     if (filters.set) params.set("set", filters.set);
     if (filters.year) params.set("year", filters.year);
     if (filters.grade) params.set("grade", filters.grade);
+    if (untaggedMode) params.set("untagged", "1");
     return params.toString();
   };
 
   const { data: results, isLoading, isFetching } = useQuery<SearchResult[]>({
     queryKey: [`/api/cards/search?${buildQueryString()}`],
-    enabled: isAuthenticated && (activeQuery.length > 0 || !!filters.set || !!filters.year || !!filters.grade),
+    enabled: isAuthenticated && (untaggedMode || activeQuery.length > 0 || !!filters.set || !!filters.year || !!filters.grade),
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -80,7 +86,28 @@ export default function SearchPage() {
           Back to Dashboard
         </Link>
 
-        <h1 className="text-3xl font-bold mb-4">Search Your Collection</h1>
+        <h1 className="text-3xl font-bold mb-4">
+          {untaggedMode ? "Untagged Cards" : "Search Your Collection"}
+        </h1>
+
+        {untaggedMode && (
+          <div className="mb-4 p-4 rounded-lg border border-amber-500/40 bg-amber-500/10 flex items-start gap-3" data-testid="banner-untagged-mode">
+            <Tag className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="flex-1 text-sm">
+              <p className="font-medium text-foreground">
+                These cards are missing player info.
+              </p>
+              <p className="text-muted-foreground mt-1">
+                Open a card and add the player name so it shows up in your portfolio exposure breakdown and gets accurate market signals.
+              </p>
+            </div>
+            <Link href="/search">
+              <Button variant="outline" size="sm" data-testid="button-clear-untagged">
+                Clear
+              </Button>
+            </Link>
+          </div>
+        )}
 
         <form onSubmit={handleSearch} className="space-y-4">
           <div className="flex gap-2">
@@ -171,7 +198,7 @@ export default function SearchPage() {
 
       {isLoading ? (
         <SearchResultSkeleton />
-      ) : !activeQuery && !filters.set && !filters.year && !filters.grade ? (
+      ) : !untaggedMode && !activeQuery && !filters.set && !filters.year && !filters.grade ? (
         <div className="text-center py-16 px-4">
           <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
             <Search className="h-10 w-10 text-muted-foreground" />
@@ -186,9 +213,13 @@ export default function SearchPage() {
           <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
             <ImageIcon className="h-10 w-10 text-muted-foreground" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">No cards found</h3>
+          <h3 className="text-xl font-semibold mb-2">
+            {untaggedMode ? "No untagged cards found" : "No cards found"}
+          </h3>
           <p className="text-muted-foreground max-w-md mx-auto">
-            Try a different search term or adjust your filters.
+            {untaggedMode
+              ? "All of your cards have player info attached. Nice work."
+              : "Try a different search term or adjust your filters."}
           </p>
         </div>
       ) : results ? (

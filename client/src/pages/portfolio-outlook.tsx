@@ -429,6 +429,15 @@ export default function PortfolioOutlookPage() {
                     .map(([pos, val]) => (
                       <ExposureBar key={pos} label={pos} value={val as number} color="primary" />
                     ))}
+                  {((exposures.byPosition || {}) as Record<string, number>).Unknown > 0 && (
+                    <Link
+                      href="/search?filter=untagged"
+                      className="block text-xs text-primary hover:underline pt-1"
+                      data-testid="link-untagged-from-position"
+                    >
+                      View untagged cards →
+                    </Link>
+                  )}
                 </div>
                 
                 <div className="space-y-2">
@@ -439,6 +448,15 @@ export default function PortfolioOutlookPage() {
                     .map(([stage, val]) => (
                       <ExposureBar key={stage} label={stage} value={val as number} color="primary" />
                     ))}
+                  {((exposures.byCareerStage || {}) as Record<string, number>).Unknown > 0 && (
+                    <Link
+                      href="/search?filter=untagged"
+                      className="block text-xs text-primary hover:underline pt-1"
+                      data-testid="link-untagged-from-stage"
+                    >
+                      View untagged cards →
+                    </Link>
+                  )}
                 </div>
 
                 {exposures.topPlayersConcentration && exposures.topPlayersConcentration.length > 0 && (

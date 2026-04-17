@@ -280,6 +280,32 @@ export default function Dashboard() {
     dc.cards?.some(card => (card.manualValue ?? card.estimatedValue) && (card.manualValue ?? card.estimatedValue)! > 0)
   ) ?? false;
 
+  // Untagged cards banner: show when >10% of cards are missing playerName
+  const untaggedStats = (() => {
+    if (!displayCases) return { pct: 0, count: 0, total: 0 };
+    let total = 0;
+    let untagged = 0;
+    for (const dc of displayCases) {
+      for (const card of dc.cards || []) {
+        total++;
+        if (!card.playerName || card.playerName.trim().length === 0) untagged++;
+      }
+    }
+    return { pct: total > 0 ? (untagged / total) * 100 : 0, count: untagged, total };
+  })();
+  const userId = (user as any)?.id ?? "anon";
+  const dismissKey = `untagged-banner-dismissed:${userId}`;
+  const [untaggedBannerDismissed, setUntaggedBannerDismissed] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setUntaggedBannerDismissed(window.localStorage.getItem(dismissKey) === "1");
+  }, [dismissKey]);
+  const showUntaggedBanner = untaggedStats.pct > 10 && !untaggedBannerDismissed;
+  const dismissUntaggedBanner = () => {
+    window.localStorage.setItem(dismissKey, "1");
+    setUntaggedBannerDismissed(true);
+  };
+
   if (isLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -290,6 +316,37 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {showUntaggedBanner && (
+        <div
+          className="mb-6 p-4 rounded-lg border border-amber-500/40 bg-amber-500/10 flex items-start gap-3"
+          data-testid="banner-untagged-dashboard"
+        >
+          <Tag className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-foreground">
+              {untaggedStats.count} of your {untaggedStats.total} cards ({Math.round(untaggedStats.pct)}%) are missing player info.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Tag them so they show up in your portfolio exposure breakdown and get accurate market signals.
+            </p>
+            <div className="flex items-center gap-2 mt-3">
+              <Link href="/search?filter=untagged">
+                <Button size="sm" data-testid="button-view-untagged">
+                  View untagged cards
+                </Button>
+              </Link>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={dismissUntaggedBanner}
+                data-testid="button-dismiss-untagged-banner"
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold" data-testid="text-dashboard-title">

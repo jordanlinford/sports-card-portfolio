@@ -1137,7 +1137,7 @@ export class DatabaseStorage implements IStorage {
 
   async searchCards(
     userId: string,
-    filters: { query?: string; set?: string; year?: number; grade?: string }
+    filters: { query?: string; set?: string; year?: number; grade?: string; untagged?: boolean }
   ): Promise<(Card & { displayCaseName: string; displayCaseId: number })[]> {
     const userCases = await db
       .select({ id: displayCases.id, name: displayCases.name })
@@ -1178,6 +1178,12 @@ export class DatabaseStorage implements IStorage {
     if (filters.grade) {
       allCards = allCards.filter(
         (c) => c.grade && c.grade.toLowerCase().includes(filters.grade!.toLowerCase())
+      );
+    }
+
+    if (filters.untagged) {
+      allCards = allCards.filter(
+        (c) => !c.playerName || c.playerName.trim().length === 0
       );
     }
 
