@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -888,6 +888,42 @@ export default function ComparePage() {
   
   const [narrative, setNarrative] = useState<ComparisonNarrative | null>(null);
   const [isLoadingNarrative, setIsLoadingNarrative] = useState(false);
+
+  // Deep-link support: /compare?tab=cards&card1=[cardId]
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get("tab");
+    const card1Param = params.get("card1");
+    if (tabParam === "cards" || tabParam === "players") {
+      setActiveTab(tabParam);
+    }
+    if (card1Param && isAuthenticated) {
+      const cardId = parseInt(card1Param, 10);
+      if (!Number.isNaN(cardId)) {
+        (async () => {
+          try {
+            const cards = await apiRequest("GET", "/api/cards") as any[];
+            const found = Array.isArray(cards) ? cards.find((c: any) => c.id === cardId) : null;
+            if (found) {
+              setLeftCard(c => ({
+                ...c,
+                playerName: found.playerName ?? c.playerName,
+                sport: found.sport ?? c.sport,
+                year: found.year ? String(found.year) : c.year,
+                setName: found.setName ?? c.setName,
+                tier: found.tier ?? c.tier,
+                grade: found.grade ?? c.grade,
+              }));
+            }
+          } catch (err) {
+            // Silently ignore — user can still fill in manually
+          }
+        })();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const analyzeLeftMutation = useMutation({
     mutationFn: async () => {

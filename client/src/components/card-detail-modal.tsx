@@ -21,7 +21,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins, ArrowRightLeft, Trash2, ImagePlus, BarChart3 } from "lucide-react";
+import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins, ArrowRightLeft, Trash2, ImagePlus, BarChart3, GitCompare } from "lucide-react";
+import { Link } from "wouter";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,
@@ -1214,6 +1215,17 @@ export function CardDetailModal({
               {card.playerName && (
                 <VerdictDivergenceNote cardOutlookAction={card.outlookAction} playerName={card.playerName} />
               )}
+
+              <Link
+                href={`/compare?tab=cards&card1=${card.id}`}
+                className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                data-testid="link-compare-to-another-card"
+              >
+                <GitCompare className="h-3.5 w-3.5" />
+                Compare to another card
+                <span aria-hidden="true">→</span>
+              </Link>
+
 
 {/* Price alerts panel hidden temporarily - will re-enable once backend issues are resolved */}
 
