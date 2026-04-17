@@ -763,6 +763,9 @@ export async function generatePortfolioOutlook(userId: string): Promise<Portfoli
     const response = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `${systemPrompt}\n\n${userPrompt}`,
+      config: {
+        maxOutputTokens: 600,
+      },
     });
 
     const content = response.text || "";
