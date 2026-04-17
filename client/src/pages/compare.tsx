@@ -424,15 +424,11 @@ function PlayerComparisonCard({
   side,
   onSelectPlayer, 
   onSelectSport,
-  onAnalyze,
-  isAnalyzing 
 }: { 
   player: ComparisonPlayer;
   side: "left" | "right";
   onSelectPlayer: (name: string) => void;
   onSelectSport: (sport: string) => void;
-  onAnalyze: () => void;
-  isAnalyzing: boolean;
 }) {
   const outlook = player.outlook;
   
@@ -463,23 +459,6 @@ function PlayerComparisonCard({
             data-testid={`input-player-${side}`}
           />
         </div>
-        {player.name && !outlook && (
-          <Button 
-            onClick={onAnalyze} 
-            disabled={isAnalyzing || !player.name}
-            className="w-full"
-            data-testid={`button-analyze-${side}`}
-          >
-            {isAnalyzing ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Analyzing...
-              </>
-            ) : (
-              "Get Outlook"
-            )}
-          </Button>
-        )}
       </CardHeader>
       
       {player.isLoading && (
@@ -574,14 +553,10 @@ function CardComparisonInput({
   card, 
   side,
   onUpdate,
-  onAnalyze,
-  isAnalyzing 
 }: { 
   card: ComparisonCard;
   side: "left" | "right";
   onUpdate: (updates: Partial<ComparisonCard>) => void;
-  onAnalyze: () => void;
-  isAnalyzing: boolean;
 }) {
   const outlook = card.outlook;
   const cardDescription = [card.year, card.setName, card.tier, card.grade !== "raw" ? `Grade ${card.grade}` : "Raw"].filter(Boolean).join(" · ");
@@ -669,30 +644,6 @@ function CardComparisonInput({
           </div>
         </div>
         
-        {card.playerName && !outlook && (
-          <div className="space-y-2">
-            {(!card.tier || !card.grade) && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                Please select card tier and grade for accurate comparison
-              </p>
-            )}
-            <Button 
-              onClick={onAnalyze} 
-              disabled={isAnalyzing || !card.playerName || !card.tier || !card.grade}
-              className="w-full"
-              data-testid={`button-analyze-card-${side}`}
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Analyzing Player...
-                </>
-              ) : (
-                "Get Player Outlook"
-              )}
-            </Button>
-          </div>
-        )}
       </CardHeader>
       
       {card.isLoading && (
@@ -1089,8 +1040,6 @@ export default function ComparePage() {
               side="left"
               onSelectPlayer={(name) => { setLeftPlayer(p => ({ ...p, name, outlook: null })); setNarrative(null); }}
               onSelectSport={(sport) => { setLeftPlayer(p => ({ ...p, sport, outlook: null })); setNarrative(null); }}
-              onAnalyze={() => analyzeLeftMutation.mutate()}
-              isAnalyzing={analyzeLeftMutation.isPending}
             />
             
             <div className="flex items-center justify-center py-4 md:py-0">
@@ -1104,10 +1053,35 @@ export default function ComparePage() {
               side="right"
               onSelectPlayer={(name) => { setRightPlayer(p => ({ ...p, name, outlook: null })); setNarrative(null); }}
               onSelectSport={(sport) => { setRightPlayer(p => ({ ...p, sport, outlook: null })); setNarrative(null); }}
-              onAnalyze={() => analyzeRightMutation.mutate()}
-              isAnalyzing={analyzeRightMutation.isPending}
             />
           </div>
+
+          {leftPlayer.name && rightPlayer.name && !leftPlayer.outlook && !rightPlayer.outlook && (
+            <div className="mt-6 flex justify-center">
+              <Button
+                onClick={() => {
+                  if (!analyzeLeftMutation.isPending && !leftPlayer.outlook) analyzeLeftMutation.mutate();
+                  if (!analyzeRightMutation.isPending && !rightPlayer.outlook) analyzeRightMutation.mutate();
+                }}
+                disabled={analyzeLeftMutation.isPending || analyzeRightMutation.isPending}
+                size="lg"
+                className="px-8"
+                data-testid="button-compare-players"
+              >
+                {(analyzeLeftMutation.isPending || analyzeRightMutation.isPending) ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Comparing...
+                  </>
+                ) : (
+                  <>
+                    <ArrowLeftRight className="h-4 w-4 mr-2" />
+                    Compare
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
 
           {leftPlayer.outlook && rightPlayer.outlook && (
             <Card className="mt-8">
@@ -1322,8 +1296,6 @@ export default function ComparePage() {
               card={leftCard}
               side="left"
               onUpdate={(updates) => setLeftCard(c => ({ ...c, ...updates }))}
-              onAnalyze={() => analyzeLeftCardMutation.mutate()}
-              isAnalyzing={analyzeLeftCardMutation.isPending}
             />
             
             <div className="flex items-center justify-center py-4 md:py-0">
@@ -1336,10 +1308,48 @@ export default function ComparePage() {
               card={rightCard}
               side="right"
               onUpdate={(updates) => setRightCard(c => ({ ...c, ...updates }))}
-              onAnalyze={() => analyzeRightCardMutation.mutate()}
-              isAnalyzing={analyzeRightCardMutation.isPending}
             />
           </div>
+
+          {(() => {
+            const leftReady = !!leftCard.playerName && !!leftCard.tier && !!leftCard.grade;
+            const rightReady = !!rightCard.playerName && !!rightCard.tier && !!rightCard.grade;
+            const bothPlayersFilled = !!leftCard.playerName && !!rightCard.playerName;
+            const bothOutlooksLoaded = !!leftCard.outlook && !!rightCard.outlook;
+            if (!bothPlayersFilled || bothOutlooksLoaded) return null;
+            const isPending = analyzeLeftCardMutation.isPending || analyzeRightCardMutation.isPending;
+            return (
+              <div className="mt-6 flex flex-col items-center gap-2">
+                {(!leftReady || !rightReady) && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Please select card tier and grade for both cards to compare
+                  </p>
+                )}
+                <Button
+                  onClick={() => {
+                    if (!analyzeLeftCardMutation.isPending && !leftCard.outlook) analyzeLeftCardMutation.mutate();
+                    if (!analyzeRightCardMutation.isPending && !rightCard.outlook) analyzeRightCardMutation.mutate();
+                  }}
+                  disabled={isPending || !leftReady || !rightReady}
+                  size="lg"
+                  className="px-8"
+                  data-testid="button-compare-cards"
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Comparing...
+                    </>
+                  ) : (
+                    <>
+                      <ArrowLeftRight className="h-4 w-4 mr-2" />
+                      Compare
+                    </>
+                  )}
+                </Button>
+              </div>
+            );
+          })()}
 
           {leftCard.outlook && rightCard.outlook && (
             <>
