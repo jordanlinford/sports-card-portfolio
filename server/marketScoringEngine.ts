@@ -109,7 +109,12 @@ function scoreMomentum(derived: DerivedMetrics): number {
 }
 
 function scoreLiquidity(derived: DerivedMetrics, metrics: MarketMetrics): number {
-  const sales30d = metrics.soldCount30d ?? 0;
+  // Fix D: when card-specific sold count is unavailable (null/undefined), return neutral
+  // instead of computing a misleading liquidity from zero/substituted data.
+  if (metrics.soldCount30d == null) {
+    return 50;
+  }
+  const sales30d = metrics.soldCount30d;
 
   const sellThroughScore = clamp(derived.sellThrough * 100, 0, 100);
 

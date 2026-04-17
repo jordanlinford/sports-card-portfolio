@@ -971,15 +971,13 @@ function buildMarketMetrics(
   const hasGemini = geminiData.available && geminiData.totalAvgPrice !== undefined;
   const hasInternal = (internalData.internalObservationCount ?? 0) > 0;
 
-  const volumeFallbackMap: Record<string, number> = { high: 150, medium: 50, low: 15 };
-
   const metrics: MarketMetrics = {
     source: hasGemini && hasInternal ? "blended" : hasGemini ? "gemini_search" : hasInternal ? "internal" : "unavailable",
+    // Fix D: do NOT substitute total player market volume when card-specific sales are unavailable.
+    // A null/undefined soldCount is always better than an incorrect volume estimate.
     soldCount30d: hasGemini && geminiData.soldCount30d !== undefined
       ? geminiData.soldCount30d
-      : hasGemini && geminiData.estimatedVolume
-        ? volumeFallbackMap[geminiData.estimatedVolume]
-        : undefined,
+      : undefined,
     soldCount7d: hasGemini ? geminiData.soldCount7d : undefined,
     soldCountPrev30d: hasGemini ? geminiData.soldCountPrev30d : undefined,
     activeListingCount: hasGemini ? geminiData.activeListingCount : undefined,
@@ -1891,6 +1889,9 @@ async function generateFreshOutlook(
         ? `Market data from search - avg across all ${playerName} cards sold in last 30 days.`
         : "Modeled estimate - not live market data. Use as directional guidance.",
       marketMetrics.source !== "unavailable" ? `Market scoring: ${marketMetrics.source} data source` : "",
+      marketMetrics.soldCount30d == null
+        ? "Volume data not available for this specific card variation — liquidity score set to neutral."
+        : "",
     ].filter(Boolean),
     newsSnippets: snippets.slice(0, 3),
     lastUpdated: new Date().toISOString(),

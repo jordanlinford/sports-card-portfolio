@@ -1058,6 +1058,8 @@ CRITICAL — PLAYER STATUS & PERFORMANCE MATTERS:
 - If you cannot find ACTUAL sold listings for this specific card, search for the SAME PLAYER's other low-numbered autos from similar products to estimate. Set confidence to "low" and be conservative.
 - NEVER extrapolate from other players' card prices for the same parallel — a Patrick Mahomes /2 and a Trey Lance /2 are vastly different values
 - NO DIRECT SALES FOUND? If there are ZERO sold listings for this exact card, you MUST: (1) search for the same player's comparable autos from similar products, (2) set salesFound to 0, (3) set confidence to "low", and (4) clearly state in details that no direct sales were found. Do NOT hallucinate a price from unrelated cards.
+- IMPORTANT: If you searched for this specific card but the results show a different variation, set, or year — do NOT use those sales. Set soldCount to null and salesFound to 0.
+- IMPORTANT: Do NOT substitute the total player market volume when card-specific sales are unavailable. A null soldCount is always better than an incorrect volume estimate.
 
 Return ONLY a JSON object:
 {
