@@ -6075,6 +6075,24 @@ RULES:
         session.customer as string
       );
 
+      // Stamp trial dates immediately if this was a trial checkout, so we don't
+      // depend on the webhook firing to prevent a second free trial.
+      if (session.metadata?.withTrial === "true" && session.subscription) {
+        try {
+          const subId = typeof session.subscription === "string" ? session.subscription : session.subscription.id;
+          const sub = await stripe.subscriptions.retrieve(subId);
+          if (sub.trial_start && sub.trial_end) {
+            await storage.updateUserByStripeCustomerId(session.customer as string, {
+              trialStart: new Date(sub.trial_start * 1000),
+              trialEnd: new Date(sub.trial_end * 1000),
+              trialSource: "stripe_checkout",
+            });
+          }
+        } catch (err) {
+          console.error("[Billing Success] Failed to stamp trial dates:", err);
+        }
+      }
+
       // Send payment confirmation email
       const user = await storage.getUser(userId);
       if (user?.email) {
