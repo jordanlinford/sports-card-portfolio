@@ -12,29 +12,35 @@
  */
 
 import { db } from "./db";
-import { marketCompsCache, cards, bookmarks, users, displayCases, playerOutlookCache } from "@shared/schema";
-import { desc, isNotNull, sql, and, lt, gt, eq } from "drizzle-orm";
+import { marketCompsCache, cards, bookmarks, users, displayCases, playerOutlookCache, cardOutlooks } from "@shared/schema";
+import { desc, isNotNull, isNull, sql, and, lt, gt, eq, asc } from "drizzle-orm";
 import { enqueueFetchJob, normalizeEbayQuery, getActiveJobCount } from "./ebayCompsService";
 
 // Configuration
 const PREWARM_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const PREWARM_HOUR_UTC = 3; // 3 AM UTC
-const MAX_CARDS_PER_RUN = 75; // Increased to accommodate priority tiers
-const DELAY_BETWEEN_JOBS_MS = 60 * 1000; // 1 minute between each card
+const MAX_CARDS_PER_RUN = 200; // Raised so priority tiers + backfill can fully run
+const DELAY_BETWEEN_JOBS_MS = 15 * 1000; // 15 seconds between each card
 const MIN_HOURS_BEFORE_EXPIRY = 12; // Only prewarm if expiring within 12 hours
 
 // Player Outlook Refresh Configuration
 const MAX_PLAYER_OUTLOOKS_PER_RUN = 50;
 const OUTLOOK_DELAY_BETWEEN_MS = 60 * 1000; // 60 seconds between refreshes (Gemini rate limiting)
 
+// Backfill pass for unanalyzed cards (no estimatedValue + no cardOutlooks row).
+// Capped per run; runs BEFORE the priority tiers so the most stale cards
+// always get covered first.
+const MAX_BACKFILL_PER_RUN = 100;
+
 // Priority allocation (how many slots per category)
-// Keys match the priority values used in PrewarmCard
+// Total = MAX_CARDS_PER_RUN minus the backfill cap, split evenly across tiers.
+// Keys match the priority values used in PrewarmCard.
 const PRIORITY_SLOTS: Record<PrewarmCard['priority'], number> = {
-  'high-volatility': 15, // Cards with high price IQR (uncertainty)
-  'bookmarked': 15,      // Cards users are watching
-  'pro-user': 15,        // Cards owned by Pro subscribers
-  'expiring': 15,        // Cache entries expiring soon
-  'popular': 15,         // Frequently added cards
+  'high-volatility': 20, // Cards with high price IQR (uncertainty)
+  'bookmarked': 20,      // Cards users are watching
+  'pro-user': 20,        // Cards owned by Pro subscribers
+  'expiring': 20,        // Cache entries expiring soon
+  'popular': 20,         // Frequently added cards
 };
 
 let prewarmTimer: NodeJS.Timeout | null = null;
@@ -285,6 +291,68 @@ async function getTopCardsToPrewarm(): Promise<PrewarmCard[]> {
 }
 
 /**
+ * Get unanalyzed cards that need a backfill prewarm.
+ *
+ * Targets cards where estimatedValue IS NULL AND there is no cardOutlooks row,
+ * ordered by oldest createdAt first (most stale first). Capped at
+ * MAX_BACKFILL_PER_RUN per run so the job catches up across a few nights.
+ */
+async function getUnanalyzedCardsToBackfill(): Promise<PrewarmCard[]> {
+  try {
+    const rows = await db
+      .select({
+        title: cards.title,
+        playerName: cards.playerName,
+        year: cards.year,
+        set: cards.set,
+        grade: cards.grade,
+      })
+      .from(cards)
+      .leftJoin(cardOutlooks, eq(cardOutlooks.cardId, cards.id))
+      .where(
+        and(
+          isNull(cards.estimatedValue),
+          isNull(cardOutlooks.cardId),
+          isNotNull(cards.playerName),
+        ),
+      )
+      .orderBy(asc(cards.createdAt))
+      .limit(MAX_BACKFILL_PER_RUN * 2); // dedupe buffer
+
+    const seen = new Set<string>();
+    const results: PrewarmCard[] = [];
+
+    for (const row of rows) {
+      if (results.length >= MAX_BACKFILL_PER_RUN) break;
+      const query = buildSearchQuery({
+        title: row.title,
+        playerName: row.playerName,
+        year: row.year,
+        set: row.set,
+        grade: row.grade,
+      });
+      const { queryHash } = normalizeEbayQuery(query);
+      if (seen.has(queryHash)) continue;
+      seen.add(queryHash);
+      results.push({
+        title: row.title,
+        playerName: row.playerName,
+        year: row.year,
+        set: row.set,
+        grade: row.grade,
+        priority: 'expiring', // reuse existing tier label for stats only
+      });
+    }
+
+    console.log(`[Prewarm:Backfill] Found ${results.length} unanalyzed cards to backfill`);
+    return results;
+  } catch (error) {
+    console.error("[Prewarm:Backfill] Error fetching unanalyzed cards:", error);
+    return [];
+  }
+}
+
+/**
  * Build a search query from card data
  */
 function buildSearchQuery(card: { title: string; playerName: string | null; year: string | number | null; set: string | null; grade: string | null }): string {
@@ -517,6 +585,51 @@ async function runPrewarmJob(): Promise<void> {
   console.log("[Prewarm] Starting nightly prewarm job with priority tiers");
   
   try {
+    // Phase 0: Backfill unanalyzed cards (no estimatedValue + no cardOutlook).
+    // Runs before priority tiers so the most stale cards get coverage first.
+    try {
+      const backfillCards = await getUnanalyzedCardsToBackfill();
+      let backfillQueued = 0;
+      let backfillSkipped = 0;
+
+      for (let i = 0; i < backfillCards.length; i++) {
+        const card = backfillCards[i];
+        processed++;
+
+        if (getActiveJobCount() >= 1) {
+          console.log(`[Prewarm:Backfill] Waiting for active job to complete...`);
+          await new Promise(resolve => setTimeout(resolve, 30000));
+        }
+
+        const query = buildSearchQuery({
+          title: card.title || '',
+          playerName: card.playerName || null,
+          year: card.year || null,
+          set: card.set || null,
+          grade: card.grade || null,
+        });
+        const { canonicalQuery, queryHash, filters } = normalizeEbayQuery(query);
+
+        console.log(`[Prewarm:Backfill] Processing ${i + 1}/${backfillCards.length}: ${canonicalQuery}`);
+
+        const result = await enqueueFetchJob(canonicalQuery, queryHash, filters as any);
+        if (result.queued) {
+          backfillQueued++;
+        } else {
+          backfillSkipped++;
+        }
+
+        if (i < backfillCards.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_JOBS_MS));
+        }
+      }
+
+      const backfillDuration = Math.round((Date.now() - startTime) / 1000);
+      console.log(`[Prewarm:Backfill] Phase complete: ${backfillQueued} queued, ${backfillSkipped} skipped, ${backfillDuration}s`);
+    } catch (backfillError) {
+      console.error("[Prewarm:Backfill] Phase failed (continuing to priority tiers):", backfillError);
+    }
+
     // Phase 1: eBay comps prewarm (existing behavior)
     try {
       const cardsToWarm = await getTopCardsToPrewarm();
