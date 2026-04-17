@@ -3892,7 +3892,7 @@ export default function OutlookOverviewPage() {
                 {usage?.remaining != null && usage.remaining > 0 ? (
                   <>
                     <p className="font-medium">
-                      {usage.remaining} free {usage.remaining === 1 ? "analysis" : "analyses"} remaining this month
+                      {usage.remaining} free {usage.remaining === 1 ? "analysis" : "analyses"} remaining today
                     </p>
                     <p className="text-sm text-muted-foreground">
                       Upgrade to Pro for unlimited analyses, Big Mover alerts, and full insights.
@@ -3900,14 +3900,14 @@ export default function OutlookOverviewPage() {
                   </>
                 ) : usage?.remaining === 0 ? (
                   <>
-                    <p className="font-medium">You've used all free analyses this month</p>
+                    <p className="font-medium">You've used all free analyses today</p>
                     <p className="text-sm text-muted-foreground">
-                      Upgrade to Pro for unlimited analyses and full access to Market Outlook.
+                      Come back tomorrow for 3 more, or upgrade to Pro for unlimited analyses.
                     </p>
                   </>
                 ) : (
                   <>
-                    <p className="font-medium">Get 3 free analyses per month</p>
+                    <p className="font-medium">Get 3 free analyses per day</p>
                     <p className="text-sm text-muted-foreground">
                       Upgrade to Pro for unlimited analyses, Big Mover alerts, and detailed insights.
                     </p>

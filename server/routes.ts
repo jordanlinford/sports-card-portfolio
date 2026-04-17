@@ -949,13 +949,14 @@ Sitemap: ${origin}/sitemap.xml
       const isPro = hasProAccess(user);
       const FREE_TIER_LIMIT = 3;
       
-      const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
+      const dailyCount = await storage.countUserDailyOutlookGenerations(userId);
       
       res.json({
-        used: monthlyCount,
+        used: dailyCount,
         limit: isPro ? null : FREE_TIER_LIMIT,
-        remaining: isPro ? null : Math.max(0, FREE_TIER_LIMIT - monthlyCount),
+        remaining: isPro ? null : Math.max(0, FREE_TIER_LIMIT - dailyCount),
         isPro,
+        period: "day",
       });
     } catch (error) {
       console.error("Error getting outlook usage:", error);
@@ -2878,7 +2879,7 @@ Sitemap: ${origin}/sitemap.xml
       const cardId = parseInt(req.params.cardId);
       const userId = req.user.claims.sub;
 
-      // Check subscription - free users get 3 analyses per month
+      // Check subscription - free users get 3 analyses per day
       const user = await storage.getUser(userId);
       const isPro = hasProAccess(user);
       const FREE_TIER_LIMIT = 3;
@@ -2903,14 +2904,15 @@ Sitemap: ${origin}/sitemap.xml
           });
         }
         
-        // Check per-user monthly limit
-        const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
-        if (monthlyCount >= FREE_TIER_LIMIT) {
+        // Check per-user daily limit
+        const dailyCount = await storage.countUserDailyOutlookGenerations(userId);
+        if (dailyCount >= FREE_TIER_LIMIT) {
           return res.status(403).json({ 
-            message: `You've used all ${FREE_TIER_LIMIT} free Market Outlook analyses this month. Upgrade to Pro for unlimited analyses.`,
+            message: `You've used all ${FREE_TIER_LIMIT} free Market Outlook analyses today. Upgrade to Pro for unlimited analyses, or come back tomorrow.`,
             usageExceeded: true,
-            used: monthlyCount,
-            limit: FREE_TIER_LIMIT
+            used: dailyCount,
+            limit: FREE_TIER_LIMIT,
+            period: "day"
           });
         }
         
@@ -3571,7 +3573,7 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(400).json({ message: "Card title is required" });
       }
 
-      // Check subscription - free users get 3 analyses per month
+      // Check subscription - free users get 3 analyses per day
       const user = await storage.getUser(userId);
       const isPro = hasProAccess(user);
       const FREE_TIER_LIMIT = 3;
@@ -3596,14 +3598,15 @@ Sitemap: ${origin}/sitemap.xml
           });
         }
         
-        // Check per-user monthly limit
-        const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
-        if (monthlyCount >= FREE_TIER_LIMIT) {
+        // Check per-user daily limit
+        const dailyCount = await storage.countUserDailyOutlookGenerations(userId);
+        if (dailyCount >= FREE_TIER_LIMIT) {
           return res.status(403).json({ 
-            message: `You've used all ${FREE_TIER_LIMIT} free Market Outlook analyses this month. Upgrade to Pro for unlimited analyses.`,
+            message: `You've used all ${FREE_TIER_LIMIT} free Market Outlook analyses today. Upgrade to Pro for unlimited analyses, or come back tomorrow.`,
             usageExceeded: true,
-            used: monthlyCount,
-            limit: FREE_TIER_LIMIT
+            used: dailyCount,
+            limit: FREE_TIER_LIMIT,
+            period: "day"
           });
         }
         
@@ -4918,15 +4921,16 @@ Sitemap: ${origin}/sitemap.xml
           });
         }
         
-        // Check per-user monthly limit
+        // Check per-user daily limit
         const FREE_TIER_LIMIT = 3;
-        const monthlyCount = await storage.countUserMonthlyOutlookGenerations(userId);
-        if (monthlyCount >= FREE_TIER_LIMIT) {
+        const dailyCount = await storage.countUserDailyOutlookGenerations(userId);
+        if (dailyCount >= FREE_TIER_LIMIT) {
           return res.status(403).json({ 
-            message: `You've used all ${FREE_TIER_LIMIT} free Player Outlook analyses this month. Upgrade to Pro for unlimited analyses.`,
+            message: `You've used all ${FREE_TIER_LIMIT} free Player Outlook analyses today. Upgrade to Pro for unlimited analyses, or come back tomorrow.`,
             usageExceeded: true,
-            used: monthlyCount,
-            limit: FREE_TIER_LIMIT
+            used: dailyCount,
+            limit: FREE_TIER_LIMIT,
+            period: "day"
           });
         }
         

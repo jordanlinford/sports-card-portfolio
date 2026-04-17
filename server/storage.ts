@@ -341,6 +341,7 @@ export interface IStorage {
 
   // Outlook usage tracking (for free tier enforcement)
   countUserMonthlyOutlookGenerations(userId: string): Promise<number>;
+  countUserDailyOutlookGenerations(userId: string): Promise<number>;
   countDailyFreeUserOutlookGenerations(): Promise<number>;
   recordOutlookUsage(userId: string, source: 'collection' | 'quick', cardId?: number, cardTitle?: string): Promise<void>;
 
@@ -1032,6 +1033,23 @@ export class DatabaseStorage implements IStorage {
         )
       );
     
+    return result?.count || 0;
+  }
+
+  async countUserDailyOutlookGenerations(userId: string): Promise<number> {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(outlookUsage)
+      .where(
+        and(
+          eq(outlookUsage.userId, userId),
+          sql`${outlookUsage.createdAt} >= ${startOfDay}`
+        )
+      );
+
     return result?.count || 0;
   }
 

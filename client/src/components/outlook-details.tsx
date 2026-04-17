@@ -540,13 +540,22 @@ export function OutlookDetails({
                 <h3 className="font-semibold mb-1">{actionStyle.label} Recommendation</h3>
                 <p className="text-sm font-medium mb-2">{actionStyle.takeaway}</p>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  {data.actionReasons.map((reason, i) => (
-                    <li key={i} className="flex items-start gap-2">
+                  {(data.isPro ? data.actionReasons : data.actionReasons.slice(0, 1)).map((reason, i) => (
+                    <li key={i} className="flex items-start gap-2" data-testid={`text-action-reason-${i}`}>
                       <span className="text-foreground mt-0.5">-</span>
                       <span>{reason}</span>
                     </li>
                   ))}
                 </ul>
+                {!data.isPro && data.actionReasons.length > 1 && (
+                  <a
+                    href="/upgrade"
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    data-testid="link-upgrade-action-reasons"
+                  >
+                    + {data.actionReasons.length - 1} more reason{data.actionReasons.length - 1 === 1 ? "" : "s"} — Upgrade to Pro
+                  </a>
+                )}
                 <p className="text-xs text-muted-foreground mt-3">
                   Re-evaluate in 30-60 days or after major news.
                 </p>

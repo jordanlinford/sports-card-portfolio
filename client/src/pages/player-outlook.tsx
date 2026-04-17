@@ -1864,7 +1864,7 @@ export default function PlayerOutlookPage() {
                   <Star className="h-4 w-4 text-purple-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-sm">3 Free Analyses/Month</p>
+                  <p className="font-medium text-sm">3 Free Analyses/Day</p>
                   <p className="text-xs text-muted-foreground">Analyze players before you buy cards</p>
                 </div>
               </div>
