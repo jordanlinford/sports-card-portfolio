@@ -9865,6 +9865,9 @@ RULES:
   // BREAK VALUE AUDITOR - Replaces old splits/box breaks hosting
   // ============================================================================
 
+  const breakAuditCache = new Map<string, { data: any; timestamp: number }>();
+  const BREAK_AUDIT_CACHE_TTL = 6 * 60 * 60 * 1000;
+
   app.post("/api/market/break-audit", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -9888,6 +9891,18 @@ RULES:
 
       const dbUser = await storage.getUser(userId);
       const isPro = dbUser ? hasProAccess(dbUser) : false;
+
+      const breakCacheKey = `${sport.toLowerCase()}|${product.toLowerCase().replace(/\s+/g, "-")}|${pricePerSlot}|${totalSlots}`;
+      const cachedBreak = breakAuditCache.get(breakCacheKey);
+      if (cachedBreak && Date.now() - cachedBreak.timestamp < BREAK_AUDIT_CACHE_TTL) {
+        const cachedResult = JSON.parse(JSON.stringify(cachedBreak.data));
+        if (!isPro) {
+          cachedResult.slotAnalyses = [];
+        }
+        console.log(`[BreakAuditor] Cache HIT for ${breakCacheKey}`);
+        return res.json(cachedResult);
+      }
+      console.log(`[BreakAuditor] Cache MISS for ${breakCacheKey}`);
 
       const sportLower = sport.toLowerCase();
       const { SPORT_FRAMEWORKS } = await import("./playerClassificationEngine");
@@ -10083,6 +10098,8 @@ Return ONLY valid JSON, no markdown.`;
       parsed.sport = sport;
       parsed.product = product;
       parsed.dataGrounded = true;
+
+      breakAuditCache.set(breakCacheKey, { data: JSON.parse(JSON.stringify(parsed)), timestamp: Date.now() });
 
       if (!isPro) {
         parsed.slotAnalyses = [];
