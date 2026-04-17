@@ -1573,6 +1573,7 @@ export type AdvisorOutlook = {
     soldCount7d?: number;
     avgPrice?: string; // e.g. "$45" — Gemini market estimate
     internalAvgPrice?: string; // e.g. "$354" — average from our own user holdings
+    internalObservationCount?: number; // how many user-owned cards back the internal avg
     internalVsMarketDeltaPct?: number; // e.g. +410 means internal is 410% above market
   };
   topSignals?: string[]; // Top 2 signal contributions driving the verdict

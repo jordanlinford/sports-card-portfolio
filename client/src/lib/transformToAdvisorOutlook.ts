@@ -377,6 +377,9 @@ function extractShortTermTrend(outlook: PlayerOutlookResponse): AdvisorOutlook["
   }
   if (met.internalAvgPrice != null && met.internalAvgPrice > 0) {
     trend.internalAvgPrice = `$${met.internalAvgPrice.toFixed(0)}`;
+    if (met.internalObservationCount != null && met.internalObservationCount > 0) {
+      trend.internalObservationCount = met.internalObservationCount;
+    }
     if (met.avgSoldPrice != null && met.avgSoldPrice > 0) {
       trend.internalVsMarketDeltaPct = Math.round(((met.internalAvgPrice - met.avgSoldPrice) / met.avgSoldPrice) * 100);
     }

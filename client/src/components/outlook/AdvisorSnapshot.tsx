@@ -356,14 +356,19 @@ function MarketDataContent({ advisor }: { advisor: AdvisorOutlook }) {
             )}
             {advisor.shortTermTrend.soldCount7d !== undefined && <span>{advisor.shortTermTrend.soldCount7d} sold/7d</span>}
             {advisor.shortTermTrend.soldCount30d !== undefined && <span>{advisor.shortTermTrend.soldCount30d} sold/30d</span>}
-            {advisor.shortTermTrend.avgPrice && <span title="Gemini market estimate" data-testid="text-market-avg">{advisor.shortTermTrend.avgPrice} market avg</span>}
+            {advisor.shortTermTrend.avgPrice && <span title="From Gemini blended market data" data-testid="text-market-avg">Market avg: {advisor.shortTermTrend.avgPrice}</span>}
             {advisor.shortTermTrend.internalAvgPrice && (
               <span
                 className="flex items-center gap-1"
                 title="Average price across cards owned by users on this platform"
                 data-testid="text-internal-avg"
               >
-                <span>{advisor.shortTermTrend.internalAvgPrice} internal avg</span>
+                <span>
+                  Your collection avg: {advisor.shortTermTrend.internalAvgPrice}
+                  {advisor.shortTermTrend.internalObservationCount !== undefined && advisor.shortTermTrend.internalObservationCount > 0 && (
+                    <span className="text-muted-foreground"> (based on {advisor.shortTermTrend.internalObservationCount} card{advisor.shortTermTrend.internalObservationCount === 1 ? "" : "s"})</span>
+                  )}
+                </span>
                 {advisor.shortTermTrend.internalVsMarketDeltaPct !== undefined && Math.abs(advisor.shortTermTrend.internalVsMarketDeltaPct) > 20 && (
                   <Badge
                     variant={advisor.shortTermTrend.internalVsMarketDeltaPct > 0 ? "default" : "destructive"}
