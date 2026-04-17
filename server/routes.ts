@@ -1803,16 +1803,18 @@ Sitemap: ${origin}/sitemap.xml
           }
 
           const title = [scan.playerName, scan.year, scan.setName].filter(Boolean).join(" ");
+          const { resolvePlayerIdentity } = await import("./playerRegistry");
+          const resolved = resolvePlayerIdentity(title || scan.playerName, scan.playerName, scan.sport);
           const cardData = {
             title: title || "Unknown Card",
-            playerName: scan.playerName || null,
+            playerName: resolved.playerName,
             year: scan.year || null,
             set: scan.setName || null,
             cardNumber: scan.cardNumber || null,
             variation: scan.variation || null,
             grade: scan.grade || null,
             grader: scan.grader === "raw" ? null : (scan.grader || null),
-            sport: scan.sport || null,
+            sport: resolved.sport,
             imagePath: scan.imagePath || null,
             estimatedValue: scan.marketValue || null,
             cardCategory: "sports" as const,
@@ -1875,6 +1877,13 @@ Sitemap: ${origin}/sitemap.xml
         console.error("Card validation failed:", parsed.error.errors);
         console.error("Card data received:", JSON.stringify(cardData, null, 2));
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
+      }
+
+      {
+        const { resolvePlayerIdentity } = await import("./playerRegistry");
+        const resolved = resolvePlayerIdentity(parsed.data.title, parsed.data.playerName, parsed.data.sport);
+        parsed.data.playerName = resolved.playerName;
+        if (!parsed.data.sport && resolved.sport) parsed.data.sport = resolved.sport;
       }
 
       const existingCards = await storage.getCards(displayCaseId);

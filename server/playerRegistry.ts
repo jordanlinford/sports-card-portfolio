@@ -265,6 +265,84 @@ export function getRegistryStats(): { totalEntries: number; loaded: boolean; sou
   };
 }
 
+export interface ResolvedPlayerIdentity {
+  playerName: string | null;
+  sport: string | null;
+  matchedFrom: "exact" | "fuzzy" | "provided" | "none";
+  confidence: number;
+}
+
+const KNOWN_SPORTS = new Set([
+  "basketball", "football", "baseball", "hockey", "soccer", "wnba", "mma", "boxing", "golf", "tennis",
+]);
+
+function normalizeSport(sport: string | null | undefined): string | null {
+  if (!sport) return null;
+  const s = sport.trim().toLowerCase();
+  if (!s || s === "unknown") return null;
+  return KNOWN_SPORTS.has(s) ? s : sport;
+}
+
+export function resolvePlayerIdentity(
+  title: string | null | undefined,
+  providedName?: string | null,
+  providedSport?: string | null,
+): ResolvedPlayerIdentity {
+  loadRegistry();
+
+  const cleanProvided = providedName && providedName.trim() && providedName.trim().toLowerCase() !== "unknown"
+    ? providedName.trim()
+    : null;
+  const sportHint = normalizeSport(providedSport);
+
+  if (cleanProvided) {
+    const exact = lookupPlayer(cleanProvided);
+    if (exact.found && exact.entry) {
+      return {
+        playerName: exact.entry.playerName,
+        sport: sportHint || normalizeSport(exact.entry.sport) || null,
+        matchedFrom: "exact",
+        confidence: 1,
+      };
+    }
+    return {
+      playerName: cleanProvided,
+      sport: sportHint,
+      matchedFrom: "provided",
+      confidence: 0.5,
+    };
+  }
+
+  if (title && title.trim()) {
+    const titleNorm = " " + normalizeForLookup(title) + " ";
+    let best: PlayerRegistryEntry | null = null;
+    let bestLen = 0;
+    const seen = new Set<string>();
+
+    for (const entry of registryMap.values()) {
+      if (seen.has(entry.playerName)) continue;
+      seen.add(entry.playerName);
+      const nameNorm = normalizeForLookup(entry.playerName);
+      if (!nameNorm || nameNorm.length < 6 || !nameNorm.includes(" ")) continue;
+      if (titleNorm.includes(" " + nameNorm + " ") && nameNorm.length > bestLen) {
+        best = entry;
+        bestLen = nameNorm.length;
+      }
+    }
+
+    if (best) {
+      return {
+        playerName: best.playerName,
+        sport: sportHint || normalizeSport(best.sport) || null,
+        matchedFrom: "fuzzy",
+        confidence: 0.85,
+      };
+    }
+  }
+
+  return { playerName: null, sport: sportHint, matchedFrom: "none", confidence: 0 };
+}
+
 export function searchPlayers(query: string, limit: number = 10): PlayerRegistryEntry[] {
   loadRegistry();
   

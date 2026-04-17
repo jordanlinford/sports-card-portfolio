@@ -89,6 +89,8 @@ export function CardDetailModal({
   ownerUserId
 }: CardDetailModalProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [playerSuggestions, setPlayerSuggestions] = useState<Array<{ name: string; sport: string }>>([]);
+  const [showPlayerSuggestions, setShowPlayerSuggestions] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showOfferModal, setShowOfferModal] = useState(false);
   const [showTradeModal, setShowTradeModal] = useState(false);
@@ -552,15 +554,68 @@ export function CardDetailModal({
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label htmlFor="edit-player-name">Player Name</Label>
+                <div className="space-y-1 relative">
+                  <Label htmlFor="edit-player-name">
+                    Player Name
+                    {!formData.playerName && (
+                      <span className="ml-2 text-xs text-amber-600 dark:text-amber-400" data-testid="text-identify-player-prompt">
+                        Identify player →
+                      </span>
+                    )}
+                  </Label>
                   <Input
                     id="edit-player-name"
                     value={formData.playerName}
-                    onChange={(e) => setFormData({ ...formData, playerName: e.target.value })}
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      setFormData({ ...formData, playerName: val });
+                      if (val.trim().length >= 2) {
+                        try {
+                          const res = await fetch(`/api/player-suggestions?q=${encodeURIComponent(val.trim())}`);
+                          if (res.ok) {
+                            const data = await res.json();
+                            setPlayerSuggestions(Array.isArray(data) ? data : []);
+                            setShowPlayerSuggestions(true);
+                          }
+                        } catch {}
+                      } else {
+                        setPlayerSuggestions([]);
+                        setShowPlayerSuggestions(false);
+                      }
+                    }}
+                    onBlur={() => setTimeout(() => setShowPlayerSuggestions(false), 150)}
+                    onFocus={() => playerSuggestions.length > 0 && setShowPlayerSuggestions(true)}
                     placeholder="e.g., LeBron James"
                     data-testid="input-edit-player-name"
+                    autoComplete="off"
                   />
+                  {showPlayerSuggestions && playerSuggestions.length > 0 && (
+                    <div
+                      className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md"
+                      data-testid="dropdown-player-suggestions"
+                    >
+                      {playerSuggestions.map((p) => (
+                        <button
+                          key={`${p.name}-${p.sport}`}
+                          type="button"
+                          className="w-full px-3 py-2 text-left text-sm hover-elevate active-elevate-2 flex justify-between items-center"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            setFormData({
+                              ...formData,
+                              playerName: p.name,
+                              sport: formData.sport || p.sport || "",
+                            });
+                            setShowPlayerSuggestions(false);
+                          }}
+                          data-testid={`button-player-suggestion-${p.name.replace(/\s+/g, "-").toLowerCase()}`}
+                        >
+                          <span>{p.name}</span>
+                          <span className="text-xs text-muted-foreground capitalize">{p.sport}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -845,6 +900,17 @@ export function CardDetailModal({
           ) : (
             <div className="space-y-4">
               <div className="space-y-3">
+                {!card.playerName && canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 hover:underline"
+                    data-testid="button-identify-player"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Identify player →
+                  </button>
+                )}
                 {card.set && (
                   <div className="flex items-center gap-2 text-sm">
                     <FileText className="w-4 h-4 text-muted-foreground" />
