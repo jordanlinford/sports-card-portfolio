@@ -91,6 +91,26 @@ app.use((req, res, next) => {
       try {
         await registerRoutes(httpServer, app);
         
+        // Admin endpoint for manual regression run (gated by QA_LOGIN_TOKEN)
+        // Must be registered BEFORE setupVite so the SPA catch-all doesn't shadow it.
+        app.get("/api/admin/run-regression", async (req, res) => {
+          const expected = process.env.QA_LOGIN_TOKEN;
+          const provided =
+            (req.headers["x-qa-token"] as string | undefined) ||
+            (req.query.token as string | undefined);
+          if (!expected || !provided || provided !== expected) {
+            return res.status(401).json({ error: "Unauthorized" });
+          }
+          try {
+            const summary = await runVerdictRegression();
+            res.json(summary);
+          } catch (err: any) {
+            console.error("[Regression] Manual run failed:", err);
+            res.status(500).json({ error: err?.message || "Regression run failed" });
+          }
+        });
+        console.log("[Regression] Admin endpoint registered: GET /api/admin/run-regression");
+
         app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
           const status = err.status || err.statusCode || 500;
           const message = err.message || "Internal Server Error";

@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins, ArrowRightLeft, Trash2, ImagePlus } from "lucide-react";
+import { Edit2, Save, X, Calendar, Award, DollarSign, TrendingUp, TrendingDown, FileText, Sparkles, RefreshCw, Loader2, Tag, Bookmark, HandCoins, ArrowRightLeft, Trash2, ImagePlus, BarChart3 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import {
   Select,

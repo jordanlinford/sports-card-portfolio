@@ -45,7 +45,7 @@ The application features a full-stack TypeScript architecture. The frontend uses
 - **Parallel Detection**: Advanced detection and pricing for SSPs, case hits, Chrome inserts, and numbered card parallels.
 - **Caching**: eBay comps caching (stale-while-revalidate), player news caching (in-memory), and persistent caching of Gemini analysis results in PostgreSQL.
 - **Worker Architecture**: Dedicated-IP VPS for eBay scraper.
-- **Scheduled Jobs**: Weekly auto-refresh for Hidden Gems, nightly player outlook refresh.
+- **Scheduled Jobs**: Weekly auto-refresh for Hidden Gems, nightly player outlook refresh, and a weekly Verdict Regression Test (Sundays 02:00 UTC) that snapshots the top 50 cached player outlooks (`player_outlook_cache` ordered by `updatedAt`) into `verdict_regression_runs` and flags `isFlip` when the verdict changes between runs while `|priceChangePct| < 15%`. Manually triggerable via `GET /api/admin/run-regression` (gated by `QA_LOGIN_TOKEN` via `x-qa-token` header or `?token=` query param), registered before Vite's SPA catch-all so the route resolves correctly in dev.
 
 ## External Dependencies
 
