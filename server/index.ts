@@ -111,6 +111,31 @@ app.use((req, res, next) => {
         });
         console.log("[Regression] Admin endpoint registered: GET /api/admin/run-regression");
 
+        // Admin endpoint to clean up cards with bad AI-generated variation strings
+        // (gated by QA_LOGIN_TOKEN). Must be registered BEFORE setupVite.
+        app.post("/api/admin/cleanup-bad-variations", async (req, res) => {
+          const expected = process.env.QA_LOGIN_TOKEN;
+          const provided =
+            (req.headers["x-qa-token"] as string | undefined) ||
+            (req.query.token as string | undefined);
+          if (!expected || !provided || provided !== expected) {
+            return res.status(401).json({ error: "Unauthorized" });
+          }
+          try {
+            const { pool } = await import("./db");
+            const result = await pool.query(
+              `UPDATE cards SET variation = NULL WHERE variation LIKE 'Err%' OR variation LIKE '%CMP should be%'`
+            );
+            const rowCount = result.rowCount ?? 0;
+            console.log(`[Cleanup] Nulled variation on ${rowCount} card(s)`);
+            res.json({ rowsUpdated: rowCount });
+          } catch (err: any) {
+            console.error("[Cleanup] Bad-variation cleanup failed:", err);
+            res.status(500).json({ error: err?.message || "Cleanup failed" });
+          }
+        });
+        console.log("[Cleanup] Admin endpoint registered: POST /api/admin/cleanup-bad-variations");
+
         app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
           const status = err.status || err.statusCode || 500;
           const message = err.message || "Internal Server Error";
