@@ -42,13 +42,22 @@ export class WebhookHandlers {
         // Update user subscription status based on Stripe subscription status
         const subscriptionStatus = status === 'active' || status === 'trialing' ? 'PRO' : 'FREE';
         
-        // Find user by Stripe customer ID and update their subscription
-        await storage.updateUserByStripeCustomerId(customerId, {
+        const updateData: any = {
           subscriptionStatus,
           stripeSubscriptionId: subscription.id,
-        });
+        };
+
+        // Stamp trial dates so the user can't claim a second free trial
+        if (status === 'trialing' && subscription.trial_start && subscription.trial_end) {
+          updateData.trialStart = new Date(subscription.trial_start * 1000);
+          updateData.trialEnd = new Date(subscription.trial_end * 1000);
+          updateData.trialSource = 'stripe_checkout';
+        }
+
+        // Find user by Stripe customer ID and update their subscription
+        await storage.updateUserByStripeCustomerId(customerId, updateData);
         
-        console.log(`Updated subscription for customer ${customerId}: ${subscriptionStatus}`);
+        console.log(`Updated subscription for customer ${customerId}: ${subscriptionStatus}${status === 'trialing' ? ' (trialing)' : ''}`);
         break;
       }
       

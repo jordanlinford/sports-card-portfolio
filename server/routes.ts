@@ -5967,6 +5967,17 @@ RULES:
         return res.status(404).json({ message: "User not found" });
       }
 
+      const withTrial = req.body?.withTrial === true;
+
+      // Block users who have already consumed any trial (app-side or Stripe)
+      // from getting a second one. Paid checkout is still available.
+      if (withTrial && user.trialEnd) {
+        return res.status(400).json({
+          message: "You've already used your free trial. You can subscribe directly without a trial.",
+          trialUsed: true,
+        });
+      }
+
       const stripe = await getUncachableStripeClient();
       const baseUrl = process.env.BASE_URL || `https://${req.hostname}`;
 
@@ -5984,7 +5995,7 @@ RULES:
         await storage.updateUserSubscription(userId, user.subscriptionStatus, customerId);
       }
 
-      const session = await stripe.checkout.sessions.create({
+      const sessionParams: any = {
         mode: "subscription",
         customer: customerId,
         line_items: [
@@ -5998,8 +6009,20 @@ RULES:
         cancel_url: `${baseUrl}/upgrade`,
         metadata: {
           userId: userId,
+          withTrial: withTrial ? "true" : "false",
         },
-      });
+      };
+
+      if (withTrial) {
+        sessionParams.subscription_data = {
+          trial_period_days: 7,
+          metadata: { userId, trialSource: "stripe_checkout" },
+        };
+        // Require a payment method on file so the subscription auto-converts on day 8
+        sessionParams.payment_method_collection = "always";
+      }
+
+      const session = await stripe.checkout.sessions.create(sessionParams);
 
       res.json({ url: session.url });
     } catch (error: any) {

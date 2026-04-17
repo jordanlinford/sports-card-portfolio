@@ -70,8 +70,8 @@ export default function Upgrade() {
   });
 
   const checkoutMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/create-checkout-session");
+    mutationFn: async (withTrial: boolean = false) => {
+      const response = await apiRequest("POST", "/api/create-checkout-session", { withTrial });
       return response;
     },
     onSuccess: (data: any) => {
@@ -98,6 +98,8 @@ export default function Upgrade() {
       });
     },
   });
+
+  const trialUsed = !!(user as any)?.trialEnd;
 
   if (hasProAccess(user)) {
     return (
@@ -224,16 +226,36 @@ export default function Upgrade() {
                 </p>
               </div>
             ) : (
-              <Button
-                className="w-full gap-2"
-                size="lg"
-                onClick={() => checkoutMutation.mutate()}
-                disabled={checkoutMutation.isPending}
-                data-testid="button-upgrade-checkout"
-              >
-                <Zap className="h-4 w-4" />
-                {checkoutMutation.isPending ? "Starting checkout..." : "Upgrade with Stripe"}
-              </Button>
+              <div className="space-y-2">
+                {!trialUsed && (
+                  <>
+                    <Button
+                      className="w-full gap-2"
+                      size="lg"
+                      onClick={() => checkoutMutation.mutate(true)}
+                      disabled={checkoutMutation.isPending}
+                      data-testid="button-upgrade-trial"
+                    >
+                      <Gift className="h-4 w-4" />
+                      {checkoutMutation.isPending ? "Starting trial..." : "Start 7-day free trial"}
+                    </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                      Card required. Auto-converts to $12/month after 7 days. Cancel anytime.
+                    </p>
+                  </>
+                )}
+                <Button
+                  className="w-full gap-2"
+                  size="lg"
+                  variant={trialUsed ? "default" : "outline"}
+                  onClick={() => checkoutMutation.mutate(false)}
+                  disabled={checkoutMutation.isPending}
+                  data-testid="button-upgrade-checkout"
+                >
+                  <Zap className="h-4 w-4" />
+                  {checkoutMutation.isPending ? "Starting checkout..." : trialUsed ? "Subscribe — $12/month" : "Subscribe now (skip trial)"}
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>
