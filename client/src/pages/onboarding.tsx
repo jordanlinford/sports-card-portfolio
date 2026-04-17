@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { formatEnumLabel } from "@/lib/formatEnum";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -359,7 +360,7 @@ function PlayerOutlookStep({
               <div className="flex flex-wrap gap-2">
                 <Badge className={`${getTemperatureColor(snapshot.temperature)} gap-1`} data-testid="badge-temperature">
                   {getTemperatureIcon(snapshot.temperature)}
-                  {snapshot.temperature}
+                  {formatEnumLabel(snapshot.temperature)}
                 </Badge>
               </div>
             </div>
@@ -369,7 +370,7 @@ function PlayerOutlookStep({
                 <div className={`p-2 rounded-lg ${getVerdictColor(verdict.action)}`} data-testid="verdict-icon">
                   {getVerdictIcon(verdict.action)}
                 </div>
-                <span className="text-2xl font-bold" data-testid="text-verdict-action">{verdict.action}</span>
+                <span className="text-2xl font-bold" data-testid="text-verdict-action">{formatEnumLabel(verdict.action)}</span>
                 {verdict.modifier && (
                   <Badge className={`${getModifierColor(verdict.modifier)} text-sm`} data-testid="badge-verdict-modifier">
                     {verdict.modifier}

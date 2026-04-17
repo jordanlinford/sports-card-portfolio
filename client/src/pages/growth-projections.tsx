@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { hasProAccess } from "@shared/schema";
+import { formatEnumLabel } from "@/lib/formatEnum";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -790,7 +791,7 @@ export default function GrowthProjectionsPage() {
                           className="h-6 w-6 mx-auto mb-2" 
                           style={{ color: TEMP_COLORS[t.temperature] }}
                         />
-                        <p className="font-medium">{t.temperature}</p>
+                        <p className="font-medium">{formatEnumLabel(t.temperature)}</p>
                         <p className="text-sm text-muted-foreground">{t.cardCount} cards</p>
                         <p className="text-lg font-semibold">{formatCurrency(t.value)}</p>
                       </div>

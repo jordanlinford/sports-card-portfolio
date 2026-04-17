@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { formatEnumLabel } from "@/lib/formatEnum";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -209,11 +210,11 @@ function GemCard({ gem, isPro }: { gem: GemCandidate; isPro: boolean }) {
         <div className="flex flex-wrap gap-2 mt-3">
           <Badge variant="outline" className={`${getTemperatureColor(gem.temperature)} flex items-center gap-1 text-xs`}>
             {getTemperatureIcon(gem.temperature)}
-            {gem.temperature}
+            {formatEnumLabel(gem.temperature)}
           </Badge>
           <Badge variant="outline" className={`${getTierColor(gem.tier)} flex items-center gap-1 text-xs`}>
             {getTierIcon(gem.tier)}
-            {gem.tier}
+            {formatEnumLabel(gem.tier)}
           </Badge>
           <Badge variant="outline" className={`${getRiskColor(gem.riskLevel)} flex items-center gap-1 text-xs`}>
             <AlertTriangle className="h-3 w-3" />

@@ -25,6 +25,7 @@ import {
   Info,
 } from "lucide-react";
 import type { AdvisorOutlook, TradeTarget } from "@shared/schema";
+import { formatEnumLabel } from "@/lib/formatEnum";
 import { LiquidityBadge } from "@/components/liquidity-badge";
 
 function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
@@ -254,7 +255,7 @@ function InlineTarget({ target, index, prefix }: { target: TradeTarget; index: n
 
   return (
     <div className="flex items-center gap-2 text-xs" data-testid={`${prefix}-target-${index}`}>
-      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold ${actionColor} border-current`}>{target.action}</Badge>
+      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold ${actionColor} border-current`}>{formatEnumLabel(target.action)}</Badge>
       <span className="text-foreground truncate font-medium">{target.card}</span>
       {target.price && <span className="text-muted-foreground shrink-0 tabular-nums">{target.price}</span>}
     </div>

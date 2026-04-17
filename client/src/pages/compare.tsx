@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatEnumLabel } from "@/lib/formatEnum";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -502,7 +503,7 @@ function PlayerComparisonCard({
             </Badge>
             <Badge variant="outline" className={getTemperatureColor(outlook.snapshot?.temperature)}>
               {getTemperatureIcon(outlook.snapshot?.temperature)}
-              <span className="ml-1">{outlook.snapshot?.temperature}</span>
+              <span className="ml-1">{formatEnumLabel(outlook.snapshot?.temperature)}</span>
             </Badge>
           </div>
           
@@ -716,7 +717,7 @@ function CardComparisonInput({
             </Badge>
             <Badge variant="outline" className={getTemperatureColor(outlook.snapshot?.temperature)}>
               {getTemperatureIcon(outlook.snapshot?.temperature)}
-              <span className="ml-1">{outlook.snapshot?.temperature}</span>
+              <span className="ml-1">{formatEnumLabel(outlook.snapshot?.temperature)}</span>
             </Badge>
           </div>
           
@@ -1162,13 +1163,13 @@ export default function ComparePage() {
                 <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
                   <div className="text-center">
                     <Badge variant="outline" className={getTemperatureColor(leftPlayer.outlook.snapshot?.temperature)}>
-                      {leftPlayer.outlook.snapshot?.temperature}
+                      {formatEnumLabel(leftPlayer.outlook.snapshot?.temperature)}
                     </Badge>
                   </div>
                   <div className="text-center text-muted-foreground">Temperature</div>
                   <div className="text-center">
                     <Badge variant="outline" className={getTemperatureColor(rightPlayer.outlook.snapshot?.temperature)}>
-                      {rightPlayer.outlook.snapshot?.temperature}
+                      {formatEnumLabel(rightPlayer.outlook.snapshot?.temperature)}
                     </Badge>
                   </div>
                   

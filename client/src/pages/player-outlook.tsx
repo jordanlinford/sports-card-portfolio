@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, Component, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { formatEnumLabel } from "@/lib/formatEnum";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -337,7 +338,7 @@ function PlayerHeader({ player, snapshot, marketPhase }: { player: PlayerOutlook
           )}
           <Badge className={`${getTemperatureColor(snapshot.temperature)} gap-1`} data-testid="badge-temperature">
             {getTemperatureIcon(snapshot.temperature)}
-            {snapshot.temperature}
+            {formatEnumLabel(snapshot.temperature)}
           </Badge>
           <Badge className={`${getVolatilityColor(snapshot.volatility)} gap-1`} data-testid="badge-volatility">
             <Activity className="h-3 w-3" />
@@ -563,7 +564,7 @@ function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["
           <div className={`p-3 rounded-lg ${getVerdictColor(verdict.action)}`}>
             {getVerdictIcon(verdict.action)}
           </div>
-          <span className="text-3xl font-bold" data-testid="text-verdict-action">{verdict.action}</span>
+          <span className="text-3xl font-bold" data-testid="text-verdict-action">{formatEnumLabel(verdict.action)}</span>
           {verdict.modifier && (
             <Badge className={`${getModifierColor(verdict.modifier)} text-sm`} data-testid="badge-verdict-modifier">
               {verdict.modifier}
@@ -1240,7 +1241,7 @@ function OutlookHistoryPanel({ playerKey }: { playerKey: string | null }) {
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-muted-foreground">{entry.temperature}</span>
+                        <span className="text-xs text-muted-foreground">{formatEnumLabel(entry.temperature)}</span>
                       </div>
                     </div>
                     <span className="text-xs text-muted-foreground" data-testid={`text-date-${entry.id}`}>
