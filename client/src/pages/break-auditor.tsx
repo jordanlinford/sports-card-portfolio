@@ -421,8 +421,33 @@ export default function BreakAuditorPage() {
                 </CardContent>
               </Card>
 
-              {isPro ? (
-                result.slotAnalyses.length > 0 && (
+              {result.slotAnalyses.length > 0 && (() => {
+                const FREE_VISIBLE = 2;
+                const visibleSlots = isPro ? result.slotAnalyses : result.slotAnalyses.slice(0, FREE_VISIBLE);
+                const lockedSlots = isPro ? [] : result.slotAnalyses.slice(FREE_VISIBLE);
+                const renderSlot = (slot: SlotAnalysis, i: number, locked = false) => (
+                  <div key={i} className="flex items-start justify-between p-3 border rounded-lg" data-testid={locked ? `slot-analysis-locked-${i}` : `slot-analysis-${i}`}>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium">{slot.team}</span>
+                        <VerdictBadge verdict={slot.verdict} />
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-1">{slot.outlook}</p>
+                      {slot.keyPlayers.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Key: {slot.keyPlayers.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right ml-4">
+                      <p className={`text-lg font-bold ${slot.estimatedValue >= parseFloat(pricePerSlot) ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                        ${slot.estimatedValue.toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">est. value</p>
+                    </div>
+                  </div>
+                );
+                return (
                   <Card data-testid="card-slot-details">
                     <CardHeader>
                       <CardTitle className="text-lg">Slot-by-Slot Analysis</CardTitle>
@@ -430,70 +455,38 @@ export default function BreakAuditorPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-3">
-                        {result.slotAnalyses.map((slot, i) => (
-                          <div key={i} className="flex items-start justify-between p-3 border rounded-lg" data-testid={`slot-analysis-${i}`}>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-medium">{slot.team}</span>
-                                <VerdictBadge verdict={slot.verdict} />
-                              </div>
-                              <p className="text-sm text-muted-foreground mb-1">{slot.outlook}</p>
-                              {slot.keyPlayers.length > 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                  Key: {slot.keyPlayers.join(", ")}
-                                </p>
-                              )}
-                            </div>
-                            <div className="text-right ml-4">
-                              <p className={`text-lg font-bold ${slot.estimatedValue >= parseFloat(pricePerSlot) ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                                ${slot.estimatedValue.toFixed(2)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">est. value</p>
-                            </div>
-                          </div>
-                        ))}
+                        {visibleSlots.map((slot, i) => renderSlot(slot, i))}
                       </div>
-                    </CardContent>
-                  </Card>
-                )
-              ) : (
-                <Card className="relative overflow-hidden" data-testid="card-pro-gate">
-                  <div className="absolute inset-0 backdrop-blur-sm bg-background/60 z-10 flex items-center justify-center">
-                    <div className="text-center p-6">
-                      <Crown className="h-8 w-8 mx-auto mb-3 text-yellow-500" />
-                      <h3 className="text-lg font-semibold mb-2">Slot-by-Slot Analysis</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Upgrade to Pro to see detailed value estimates for every team/slot
-                      </p>
-                      <Button asChild>
-                        <Link href="/upgrade">
-                          Upgrade to Pro
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Slot-by-Slot Analysis</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {[1, 2, 3, 4].map((i) => (
-                        <div key={i} className="flex items-start justify-between p-3 border rounded-lg opacity-30">
-                          <div className="flex-1">
-                            <div className="h-4 bg-muted rounded w-24 mb-2" />
-                            <div className="h-3 bg-muted rounded w-48 mb-1" />
-                            <div className="h-3 bg-muted rounded w-32" />
+                      {lockedSlots.length > 0 && (
+                        <div className="relative mt-3" data-testid="paywall-slot-blur">
+                          <div
+                            className="space-y-3 pointer-events-none select-none"
+                            style={{ filter: "blur(4px)" }}
+                            aria-hidden="true"
+                          >
+                            {lockedSlots.map((slot, i) => renderSlot(slot, i + FREE_VISIBLE, true))}
                           </div>
-                          <div className="text-right ml-4">
-                            <div className="h-5 bg-muted rounded w-16 mb-1" />
-                            <div className="h-3 bg-muted rounded w-12" />
+                          <div className="pointer-events-none absolute inset-x-0 -top-6 h-10 bg-gradient-to-b from-background to-transparent" />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="pointer-events-auto text-center p-6 rounded-lg bg-background/90 border shadow-sm max-w-sm">
+                              <Lock className="h-7 w-7 mx-auto mb-3 text-muted-foreground" />
+                              <p className="text-base font-semibold mb-3">
+                                Upgrade to Pro to see all {result.slotAnalyses.length} slots
+                              </p>
+                              <Button asChild className="gap-2" data-testid="button-unlock-slots">
+                                <Link href="/upgrade">
+                                  <Crown className="h-4 w-4" />
+                                  Unlock Full Analysis — $12/month
+                                </Link>
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })()}
             </div>
           )}
         </div>

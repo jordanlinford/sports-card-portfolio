@@ -800,167 +800,163 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
         </CardContent>
       </Card>
 
-      {isPro ? (
-        <>
-          {result.hitBreakdown && result.hitBreakdown.length > 0 && (
-            <Card data-testid="card-hit-breakdown">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  Hit Breakdown & Grading Recommendations
-                </CardTitle>
-                <CardDescription>Key hits, their odds, values, and whether grading is worthwhile</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {result.hitBreakdown.map((hit, i) => (
-                    <div
-                      key={i}
-                      className={`p-3 rounded-lg border ${hit.isCaseHit ? "border-yellow-500/50 bg-yellow-500/5" : ""}`}
-                      data-testid={`row-hit-${i}`}
-                    >
-                      <div className="flex gap-3">
-                        <HitImage src={hit.exampleImageUrl} alt={hit.cardType} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap mb-1">
-                            {hit.isCaseHit && (
-                              <Badge variant="outline" className="bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30 gap-1 text-xs" data-testid={`badge-case-hit-${i}`}>
-                                <Star className="h-3 w-3 fill-yellow-500" />
-                                Case Hit
-                              </Badge>
-                            )}
-                            <p className="font-medium">{hit.cardType}</p>
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                            <span>{hit.odds}</span>
-                            {hit.playerExample && (
-                              <>
-                                <span>·</span>
-                                <span>e.g. {hit.playerExample}</span>
-                              </>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                            <div>
-                              <span className="text-muted-foreground">Raw: </span>
-                              <span className="font-medium">${hit.estimatedRawValue?.toFixed(0)}</span>
-                              {hit.estimatedRawMin !== undefined && hit.estimatedRawMax !== undefined && (
-                                <span className="text-xs text-muted-foreground ml-1">(${hit.estimatedRawMin?.toFixed(0)}-${hit.estimatedRawMax?.toFixed(0)})</span>
-                              )}
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">PSA 10: </span>
-                              <span className="font-medium">${hit.estimatedGradedValue?.toFixed(0)}</span>
-                              {hit.estimatedGradedMin !== undefined && hit.estimatedGradedMax !== undefined && (
-                                <span className="text-xs text-muted-foreground ml-1">(${hit.estimatedGradedMin?.toFixed(0)}-${hit.estimatedGradedMax?.toFixed(0)})</span>
-                              )}
-                            </div>
-                            <GradingBadge recommendation={hit.gradingRecommendation} />
-                          </div>
-                          {hit.gradingRationale && (
-                            <p className="text-xs text-muted-foreground mt-1">{hit.gradingRationale}</p>
-                          )}
+      {(() => {
+        const FREE_VISIBLE = 3;
+        const hits = result.hitBreakdown ?? [];
+        const visibleHits = isPro ? hits : hits.slice(0, FREE_VISIBLE);
+        const lockedHits = isPro ? [] : hits.slice(FREE_VISIBLE);
+        const renderHit = (hit: HitBreakdownItem, i: number, locked = false) => (
+          <div
+            key={i}
+            className={`p-3 rounded-lg border ${hit.isCaseHit ? "border-yellow-500/50 bg-yellow-500/5" : ""}`}
+            data-testid={locked ? `row-hit-locked-${i}` : `row-hit-${i}`}
+          >
+            <div className="flex gap-3">
+              <HitImage src={hit.exampleImageUrl} alt={hit.cardType} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  {hit.isCaseHit && (
+                    <Badge variant="outline" className="bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30 gap-1 text-xs">
+                      <Star className="h-3 w-3 fill-yellow-500" />
+                      Case Hit
+                    </Badge>
+                  )}
+                  <p className="font-medium">{hit.cardType}</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+                  <span>{hit.odds}</span>
+                  {hit.playerExample && (
+                    <>
+                      <span>·</span>
+                      <span>e.g. {hit.playerExample}</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Raw: </span>
+                    <span className="font-medium">${hit.estimatedRawValue?.toFixed(0)}</span>
+                    {hit.estimatedRawMin !== undefined && hit.estimatedRawMax !== undefined && (
+                      <span className="text-xs text-muted-foreground ml-1">(${hit.estimatedRawMin?.toFixed(0)}-${hit.estimatedRawMax?.toFixed(0)})</span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">PSA 10: </span>
+                    <span className="font-medium">${hit.estimatedGradedValue?.toFixed(0)}</span>
+                    {hit.estimatedGradedMin !== undefined && hit.estimatedGradedMax !== undefined && (
+                      <span className="text-xs text-muted-foreground ml-1">(${hit.estimatedGradedMin?.toFixed(0)}-${hit.estimatedGradedMax?.toFixed(0)})</span>
+                    )}
+                  </div>
+                  <GradingBadge recommendation={hit.gradingRecommendation} />
+                </div>
+                {hit.gradingRationale && (
+                  <p className="text-xs text-muted-foreground mt-1">{hit.gradingRationale}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+        return (
+          <>
+            {hits.length > 0 && (
+              <Card data-testid="card-hit-breakdown">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Hit Breakdown & Grading Recommendations
+                  </CardTitle>
+                  <CardDescription>Key hits, their odds, values, and whether grading is worthwhile</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {visibleHits.map((hit, i) => renderHit(hit, i))}
+                  </div>
+                  {lockedHits.length > 0 && (
+                    <div className="relative mt-3" data-testid="paywall-hit-blur">
+                      <div
+                        className="space-y-3 pointer-events-none select-none"
+                        style={{ filter: "blur(4px)" }}
+                        aria-hidden="true"
+                      >
+                        {lockedHits.map((hit, i) => renderHit(hit, i + FREE_VISIBLE, true))}
+                      </div>
+                      <div className="pointer-events-none absolute inset-x-0 -top-6 h-10 bg-gradient-to-b from-background to-transparent" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="pointer-events-auto text-center p-6 rounded-lg bg-background/90 border shadow-sm max-w-sm">
+                          <Lock className="h-7 w-7 mx-auto mb-3 text-muted-foreground" />
+                          <p className="text-base font-semibold mb-3">
+                            Upgrade to Pro to see the full hit breakdown
+                          </p>
+                          <Button asChild className="gap-2" data-testid="button-unlock-hits">
+                            <Link href="/upgrade">
+                              <Crown className="h-4 w-4" />
+                              Unlock Full Analysis — $12/month
+                            </Link>
+                          </Button>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-          {result.starRookies && result.starRookies.length > 0 && (
-            <Card data-testid="card-star-rookies">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Star className="h-5 w-5" />
-                  Star Rookie Spotlight
-                </CardTitle>
-                <CardDescription>The most valuable rookies in this product</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {result.starRookies.map((rookie, i) => (
-                    <div key={i} className="p-3 border rounded-lg" data-testid={`card-rookie-${i}`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <Trophy className="h-4 w-4 text-yellow-500" />
-                        <span className="font-semibold">{rookie.playerName}</span>
-                        <Badge variant="secondary" className="text-xs">{rookie.position}</Badge>
+            {isPro && result.starRookies && result.starRookies.length > 0 && (
+              <Card data-testid="card-star-rookies">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Star className="h-5 w-5" />
+                    Star Rookie Spotlight
+                  </CardTitle>
+                  <CardDescription>The most valuable rookies in this product</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {result.starRookies.map((rookie, i) => (
+                      <div key={i} className="p-3 border rounded-lg" data-testid={`card-rookie-${i}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Trophy className="h-4 w-4 text-yellow-500" />
+                          <span className="font-semibold">{rookie.playerName}</span>
+                          <Badge variant="secondary" className="text-xs">{rookie.position}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">{rookie.team}</p>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-muted-foreground">Raw:</span>
+                          <span className="font-medium">${rookie.currentRawValue?.toFixed(0)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-muted-foreground">PSA 10:</span>
+                          <span className="font-medium text-green-600 dark:text-green-400">${rookie.currentGradedValue?.toFixed(0)}</span>
+                        </div>
+                        {rookie.outlook && (
+                          <p className="text-xs text-muted-foreground italic">{rookie.outlook}</p>
+                        )}
                       </div>
-                      <p className="text-xs text-muted-foreground mb-2">{rookie.team}</p>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">Raw:</span>
-                        <span className="font-medium">${rookie.currentRawValue?.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="text-muted-foreground">PSA 10:</span>
-                        <span className="font-medium text-green-600 dark:text-green-400">${rookie.currentGradedValue?.toFixed(0)}</span>
-                      </div>
-                      {rookie.outlook && (
-                        <p className="text-xs text-muted-foreground italic">{rookie.outlook}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-          {result.qualityBreakdown && (
-            <Card data-testid="card-quality-breakdown">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Quality Score Breakdown
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <QualityBar label="Cost Efficiency" value={result.qualityBreakdown.costEfficiency} />
-                <QualityBar label="Hit Ceiling" value={result.qualityBreakdown.hitCeiling} />
-                <QualityBar label="Rookie Class Depth" value={result.qualityBreakdown.rookieClassDepth} />
-                <QualityBar label="Gradability" value={result.qualityBreakdown.gradability} />
-              </CardContent>
-            </Card>
-          )}
-        </>
-      ) : (
-        <Card className="relative overflow-hidden" data-testid="card-pro-gate">
-          <div className="absolute inset-0 backdrop-blur-sm bg-background/60 z-10 flex items-center justify-center">
-            <div className="text-center p-6">
-              <Crown className="h-8 w-8 mx-auto mb-3 text-yellow-500" />
-              <h3 className="text-lg font-semibold mb-2">Full ROI Breakdown</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Upgrade to Pro for detailed hit breakdown, grading recommendations, star rookie spotlight, and quality score analysis
-              </p>
-              <Button asChild data-testid="button-upgrade">
-                <Link href="/upgrade">
-                  Upgrade to Pro
-                </Link>
-              </Button>
-            </div>
-          </div>
-          <CardHeader>
-            <CardTitle className="text-lg">Hit Breakdown & Grading</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center justify-between p-3 border rounded-lg opacity-30">
-                  <div className="flex-1">
-                    <div className="h-4 bg-muted rounded w-32 mb-2" />
-                    <div className="h-3 bg-muted rounded w-20" />
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="h-4 bg-muted rounded w-16" />
-                    <div className="h-4 bg-muted rounded w-16" />
-                    <div className="h-4 bg-muted rounded w-20" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            {isPro && result.qualityBreakdown && (
+              <Card data-testid="card-quality-breakdown">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Award className="h-5 w-5" />
+                    Quality Score Breakdown
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <QualityBar label="Cost Efficiency" value={result.qualityBreakdown.costEfficiency} />
+                  <QualityBar label="Hit Ceiling" value={result.qualityBreakdown.hitCeiling} />
+                  <QualityBar label="Rookie Class Depth" value={result.qualityBreakdown.rookieClassDepth} />
+                  <QualityBar label="Gradability" value={result.qualityBreakdown.gradability} />
+                </CardContent>
+              </Card>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }
