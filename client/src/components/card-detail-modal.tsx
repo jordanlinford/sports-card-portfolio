@@ -193,6 +193,24 @@ export function CardDetailModal({
     },
   });
 
+  const { data: internalAvgData } = useQuery<{
+    internalAvg: number | null;
+    count: number;
+    min?: number;
+    max?: number;
+    oldestObservedAt: string | null;
+    newestObservedAt: string | null;
+  }>({
+    queryKey: ["/api/cards", card?.id, "internal-avg"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cards/${card!.id}/internal-avg`);
+      if (!res.ok) return { internalAvg: null, count: 0, oldestObservedAt: null, newestObservedAt: null };
+      return res.json();
+    },
+    enabled: isOpen && !!card && isAuthenticated,
+    staleTime: 1000 * 60 * 10,
+  });
+
   const refreshPriceMutation = useMutation({
     mutationFn: async (cardId: number) => {
       return await apiRequest("POST", `/api/cards/${cardId}/lookup-price`);
@@ -957,7 +975,7 @@ export function CardDetailModal({
 
                 <div className="flex items-center gap-2 text-sm flex-wrap">
                   <TrendingUp className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Estimated Value:</span>
+                  <span className="text-muted-foreground">Market Avg (AI):</span>
                   <span className="font-medium" data-testid="text-estimated-value">
                     {formatCurrency(currentValue)}
                   </span>
@@ -989,6 +1007,44 @@ export function CardDetailModal({
                     return null;
                   })()}
                 </div>
+
+                {internalAvgData && internalAvgData.internalAvg !== null && internalAvgData.count > 0 && (() => {
+                  const internalAvg = internalAvgData.internalAvg!;
+                  const delta = currentValue && currentValue > 0
+                    ? ((currentValue - internalAvg) / internalAvg) * 100
+                    : null;
+                  const olderDate = internalAvgData.oldestObservedAt
+                    ? new Date(internalAvgData.oldestObservedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                    : null;
+                  const newerDate = internalAvgData.newestObservedAt
+                    ? new Date(internalAvgData.newestObservedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                    : null;
+                  return (
+                    <div className="flex items-center gap-2 text-sm flex-wrap" data-testid="row-internal-avg">
+                      <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Internal Avg (history):</span>
+                      <span className="font-medium" data-testid="text-internal-avg">
+                        {formatCurrency(internalAvg)}
+                      </span>
+                      <span className="text-xs text-muted-foreground" data-testid="text-internal-avg-meta">
+                        from {internalAvgData.count} comp{internalAvgData.count === 1 ? "" : "s"}
+                        {olderDate && newerDate && olderDate !== newerDate && ` · ${olderDate}–${newerDate}`}
+                        {olderDate && newerDate && olderDate === newerDate && ` · ${newerDate}`}
+                      </span>
+                      {delta !== null && Math.abs(delta) >= 5 && (
+                        <Badge
+                          variant={delta > 0 ? "default" : "destructive"}
+                          className="gap-1 text-xs"
+                          title={delta > 0 ? "Market is above our historical average" : "Market is below our historical average"}
+                          data-testid="badge-internal-vs-market"
+                        >
+                          {delta > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {delta > 0 ? "+" : ""}{delta.toFixed(1)}% vs market
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {oneOfOneProjection && oneOfOneProjection.isOneOfOne && oneOfOneProjection.baseParallel && (
                   <div className="rounded-md border border-dashed p-3 space-y-2" data-testid="section-1of1-projection">

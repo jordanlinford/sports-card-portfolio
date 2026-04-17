@@ -2117,6 +2117,56 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // Internal historical average from comp_observations (last 90 days, matched on set/year/variation/grade)
+  app.get("/api/cards/:cardId/internal-avg", isAuthenticated, async (req: any, res) => {
+    try {
+      const cardId = parseInt(req.params.cardId);
+      const userId = req.user.claims.sub;
+      if (isNaN(cardId)) return res.status(400).json({ message: "Invalid card ID" });
+
+      const card = await storage.getCard(cardId);
+      if (!card) return res.status(404).json({ message: "Card not found" });
+
+      const displayCase = await storage.getDisplayCaseByIdAndUser(card.displayCaseId, userId);
+      if (!displayCase) return res.status(403).json({ message: "Permission denied" });
+
+      const comps = await storage.getCompObservations(
+        card.title,
+        card.set || undefined,
+        card.year || undefined,
+        card.variation || undefined,
+      );
+
+      // Optional grade filter applied in-memory (storage helper doesn't filter by grade)
+      const gradeNorm = (card.grade || "").trim().toLowerCase();
+      const matched = gradeNorm
+        ? comps.filter(c => (c.grade || "").trim().toLowerCase() === gradeNorm)
+        : comps;
+
+      if (matched.length === 0) {
+        return res.json({ internalAvg: null, count: 0, oldestObservedAt: null, newestObservedAt: null });
+      }
+
+      const prices = matched.map(c => c.price).filter(p => p > 0);
+      const avg = prices.reduce((s, p) => s + p, 0) / prices.length;
+      const min = Math.min(...prices);
+      const max = Math.max(...prices);
+      const dates = matched.map(c => new Date(c.observedAt).getTime()).filter(t => !isNaN(t));
+
+      res.json({
+        internalAvg: Math.round(avg * 100) / 100,
+        count: matched.length,
+        min: Math.round(min * 100) / 100,
+        max: Math.round(max * 100) / 100,
+        oldestObservedAt: dates.length ? new Date(Math.min(...dates)).toISOString() : null,
+        newestObservedAt: dates.length ? new Date(Math.max(...dates)).toISOString() : null,
+      });
+    } catch (error) {
+      console.error("Error computing internal avg:", error);
+      res.status(500).json({ message: "Failed to compute internal average" });
+    }
+  });
+
   // Bulk price lookup for all cards in a display case (Pro feature)
   interface RefreshJob {
     status: "running" | "complete";
