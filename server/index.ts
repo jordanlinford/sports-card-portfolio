@@ -5,6 +5,7 @@ import { createServer } from "http";
 import { startPrewarmJob } from "./prewarmJob";
 import { startCareerStageJob } from "./careerStageJob";
 import { startHiddenGemsRefreshJob } from "./hiddenGemsService";
+import { startRegressionTestScheduler, runVerdictRegression } from "./regressionTestJob";
 
 const app = express();
 const httpServer = createServer(app);
@@ -136,7 +137,29 @@ app.use((req, res, next) => {
         
         // Start the weekly Hidden Gems auto-refresh (every Monday 5 AM UTC)
         startHiddenGemsRefreshJob();
-        
+
+        // Start the weekly verdict regression test job (every Sunday 2 AM UTC)
+        startRegressionTestScheduler();
+
+        // Admin endpoint for manual regression run (gated by QA_LOGIN_TOKEN)
+        app.get("/api/admin/run-regression", async (req, res) => {
+          const expected = process.env.QA_LOGIN_TOKEN;
+          const provided =
+            (req.headers["x-qa-token"] as string | undefined) ||
+            (req.query.token as string | undefined);
+          if (!expected || !provided || provided !== expected) {
+            return res.status(401).json({ error: "Unauthorized" });
+          }
+          try {
+            const summary = await runVerdictRegression();
+            res.json(summary);
+          } catch (err: any) {
+            console.error("[Regression] Manual run failed:", err);
+            res.status(500).json({ error: err?.message || "Regression run failed" });
+          }
+        });
+        console.log("[Regression] Admin endpoint registered: GET /api/admin/run-regression");
+
         log("All routes registered successfully");
         
         try {
