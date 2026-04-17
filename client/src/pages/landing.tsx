@@ -84,9 +84,15 @@ export default function Landing() {
                     sportscardportfolio.io / player-outlook
                   </div>
                 </div>
-                {/* Cropped player outlook screenshot */}
+                {/* Cropped player outlook screenshot with bottom fade */}
                 <div className="bg-white dark:bg-zinc-950">
-                  <div className="aspect-[4/3] overflow-hidden">
+                  <div
+                    className="aspect-[4/3] overflow-hidden"
+                    style={{
+                      WebkitMaskImage: "linear-gradient(to bottom, black 75%, transparent 100%)",
+                      maskImage: "linear-gradient(to bottom, black 75%, transparent 100%)",
+                    }}
+                  >
                     <img
                       src={playerOutlookImg}
                       alt="Player Outlook for Josh Allen showing Trade the Hype verdict, with Hold and Buy recommendation cards and a brief market summary"
@@ -180,7 +186,7 @@ export default function Landing() {
                   <h3 className="text-lg font-semibold mb-2">{title}</h3>
                   <p className="text-sm text-muted-foreground mb-4">{blurb}</p>
                   <span className="inline-flex items-center text-sm font-medium text-primary">
-                    Learn more
+                    Try it free
                     <ArrowRight className="h-4 w-4 ml-1 transition-transform group-hover:translate-x-0.5" />
                   </span>
                 </div>
