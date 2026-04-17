@@ -895,8 +895,18 @@ export default function ComparePage() {
     const params = new URLSearchParams(window.location.search);
     const tabParam = params.get("tab");
     const card1Param = params.get("card1");
+    const player1Param = params.get("player1");
+    const player2Param = params.get("player2");
     if (tabParam === "cards" || tabParam === "players") {
       setActiveTab(tabParam);
+    } else if ((player1Param || player2Param) && !card1Param) {
+      setActiveTab("players");
+    }
+    if (player1Param) {
+      setLeftPlayer(p => ({ ...p, name: player1Param }));
+    }
+    if (player2Param) {
+      setRightPlayer(p => ({ ...p, name: player2Param }));
     }
     if (card1Param && isAuthenticated) {
       const cardId = parseInt(card1Param, 10);
