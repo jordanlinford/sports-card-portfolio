@@ -632,6 +632,15 @@ function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["
   const isInsufficientData = verdict.action === "WATCH" && typeof verdict.modifier === "string" && verdict.modifier.toLowerCase().includes("insufficient");
   const verdictLabel = isInsufficientData ? "Watching" : formatEnumLabel(verdict.action);
   const verdictTooltip = isInsufficientData ? "Not enough sales data for a confident signal yet." : undefined;
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const summaryRef = useRef<HTMLParagraphElement | null>(null);
+  const [summaryOverflows, setSummaryOverflows] = useState(false);
+  const summaryText = (verdict.summary ?? "").trim();
+  useEffect(() => {
+    const el = summaryRef.current;
+    if (!el) return;
+    setSummaryOverflows(el.scrollHeight - el.clientHeight > 1);
+  }, [summaryText]);
   return (
     <Card className={`border-2 ${getVerdictColor(verdict.action)}`} data-testid="card-verdict">
       <CardHeader className="pb-3">
@@ -659,7 +668,25 @@ function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["
             </Badge>
           )}
         </div>
-        <p className="text-sm text-muted-foreground" data-testid="text-verdict-summary">{enforceCompleteSentences(verdict.summary)}</p>
+        <div>
+          <p
+            ref={summaryRef}
+            className={`text-sm text-muted-foreground whitespace-pre-wrap ${summaryExpanded ? "" : "line-clamp-4"}`}
+            data-testid="text-verdict-summary"
+          >
+            {summaryText}
+          </p>
+          {(summaryOverflows || summaryExpanded) && (
+            <button
+              type="button"
+              onClick={() => setSummaryExpanded((v) => !v)}
+              className="mt-1 text-xs font-medium text-primary hover:underline"
+              data-testid="button-toggle-verdict-summary"
+            >
+              {summaryExpanded ? "Show less" : "Show more"}
+            </button>
+          )}
+        </div>
         {verdict.whatMustBeTrue && verdict.whatMustBeTrue.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-xs font-medium text-muted-foreground mb-2">What must be true:</p>
