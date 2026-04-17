@@ -20,6 +20,7 @@ import CaseNew from "@/pages/case-new";
 import CaseEdit from "@/pages/case-edit";
 import CaseView from "@/pages/case-view";
 import Upgrade from "@/pages/upgrade";
+import PricingPage from "@/pages/pricing";
 import BillingSuccess from "@/pages/billing-success";
 import SearchPage from "@/pages/search";
 import TermsOfService from "@/pages/terms-of-service";
@@ -72,6 +73,7 @@ function Router() {
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/explore" component={Explore} />
       <Route path="/upgrade" component={Upgrade} />
+      <Route path="/pricing" component={PricingPage} />
       <Route path="/billing/success" component={BillingSuccess} />
       <Route path="/share/:token" component={ShareViewer} />
       <Route path="/blog" component={BlogListing} />

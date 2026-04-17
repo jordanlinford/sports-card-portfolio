@@ -157,6 +157,19 @@ export function Navigation() {
               </Button>
             </Link>
 
+            {/* Pricing - Public */}
+            <Link href="/pricing">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn("gap-2", isActive("/pricing") && "bg-accent")}
+                data-testid="nav-pricing"
+              >
+                <HandCoins className="h-4 w-4" />
+                Pricing
+              </Button>
+            </Link>
+
             {/* Portfolio Dropdown - auth only */}
             {isAuthenticated && user && (
               <DropdownMenu>
@@ -594,6 +607,18 @@ export function Navigation() {
                     <Zap className="h-4 w-4" />
                     Alpha Feed
                     <Badge variant="default" className="ml-auto text-[9px] px-1 py-0 h-4 bg-primary">New</Badge>
+                  </Button>
+                </Link>
+
+                {/* Pricing - Public */}
+                <Link href="/pricing" onClick={() => setMobileMenuOpen(false)}>
+                  <Button
+                    variant="ghost"
+                    className={cn("w-full justify-start gap-3", isActive("/pricing") && "bg-accent")}
+                    data-testid="nav-pricing-mobile"
+                  >
+                    <HandCoins className="h-4 w-4" />
+                    Pricing
                   </Button>
                 </Link>
 
