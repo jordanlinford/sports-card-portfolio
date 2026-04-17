@@ -9,6 +9,7 @@ import type {
   TradeTargetsData,
   Decisions,
 } from "@shared/schema";
+import { firstSentence } from "@/lib/formatEnum";
 
 function mapVerdictToAdvisor(
   investmentCall?: PlayerOutlookResponse["investmentCall"],
@@ -765,13 +766,16 @@ export function transformToAdvisorOutlook(outlook: PlayerOutlookResponse): Advis
     ? phase.charAt(0) + phase.slice(1).toLowerCase()
     : undefined;
   
+  const advisorTake = buildAdvisorTake(outlook, label);
+  const safeLabel = (label && label.trim()) || firstSentence(advisorTake) || verdict.replace(/_/g, " ");
+
   return {
     verdict,
-    verdictLabel: label,
+    verdictLabel: safeLabel,
     confidence: mapConfidence(outlook.investmentCall, outlook.snapshot),
     horizon: mapHorizon(outlook.investmentCall, outlook.snapshot),
     decisions: buildDecisions(outlook, verdict),
-    advisorTake: buildAdvisorTake(outlook, label),
+    advisorTake,
     packHitReaction: extractPackHitReaction(outlook),
     collectorTip: outlook.investmentCall?.collectorTip,
     topReasons: extractTopReasons(outlook),

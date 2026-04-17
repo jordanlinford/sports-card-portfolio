@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   ExternalLink,
 } from "lucide-react";
+import { firstSentence } from "@/lib/formatEnum";
 import type { 
   PlayerOutlookResponse, 
   MarketTemperature, 
@@ -245,7 +246,7 @@ export default function PublicPlayerOutlookPage() {
                   data-testid="badge-verdict"
                 >
                   {getVerdictIcon(advisorOutlook.verdict)}
-                  <span className="ml-2">{advisorOutlook.verdictLabel || advisorOutlook.verdict}</span>
+                  <span className="ml-2">{advisorOutlook.verdictLabel || firstSentence(advisorOutlook.advisorTake) || advisorOutlook.verdict}</span>
                 </Badge>
                 
                 {temperature && (

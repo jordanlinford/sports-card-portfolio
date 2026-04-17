@@ -41,3 +41,16 @@ export function enforceCompleteSentences(text: string | null | undefined): strin
   const trimmed = s.slice(0, lastIdx).trim();
   return trimmed || s + ".";
 }
+
+/**
+ * Extract the first complete sentence from a longer body of text.
+ * Useful as a title fallback when a headline/label field is missing or empty.
+ */
+export function firstSentence(text: string | null | undefined): string {
+  if (!text) return "";
+  const s = String(text).trim();
+  if (!s) return "";
+  const match = s.match(/^[^.!?]+[.!?]/);
+  if (match) return match[0].trim();
+  return s;
+}
