@@ -282,45 +282,45 @@ function PlayerOutlookSkeleton() {
   );
 }
 
-function formatRelativeTime(iso?: string): { rel: string; abs: string; isStale: boolean } {
-  if (!iso) return { rel: "Unknown", abs: "Unknown", isStale: false };
+function formatFreshness(iso?: string): { display: string; ageDays: number; isOutdated: boolean } {
+  if (!iso) return { display: "Unknown", ageDays: 0, isOutdated: false };
   const then = new Date(iso).getTime();
-  if (isNaN(then)) return { rel: "Unknown", abs: "Unknown", isStale: false };
+  if (isNaN(then)) return { display: "Unknown", ageDays: 0, isOutdated: false };
   const diffMs = Date.now() - then;
   const mins = Math.floor(diffMs / 60000);
   const hours = Math.floor(mins / 60);
   const days = Math.floor(hours / 24);
-  let rel: string;
-  if (mins < 1) rel = "just now";
-  else if (mins < 60) rel = `${mins}m ago`;
-  else if (hours < 24) rel = `${hours}h ago`;
-  else if (days < 7) rel = `${days}d ago`;
-  else rel = `${Math.floor(days / 7)}w ago`;
-  return { rel, abs: new Date(iso).toLocaleString(), isStale: hours >= 24 };
+  let display: string;
+  if (mins < 1) display = "just now";
+  else if (mins < 60) display = `${mins} ${mins === 1 ? "minute" : "minutes"} ago`;
+  else if (hours < 24) display = `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+  else if (days < 7) display = `${days} ${days === 1 ? "day" : "days"} ago`;
+  else display = new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return { display, ageDays: days, isOutdated: days > 7 };
 }
 
-function DataFreshnessBadge({ generatedAt, cacheStatus }: { generatedAt?: string; cacheStatus?: string }) {
-  const { rel, abs, isStale } = formatRelativeTime(generatedAt);
-  const updating = cacheStatus === "stale";
-  const color = updating
-    ? "text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/20"
-    : isStale
-    ? "text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20"
-    : "text-muted-foreground border-border bg-muted/30";
+function DataFreshnessBadge({ generatedAt, lastUpdated, cacheStatus }: { generatedAt?: string; lastUpdated?: string; cacheStatus?: string }) {
+  const ts = generatedAt || lastUpdated;
+  const { display, isOutdated } = formatFreshness(ts);
+  const isStaleCache = cacheStatus === "stale";
+  const showWarning = isOutdated || isStaleCache;
+  const tooltip = showWarning ? "Data may be outdated — click Refresh to update." : ts ? `Last analyzed ${new Date(ts).toLocaleString()}` : "";
+  const color = showWarning
+    ? "text-amber-600 dark:text-amber-400"
+    : "text-muted-foreground";
   return (
-    <div
-      className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border ${color}`}
-      title={`Market data analyzed at ${abs}`}
+    <p
+      className={`text-xs ${color} flex items-center gap-1.5`}
+      title={tooltip}
       data-testid="badge-data-freshness"
     >
-      <Clock className="h-3.5 w-3.5 shrink-0" />
+      <Clock className="h-3 w-3 shrink-0" />
       <span>
-        Data as of <span className="font-medium" data-testid="text-freshness-relative">{rel}</span>
-        <span className="text-muted-foreground/70"> · {abs}</span>
-        {updating && <span className="ml-1.5 italic">refreshing in background…</span>}
-        {!updating && isStale && <span className="ml-1.5">— may be outdated</span>}
+        Data as of <span className="font-medium" data-testid="text-freshness-relative">{display}</span>
+        {isStaleCache && <span className="ml-1 italic">— refreshing in background…</span>}
+        {showWarning && !isStaleCache && <span className="ml-1">— may be outdated</span>}
       </span>
-    </div>
+    </p>
   );
 }
 
@@ -1045,13 +1045,12 @@ function downgradeConfidence(level: string, steps: number): "HIGH" | "MEDIUM" | 
 function ConfidenceBreakdownPanel({ investmentCall, evidence, generatedAt, cacheStatus }: ConfidenceBreakdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   
-  // Compute staleness from generatedAt — stale data should not display as HIGH confidence
-  const ageHours = generatedAt ? (Date.now() - new Date(generatedAt).getTime()) / (1000 * 60 * 60) : 0;
-  const ageDays = ageHours / 24;
-  // 0 steps if <2 days, 1 step if 2-7 days, 2 steps if >7 days (or cacheStatus=stale)
-  const stalenessPenalty = ageDays > 7 || cacheStatus === "stale" ? 2 : ageDays > 2 ? 1 : 0;
+  // Display-only staleness penalty: stored values are unchanged
+  const ageDays = generatedAt ? (Date.now() - new Date(generatedAt).getTime()) / (1000 * 60 * 60 * 24) : 0;
+  const isStale = cacheStatus === "stale" || ageDays > 7;
+  const stalenessPenalty = isStale ? 1 : 0;
   
-  // Use Gemini-provided confidence assessments, downgraded by staleness
+  // Use Gemini-provided confidence assessments (downgraded one step if stale)
   const analysisConfidence = downgradeConfidence(investmentCall?.confidence || "MEDIUM", stalenessPenalty);
   const dataQuality = downgradeConfidence(evidence?.dataQuality || "MEDIUM", stalenessPenalty);
   const marketDataConfidence = downgradeConfidence(evidence?.marketDataConfidence || "MEDIUM", stalenessPenalty);
@@ -1948,7 +1947,7 @@ export default function PlayerOutlookPage() {
           
           <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} marketPhase={outlookData.marketPhase} />
 
-          <DataFreshnessBadge generatedAt={outlookData.generatedAt} cacheStatus={outlookData.cacheStatus} />
+          <DataFreshnessBadge generatedAt={outlookData.generatedAt} lastUpdated={outlookData.evidence?.lastUpdated} cacheStatus={outlookData.cacheStatus} />
           
           <AdvisorSnapshot 
             advisor={advisorOutlook} 
