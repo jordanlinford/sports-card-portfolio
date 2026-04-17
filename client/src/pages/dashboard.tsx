@@ -20,8 +20,11 @@ import {
   TrendingUp,
   Tag,
   BarChart3,
-  ArrowRight
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -373,6 +376,61 @@ export default function Dashboard() {
           </ProFeatureGate>
         </div>
       </div>
+
+      {(() => {
+        const allCards = displayCases?.flatMap(dc => dc.cards || []) ?? [];
+        const totalCards = allCards.length;
+        if (totalCards === 0) return null;
+        const analyzedCards = allCards.filter(c => ((c.manualValue ?? c.estimatedValue) ?? 0) > 0);
+        const analyzedCount = analyzedCards.length;
+        const pct = Math.round((analyzedCount / totalCards) * 100);
+        const fullyHealthy = analyzedCount === totalCards;
+        const firstUnanalyzedCase = displayCases?.find(dc =>
+          dc.cards?.some(c => !((c.manualValue ?? c.estimatedValue) ?? 0))
+        );
+        return (
+          <Card
+            className={`mb-6 border ${fullyHealthy ? "border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/20" : "border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20"}`}
+            data-testid="banner-collection-health"
+          >
+            <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-4">
+              <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${fullyHealthy ? "bg-green-100 dark:bg-green-900/40" : "bg-amber-100 dark:bg-amber-900/40"}`}>
+                  {fullyHealthy ? (
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <h3 className="font-semibold text-sm" data-testid="text-collection-health-title">
+                      Collection Health
+                    </h3>
+                    <span className="text-sm text-muted-foreground" data-testid="text-collection-health-stats">
+                      {analyzedCount} of {totalCards} cards analyzed ({pct}%)
+                    </span>
+                  </div>
+                  <Progress value={pct} className="h-1.5 mt-2" data-testid="progress-collection-health" />
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {fullyHealthy
+                      ? "Every card has a value. Your portfolio data is fully up to date."
+                      : `${totalCards - analyzedCount} card${totalCards - analyzedCount === 1 ? "" : "s"} still need a value to power accurate insights.`}
+                  </p>
+                </div>
+              </div>
+              {!fullyHealthy && firstUnanalyzedCase && (
+                <Link href={`/cases/${firstUnanalyzedCase.id}/edit`}>
+                  <Button size="sm" variant="outline" className="gap-2 shrink-0" data-testid="button-analyze-missing">
+                    Analyze missing
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Break Value Auditor CTA */}
       <Card className="mb-8 bg-gradient-to-r from-primary/5 via-primary/10 to-accent/5 border-primary/20">
