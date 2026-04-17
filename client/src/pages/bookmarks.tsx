@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { sanitizeCardField } from "@/lib/sanitizeCardField";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,7 +107,7 @@ export default function BookmarksPage() {
                 </CardTitle>
                 <CardDescription className="flex items-center gap-2 flex-wrap">
                   {bookmark.card.year && <span>{bookmark.card.year}</span>}
-                  {bookmark.card.set && <span className="truncate">{bookmark.card.set}</span>}
+                  {sanitizeCardField(bookmark.card.set) && <span className="truncate">{sanitizeCardField(bookmark.card.set)}</span>}
                 </CardDescription>
               </CardHeader>
               <CardContent className="pb-4">

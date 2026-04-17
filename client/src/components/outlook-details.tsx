@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { sanitizeCardField } from "@/lib/sanitizeCardField";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -398,8 +399,8 @@ export function OutlookDetails({
               </CardTitle>
               <div className="flex flex-wrap gap-2 text-sm text-muted-foreground mb-3">
                 {data.card.year && <span>{data.card.year}</span>}
-                {data.card.set && <span>{data.card.set}</span>}
-                {data.card.variation && <span>- {data.card.variation}</span>}
+                {sanitizeCardField(data.card.set) && <span>{sanitizeCardField(data.card.set)}</span>}
+                {sanitizeCardField(data.card.variation) && <span>- {sanitizeCardField(data.card.variation)}</span>}
                 {data.card.grade && (
                   <Badge variant="outline" className="text-xs">{data.card.grade}</Badge>
                 )}

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { sanitizeCardField } from "@/lib/sanitizeCardField";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -3069,7 +3070,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                     </p>
                     {card.status === "done" && (
                       <p className="text-xs text-muted-foreground truncate">
-                        {[card.year, card.set, card.variation].filter(Boolean).join(" · ")}
+                        {[card.year, sanitizeCardField(card.set), sanitizeCardField(card.variation)].filter(Boolean).join(" · ")}
                         {card.grade && ` — ${card.grade}`}
                       </p>
                     )}
@@ -3435,7 +3436,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{card.playerName}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {[card.year, card.set, card.variation].filter(Boolean).join(" · ")}
+                      {[card.year, sanitizeCardField(card.set), sanitizeCardField(card.variation)].filter(Boolean).join(" · ")}
                     </p>
                   </div>
                   <Check className="h-4 w-4 text-green-500 shrink-0" />
@@ -3709,7 +3710,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
           )}
         </div>
         <p className="text-sm text-muted-foreground truncate">
-          {card.year} {card.set} {card.variation ? `- ${card.variation}` : ""} {card.grade ? `(${card.grade})` : ""}
+          {card.year} {sanitizeCardField(card.set)} {sanitizeCardField(card.variation) ? `- ${sanitizeCardField(card.variation)}` : ""} {card.grade ? `(${card.grade})` : ""}
         </p>
         {showDetails && isPro && hasOutlook && card.outlookExplanationShort && (
           <p className="text-xs text-muted-foreground mt-1 line-clamp-1">

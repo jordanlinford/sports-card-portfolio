@@ -40,6 +40,43 @@ import { CardOutlookPanel } from "@/components/card-outlook-panel";
 import { CardPriceAlertsPanel } from "@/components/card-price-alerts-panel";
 import { PriceSparkline } from "@/components/price-sparkline";
 import { ProFeatureGate } from "@/components/pro-feature-gate";
+import { sanitizeCardField } from "@/lib/sanitizeCardField";
+import { bucketVerdict, formatVerdictLabel, aggregatePlayerSignalBucket } from "@/lib/verdictBuckets";
+
+function VerdictDivergenceNote({ cardId, playerName }: { cardId: number; playerName: string }) {
+  const { data: outlook } = useQuery<{ action?: string | null } | null>({
+    queryKey: ["/api/cards", cardId, "outlook"],
+    queryFn: async () => {
+      const res = await fetch(`/api/cards/${cardId}/outlook`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!cardId,
+    staleTime: 1000 * 60 * 5,
+  });
+  const { data: signalsData } = useQuery<{ signals: Array<{ signalType?: string | null }> }>({
+    queryKey: ["/api/alpha/signals/player", playerName],
+    queryFn: async () => {
+      const res = await fetch(`/api/alpha/signals/player/${encodeURIComponent(playerName)}`);
+      if (!res.ok) return { signals: [] };
+      return res.json();
+    },
+    enabled: !!playerName,
+    staleTime: 1000 * 60 * 5,
+  });
+  const cardBucket = bucketVerdict(outlook?.action);
+  const playerAgg = aggregatePlayerSignalBucket(signalsData?.signals);
+  if (!cardBucket || !playerAgg) return null;
+  if (cardBucket === playerAgg.bucket) return null;
+  return (
+    <p
+      className="text-xs text-muted-foreground italic mt-2"
+      data-testid="text-verdict-divergence-modal"
+    >
+      The overall {playerName} market signal is {formatVerdictLabel(playerAgg.label)} — this card's signal differs based on its specific variation.
+    </p>
+  );
+}
 
 interface CardDetailModalProps {
   card: Card | null;
@@ -929,11 +966,11 @@ export function CardDetailModal({
                     Identify player →
                   </button>
                 )}
-                {card.set && (
+                {sanitizeCardField(card.set) && (
                   <div className="flex items-center gap-2 text-sm">
                     <FileText className="w-4 h-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Set:</span>
-                    <span className="font-medium" data-testid="text-card-set">{card.set}</span>
+                    <span className="font-medium" data-testid="text-card-set">{sanitizeCardField(card.set)}</span>
                   </div>
                 )}
 
@@ -945,11 +982,11 @@ export function CardDetailModal({
                   </div>
                 )}
 
-                {card.variation && (
+                {sanitizeCardField(card.variation) && (
                   <div className="flex items-center gap-2 text-sm">
                     <Sparkles className="w-4 h-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Variation:</span>
-                    <Badge variant="outline" data-testid="badge-card-variation">{card.variation}</Badge>
+                    <Badge variant="outline" data-testid="badge-card-variation">{sanitizeCardField(card.variation)}</Badge>
                   </div>
                 )}
 
@@ -1166,6 +1203,9 @@ export function CardDetailModal({
                 isPro={isPro} 
                 canEdit={canEdit} 
               />
+              {card.playerName && (
+                <VerdictDivergenceNote cardId={card.id} playerName={card.playerName} />
+              )}
 
 {/* Price alerts panel hidden temporarily - will re-enable once backend issues are resolved */}
 

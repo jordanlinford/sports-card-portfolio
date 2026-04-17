@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { sanitizeCardField } from "@/lib/sanitizeCardField";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -283,9 +284,9 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
               {card.year && (
                 <span className={`text-xs ${theme.textMuted}`}>{card.year}</span>
               )}
-              {card.variation && (
+              {sanitizeCardField(card.variation) && (
                 <Badge variant="outline" className="text-xs">
-                  {card.variation}
+                  {sanitizeCardField(card.variation)}
                 </Badge>
               )}
               {card.grade && (
