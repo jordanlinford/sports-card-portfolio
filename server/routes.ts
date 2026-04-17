@@ -4248,6 +4248,12 @@ Sitemap: ${origin}/sitemap.xml
               return { psa9, psa10 };
             }
 
+            // Don't fabricate graded estimates when we have no real comps backing marketValue —
+            // the multiplier would be applied to a phantom number and produce confidently-wrong output.
+            if (!compCount || compCount <= 0) {
+              return null;
+            }
+
             const estPsa9 = Math.round(marketValue * 2);
             const estPsa10 = Math.round(marketValue * 4);
             return { psa9: estPsa9, psa10: estPsa10, estimated: true };
