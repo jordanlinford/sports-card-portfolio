@@ -1571,7 +1571,9 @@ export type AdvisorOutlook = {
     volumeDirection?: string; // "rising" | "stable" | "falling"
     soldCount30d?: number;
     soldCount7d?: number;
-    avgPrice?: string; // e.g. "$45"
+    avgPrice?: string; // e.g. "$45" — Gemini market estimate
+    internalAvgPrice?: string; // e.g. "$354" — average from our own user holdings
+    internalVsMarketDeltaPct?: number; // e.g. +410 means internal is 410% above market
   };
   topSignals?: string[]; // Top 2 signal contributions driving the verdict
   timing?: string; // "Overextended" | "Early" | "Fair" | "Late"

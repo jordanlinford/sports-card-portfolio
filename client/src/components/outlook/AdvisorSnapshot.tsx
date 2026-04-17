@@ -356,7 +356,31 @@ function MarketDataContent({ advisor }: { advisor: AdvisorOutlook }) {
             )}
             {advisor.shortTermTrend.soldCount7d !== undefined && <span>{advisor.shortTermTrend.soldCount7d} sold/7d</span>}
             {advisor.shortTermTrend.soldCount30d !== undefined && <span>{advisor.shortTermTrend.soldCount30d} sold/30d</span>}
-            {advisor.shortTermTrend.avgPrice && <span>{advisor.shortTermTrend.avgPrice} avg</span>}
+            {advisor.shortTermTrend.avgPrice && <span title="Gemini market estimate" data-testid="text-market-avg">{advisor.shortTermTrend.avgPrice} market avg</span>}
+            {advisor.shortTermTrend.internalAvgPrice && (
+              <span
+                className="flex items-center gap-1"
+                title="Average price across cards owned by users on this platform"
+                data-testid="text-internal-avg"
+              >
+                <span>{advisor.shortTermTrend.internalAvgPrice} internal avg</span>
+                {advisor.shortTermTrend.internalVsMarketDeltaPct !== undefined && Math.abs(advisor.shortTermTrend.internalVsMarketDeltaPct) >= 25 && (
+                  <Badge
+                    variant={advisor.shortTermTrend.internalVsMarketDeltaPct > 0 ? "default" : "destructive"}
+                    className="text-[10px] px-1.5 py-0 h-4"
+                    title={
+                      advisor.shortTermTrend.internalVsMarketDeltaPct > 0
+                        ? "Users hold cards priced above current market — possible overvalued holdings, premium variants, or stale market data"
+                        : "Users hold cards priced below current market — possible undervalued opportunity"
+                    }
+                    data-testid="badge-internal-vs-market-gap"
+                  >
+                    {advisor.shortTermTrend.internalVsMarketDeltaPct > 0 ? "+" : ""}
+                    {advisor.shortTermTrend.internalVsMarketDeltaPct}% vs market
+                  </Badge>
+                )}
+              </span>
+            )}
           </div>
         </div>
       )}
