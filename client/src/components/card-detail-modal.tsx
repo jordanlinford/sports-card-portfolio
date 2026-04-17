@@ -41,20 +41,23 @@ import { CardPriceAlertsPanel } from "@/components/card-price-alerts-panel";
 import { PriceSparkline } from "@/components/price-sparkline";
 import { ProFeatureGate } from "@/components/pro-feature-gate";
 import { sanitizeCardField } from "@/lib/sanitizeCardField";
-import { bucketVerdict, formatVerdictLabel, aggregatePlayerSignalBucket } from "@/lib/verdictBuckets";
+import { bucketVerdict } from "@/lib/verdictBuckets";
 
-function VerdictDivergenceNote({ cardId, playerName }: { cardId: number; playerName: string }) {
-  const { data: outlook } = useQuery<{ action?: string | null } | null>({
-    queryKey: ["/api/cards", cardId, "outlook"],
-    queryFn: async () => {
-      const res = await fetch(`/api/cards/${cardId}/outlook`);
-      if (!res.ok) return null;
-      return res.json();
-    },
-    enabled: !!cardId,
-    staleTime: 1000 * 60 * 5,
-  });
-  const { data: signalsData } = useQuery<{ signals: Array<{ signalType?: string | null }> }>({
+function humanReadableVerdict(verdict: string): string {
+  return verdict
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function VerdictDivergenceNote({
+  cardOutlookAction,
+  playerName,
+}: {
+  cardOutlookAction?: string | null;
+  playerName: string;
+}) {
+  const { data: signalsData } = useQuery<{ signals: Array<{ action?: string | null }> }>({
     queryKey: ["/api/alpha/signals/player", playerName],
     queryFn: async () => {
       const res = await fetch(`/api/alpha/signals/player/${encodeURIComponent(playerName)}`);
@@ -64,16 +67,21 @@ function VerdictDivergenceNote({ cardId, playerName }: { cardId: number; playerN
     enabled: !!playerName,
     staleTime: 1000 * 60 * 5,
   });
-  const cardBucket = bucketVerdict(outlook?.action);
-  const playerAgg = aggregatePlayerSignalBucket(signalsData?.signals);
-  if (!cardBucket || !playerAgg) return null;
-  if (cardBucket === playerAgg.bucket) return null;
+
+  const playerVerdict = signalsData?.signals?.[0]?.action;
+  if (!playerVerdict) return null;
+
+  const cardBucket = bucketVerdict(cardOutlookAction);
+  const playerBucket = bucketVerdict(playerVerdict);
+  if (!cardBucket || !playerBucket) return null;
+  if (cardBucket === playerBucket) return null;
+
   return (
     <p
       className="text-xs text-muted-foreground italic mt-2"
       data-testid="text-verdict-divergence-modal"
     >
-      The overall {playerName} market signal is {formatVerdictLabel(playerAgg.label)} — this card's signal differs based on its specific variation.
+      The overall {playerName} market signal is {humanReadableVerdict(playerVerdict)} — this card's signal differs based on its specific variation.
     </p>
   );
 }
@@ -1204,7 +1212,7 @@ export function CardDetailModal({
                 canEdit={canEdit} 
               />
               {card.playerName && (
-                <VerdictDivergenceNote cardId={card.id} playerName={card.playerName} />
+                <VerdictDivergenceNote cardOutlookAction={card.outlookAction} playerName={card.playerName} />
               )}
 
 {/* Price alerts panel hidden temporarily - will re-enable once backend issues are resolved */}
