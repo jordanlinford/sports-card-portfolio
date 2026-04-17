@@ -2759,3 +2759,31 @@ export const insertCompObservationSchema = createInsertSchema(compObservations).
 });
 export type InsertCompObservation = z.infer<typeof insertCompObservationSchema>;
 export type CompObservation = typeof compObservations.$inferSelect;
+
+// ============================================================================
+// VERDICT REGRESSION TEST RUNS
+// ============================================================================
+export const verdictRegressionRuns = pgTable("verdict_regression_runs", {
+  id: serial("id").primaryKey(),
+  playerKey: varchar("player_key").notNull(),
+  playerName: varchar("player_name").notNull(),
+  sport: varchar("sport").notNull(),
+  previousVerdict: varchar("previous_verdict"),
+  currentVerdict: varchar("current_verdict"),
+  previousPrice: real("previous_price"),
+  currentPrice: real("current_price"),
+  priceChangePct: real("price_change_pct"),
+  isFlip: boolean("is_flip").default(false),
+  runDate: timestamp("run_date").defaultNow(),
+}, (table) => [
+  index("idx_vrr_player").on(table.playerKey),
+  index("idx_vrr_run_date").on(table.runDate),
+  index("idx_vrr_flip").on(table.isFlip),
+]);
+
+export const insertVerdictRegressionRunSchema = createInsertSchema(verdictRegressionRuns).omit({
+  id: true,
+  runDate: true,
+});
+export type InsertVerdictRegressionRun = z.infer<typeof insertVerdictRegressionRunSchema>;
+export type VerdictRegressionRun = typeof verdictRegressionRuns.$inferSelect;
