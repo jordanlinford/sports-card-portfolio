@@ -282,6 +282,48 @@ function PlayerOutlookSkeleton() {
   );
 }
 
+function formatRelativeTime(iso?: string): { rel: string; abs: string; isStale: boolean } {
+  if (!iso) return { rel: "Unknown", abs: "Unknown", isStale: false };
+  const then = new Date(iso).getTime();
+  if (isNaN(then)) return { rel: "Unknown", abs: "Unknown", isStale: false };
+  const diffMs = Date.now() - then;
+  const mins = Math.floor(diffMs / 60000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  let rel: string;
+  if (mins < 1) rel = "just now";
+  else if (mins < 60) rel = `${mins}m ago`;
+  else if (hours < 24) rel = `${hours}h ago`;
+  else if (days < 7) rel = `${days}d ago`;
+  else rel = `${Math.floor(days / 7)}w ago`;
+  return { rel, abs: new Date(iso).toLocaleString(), isStale: hours >= 24 };
+}
+
+function DataFreshnessBadge({ generatedAt, cacheStatus }: { generatedAt?: string; cacheStatus?: string }) {
+  const { rel, abs, isStale } = formatRelativeTime(generatedAt);
+  const updating = cacheStatus === "stale";
+  const color = updating
+    ? "text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-700 bg-blue-50/50 dark:bg-blue-950/20"
+    : isStale
+    ? "text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20"
+    : "text-muted-foreground border-border bg-muted/30";
+  return (
+    <div
+      className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md border ${color}`}
+      title={`Market data analyzed at ${abs}`}
+      data-testid="badge-data-freshness"
+    >
+      <Clock className="h-3.5 w-3.5 shrink-0" />
+      <span>
+        Data as of <span className="font-medium" data-testid="text-freshness-relative">{rel}</span>
+        <span className="text-muted-foreground/70"> · {abs}</span>
+        {updating && <span className="ml-1.5 italic">refreshing in background…</span>}
+        {!updating && isStale && <span className="ml-1.5">— may be outdated</span>}
+      </span>
+    </div>
+  );
+}
+
 function PlayerHeader({ player, snapshot, marketPhase }: { player: PlayerOutlookResponse["player"]; snapshot: PlayerOutlookResponse["snapshot"]; marketPhase?: MarketPhase }) {
   const { data: imageData } = useQuery({
     queryKey: ["/api/player-image", player.name, player.sport],
@@ -1891,6 +1933,8 @@ export default function PlayerOutlookPage() {
           })()}
           
           <PlayerHeader player={outlookData.player} snapshot={outlookData.snapshot} marketPhase={outlookData.marketPhase} />
+
+          <DataFreshnessBadge generatedAt={outlookData.generatedAt} cacheStatus={outlookData.cacheStatus} />
           
           <AdvisorSnapshot 
             advisor={advisorOutlook} 
@@ -2020,10 +2064,6 @@ export default function PlayerOutlookPage() {
             </CardContent>
           </Card>
 
-          <p className="text-xs text-center text-muted-foreground">
-            Generated at {new Date(outlookData.generatedAt).toLocaleString()}
-            {outlookData.cacheStatus === "stale" && " (updating in background)"}
-          </p>
         </div>
         );
       })()}
