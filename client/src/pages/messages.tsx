@@ -296,23 +296,6 @@ export default function MessagesPage() {
     }
   }, [params.conversationId]);
 
-  // On desktop, auto-select the first conversation so the right panel isn't
-  // an empty grey area on initial load.
-  useEffect(() => {
-    if (
-      !params.conversationId &&
-      selectedConversation === null &&
-      conversations &&
-      conversations.length > 0 &&
-      typeof window !== "undefined" &&
-      window.matchMedia("(min-width: 768px)").matches
-    ) {
-      const first = conversations[0];
-      setSelectedConversation(first.id);
-      setLocation(`/messages/${first.id}`, { replace: true });
-    }
-  }, [conversations, params.conversationId, selectedConversation, setLocation]);
-
   if (authLoading) {
     return (
       <div className="container max-w-4xl mx-auto py-8 px-4">
@@ -343,26 +326,47 @@ export default function MessagesPage() {
 
       <Card className="overflow-hidden">
         <CardContent className="p-0 h-[600px]">
-          {selectedConversation ? (
-            <ConversationView 
-              conversationId={selectedConversation}
-              onBack={() => {
-                setSelectedConversation(null);
-                setLocation("/messages");
-              }}
-              userId={userId}
-            />
-          ) : (
-            <>
+          {/* Mobile: single-pane (list OR conversation) */}
+          <div className="md:hidden h-full">
+            {selectedConversation ? (
+              <ConversationView
+                conversationId={selectedConversation}
+                onBack={() => {
+                  setSelectedConversation(null);
+                  setLocation("/messages");
+                }}
+                userId={userId}
+              />
+            ) : inboxLoading ? (
+              <InboxSkeleton />
+            ) : conversations?.length === 0 ? (
+              <EmptyInboxState />
+            ) : (
+              <ScrollArea className="h-full">
+                {conversations?.map((conversation) => (
+                  <ConversationListItem
+                    key={conversation.id}
+                    conversation={conversation}
+                    onClick={() => {
+                      setSelectedConversation(conversation.id);
+                      setLocation(`/messages/${conversation.id}`);
+                    }}
+                    isActive={selectedConversation === conversation.id}
+                  />
+                ))}
+              </ScrollArea>
+            )}
+          </div>
+
+          {/* Desktop: two-pane (list always visible on left, conversation/empty state on right) */}
+          <div className="hidden md:grid md:grid-cols-[320px_1fr] h-full">
+            <div className="border-r overflow-hidden flex flex-col">
               {inboxLoading ? (
                 <InboxSkeleton />
               ) : conversations?.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4">
-                  <Inbox className="h-16 w-16 text-muted-foreground mb-4" />
-                  <CardTitle className="mb-2">No conversations yet</CardTitle>
-                  <CardDescription className="max-w-sm">
-                    Start a conversation by visiting a collector's profile and clicking the message button.
-                  </CardDescription>
+                  <Inbox className="h-12 w-12 text-muted-foreground mb-3" />
+                  <p className="text-sm text-muted-foreground">No conversations yet</p>
                 </div>
               ) : (
                 <ScrollArea className="h-full">
@@ -379,10 +383,52 @@ export default function MessagesPage() {
                   ))}
                 </ScrollArea>
               )}
-            </>
-          )}
+            </div>
+            <div className="overflow-hidden">
+              {selectedConversation ? (
+                <ConversationView
+                  conversationId={selectedConversation}
+                  onBack={() => {
+                    setSelectedConversation(null);
+                    setLocation("/messages");
+                  }}
+                  userId={userId}
+                />
+              ) : (
+                <EmptyConversationState hasConversations={!!conversations && conversations.length > 0} />
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function EmptyInboxState() {
+  return (
+    <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4" data-testid="empty-inbox-state">
+      <Inbox className="h-16 w-16 text-muted-foreground mb-4" />
+      <CardTitle className="mb-2">No conversations yet</CardTitle>
+      <CardDescription className="max-w-sm">
+        Start a conversation by visiting a collector's profile and clicking the message button.
+      </CardDescription>
+    </div>
+  );
+}
+
+function EmptyConversationState({ hasConversations }: { hasConversations: boolean }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-full py-12 text-center px-4" data-testid="empty-conversation-state">
+      <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
+      <CardTitle className="mb-2">
+        {hasConversations ? "Select a conversation" : "No conversations yet"}
+      </CardTitle>
+      <CardDescription className="max-w-sm">
+        {hasConversations
+          ? "Choose a conversation from the list to start chatting."
+          : "Start a conversation by visiting a collector's profile and clicking the message button."}
+      </CardDescription>
     </div>
   );
 }
