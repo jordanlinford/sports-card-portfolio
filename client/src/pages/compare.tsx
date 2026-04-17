@@ -705,6 +705,30 @@ function CardComparisonInput({
   );
 }
 
+function getCardUpsideScore(card: ComparisonCard): number | null {
+  const v = card.outlook?.marketSignals?.composite;
+  return typeof v === "number" ? Math.round(v) : null;
+}
+
+function getCardRiskScore(card: ComparisonCard): number | null {
+  const v = card.outlook?.investmentCall?.scores?.downsideRiskScore;
+  return typeof v === "number" ? Math.round(v) : null;
+}
+
+function getCardMarketAvg(card: ComparisonCard): number | null {
+  const m = card.outlook?.marketMetrics;
+  if (typeof m?.medianSoldPrice === "number") return m.medianSoldPrice;
+  if (typeof m?.avgSoldPrice === "number") return m.avgSoldPrice;
+  return null;
+}
+
+function getCardValueScore(card: ComparisonCard): number | null {
+  const upside = getCardUpsideScore(card);
+  if (upside === null) return null;
+  const risk = getCardRiskScore(card);
+  return risk !== null ? upside - risk : upside;
+}
+
 function CardComparisonSummary({ 
   leftCard, 
   rightCard 
@@ -712,11 +736,82 @@ function CardComparisonSummary({
   leftCard: ComparisonCard; 
   rightCard: ComparisonCard;
 }) {
-  const comparison = compareCards(leftCard, rightCard);
-  if (!comparison) return null;
+  const leftValue = getCardValueScore(leftCard);
+  const rightValue = getCardValueScore(rightCard);
+  let winnerSide: "left" | "right" | "tie" = "tie";
+  if (typeof leftValue === "number" && typeof rightValue === "number") {
+    if (leftValue > rightValue) winnerSide = "left";
+    else if (rightValue > leftValue) winnerSide = "right";
+  }
+  const winnerName =
+    winnerSide === "left" ? leftCard.playerName :
+    winnerSide === "right" ? rightCard.playerName : null;
 
-  const leftDescription = [leftCard.year, leftCard.setName, leftCard.tier].filter(Boolean).join(" ");
-  const rightDescription = [rightCard.year, rightCard.setName, rightCard.tier].filter(Boolean).join(" ");
+  const renderCardColumn = (side: "left" | "right", card: ComparisonCard) => {
+    const isWinner = winnerSide === side;
+    const upside = getCardUpsideScore(card);
+    const risk = getCardRiskScore(card);
+    const marketAvg = getCardMarketAvg(card);
+    const setYearGrade = [
+      card.year,
+      card.setName,
+      card.tier ? formatEnumLabel(card.tier) : null,
+      card.grade ? (card.grade === "raw" ? "Raw" : `Grade ${card.grade}`) : null,
+    ].filter(Boolean).join(" · ");
+    const o = card.outlook!;
+    return (
+      <div
+        className={`p-4 rounded-lg border ${
+          isWinner
+            ? "border-amber-500/50 bg-amber-500/5 ring-2 ring-amber-500/30"
+            : "border-border bg-muted/20"
+        }`}
+        data-testid={`card-comparison-column-${side}`}
+      >
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="text-sm font-semibold truncate" data-testid={`text-card-name-${side}`}>{card.playerName}</p>
+          {isWinner && (
+            <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 gap-1" data-testid={`badge-card-winner-${side}`}>
+              <Trophy className="h-3 w-3" />
+              Better Value
+            </Badge>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground mb-3" data-testid={`text-card-set-year-grade-${side}`}>
+          {setYearGrade || "—"}
+        </p>
+        <div className="mb-3">
+          <Badge className={`${getVerdictColor(o.verdict?.action)} gap-1`} data-testid={`badge-card-verdict-${side}`}>
+            {getVerdictIcon(o.verdict?.action)}
+            {getVerdictLabel(o.investmentCall?.verdict, o.investmentCall?.postureLabel)}
+          </Badge>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground">Market Avg</p>
+            <p className="text-base font-semibold" data-testid={`text-card-market-avg-${side}`}>
+              {marketAvg !== null ? `$${marketAvg.toFixed(0)}` : "—"}
+            </p>
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground">Upside</p>
+            <p
+              className={`text-base font-semibold ${isWinner ? "text-amber-600 dark:text-amber-400" : ""}`}
+              data-testid={`text-card-upside-${side}`}
+            >
+              {upside !== null ? upside : "—"}
+            </p>
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-xs text-muted-foreground">Risk</p>
+            <p className="text-base font-semibold" data-testid={`text-card-risk-${side}`}>
+              {risk !== null ? risk : "—"}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <Card className="mt-8">
@@ -728,75 +823,21 @@ function CardComparisonSummary({
           <div className="flex items-center gap-2 justify-center">
             <Trophy className="h-5 w-5 text-amber-500" />
             <span className="font-semibold text-lg">
-              {comparison.winner === "equal" 
-                ? "These cards are equally attractive" 
-                : `${comparison.winner === "left" ? leftCard.playerName : rightCard.playerName}'s card is the better investment`}
+              {winnerSide === "tie"
+                ? "These cards have equal value"
+                : `${winnerName}'s card is the better value`}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground text-center mt-1">
-            {comparison.reason}
-          </p>
+          {winnerSide !== "tie" && typeof leftValue === "number" && typeof rightValue === "number" && (
+            <p className="text-sm text-muted-foreground text-center mt-1">
+              Value score: {Math.max(leftValue, rightValue)} vs {Math.min(leftValue, rightValue)}
+              <span className="ml-1 text-xs">(upside − risk)</span>
+            </p>
+          )}
         </div>
-
-        <div className="grid grid-cols-3 gap-4 text-center mb-6">
-          <div className="space-y-1">
-            <p className="text-sm font-medium">{leftCard.playerName}</p>
-            <p className="text-xs text-muted-foreground">{leftDescription}</p>
-            <Badge className={getVerdictColor(leftCard.outlook?.verdict?.action)}>
-              {getVerdictLabel(leftCard.outlook?.investmentCall?.verdict, leftCard.outlook?.investmentCall?.postureLabel)}
-            </Badge>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">vs</p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-medium">{rightCard.playerName}</p>
-            <p className="text-xs text-muted-foreground">{rightDescription}</p>
-            <Badge className={getVerdictColor(rightCard.outlook?.verdict?.action)}>
-              {getVerdictLabel(rightCard.outlook?.investmentCall?.verdict, rightCard.outlook?.investmentCall?.postureLabel)}
-            </Badge>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <p className="text-sm font-medium text-muted-foreground">Score Breakdown</p>
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-lg font-bold">{comparison.breakdown.playerScore.left}</div>
-            </div>
-            <div className="text-center text-muted-foreground">Player Outlook (50%)</div>
-            <div className="text-center">
-              <div className="text-lg font-bold">{comparison.breakdown.playerScore.right}</div>
-            </div>
-
-            <div className="text-center">
-              <div className="text-lg font-bold">{comparison.breakdown.tierScore.left}</div>
-            </div>
-            <div className="text-center text-muted-foreground">Card Tier (30%)</div>
-            <div className="text-center">
-              <div className="text-lg font-bold">{comparison.breakdown.tierScore.right}</div>
-            </div>
-
-            <div className="text-center">
-              <div className="text-lg font-bold">{comparison.breakdown.gradeScore.left}</div>
-            </div>
-            <div className="text-center text-muted-foreground">Grade (20%)</div>
-            <div className="text-center">
-              <div className="text-lg font-bold">{comparison.breakdown.gradeScore.right}</div>
-            </div>
-
-            <div className="text-center border-t pt-2">
-              <div className={`text-xl font-bold ${comparison.winner === "left" ? "text-green-600 dark:text-green-400" : ""}`}>
-                {comparison.breakdown.totalScore.left}
-              </div>
-            </div>
-            <div className="text-center text-muted-foreground border-t pt-2">Total Score</div>
-            <div className="text-center border-t pt-2">
-              <div className={`text-xl font-bold ${comparison.winner === "right" ? "text-green-600 dark:text-green-400" : ""}`}>
-                {comparison.breakdown.totalScore.right}
-              </div>
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {renderCardColumn("left", leftCard)}
+          {renderCardColumn("right", rightCard)}
         </div>
       </CardContent>
     </Card>
