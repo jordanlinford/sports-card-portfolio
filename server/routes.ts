@@ -10181,12 +10181,34 @@ Return ONLY valid JSON, no markdown.`;
         sport: z.string().min(1),
         product: z.string().min(1),
         boxCost: z.coerce.number().positive().optional(),
+        boxType: z.enum(["hobby", "mega", "blaster", "hanger", "case"]).optional(),
       });
       const parseResult = sealedRoiSchema.safeParse(req.body);
       if (!parseResult.success) {
         return res.status(400).json({ error: "Invalid input", details: parseResult.error.flatten().fieldErrors });
       }
-      const { sport, product, boxCost } = parseResult.data;
+      const { sport, product, boxCost, boxType: providedBoxType } = parseResult.data;
+
+      // Detect box type from product name when not explicitly provided
+      function detectBoxType(name: string): "hobby" | "mega" | "blaster" | "hanger" | "case" {
+        const n = name.toLowerCase();
+        if (n.includes("case")) return "case";
+        if (n.includes("hobby")) return "hobby";
+        if (n.includes("mega")) return "mega";
+        if (n.includes("blaster")) return "blaster";
+        if (n.includes("hanger") || n.includes("cello") || n.includes("fat pack") || n.includes("tin")) return "hanger";
+        return "hobby";
+      }
+      const boxType = providedBoxType || detectBoxType(product);
+
+      const boxTypeGuidance: Record<string, string> = {
+        hobby: "BOX TYPE: HOBBY — Full configuration with autographs, premium parallels, and hits per box. Use standard hobby odds tables. Apply standard EV thresholds.",
+        mega: "BOX TYPE: MEGA — Mass-retail premium SKU. CRITICAL: identify and emphasize the mega-exclusive parallels (e.g. Green Mega Prizm, Pink Pulsar Mega Prizm, Choice Pink, etc.) — these typically drive 50-70% of the box's EV. Mega boxes RARELY contain autographs (baseball/basketball megas occasionally have 1). Hits are mostly retail-exclusive parallels of star rookies. Note in marketContext exactly which parallel is the headline chase.",
+        blaster: "BOX TYPE: BLASTER — Small mass-retail SKU (~6-8 packs). NO AUTOGRAPHS. Usually 1 guaranteed insert or low-tier parallel as a 'feel-good hit'. Worst $/card EV of any retail format because you pay packaging premium for a forced low-value hit. Identify the blaster-exclusive parallel if any (e.g. Blue Wave, Orange Lazer). Almost always negative EV unless the exclusive parallel is currently hot.",
+        hanger: "BOX TYPE: HANGER / CELLO / FAT PACK / TIN — Single-pack lottery format (~$10-15). NO AUTOGRAPHS, NO GUARANTEED HITS. Pure parallel chase (e.g. Red Cracked Ice in Prizm hangers, Yellow in Topps hangers). Evaluate as a lottery ticket: identify the ONE chase parallel and its current sold price. Almost always sub-$1 base EV. The verdict should reflect lottery dynamics, not standard EV math.",
+        case: "BOX TYPE: CASE — Multiple hobby boxes purchased together. Treat as N × hobby box EV with case-hit guarantees factored in (typically 1 case hit per case).",
+      };
+      const boxTypeContext = boxTypeGuidance[boxType] || boxTypeGuidance.hobby;
 
       const dbUser = await storage.getUser(userId);
       const isPro = dbUser ? hasProAccess(dbUser) : false;
@@ -10313,7 +10335,10 @@ You understand that 80-90% of sealed wax is net-negative EV once fees and liquid
 Analyze this sealed hobby box product:
 - Product: ${product}
 - Sport: ${sport}
-${boxCost ? `- User-provided box cost: $${boxCost}` : "- Research the current market price for this hobby box"}
+- Box format: ${boxType}
+${boxCost ? `- User-provided box cost: $${boxCost}` : "- Research the current market price for this product"}
+
+${boxTypeContext}
 
 ${checklistContext}
 ${playerDataContext}
@@ -10537,18 +10562,60 @@ Return ONLY valid JSON, no markdown.`;
       parsed.expectedValue = Math.round(totalEV * 100) / 100;
       parsed.caseHitCeilingEV = Math.round(caseHitCeilingEV * 100) / 100;
 
-      // FIX 4: Realistic EV thresholds that account for fees
+      // FIX 4: Realistic, type-aware EV thresholds that account for fees
       function computeVerdictAndRatio(ev: number, cost: number, isNew: boolean) {
         const ratio = cost > 0 ? ev / cost : 0;
         let verdict: string;
-        if (isNew) {
-          verdict = ratio < 0.95 ? "NEGATIVE_EV" : "WAIT";
-        } else if (ratio >= 1.25) {
-          verdict = "POSITIVE_EV";
-        } else if (ratio >= 0.95) {
-          verdict = "SPECULATIVE";
+        let formatNote = "";
+
+        if (boxType === "hanger") {
+          // Hangers are pure lottery — no autos, single pack. EV math always looks bad.
+          // Surface lottery dynamics rather than standard verdicts.
+          if (isNew) {
+            verdict = "WAIT";
+          } else if (ratio >= 1.25) {
+            verdict = "POSITIVE_EV";
+          } else if (ratio >= 0.50 || caseHitCeilingEV > cost * 0.5) {
+            verdict = "LOTTERY_PLAY";
+          } else {
+            verdict = "NEGATIVE_EV";
+          }
+          formatNote = "Hangers are lottery tickets — most break experiences land near zero. Only buy if you specifically want to chase the retail-exclusive parallel.";
+        } else if (boxType === "blaster") {
+          // Blasters are designed for negative EV. Tighter "Positive" threshold needed.
+          if (isNew) {
+            verdict = ratio < 0.85 ? "NEGATIVE_EV" : "WAIT";
+          } else if (ratio >= 1.40) {
+            verdict = "POSITIVE_EV";
+          } else if (ratio >= 1.0) {
+            verdict = "SPECULATIVE";
+          } else {
+            verdict = "NEGATIVE_EV";
+          }
+          formatNote = "Blasters carry the worst $/card EV of any retail format — the guaranteed insert is almost always low-tier filler.";
+        } else if (boxType === "mega") {
+          // Megas have higher variance — mega-exclusive parallels can drive big swings.
+          if (isNew) {
+            verdict = ratio < 0.90 ? "NEGATIVE_EV" : "WAIT";
+          } else if (ratio >= 1.20) {
+            verdict = "POSITIVE_EV";
+          } else if (ratio >= 0.90) {
+            verdict = "SPECULATIVE";
+          } else {
+            verdict = "NEGATIVE_EV";
+          }
+          formatNote = "Mega EV is dominated by the retail-exclusive parallel of the headline rookie — when that card is hot, megas can rival hobby; when it cools, the box is a brick.";
         } else {
-          verdict = "NEGATIVE_EV";
+          // Hobby & case use the standard thresholds
+          if (isNew) {
+            verdict = ratio < 0.95 ? "NEGATIVE_EV" : "WAIT";
+          } else if (ratio >= 1.25) {
+            verdict = "POSITIVE_EV";
+          } else if (ratio >= 0.95) {
+            verdict = "SPECULATIVE";
+          } else {
+            verdict = "NEGATIVE_EV";
+          }
         }
 
         const verdictLabels: Record<string, string> = {
@@ -10556,11 +10623,12 @@ Return ONLY valid JSON, no markdown.`;
           NEGATIVE_EV: "negative expected value after fees and liquidity adjustments",
           SPECULATIVE: "speculative — marginally close to break-even after fees, but not clearly profitable",
           WAIT: "uncertain — prices are still settling on this new release",
+          LOTTERY_PLAY: "lottery play — base EV is poor, but the retail-exclusive chase parallel offers asymmetric upside",
         };
 
-        const explanation = `At $${cost.toFixed(0)}, this box has a fee-adjusted EV of $${ev.toFixed(0)} (${ratio.toFixed(2)}x). ${verdictLabels[verdict] || verdict}. ${
+        const explanation = `At $${cost.toFixed(0)}, this ${boxType} has a fee-adjusted EV of $${ev.toFixed(0)} (${ratio.toFixed(2)}x). ${verdictLabels[verdict] || verdict}. ${
           caseHitCeilingEV > 0 ? `Case hits add $${caseHitCeilingEV.toFixed(0)} ceiling EV (not included in base ratio — those are lottery outcomes).` : ""
-        } Values reflect median sold prices minus 13% eBay fees and shipping.`;
+        }${formatNote ? ` ${formatNote}` : ""} Values reflect median sold prices minus 13% eBay fees and shipping.`;
 
         return { ratio: Math.round(ratio * 100) / 100, verdict, explanation };
       }

@@ -111,7 +111,9 @@ const SPORTS = [
 const BOX_TYPES = [
   { value: "all", label: "All Types" },
   { value: "hobby", label: "Hobby" },
-  { value: "retail", label: "Retail / Blaster / Mega" },
+  { value: "mega", label: "Mega Box" },
+  { value: "blaster", label: "Blaster" },
+  { value: "hanger", label: "Hanger / Cello / Tin" },
 ];
 
 const SEALED_PRODUCTS: Record<string, Array<{ name: string; msrp: number; type: string }>> = {
@@ -123,25 +125,25 @@ const SEALED_PRODUCTS: Record<string, Array<{ name: string; msrp: number; type: 
     { name: "2025 Panini Mosaic Football Hobby", msrp: 250, type: "hobby" },
     { name: "2025 Panini National Treasures Football Hobby", msrp: 850, type: "hobby" },
     { name: "2025 Panini Immaculate Football Hobby", msrp: 700, type: "hobby" },
-    { name: "2025 Panini Prizm Football Blaster", msrp: 40, type: "retail" },
-    { name: "2025 Panini Prizm Football Mega Box", msrp: 80, type: "retail" },
-    { name: "2025 Panini Prizm Football Retail Hanger", msrp: 15, type: "retail" },
-    { name: "2025 Panini Prizm Football Cello/Fat Pack", msrp: 10, type: "retail" },
-    { name: "2025 Panini Select Football Blaster", msrp: 35, type: "retail" },
-    { name: "2025 Panini Select Football Mega Box", msrp: 70, type: "retail" },
-    { name: "2025 Panini Donruss Football Blaster", msrp: 30, type: "retail" },
-    { name: "2025 Panini Donruss Football Mega Box", msrp: 55, type: "retail" },
-    { name: "2025 Panini Mosaic Football Blaster", msrp: 35, type: "retail" },
-    { name: "2025 Panini Mosaic Football Mega Box", msrp: 65, type: "retail" },
+    { name: "2025 Panini Prizm Football Blaster", msrp: 40, type: "blaster" },
+    { name: "2025 Panini Prizm Football Mega Box", msrp: 80, type: "mega" },
+    { name: "2025 Panini Prizm Football Retail Hanger", msrp: 15, type: "hanger" },
+    { name: "2025 Panini Prizm Football Cello/Fat Pack", msrp: 10, type: "hanger" },
+    { name: "2025 Panini Select Football Blaster", msrp: 35, type: "blaster" },
+    { name: "2025 Panini Select Football Mega Box", msrp: 70, type: "mega" },
+    { name: "2025 Panini Donruss Football Blaster", msrp: 30, type: "blaster" },
+    { name: "2025 Panini Donruss Football Mega Box", msrp: 55, type: "mega" },
+    { name: "2025 Panini Mosaic Football Blaster", msrp: 35, type: "blaster" },
+    { name: "2025 Panini Mosaic Football Mega Box", msrp: 65, type: "mega" },
     { name: "2024 Panini Prizm Football Hobby", msrp: 400, type: "hobby" },
     { name: "2024 Panini Select Football Hobby", msrp: 375, type: "hobby" },
     { name: "2024 Panini Donruss Optic Football Hobby", msrp: 275, type: "hobby" },
     { name: "2024 Panini Contenders Football Hobby", msrp: 325, type: "hobby" },
     { name: "2024 Panini National Treasures Football Hobby", msrp: 800, type: "hobby" },
     { name: "2024 Panini Flawless Football Hobby", msrp: 3500, type: "hobby" },
-    { name: "2024 Panini Prizm Football Blaster", msrp: 35, type: "retail" },
-    { name: "2024 Panini Prizm Football Mega Box", msrp: 75, type: "retail" },
-    { name: "2024 Panini Select Football Blaster", msrp: 30, type: "retail" },
+    { name: "2024 Panini Prizm Football Blaster", msrp: 35, type: "blaster" },
+    { name: "2024 Panini Prizm Football Mega Box", msrp: 75, type: "mega" },
+    { name: "2024 Panini Select Football Blaster", msrp: 30, type: "blaster" },
   ],
   basketball: [
     { name: "2025-26 Panini Prizm Basketball Hobby", msrp: 500, type: "hobby" },
@@ -150,21 +152,21 @@ const SEALED_PRODUCTS: Record<string, Array<{ name: string; msrp: number; type: 
     { name: "2025-26 Panini Contenders Basketball Hobby", msrp: 400, type: "hobby" },
     { name: "2025-26 Panini National Treasures Basketball Hobby", msrp: 900, type: "hobby" },
     { name: "2025-26 Panini Mosaic Basketball Hobby", msrp: 300, type: "hobby" },
-    { name: "2025-26 Panini Prizm Basketball Blaster", msrp: 40, type: "retail" },
-    { name: "2025-26 Panini Prizm Basketball Mega Box", msrp: 80, type: "retail" },
-    { name: "2025-26 Panini Prizm Basketball Retail Hanger", msrp: 15, type: "retail" },
-    { name: "2025-26 Panini Select Basketball Blaster", msrp: 35, type: "retail" },
-    { name: "2025-26 Panini Select Basketball Mega Box", msrp: 70, type: "retail" },
-    { name: "2025-26 Panini Donruss Basketball Blaster", msrp: 30, type: "retail" },
-    { name: "2025-26 Panini Mosaic Basketball Blaster", msrp: 35, type: "retail" },
+    { name: "2025-26 Panini Prizm Basketball Blaster", msrp: 40, type: "blaster" },
+    { name: "2025-26 Panini Prizm Basketball Mega Box", msrp: 80, type: "mega" },
+    { name: "2025-26 Panini Prizm Basketball Retail Hanger", msrp: 15, type: "hanger" },
+    { name: "2025-26 Panini Select Basketball Blaster", msrp: 35, type: "blaster" },
+    { name: "2025-26 Panini Select Basketball Mega Box", msrp: 70, type: "mega" },
+    { name: "2025-26 Panini Donruss Basketball Blaster", msrp: 30, type: "blaster" },
+    { name: "2025-26 Panini Mosaic Basketball Blaster", msrp: 35, type: "blaster" },
     { name: "2024-25 Panini Prizm Basketball Hobby", msrp: 450, type: "hobby" },
     { name: "2024-25 Panini Select Basketball Hobby", msrp: 400, type: "hobby" },
     { name: "2024-25 Panini Donruss Optic Basketball Hobby", msrp: 300, type: "hobby" },
     { name: "2024-25 Panini Contenders Basketball Hobby", msrp: 375, type: "hobby" },
     { name: "2024-25 Panini National Treasures Basketball Hobby", msrp: 850, type: "hobby" },
     { name: "2024-25 Panini Immaculate Basketball Hobby", msrp: 750, type: "hobby" },
-    { name: "2024-25 Panini Prizm Basketball Blaster", msrp: 35, type: "retail" },
-    { name: "2024-25 Panini Prizm Basketball Mega Box", msrp: 75, type: "retail" },
+    { name: "2024-25 Panini Prizm Basketball Blaster", msrp: 35, type: "blaster" },
+    { name: "2024-25 Panini Prizm Basketball Mega Box", msrp: 75, type: "mega" },
   ],
   baseball: [
     { name: "2025 Topps Chrome Baseball Hobby", msrp: 300, type: "hobby" },
@@ -174,49 +176,49 @@ const SEALED_PRODUCTS: Record<string, Array<{ name: string; msrp: number; type: 
     { name: "2025 Topps Sterling Baseball Hobby", msrp: 500, type: "hobby" },
     { name: "2025 Topps Inception Baseball Hobby", msrp: 250, type: "hobby" },
     { name: "2025 Panini Prizm Baseball Hobby", msrp: 300, type: "hobby" },
-    { name: "2025 Topps Series 1 Baseball Blaster", msrp: 30, type: "retail" },
-    { name: "2025 Topps Series 1 Baseball Mega Box", msrp: 50, type: "retail" },
-    { name: "2025 Topps Series 1 Baseball Hanger", msrp: 12, type: "retail" },
-    { name: "2025 Topps Chrome Baseball Blaster", msrp: 40, type: "retail" },
-    { name: "2025 Topps Chrome Baseball Mega Box", msrp: 70, type: "retail" },
-    { name: "2025 Bowman Baseball Blaster", msrp: 35, type: "retail" },
-    { name: "2025 Bowman Baseball Mega Box", msrp: 60, type: "retail" },
+    { name: "2025 Topps Series 1 Baseball Blaster", msrp: 30, type: "blaster" },
+    { name: "2025 Topps Series 1 Baseball Mega Box", msrp: 50, type: "mega" },
+    { name: "2025 Topps Series 1 Baseball Hanger", msrp: 12, type: "hanger" },
+    { name: "2025 Topps Chrome Baseball Blaster", msrp: 40, type: "blaster" },
+    { name: "2025 Topps Chrome Baseball Mega Box", msrp: 70, type: "mega" },
+    { name: "2025 Bowman Baseball Blaster", msrp: 35, type: "blaster" },
+    { name: "2025 Bowman Baseball Mega Box", msrp: 60, type: "mega" },
     { name: "2024 Topps Chrome Baseball Hobby", msrp: 275, type: "hobby" },
     { name: "2024 Bowman Chrome Baseball Hobby", msrp: 325, type: "hobby" },
     { name: "2024 Topps Series 1 Baseball Hobby", msrp: 175, type: "hobby" },
     { name: "2024 Topps Series 2 Baseball Hobby", msrp: 175, type: "hobby" },
     { name: "2024 Topps Sterling Baseball Hobby", msrp: 450, type: "hobby" },
     { name: "2024 Panini Prizm Baseball Hobby", msrp: 275, type: "hobby" },
-    { name: "2024 Topps Chrome Baseball Blaster", msrp: 35, type: "retail" },
-    { name: "2024 Topps Series 1 Baseball Blaster", msrp: 25, type: "retail" },
+    { name: "2024 Topps Chrome Baseball Blaster", msrp: 35, type: "blaster" },
+    { name: "2024 Topps Series 1 Baseball Blaster", msrp: 25, type: "blaster" },
   ],
   hockey: [
     { name: "2025-26 Upper Deck Series 1 Hockey Hobby", msrp: 200, type: "hobby" },
     { name: "2025-26 Upper Deck Series 2 Hockey Hobby", msrp: 200, type: "hobby" },
     { name: "2025-26 Upper Deck Artifacts Hockey Hobby", msrp: 250, type: "hobby" },
     { name: "2025-26 Upper Deck SP Authentic Hockey Hobby", msrp: 350, type: "hobby" },
-    { name: "2025-26 Upper Deck Series 1 Hockey Blaster", msrp: 30, type: "retail" },
-    { name: "2025-26 Upper Deck Series 1 Hockey Mega Box", msrp: 55, type: "retail" },
-    { name: "2025-26 Upper Deck Series 1 Hockey Retail Tin", msrp: 25, type: "retail" },
+    { name: "2025-26 Upper Deck Series 1 Hockey Blaster", msrp: 30, type: "blaster" },
+    { name: "2025-26 Upper Deck Series 1 Hockey Mega Box", msrp: 55, type: "mega" },
+    { name: "2025-26 Upper Deck Series 1 Hockey Retail Tin", msrp: 25, type: "hanger" },
     { name: "2024-25 Upper Deck Series 1 Hockey Hobby", msrp: 175, type: "hobby" },
     { name: "2024-25 Upper Deck Series 2 Hockey Hobby", msrp: 175, type: "hobby" },
     { name: "2024-25 Upper Deck Artifacts Hockey Hobby", msrp: 225, type: "hobby" },
     { name: "2024-25 Upper Deck SP Authentic Hockey Hobby", msrp: 325, type: "hobby" },
     { name: "2024-25 Upper Deck The Cup Hockey Hobby", msrp: 750, type: "hobby" },
-    { name: "2024-25 Upper Deck Series 1 Hockey Blaster", msrp: 25, type: "retail" },
-    { name: "2024-25 Upper Deck Series 2 Hockey Blaster", msrp: 25, type: "retail" },
+    { name: "2024-25 Upper Deck Series 1 Hockey Blaster", msrp: 25, type: "blaster" },
+    { name: "2024-25 Upper Deck Series 2 Hockey Blaster", msrp: 25, type: "blaster" },
   ],
   soccer: [
     { name: "2025 Panini Prizm FIFA Club World Cup Soccer Hobby", msrp: 350, type: "hobby" },
     { name: "2025 Topps Chrome UEFA Champions League Soccer Hobby", msrp: 300, type: "hobby" },
     { name: "2025 Panini Select FIFA Soccer Hobby", msrp: 400, type: "hobby" },
     { name: "2025 Topps Merlin Heritage Soccer Hobby", msrp: 250, type: "hobby" },
-    { name: "2025 Panini Prizm FIFA Club World Cup Soccer Blaster", msrp: 35, type: "retail" },
-    { name: "2025 Panini Prizm FIFA Club World Cup Soccer Mega Box", msrp: 65, type: "retail" },
+    { name: "2025 Panini Prizm FIFA Club World Cup Soccer Blaster", msrp: 35, type: "blaster" },
+    { name: "2025 Panini Prizm FIFA Club World Cup Soccer Mega Box", msrp: 65, type: "mega" },
     { name: "2024-25 Topps Chrome UEFA Champions League Soccer Hobby", msrp: 275, type: "hobby" },
     { name: "2024 Panini Prizm World Cup Soccer Hobby", msrp: 350, type: "hobby" },
     { name: "2024 Panini Prizm Premier League Soccer Hobby", msrp: 300, type: "hobby" },
-    { name: "2024 Panini Prizm Premier League Soccer Blaster", msrp: 30, type: "retail" },
+    { name: "2024 Panini Prizm Premier League Soccer Blaster", msrp: 30, type: "blaster" },
   ],
 };
 
@@ -227,6 +229,7 @@ function VerdictBadge({ verdict }: { verdict: string }) {
     SPECULATIVE: { color: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30", icon: AlertTriangle, label: "Speculative" },
     BREAK_EVEN: { color: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30", icon: Scale, label: "Break Even" },
     WAIT: { color: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30", icon: Pause, label: "Wait" },
+    LOTTERY_PLAY: { color: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30", icon: Sparkles, label: "Lottery Play" },
   };
 
   const c = config[verdict] || config.BREAK_EVEN;
@@ -319,10 +322,14 @@ export default function SealedRoiPage() {
     setResult(null);
 
     try {
+      const selectedType = product !== "custom" && sport
+        ? SEALED_PRODUCTS[sport]?.find(p => p.name === product)?.type
+        : undefined;
       const data = await apiRequest("POST", "/api/market/sealed-product-roi", {
         sport,
         product: selectedProduct,
         boxCost: boxCost ? parseFloat(boxCost) : (selectedMsrp || undefined),
+        boxType: selectedType,
       });
       setResult(data as SealedProductResult);
     } catch (err: any) {
@@ -347,6 +354,8 @@ export default function SealedRoiPage() {
     try {
       const msrpA = product !== "custom" ? SEALED_PRODUCTS[sport]?.find(p => p.name === product)?.msrp : undefined;
       const msrpB = productB !== "custom" ? SEALED_PRODUCTS[sportB]?.find(p => p.name === productB)?.msrp : undefined;
+      const typeA = product !== "custom" ? SEALED_PRODUCTS[sport]?.find(p => p.name === product)?.type : undefined;
+      const typeB = productB !== "custom" ? SEALED_PRODUCTS[sportB]?.find(p => p.name === productB)?.type : undefined;
 
       const effectiveBoxCostA = boxCost ? parseFloat(boxCost) : (msrpA || 0);
       const canReuseResultA = result
@@ -359,11 +368,13 @@ export default function SealedRoiPage() {
           sport,
           product: prodA,
           boxCost: boxCost ? parseFloat(boxCost) : (msrpA || undefined),
+          boxType: typeA,
         }),
         apiRequest("POST", "/api/market/sealed-product-roi", {
           sport: sportB,
           product: prodB,
           boxCost: boxCostB ? parseFloat(boxCostB) : (msrpB || undefined),
+          boxType: typeB,
         }),
       ]) as [SealedProductResult, SealedProductResult];
 
