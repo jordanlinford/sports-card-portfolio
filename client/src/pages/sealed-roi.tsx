@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AnalysisProgressSteps } from "@/components/analysis-progress-steps";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -580,12 +581,12 @@ export default function SealedRoiPage() {
 
               {isAnalyzing && (
                 <Card className="h-full flex items-center justify-center min-h-[400px]">
-                  <CardContent className="text-center py-12">
-                    <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin mb-4" />
-                    <h3 className="text-xl font-semibold mb-2">Researching Product...</h3>
-                    <p className="text-muted-foreground">
-                      Analyzing checklist, hit odds, market values, and grading potential
-                    </p>
+                  <CardContent className="w-full">
+                    <AnalysisProgressSteps
+                      isAnalyzing={isAnalyzing}
+                      title="Researching Product..."
+                      subtitle="Analyzing checklist, hit odds, market values, and grading potential"
+                    />
                   </CardContent>
                 </Card>
               )}

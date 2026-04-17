@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { AnalysisProgressSteps } from "@/components/analysis-progress-steps";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -355,12 +356,12 @@ export default function BreakAuditorPage() {
 
           {isAnalyzing && (
             <Card className="h-full flex items-center justify-center min-h-[400px]">
-              <CardContent className="text-center py-12">
-                <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Analyzing Break Value...</h3>
-                <p className="text-muted-foreground">
-                  Evaluating card values, player outlooks, and market conditions
-                </p>
+              <CardContent className="w-full">
+                <AnalysisProgressSteps
+                  isAnalyzing={isAnalyzing}
+                  title="Analyzing Break Value..."
+                  subtitle="Evaluating card values, player outlooks, and market conditions"
+                />
               </CardContent>
             </Card>
           )}
