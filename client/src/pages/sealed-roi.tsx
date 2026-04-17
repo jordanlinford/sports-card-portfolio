@@ -642,13 +642,7 @@ function proxyImageUrl(url?: string): string | undefined {
 function ProductImage({ src, alt, className }: { src?: string; alt: string; className?: string }) {
   const [failed, setFailed] = useState(false);
 
-  if (!src || failed) {
-    return (
-      <div className={`flex items-center justify-center bg-muted rounded-lg ${className || ""}`}>
-        <Package className="h-12 w-12 text-muted-foreground/30" />
-      </div>
-    );
-  }
+  if (!src || failed) return null;
 
   return (
     <img
@@ -747,7 +741,7 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
               </div>
             )}
             <div className="flex-1">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className={`grid grid-cols-2 ${result.qualityScore > 0 ? "sm:grid-cols-4" : "sm:grid-cols-3"} gap-3 mb-4`}>
                 <div className="text-center p-3 bg-muted rounded-lg">
                   <DollarSign className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
                   <p className="text-xl font-bold" data-testid="text-box-cost">${result.boxCost?.toFixed(0) || "N/A"}</p>
@@ -765,11 +759,13 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
                   </p>
                   <p className="text-xs text-muted-foreground">EV Ratio</p>
                 </div>
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <Award className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                  <p className="text-xl font-bold" data-testid="text-quality-score">{result.qualityScore}</p>
-                  <p className="text-xs text-muted-foreground">Quality Score</p>
-                </div>
+                {result.qualityScore > 0 && (
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <Award className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                    <p className="text-xl font-bold" data-testid="text-quality-score">{result.qualityScore}</p>
+                    <p className="text-xs text-muted-foreground">Quality Score</p>
+                  </div>
+                )}
               </div>
               {result.caseHitCeilingEV != null && result.caseHitCeilingEV > 0 && (
                 <div className="flex items-center gap-2 p-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg text-sm" data-testid="text-ceiling-ev">
