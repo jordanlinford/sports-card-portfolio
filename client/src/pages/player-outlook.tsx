@@ -206,7 +206,30 @@ function SignalContextHeader({ signalId, playerName }: { signalId: string; playe
   );
 }
 
-function RelatedSignalsPanel({ playerName }: { playerName: string }) {
+function classifyVerdictDirection(verdict?: string | null): "bullish" | "bearish" | "neutral" | null {
+  if (!verdict) return null;
+  const v = verdict.toUpperCase();
+  if (v === "BUY" || v === "ACCUMULATE") return "bullish";
+  if (v === "SELL" || v === "AVOID" || v === "TRADE_THE_HYPE") return "bearish";
+  if (v === "HOLD" || v === "HOLD_CORE" || v === "SPECULATIVE_FLYER") return "neutral";
+  return null;
+}
+
+function classifySignalDirection(signalType?: string | null): "bullish" | "bearish" | "neutral" | null {
+  if (!signalType) return null;
+  const s = signalType.toLowerCase();
+  if (s === "buy") return "bullish";
+  if (s === "sell") return "bearish";
+  if (s === "hold") return "neutral";
+  return null;
+}
+
+function formatVerdictForDisplay(verdict?: string | null): string {
+  if (!verdict) return "";
+  return verdict.toUpperCase().replace(/_/g, " ");
+}
+
+function RelatedSignalsPanel({ playerName, playerVerdict }: { playerName: string; playerVerdict?: string | null }) {
   const { data: signalsData } = useQuery<{ signals: any[] }>({
     queryKey: ["/api/alpha/signals/player", playerName],
     queryFn: async () => {
@@ -227,6 +250,9 @@ function RelatedSignalsPanel({ playerName }: { playerName: string }) {
     hold: { label: "Hold", className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30" },
   };
 
+  const playerDir = classifyVerdictDirection(playerVerdict);
+  const playerVerdictDisplay = formatVerdictForDisplay(playerVerdict);
+
   return (
     <Card data-testid="related-signals-panel">
       <CardHeader className="pb-3">
@@ -240,14 +266,26 @@ function RelatedSignalsPanel({ playerName }: { playerName: string }) {
           {signals.map((s: any) => {
             const info = labelMap[s.signalType?.toLowerCase()] || labelMap.hold;
             const topDriver = s.drivers?.filter(Boolean)?.[0];
+            const cardDir = classifySignalDirection(s.signalType);
+            const showDivergenceNote = !!playerDir && !!cardDir && playerDir !== cardDir;
             return (
-              <div key={s.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50" data-testid={`related-signal-${s.id}`}>
-                <Badge className={`${info.className} text-[10px] shrink-0`}>{info.label}</Badge>
-                <span className="text-xs text-muted-foreground truncate flex-1">
-                  {topDriver || s.cardTitle || ""}
-                </span>
-                {s.confidence && (
-                  <span className="text-[10px] text-muted-foreground shrink-0">{s.confidence}</span>
+              <div key={s.id} className="space-y-1" data-testid={`related-signal-${s.id}`}>
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                  <Badge className={`${info.className} text-[10px] shrink-0`}>{info.label}</Badge>
+                  <span className="text-xs text-muted-foreground truncate flex-1">
+                    {topDriver || s.cardTitle || ""}
+                  </span>
+                  {s.confidence && (
+                    <span className="text-[10px] text-muted-foreground shrink-0">{s.confidence}</span>
+                  )}
+                </div>
+                {showDivergenceNote && (
+                  <p
+                    className="text-[11px] text-muted-foreground italic px-2"
+                    data-testid={`text-verdict-divergence-${s.id}`}
+                  >
+                    Note: The overall {playerName} market signal is {playerVerdictDisplay} — this card's individual signal differs based on its specific condition, set, and variation.
+                  </p>
                 )}
               </div>
             );
@@ -1982,7 +2020,10 @@ export default function PlayerOutlookPage() {
             outlook={outlookData} 
           />
 
-          <RelatedSignalsPanel playerName={outlookData.player.name} />
+          <RelatedSignalsPanel
+            playerName={outlookData.player.name}
+            playerVerdict={outlookData.investmentCall?.verdict || outlookData.verdict?.action}
+          />
 
           {/* Confidence breakdown - show analysis transparency */}
           <ConfidenceBreakdownPanel 
