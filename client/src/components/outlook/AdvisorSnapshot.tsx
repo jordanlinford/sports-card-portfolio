@@ -384,6 +384,13 @@ function MarketDataContent({ advisor }: { advisor: AdvisorOutlook }) {
                     {advisor.shortTermTrend.internalVsMarketDeltaPct}% vs market
                   </Badge>
                 )}
+                <span
+                  title={`Market avg is based on all recent sales. Your collection avg is based on ${advisor.shortTermTrend.internalObservationCount ?? 0} cards in SCP collections.`}
+                  className="inline-flex cursor-help"
+                  data-testid="icon-info-internal-avg"
+                >
+                  <Info className="h-3 w-3 text-muted-foreground" />
+                </span>
               </span>
             )}
           </div>
