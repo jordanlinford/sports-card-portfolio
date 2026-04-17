@@ -28,6 +28,13 @@ import type { PortfolioSnapshot, PortfolioExposures, RiskSignal, RecommendedActi
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 
+type PortfolioValueSummary = {
+  totalValue: number;
+  totalCards: number;
+  analyzedCards: number;
+  coveragePct: number;
+};
+
 function formatTimestamp(date: Date | string | null | undefined): string {
   if (!date) return "Unknown";
   const d = new Date(date);
@@ -165,6 +172,10 @@ export default function PortfolioOutlookPage() {
 
   const { data, isLoading, error } = useQuery<{ hasSnapshot: boolean; snapshot?: PortfolioSnapshot }>({
     queryKey: ["/api/portfolio/outlook"],
+  });
+
+  const { data: valueSummary } = useQuery<PortfolioValueSummary>({
+    queryKey: ["/api/portfolio/value"],
   });
 
   const generateMutation = useMutation({
@@ -356,11 +367,36 @@ export default function PortfolioOutlookPage() {
               </p>
             </div>
             <div className="text-right shrink-0">
-              <div className="text-2xl font-bold">
-                ${snapshot.portfolioValueEstimate?.toLocaleString() || "0"}
+              <div className="flex items-center justify-end gap-1.5">
+                <div className="text-2xl font-bold" data-testid="text-portfolio-value">
+                  ${(valueSummary?.totalValue ?? snapshot.portfolioValueEstimate ?? 0).toLocaleString(
+                    undefined,
+                    { maximumFractionDigits: 0 },
+                  )}
+                </div>
+                {valueSummary && valueSummary.totalCards > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className="inline-flex items-center text-muted-foreground cursor-help"
+                        data-testid="tooltip-value-coverage"
+                      >
+                        <Info className="h-3.5 w-3.5" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs max-w-[220px]">
+                        Based on {valueSummary.analyzedCards} of {valueSummary.totalCards} cards with market data
+                        {valueSummary.coveragePct < 100
+                          ? ` (${Math.round(valueSummary.coveragePct)}% coverage)`
+                          : ""}.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
               </div>
               <div className="text-sm text-muted-foreground">
-                {snapshot.cardCount || 0} cards
+                {valueSummary?.totalCards ?? snapshot.cardCount ?? 0} cards
               </div>
             </div>
           </div>

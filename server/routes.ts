@@ -7758,6 +7758,19 @@ RULES:
     }
   });
 
+  // Canonical portfolio value (single source of truth, used by both
+  // Analytics and Portfolio Outlook so totals never disagree).
+  app.get("/api/portfolio/value", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const summary = await storage.getPortfolioValueSummary(userId);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching portfolio value summary:", error);
+      res.status(500).json({ message: "Failed to fetch portfolio value" });
+    }
+  });
+
   // Portfolio Growth Projections (Pro feature)
   app.get("/api/analytics/growth-projections", isAuthenticated, async (req: any, res) => {
     try {

@@ -246,6 +246,12 @@ export interface IStorage {
     valueByCase: { caseName: string; totalValue: number; cardCount: number }[];
     recentValueChanges: (Card & { displayCaseName: string })[];
   }>;
+  getPortfolioValueSummary(userId: string): Promise<{
+    totalValue: number;
+    totalCards: number;
+    analyzedCards: number;
+    coveragePct: number;
+  }>;
 
   // Duplicate detection
   findSimilarCards(userId: string, title: string, excludeCardId?: number): Promise<Card[]>;
@@ -1825,6 +1831,47 @@ export class DatabaseStorage implements IStorage {
       valueByCase,
       recentValueChanges,
     };
+  }
+
+  async getPortfolioValueSummary(userId: string): Promise<{
+    totalValue: number;
+    totalCards: number;
+    analyzedCards: number;
+    coveragePct: number;
+  }> {
+    const userCases = await db
+      .select({ id: displayCases.id })
+      .from(displayCases)
+      .where(eq(displayCases.userId, userId));
+    const caseIds = userCases.map(c => c.id);
+    if (caseIds.length === 0) {
+      return { totalValue: 0, totalCards: 0, analyzedCards: 0, coveragePct: 0 };
+    }
+
+    const allCards = await db
+      .select()
+      .from(cards)
+      .where(inArray(cards.displayCaseId, caseIds));
+
+    // Dedupe by imagePath, preferring the row with highest effective value so
+    // manual overrides aren't dropped in favor of a stale estimate duplicate.
+    const effective = (c: typeof allCards[0]) => c.manualValue ?? c.estimatedValue ?? 0;
+    const dedup = new Map<string, typeof allCards[0]>();
+    for (const c of allCards) {
+      const key = c.imagePath || `id:${c.id}`;
+      const existing = dedup.get(key);
+      if (!existing || effective(c) > effective(existing)) {
+        dedup.set(key, c);
+      }
+    }
+    const unique = Array.from(dedup.values());
+    const totalValue = unique.reduce((sum, c) => sum + effective(c), 0);
+    const totalCards = unique.length;
+    const analyzedCards = unique.filter(
+      c => c.manualValue !== null || c.estimatedValue !== null,
+    ).length;
+    const coveragePct = totalCards > 0 ? (analyzedCards / totalCards) * 100 : 0;
+    return { totalValue, totalCards, analyzedCards, coveragePct };
   }
 
   async findSimilarCards(userId: string, title: string, excludeCardId?: number): Promise<Card[]> {

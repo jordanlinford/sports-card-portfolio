@@ -14,7 +14,8 @@ import {
   ImageIcon,
   BarChart3,
   LineChart,
-  Sparkles
+  Sparkles,
+  Info,
 } from "lucide-react";
 import type { Card as CardType } from "@shared/schema";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
@@ -31,6 +32,40 @@ import {
   Cell,
   Legend,
 } from "recharts";
+import {
+  Tooltip as UITooltip,
+  TooltipContent as UITooltipContent,
+  TooltipTrigger as UITooltipTrigger,
+} from "@/components/ui/tooltip";
+
+type PortfolioValueSummary = {
+  totalValue: number;
+  totalCards: number;
+  analyzedCards: number;
+  coveragePct: number;
+};
+
+function CoverageTooltip({ summary }: { summary?: PortfolioValueSummary }) {
+  if (!summary || summary.totalCards === 0) return null;
+  return (
+    <UITooltip>
+      <UITooltipTrigger asChild>
+        <span
+          className="inline-flex items-center text-muted-foreground cursor-help"
+          data-testid="tooltip-value-coverage"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </span>
+      </UITooltipTrigger>
+      <UITooltipContent>
+        <p className="text-xs max-w-[220px]">
+          Based on {summary.analyzedCards} of {summary.totalCards} cards with market data
+          {summary.coveragePct < 100 ? ` (${Math.round(summary.coveragePct)}% coverage)` : ""}.
+        </p>
+      </UITooltipContent>
+    </UITooltip>
+  );
+}
 
 type AnalyticsData = {
   totalValue: number;
@@ -114,6 +149,11 @@ export default function AnalyticsPage() {
 
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ["/api/analytics"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: valueSummary } = useQuery<PortfolioValueSummary>({
+    queryKey: ["/api/portfolio/value"],
     enabled: isAuthenticated,
   });
 
@@ -207,15 +247,20 @@ export default function AnalyticsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+                  Total Value
+                  <CoverageTooltip summary={valueSummary} />
+                </CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-total-value">
-                  {formatCurrency(analytics.totalValue)}
+                  {formatCurrency(valueSummary?.totalValue ?? analytics.totalValue)}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Estimated collection value
+                  {valueSummary && valueSummary.totalCards > 0
+                    ? `Based on ${valueSummary.analyzedCards} of ${valueSummary.totalCards} cards with market data`
+                    : "Estimated collection value"}
                 </p>
               </CardContent>
             </Card>
