@@ -25,6 +25,8 @@ import {
   Minus,
   BarChart3,
   Clock,
+  Package,
+  ArrowRight,
 } from "lucide-react";
 import { Footer } from "@/components/footer";
 import { formatEnumLabel } from "@/lib/formatEnum";
@@ -337,6 +339,56 @@ export default function MarketLeaderboardPage() {
               <LeaderboardTable entries={entries} isLoading={isLoading} />
             </CardContent>
           </Card>
+
+          <div className="mt-10" data-testid="section-tools">
+            <h2 className="text-lg font-semibold mb-1">Tools</h2>
+            <p className="text-xs text-muted-foreground mb-4">
+              Use these alongside the leaderboard to pressure-test your buys.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Link href="/market/break-auditor" data-testid="link-tool-break-auditor">
+                <Card className="h-full hover-elevate active-elevate-2 cursor-pointer transition">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-md bg-primary/10 text-primary">
+                        <Package className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-base">Break Value Auditor</CardTitle>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Should you join that break? Analyze EV before you buy in.
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+
+              <Link href="/market/sealed-roi" data-testid="link-tool-sealed-roi">
+                <Card className="h-full hover-elevate active-elevate-2 cursor-pointer transition">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-md bg-primary/10 text-primary">
+                        <Target className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-base">Sealed Product ROI</CardTitle>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Should you buy that hobby box? Analyze hit odds and grading potential.
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          </div>
         </div>
       </main>
       <Footer />
