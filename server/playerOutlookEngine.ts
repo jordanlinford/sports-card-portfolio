@@ -1252,6 +1252,10 @@ TONE ENFORCEMENT:
     const response = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `${systemMessage}\n\n${prompt}`,
+      config: {
+        maxOutputTokens: 16384,
+        thinkingConfig: { thinkingBudget: 2048 },
+      },
     });
     
     const content = response.text || "{}";
