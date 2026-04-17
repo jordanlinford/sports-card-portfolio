@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { PlayerAutocomplete } from "@/components/player-autocomplete";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -1090,76 +1091,121 @@ export default function ComparePage() {
               </CardHeader>
               <CardContent>
                 {(() => {
-                  const comparison = comparePlayers(leftPlayer.outlook, rightPlayer.outlook);
-                  if (!comparison.betterPlayer) return null;
-                  
-                  const winnerName = comparison.betterPlayer === "left" 
-                    ? leftPlayer.name 
-                    : comparison.betterPlayer === "right" 
-                      ? rightPlayer.name 
-                      : null;
-                  
-                  return (
-                    <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20" data-testid="better-investment-verdict">
-                      <div className="flex items-center gap-2 justify-center">
-                        <Trophy className="h-5 w-5 text-amber-500" />
-                        <span className="font-semibold text-lg">
-                          {comparison.betterPlayer === "equal" 
-                            ? "Tie" 
-                            : `${winnerName} is the better investment`}
-                        </span>
+                  const leftComp = leftPlayer.outlook?.marketSignals?.composite;
+                  const rightComp = rightPlayer.outlook?.marketSignals?.composite;
+                  let winnerSide: "left" | "right" | "tie" = "tie";
+                  if (typeof leftComp === "number" && typeof rightComp === "number") {
+                    if (leftComp > rightComp) winnerSide = "left";
+                    else if (rightComp > leftComp) winnerSide = "right";
+                  }
+                  const winnerName =
+                    winnerSide === "left" ? leftPlayer.name :
+                    winnerSide === "right" ? rightPlayer.name : null;
+
+                  const renderPlayerColumn = (
+                    side: "left" | "right",
+                    player: ComparisonPlayer,
+                  ) => {
+                    const o = player.outlook!;
+                    const ms = o.marketSignals;
+                    const isWinner = winnerSide === side;
+                    const composite = typeof ms?.composite === "number" ? Math.round(ms.composite) : null;
+                    const phase = o.marketPhase;
+                    const summary = o.investmentCall?.oneLineRationale || (o.thesis && o.thesis[0]) || null;
+                    const bars: Array<{ label: string; value: number | undefined }> = [
+                      { label: "Demand", value: ms?.demandScore },
+                      { label: "Momentum", value: ms?.momentumScore },
+                      { label: "Hype", value: ms?.hypeScore },
+                      { label: "Liquidity", value: ms?.liquidityScore },
+                    ];
+                    return (
+                      <div
+                        className={`p-4 rounded-lg border ${
+                          isWinner
+                            ? "border-amber-500/50 bg-amber-500/5 ring-2 ring-amber-500/30"
+                            : "border-border bg-muted/20"
+                        }`}
+                        data-testid={`comparison-column-${side}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <p className="text-sm font-semibold truncate" data-testid={`text-comparison-name-${side}`}>{player.name}</p>
+                          {isWinner && (
+                            <Badge className="bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/40 gap-1" data-testid={`badge-winner-${side}`}>
+                              <Trophy className="h-3 w-3" />
+                              Winner
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap mb-3">
+                          <Badge className={`${getVerdictColor(o.verdict?.action)} gap-1`} data-testid={`badge-verdict-${side}`}>
+                            {getVerdictIcon(o.verdict?.action)}
+                            {getVerdictLabel(o.investmentCall?.verdict, o.investmentCall?.postureLabel)}
+                          </Badge>
+                          {phase && (
+                            <Badge variant="outline" className="text-xs" data-testid={`badge-phase-${side}`}>
+                              {formatEnumLabel(phase)}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="mb-4">
+                          <p className="text-xs text-muted-foreground">Composite Score</p>
+                          <p
+                            className={`text-3xl font-bold ${isWinner ? "text-amber-600 dark:text-amber-400" : ""}`}
+                            data-testid={`text-composite-${side}`}
+                          >
+                            {composite !== null ? composite : "—"}
+                          </p>
+                        </div>
+                        <div className="space-y-2 mb-4">
+                          {bars.map((b) => {
+                            const v = typeof b.value === "number" ? Math.max(0, Math.min(100, Math.round(b.value))) : null;
+                            return (
+                              <div key={b.label}>
+                                <div className="flex items-center justify-between text-xs mb-1">
+                                  <span className="text-muted-foreground">{b.label}</span>
+                                  <span className="font-medium" data-testid={`text-${b.label.toLowerCase()}-${side}`}>
+                                    {v !== null ? v : "—"}
+                                  </span>
+                                </div>
+                                <Progress value={v ?? 0} className="h-1.5" />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {summary && (
+                          <p className="text-sm text-muted-foreground" data-testid={`text-summary-${side}`}>
+                            {summary}
+                          </p>
+                        )}
                       </div>
-                      <p className="text-sm text-muted-foreground text-center mt-1">
-                        {comparison.reason}
-                      </p>
-                    </div>
+                    );
+                  };
+
+                  return (
+                    <>
+                      <div className="mb-6 p-4 rounded-lg bg-primary/5 border border-primary/20" data-testid="better-investment-verdict">
+                        <div className="flex items-center gap-2 justify-center">
+                          <Trophy className="h-5 w-5 text-amber-500" />
+                          <span className="font-semibold text-lg">
+                            {winnerSide === "tie"
+                              ? "Tie — composite scores are equal"
+                              : `${winnerName} wins by composite score`}
+                          </span>
+                        </div>
+                        {winnerSide !== "tie" && typeof leftComp === "number" && typeof rightComp === "number" && (
+                          <p className="text-sm text-muted-foreground text-center mt-1">
+                            {Math.round(Math.max(leftComp, rightComp))} vs {Math.round(Math.min(leftComp, rightComp))}
+                          </p>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {renderPlayerColumn("left", leftPlayer)}
+                        {renderPlayerColumn("right", rightPlayer)}
+                      </div>
+                    </>
                   );
                 })()}
-                
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{leftPlayer.name}</p>
-                    <Badge className={getVerdictColor(leftPlayer.outlook.verdict?.action)}>
-                      {getVerdictLabel(leftPlayer.outlook.investmentCall?.verdict, leftPlayer.outlook.investmentCall?.postureLabel)}
-                    </Badge>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">vs</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{rightPlayer.name}</p>
-                    <Badge className={getVerdictColor(rightPlayer.outlook.verdict?.action)}>
-                      {getVerdictLabel(rightPlayer.outlook.investmentCall?.verdict, rightPlayer.outlook.investmentCall?.postureLabel)}
-                    </Badge>
-                  </div>
-                </div>
-                
-                <div className="mt-6 grid grid-cols-3 gap-4 text-sm">
-                  <div className="text-center">
-                    <Badge variant="outline" className={getTemperatureColor(leftPlayer.outlook.snapshot?.temperature)}>
-                      {formatEnumLabel(leftPlayer.outlook.snapshot?.temperature)}
-                    </Badge>
-                  </div>
-                  <div className="text-center text-muted-foreground">Temperature</div>
-                  <div className="text-center">
-                    <Badge variant="outline" className={getTemperatureColor(rightPlayer.outlook.snapshot?.temperature)}>
-                      {formatEnumLabel(rightPlayer.outlook.snapshot?.temperature)}
-                    </Badge>
-                  </div>
-                  
-                  <div className="text-center">{leftPlayer.outlook.snapshot?.volatility}</div>
-                  <div className="text-center text-muted-foreground">Volatility</div>
-                  <div className="text-center">{rightPlayer.outlook.snapshot?.volatility}</div>
-                  
-                  <div className="text-center">{leftPlayer.outlook.snapshot?.risk}</div>
-                  <div className="text-center text-muted-foreground">Risk</div>
-                  <div className="text-center">{rightPlayer.outlook.snapshot?.risk}</div>
-                  
-                  <div className="text-center">{leftPlayer.outlook.snapshot?.horizon}</div>
-                  <div className="text-center text-muted-foreground">Horizon</div>
-                  <div className="text-center">{rightPlayer.outlook.snapshot?.horizon}</div>
-                </div>
-                
+
                 {!narrative && (
                   <div className="mt-6 text-center">
                     <Button 
