@@ -25,7 +25,7 @@ import {
   Info,
 } from "lucide-react";
 import type { AdvisorOutlook, TradeTarget } from "@shared/schema";
-import { formatEnumLabel } from "@/lib/formatEnum";
+import { formatEnumLabel, enforceCompleteSentences } from "@/lib/formatEnum";
 import { LiquidityBadge } from "@/components/liquidity-badge";
 
 function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
@@ -399,7 +399,7 @@ function WhyContent({ advisor }: { advisor: AdvisorOutlook }) {
     <>
       {advisor.conviction?.narrative && (
         <p className="text-xs text-muted-foreground italic" data-testid="text-conviction-narrative">
-          {advisor.conviction.narrative}
+          {enforceCompleteSentences(advisor.conviction.narrative)}
         </p>
       )}
       {advisor.topReasons && advisor.topReasons.length > 0 && (

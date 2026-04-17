@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Component, type ReactNode } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { formatEnumLabel } from "@/lib/formatEnum";
+import { formatEnumLabel, enforceCompleteSentences } from "@/lib/formatEnum";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -571,7 +571,7 @@ function VerdictCard({ verdict, confidence }: { verdict: PlayerOutlookResponse["
             </Badge>
           )}
         </div>
-        <p className="text-sm text-muted-foreground" data-testid="text-verdict-summary">{verdict.summary}</p>
+        <p className="text-sm text-muted-foreground" data-testid="text-verdict-summary">{enforceCompleteSentences(verdict.summary)}</p>
         {verdict.whatMustBeTrue && verdict.whatMustBeTrue.length > 0 && (
           <div className="pt-2 border-t">
             <p className="text-xs font-medium text-muted-foreground mb-2">What must be true:</p>
