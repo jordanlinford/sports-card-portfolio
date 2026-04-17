@@ -161,7 +161,10 @@ export function PriceTrendChart({
     }
   }, [autoLoad, preloadedData, hasTriggeredAutoLoad, history, fetchMutation.isPending]);
 
-  if (fetchMutation.isPending) {
+  const shouldAutoLoad =
+    !!autoLoad && !!playerRequest && !preloadedData && !history && !fetchMutation.isError;
+
+  if (fetchMutation.isPending || (shouldAutoLoad && !fetchMutation.isError)) {
     return (
       <Card>
         <CardHeader className="pb-2">
