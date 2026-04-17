@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { formatEnumLabel } from "@/lib/formatEnum";
 
 function formatTimestamp(date: Date | string | null | undefined): string {
   if (!date) return "Unknown";
@@ -211,7 +212,7 @@ function NextBuyCard({
                 variant={buy.verdict === "BUY" ? "default" : "secondary"}
                 className={buy.verdict === "BUY" ? "bg-green-600" : ""}
               >
-                {buy.verdict}
+                {formatEnumLabel(buy.verdict)}
               </Badge>
               {buy.source && (
                 <Badge variant="outline" className="text-xs">

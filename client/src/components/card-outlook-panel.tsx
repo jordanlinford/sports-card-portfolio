@@ -36,6 +36,7 @@ import { useLocation } from "wouter";
 import type { Card as CardType, LiquidityTier } from "@shared/schema";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
 import { LiquidityBadge } from "@/components/liquidity-badge";
+import { formatEnumLabel } from "@/lib/formatEnum";
 
 function getLiquidityTierFromScore(score: number | undefined): LiquidityTier {
   if (score === undefined || score === null) return "UNCERTAIN";
@@ -862,11 +863,11 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                           variant={entry.verdict === "ACCUMULATE" || entry.verdict === "BUY" ? "default" : "secondary"}
                           className="text-[10px] px-1.5 py-0"
                         >
-                          {entry.verdict}
+                          {formatEnumLabel(entry.verdict)}
                         </Badge>
                         {verdictChanged && (
                           <span className="text-amber-500 text-[10px]">
-                            (was {prevEntry.verdict})
+                            (was {formatEnumLabel(prevEntry.verdict)})
                           </span>
                         )}
                         <span className="text-muted-foreground capitalize">

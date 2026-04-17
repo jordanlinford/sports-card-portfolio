@@ -4,6 +4,7 @@ import { Link } from "wouter";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatEnumLabel } from "@/lib/formatEnum";
 import {
   Select,
   SelectContent,
@@ -314,7 +315,7 @@ export default function PublicIntelPage() {
                             <span className="ml-0.5">
                               {entry.verdict === "TRADE_THE_HYPE" ? "TRADE" :
                                entry.verdict === "HOLD_CORE" ? "HOLD" :
-                               entry.verdict}
+                               formatEnumLabel(entry.verdict)}
                             </span>
                           </Badge>
                         </span>

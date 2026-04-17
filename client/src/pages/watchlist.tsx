@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { formatEnumLabel } from "@/lib/formatEnum";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,15 +75,6 @@ const LAUNCH_PLAYERS = [
   { name: "Mac Jones", sport: "football" },
   { name: "Russell Wilson", sport: "football" },
 ];
-
-function formatEnumLabel(value: string | null | undefined): string {
-  if (!value) return "";
-  return String(value)
-    .split(/[_\s-]+/)
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(" ");
-}
 
 function getVerdictIcon(verdict: PlayerVerdict) {
   switch (verdict) {

@@ -725,7 +725,7 @@ function TieredRecommendationsCard({ recommendations }: { recommendations?: Tier
             <div className="flex items-center gap-3 flex-1">
               <Badge className={`${getVerdictColor(tier.data.verdict)} min-w-[60px] justify-center`}>
                 {getVerdictIcon(tier.data.verdict)}
-                <span className="ml-1">{tier.data.verdict}</span>
+                <span className="ml-1">{formatEnumLabel(tier.data.verdict)}</span>
               </Badge>
               <div className="flex-1">
                 <p className="text-sm font-medium">{tier.label}</p>
@@ -1232,7 +1232,7 @@ function OutlookHistoryPanel({ playerKey }: { playerKey: string | null }) {
                       <div>
                         <div className="flex items-center gap-2">
                           <Badge className={getVerdictColor(entry.verdict)} data-testid={`badge-verdict-${entry.id}`}>
-                            {entry.verdict}
+                            {formatEnumLabel(entry.verdict)}
                           </Badge>
                           {entry.verdictModifier && (
                             <span className="text-xs text-muted-foreground">

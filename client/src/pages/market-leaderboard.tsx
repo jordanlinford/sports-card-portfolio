@@ -27,6 +27,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Footer } from "@/components/footer";
+import { formatEnumLabel } from "@/lib/formatEnum";
 
 type LeaderboardEntry = {
   rank: number;
@@ -215,7 +216,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
                   <span className="ml-0.5">
                     {entry.verdict === "TRADE_THE_HYPE" ? "TRADE" :
                      entry.verdict === "HOLD_CORE" ? "HOLD" :
-                     entry.verdict}
+                     formatEnumLabel(entry.verdict)}
                   </span>
                 </Badge>
               </span>
