@@ -316,6 +316,10 @@ export default function SealedRoiPage() {
       setError("Please select a sport and product");
       return;
     }
+    if (product === "custom" && (!boxType || boxType === "all")) {
+      setError("Please pick a Box Type (Hobby, Mega, Blaster, or Hanger) for custom entries.");
+      return;
+    }
 
     setError("");
     setIsAnalyzing(true);
@@ -325,7 +329,6 @@ export default function SealedRoiPage() {
       const catalogType = product !== "custom" && sport
         ? SEALED_PRODUCTS[sport]?.find(p => p.name === product)?.type
         : undefined;
-      // For custom entries, use the form's boxType selection ("all" means let the backend detect)
       const formType = boxType !== "all" ? boxType : undefined;
       const selectedType = catalogType || formType;
       const data = await apiRequest("POST", "/api/market/sealed-product-roi", {
@@ -347,6 +350,14 @@ export default function SealedRoiPage() {
     const prodB = selectedProductB;
     if (!sport || !prodA || !sportB || !prodB) {
       setError("Please select both products for comparison");
+      return;
+    }
+    if (product === "custom" && (!boxType || boxType === "all")) {
+      setError("Please pick a Box Type for the first custom entry.");
+      return;
+    }
+    if (productB === "custom" && (!boxTypeB || boxTypeB === "all")) {
+      setError("Please pick a Box Type for the second custom entry.");
       return;
     }
 
