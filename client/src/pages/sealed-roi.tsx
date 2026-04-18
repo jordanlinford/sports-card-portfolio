@@ -322,9 +322,12 @@ export default function SealedRoiPage() {
     setResult(null);
 
     try {
-      const selectedType = product !== "custom" && sport
+      const catalogType = product !== "custom" && sport
         ? SEALED_PRODUCTS[sport]?.find(p => p.name === product)?.type
         : undefined;
+      // For custom entries, use the form's boxType selection ("all" means let the backend detect)
+      const formType = boxType !== "all" ? boxType : undefined;
+      const selectedType = catalogType || formType;
       const data = await apiRequest("POST", "/api/market/sealed-product-roi", {
         sport,
         product: selectedProduct,
@@ -354,8 +357,10 @@ export default function SealedRoiPage() {
     try {
       const msrpA = product !== "custom" ? SEALED_PRODUCTS[sport]?.find(p => p.name === product)?.msrp : undefined;
       const msrpB = productB !== "custom" ? SEALED_PRODUCTS[sportB]?.find(p => p.name === productB)?.msrp : undefined;
-      const typeA = product !== "custom" ? SEALED_PRODUCTS[sport]?.find(p => p.name === product)?.type : undefined;
-      const typeB = productB !== "custom" ? SEALED_PRODUCTS[sportB]?.find(p => p.name === productB)?.type : undefined;
+      const catalogTypeA = product !== "custom" ? SEALED_PRODUCTS[sport]?.find(p => p.name === product)?.type : undefined;
+      const catalogTypeB = productB !== "custom" ? SEALED_PRODUCTS[sportB]?.find(p => p.name === productB)?.type : undefined;
+      const typeA = catalogTypeA || (boxType !== "all" ? boxType : undefined);
+      const typeB = catalogTypeB || (boxTypeB !== "all" ? boxTypeB : undefined);
 
       const effectiveBoxCostA = boxCost ? parseFloat(boxCost) : (msrpA || 0);
       const canReuseResultA = result
