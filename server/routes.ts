@@ -10258,7 +10258,7 @@ Return ONLY valid JSON, no markdown.`;
       const dbUser = await storage.getUser(userId);
       const isPro = dbUser ? hasProAccess(dbUser) : false;
 
-      const cacheKey = `${sport.toLowerCase()}-${product.toLowerCase().replace(/\s+/g, "-")}`;
+      const cacheKey = `${sport.toLowerCase()}-${product.toLowerCase().replace(/\s+/g, "-")}-${boxType}`;
       const cached = sealedProductCache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < SEALED_CACHE_TTL) {
         const cachedResult = JSON.parse(JSON.stringify(cached.data));
@@ -10283,7 +10283,7 @@ Return ONLY valid JSON, no markdown.`;
             SPECULATIVE: "speculative — marginally close to break-even after fees, but not clearly profitable",
             WAIT: "uncertain — prices are still settling on this new release",
           };
-          cachedResult.verdictExplanation = `At $${boxCost.toFixed(0)}, this box has a fee-adjusted EV of $${ev.toFixed(0)} (${cachedResult.evRatio.toFixed(2)}x). ${verdictLabels[cachedResult.roiVerdict] || cachedResult.roiVerdict}. ${
+          cachedResult.verdictExplanation = `At $${boxCost.toFixed(0)}, this ${boxType} has a fee-adjusted EV of $${ev.toFixed(0)} (${cachedResult.evRatio.toFixed(2)}x). ${verdictLabels[cachedResult.roiVerdict] || cachedResult.roiVerdict}. ${
             ceilEV > 0 ? `Case hits add $${ceilEV.toFixed(0)} ceiling EV (not included in base ratio).` : ""
           } Values reflect median sold prices minus 13% eBay fees and shipping.`;
         }
