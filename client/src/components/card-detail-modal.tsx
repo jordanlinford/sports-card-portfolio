@@ -405,7 +405,39 @@ export function CardDetailModal({
       await queryClient.refetchQueries({ queryKey: [`/api/display-cases/${displayCaseId}`] });
       await queryClient.refetchQueries({ queryKey: [`/api/display-cases/${displayCaseId}/public`] });
       queryClient.invalidateQueries({ queryKey: ["/api/display-cases"] });
+      // Invalidate any /api/cards/search queries (untagged list, search results, etc.)
+      // so the parent page reflects the just-saved changes instead of showing stale data.
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && key.startsWith("/api/cards/search");
+        },
+      });
       
+      // Mutate the parent-supplied card object so the view-mode display reflects
+      // the just-saved values immediately (the search/list parent doesn't refetch
+      // its cached row, so without this the modal would still show stale data).
+      if (card) {
+        (card as any).title = formData.title.trim();
+        (card as any).playerName = formData.playerName.trim() || null;
+        (card as any).sport = formData.sport.trim() || null;
+        (card as any).position = formData.position.trim() || null;
+        (card as any).set = formData.set.trim() || null;
+        (card as any).year = formData.year ? parseInt(formData.year) : null;
+        (card as any).variation = formData.variation.trim() || null;
+        (card as any).grade = formData.grade.trim() || null;
+        (card as any).grader = formData.grader.trim() || null;
+        (card as any).legacyTier = formData.careerStage.trim() || null;
+        (card as any).isRookie = formData.isRookie;
+        (card as any).purchasePrice = formData.purchasePrice ? parseFloat(formData.purchasePrice) : null;
+        (card as any).manualValue = formData.manualValue ? parseFloat(formData.manualValue) : null;
+        (card as any).notes = formData.notes.trim() || null;
+        (card as any).tags = formData.tags.length > 0 ? formData.tags : null;
+        (card as any).openToOffers = formData.openToOffers;
+        (card as any).minOfferAmount = formData.minOfferAmount ? parseFloat(formData.minOfferAmount) : null;
+        if (newImagePath) (card as any).imagePath = newImagePath;
+      }
+
       toast({
         title: "Card updated",
         description: "Your card details have been saved.",
