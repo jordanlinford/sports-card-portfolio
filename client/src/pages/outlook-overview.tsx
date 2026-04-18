@@ -269,6 +269,9 @@ type QuickAnalyzeResult = {
       psa10: number | null;
       estimated?: boolean;
       lowPop?: boolean;
+      triangulated?: boolean;
+      notes?: string;
+      sources?: string[];
     } | null;
     isRaw?: boolean;
   };
@@ -2879,13 +2882,16 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   <DemandTierBadge tier={result.demandTier} />
                 )}
 
-                {result.market.isRaw && result.market.gradedEstimates && (result.market.gradedEstimates.psa9 || result.market.gradedEstimates.psa10) && result.market.value && (result.market.compCount ?? 0) > 0 && (
+                {result.market.isRaw && result.market.gradedEstimates && (result.market.gradedEstimates.psa9 || result.market.gradedEstimates.psa10) && result.market.value && ((result.market.compCount ?? 0) > 0 || result.market.gradedEstimates.triangulated) && (
                   <GradedValueMatrix
                     rawValue={trendCorrectedValue ?? result.market.value}
                     psa9Price={result.market.gradedEstimates.psa9}
                     psa10Price={result.market.gradedEstimates.psa10}
                     estimated={result.market.gradedEstimates.estimated}
                     lowPop={result.market.gradedEstimates.lowPop}
+                    triangulated={result.market.gradedEstimates.triangulated}
+                    triangulationNotes={result.market.gradedEstimates.notes}
+                    triangulationSources={result.market.gradedEstimates.sources}
                   />
                 )}
 

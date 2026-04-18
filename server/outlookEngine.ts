@@ -1568,6 +1568,131 @@ Return ONLY this JSON:
 }
 
 // ============================================================
+// GRADED VALUE TRIANGULATION — estimate PSA 9 / PSA 10 when no direct graded comps exist
+// Looks at OTHER parallels of the same player/year/set that DO have graded sales,
+// then triangulates what PSA 9/10 of THIS card would realistically sell for.
+// Used for low-numbered cards, 1/1s, and any raw card where Gemini found no graded comps.
+// ============================================================
+export async function fetchGradedTriangulation(card: {
+  playerName: string;
+  year?: string | number;
+  set?: string;
+  variation?: string;
+  sport?: string;
+  rawValue: number;
+}): Promise<{
+  psa9: number | null;
+  psa10: number | null;
+  notes: string;
+  sources: string[];
+} | null> {
+  const player = card.playerName;
+  const year = card.year ? String(card.year) : "";
+  const set = card.set || "";
+  const variation = card.variation || "";
+  const popMatch = variation.match(/\/\s*(\d+)\b/);
+  const popNumber = popMatch ? parseInt(popMatch[1]) : null;
+  const is1of1 = /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(variation);
+  const cardLabel = is1of1 ? "1/1" : popNumber ? `/${popNumber}` : "";
+  const sport = card.sport ? card.sport : "";
+  const cardDesc = `${year} ${set} ${player} ${variation}`.trim();
+  const sportLine = sport ? `Sport: ${sport}\n` : "";
+
+  const prompt = `You are a sports card pricing expert. I need to estimate what THIS card would sell for in PSA 9 and PSA 10 condition. There are NO direct graded sold comps for this exact card, so you must triangulate from comparable cards.
+
+CARD: "${cardDesc}"
+${sportLine}${cardLabel ? `Print Run: ${cardLabel}` : "Print Run: unnumbered"}
+Current raw (ungraded) value: $${card.rawValue}
+
+DO NOT just multiply the raw value by a fixed number. That is lazy and wrong. Instead:
+
+Step 1 — Search eBay for graded sold comps of OTHER parallels of this player from the same year and set:
+  - "${player} ${year} ${set} PSA 10 sold"
+  - "${player} ${year} ${set} PSA 9 sold"
+  - Look at base, /99, /50, /25, /10, and any other parallels you can find
+
+Step 2 — Establish the raw-to-PSA-10 and raw-to-PSA-9 ratio for THIS player in THIS set, using whichever parallels have data. (e.g., if their base PSA 10 sells for $80 and base raw sells for $20, that's a 4x raw→PSA-10 ratio for this product.)
+
+Step 3 — Apply that ratio to THIS card's raw value of $${card.rawValue}. ${cardLabel ? `Adjust for the rarity premium of ${cardLabel} vs the parallels you found data on (rarer parallels usually command a SMALLER multiplier % over raw because raw is already inflated by scarcity, but a LARGER absolute dollar premium).` : ""}
+
+Step 4 — Sanity check: does the result make sense for a player at this tier? If the player commands $50 raw on base cards, a PSA 10 of a /10 selling for $5,000 is unrealistic.
+
+Be conservative. When in doubt, lean toward the lower end. It's better to underpromise than to set unrealistic expectations.
+
+Return ONLY this JSON:
+{
+  "psa9": <triangulated PSA 9 estimate, or null if you cannot find any comparable data>,
+  "psa10": <triangulated PSA 10 estimate, or null if you cannot find any comparable data>,
+  "notes": "<one sentence explaining the triangulation logic and why these numbers make sense>",
+  "sources": ["<comp 1: e.g., 'Base PSA 10 sold for $X on ebay (Mar 2026)'>", "<comp 2>", "<comp 3>"]
+}`;
+
+  try {
+    console.log(`[Graded Triangulation] Starting for: ${cardDesc} (raw=$${card.rawValue})`);
+    const startTime = Date.now();
+
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const elapsed = Date.now() - startTime;
+    let responseText = response.text || "";
+    console.log(`[Graded Triangulation] Response in ${elapsed}ms`);
+
+    responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.warn(`[Graded Triangulation] No JSON in response`);
+      return null;
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    const psa9 = typeof parsed.psa9 === "number" && parsed.psa9 > 0 ? Math.round(parsed.psa9) : null;
+    const psa10 = typeof parsed.psa10 === "number" && parsed.psa10 > 0 ? Math.round(parsed.psa10) : null;
+
+    if (!psa9 && !psa10) {
+      console.warn(`[Graded Triangulation] Gemini returned no usable estimates`);
+      return null;
+    }
+
+    // Sanity guard: graded values must exceed raw and follow PSA10 > PSA9 ordering
+    let safePsa9 = psa9;
+    let safePsa10 = psa10;
+    if (safePsa9 && safePsa9 <= card.rawValue) safePsa9 = null;
+    if (safePsa10 && safePsa10 <= card.rawValue) safePsa10 = null;
+    if (safePsa9 && safePsa10 && safePsa9 > safePsa10) {
+      // Swap order is wrong — drop the lower one to avoid confusion
+      safePsa9 = null;
+    }
+
+    if (!safePsa9 && !safePsa10) {
+      console.warn(`[Graded Triangulation] Estimates failed sanity checks vs raw value`);
+      return null;
+    }
+
+    const sources = Array.isArray(parsed.sources)
+      ? parsed.sources.filter((s: any) => typeof s === "string").slice(0, 5)
+      : [];
+
+    console.log(`[Graded Triangulation] Result: PSA 9 $${safePsa9 || "—"}, PSA 10 $${safePsa10 || "—"} | ${parsed.notes?.substring(0, 100) || ""}`);
+
+    return {
+      psa9: safePsa9,
+      psa10: safePsa10,
+      notes: parsed.notes || "Triangulated from comparable parallels of the same player/set.",
+      sources,
+    };
+  } catch (error: any) {
+    console.error(`[Graded Triangulation] Error:`, error.message);
+    return null;
+  }
+}
+
+// ============================================================
 // CROSS-PRODUCT FALLBACK PRICE — for cards with no direct eBay comps
 // Searches comparable players / products to find a realistic floor price
 // ============================================================

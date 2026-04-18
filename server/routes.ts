@@ -3677,7 +3677,7 @@ Sitemap: ${origin}/sitemap.xml
       // This saves ~30s vs running cross-product serially after the main calls complete.
       console.log(`[Quick Analyze] Starting unified analysis for: ${title}`);
       const startTime = Date.now();
-      const { fetchMonthlyPriceHistory, fetchLowPopFallbackPrice, fetchCrossProductFallbackPrice } = await import("./outlookEngine");
+      const { fetchMonthlyPriceHistory, fetchLowPopFallbackPrice, fetchCrossProductFallbackPrice, fetchGradedTriangulation } = await import("./outlookEngine");
       const playerNameForSearch = (title || "").split(/\s+/).slice(0, 3).join(" ");
       const setLower = (set || "").toLowerCase();
       const titleLower = (title || "").toLowerCase();
@@ -4196,6 +4196,26 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // GRADED TRIANGULATION — fill in PSA 9/10 estimates when raw card has no graded comps.
+      // Especially valuable for /10, /25, 1/1s and other low-pop cards where collectors
+      // really want to know "what if I graded this?" but Gemini found no direct graded sales.
+      let gradedTriangulationResult: { psa9: number | null; psa10: number | null; notes: string; sources: string[] } | null = null;
+      const hasGeminiGraded = !!(unifiedResult?.market.psa9Price || unifiedResult?.market.psa10Price);
+      if (qaIsRaw && marketValue && marketValue > 0 && !hasGeminiGraded && effectivePlayerName) {
+        try {
+          gradedTriangulationResult = await fetchGradedTriangulation({
+            playerName: effectivePlayerName,
+            year: year || undefined,
+            set: set || undefined,
+            variation: variation || undefined,
+            sport: detectedSport || sport || undefined,
+            rawValue: marketValue,
+          });
+        } catch (gtErr: any) {
+          console.warn(`[Quick Analyze] Graded triangulation error: ${gtErr.message}`);
+        }
+      }
+
       logActivity("card_analysis", {
         userId,
         metadata: { title, year, set, action: finalAction, marketValue },
@@ -4252,15 +4272,20 @@ Sitemap: ${origin}/sitemap.xml
               return { psa9, psa10 };
             }
 
-            // Don't fabricate graded estimates when we have no real comps backing marketValue —
-            // the multiplier would be applied to a phantom number and produce confidently-wrong output.
-            if (!compCount || compCount <= 0) {
-              return null;
+            // No direct graded comps. Use the triangulated values computed earlier
+            // (fetched in parallel from fetchGradedTriangulation when raw + missing graded data).
+            if (gradedTriangulationResult && (gradedTriangulationResult.psa9 || gradedTriangulationResult.psa10)) {
+              return {
+                psa9: gradedTriangulationResult.psa9,
+                psa10: gradedTriangulationResult.psa10,
+                estimated: true,
+                triangulated: true,
+                notes: gradedTriangulationResult.notes,
+                sources: gradedTriangulationResult.sources,
+              };
             }
 
-            const estPsa9 = Math.round(marketValue * 2);
-            const estPsa10 = Math.round(marketValue * 4);
-            return { psa9: estPsa9, psa10: estPsa10, estimated: true };
+            return null;
           })() : null,
           isRaw: qaIsRaw,
         },

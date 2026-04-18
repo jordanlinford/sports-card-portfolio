@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Award, TrendingUp, DollarSign, ArrowRight, Search, Calculator } from "lucide-react";
+import { Award, TrendingUp, DollarSign, Search, Calculator, AlertCircle, Info } from "lucide-react";
+import { useState } from "react";
 
 interface GradedValueMatrixProps {
   rawValue: number;
@@ -8,6 +9,9 @@ interface GradedValueMatrixProps {
   psa10Price: number | null;
   estimated?: boolean;
   lowPop?: boolean;
+  triangulated?: boolean;
+  triangulationNotes?: string;
+  triangulationSources?: string[];
 }
 
 const GRADING_COST = {
@@ -76,7 +80,8 @@ const VERDICT_STYLES = {
   },
 };
 
-export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, lowPop }: GradedValueMatrixProps) {
+export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, lowPop, triangulated, triangulationNotes, triangulationSources }: GradedValueMatrixProps) {
+  const [showSources, setShowSources] = useState(false);
   if (!psa9Price && !psa10Price) return null;
   if (rawValue <= 0) return null;
 
@@ -97,6 +102,26 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
+        {triangulated && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5" data-testid="banner-triangulated">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <div className="space-y-1 flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 leading-tight">
+                  No direct comps exist — these are estimates
+                </p>
+                <p className="text-[10px] text-amber-700/80 dark:text-amber-300/80 leading-snug">
+                  Triangulated from comparable parallels of the same player and set. Treat as directional, not precise.
+                </p>
+                {triangulationNotes && (
+                  <p className="text-[10px] text-amber-700/70 dark:text-amber-300/70 leading-snug italic pt-0.5">
+                    {triangulationNotes}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-2 text-center" data-testid="graded-value-table">
           <div className="rounded-lg bg-muted/50 p-2.5">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">Raw</p>
@@ -147,7 +172,12 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
         </div>
 
         <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground/60 leading-tight">
-          {lowPop ? (
+          {triangulated ? (
+            <>
+              <Calculator className="h-3 w-3 shrink-0 mt-0.5" />
+              <span>Estimates derived from graded sales of comparable parallels in the same player/year/set. Outcome depends on grading result (~${GRADING_COST.regular}/card cost) and varies by condition, timing, and centering. Not guaranteed.</span>
+            </>
+          ) : lowPop ? (
             <>
               <Calculator className="h-3 w-3 shrink-0 mt-0.5" />
               <span>Low print run card — graded comps for this exact card are extremely rare. Estimates based on comparable parallels from this player. Grading a low-pop card adds authentication value but the premium over raw is modest since scarcity is already priced in. (~${GRADING_COST.regular}/card grading cost).</span>
@@ -164,6 +194,31 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
             </>
           )}
         </div>
+
+        {triangulated && triangulationSources && triangulationSources.length > 0 && (
+          <div className="border-t border-border/40 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowSources(!showSources)}
+              className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="button-toggle-triangulation-sources"
+            >
+              <Info className="h-3 w-3" />
+              <span className="underline-offset-2 hover:underline">
+                {showSources ? "Hide" : "Show"} comps used for estimate
+              </span>
+            </button>
+            {showSources && (
+              <ul className="mt-1.5 space-y-0.5 pl-4" data-testid="list-triangulation-sources">
+                {triangulationSources.map((src, i) => (
+                  <li key={i} className="text-[10px] text-muted-foreground/80 list-disc leading-snug">
+                    {src}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
