@@ -148,6 +148,41 @@ const CONFIDENCE_STYLES: Record<string, { color: string; icon: typeof CheckCircl
   LOW: { color: "text-red-500", icon: XCircle },
 };
 
+function parsePrintRun(...sources: Array<string | null | undefined>): number | null {
+  for (const src of sources) {
+    if (!src) continue;
+    const text = String(src);
+    const oneOfOne = /\b1\s*\/\s*1\b/.exec(text);
+    if (oneOfOne) return 1;
+    const matches = text.match(/\/\s*(\d{1,4})\b/g);
+    if (matches && matches.length > 0) {
+      const nums = matches
+        .map(m => parseInt(m.replace(/[^\d]/g, ""), 10))
+        .filter(n => Number.isFinite(n) && n > 0 && n <= 5000);
+      if (nums.length > 0) return Math.min(...nums);
+    }
+    if (/\bsuper\s*fractor\b/i.test(text)) return 1;
+  }
+  return null;
+}
+
+function getTakeawayForCard(action: string, baseTakeaway: string, printRun: number | null): string {
+  if (printRun === null) return baseTakeaway;
+  if (printRun === 1) {
+    if (action === "WATCH") return "True 1-of-1 — there is no volume to monitor. Track player news, recent sales of comparable 1/1s, and any grading population shifts.";
+    if (action === "HOLD" || action === "HOLD_CORE" || action === "LONG_HOLD" || action === "LEGACY_HOLD") return "True 1-of-1. Hold — value is set by player news and the next motivated buyer, not by trading volume.";
+    if (action === "MONITOR" || action === "AVOID_NEW_MONEY") return "True 1-of-1. Volume signals don't apply — let player news and any comparable 1/1 sale guide your next move.";
+    return baseTakeaway;
+  }
+  if (printRun <= 25) {
+    if (action === "WATCH") return `Ultra-low print run (/${printRun}). Volume signals are unreliable — focus on player news, comparable parallel sales, and PSA pop changes.`;
+    if (action === "HOLD" || action === "HOLD_CORE" || action === "LONG_HOLD") return `Low print (/${printRun}). Hold — short-term volume noise won't move this; player narrative and comparable parallel sales will.`;
+    if (action === "MONITOR") return `Low print (/${printRun}). Watch player news and comparable parallel sales rather than volume — listings are too thin to read trend from.`;
+    return baseTakeaway;
+  }
+  return baseTakeaway;
+}
+
 function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined || isNaN(value)) return "N/A";
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -337,6 +372,8 @@ export function OutlookDetails({
 
   const actionStyle = ACTION_STYLES[data.action] || ACTION_STYLES.WATCH;
   const ActionIcon = actionStyle.icon;
+  const cardPrintRun = parsePrintRun(data.card.variation, data.card.title, data.card.set);
+  const verdictTakeaway = getTakeawayForCard(data.action, actionStyle.takeaway, cardPrintRun);
   const confidenceStyle = CONFIDENCE_STYLES[data.confidence?.level || "LOW"] || CONFIDENCE_STYLES.LOW;
   const ConfidenceIcon = confidenceStyle.icon;
 
@@ -374,7 +411,7 @@ export function OutlookDetails({
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-white/20">
-          <p className="text-sm sm:text-base opacity-95">{actionStyle.takeaway}</p>
+          <p className="text-sm sm:text-base opacity-95">{verdictTakeaway}</p>
         </div>
       </div>
 
@@ -538,7 +575,7 @@ export function OutlookDetails({
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">{actionStyle.label} Recommendation</h3>
-                <p className="text-sm font-medium mb-2">{actionStyle.takeaway}</p>
+                <p className="text-sm font-medium mb-2">{verdictTakeaway}</p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {(data.isPro ? data.actionReasons : data.actionReasons.slice(0, 1)).map((reason, i) => (
                     <li key={i} className="flex items-start gap-2" data-testid={`text-action-reason-${i}`}>
