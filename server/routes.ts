@@ -4201,6 +4201,7 @@ Sitemap: ${origin}/sitemap.xml
       // Especially valuable for /10, /25, 1/1s and other low-pop cards where collectors
       // really want to know "what if I graded this?" but Gemini found no direct graded sales.
       let gradedTriangulationResult: { psa9: number | null; psa10: number | null; notes: string; sources: string[] } | null = null;
+      let gradedHeuristicResult: { psa9: number | null; psa10: number | null; notes: string } | null = null;
       const hasGeminiGraded = !!(unifiedResult?.market.psa9Price || unifiedResult?.market.psa10Price);
       if (qaIsRaw && marketValue && marketValue > 0 && !hasGeminiGraded && effectivePlayerName) {
         try {
@@ -4214,6 +4215,55 @@ Sitemap: ${origin}/sitemap.xml
           });
         } catch (gtErr: any) {
           console.warn(`[Quick Analyze] Graded triangulation error: ${gtErr.message}`);
+        }
+
+        // FINAL-TIER FALLBACK — when neither Gemini nor triangulation produced any graded
+        // estimate (common on true 1/1s where no comparable graded comps exist), apply a
+        // heuristic raw-to-graded multiplier so collectors still see a directional answer
+        // to "what could this be worth graded?" with a clear "estimate only" disclaimer.
+        const triangulationProducedNothing =
+          !gradedTriangulationResult ||
+          (!gradedTriangulationResult.psa9 && !gradedTriangulationResult.psa10);
+        if (triangulationProducedNothing) {
+          const lowPopMatchHeur = variation ? variation.match(/\/\s*(\d+)\b/) : null;
+          const popNum = lowPopMatchHeur ? parseInt(lowPopMatchHeur[1]) : null;
+          const is1of1Heur = /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(variation || "");
+          const isLowPopHeur = is1of1Heur || (popNum !== null && popNum <= 25);
+
+          // Multiplier curve. For low-pop cards the raw price already bakes in scarcity,
+          // so the graded premium is a SMALLER % uplift but still meaningful in absolute $.
+          // For "normal" cards the % uplift is larger because the grade itself adds scarcity.
+          let psa9Mult: number;
+          let psa10Mult: number;
+          if (isLowPopHeur) {
+            // Low-pop / 1-of-1 — modest % uplift, primarily reflects authentication value
+            psa9Mult = 1.15;
+            psa10Mult = 1.45;
+          } else if (marketValue >= 1000) {
+            psa9Mult = 1.3;
+            psa10Mult = 2.0;
+          } else if (marketValue >= 100) {
+            psa9Mult = 1.5;
+            psa10Mult = 2.5;
+          } else if (marketValue >= 20) {
+            psa9Mult = 2.0;
+            psa10Mult = 4.0;
+          } else {
+            psa9Mult = 3.0;
+            psa10Mult = 8.0;
+          }
+
+          const psa9Est = Math.round(marketValue * psa9Mult);
+          const psa10Est = Math.round(marketValue * psa10Mult);
+
+          gradedHeuristicResult = {
+            psa9: psa9Est,
+            psa10: psa10Est,
+            notes: isLowPopHeur
+              ? `Rough estimate using a typical low-pop graded premium (~${psa9Mult.toFixed(2)}x raw for PSA 9, ~${psa10Mult.toFixed(2)}x for PSA 10). No real graded comps exist for this card.`
+              : `Rough estimate using typical raw-to-graded multipliers (~${psa9Mult.toFixed(1)}x raw for PSA 9, ~${psa10Mult.toFixed(1)}x for PSA 10). No graded sold comps were found for this exact card.`,
+          };
+          console.log(`[Quick Analyze] HEURISTIC GRADED FALLBACK: PSA 9 $${psa9Est}, PSA 10 $${psa10Est} (raw $${marketValue}, lowPop=${isLowPopHeur})`);
         }
       }
 
@@ -4283,6 +4333,21 @@ Sitemap: ${origin}/sitemap.xml
                 triangulated: true,
                 notes: gradedTriangulationResult.notes,
                 sources: gradedTriangulationResult.sources,
+              };
+            }
+
+            // Final fallback: heuristic raw-to-graded multiplier so collectors always
+            // get a directional "what could this be worth graded?" answer, even on 1/1s
+            // with no comparable comps anywhere. Marked `estimated:true` (no triangulated
+            // flag) so the UI shows the "typical multiplier, no comps found" disclaimer.
+            if (gradedHeuristicResult && (gradedHeuristicResult.psa9 || gradedHeuristicResult.psa10)) {
+              return {
+                psa9: gradedHeuristicResult.psa9,
+                psa10: gradedHeuristicResult.psa10,
+                estimated: true,
+                lowPop: !!(variation && /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(variation)) ||
+                        !!(variation && variation.match(/\/\s*(\d+)\b/) && parseInt(variation.match(/\/\s*(\d+)\b/)![1]) <= 25),
+                notes: gradedHeuristicResult.notes,
               };
             }
 
