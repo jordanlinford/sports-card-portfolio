@@ -166,15 +166,15 @@ function parsePrintRun(...sources: Array<string | null | undefined>): number | n
   return null;
 }
 
-function getTakeawayForCard(action: string, baseTakeaway: string, printRun: number | null): string {
-  if (printRun === null) return baseTakeaway;
+function getLowPrintCaveat(printRun: number | null): string | null {
+  if (printRun === null) return null;
   if (printRun === 1) {
-    return "Congrats on your 1-of-1 — you help set the market on this one. There's no direct sales history, so our estimate is anchored to similar players, sets, and parallels.";
+    return "1-of-1 — no direct sales history. Estimate is anchored to comparable players, sets, and parallels.";
   }
   if (printRun <= 25) {
-    return `Low-numbered card (/${printRun}). These rarely trade, so you have a real say in the price. Our estimate is anchored to similar players, sets, and parallels rather than direct sales.`;
+    return `Print run /${printRun} — direct sales are scarce. Estimate is anchored to comparable players, sets, and parallels.`;
   }
-  return baseTakeaway;
+  return null;
 }
 
 function formatCurrency(value: number | null | undefined): string {
@@ -367,7 +367,7 @@ export function OutlookDetails({
   const actionStyle = ACTION_STYLES[data.action] || ACTION_STYLES.WATCH;
   const ActionIcon = actionStyle.icon;
   const cardPrintRun = parsePrintRun(data.card.variation, data.card.title, data.card.set);
-  const verdictTakeaway = getTakeawayForCard(data.action, actionStyle.takeaway, cardPrintRun);
+  const lowPrintCaveat = getLowPrintCaveat(cardPrintRun);
   const confidenceStyle = CONFIDENCE_STYLES[data.confidence?.level || "LOW"] || CONFIDENCE_STYLES.LOW;
   const ConfidenceIcon = confidenceStyle.icon;
 
@@ -410,7 +410,12 @@ export function OutlookDetails({
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-white/20">
-          <p className="text-sm sm:text-base opacity-95">{verdictTakeaway}</p>
+          <p className="text-sm sm:text-base opacity-95">{actionStyle.takeaway}</p>
+          {lowPrintCaveat && (
+            <p className="mt-1.5 text-xs sm:text-sm opacity-80 italic" data-testid="text-low-print-caveat">
+              {lowPrintCaveat}
+            </p>
+          )}
         </div>
       </div>
 
@@ -574,7 +579,10 @@ export function OutlookDetails({
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">{actionStyle.label} Recommendation</h3>
-                <p className="text-sm font-medium mb-2">{verdictTakeaway}</p>
+                <p className="text-sm font-medium mb-2">{actionStyle.takeaway}</p>
+                {lowPrintCaveat && (
+                  <p className="text-xs text-muted-foreground italic mb-2">{lowPrintCaveat}</p>
+                )}
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {(data.isPro ? data.actionReasons : data.actionReasons.slice(0, 1)).map((reason, i) => (
                     <li key={i} className="flex items-start gap-2" data-testid={`text-action-reason-${i}`}>
