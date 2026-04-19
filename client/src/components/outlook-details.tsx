@@ -582,6 +582,21 @@ export function OutlookDetails({
               />
             </div>
           )}
+          {data.isPro && cardPrintRun !== null && cardPrintRun <= 25 && (
+            <div className="pt-4 border-t mt-4">
+              <div
+                className="flex items-start gap-2 px-3 py-2 rounded-md border bg-muted/40 border-muted-foreground/20 text-muted-foreground"
+                data-testid="lowprint-trend-caveat"
+              >
+                <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span className="text-sm">
+                  {cardPrintRun === 1
+                    ? "Trend signals don't apply to 1-of-1s — value is driven by collector demand, not market activity."
+                    : `Trend signals are unreliable on /${cardPrintRun} cards — value is driven by collector demand, not market activity.`}
+                </span>
+              </div>
+            </div>
+          )}
         </CardHeader>
       </Card>
 
