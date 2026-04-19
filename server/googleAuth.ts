@@ -76,6 +76,8 @@ export function setupGoogleAuth(app: Express) {
             await storage.updateGoogleId(existingUser.id, googleId);
           }
 
+          await storage.bumpLogin(existingUser.id);
+
           const sessionUser = {
             claims: { sub: existingUser.id },
             authProvider: "google" as const,
@@ -100,6 +102,8 @@ export function setupGoogleAuth(app: Express) {
           );
           sendNewSignupNotification(userName, newUser.email, "google").catch(() => {});
         }
+
+        await storage.bumpLogin(newUser.id);
 
         const sessionUser = {
           claims: { sub: newUser.id },

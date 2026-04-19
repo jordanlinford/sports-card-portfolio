@@ -19,7 +19,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { User, DisplayCaseWithCards, PlayerRegistry, BlogPostWithAuthor, SupportTicketWithRequester, SupportTicketWithMessages, SupportTicketStatus } from "@shared/schema";
+import type { User, AdminUserSummary, DisplayCaseWithCards, PlayerRegistry, BlogPostWithAuthor, SupportTicketWithRequester, SupportTicketWithMessages, SupportTicketStatus } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
 import { HeroImageUploader } from "@/components/hero-image-uploader";
 
 interface PlatformStats {
@@ -69,7 +70,7 @@ function StatCard({ title, value, icon: Icon, description }: { title: string; va
   );
 }
 
-function UserRow({ user, onUpdateSubscription, onDelete }: { user: User; onUpdateSubscription: (userId: string, status: string) => void; onDelete: (userId: string) => void }) {
+function UserRow({ user, onUpdateSubscription, onDelete }: { user: AdminUserSummary; onUpdateSubscription: (userId: string, status: string) => void; onDelete: (userId: string) => void }) {
   const initials = user.handle 
     ? user.handle.slice(0, 2).toUpperCase()
     : [user.firstName, user.lastName]
@@ -91,6 +92,19 @@ function UserRow({ user, onUpdateSubscription, onDelete }: { user: User; onUpdat
           {user.handle ? `@${user.handle}` : [user.firstName, user.lastName].filter(Boolean).join(" ") || "Anonymous"}
         </p>
         <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+          <span data-testid={`text-login-count-${user.id}`}>
+            Logins: <span className="font-medium text-foreground">{user.loginCount ?? 0}</span>
+          </span>
+          <span data-testid={`text-last-login-${user.id}`}>
+            Last login: {user.lastLoginAt ? formatDistanceToNow(new Date(user.lastLoginAt), { addSuffix: true }) : "never"}
+          </span>
+          {user.lastActivityAt && (
+            <span data-testid={`text-last-active-${user.id}`}>
+              Active: {formatDistanceToNow(new Date(user.lastActivityAt), { addSuffix: true })}
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         {user.isAdmin && (
@@ -99,6 +113,23 @@ function UserRow({ user, onUpdateSubscription, onDelete }: { user: User; onUpdat
         <Badge variant={isPro ? "default" : "secondary"}>
           {user.subscriptionStatus || "FREE"}
         </Badge>
+        {user.isOnTrial && (
+          <Badge variant="outline" className="border-amber-500 text-amber-600 dark:text-amber-400" data-testid={`badge-trial-${user.id}`}>
+            Trial{user.trialSource ? ` · ${user.trialSource}` : ""}
+            {user.trialEnd ? ` · ends ${format(new Date(user.trialEnd), "MMM d")}` : ""}
+          </Badge>
+        )}
+        {user.promoCodes.map((p) => (
+          <Badge
+            key={p.code}
+            variant="outline"
+            className="border-violet-500 text-violet-600 dark:text-violet-400"
+            title={p.description || p.code}
+            data-testid={`badge-promo-${user.id}-${p.code}`}
+          >
+            Promo: {p.code}
+          </Badge>
+        ))}
         {isPro ? (
           <Button
             size="sm"
@@ -2226,7 +2257,7 @@ export default function AdminDashboard() {
     retry: false,
   });
 
-  const { data: users, isLoading: usersLoading } = useQuery<User[]>({
+  const { data: users, isLoading: usersLoading } = useQuery<AdminUserSummary[]>({
     queryKey: ["/api/admin/users"],
     retry: false,
   });

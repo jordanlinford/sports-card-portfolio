@@ -72,6 +72,8 @@ export const users = pgTable("users", {
   trialStart: timestamp("trial_start"),
   trialEnd: timestamp("trial_end"),
   trialSource: varchar("trial_source", { length: 50 }),
+  lastLoginAt: timestamp("last_login_at"),
+  loginCount: integer("login_count").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -536,6 +538,12 @@ export const outlookUsageRelations = relations(outlookUsage, ({ one }) => ({
 // Schemas and Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+export type AdminUserSummary = User & {
+  lastActivityAt: Date | null;
+  promoCodes: { code: string; description: string | null; redeemedAt: Date | null }[];
+  isOnTrial: boolean;
+};
 
 export function hasProAccess(user: User | undefined | null): boolean {
   if (!user) return false;

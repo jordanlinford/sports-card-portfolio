@@ -91,7 +91,11 @@ export async function setupAuth(app: Express) {
   ) => {
     const user = {};
     updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
+    const claims = tokens.claims();
+    await upsertUser(claims);
+    if (claims && (claims as any).sub) {
+      await storage.bumpLogin((claims as any).sub as string);
+    }
     verified(null, user);
   };
 

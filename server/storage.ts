@@ -33,6 +33,8 @@ import {
   supportTicketMessages,
   type User,
   type UpsertUser,
+  type AdminUserSummary,
+  activityLogs,
   type DisplayCase,
   type InsertDisplayCase,
   type Card,
@@ -227,7 +229,8 @@ export interface IStorage {
   getPoundForPoundDisplayCases(limit?: number, minCards?: number): Promise<{ id: number; name: string; ownerName: string; ownerImage: string | null; avgValue: number; cardCount: number; theme: string; bestCardName: string | null }[]>;
 
   // Admin operations
-  getAllUsers(): Promise<User[]>;
+  getAllUsers(): Promise<AdminUserSummary[]>;
+  bumpLogin(userId: string): Promise<void>;
   getAllDisplayCases(): Promise<(DisplayCaseWithCards & { ownerName: string })[]>;
   getPlatformStats(): Promise<{ totalUsers: number; totalDisplayCases: number; totalCards: number; proUsers: number }>;
   isUserAdmin(userId: string): Promise<boolean>;
@@ -1634,8 +1637,66 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Admin operations
-  async getAllUsers(): Promise<User[]> {
-    return db.select().from(users).orderBy(desc(users.createdAt));
+  async getAllUsers(): Promise<AdminUserSummary[]> {
+    const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
+    if (allUsers.length === 0) return [];
+
+    const userIds = allUsers.map((u) => u.id);
+
+    // Last activity per user (most recent activity_logs row per user_id)
+    const lastActivityRows = await db
+      .select({
+        userId: activityLogs.userId,
+        lastAt: sql<Date>`MAX(${activityLogs.createdAt})`,
+      })
+      .from(activityLogs)
+      .where(inArray(activityLogs.userId, userIds))
+      .groupBy(activityLogs.userId);
+    const lastActivityMap = new Map<string, Date>();
+    for (const row of lastActivityRows) {
+      if (row.userId && row.lastAt) lastActivityMap.set(row.userId, row.lastAt);
+    }
+
+    // Promo code redemptions per user, joined to promo_codes for code text
+    const redemptionRows = await db
+      .select({
+        userId: promoCodeRedemptions.userId,
+        code: promoCodes.code,
+        description: promoCodes.description,
+        redeemedAt: promoCodeRedemptions.redeemedAt,
+      })
+      .from(promoCodeRedemptions)
+      .innerJoin(promoCodes, eq(promoCodeRedemptions.promoCodeId, promoCodes.id))
+      .where(inArray(promoCodeRedemptions.userId, userIds));
+    const promoMap = new Map<string, { code: string; description: string | null; redeemedAt: Date | null }[]>();
+    for (const r of redemptionRows) {
+      if (!r.userId) continue;
+      const list = promoMap.get(r.userId) ?? [];
+      list.push({ code: r.code, description: r.description ?? null, redeemedAt: r.redeemedAt ?? null });
+      promoMap.set(r.userId, list);
+    }
+
+    const now = new Date();
+    return allUsers.map((u) => ({
+      ...u,
+      lastActivityAt: lastActivityMap.get(u.id) ?? null,
+      promoCodes: promoMap.get(u.id) ?? [],
+      isOnTrial: !!(u.trialEnd && u.trialEnd > now),
+    }));
+  }
+
+  async bumpLogin(userId: string): Promise<void> {
+    try {
+      await db
+        .update(users)
+        .set({
+          lastLoginAt: new Date(),
+          loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
+        })
+        .where(eq(users.id, userId));
+    } catch (err) {
+      console.error("[bumpLogin] Failed to update login stats:", err);
+    }
   }
 
   async getAllDisplayCases(): Promise<(DisplayCaseWithCards & { ownerName: string })[]> {
