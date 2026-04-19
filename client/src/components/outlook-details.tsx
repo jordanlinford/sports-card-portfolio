@@ -169,16 +169,10 @@ function parsePrintRun(...sources: Array<string | null | undefined>): number | n
 function getTakeawayForCard(action: string, baseTakeaway: string, printRun: number | null): string {
   if (printRun === null) return baseTakeaway;
   if (printRun === 1) {
-    if (action === "WATCH") return "True 1-of-1 — there is no volume to monitor. Track player news, recent sales of comparable 1/1s, and any grading population shifts.";
-    if (action === "HOLD" || action === "HOLD_CORE" || action === "LONG_HOLD" || action === "LEGACY_HOLD") return "True 1-of-1. Hold — value is set by player news and the next motivated buyer, not by trading volume.";
-    if (action === "MONITOR" || action === "AVOID_NEW_MONEY") return "True 1-of-1. Volume signals don't apply — let player news and any comparable 1/1 sale guide your next move.";
-    return baseTakeaway;
+    return "Congrats on your 1-of-1 — you help set the market on this one. There's no direct sales history, so our estimate is anchored to similar players, sets, and parallels.";
   }
   if (printRun <= 25) {
-    if (action === "WATCH") return `Ultra-low print run (/${printRun}). Volume signals are unreliable — focus on player news, comparable parallel sales, and PSA pop changes.`;
-    if (action === "HOLD" || action === "HOLD_CORE" || action === "LONG_HOLD") return `Low print (/${printRun}). Hold — short-term volume noise won't move this; player narrative and comparable parallel sales will.`;
-    if (action === "MONITOR") return `Low print (/${printRun}). Watch player news and comparable parallel sales rather than volume — listings are too thin to read trend from.`;
-    return baseTakeaway;
+    return `Low-numbered card (/${printRun}). These rarely trade, so you have a real say in the price. Our estimate is anchored to similar players, sets, and parallels rather than direct sales.`;
   }
   return baseTakeaway;
 }
@@ -393,6 +387,11 @@ export function OutlookDetails({
               <div className="text-3xl sm:text-4xl font-bold" data-testid="text-verdict-hero">
                 {actionStyle.label}
               </div>
+              {cardPrintRun !== null && cardPrintRun <= 25 && (
+                <div className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-black/15 px-2 py-0.5 text-xs font-medium" data-testid="badge-hard-to-comp">
+                  {cardPrintRun === 1 ? "1-of-1 · Hard to comp" : `/${cardPrintRun} · Hard to comp`}
+                </div>
+              )}
             </div>
           </div>
           <div className="text-center sm:text-right">
