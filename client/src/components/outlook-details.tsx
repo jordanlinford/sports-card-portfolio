@@ -571,7 +571,7 @@ export function OutlookDetails({
               )}
             </div>
           </div>
-          {data.isPro && getDivergenceStatus(
+          {data.isPro && (cardPrintRun === null || cardPrintRun > 25) && getDivergenceStatus(
             getPriceDirection(data.signals.trend),
             getLiquidityTierFromScore(data.signals.liquidity)
           ) && (
