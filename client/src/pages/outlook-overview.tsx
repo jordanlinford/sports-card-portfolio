@@ -2882,7 +2882,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                   <DemandTierBadge tier={result.demandTier} />
                 )}
 
-                {result.market.isRaw && result.market.gradedEstimates && (result.market.gradedEstimates.psa9 || result.market.gradedEstimates.psa10) && result.market.value && ((result.market.compCount ?? 0) > 0 || result.market.gradedEstimates.triangulated || result.market.gradedEstimates.estimated) && (
+                {result.market.isRaw && result.market.gradedEstimates && (result.market.gradedEstimates.psa9 || result.market.gradedEstimates.psa10) && result.market.value && (
                   <GradedValueMatrix
                     rawValue={trendCorrectedValue ?? result.market.value}
                     psa9Price={result.market.gradedEstimates.psa9}
