@@ -32,6 +32,7 @@ interface MonthlyPriceHistory {
   dataPoints: MonthlyPricePoint[];
   confidence: "HIGH" | "MEDIUM" | "LOW";
   notes: string;
+  hasAnySales?: boolean;
 }
 
 interface PlayerPriceRequest {
@@ -135,9 +136,10 @@ export function PriceTrendChart({
 
   useEffect(() => {
     if (history && history.dataPoints && history.dataPoints.length > 0 && onPriceLoaded) {
-      const recentPoints = history.dataPoints.slice(-3);
-      const recentAvg = recentPoints.reduce((sum, p) => sum + (p.avgPrice || 0), 0) / recentPoints.length;
       const hasRealSales = history.dataPoints.some(p => (p.salesCount || 0) > 0);
+      if (!hasRealSales) return;
+      const realPoints = history.dataPoints.filter(p => (p.salesCount || 0) > 0).slice(-3);
+      const recentAvg = realPoints.reduce((sum, p) => sum + (p.avgPrice || 0), 0) / realPoints.length;
       if (recentAvg > 0) {
         onPriceLoaded(Math.round(recentAvg * 100) / 100, hasRealSales);
       }
@@ -219,6 +221,39 @@ export function PriceTrendChart({
               Load 18-Month Price Chart
             </Button>
           )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const totalSalesCount = history.dataPoints.reduce((sum, dp) => sum + (dp.salesCount || 0), 0);
+  const hasAnySales = history.hasAnySales !== undefined ? history.hasAnySales : totalSalesCount > 0;
+
+  if (!hasAnySales) {
+    return (
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Price Trend
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {subtitle || history.cardDescription || "Recent sold prices"}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div
+            className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3"
+            data-testid="price-trend-no-sales"
+          >
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="text-xs text-amber-900 dark:text-amber-200">
+              <p className="font-medium">Too new for trend analysis</p>
+              <p className="mt-1 text-amber-800/80 dark:text-amber-200/80">
+                {history.notes || "No recorded sales found in the lookback window — likely a newly released product. A trend chart isn't reliable yet; check back after a few weeks of sales history."}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -423,8 +458,14 @@ export function ComparisonPriceTrendChart({
     );
   }
 
-  const hasPlayer1 = history1 && history1.dataPoints.length > 0;
-  const hasPlayer2 = history2 && history2.dataPoints.length > 0;
+  const player1HasSales = !!history1 && (history1.hasAnySales !== undefined
+    ? history1.hasAnySales
+    : history1.dataPoints.some(p => (p.salesCount || 0) > 0));
+  const player2HasSales = !!history2 && (history2.hasAnySales !== undefined
+    ? history2.hasAnySales
+    : history2.dataPoints.some(p => (p.salesCount || 0) > 0));
+  const hasPlayer1 = !!history1 && history1.dataPoints.length > 0 && player1HasSales;
+  const hasPlayer2 = !!history2 && history2.dataPoints.length > 0 && player2HasSales;
 
   const allMonths = new Set<string>();
   if (hasPlayer1) history1.dataPoints.forEach((dp) => allMonths.add(dp.month));
