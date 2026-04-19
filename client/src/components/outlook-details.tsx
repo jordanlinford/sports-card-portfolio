@@ -166,6 +166,20 @@ function parsePrintRun(...sources: Array<string | null | undefined>): number | n
   return null;
 }
 
+function getLowPrintTakeaway(action: string, baseTakeaway: string, printRun: number | null): string {
+  if (printRun === null || printRun > 25) return baseTakeaway;
+  switch (action) {
+    case "WATCH":
+      return "Don't buy aggressively. Watch for player news and any comparable parallel sales.";
+    case "MONITOR":
+      return "Hold and watch — let player news and any comparable parallel sale guide your next move.";
+    case "HOLD_ROLE_RISK":
+      return "Role uncertainty. Hold and follow the player's situation closely.";
+    default:
+      return baseTakeaway;
+  }
+}
+
 function getLowPrintCaveat(printRun: number | null): string | null {
   if (printRun === null) return null;
   if (printRun === 1) {
@@ -368,6 +382,7 @@ export function OutlookDetails({
   const ActionIcon = actionStyle.icon;
   const cardPrintRun = parsePrintRun(data.card.variation, data.card.title, data.card.set);
   const lowPrintCaveat = getLowPrintCaveat(cardPrintRun);
+  const verdictTakeaway = getLowPrintTakeaway(data.action, actionStyle.takeaway, cardPrintRun);
   const confidenceStyle = CONFIDENCE_STYLES[data.confidence?.level || "LOW"] || CONFIDENCE_STYLES.LOW;
   const ConfidenceIcon = confidenceStyle.icon;
 
@@ -410,7 +425,7 @@ export function OutlookDetails({
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-white/20">
-          <p className="text-sm sm:text-base opacity-95">{actionStyle.takeaway}</p>
+          <p className="text-sm sm:text-base opacity-95">{verdictTakeaway}</p>
           {lowPrintCaveat && (
             <p className="mt-1.5 text-xs sm:text-sm opacity-80 italic" data-testid="text-low-print-caveat">
               {lowPrintCaveat}
@@ -579,7 +594,7 @@ export function OutlookDetails({
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">{actionStyle.label} Recommendation</h3>
-                <p className="text-sm font-medium mb-2">{actionStyle.takeaway}</p>
+                <p className="text-sm font-medium mb-2">{verdictTakeaway}</p>
                 {lowPrintCaveat && (
                   <p className="text-xs text-muted-foreground italic mb-2">{lowPrintCaveat}</p>
                 )}
