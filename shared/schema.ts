@@ -2513,6 +2513,7 @@ export const scanHistory = pgTable("scan_history", {
   sport: varchar("sport", { length: 50 }),
   cardNumber: varchar("card_number", { length: 50 }),
   imagePath: text("image_path"),
+  imageHash: varchar("image_hash", { length: 64 }),
   scanConfidence: varchar("scan_confidence", { length: 20 }),
   marketValue: real("market_value"),
   action: varchar("action", { length: 50 }),

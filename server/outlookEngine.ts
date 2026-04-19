@@ -1504,29 +1504,28 @@ CARD: "${searchDesc}"
 Print Run: ${cardLabel} (only ${is1of1 ? 1 : popNumber} copies exist)
 Condition: ${isRaw ? "RAW (ungraded)" : (card.grade || "Unknown")}
 
-Search eBay for pricing data in this order:
+Your job: gather actual eBay sold-comp data points. Do NOT make up a single "average price" out of thin air — instead, return the individual comps you found and let the system compute the median.
+
+Search eBay for sold listings in this order:
 1. This exact card: "${playerName} ${year} ${set} ${is1of1 ? "1/1" : `/${popNumber}`} sold eBay"
-2. This player's recent sales: "${playerName} sold eBay" — establishes the market floor
-3. This player's higher-numbered parallels from the same set:
+2. This player's higher-numbered parallels from the same set (most useful triangulation):
    - "${playerName} ${year} ${set} /25 sold eBay"
    - "${playerName} ${year} ${set} /99 sold eBay"
-4. If no set-specific data: "${playerName} ${year} auto sold eBay"
+   - "${playerName} ${year} ${set} /150 sold eBay"
+3. This player's other rare autos/relics from the same year: "${playerName} ${year} auto /25 sold eBay"
+4. As a last resort, base autos to establish the player's floor: "${playerName} ${year} ${set} auto sold eBay"
 
-Using your search results and expert knowledge of the sports card market, estimate what this card would realistically sell for on eBay today.
-Do NOT apply fixed multiplier formulas. Use your judgment based on what you find and what you know about:
-- This player's position, tier, and current demand
-- The memorabilia type (caps/hat swatches are worth less than game-used patches/jerseys)
-- The brand and set tier
-- What collectors actually pay for rare cards at this player's level
+For each comp you find, record: the ACTUAL sold price (not asking), a brief description of what parallel/print-run it was, and a relevance weight (1-10) for how comparable it is to the target card.
 
-Be realistic and conservative. Cite the comps or knowledge used in your notes.
+Be honest. If you only find 1-2 weak comps, return only those — do not pad with guesses. The system will widen the uncertainty range automatically when comps are sparse.
 
-Return ONLY this JSON:
+Return ONLY this JSON (no markdown, no prose):
 {
-  "avgPrice": <your best triangulated estimate for ${isRaw ? "raw/ungraded" : "this grade"}>,
-  "minPrice": <conservative low estimate>,
-  "maxPrice": <aggressive high estimate>,
-  "notes": "<explain your triangulation: which parallel sold for how much, what multiplier you applied>"
+  "comps": [
+    { "price": <number>, "description": "<e.g., '${playerName} ${year} ${set} /25 PSA 9 sold $X (Mar 2026)'>", "weight": <1-10> },
+    ...
+  ],
+  "notes": "<one sentence summarizing the comp picture: how many comps, their range, and your overall confidence>"
 }`;
 
   try {
@@ -1547,20 +1546,75 @@ Return ONLY this JSON:
 
     responseText = responseText.replace(/```json\s*/gi, "").replace(/```\s*/g, "");
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      if (parsed.avgPrice && typeof parsed.avgPrice === "number" && parsed.avgPrice > 0) {
-        console.log(`[LowPop Fallback] Triangulated: $${parsed.avgPrice} (range $${parsed.minPrice}-$${parsed.maxPrice}) | ${parsed.notes?.substring(0, 100)}`);
-        return {
-          avgPrice: parsed.avgPrice,
-          minPrice: parsed.minPrice || parsed.avgPrice * 0.7,
-          maxPrice: parsed.maxPrice || parsed.avgPrice * 1.5,
-          notes: parsed.notes || "Triangulated from parallel comps",
-        };
-      }
+    if (!jsonMatch) {
+      console.warn(`[LowPop Fallback] No JSON in response`);
+      return null;
     }
-    console.warn(`[LowPop Fallback] Could not parse valid price from response`);
-    return null;
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    let comps: Array<{ price: number; description: string; weight: number }> = Array.isArray(parsed.comps)
+      ? parsed.comps
+          .filter((c: any) => c && typeof c.price === "number" && c.price > 0 && c.price < 1000000)
+          .map((c: any) => ({
+            price: c.price,
+            description: String(c.description || "").slice(0, 200),
+            weight: Math.max(1, Math.min(10, Number(c.weight) || 5)),
+          }))
+      : [];
+
+    // Backwards-compat: if Gemini still returned a flat avgPrice, wrap it as a single weak comp
+    if (comps.length === 0 && typeof parsed.avgPrice === "number" && parsed.avgPrice > 0) {
+      comps = [{ price: parsed.avgPrice, description: "Single triangulated estimate (low confidence)", weight: 3 }];
+    }
+
+    if (comps.length === 0) {
+      console.warn(`[LowPop Fallback] No valid comps returned`);
+      return null;
+    }
+
+    // Sort by price for median calculation
+    const sortedPrices = [...comps].sort((a, b) => a.price - b.price);
+    const median = sortedPrices.length % 2 === 1
+      ? sortedPrices[Math.floor(sortedPrices.length / 2)].price
+      : (sortedPrices[sortedPrices.length / 2 - 1].price + sortedPrices[sortedPrices.length / 2].price) / 2;
+
+    const minComp = sortedPrices[0].price;
+    const maxComp = sortedPrices[sortedPrices.length - 1].price;
+
+    // Sparse-data uncertainty: widen the range when we have few comps. With 1 comp, ±50%.
+    // With 2 comps, use min/max but pad ±25%. With 3+, trust the actual min/max.
+    let minPrice: number;
+    let maxPrice: number;
+    if (comps.length === 1) {
+      minPrice = median * 0.5;
+      maxPrice = median * 1.5;
+    } else if (comps.length === 2) {
+      minPrice = median * 0.75;
+      maxPrice = median * 1.25;
+    } else {
+      minPrice = minComp;
+      maxPrice = maxComp;
+    }
+
+    // Floor refusal: if all comps are below $5 OR median is absurdly high relative to comp spread, bail.
+    if (median < 1) {
+      console.warn(`[LowPop Fallback] Median too low ($${median}), refusing estimate`);
+      return null;
+    }
+
+    const compNote = comps.length < 3
+      ? ` (sparse: ${comps.length} comp${comps.length === 1 ? "" : "s"} — wide uncertainty)`
+      : ` (${comps.length} comps)`;
+    const notes = `Median of ${comps.length} comp${comps.length === 1 ? "" : "s"}${compNote}. ${parsed.notes || ""}`.trim();
+
+    console.log(`[LowPop Fallback] Median $${median.toFixed(0)} from ${comps.length} comps (range $${minPrice.toFixed(0)}-$${maxPrice.toFixed(0)})`);
+
+    return {
+      avgPrice: median,
+      minPrice,
+      maxPrice,
+      notes,
+    };
   } catch (error: any) {
     console.error(`[LowPop Fallback] Error:`, error.message);
     return null;

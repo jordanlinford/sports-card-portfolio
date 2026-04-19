@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { createHash } from "crypto";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupGoogleAuth } from "./googleAuth";
@@ -4428,6 +4429,11 @@ Sitemap: ${origin}/sitemap.xml
   
   // In-memory daily scan counter (resets on server restart, but that's fine for rate limiting)
   const dailyScanCounts = new Map<string, { count: number; date: string }>();
+
+  // In-flight scan dedupe map: prevents two concurrent identical scans (same user + same image hash)
+  // from both calling Gemini & both burning quota. Keyed by `${userId}:${imageHash}`. Each entry holds
+  // a Promise that resolves to the response payload. Entry is deleted when the in-flight scan settles.
+  const inFlightScans = new Map<string, Promise<any>>();
   
   function getScanCountForToday(userId: string): number {
     const today = new Date().toISOString().split('T')[0];
@@ -4474,7 +4480,102 @@ Sitemap: ${origin}/sitemap.xml
       const isPro = hasProAccess(user);
       const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
       const scansToday = getScanCountForToday(userId);
-      
+
+      // Compute SHA-256 of the (front) image bytes to detect identical re-scans
+      let imageHash: string | null = null;
+      try {
+        let rawForHash = imageData;
+        if (typeof rawForHash === "string" && rawForHash.startsWith("data:")) {
+          rawForHash = rawForHash.split(",")[1] || rawForHash;
+        }
+        if (typeof rawForHash === "string" && /^[A-Za-z0-9+/=]+$/.test(rawForHash.substring(0, 100))) {
+          const buf = Buffer.from(rawForHash, "base64");
+          imageHash = createHash("sha256").update(buf).digest("hex");
+        }
+      } catch (hashErr) {
+        console.warn("[Card Scan] Image hashing failed (non-fatal):", hashErr);
+      }
+
+      // RACE GUARD: if an identical scan (same user+hash) is already in flight, wait for it
+      // to finish before proceeding. After it settles, the DB cache will have the entry and
+      // the next lookup will hit it — preventing two concurrent Gemini calls for the same image.
+      const inFlightKey = imageHash ? `${userId}:${imageHash}` : null;
+      if (inFlightKey && inFlightScans.has(inFlightKey)) {
+        try {
+          console.log(`[Card Scan] In-flight scan detected for hash ${imageHash!.slice(0, 12)}…, awaiting…`);
+          await inFlightScans.get(inFlightKey);
+        } catch {
+          // If the in-flight scan errored, we'll just proceed and try ourselves.
+        }
+      }
+
+      // Register this request as in-flight so concurrent duplicates wait for us
+      let inFlightResolve: (() => void) | null = null;
+      if (inFlightKey && !inFlightScans.has(inFlightKey)) {
+        const p = new Promise<void>((resolve) => {
+          inFlightResolve = resolve;
+        });
+        inFlightScans.set(inFlightKey, p);
+        // Always clear from the map when this request finishes (success or failure)
+        res.on("finish", () => {
+          inFlightScans.delete(inFlightKey);
+          if (inFlightResolve) inFlightResolve();
+        });
+        res.on("close", () => {
+          if (inFlightScans.has(inFlightKey)) {
+            inFlightScans.delete(inFlightKey);
+            if (inFlightResolve) inFlightResolve();
+          }
+        });
+      }
+
+      // STABLE-IDENTIFICATION CACHE: if this exact image was scanned in the last 14 days,
+      // reuse the prior identification instead of re-running Gemini OCR. Same image →
+      // same identification, every time. Doesn't burn the user's daily scan quota.
+      if (imageHash) {
+        try {
+          const priorScan = await storage.findScanByImageHash(userId, imageHash, 14);
+          if (priorScan && priorScan.playerName) {
+            console.log(`[Card Scan] Reusing prior identification for image hash ${imageHash.slice(0, 12)}… (scan #${priorScan.id}, ${Math.round((Date.now() - priorScan.createdAt.getTime()) / 1000 / 60)}min old)`);
+            const cachedScanResult = {
+              success: true,
+              cardIdentification: {
+                playerName: priorScan.playerName,
+                year: priorScan.year,
+                setName: priorScan.setName,
+                variation: priorScan.variation,
+                cardNumber: priorScan.cardNumber,
+                sport: priorScan.sport,
+              },
+              gradeEstimate: {
+                appearsToBe: (priorScan.grade ? "graded" : "raw") as "graded" | "raw",
+                grade: priorScan.grade,
+                gradingCompany: priorScan.grader,
+              },
+              confidence: priorScan.scanConfidence || "high",
+              fromImageCache: true,
+            };
+            return res.json({
+              success: true,
+              scan: cachedScanResult,
+              scanHistoryId: priorScan.id,
+              fieldConfidence: {},
+              uncertainFields: [],
+              parallelSuggestions: [],
+              fromImageCache: true,
+              usage: {
+                scansToday,
+                dailyLimit,
+                remainingScans: Math.max(0, dailyLimit - scansToday),
+                isPro,
+              },
+            });
+          }
+        } catch (cacheErr) {
+          console.warn("[Card Scan] Image hash cache lookup failed (non-fatal):", cacheErr);
+        }
+      }
+
       if (scansToday >= dailyLimit) {
         return res.status(429).json({
           message: isPro 
@@ -4573,6 +4674,7 @@ Sitemap: ${origin}/sitemap.xml
           sport: cardId?.sport || null,
           cardNumber: cardId?.cardNumber || null,
           imagePath: uploadedImagePath,
+          imageHash: imageHash || null,
           scanConfidence: scanResult.confidence || null,
           marketValue: null,
           action: null,

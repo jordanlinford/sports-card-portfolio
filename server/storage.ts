@@ -437,6 +437,7 @@ export interface IStorage {
   updateScanHistoryAnalysis(id: number, userId: string, marketValue: number | null, action: string | null): Promise<ScanHistory | undefined>;
   updateScanHistoryMetadata(id: number, userId: string, data: { playerName?: string; year?: number | null; setName?: string; variation?: string; grade?: string; grader?: string; sport?: string; cardNumber?: string; scanConfidence?: string }): Promise<ScanHistory | undefined>;
   findRecentScanPrice(playerName: string, year: number | null, variation: string | null, userId: string): Promise<{ marketValue: number; createdAt: Date } | null>;
+  findScanByImageHash(userId: string, imageHash: string, withinDays?: number): Promise<ScanHistory | null>;
 
   // Pop Report History operations
   insertPopSnapshots(snapshots: InsertPopHistory[]): Promise<PopHistory[]>;
@@ -3571,6 +3572,22 @@ export class DatabaseStorage implements IStorage {
     }
     
     return message;
+  }
+
+  async findScanByImageHash(userId: string, imageHash: string, withinDays: number = 14): Promise<ScanHistory | null> {
+    if (!imageHash) return null;
+    const cutoff = new Date(Date.now() - withinDays * 24 * 60 * 60 * 1000);
+    const [row] = await db
+      .select()
+      .from(scanHistory)
+      .where(and(
+        eq(scanHistory.userId, userId),
+        eq(scanHistory.imageHash, imageHash),
+        gt(scanHistory.createdAt, cutoff),
+      ))
+      .orderBy(desc(scanHistory.createdAt))
+      .limit(1);
+    return row || null;
   }
 
   async createScanHistory(data: InsertScanHistory): Promise<ScanHistory> {
