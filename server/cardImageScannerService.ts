@@ -181,7 +181,7 @@ export async function scanCardImage(
       : CARD_SCAN_PROMPT;
 
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-pro",
       contents: [
         {
           role: "user",
