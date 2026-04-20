@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { sanitizeCardField } from "@/lib/sanitizeCardField";
 import { submitScanAndWait } from "@/lib/scanPolling";
+import { useScanJobs } from "@/contexts/ScanJobContext";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -754,6 +755,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [backImageData, setBackImageData] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanProgressMessage, setScanProgressMessage] = useState<string | null>(null);
+  const { trackJob: trackScanJob } = useScanJobs();
   const [showScanAddDialog, setShowScanAddDialog] = useState(false);
   const [showConfirmedAddDialog, setShowConfirmedAddDialog] = useState(false);
   
@@ -1213,6 +1215,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         const scanData = await submitScanAndWait({
           body: { imageData: base64 },
           signal: batchAbort.signal,
+          onJobStarted: (jobId) => trackScanJob(jobId),
         });
         clearTimeout(batchTimeout);
 
@@ -1508,6 +1511,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
           ...(effectiveBackData ? { imageDataBack: effectiveBackData, mimeTypeBack: "image/jpeg" } : {}),
         },
         signal: abortController.signal,
+        onJobStarted: (jobId) => {
+          trackScanJob(jobId);
+          toast({
+            title: "Scan started",
+            description: "You can keep browsing — we'll notify you when it's ready.",
+          });
+        },
         onProgress: (update) => {
           setScanProgressMessage(
             update.status === "queued"

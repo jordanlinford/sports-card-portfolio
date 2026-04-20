@@ -14,6 +14,12 @@ type SubmitOptions = {
   body: unknown;
   signal?: AbortSignal;
   onProgress?: (update: ScanProgressUpdate) => void;
+  /**
+   * Called as soon as the server accepts the scan and returns a jobId
+   * (before any polling). Use this to register the job with
+   * ScanJobContext so it survives page navigation.
+   */
+  onJobStarted?: (jobId: string) => void;
   /** Poll interval in ms. Defaults to 1500. */
   pollIntervalMs?: number;
   /** Overall timeout in ms. Defaults to 180_000 (3 min). */

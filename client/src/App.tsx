@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { FeedbackWidget } from "@/components/feedback-widget";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ScanJobProvider } from "@/contexts/ScanJobContext";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -163,6 +164,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="system" storageKey="mydisplaycase-theme">
         <TooltipProvider>
+          <ScanJobProvider>
           <div className="min-h-screen bg-background flex flex-col">
             <Navigation />
             <TrialBanner />
@@ -178,6 +180,7 @@ function App() {
           <BatchAnalysisBanner />
           <Toaster />
           <FeedbackWidget />
+          </ScanJobProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

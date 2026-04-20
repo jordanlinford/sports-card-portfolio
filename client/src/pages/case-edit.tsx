@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { submitScanAndWait } from "@/lib/scanPolling";
+import { useScanJobs } from "@/contexts/ScanJobContext";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { SuccessOverlay } from "@/components/success-animation";
 import { KeyboardHint } from "@/components/keyboard-hint";
@@ -215,6 +216,7 @@ export default function CaseEdit() {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { trackJob: trackScanJob } = useScanJobs();
   const [showAddCard, setShowAddCard] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -704,6 +706,13 @@ export default function CaseEdit() {
       const response = await submitScanAndWait({
         body: { imageData: base64Data, mimeType: "image/jpeg" },
         signal: scanAbort.signal,
+        onJobStarted: (jobId) => {
+          trackScanJob(jobId);
+          toast({
+            title: "Scan started",
+            description: "You can keep browsing — we'll notify you when it's ready.",
+          });
+        },
       });
       clearTimeout(scanTimeout);
       
