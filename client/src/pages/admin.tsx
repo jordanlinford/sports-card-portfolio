@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download, Globe, Zap, ExternalLink, MessageCircle, Send, Clock, CheckCircle, AlertCircle, Sparkles, Loader2, ArrowRight, Check, X } from "lucide-react";
@@ -2262,6 +2262,92 @@ export default function AdminDashboard() {
     retry: false,
   });
 
+  const [userSearch, setUserSearch] = useState("");
+  const [userPlanFilter, setUserPlanFilter] = useState<"all" | "pro" | "free" | "trial" | "promo" | "admin">("all");
+  const [userActivityFilter, setUserActivityFilter] = useState<"all" | "never" | "7d" | "30d" | "stale30">("all");
+  const [userSortBy, setUserSortBy] = useState<"recent_login" | "most_logins" | "newest" | "least_active">("recent_login");
+
+  const filteredUsers = useMemo(() => {
+    if (!users) return [];
+    const q = userSearch.trim().toLowerCase();
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+
+    let list = users.filter((u) => {
+      if (q) {
+        const hay = [
+          u.email,
+          u.handle,
+          u.firstName,
+          u.lastName,
+          u.id,
+          ...u.promoCodes.map((p) => p.code),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+
+      switch (userPlanFilter) {
+        case "pro":
+          if (u.subscriptionStatus !== "PRO") return false;
+          break;
+        case "free":
+          if (u.subscriptionStatus === "PRO") return false;
+          break;
+        case "trial":
+          if (!u.isOnTrial) return false;
+          break;
+        case "promo":
+          if (u.promoCodes.length === 0) return false;
+          break;
+        case "admin":
+          if (!u.isAdmin) return false;
+          break;
+      }
+
+      const last = u.lastLoginAt ? new Date(u.lastLoginAt).getTime() : null;
+      switch (userActivityFilter) {
+        case "never":
+          if (last !== null) return false;
+          break;
+        case "7d":
+          if (last === null || now - last > 7 * DAY) return false;
+          break;
+        case "30d":
+          if (last === null || now - last > 30 * DAY) return false;
+          break;
+        case "stale30":
+          if (last !== null && now - last <= 30 * DAY) return false;
+          break;
+      }
+
+      return true;
+    });
+
+    list = [...list].sort((a, b) => {
+      if (userSortBy === "most_logins") {
+        return (b.loginCount ?? 0) - (a.loginCount ?? 0);
+      }
+      if (userSortBy === "newest") {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      }
+      if (userSortBy === "least_active") {
+        const ta = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
+        const tb = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+        return ta - tb;
+      }
+      const ta = a.lastLoginAt ? new Date(a.lastLoginAt).getTime() : 0;
+      const tb = b.lastLoginAt ? new Date(b.lastLoginAt).getTime() : 0;
+      return tb - ta;
+    });
+
+    return list;
+  }, [users, userSearch, userPlanFilter, userActivityFilter, userSortBy]);
+
   const { data: displayCases, isLoading: casesLoading } = useQuery<DisplayCaseWithOwner[]>({
     queryKey: ["/api/admin/display-cases"],
     retry: false,
@@ -2438,7 +2524,62 @@ export default function AdminDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle>All Users</CardTitle>
-                <CardDescription>Manage platform users and their subscriptions</CardDescription>
+                <CardDescription>
+                  Manage platform users and their subscriptions
+                  {users && (
+                    <span className="ml-2 text-xs" data-testid="text-user-result-count">
+                      · Showing {filteredUsers.length} of {users.length}
+                    </span>
+                  )}
+                </CardDescription>
+                <div className="flex flex-col md:flex-row gap-2 pt-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Search by email, handle, name, or promo code..."
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      className="pl-8"
+                      data-testid="input-user-search"
+                    />
+                  </div>
+                  <Select value={userPlanFilter} onValueChange={(v) => setUserPlanFilter(v as typeof userPlanFilter)}>
+                    <SelectTrigger className="w-full md:w-[160px]" data-testid="select-user-plan">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All plans</SelectItem>
+                      <SelectItem value="pro">Pro only</SelectItem>
+                      <SelectItem value="free">Free only</SelectItem>
+                      <SelectItem value="trial">On trial</SelectItem>
+                      <SelectItem value="promo">Used promo code</SelectItem>
+                      <SelectItem value="admin">Admins</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={userActivityFilter} onValueChange={(v) => setUserActivityFilter(v as typeof userActivityFilter)}>
+                    <SelectTrigger className="w-full md:w-[170px]" data-testid="select-user-activity">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Any activity</SelectItem>
+                      <SelectItem value="7d">Active last 7 days</SelectItem>
+                      <SelectItem value="30d">Active last 30 days</SelectItem>
+                      <SelectItem value="stale30">Inactive 30+ days</SelectItem>
+                      <SelectItem value="never">Never logged in</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={userSortBy} onValueChange={(v) => setUserSortBy(v as typeof userSortBy)}>
+                    <SelectTrigger className="w-full md:w-[170px]" data-testid="select-user-sort">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="recent_login">Most recent login</SelectItem>
+                      <SelectItem value="most_logins">Most logins</SelectItem>
+                      <SelectItem value="newest">Newest signup</SelectItem>
+                      <SelectItem value="least_active">Least active</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <ScrollArea className="h-[500px]">
@@ -2448,13 +2589,13 @@ export default function AdminDashboard() {
                         <Skeleton key={i} className="h-16" />
                       ))}
                     </div>
-                  ) : users && users.length > 0 ? (
-                    users.map((user) => (
+                  ) : filteredUsers.length > 0 ? (
+                    filteredUsers.map((user) => (
                       <UserRow key={user.id} user={user} onUpdateSubscription={handleUpdateSubscription} onDelete={handleDeleteUser} />
                     ))
                   ) : (
-                    <div className="p-8 text-center text-muted-foreground">
-                      No users found
+                    <div className="p-8 text-center text-muted-foreground" data-testid="text-no-users">
+                      {users && users.length > 0 ? "No users match your filters" : "No users found"}
                     </div>
                   )}
                 </ScrollArea>
