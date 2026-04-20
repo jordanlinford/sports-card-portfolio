@@ -121,7 +121,11 @@ export function ScanStatusIndicator() {
                     onDismiss={() => dismissJob(job.jobId)}
                     onView={() => {
                       setOpen(false);
-                      navigate("/scan-history");
+                      navigate(
+                        job.scanHistoryId
+                          ? `/scan-history?open=${job.scanHistoryId}`
+                          : "/scan-history",
+                      );
                     }}
                   />
                 ))

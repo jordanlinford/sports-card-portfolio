@@ -149,12 +149,16 @@ export function ScanJobProvider({ children }: { children: React.ReactNode }) {
             if (data.status === "complete" && job.status !== "complete") {
               const player =
                 data.result?.scan?.cardIdentification?.playerName || "Your card";
+              const historyId = data.scanHistoryId ?? data.result?.scanHistoryId;
+              const viewHref = historyId
+                ? `/scan-history?open=${historyId}`
+                : "/scan-history";
               toast({
-                title: "Scan ready",
-                description: `${player} has been identified.`,
+                title: `Scan for ${player} is ready`,
+                description: "Tap to view the result.",
                 action: (
                   <button
-                    onClick={() => navigate("/scan-history")}
+                    onClick={() => navigate(viewHref)}
                     className="text-sm font-medium underline underline-offset-2"
                     data-testid={`button-view-scan-${job.jobId}`}
                   >

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, Link } from "wouter";
@@ -285,8 +285,17 @@ export default function ScanHistoryPage() {
   const [page, setPage] = useState(0);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedScan, setSelectedScan] = useState<ScanHistory | null>(null);
+  const autoOpenedIdRef = useRef<string | null>(null);
 
   const offset = page * PAGE_SIZE;
+
+  // Read ?open=<scanHistoryId> so toasts / the scan indicator can deep-link
+  // straight into a specific scan's detail view.
+  const autoOpenScanId = (() => {
+    if (typeof window === "undefined") return null;
+    const raw = new URLSearchParams(window.location.search).get("open");
+    return raw && /^\d+$/.test(raw) ? raw : null;
+  })();
 
   const { data, isLoading } = useQuery<ScanHistoryResponse>({
     queryKey: ['/api/scan-history', page],
@@ -374,6 +383,24 @@ export default function ScanHistoryPage() {
     setSelectedScan(scan);
     setAddDialogOpen(true);
   };
+
+  // When arriving with ?open=<id>, auto-open that scan's detail dialog once
+  // the scan-history data has loaded. Clears the query param afterwards so
+  // a page refresh doesn't re-open it endlessly.
+  useEffect(() => {
+    if (!autoOpenScanId) return;
+    if (autoOpenedIdRef.current === autoOpenScanId) return;
+    const match = data?.items?.find((s) => String(s.id) === autoOpenScanId);
+    if (!match) return;
+    autoOpenedIdRef.current = autoOpenScanId;
+    setSelectedScan(match);
+    setAddDialogOpen(true);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("open");
+      window.history.replaceState({}, "", url.toString());
+    } catch {}
+  }, [autoOpenScanId, data?.items]);
 
   const handleCreateNewWithCard = () => {
     if (!selectedScan) return;
