@@ -7849,80 +7849,128 @@ RULES:
       
       const origin = getOriginUrl(req);
       const url = `${origin}/outlook/${sport}/${slug}`;
-      const title = outlook.seoTitle || `${outlook.playerName} Sports Card Investment Outlook`;
-      const description = outlook.seoDescription || 
-        `Should you buy or sell ${outlook.playerName} cards? Get AI-powered investment analysis, market temperature, and timing tips.`;
-      
+      const currentYear = new Date().getFullYear();
+      const sportLabel = (outlook.sport || "").charAt(0).toUpperCase() + (outlook.sport || "").slice(1);
+      const title = outlook.seoTitle ||
+        `${outlook.playerName} ${currentYear} Card Value, Prices & Buy/Sell Verdict | Sports Card Portfolio`;
+      const description = outlook.seoDescription ||
+        `Should you buy or sell ${outlook.playerName} ${sportLabel.toLowerCase()} cards in ${currentYear}? AI-powered Buy/Hold/Sell verdict, real eBay sold comps, market temperature, and grading recommendations.`;
+
       const { transformToSSRAdvisorOutlook, applySSRVerdictGuardrails } = await import("./lib/outlookTransformServer");
       const advisorOutlook = applySSRVerdictGuardrails(transformToSSRAdvisorOutlook(outlook.outlookJson));
-      
+
       const verdict = advisorOutlook.verdict;
       const verdictLabel = advisorOutlook.verdictLabel;
       const advisorTake = advisorOutlook.advisorTake;
       const topReasons = advisorOutlook.topReasons;
-      
-      // Generate JSON-LD structured data
-      const jsonLd = {
-        "@context": "https://schema.org",
-        "@type": "Article",
-        "headline": title,
-        "description": description,
-        "author": {
-          "@type": "Organization",
-          "name": "Sports Card Portfolio",
-          "url": origin
+
+      // Generate JSON-LD structured data — Article + Person about the player so AI
+      // search engines can attach the verdict/insights directly to the player entity.
+      const jsonLd = [
+        {
+          "@context": "https://schema.org",
+          "@type": "Article",
+          "headline": title,
+          "description": description,
+          "author": {
+            "@type": "Organization",
+            "name": "Sports Card Portfolio",
+            "url": origin,
+          },
+          "publisher": {
+            "@type": "Organization",
+            "name": "Sports Card Portfolio",
+            "url": origin,
+            "logo": {
+              "@type": "ImageObject",
+              "url": `${origin}/icons/icon-180x180.png`,
+            },
+          },
+          "dateModified": outlook.updatedAt?.toISOString() || new Date().toISOString(),
+          "mainEntityOfPage": url,
+          "about": {
+            "@type": "Person",
+            "name": outlook.playerName,
+          },
         },
-        "publisher": {
-          "@type": "Organization",
-          "name": "Sports Card Portfolio",
-          "url": origin
+        {
+          "@context": "https://schema.org",
+          "@type": "WebPage",
+          "name": title,
+          "description": description,
+          "url": url,
+          "isPartOf": {
+            "@type": "WebSite",
+            "name": "Sports Card Portfolio",
+            "url": origin,
+          },
+          "primaryImageOfPage": {
+            "@type": "ImageObject",
+            "url": `${origin}/og-default.png`,
+          },
+          "breadcrumb": {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": origin },
+              { "@type": "ListItem", "position": 2, "name": sportLabel, "item": `${origin}/explore?sport=${outlook.sport}` },
+              { "@type": "ListItem", "position": 3, "name": outlook.playerName, "item": url },
+            ],
+          },
         },
-        "dateModified": outlook.updatedAt?.toISOString() || new Date().toISOString(),
-        "mainEntityOfPage": url,
-        "about": {
-          "@type": "Person",
-          "name": outlook.playerName
-        }
-      };
+      ];
       
+      // Escape every dynamic value going into the SSR HTML to prevent injection.
+      // JSON.stringify the JSON-LD graph but also replace `<` to defeat </script> escapes.
+      const safeTitle = escapeHtml(title);
+      const safeDescription = escapeHtml(description);
+      const safeUrl = escapeHtml(url);
+      const safeOrigin = escapeHtml(origin);
+      const safePlayerName = escapeHtml(outlook.playerName || "");
+      const safeSportLabel = escapeHtml(sportLabel);
+      const safeVerdict = escapeHtml(verdict || "");
+      const safeVerdictLabel = escapeHtml(verdictLabel || "");
+      const safeAdvisorTake = escapeHtml(advisorTake || "");
+      const safeReasons = topReasons.map((r) => escapeHtml(r));
+      const safeJsonLd = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+
       const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <meta name="description" content="${description}">
-  <meta property="og:title" content="${title}">
-  <meta property="og:description" content="${description}">
+  <title>${safeTitle}</title>
+  <meta name="description" content="${safeDescription}">
+  <meta property="og:title" content="${safeTitle}">
+  <meta property="og:description" content="${safeDescription}">
   <meta property="og:type" content="article">
-  <meta property="og:url" content="${url}">
+  <meta property="og:url" content="${safeUrl}">
   <meta property="og:site_name" content="Sports Card Portfolio">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="${title}">
-  <meta name="twitter:description" content="${description}">
-  <link rel="canonical" href="${url}">
-  <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
+  <meta name="twitter:title" content="${safeTitle}">
+  <meta name="twitter:description" content="${safeDescription}">
+  <link rel="canonical" href="${safeUrl}">
+  <script type="application/ld+json">${safeJsonLd}</script>
 </head>
 <body>
   <main>
     <article>
-      <h1>${outlook.playerName} Sports Card Investment Outlook</h1>
-      <p><strong>Sport:</strong> ${outlook.sport}</p>
-      <p><strong>Verdict:</strong> ${verdictLabel} (${verdict})</p>
+      <h1>${safePlayerName} ${currentYear} Card Value &amp; Buy/Sell Verdict</h1>
+      <p><strong>Sport:</strong> ${safeSportLabel}</p>
+      <p><strong>Verdict:</strong> ${safeVerdictLabel} (${safeVerdict})</p>
       <section>
         <h2>Advisor Analysis</h2>
-        <p>${advisorTake}</p>
+        <p>${safeAdvisorTake}</p>
       </section>
-      ${topReasons.length > 0 ? `
+      ${safeReasons.length > 0 ? `
       <section>
         <h2>Key Reasons</h2>
         <ul>
-          ${topReasons.map(r => `<li>${r}</li>`).join('\n          ')}
+          ${safeReasons.map(r => `<li>${r}</li>`).join('\n          ')}
         </ul>
       </section>` : ''}
       <section>
         <h2>Get the Full Analysis</h2>
-        <p>Sign up at <a href="${origin}">Sports Card Portfolio</a> for real-time market intelligence, price tracking, and personalized investment recommendations.</p>
+        <p>Sign up at <a href="${safeOrigin}">Sports Card Portfolio</a> for real-time market intelligence, price tracking, and personalized investment recommendations.</p>
       </section>
     </article>
   </main>

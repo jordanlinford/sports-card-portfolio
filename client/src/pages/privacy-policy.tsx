@@ -4,7 +4,7 @@ import { ArrowLeft } from "lucide-react";
 export default function PrivacyPolicy() {
   const lastUpdated = "December 18, 2024";
   const companyName = "Sports Card Portfolio";
-  const websiteUrl = "sportscardportfolio.com";
+  const websiteUrl = "sportscardportfolio.io";
   const contactEmail = "info@sportscardportfolio.io";
 
   return (

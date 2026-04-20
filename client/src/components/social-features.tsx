@@ -99,7 +99,7 @@ export function ShareButtons({ displayCaseId, caseName }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
-  const productionDomain = "https://sportscardportfolio.com";
+  const productionDomain = "https://sportscardportfolio.io";
   const shareUrl = `${productionDomain}/case/${displayCaseId}`;
   
   const shareText = `Check out "${caseName}" on Sports Card Portfolio!`;
