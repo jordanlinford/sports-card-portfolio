@@ -558,15 +558,122 @@ export default function ScanHistoryPage() {
       )}
 
       <Dialog open={addDialogOpen} onOpenChange={(open) => { setAddDialogOpen(open); if (!open) setSelectedScan(null); }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto" data-testid="dialog-scan-result">
           <DialogHeader>
-            <DialogTitle>Add to Collection</DialogTitle>
+            <DialogTitle>Scan result</DialogTitle>
             <DialogDescription>
-              {selectedScan ? (
-                <>Add <span className="font-medium">{[selectedScan.year, selectedScan.setName, selectedScan.playerName].filter(Boolean).join(" ")}</span> to a collection</>
-              ) : "Choose a collection"}
+              {selectedScan
+                ? "Here's what we identified. Save it to a collection or open the full analysis."
+                : "Loading scan…"}
             </DialogDescription>
           </DialogHeader>
+
+          {selectedScan && (
+            <div className="space-y-4">
+              {/* Card preview: image + identification */}
+              <div className="flex gap-4">
+                {selectedScan.imagePath ? (
+                  <img
+                    src={selectedScan.imagePath}
+                    alt={selectedScan.playerName || "Scanned card"}
+                    className="h-32 w-24 rounded-md object-cover border bg-muted shrink-0"
+                    data-testid="img-scan-result"
+                  />
+                ) : (
+                  <div className="h-32 w-24 rounded-md border bg-muted flex items-center justify-center shrink-0">
+                    <Camera className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="font-semibold text-base leading-tight" data-testid="text-scan-result-player">
+                    {selectedScan.playerName || "Unknown player"}
+                  </div>
+                  <div className="text-sm text-muted-foreground" data-testid="text-scan-result-card">
+                    {[selectedScan.year, selectedScan.setName, selectedScan.variation]
+                      .filter(Boolean)
+                      .join(" • ") || "Card details unavailable"}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {selectedScan.cardNumber && (
+                      <Badge variant="outline" className="text-xs">#{selectedScan.cardNumber}</Badge>
+                    )}
+                    {selectedScan.grade && (
+                      <Badge variant="outline" className="text-xs">
+                        {selectedScan.grader && selectedScan.grader !== "raw"
+                          ? `${selectedScan.grader.toUpperCase()} ${selectedScan.grade}`
+                          : selectedScan.grade}
+                      </Badge>
+                    )}
+                    {selectedScan.sport && (
+                      <Badge variant="outline" className="text-xs capitalize">{selectedScan.sport}</Badge>
+                    )}
+                    {selectedScan.scanConfidence && (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${
+                          selectedScan.scanConfidence === "high"
+                            ? "bg-green-500/10 text-green-600 border-green-500/20"
+                            : selectedScan.scanConfidence === "medium"
+                              ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+                              : "bg-red-500/10 text-red-600 border-red-500/20"
+                        }`}
+                        data-testid="badge-scan-confidence"
+                      >
+                        {selectedScan.scanConfidence.toUpperCase()} confidence
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Market value + verdict */}
+              {(selectedScan.marketValue != null || selectedScan.action) && (
+                <div className="rounded-lg border bg-muted/40 p-3 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                      Market value
+                    </div>
+                    <div className="text-2xl font-semibold tabular-nums" data-testid="text-scan-result-value">
+                      {selectedScan.marketValue != null
+                        ? `$${selectedScan.marketValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                        : "—"}
+                    </div>
+                  </div>
+                  {selectedScan.action && (
+                    <Badge
+                      variant="outline"
+                      className={`gap-1 ${getActionColor(selectedScan.action)}`}
+                      data-testid="badge-scan-action"
+                    >
+                      {getActionIcon(selectedScan.action)}
+                      {getActionLabel(selectedScan.action)}
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {/* Open full analysis */}
+              <Button
+                variant="default"
+                className="w-full gap-2"
+                onClick={() => { setAddDialogOpen(false); handleReAnalyze(selectedScan); }}
+                data-testid="button-view-full-analysis"
+              >
+                <Eye className="h-4 w-4" />
+                View full analysis
+              </Button>
+
+              <div className="relative pt-1">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Save to collection</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Button
               variant="outline"
