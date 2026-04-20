@@ -85,12 +85,22 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
   if (!psa9Price && !psa10Price) return null;
   if (rawValue <= 0) return null;
 
-  // If PSA 10 is missing but PSA 9 exists, estimate PSA 10 as ~1.5x PSA 9
-  const psa10Estimated = !psa10Price && psa9Price ? Math.round(psa9Price * 1.5) : null;
-  const effectivePsa10 = psa10Price ?? psa10Estimated;
-  const isPsa10Estimated = !psa10Price && !!psa10Estimated;
+  // Floor graded values at raw — a graded copy can never be worth less than the
+  // ungraded copy of the same card (worst case: it grades poorly, you crack it
+  // back out to raw). PSA 10 must also be >= PSA 9.
+  const flooredPsa9 = psa9Price !== null ? Math.max(psa9Price, rawValue) : null;
 
-  const recommendation = getGradeRecommendation(rawValue, psa9Price, effectivePsa10);
+  // If PSA 10 is missing but PSA 9 exists, estimate PSA 10 as ~1.5x PSA 9
+  const psa10Estimated = !psa10Price && flooredPsa9 ? Math.round(flooredPsa9 * 1.5) : null;
+  const rawPsa10 = psa10Price ?? psa10Estimated;
+  const effectivePsa10 = rawPsa10 !== null
+    ? Math.max(rawPsa10, flooredPsa9 ?? 0, rawValue)
+    : null;
+  const isPsa10Estimated = !psa10Price && !!psa10Estimated;
+  const psa9Floored = psa9Price !== null && flooredPsa9 !== psa9Price;
+  const psa10Floored = psa10Price !== null && effectivePsa10 !== psa10Price;
+
+  const recommendation = getGradeRecommendation(rawValue, flooredPsa9, effectivePsa10);
   const styles = VERDICT_STYLES[recommendation.verdict];
 
   return (
@@ -130,10 +140,10 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
           <div className="rounded-lg bg-blue-500/5 border border-blue-500/10 p-2.5">
             <p className="text-[10px] uppercase tracking-wider text-blue-600 dark:text-blue-400 font-medium">PSA 9</p>
             <p className="text-base font-bold mt-0.5 text-blue-700 dark:text-blue-300" data-testid="text-psa9-value">
-              {psa9Price ? formatCurrency(psa9Price) : "—"}
+              {flooredPsa9 ? formatCurrency(flooredPsa9) : "—"}
             </p>
-            {psa9Price && (
-              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{estimated ? "est." : "avg"}</p>
+            {flooredPsa9 && (
+              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{estimated || psa9Floored ? "est." : "avg"}</p>
             )}
           </div>
           <div className="rounded-lg bg-purple-500/5 border border-purple-500/10 p-2.5">
@@ -142,7 +152,7 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
               {effectivePsa10 ? formatCurrency(effectivePsa10) : "—"}
             </p>
             {effectivePsa10 && (
-              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{(estimated || isPsa10Estimated) ? "est." : "avg"}</p>
+              <p className="text-[9px] text-muted-foreground/50 mt-0.5">{(estimated || isPsa10Estimated || psa10Floored) ? "est." : "avg"}</p>
             )}
           </div>
         </div>
