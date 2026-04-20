@@ -4319,8 +4319,14 @@ Sitemap: ${origin}/sitemap.xml
             const psa9 = unifiedResult?.market.psa9Price ?? null;
             const psa10 = unifiedResult?.market.psa10Price ?? null;
 
+            // tier indicates the data quality of these graded estimates so the
+            // UI / recommendation logic can stop treating a heuristic guess like
+            // a real-comp-backed verdict.
+            //   1 = direct eBay sold comps for THIS exact card (high confidence)
+            //   2 = triangulated from sibling parallels of the same player/set
+            //   3 = pure raw→graded multiplier heuristic, no comps at all
             if (psa9 || psa10) {
-              return { psa9, psa10 };
+              return { psa9, psa10, tier: 1 as const };
             }
 
             // No direct graded comps. Use the triangulated values computed earlier
@@ -4331,6 +4337,7 @@ Sitemap: ${origin}/sitemap.xml
                 psa10: gradedTriangulationResult.psa10,
                 estimated: true,
                 triangulated: true,
+                tier: 2 as const,
                 notes: gradedTriangulationResult.notes,
                 sources: gradedTriangulationResult.sources,
               };
@@ -4345,6 +4352,7 @@ Sitemap: ${origin}/sitemap.xml
                 psa9: gradedHeuristicResult.psa9,
                 psa10: gradedHeuristicResult.psa10,
                 estimated: true,
+                tier: 3 as const,
                 lowPop: !!(variation && /\b1\s*\/\s*1\b|one[\s-]+of[\s-]+one|superfractor/i.test(variation)) ||
                         !!(variation && variation.match(/\/\s*(\d+)\b/) && parseInt(variation.match(/\/\s*(\d+)\b/)![1]) <= 25),
                 notes: gradedHeuristicResult.notes,

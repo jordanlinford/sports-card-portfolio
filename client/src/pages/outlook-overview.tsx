@@ -1520,7 +1520,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         },
         onProgress: (update) => {
           setScanProgressMessage(
-            update.status === "queued"
+            update.status === "pending"
               ? "Waiting in queue…"
               : update.status === "processing"
               ? (update.progress || "Identifying card…")
