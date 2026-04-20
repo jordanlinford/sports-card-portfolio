@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { startScanWorker } from "./scanWorker";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { startPrewarmJob } from "./prewarmJob";
@@ -90,6 +91,13 @@ app.use((req, res, next) => {
       // Now do the heavier initialization after server is listening
       try {
         await registerRoutes(httpServer, app);
+
+        // Start the background scan-job worker now that storage and routes are ready.
+        try {
+          startScanWorker();
+        } catch (workerErr) {
+          console.error("[ScanWorker] Failed to start:", workerErr);
+        }
         
         // Admin endpoint for manual regression run (gated by QA_LOGIN_TOKEN)
         // Must be registered BEFORE setupVite so the SPA catch-all doesn't shadow it.

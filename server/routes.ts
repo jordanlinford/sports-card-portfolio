@@ -4641,13 +4641,15 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      if (scansToday >= dailyLimit) {
+      // Enforce daily limit *including* pending jobs so a user can't queue past their cap
+      const pendingJobCount = await storage.countPendingScanJobs(userId);
+      if (scansToday + pendingJobCount >= dailyLimit) {
         return res.status(429).json({
-          message: isPro 
-            ? `You've reached your daily limit of ${dailyLimit} scans. Try again tomorrow.`
+          message: isPro
+            ? `You've reached your daily limit of ${dailyLimit} scans (including in-progress). Try again tomorrow.`
             : `You've used all ${dailyLimit} free scans today. Upgrade to Pro for more scans.`,
           limitReached: true,
-          used: scansToday,
+          used: scansToday + pendingJobCount,
           limit: dailyLimit,
           isPro,
         });
@@ -4656,7 +4658,7 @@ Sitemap: ${origin}/sitemap.xml
       // Check if Gemini credentials are configured
       if (!process.env.AI_INTEGRATIONS_GEMINI_API_KEY || !process.env.AI_INTEGRATIONS_GEMINI_BASE_URL) {
         console.error("[Card Scan] Gemini credentials not configured");
-        return res.status(503).json({ 
+        return res.status(503).json({
           message: "Card scanning is not available. AI service not configured.",
           serviceUnavailable: true,
           usage: {
@@ -4668,191 +4670,136 @@ Sitemap: ${origin}/sitemap.xml
         });
       }
 
-      // Import card scanner service - use scanCardImage directly (not scanCardWithPricing)
-      const { scanCardImage } = await import("./cardImageScannerService");
+      // If an identical scan (same user+hash) is already queued or processing,
+      // return that job ID instead of creating a duplicate.
+      if (imageHash) {
+        try {
+          const activeJob = await storage.findActiveScanJobByHash(userId, imageHash);
+          if (activeJob) {
+            console.log(`[Card Scan] Reusing active job ${activeJob.id} for hash ${imageHash.slice(0, 12)}…`);
+            return res.status(202).json({
+              async: true,
+              jobId: activeJob.id,
+              status: activeJob.status,
+              progress: activeJob.progress,
+              usage: {
+                scansToday,
+                dailyLimit,
+                remainingScans: Math.max(0, dailyLimit - scansToday - pendingJobCount),
+                isPro,
+              },
+            });
+          }
+        } catch (dedupErr) {
+          console.warn("[Card Scan] Active-job dedup lookup failed (non-fatal):", dedupErr);
+        }
+      }
 
-      console.log(`[Card Scan] User ${userId} scanning card image (identify only)...`);
-      
-      // Perform the scan - identification ONLY (no pricing)
-      let scanResult;
+      // Enqueue a background job and return immediately. Worker picks it up,
+      // runs Gemini + writes scan history + stores result, all while the user
+      // is free to navigate away and come back.
+      let job;
       try {
-        scanResult = await scanCardImage(imageData, mimeType || "image/jpeg", imageDataBack, mimeTypeBack || "image/jpeg");
-      } catch (scanError) {
-        console.error("[Card Scan] Scan failed:", scanError);
+        job = await storage.enqueueScanJob({
+          userId,
+          imageHash,
+          imageData,
+          mimeType: mimeType || "image/jpeg",
+          imageDataBack: imageDataBack || null,
+          mimeTypeBack: imageDataBack ? (mimeTypeBack || "image/jpeg") : null,
+        });
+      } catch (enqueueErr) {
+        console.error("[Card Scan] Failed to enqueue scan job:", enqueueErr);
         return res.status(500).json({
-          message: "Card scanning temporarily unavailable. Please try again or enter details manually.",
+          message: "Failed to start card scan. Please try again.",
           scanError: true,
           usage: {
             scansToday,
             dailyLimit,
-            remainingScans: Math.max(0, dailyLimit - scansToday),
+            remainingScans: Math.max(0, dailyLimit - scansToday - pendingJobCount),
             isPro,
           },
         });
       }
-      
-      // Increment scan count after successful scan
+
+      console.log(`[Card Scan] Enqueued job ${job.id} for user ${userId}`);
+
+      // Reserve the slot against the daily cap immediately so concurrent
+      // submissions can't race past the limit. If the scan ultimately fails
+      // we leave this incremented — same as the old sync behavior would have
+      // been if the worker crashed after starting.
       incrementScanCount(userId);
 
-      logActivity("card_scan", {
-        userId,
-        metadata: { 
-          playerName: scanResult.cardIdentification?.playerName,
-          year: scanResult.cardIdentification?.year,
-          set: scanResult.cardIdentification?.setName,
-          confidence: scanResult.confidence,
-        },
-        req,
-      });
-      recordInterestEvent({
-        playerName: scanResult.cardIdentification?.playerName ?? undefined,
-        cardTitle: scanResult.cardIdentification ? `${scanResult.cardIdentification.playerName} ${scanResult.cardIdentification.year || ''} ${scanResult.cardIdentification.setName || ''}`.trim() : undefined,
-        eventType: "scan",
-        userId,
-      });
-
-      let scanHistoryId: number | undefined;
-      try {
-        const cardId = scanResult.cardIdentification;
-
-        let uploadedImagePath: string | null = null;
-        try {
-          let rawBase64 = imageData;
-          if (rawBase64.startsWith("data:")) {
-            rawBase64 = rawBase64.split(",")[1] || rawBase64;
-          }
-          const imageBuffer = Buffer.from(rawBase64, "base64");
-          const objService = new ObjectStorageService();
-          uploadedImagePath = await objService.uploadBuffer(imageBuffer, mimeType || "image/jpeg", userId);
-        } catch (uploadErr) {
-          console.error("[Card Scan] Image upload failed (non-fatal):", uploadErr);
-        }
-
-        const historyRecord = await storage.createScanHistory({
-          userId,
-          playerName: cardId?.playerName || null,
-          year: cardId?.year ? parseInt(String(cardId.year)) : null,
-          setName: cardId?.setName || null,
-          variation: cardId?.variation || null,
-          grade: (cardId as any)?.grade || null,
-          grader: (cardId as any)?.grader || null,
-          sport: cardId?.sport || null,
-          cardNumber: cardId?.cardNumber || null,
-          imagePath: uploadedImagePath,
-          imageHash: imageHash || null,
-          scanConfidence: scanResult.confidence || null,
-          marketValue: null,
-          action: null,
-          scanSource: "card_analysis",
-        });
-        scanHistoryId = historyRecord.id;
-      } catch (historyErr) {
-        console.error("[Card Scan] Failed to save scan history:", historyErr);
-      }
-
-      const remainingScans = dailyLimit - scansToday - 1;
-
-      const fieldConfidence: Record<string, { confident: boolean; reason?: string }> = {};
-      const ci = scanResult.cardIdentification;
-      const overallConf = scanResult.confidence;
-
-      fieldConfidence.playerName = {
-        confident: !!ci.playerName && ci.playerName !== "Unknown",
-        reason: (!ci.playerName || ci.playerName === "Unknown") ? "Could not read player name from image" : undefined,
-      };
-      fieldConfidence.year = {
-        confident: ci.year !== null && ci.year !== undefined,
-        reason: ci.year == null ? "Year not visible on card" : undefined,
-      };
-      fieldConfidence.setName = {
-        confident: !!ci.setName && ci.setName !== "Unknown",
-        reason: (!ci.setName || ci.setName === "Unknown") ? "Set name could not be determined" : undefined,
-      };
-      const variationIsBase = !ci.variation || ci.variation === "Base";
-      fieldConfidence.variation = {
-        confident: variationIsBase ? (overallConf !== "low") : (overallConf === "high"),
-        reason: !ci.variation ? "Parallel/variation not identified — may be base" : (ci.variation === "Base" && overallConf === "low") ? "Base identification with low confidence — check if this has a parallel" : (overallConf !== "high" ? "Variation identified but with lower confidence" : undefined),
-      };
-      fieldConfidence.cardNumber = {
-        confident: !!ci.cardNumber,
-        reason: !ci.cardNumber ? "Card number not visible" : undefined,
-      };
-      fieldConfidence.grade = {
-        confident: scanResult.gradeEstimate.appearsToBe === "graded" ? !!scanResult.gradeEstimate.grade : true,
-        reason: (scanResult.gradeEstimate.appearsToBe === "graded" && !scanResult.gradeEstimate.grade) ? "Graded card detected but grade not readable" : undefined,
-      };
-      fieldConfidence.grader = {
-        confident: scanResult.gradeEstimate.appearsToBe === "graded" ? !!scanResult.gradeEstimate.gradingCompany : true,
-        reason: (scanResult.gradeEstimate.appearsToBe === "graded" && !scanResult.gradeEstimate.gradingCompany) ? "Grading company not identified" : undefined,
-      };
-
-      const uncertainFields = Object.entries(fieldConfidence).filter(([, v]) => !v.confident).map(([k]) => k);
-
-      const parallelSuggestions: string[] = [];
-      if (!fieldConfidence.variation.confident && ci.setName && ci.setName !== "Unknown") {
-        const setLower = ci.setName.toLowerCase();
-        if (setLower.includes("prizm")) {
-          parallelSuggestions.push("Base", "Silver Prizm", "Red Prizm /299", "Blue Prizm /199", "Green Prizm", "Pink Prizm", "Orange Prizm /49", "Gold Prizm /10", "Black Prizm /1", "Mojo", "Hyper Prizm", "Disco", "Camo");
-        } else if (setLower.includes("chrome") || setLower.includes("finest")) {
-          parallelSuggestions.push("Base", "Refractor", "Pink Refractor", "Gold Refractor /50", "Orange Refractor /25", "Red Refractor /5", "Superfractor /1");
-        } else if (setLower.includes("select")) {
-          parallelSuggestions.push("Base", "Silver", "Concourse", "Premier Level", "Tie-Dye", "Zebra", "Disco", "Gold /10");
-        } else if (setLower.includes("donruss")) {
-          parallelSuggestions.push("Base", "Rated Rookie", "Press Proof", "Holo", "Elite Series");
-        } else if (setLower.includes("optic")) {
-          parallelSuggestions.push("Base", "Holo", "Pink", "Blue /49", "Red /99", "Orange /199", "Green /5", "Gold /10", "Black /1");
-        } else {
-          parallelSuggestions.push("Base", "Refractor", "Holo", "Numbered", "Short Print");
-        }
-      }
-
-      res.json({
-        success: scanResult.success,
-        scan: scanResult,
-        scanHistoryId,
-        fieldConfidence,
-        uncertainFields,
-        parallelSuggestions,
+      return res.status(202).json({
+        async: true,
+        jobId: job.id,
+        status: job.status,
+        progress: job.progress,
         usage: {
           scansToday: scansToday + 1,
           dailyLimit,
-          remainingScans: Math.max(0, remainingScans),
+          remainingScans: Math.max(0, dailyLimit - scansToday - 1 - pendingJobCount),
           isPro,
         },
       });
     } catch (error) {
-      console.error("Error scanning card image:", error);
-      
-      // Try to get usage data even on error
-      try {
-        const userId = req.user?.claims?.sub;
-        if (userId) {
-          const user = await storage.getUser(userId);
-          const isPro = hasProAccess(user);
-          const dailyLimit = isPro ? PRO_SCAN_DAILY_LIMIT : FREE_SCAN_DAILY_LIMIT;
-          const scansToday = getScanCountForToday(userId);
-          
-          return res.status(500).json({ 
-            message: "Failed to scan card image. Please try again or enter details manually.",
-            scanError: true,
-            usage: {
-              scansToday,
-              dailyLimit,
-              remainingScans: Math.max(0, dailyLimit - scansToday),
-              isPro,
-            },
-          });
-        }
-      } catch (usageError) {
-        // If we can't get usage data, just return the basic error
-      }
-      
-      res.status(500).json({ 
-        message: "Failed to scan card image. Please try again or enter details manually.",
+      console.error("Error enqueuing card scan:", error);
+      return res.status(500).json({
+        message: "Failed to start card scan. Please try again or enter details manually.",
         scanError: true,
       });
     }
   });
+
+  // Poll a specific scan job
+  app.get("/api/cards/scan-jobs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const jobId = req.params.id;
+      const job = await storage.getScanJob(jobId, userId);
+      if (!job) return res.status(404).json({ message: "Scan job not found" });
+      return res.json({
+        id: job.id,
+        status: job.status,
+        progress: job.progress,
+        result: job.status === "complete" ? job.result : null,
+        error: job.status === "failed" ? job.errorMessage : null,
+        scanHistoryId: job.scanHistoryId,
+        createdAt: job.createdAt,
+        completedAt: job.completedAt,
+      });
+    } catch (error) {
+      console.error("Error fetching scan job:", error);
+      return res.status(500).json({ message: "Failed to fetch scan job" });
+    }
+  });
+
+  // List a user's active (queued+processing) scan jobs — for the in-progress tray
+  app.get("/api/cards/scan-jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const active = req.query.active === "true" || req.query.active === "1";
+      const limit = Math.min(parseInt(String(req.query.limit ?? "20")) || 20, 50);
+      const jobs = active
+        ? await storage.listActiveScanJobs(userId, limit)
+        : await storage.listRecentScanJobs(userId, limit);
+      return res.json(
+        jobs.map((job) => ({
+          id: job.id,
+          status: job.status,
+          progress: job.progress,
+          createdAt: job.createdAt,
+          completedAt: job.completedAt,
+          scanHistoryId: job.scanHistoryId,
+          error: job.status === "failed" ? job.errorMessage : null,
+        })),
+      );
+    } catch (error) {
+      console.error("Error listing scan jobs:", error);
+      return res.status(500).json({ message: "Failed to list scan jobs" });
+    }
+  });
+
 
   // Scan a card image and get identification + pricing (legacy endpoint)
   app.post("/api/cards/scan-image", isAuthenticated, async (req: any, res) => {

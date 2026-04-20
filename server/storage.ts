@@ -105,6 +105,9 @@ import {
   type InsertSupportTicketMessage,
   type SupportTicketStatus,
   scanHistory,
+  scanJobs,
+  type ScanJob,
+  type ScanJobStatus,
   type ScanHistory,
   type InsertScanHistory,
   popHistory,
@@ -1683,6 +1686,168 @@ export class DatabaseStorage implements IStorage {
       promoCodes: promoMap.get(u.id) ?? [],
       isOnTrial: !!(u.trialEnd && u.trialEnd > now),
     }));
+  }
+
+  async enqueueScanJob(input: {
+    userId: string;
+    imageHash: string | null;
+    imageData: string;
+    mimeType: string;
+    imageDataBack: string | null;
+    mimeTypeBack: string | null;
+  }): Promise<ScanJob> {
+    const [job] = await db
+      .insert(scanJobs)
+      .values({
+        userId: input.userId,
+        imageHash: input.imageHash,
+        imageData: input.imageData,
+        mimeType: input.mimeType,
+        imageDataBack: input.imageDataBack,
+        mimeTypeBack: input.mimeTypeBack,
+        status: "queued",
+      })
+      .returning();
+    return job;
+  }
+
+  async getScanJob(jobId: string, userId: string): Promise<ScanJob | undefined> {
+    const [job] = await db
+      .select()
+      .from(scanJobs)
+      .where(and(eq(scanJobs.id, jobId), eq(scanJobs.userId, userId)));
+    return job;
+  }
+
+  async findActiveScanJobByHash(userId: string, imageHash: string): Promise<ScanJob | undefined> {
+    const [job] = await db
+      .select()
+      .from(scanJobs)
+      .where(
+        and(
+          eq(scanJobs.userId, userId),
+          eq(scanJobs.imageHash, imageHash),
+          inArray(scanJobs.status, ["queued", "processing"]),
+        ),
+      )
+      .orderBy(desc(scanJobs.createdAt))
+      .limit(1);
+    return job;
+  }
+
+  async listActiveScanJobs(userId: string, limit: number = 20): Promise<ScanJob[]> {
+    return db
+      .select()
+      .from(scanJobs)
+      .where(and(eq(scanJobs.userId, userId), inArray(scanJobs.status, ["queued", "processing"])))
+      .orderBy(desc(scanJobs.createdAt))
+      .limit(limit);
+  }
+
+  async listRecentScanJobs(userId: string, limit: number = 20): Promise<ScanJob[]> {
+    return db
+      .select()
+      .from(scanJobs)
+      .where(eq(scanJobs.userId, userId))
+      .orderBy(desc(scanJobs.createdAt))
+      .limit(limit);
+  }
+
+  async countPendingScanJobs(userId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(scanJobs)
+      .where(and(eq(scanJobs.userId, userId), inArray(scanJobs.status, ["queued", "processing"])));
+    return result[0]?.count ?? 0;
+  }
+
+  async claimNextQueuedScanJob(): Promise<ScanJob | undefined> {
+    // Atomic claim using FOR UPDATE SKIP LOCKED so multiple workers (or worker
+    // ticks racing each other) never grab the same job.
+    const result = await db.execute<ScanJob>(sql`
+      WITH next_job AS (
+        SELECT id FROM scan_jobs
+        WHERE status = 'queued'
+        ORDER BY created_at ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 1
+      )
+      UPDATE scan_jobs
+      SET status = 'processing',
+          started_at = NOW(),
+          updated_at = NOW(),
+          attempts = attempts + 1
+      FROM next_job
+      WHERE scan_jobs.id = next_job.id
+      RETURNING scan_jobs.*
+    `);
+    const rows = (result as any).rows ?? result;
+    return Array.isArray(rows) ? rows[0] : undefined;
+  }
+
+  async updateScanJobProgress(jobId: string, progress: string): Promise<void> {
+    await db
+      .update(scanJobs)
+      .set({ progress, updatedAt: new Date() })
+      .where(eq(scanJobs.id, jobId));
+  }
+
+  async completeScanJob(jobId: string, result: any, scanHistoryId: number | null): Promise<void> {
+    await db
+      .update(scanJobs)
+      .set({
+        status: "complete",
+        result,
+        scanHistoryId,
+        progress: null,
+        // Clear image bytes — we don't need to keep megabytes of base64 around
+        // once the scan is done. The result jsonb has everything the client needs.
+        imageData: null,
+        imageDataBack: null,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(scanJobs.id, jobId));
+  }
+
+  async failScanJob(jobId: string, errorMessage: string): Promise<void> {
+    await db
+      .update(scanJobs)
+      .set({
+        status: "failed",
+        errorMessage,
+        progress: null,
+        imageData: null,
+        imageDataBack: null,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(scanJobs.id, jobId));
+  }
+
+  async recoverStuckScanJobs(staleSeconds: number = 300): Promise<number> {
+    // Reset processing rows whose worker died mid-scan (e.g. server restart)
+    // back to queued so they get retried. Cap attempts at 3 — beyond that, fail.
+    const result = await db.execute<{ id: string }>(sql`
+      WITH stuck AS (
+        SELECT id, attempts FROM scan_jobs
+        WHERE status = 'processing'
+          AND started_at < NOW() - (${staleSeconds} || ' seconds')::interval
+      )
+      UPDATE scan_jobs
+      SET
+        status = CASE WHEN scan_jobs.attempts >= 3 THEN 'failed' ELSE 'queued' END,
+        error_message = CASE WHEN scan_jobs.attempts >= 3
+                             THEN 'Scan exceeded maximum retries after worker crash'
+                             ELSE NULL END,
+        progress = NULL,
+        updated_at = NOW()
+      FROM stuck
+      WHERE scan_jobs.id = stuck.id
+      RETURNING scan_jobs.id
+    `);
+    const rows = (result as any).rows ?? result;
+    return Array.isArray(rows) ? rows.length : 0;
   }
 
   async bumpLogin(userId: string): Promise<void> {

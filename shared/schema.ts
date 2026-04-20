@@ -2543,6 +2543,36 @@ export const insertScanHistorySchema = createInsertSchema(scanHistory).omit({
 export type InsertScanHistory = z.infer<typeof insertScanHistorySchema>;
 export type ScanHistory = typeof scanHistory.$inferSelect;
 
+// ============================================================================
+// SCAN JOBS (background scan queue)
+// ============================================================================
+export const scanJobs = pgTable("scan_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  status: varchar("status", { length: 20 }).notNull().default("queued"),
+  progress: varchar("progress", { length: 80 }),
+  imageHash: varchar("image_hash", { length: 64 }),
+  imageData: text("image_data"),
+  mimeType: varchar("mime_type", { length: 50 }),
+  imageDataBack: text("image_data_back"),
+  mimeTypeBack: varchar("mime_type_back", { length: 50 }),
+  result: jsonb("result"),
+  errorMessage: text("error_message"),
+  scanHistoryId: integer("scan_history_id"),
+  attempts: integer("attempts").notNull().default(0),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_scan_jobs_user_created").on(table.userId, table.createdAt),
+  index("idx_scan_jobs_status_created").on(table.status, table.createdAt),
+  index("idx_scan_jobs_user_hash_active").on(table.userId, table.imageHash, table.status),
+]);
+
+export type ScanJob = typeof scanJobs.$inferSelect;
+export type ScanJobStatus = "queued" | "processing" | "complete" | "failed";
+
 export const unifiedAnalysisDbCache = pgTable("unified_analysis_cache", {
   cacheKey: varchar("cache_key", { length: 512 }).primaryKey(),
   resultJson: jsonb("result_json").notNull(),
