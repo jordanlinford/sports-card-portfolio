@@ -150,9 +150,9 @@ function getPositionPremium(sport: string, position?: string): number {
   return sportPositions[position.toLowerCase()] ?? 5;
 }
 
-// EXPLICIT SEASON YEAR - DO NOT use new Date().getFullYear()
-// Update this constant at the start of each NFL season
-const CURRENT_SEASON_YEAR = 2025;
+// Tracks the current calendar year so career-stage math (rookie / year-2 /
+// prime / aging) automatically rolls forward each January without a manual edit.
+const CURRENT_SEASON_YEAR = new Date().getFullYear();
 
 // Calculate career stage from rookie season year
 // Uses explicit season years for consistency and testability
