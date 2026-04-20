@@ -2901,6 +2901,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                     triangulated={result.market.gradedEstimates.triangulated}
                     triangulationNotes={result.market.gradedEstimates.notes}
                     triangulationSources={result.market.gradedEstimates.sources}
+                    tier={result.market.gradedEstimates.tier}
                   />
                 )}
 
