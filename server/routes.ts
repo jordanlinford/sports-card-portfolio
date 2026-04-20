@@ -473,12 +473,24 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // Helper to get origin URL (prefer HTTPS and deployment domain)
   const getOriginUrl = (req: any) => {
-    const host = process.env.REPLIT_DEPLOYMENT_DOMAIN || req.headers.host;
-    // Always use HTTPS in production, fallback to forwarded proto or https
-    const proto = process.env.REPLIT_DEPLOYMENT_DOMAIN 
-      ? 'https' 
-      : (req.headers['x-forwarded-proto'] || 'https');
-    return `${proto}://${host}`;
+    const customDomain = process.env.CUSTOM_DOMAIN || "sportscardportfolio.io";
+    const requestHost = (req.headers.host || "").toString();
+    const isReplitAutoDomain = /\.replit\.(app|dev)$/i.test(requestHost);
+    const isProd = process.env.NODE_ENV === "production";
+
+    // In production, if the request came in on the bare *.replit.app/*.replit.dev
+    // domain (or with no host), canonicalize URLs to the custom domain so sitemap,
+    // SSR canonical tags, and OG URLs always point at sportscardportfolio.io.
+    if (isProd && (isReplitAutoDomain || !requestHost)) {
+      return `https://${customDomain}`;
+    }
+
+    // Otherwise honor the actual request host so the custom domain, dev server,
+    // and preview environments all serve URLs that match the host they were
+    // requested on.
+    const proto = (req.headers["x-forwarded-proto"] as string) ||
+      (isProd ? "https" : "http");
+    return `${proto}://${requestHost}`;
   };
   
   // Helper to safely encode content for JSON-LD (prevent script breakout)
