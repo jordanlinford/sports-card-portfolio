@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { submitScanAndWait } from "@/lib/scanPolling";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { SuccessOverlay } from "@/components/success-animation";
 import { KeyboardHint } from "@/components/keyboard-hint";
@@ -699,20 +700,12 @@ export default function CaseEdit() {
       setSelectedFile(new File([blob], `scan-${Date.now()}.jpg`, { type: "image/jpeg" }));
       
       const scanAbort = new AbortController();
-      const scanTimeout = setTimeout(() => scanAbort.abort(), 120000);
-      const scanRes = await fetch("/api/cards/scan-identify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ imageData: base64Data, mimeType: "image/jpeg" }),
+      const scanTimeout = setTimeout(() => scanAbort.abort(), 180000);
+      const response = await submitScanAndWait({
+        body: { imageData: base64Data, mimeType: "image/jpeg" },
         signal: scanAbort.signal,
       });
       clearTimeout(scanTimeout);
-      if (!scanRes.ok) {
-        const errText = (await scanRes.text()) || scanRes.statusText;
-        throw new Error(`${scanRes.status}: ${errText}`);
-      }
-      const response = await scanRes.json();
       
       if (response.success && response.scan?.cardIdentification) {
         const card = response.scan.cardIdentification;

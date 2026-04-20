@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { sanitizeCardField } from "@/lib/sanitizeCardField";
+import { submitScanAndWait } from "@/lib/scanPolling";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -752,6 +753,7 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [backImageData, setBackImageData] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [scanProgressMessage, setScanProgressMessage] = useState<string | null>(null);
   const [showScanAddDialog, setShowScanAddDialog] = useState(false);
   const [showConfirmedAddDialog, setShowConfirmedAddDialog] = useState(false);
   
@@ -1207,18 +1209,12 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
         if (batchCancelledRef.current) break;
 
         const batchAbort = new AbortController();
-        const batchTimeout = setTimeout(() => batchAbort.abort(), 120000);
-        const scanRes = await fetch("/api/cards/scan-identify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ imageData: base64 }),
+        const batchTimeout = setTimeout(() => batchAbort.abort(), 180000);
+        const scanData = await submitScanAndWait({
+          body: { imageData: base64 },
           signal: batchAbort.signal,
         });
         clearTimeout(batchTimeout);
-
-        if (!scanRes.ok) throw new Error("Scan failed");
-        const scanData = await scanRes.json();
 
         if (batchCancelledRef.current) break;
 
@@ -1503,26 +1499,27 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
       
       const effectiveBackData = currentBackImageData !== undefined ? currentBackImageData : backImageData;
 
-      const timeoutId = setTimeout(() => abortController.abort(), 120000);
+      const timeoutId = setTimeout(() => abortController.abort(), 180000);
 
-      const res = await fetch("/api/cards/scan-identify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
+      const response = await submitScanAndWait({
+        body: {
           imageData: base64Data,
           mimeType: "image/jpeg",
           ...(effectiveBackData ? { imageDataBack: effectiveBackData, mimeTypeBack: "image/jpeg" } : {}),
-        }),
+        },
         signal: abortController.signal,
+        onProgress: (update) => {
+          setScanProgressMessage(
+            update.status === "queued"
+              ? "Waiting in queue…"
+              : update.status === "processing"
+              ? (update.progress || "Identifying card…")
+              : null,
+          );
+        },
       });
       clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        const text = (await res.text()) || res.statusText;
-        throw new Error(`${res.status}: ${text}`);
-      }
-      const response = await res.json();
+      setScanProgressMessage(null);
       
       // Handle service unavailable errors
       if (response.serviceUnavailable || response.scanError) {
@@ -2103,7 +2100,9 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                     {scanning && (
                       <div className="absolute inset-0 bg-background/80 flex flex-col items-center justify-center z-20 rounded-lg">
                         <Loader2 className="h-6 w-6 animate-spin text-primary mb-1" />
-                        <span className="text-xs font-medium">Scanning...</span>
+                        <span className="text-xs font-medium" data-testid="text-scan-progress">
+                          {scanProgressMessage || "Scanning..."}
+                        </span>
                         <button
                           onClick={cancelScan}
                           className="mt-2 text-xs text-muted-foreground hover:text-foreground underline"
