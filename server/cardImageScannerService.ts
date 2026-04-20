@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import sharp from "sharp";
 import * as ebayComps from "./ebayCompsService";
 import { fetchGeminiMarketData } from "./outlookEngine";
 import { getPlayerDemandContext } from "./demandTierEngine";
@@ -147,6 +148,20 @@ async function processImageData(imageData: string, mimeType: string): Promise<{ 
     base64Data = Buffer.from(arrayBuffer).toString("base64");
     actualMimeType = response.headers.get("content-type") || mimeType;
   }
+
+  // EXIF rotation normalization — phone cameras embed an orientation tag
+  // instead of physically rotating the pixels. Gemini ignores EXIF, so a
+  // sideways-shot iPhone photo arrives at the model rotated 90°, which
+  // tanks parallel/border identification accuracy. sharp().rotate() with no
+  // argument auto-applies the EXIF orientation and strips the tag.
+  try {
+    const inputBuffer = Buffer.from(base64Data, "base64");
+    const rotatedBuffer = await sharp(inputBuffer).rotate().toBuffer();
+    base64Data = rotatedBuffer.toString("base64");
+  } catch (rotateErr) {
+    console.warn("[CardScanner] EXIF auto-rotate failed, sending original bytes:", rotateErr);
+  }
+
   return { base64Data, actualMimeType };
 }
 
