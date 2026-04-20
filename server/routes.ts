@@ -10700,12 +10700,36 @@ Return ONLY valid JSON, no markdown.`;
       let caseHitCeilingEV = 0;
       let hitDebugLines: string[] = [];
 
+      const { computeGradingEv: computeHitGradingEv } = await import("@shared/gradingEv");
+
       if (Array.isArray(parsed.hitBreakdown)) {
         for (const hit of parsed.hitBreakdown) {
           let rawVal = hit.estimatedRawValue || 0;
           const perBox = hit.perBoxOdds ?? 0;
           const soldComps = hit.soldComps ?? 0;
           const isCaseHit = hit.isCaseHit === true;
+
+          // Reproduce gradingRecommendation server-side using the SAME EV math
+          // the scan-result modal uses, so users see consistent advice across
+          // the app instead of trusting Gemini's opaque GRADE_IT/SELL_RAW string.
+          const psa10Comp = hit.estimatedGradedValue || null;
+          const psa9Comp = psa10Comp ? Math.round(psa10Comp * 0.55) : null; // industry rule of thumb: PSA 9 ≈ 55% of PSA 10 for modern
+          const hitDataTier: 1 | 2 | 3 = soldComps >= 3 ? 1 : soldComps >= 1 ? 2 : 3;
+          if (rawVal > 0 && psa10Comp) {
+            const hitEv = computeHitGradingEv({
+              rawValue: rawVal,
+              psa9Price: psa9Comp,
+              psa10Price: psa10Comp,
+              gradingTier: "regular",
+              dataTier: hitDataTier,
+            });
+            hit.gradingRecommendation =
+              hitEv.verdict === "YES" ? "GRADE_IT" : hitEv.verdict === "NO" ? "SELL_RAW" : "HOLD";
+            hit.gradingRationale = hitEv.reason;
+            hit.gradingExpectedProfit = Math.round(hitEv.expectedProfit * 100) / 100;
+            hit.gradingFee = hitEv.gradingFee;
+            hit.gradingDataTier = hitDataTier;
+          }
 
           // FIX 1: Transaction friction — cards under $5 are worth $0 after fees
           if (rawVal < LIQUIDATION_FLOOR) {

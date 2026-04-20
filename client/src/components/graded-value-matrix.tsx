@@ -1,9 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Award, TrendingUp, DollarSign, Search, Calculator, AlertCircle, Info, CheckCircle2, HelpCircle } from "lucide-react";
+import { Award, TrendingUp, DollarSign, Search, Calculator, AlertCircle, Info, CheckCircle2, HelpCircle, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import {
+  computeGradingEv,
+  PSA_GRADING_COSTS,
+  GRADING_DISCLAIMER,
+  type GradingDataTier,
+} from "@shared/gradingEv";
 
-export type GradedDataTier = 1 | 2 | 3;
+export type GradedDataTier = GradingDataTier;
 
 interface GradedValueMatrixProps {
   rawValue: number;
@@ -23,11 +29,7 @@ interface GradedValueMatrixProps {
   tier?: GradedDataTier;
 }
 
-const GRADING_COST = {
-  economy: 20,
-  regular: 35,
-  express: 50,
-};
+const GRADING_COST = PSA_GRADING_COSTS;
 
 function formatCurrency(value: number): string {
   if (value >= 1000) {
@@ -35,50 +37,6 @@ function formatCurrency(value: number): string {
   }
   if (value < 1) return `$${value.toFixed(2)}`;
   return `$${Math.round(value)}`;
-}
-
-function getGradeRecommendation(
-  rawValue: number,
-  psa9Price: number | null,
-  psa10Price: number | null,
-  tier: GradedDataTier = 1,
-): {
-  verdict: "YES" | "MAYBE" | "NO";
-  reason: string;
-  tier: GradedDataTier;
-} {
-  const psa10Profit = psa10Price ? psa10Price - rawValue - GRADING_COST.regular : null;
-  const psa9Profit = psa9Price ? psa9Price - rawValue - GRADING_COST.regular : null;
-
-  if (psa10Profit && psa10Profit > rawValue * 0.5) {
-    return {
-      verdict: "YES",
-      reason: `PSA 10 could add ~${formatCurrency(psa10Profit)} in value after grading costs`,
-      tier,
-    };
-  }
-
-  if (psa9Profit && psa9Profit > 0) {
-    return {
-      verdict: "MAYBE",
-      reason: `PSA 9 could add ~${formatCurrency(psa9Profit)} in value, but grading fees eat into the margin`,
-      tier,
-    };
-  }
-
-  if (psa10Profit && psa10Profit > 0) {
-    return {
-      verdict: "MAYBE",
-      reason: `Only worth grading if it gets a PSA 10 — slim margin at PSA 9`,
-      tier,
-    };
-  }
-
-  return {
-    verdict: "NO",
-    reason: "Grading cost would exceed the value increase",
-    tier,
-  };
 }
 
 const TIER_LABELS: Record<GradedDataTier, { text: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -142,9 +100,16 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
   const psa9Floored = psa9Price !== null && flooredPsa9 !== psa9Price;
   const psa10Floored = psa10Price !== null && effectivePsa10 !== psa10Price;
 
-  const recommendation = getGradeRecommendation(rawValue, flooredPsa9, effectivePsa10, resolvedTier);
+  const evResult = computeGradingEv({
+    rawValue,
+    psa9Price: flooredPsa9,
+    psa10Price: effectivePsa10,
+    gradingTier: "regular",
+    dataTier: resolvedTier,
+  });
+  const recommendation = { ...evResult, tier: resolvedTier };
   const styles = VERDICT_STYLES[recommendation.verdict];
-  const tierLabel = TIER_LABELS[recommendation.tier];
+  const tierLabel = TIER_LABELS[resolvedTier];
   const TierIcon = tierLabel.Icon;
 
   return (
@@ -217,7 +182,7 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
             </Badge>
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <DollarSign className="h-3 w-3" />
-              Grading costs ~${GRADING_COST.regular}
+              PSA Regular ~${GRADING_COST.regular} (Economy ${GRADING_COST.economy} / Express ${GRADING_COST.express})
             </span>
           </div>
           <p className={`text-xs ${styles.text}`} data-testid="text-grade-reason">
@@ -230,6 +195,16 @@ export function GradedValueMatrix({ rawValue, psa9Price, psa10Price, estimated, 
             <TierIcon className="h-3 w-3 shrink-0" />
             <span>{tierLabel.text}</span>
           </div>
+          <a
+            href="https://www.psacard.com/services"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground/70 hover:text-foreground hover:underline"
+            data-testid="link-psa-disclaimer"
+          >
+            <ExternalLink className="h-2.5 w-2.5" />
+            <span>{GRADING_DISCLAIMER}</span>
+          </a>
         </div>
 
         <div className="flex items-start gap-1.5 text-[10px] text-muted-foreground/60 leading-tight">
