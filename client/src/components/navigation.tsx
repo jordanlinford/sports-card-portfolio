@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { SiGoogle } from "react-icons/si";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/notification-bell";
+import { ScanStatusIndicator } from "@/components/scan-status-indicator";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -461,6 +462,7 @@ export function Navigation() {
                   </Link>
                 )}
 
+                <ScanStatusIndicator />
                 <NotificationBell />
 
                 {/* Profile Menu - Simplified */}
