@@ -2549,7 +2549,7 @@ export type ScanHistory = typeof scanHistory.$inferSelect;
 export const scanJobs = pgTable("scan_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
-  status: varchar("status", { length: 20 }).notNull().default("queued"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
   progress: varchar("progress", { length: 80 }),
   imageHash: varchar("image_hash", { length: 64 }),
   imageData: text("image_data"),
@@ -2571,7 +2571,7 @@ export const scanJobs = pgTable("scan_jobs", {
 ]);
 
 export type ScanJob = typeof scanJobs.$inferSelect;
-export type ScanJobStatus = "queued" | "processing" | "complete" | "failed";
+export type ScanJobStatus = "pending" | "processing" | "complete" | "error";
 
 export const unifiedAnalysisDbCache = pgTable("unified_analysis_cache", {
   cacheKey: varchar("cache_key", { length: 512 }).primaryKey(),

@@ -18,7 +18,7 @@ const POLL_INTERVAL_MS = 2000;
 export type TrackedScanJob = {
   jobId: string;
   startedAt: number;
-  status: "queued" | "processing" | "complete" | "failed";
+  status: "pending" | "processing" | "complete" | "error";
   progress: string | null;
   playerName?: string | null;
   scanHistoryId?: number | null;
@@ -85,7 +85,7 @@ export function ScanJobProvider({ children }: { children: React.ReactNode }) {
         {
           jobId,
           startedAt: Date.now(),
-          status: "queued",
+          status: "pending",
           progress: null,
         },
       ];
@@ -97,7 +97,7 @@ export function ScanJobProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const clearCompleted = useCallback(() => {
-    setJobs((prev) => prev.filter((j) => j.status === "queued" || j.status === "processing"));
+    setJobs((prev) => prev.filter((j) => j.status === "pending" || j.status === "processing"));
   }, []);
 
   // Single background poller for all tracked jobs that haven't settled yet.
@@ -109,7 +109,7 @@ export function ScanJobProvider({ children }: { children: React.ReactNode }) {
 
     const tick = async () => {
       const active = jobsRef.current.filter(
-        (j) => j.status === "queued" || j.status === "processing",
+        (j) => j.status === "pending" || j.status === "processing",
       );
       if (active.length === 0) return;
 
@@ -168,7 +168,7 @@ export function ScanJobProvider({ children }: { children: React.ReactNode }) {
               });
               // Nudge any queries that care about scan history.
               queryClient.invalidateQueries({ queryKey: ["/api/scan-history"] });
-            } else if (data.status === "failed" && job.status !== "failed") {
+            } else if (data.status === "error" && job.status !== "error") {
               toast({
                 title: "Scan failed",
                 description: data.error || "Try again or enter the card manually.",
@@ -199,7 +199,7 @@ export function ScanJobProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<ScanJobContextValue>(
     () => ({
       jobs,
-      activeCount: jobs.filter((j) => j.status === "queued" || j.status === "processing").length,
+      activeCount: jobs.filter((j) => j.status === "pending" || j.status === "processing").length,
       trackJob,
       dismissJob,
       clearCompleted,

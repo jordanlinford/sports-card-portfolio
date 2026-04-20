@@ -2,11 +2,11 @@
 // promise-style API for the existing scan handlers. The server either:
 //   a) returns the full scan result synchronously (14-day image-hash cache), OR
 //   b) returns 202 { async: true, jobId, status, progress, usage } and we poll
-//      GET /api/cards/scan-jobs/:id until status is "complete" or "failed".
+//      GET /api/cards/scan-jobs/:id until status is "complete" or "error".
 
 export type ScanProgressUpdate = {
   jobId: string;
-  status: "queued" | "processing" | "complete" | "failed";
+  status: "pending" | "processing" | "complete" | "error";
   progress: string | null;
 };
 
@@ -69,7 +69,7 @@ export async function submitScanAndWait(opts: SubmitOptions): Promise<any> {
 
   onProgress?.({
     jobId,
-    status: (initial.status as ScanProgressUpdate["status"]) ?? "queued",
+    status: (initial.status as ScanProgressUpdate["status"]) ?? "pending",
     progress: initial.progress ?? null,
   });
 
@@ -115,7 +115,7 @@ export async function submitScanAndWait(opts: SubmitOptions): Promise<any> {
       return payload;
     }
 
-    if (job.status === "failed") {
+    if (job.status === "error") {
       throw new Error(job.error || "Scan failed");
     }
     // otherwise: still queued/processing — keep polling.

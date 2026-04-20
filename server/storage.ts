@@ -1705,7 +1705,7 @@ export class DatabaseStorage implements IStorage {
         mimeType: input.mimeType,
         imageDataBack: input.imageDataBack,
         mimeTypeBack: input.mimeTypeBack,
-        status: "queued",
+        status: "pending",
       })
       .returning();
     return job;
@@ -1727,7 +1727,7 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(scanJobs.userId, userId),
           eq(scanJobs.imageHash, imageHash),
-          inArray(scanJobs.status, ["queued", "processing"]),
+          inArray(scanJobs.status, ["pending", "processing"]),
         ),
       )
       .orderBy(desc(scanJobs.createdAt))
@@ -1739,7 +1739,7 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(scanJobs)
-      .where(and(eq(scanJobs.userId, userId), inArray(scanJobs.status, ["queued", "processing"])))
+      .where(and(eq(scanJobs.userId, userId), inArray(scanJobs.status, ["pending", "processing"])))
       .orderBy(desc(scanJobs.createdAt))
       .limit(limit);
   }
@@ -1757,7 +1757,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(scanJobs)
-      .where(and(eq(scanJobs.userId, userId), inArray(scanJobs.status, ["queued", "processing"])));
+      .where(and(eq(scanJobs.userId, userId), inArray(scanJobs.status, ["pending", "processing"])));
     return result[0]?.count ?? 0;
   }
 
@@ -1767,7 +1767,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db.execute<ScanJob>(sql`
       WITH next_job AS (
         SELECT id FROM scan_jobs
-        WHERE status = 'queued'
+        WHERE status = 'pending'
         ORDER BY created_at ASC
         FOR UPDATE SKIP LOCKED
         LIMIT 1
@@ -1814,7 +1814,7 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(scanJobs)
       .set({
-        status: "failed",
+        status: "error",
         errorMessage,
         progress: null,
         imageData: null,
@@ -1836,7 +1836,7 @@ export class DatabaseStorage implements IStorage {
       )
       UPDATE scan_jobs
       SET
-        status = CASE WHEN scan_jobs.attempts >= 3 THEN 'failed' ELSE 'queued' END,
+        status = CASE WHEN scan_jobs.attempts >= 3 THEN 'error' ELSE 'pending' END,
         error_message = CASE WHEN scan_jobs.attempts >= 3
                              THEN 'Scan exceeded maximum retries after worker crash'
                              ELSE NULL END,

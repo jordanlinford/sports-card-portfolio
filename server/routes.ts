@@ -4763,7 +4763,7 @@ Sitemap: ${origin}/sitemap.xml
         status: job.status,
         progress: job.progress,
         result: job.status === "complete" ? job.result : null,
-        error: job.status === "failed" ? job.errorMessage : null,
+        error: job.status === "error" ? job.errorMessage : null,
         scanHistoryId: job.scanHistoryId,
         createdAt: job.createdAt,
         completedAt: job.completedAt,
@@ -4791,7 +4791,7 @@ Sitemap: ${origin}/sitemap.xml
           createdAt: job.createdAt,
           completedAt: job.completedAt,
           scanHistoryId: job.scanHistoryId,
-          error: job.status === "failed" ? job.errorMessage : null,
+          error: job.status === "error" ? job.errorMessage : null,
         })),
       );
     } catch (error) {

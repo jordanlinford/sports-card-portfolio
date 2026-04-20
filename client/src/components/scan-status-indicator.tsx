@@ -40,7 +40,7 @@ export function ScanStatusIndicator() {
   if (jobs.length === 0) return null;
 
   const completedJobs = jobs.filter((j) => j.status === "complete");
-  const failedJobs = jobs.filter((j) => j.status === "failed");
+  const failedJobs = jobs.filter((j) => j.status === "error");
   const doneCount = completedJobs.length + failedJobs.length;
 
   // Badge text: active wins → else green flash shows a check → else doneCount.
@@ -173,13 +173,13 @@ function ScanJobRow({
   onDismiss: () => void;
   onView: () => void;
 }) {
-  const isActive = job.status === "queued" || job.status === "processing";
+  const isActive = job.status === "pending" || job.status === "processing";
   const isComplete = job.status === "complete";
-  const isFailed = job.status === "failed";
+  const isFailed = job.status === "error";
 
   const title = job.playerName || (isActive ? "Identifying card…" : "Unidentified card");
   const subtitle = isActive
-    ? job.progress || (job.status === "queued" ? "Waiting in queue" : "Processing")
+    ? job.progress || (job.status === "pending" ? "Waiting in queue" : "Processing")
     : isComplete
     ? "Ready to view"
     : job.error || "Scan failed";
