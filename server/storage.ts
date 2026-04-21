@@ -1763,8 +1763,11 @@ export class DatabaseStorage implements IStorage {
 
   async claimNextQueuedScanJob(): Promise<ScanJob | undefined> {
     // Atomic claim using FOR UPDATE SKIP LOCKED so multiple workers (or worker
-    // ticks racing each other) never grab the same job.
-    const result = await db.execute<ScanJob>(sql`
+    // ticks racing each other) never grab the same job. We only RETURN the id
+    // here because raw db.execute() returns snake_case column names; we then
+    // re-select the full row through Drizzle so the caller gets a properly
+    // typed ScanJob with camelCase fields (userId, imageData, etc).
+    const result = await db.execute<{ id: string }>(sql`
       WITH next_job AS (
         SELECT id FROM scan_jobs
         WHERE status = 'pending'
@@ -1779,10 +1782,17 @@ export class DatabaseStorage implements IStorage {
           attempts = attempts + 1
       FROM next_job
       WHERE scan_jobs.id = next_job.id
-      RETURNING scan_jobs.*
+      RETURNING scan_jobs.id
     `);
     const rows = (result as any).rows ?? result;
-    return Array.isArray(rows) ? rows[0] : undefined;
+    const claimedId = Array.isArray(rows) ? rows[0]?.id : undefined;
+    if (!claimedId) return undefined;
+
+    const [job] = await db
+      .select()
+      .from(scanJobs)
+      .where(eq(scanJobs.id, claimedId));
+    return job;
   }
 
   async updateScanJobProgress(jobId: string, progress: string): Promise<void> {
