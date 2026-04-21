@@ -81,6 +81,63 @@ export function getZeroCompPriceCeiling(
 }
 
 /**
+ * Detects "chase insert / SSP" patterns where the card is rare-by-design
+ * (premium insert, image variation, color blast, 8-bit, superfractor, etc.)
+ * but does NOT have a low serial number to anchor a triangulated valuation.
+ *
+ * Use case: the product is too new for any verified eBay sales to exist yet,
+ * AND there's no /1, /5, /10, /25 print run we can lean on for triangulation.
+ * In that situation any price we display is a guess that will likely be
+ * dramatically wrong (e.g., $59 estimate for an insert actually selling
+ * $150-$850+). Better to be honest about insufficient data and send the
+ * user to eBay sold listings.
+ *
+ * Returns null when not a chase pattern (so caller falls through to normal
+ * pricing). Returns an object with the detected pattern name when it is.
+ */
+export type ChaseInsertMatch = { pattern: string; reason: string };
+export function detectChaseInsert(
+  setName: string | undefined | null,
+  variation: string | undefined | null,
+  title: string | undefined | null,
+): ChaseInsertMatch | null {
+  const haystack = `${setName || ""} ${variation || ""} ${title || ""}`.toLowerCase();
+  if (!haystack.trim()) return null;
+
+  // Patterns are tuned to catch known SSP/chase inserts and high-end
+  // parallels that command 5-50x the base card but rarely have early sales.
+  const patterns: Array<{ re: RegExp; name: string }> = [
+    { re: /\b8[\s-]?bit\b/i, name: "8-Bit" },
+    { re: /\bsuper[\s-]?fractor\b/i, name: "SuperFractor" },
+    { re: /\bimage\s+variation\b/i, name: "Image Variation" },
+    { re: /\bphoto\s+variation\b/i, name: "Photo Variation" },
+    { re: /\bclear\s+cut\b/i, name: "Clear Cut" },
+    { re: /\bcolor\s+blast\b/i, name: "Color Blast" },
+    { re: /\bdownt[ow]wn\b/i, name: "Downtown" },
+    { re: /\bkaboom\b/i, name: "Kaboom" },
+    { re: /\bcolor\s+wheel\b/i, name: "Color Wheel" },
+    { re: /\bnegative\s+(refractor)?\b/i, name: "Negative Refractor" },
+    { re: /\bgold\s+vinyl\b/i, name: "Gold Vinyl" },
+    { re: /\bblack\s+(refractor|prizm|finite|shimmer)\b/i, name: "Black parallel" },
+    { re: /\bsapphire\s+edition\b/i, name: "Sapphire Edition" },
+    { re: /\bconcourse\b/i, name: "Concourse" },
+    { re: /\b(ssp|short\s*print)\b/i, name: "SSP / Short Print" },
+    { re: /\brookie\s+debut\s+patch\b/i, name: "Rookie Debut Patch" },
+    { re: /\bshohei\s+revolution\b/i, name: "Revolution Insert" },
+  ];
+
+  for (const { re, name } of patterns) {
+    if (re.test(haystack)) {
+      return {
+        pattern: name,
+        reason: `${name} insert/SSP — too new for verified sold comps to exist yet`,
+      };
+    }
+  }
+  return null;
+}
+
+/**
  * Robustly parses a price value from Gemini output.
  * Handles: number, string number, string range ("80-150" → lower bound), null, undefined.
  * Returns null only when no usable number can be extracted.

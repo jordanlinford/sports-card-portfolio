@@ -4070,6 +4070,27 @@ Sitemap: ${origin}/sitemap.xml
         console.log(`[Quick Analyze] ZERO-COMP DISCOUNT SKIPPED: Low-pop card (${variation}) — zero comps expected for rare numbered parallels. Using Gemini estimate $${marketValue} directly.`);
       }
 
+      // CHASE INSERT / SSP DETECTION — when a brand-new chase insert (8-Bit,
+      // SuperFractor, Image Variation, Color Blast, etc.) has no verified sold
+      // comps and isn't already on the low-pop triangulation path (/25 or under),
+      // we cannot honestly produce a price. The Gemini guess can be off by 5-15x
+      // (e.g., $59 estimate vs real $150-$850+ for Joe Montana 8-Bit). Flag the
+      // response so the UI can show "too new — verify on eBay" instead of a
+      // confident-but-wrong number.
+      let insufficientData = false;
+      let insufficientDataReason: string | null = null;
+      let insufficientDataPattern: string | null = null;
+      if (compCount === 0 && !isLowPopCard) {
+        const { detectChaseInsert } = await import("./outlookEngine");
+        const chase = detectChaseInsert(set, variation, title);
+        if (chase) {
+          insufficientData = true;
+          insufficientDataReason = chase.reason;
+          insufficientDataPattern = chase.pattern;
+          console.log(`[Quick Analyze] CHASE INSERT (no comps): ${chase.pattern} — flagging insufficientData. Backend price $${marketValue} retained for verdict logic only; UI will suppress display.`);
+        }
+      }
+
       // PRICE CONSISTENCY ANCHOR — stabilize results across repeated scans
       // If we have a recent scan for the same card, check if the new price is wildly different
       if (marketValue && marketValue > 0 && effectivePlayerName) {
@@ -4361,6 +4382,9 @@ Sitemap: ${origin}/sitemap.xml
           activeListing: unifiedResult?.market?.activeListing || 0,
           pricePoints: isPro ? priceData.pricePoints : null,
           modeledEstimate: null,
+          insufficientData,
+          insufficientDataReason,
+          insufficientDataPattern,
           geminiData: unifiedResult ? {
             soldCount: unifiedResult.market.soldCount,
             liquidity: unifiedResult.market.liquidity,

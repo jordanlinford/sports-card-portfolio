@@ -67,6 +67,9 @@ export type OutlookDisplayData = {
       referenceComps: Array<{ cardType: string; estimatedValue: number; liquidity: string }>;
       source: "MODEL";
     } | null;
+    insufficientData?: boolean;
+    insufficientDataReason?: string | null;
+    insufficientDataPattern?: string | null;
   };
   signals: {
     trend?: number;
@@ -410,7 +413,13 @@ export function OutlookDetails({
             </div>
           </div>
           <div className="text-center sm:text-right">
-            {data.market?.value != null && (
+            {data.market?.insufficientData ? (
+              <>
+                <div className="text-sm opacity-90">No verified sales</div>
+                <div className="text-2xl sm:text-3xl font-bold">—</div>
+                <div className="text-xs opacity-80 mt-0.5">Too new to price</div>
+              </>
+            ) : data.market?.value != null && (
               <>
                 <div className="text-sm opacity-90">
                   {data.market.compCount === 0
@@ -425,14 +434,63 @@ export function OutlookDetails({
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-white/20">
-          <p className="text-sm sm:text-base opacity-95">{verdictTakeaway}</p>
-          {lowPrintCaveat && (
+          <p className="text-sm sm:text-base opacity-95">
+            {data.market?.insufficientData
+              ? "We can't make a confident recommendation without verified sales data. Check eBay sold listings below to assess this card."
+              : verdictTakeaway}
+          </p>
+          {lowPrintCaveat && !data.market?.insufficientData && (
             <p className="mt-1.5 text-xs sm:text-sm opacity-80 italic" data-testid="text-low-print-caveat">
               {lowPrintCaveat}
             </p>
           )}
         </div>
       </div>
+
+      {data.market?.insufficientData && (() => {
+        const ebayQuery = [
+          data.card.year,
+          data.card.playerName || data.card.title,
+          sanitizeCardField(data.card.set),
+          sanitizeCardField(data.card.variation),
+        ].filter(Boolean).join(" ").trim();
+        const ebayUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(ebayQuery)}&_sacat=0&LH_Sold=1&LH_Complete=1`;
+        return (
+          <div
+            className="rounded-lg border border-amber-500/40 bg-amber-50 dark:bg-amber-950/30 p-4 sm:p-5"
+            data-testid="banner-insufficient-data"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold text-amber-900 dark:text-amber-100">
+                  Too new to price reliably
+                </div>
+                <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                  {data.market.insufficientDataPattern
+                    ? `${data.market.insufficientDataPattern} insert/SSP — `
+                    : ""}
+                  no verified eBay sold listings exist yet for this exact card.
+                  Any estimate would be a guess. Check current sold listings on eBay
+                  for the most accurate pricing.
+                </p>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 border-amber-600/50 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                  data-testid="link-ebay-sold"
+                >
+                  <a href={ebayUrl} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                    Check eBay sold listings
+                  </a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <Card>
         <CardHeader>
@@ -528,7 +586,15 @@ export function OutlookDetails({
               </div>
             </div>
             <div className="text-right">
-              {data.market?.value != null ? (
+              {data.market?.insufficientData ? (
+                <>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
+                    NO VERIFIED SALES
+                  </div>
+                  <div className="text-3xl font-bold text-muted-foreground" data-testid="text-market-value">—</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Too new to price reliably</div>
+                </>
+              ) : data.market?.value != null ? (
                 <>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">
                     {data.market.compCount === 0
