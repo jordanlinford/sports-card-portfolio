@@ -19,6 +19,68 @@ const playerNewsCache = new Map<string, { data: { snippets: string[]; momentum: 
 const NEWS_CACHE_TTL_MS = 4 * 60 * 60 * 1000;
 
 /**
+ * Classifies a card's product line to bound zero-comp price estimates.
+ * "Novelty" themed/gimmick products (Monopoly, Wonders of the World, Sticker albums, etc.)
+ * sell for very little even for elite players, but Gemini cross-product fallback often
+ * hallucinates flagship-Prizm-level prices. This tier provides a hard sanity ceiling
+ * applied ONLY when there are zero verified sold comps.
+ */
+export type ProductTier = "novelty" | "budget" | "midTier" | "flagship" | "premium" | "unknown";
+
+export function detectProductTier(setName: string | undefined | null): ProductTier {
+  const s = (setName || "").toLowerCase();
+  if (!s) return "unknown";
+  // Novelty / themed / gimmick lines — sell low regardless of player.
+  // Use specific phrases to avoid false positives (e.g., "Topps Chrome Wonders" should NOT match).
+  if (/\b(monopoly|wonders\s+of\s+the\s+world|sticker\s+album|stickers\s+album|panini\s+album|mega\s*man|pop\s*warner|wwe\s+chronicles|kid\s+stars)\b/i.test(s)) return "novelty";
+  // Premium / hit-driven products
+  if (/\b(national\s*treasures|flawless|immaculate|noir|origins|one[\s-]+and[\s-]+one|playbook\s*signatures|crown\s*royale)\b/i.test(s)) return "premium";
+  // Flagship — high collector demand
+  if (/\b(prizm(?!\s*monopoly)|optic|select|mosaic\s*(?!sticker)|topps\s*chrome|bowman\s*chrome|panini\s*chrome)\b/i.test(s)) return "flagship";
+  // Mid-tier
+  if (/\b(donruss\s*optic|contenders|absolute|certified|elite|finest|stadium\s*club|allen\s*&?\s*ginter)\b/i.test(s)) return "midTier";
+  // Budget base products
+  if (/\b(score|donruss(?!\s*optic)|hoops|nba\s*hoops|panini|topps(?!\s*chrome)|bowman(?!\s*chrome)|leaf|upper\s*deck\s*series)\b/i.test(s)) return "budget";
+  return "unknown";
+}
+
+/**
+ * Returns the maximum reasonable USD price for a non-auto card with ZERO verified
+ * sold comps, given product tier and serial-number bucket. Used as a sanity cap
+ * to suppress wildly hallucinated cross-product estimates. Autos are not capped.
+ * Returns null = no cap.
+ */
+export function getZeroCompPriceCeiling(
+  tier: ProductTier,
+  serialNumber: number | null,
+  isAuto: boolean,
+  year?: number | null,
+): number | null {
+  if (isAuto) return null; // Autos can legitimately reach high values; don't cap here
+  // Vintage cards (pre-2006) often have legitimate high values for HOFers and iconic
+  // inserts even in low-tier products — don't cap them here.
+  if (year && year <= 2005) return null;
+  const sn = serialNumber || 9999;
+  if (tier === "novelty") {
+    if (sn <= 5) return 60;
+    if (sn <= 10) return 40;
+    if (sn <= 25) return 25;
+    if (sn <= 50) return 15;
+    if (sn <= 99) return 10;
+    return 8;
+  }
+  if (tier === "budget") {
+    if (sn <= 5) return 150;
+    if (sn <= 10) return 90;
+    if (sn <= 25) return 50;
+    if (sn <= 50) return 30;
+    if (sn <= 99) return 20;
+    return 12;
+  }
+  return null; // midTier/flagship/premium/unknown — let estimate flow through
+}
+
+/**
  * Robustly parses a price value from Gemini output.
  * Handles: number, string number, string range ("80-150" → lower bound), null, undefined.
  * Returns null only when no usable number can be extracted.
@@ -1788,6 +1850,26 @@ export async function fetchCrossProductFallbackPrice(card: {
 
   const isNamedParallel = /\b(rare\s*gold|gold\s*refractor|atomic|refractor|chrome|gold|silver|ruby|emerald|sapphire|diamond|platinum|burgundy|red|blue|green|purple|orange|pink|black|white|sparkle|shimmer|glitter|holo|holographic|hyper|prismatic|tie[- ]?dye|camo|mosaic|peacock|nebula|pulsar|wave|swirl|x[- ]?fractor)\b/i.test(variation);
   const isVintage = year && parseInt(String(year)) <= 2005;
+  const productTier = detectProductTier(set);
+  const noveltyNote = productTier === "novelty" ? `
+
+NOVELTY / THEMED PRODUCT — CRITICAL PRICING CONTEXT:
+The set "${set}" is a NOVELTY/THEMED product line (Monopoly, Wonders, Stickers, Album, etc.).
+These products are gimmick/themed releases that sell at FRACTIONS of flagship Prizm/Optic prices,
+EVEN for elite players. Typical sold prices on eBay:
+- Base/common cards: $0.50 - $3
+- Numbered parallels /99-/199: $1 - $10 (even for global stars)
+- Numbered parallels /25-/50: $5 - $25
+- Numbered parallels /10 or lower: $15 - $60
+DO NOT compare to flagship Prizm Premier, Topps Chrome UCL, or Select prices — those are different products.
+DO NOT apply elite-player premium multipliers to novelty products. The product tier dominates pricing here.
+` : productTier === "budget" ? `
+
+BUDGET PRODUCT CONTEXT:
+The set "${set}" is a budget/base product line. Numbered parallels here typically sell well below
+flagship Prizm/Optic equivalents. Be conservative — base cards $1-$5, /99 parallels $3-$15,
+/25 parallels $8-$40 even for high-tier players.
+` : "";
 
   const searchQueries = isAuto ? [
     `"${player} ${year} ${sport} auto sold eBay"`,
@@ -1837,7 +1919,7 @@ This is a vintage card from ${year}. Vintage cards (1990s-2000s) have different 
 
 CARD: "${cardDesc}"
 Card Type: ${serialLabel} ${cardTypeLabel}${isAuto ? "" : " (NOT an autograph)"}
-${namedParallelNote}
+${noveltyNote}${namedParallelNote}
 PLAYER TIER ASSESSMENT (DO THIS FIRST):
 Before estimating price, assess this player's actual market demand tier. Search for who "${player}" is:
 - What round were they drafted? What pick? (1st round picks = high demand, 3rd+ round = low-mid demand)
@@ -1902,13 +1984,25 @@ Return ONLY this JSON:
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       if (parsed.avgPrice && typeof parsed.avgPrice === "number" && parsed.avgPrice > 0) {
-        console.log(`[CrossProduct Fallback] Estimate: $${parsed.avgPrice} (range $${parsed.minPrice}-$${parsed.maxPrice}) | ${(parsed.notes || "").substring(0, 120)}`);
-        return {
-          avgPrice: parsed.avgPrice,
-          minPrice: parsed.minPrice || Math.round(parsed.avgPrice * 0.6),
-          maxPrice: parsed.maxPrice || Math.round(parsed.avgPrice * 1.8),
-          notes: parsed.notes || "Estimated from comparable player/product comps",
-        };
+        let avgPrice = parsed.avgPrice;
+        let minPrice = parsed.minPrice || Math.round(avgPrice * 0.4);
+        let maxPrice = parsed.maxPrice || Math.round(avgPrice * 2.2);
+        let notes = parsed.notes || "Estimated from comparable player/product comps";
+
+        // Sanity cap for novelty/budget products with zero verified comps —
+        // suppresses Gemini hallucinations like $175 for a $1.49 Monopoly insert.
+        const ceiling = getZeroCompPriceCeiling(productTier, serialNumber, isAuto, year ? parseInt(String(year)) : null);
+        if (ceiling !== null && avgPrice > ceiling) {
+          console.warn(`[CrossProduct Fallback] PRODUCT-TIER CAP: ${productTier} ${serialLabel} estimate $${avgPrice} exceeds ceiling $${ceiling}. Clamping.`);
+          const ratio = ceiling / avgPrice;
+          avgPrice = ceiling;
+          minPrice = Math.max(1, Math.round(minPrice * ratio));
+          maxPrice = Math.max(avgPrice, Math.round(maxPrice * ratio));
+          notes = `[Capped to $${ceiling} — ${productTier} product tier with no verified comps] ${notes}`;
+        }
+
+        console.log(`[CrossProduct Fallback] Estimate: $${avgPrice} (range $${minPrice}-$${maxPrice}) tier=${productTier} | ${notes.substring(0, 120)}`);
+        return { avgPrice, minPrice, maxPrice, notes };
       }
     }
     console.warn(`[CrossProduct Fallback] Could not parse valid price from response`);

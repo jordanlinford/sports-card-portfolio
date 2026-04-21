@@ -3942,6 +3942,34 @@ Sitemap: ${origin}/sitemap.xml
         console.log(`[Quick Analyze] GEMINI-DIRECT: Using Gemini price $${marketValue} (range $${priceMin}-$${priceMax}, ${compCount} comps). No corrections applied.`);
       }
 
+      // ZERO-COMP SANITY CAP: When no verified sold comps exist, apply product-tier
+      // ceiling to suppress hallucinations (e.g., $175 estimate for a $1.49 Monopoly insert).
+      if (marketValue && marketValue > 0 && compCount === 0) {
+        const { detectProductTier, getZeroCompPriceCeiling } = await import("./outlookEngine");
+        const capTier = detectProductTier(set);
+        const capSerialMatch = (variation || "").match(/\/\s*(\d+)\b/);
+        const capSerialNumber = capSerialMatch ? parseInt(capSerialMatch[1]) : null;
+        const capIsAuto = /auto(graph)?/i.test(variation || "") || /auto(graph)?/i.test(set || "");
+        const capCeiling = getZeroCompPriceCeiling(capTier, capSerialNumber, capIsAuto, year ? parseInt(year) : null);
+        if (capCeiling !== null && marketValue > capCeiling) {
+          console.warn(`[Quick Analyze] ZERO-COMP CAP (${pricingSource}): ${capTier} ${capSerialNumber ? `/${capSerialNumber}` : "unnumbered"} estimate $${marketValue} > ceiling $${capCeiling}. Clamping.`);
+          const ratio = capCeiling / marketValue;
+          if (priceMin !== null) priceMin = Math.max(1, Math.round(priceMin * ratio));
+          if (priceMax !== null) priceMax = Math.max(capCeiling, Math.round(priceMax * ratio));
+          marketValue = capCeiling;
+          // Widen the range to reflect uncertainty
+          if (priceMin === null || priceMin > marketValue * 0.3) priceMin = Math.max(1, Math.round(marketValue * 0.3));
+          if (priceMax === null || priceMax < marketValue * 1.8) priceMax = Math.round(marketValue * 1.8);
+          pricingSource = `${pricingSource}_capped`;
+        } else if (marketValue > 0 && (priceMin === null || priceMax === null || (priceMax - priceMin) / marketValue < 0.6)) {
+          // Even when not capped, widen tight ranges for zero-comp estimates so the UI
+          // doesn't communicate false confidence (e.g., $149-$201 for a guess).
+          priceMin = Math.max(1, Math.round(marketValue * 0.4));
+          priceMax = Math.round(marketValue * 2.2);
+          console.log(`[Quick Analyze] ZERO-COMP RANGE WIDEN: $${marketValue} -> range $${priceMin}-$${priceMax}`);
+        }
+      }
+
       // TIER 2: Cross-product fallback — only when Gemini has NO price
       if (!marketValue || marketValue <= 0) {
         if (specCrossProduct && specCrossProduct.avgPrice > 0) {
@@ -3950,6 +3978,18 @@ Sitemap: ${origin}/sitemap.xml
           priceMax = specCrossProduct.maxPrice || null;
           pricingSource = "cross_product";
           console.log(`[Quick Analyze] FALLBACK (Tier 2): Cross-product $${marketValue} (range $${priceMin}-$${priceMax})`);
+
+          // Enforce uniform zero-comp uncertainty range — model-provided tight bands
+          // (e.g., $149-$201) communicate false confidence for an unanchored estimate.
+          if (marketValue && marketValue > 0) {
+            const minSpread = marketValue * 0.6;
+            const currentSpread = (priceMax || marketValue) - (priceMin || marketValue);
+            if (currentSpread < minSpread) {
+              priceMin = Math.max(1, Math.round(marketValue * 0.4));
+              priceMax = Math.round(marketValue * 2.2);
+              console.log(`[Quick Analyze] CROSS-PRODUCT RANGE WIDEN: $${marketValue} -> range $${priceMin}-$${priceMax}`);
+            }
+          }
         }
 
         if ((!marketValue || marketValue <= 0) && (qaIs1of1 || qaIsVeryLowPop)) {
