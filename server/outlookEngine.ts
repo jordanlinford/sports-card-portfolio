@@ -106,7 +106,10 @@ export function detectChaseInsert(
 
   // Patterns are tuned to catch known SSP/chase inserts and high-end
   // parallels that command 5-50x the base card but rarely have early sales.
+  // Order: most-specific named patterns first so they win the `name` slot
+  // before the generic colored-parallel catch-all.
   const patterns: Array<{ re: RegExp; name: string }> = [
+    // Premium / iconic chase inserts
     { re: /\b8[\s-]?bit\b/i, name: "8-Bit" },
     { re: /\bsuper[\s-]?fractor\b/i, name: "SuperFractor" },
     { re: /\bimage\s+variation\b/i, name: "Image Variation" },
@@ -115,15 +118,32 @@ export function detectChaseInsert(
     { re: /\bcolor\s+blast\b/i, name: "Color Blast" },
     { re: /\bdownt[ow]wn\b/i, name: "Downtown" },
     { re: /\bkaboom\b/i, name: "Kaboom" },
+    { re: /\bcourtside\b/i, name: "Courtside" },
     { re: /\bcolor\s+wheel\b/i, name: "Color Wheel" },
-    { re: /\bnegative\s+(refractor)?\b/i, name: "Negative Refractor" },
+    { re: /\bstained\s+glass\b/i, name: "Stained Glass" },
     { re: /\bgold\s+vinyl\b/i, name: "Gold Vinyl" },
-    { re: /\bblack\s+(refractor|prizm|finite|shimmer)\b/i, name: "Black parallel" },
     { re: /\bsapphire\s+edition\b/i, name: "Sapphire Edition" },
-    { re: /\bconcourse\b/i, name: "Concourse" },
-    { re: /\b(ssp|short\s*print)\b/i, name: "SSP / Short Print" },
     { re: /\brookie\s+debut\s+patch\b/i, name: "Rookie Debut Patch" },
     { re: /\bshohei\s+revolution\b/i, name: "Revolution Insert" },
+    // Topps Heritage chase
+    { re: /\bheritage\s+(sp|short\s*print)\b/i, name: "Heritage SP" },
+    { re: /\bhigh\s+number\b/i, name: "High Number SP" },
+    // Specific named refractor/parallel families (must come before generic colored-parallel)
+    { re: /\bnegative\s+(refractor|prizm)\b/i, name: "Negative Refractor" },
+    { re: /\bmojo\s+refractor\b/i, name: "Mojo Refractor" },
+    { re: /\batomic\s+refractor\b/i, name: "Atomic Refractor" },
+    { re: /\b(fotl\s+)?shimmer(\s+(refractor|prizm))?\b/i, name: "Shimmer" },
+    { re: /\bblack\s+(refractor|prizm|finite|shimmer)\b/i, name: "Black parallel" },
+    // Generic SSP catch-all (last named pattern before the color generic)
+    { re: /\b(ssp|short\s*print)\b/i, name: "SSP / Short Print" },
+    // Generic colored parallel — catches the long tail of named-color
+    // parallels across Panini and Topps without enumerating every set.
+    // Excludes "silver" (it's the base Prizm/Refractor parallel for most
+    // products and a no-comp result there usually means low demand, not rare).
+    {
+      re: /\b(gold|red|blue|green|orange|purple|pink|teal|aqua|yellow|white)\s+(prizm|refractor|cracked\s+ice|wave|mosaic|pulsar|laser|lazer|scope|ice|sparkle)\b/i,
+      name: "Colored parallel",
+    },
   ];
 
   for (const { re, name } of patterns) {
