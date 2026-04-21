@@ -1936,6 +1936,11 @@ export interface MonthlyPriceHistory {
   confidence: "HIGH" | "MEDIUM" | "LOW";
   notes: string;
   hasAnySales?: boolean;
+  // When hasAnySales is false, this distinguishes between a card that's
+  // genuinely new to market (< ~6 months old) vs an older card where Gemini
+  // simply couldn't find sales data. The UI uses this to render different
+  // copy — "too new" is misleading for a 5-year-old card.
+  noSalesReason?: "too_new" | "no_data_found";
 }
 
 const monthlyPriceCache = new Map<string, { data: MonthlyPriceHistory; cachedAt: number }>();
@@ -2208,14 +2213,35 @@ Rules:
       computedConfidence = "LOW";
     }
 
+    // Decide whether "no sales" really means "card just released" vs.
+    // "we couldn't find sales data for an existing product." A 2021 card
+    // is not too new for trend analysis — it just lacks comp data.
+    let noSalesReason: "too_new" | "no_data_found" | undefined;
+    if (!hasAnySales) {
+      const yearNum = params.year ? parseInt(String(params.year), 10) : NaN;
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      // Treat as "too new" only if the card year is the current calendar year
+      // and we're still in the first half of it (i.e. < ~6 months of market
+      // history is plausible). Anything older falls into "no_data_found".
+      const isLikelyNew = !isNaN(yearNum) && yearNum >= currentYear && now.getMonth() < 6;
+      noSalesReason = isLikelyNew ? "too_new" : "no_data_found";
+    }
+
+    const defaultNoSalesNote =
+      noSalesReason === "no_data_found"
+        ? "Couldn't find recent sold comps for this exact card — try a different parallel/grade or check eBay directly."
+        : "No actual sales data found — prices are estimates only.";
+
     const result: MonthlyPriceHistory = {
       playerName: params.playerName,
       sport: params.sport,
       cardDescription: isPlayerLevelRequest ? `${params.playerName} — overall card market` : searchDescription,
       dataPoints: filledPoints,
       confidence: computedConfidence as "HIGH" | "MEDIUM" | "LOW",
-      notes: parsed.notes || (!hasAnySales ? "No actual sales data found — prices are estimates only." : (realDataMonths < 6 ? `Based on ${realDataMonths} months of data with interpolation.` : "")),
+      notes: parsed.notes || (!hasAnySales ? defaultNoSalesNote : (realDataMonths < 6 ? `Based on ${realDataMonths} months of data with interpolation.` : "")),
       hasAnySales,
+      noSalesReason,
     };
 
     monthlyPriceCache.set(cacheKey, { data: result, cachedAt: Date.now() });

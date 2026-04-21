@@ -33,6 +33,7 @@ interface MonthlyPriceHistory {
   confidence: "HIGH" | "MEDIUM" | "LOW";
   notes: string;
   hasAnySales?: boolean;
+  noSalesReason?: "too_new" | "no_data_found";
 }
 
 interface PlayerPriceRequest {
@@ -248,9 +249,16 @@ export function PriceTrendChart({
           >
             <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
             <div className="text-xs text-amber-900 dark:text-amber-200">
-              <p className="font-medium">Too new for trend analysis</p>
+              <p className="font-medium">
+                {history.noSalesReason === "no_data_found"
+                  ? "No sold comps found"
+                  : "Too new for trend analysis"}
+              </p>
               <p className="mt-1 text-amber-800/80 dark:text-amber-200/80">
-                {history.notes || "No recorded sales found in the lookback window — likely a newly released product. A trend chart isn't reliable yet; check back after a few weeks of sales history."}
+                {history.notes ||
+                  (history.noSalesReason === "no_data_found"
+                    ? "We couldn't find recent sold comps for this exact card. Try a different parallel/grade combination or check eBay sold listings directly."
+                    : "No recorded sales found in the lookback window — likely a newly released product. A trend chart isn't reliable yet; check back after a few weeks of sales history.")}
               </p>
             </div>
           </div>
