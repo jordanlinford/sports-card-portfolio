@@ -4,3 +4,5 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+# Oversized media files (GitHub 100MB limit)
+attached_assets/Screen_Recording_2026-01-26_185400_1769479365541.mp4
