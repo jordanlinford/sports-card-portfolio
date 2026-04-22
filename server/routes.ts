@@ -586,37 +586,49 @@ Sitemap: ${origin}/sitemap.xml
       const imageUrl = rawImageUrl.startsWith('/') ? `${origin}${rawImageUrl}` : rawImageUrl;
       const publishedDate = post.publishedAt ? new Date(post.publishedAt).toISOString() : '';
       
-      // Convert content to readable HTML (simple markdown-like conversion)
-      // First handle markdown headings, then paragraphs
+      // Convert content to readable HTML.
+      // If content is HTML (explicit format or auto-detected), pass it through
+      // after stripping the document wrapper so it nests inside our SSR shell.
       const rawContent = post.content || '';
-      const contentHtml = rawContent
-        .split('\n\n')
-        .map(paragraph => {
-          const trimmed = paragraph.trim();
-          if (!trimmed) return '';
-          // Handle markdown headings
-          if (trimmed.startsWith('### ')) {
-            return `<h3>${escapeHtml(trimmed.slice(4))}</h3>`;
-          }
-          if (trimmed.startsWith('## ')) {
-            return `<h2>${escapeHtml(trimmed.slice(3))}</h2>`;
-          }
-          if (trimmed.startsWith('# ')) {
-            return `<h2>${escapeHtml(trimmed.slice(2))}</h2>`;
-          }
-          // Handle bullet lists
-          if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-            const items = trimmed.split('\n')
-              .filter(line => line.trim().startsWith('- ') || line.trim().startsWith('* '))
-              .map(line => `<li>${escapeHtml(line.trim().slice(2))}</li>`)
-              .join('');
-            return `<ul>${items}</ul>`;
-          }
-          // Regular paragraph
-          return `<p>${escapeHtml(trimmed).replace(/\n/g, '<br/>')}</p>`;
-        })
-        .filter(Boolean)
-        .join('\n');
+      const isHtmlContent = post.contentFormat === 'html' ||
+        /<!doctype\s+html|<html[\s>]|<body[\s>]|<p[\s>]|<h[1-6][\s>]|<div[\s>]|<style[\s>]/i.test(rawContent);
+
+      let contentHtml: string;
+      if (isHtmlContent) {
+        const bodyMatch = rawContent.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
+        contentHtml = bodyMatch
+          ? bodyMatch[1]
+          : rawContent
+              .replace(/<!doctype[^>]*>/gi, '')
+              .replace(/<\/?html\b[^>]*>/gi, '')
+              .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, '');
+      } else {
+        contentHtml = rawContent
+          .split('\n\n')
+          .map(paragraph => {
+            const trimmed = paragraph.trim();
+            if (!trimmed) return '';
+            if (trimmed.startsWith('### ')) {
+              return `<h3>${escapeHtml(trimmed.slice(4))}</h3>`;
+            }
+            if (trimmed.startsWith('## ')) {
+              return `<h2>${escapeHtml(trimmed.slice(3))}</h2>`;
+            }
+            if (trimmed.startsWith('# ')) {
+              return `<h2>${escapeHtml(trimmed.slice(2))}</h2>`;
+            }
+            if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+              const items = trimmed.split('\n')
+                .filter(line => line.trim().startsWith('- ') || line.trim().startsWith('* '))
+                .map(line => `<li>${escapeHtml(line.trim().slice(2))}</li>`)
+                .join('');
+              return `<ul>${items}</ul>`;
+            }
+            return `<p>${escapeHtml(trimmed).replace(/\n/g, '<br/>')}</p>`;
+          })
+          .filter(Boolean)
+          .join('\n');
+      }
 
       const jsonLd = safeJsonLd({
         "@context": "https://schema.org",
@@ -7148,7 +7160,7 @@ RULES:
 
   app.post("/api/admin/blog", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const { title, slug, excerpt, content, heroImageUrl, videoEmbeds, isPublished } = req.body;
+      const { title, slug, excerpt, content, heroImageUrl, videoEmbeds, isPublished, contentFormat } = req.body;
       
       if (!title || !slug || !content) {
         return res.status(400).json({ message: "Title, slug, and content are required" });
@@ -7160,11 +7172,18 @@ RULES:
         return res.status(400).json({ message: "A post with this slug already exists" });
       }
 
+      // Auto-detect HTML content if format wasn't explicitly set
+      const looksLikeHtml = /<!doctype\s+html|<html[\s>]|<body[\s>]|<p[\s>]|<h[1-6][\s>]|<div[\s>]|<style[\s>]/i.test(content);
+      const resolvedFormat = contentFormat === "html" || contentFormat === "text"
+        ? contentFormat
+        : (looksLikeHtml ? "html" : "text");
+
       const post = await storage.createBlogPost({
         title,
         slug,
         excerpt: excerpt || null,
         content,
+        contentFormat: resolvedFormat,
         heroImageUrl: heroImageUrl || null,
         videoEmbeds: videoEmbeds || [],
         isPublished: isPublished || false,
@@ -7203,6 +7222,14 @@ RULES:
       if (content !== undefined) updateData.content = content;
       if (heroImageUrl !== undefined) updateData.heroImageUrl = heroImageUrl;
       if (videoEmbeds !== undefined) updateData.videoEmbeds = videoEmbeds;
+      // Persist contentFormat when explicitly provided; otherwise auto-detect
+      // from the new content so HTML pastes always render as HTML.
+      if (req.body.contentFormat === "html" || req.body.contentFormat === "text") {
+        updateData.contentFormat = req.body.contentFormat;
+      } else if (content !== undefined) {
+        const looksLikeHtml = /<!doctype\s+html|<html[\s>]|<body[\s>]|<p[\s>]|<h[1-6][\s>]|<div[\s>]|<style[\s>]/i.test(content);
+        if (looksLikeHtml) updateData.contentFormat = "html";
+      }
       if (isPublished !== undefined) {
         updateData.isPublished = isPublished;
         if (isPublished) {
