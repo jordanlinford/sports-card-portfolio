@@ -1965,9 +1965,9 @@ export class DatabaseStorage implements IStorage {
     await db.delete(tradeOffers).where(or(eq(tradeOffers.fromUserId, userId), eq(tradeOffers.toUserId, userId)));
     await db.delete(notifications).where(eq(notifications.userId, userId));
     await db.delete(userBadges).where(eq(userBadges.userId, userId));
-    await db.delete(follows).where(or(eq(follows.followerId, userId), eq(follows.followingId, userId)));
+    await db.delete(follows).where(or(eq(follows.followerId, userId), eq(follows.followedId, userId)));
     await db.delete(messages).where(eq(messages.senderId, userId));
-    await db.delete(conversations).where(or(eq(conversations.user1Id, userId), eq(conversations.user2Id, userId)));
+    await db.delete(conversations).where(or(eq(conversations.participantAId, userId), eq(conversations.participantBId, userId)));
     await db.delete(outlookUsage).where(eq(outlookUsage.userId, userId));
     await db.delete(playerWatchlist).where(eq(playerWatchlist.userId, userId));
     await db.delete(userAlertSettings).where(eq(userAlertSettings.userId, userId));
