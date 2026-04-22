@@ -28,12 +28,70 @@ function looksLikeHtml(content: string): boolean {
   return /<!doctype\s+html|<html[\s>]|<body[\s>]|<p[\s>]|<h[1-6][\s>]|<div[\s>]|<style[\s>]/i.test(content);
 }
 
+// Scope a CSS string so every rule applies only inside the given selector.
+// Handles comma-separated selectors, nested @media / @supports blocks, and
+// remaps `body`/`html` to the scope wrapper itself.
+function scopeCss(css: string, scope: string): string {
+  // Strip comments first so they don't confuse the brace walker.
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  let out = "";
+  let i = 0;
+  while (i < stripped.length) {
+    // Skip whitespace
+    while (i < stripped.length && /\s/.test(stripped[i])) i++;
+    if (i >= stripped.length) break;
+
+    const selectorStart = i;
+    while (i < stripped.length && stripped[i] !== "{" && stripped[i] !== "}") i++;
+    if (i >= stripped.length) break;
+    if (stripped[i] === "}") {
+      i++;
+      continue;
+    }
+
+    const selector = stripped.slice(selectorStart, i).trim();
+    i++; // past '{'
+
+    let depth = 1;
+    const bodyStart = i;
+    while (i < stripped.length && depth > 0) {
+      if (stripped[i] === "{") depth++;
+      else if (stripped[i] === "}") depth--;
+      i++;
+    }
+    const body = stripped.slice(bodyStart, i - 1);
+
+    if (/^@(media|supports|container)\b/.test(selector)) {
+      out += `${selector} {\n${scopeCss(body, scope)}\n}\n`;
+    } else if (selector.startsWith("@")) {
+      // @keyframes, @font-face, @page, @charset, @import — leave alone.
+      out += `${selector} {${body}}\n`;
+    } else {
+      const scoped = selector
+        .split(",")
+        .map(part => {
+          const s = part.trim();
+          if (!s) return s;
+          if (s === "body" || s === "html" || s === ":root") return scope;
+          if (s.startsWith("body ") || s.startsWith("html ")) {
+            return `${scope} ${s.split(/\s+/).slice(1).join(" ")}`;
+          }
+          return `${scope} ${s}`;
+        })
+        .filter(Boolean)
+        .join(", ");
+      out += `${scoped} { ${body.trim()} }\n`;
+    }
+  }
+  return out;
+}
+
 function prepareHtmlForRender(raw: string): { html: string; styles: string } {
   if (!raw) return { html: "", styles: "" };
 
-  const styleBlocks: string[] = [];
+  const rawStyleBlocks: string[] = [];
   let html = raw.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (_match, css) => {
-    styleBlocks.push(String(css));
+    rawStyleBlocks.push(String(css));
     return "";
   });
 
@@ -47,7 +105,11 @@ function prepareHtmlForRender(raw: string): { html: string; styles: string } {
       .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, "");
   }
 
-  return { html: html.trim(), styles: styleBlocks.join("\n") };
+  const scopedStyles = rawStyleBlocks
+    .map(css => scopeCss(css, ".blog-html-scope"))
+    .join("\n");
+
+  return { html: html.trim(), styles: scopedStyles };
 }
 
 function parseTextWithLinks(text: string): (string | JSX.Element)[] {
@@ -300,7 +362,7 @@ export default function BlogPostPage() {
               return (
                 <>
                   {styles && <style dangerouslySetInnerHTML={{ __html: styles }} />}
-                  <div dangerouslySetInnerHTML={{ __html: html }} />
+                  <div className="blog-html-scope" dangerouslySetInnerHTML={{ __html: html }} />
                 </>
               );
             })()
