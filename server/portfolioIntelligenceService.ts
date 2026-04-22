@@ -764,17 +764,28 @@ export async function generatePortfolioOutlook(userId: string): Promise<Portfoli
       model: "gemini-2.5-flash",
       contents: `${systemPrompt}\n\n${userPrompt}`,
       config: {
-        maxOutputTokens: 600,
+        maxOutputTokens: 2000,
+        responseMimeType: "application/json",
       },
     });
 
     const content = response.text || "";
     if (!content) throw new Error("No AI response");
-    
+
+    // With responseMimeType=application/json Gemini returns raw JSON, but
+    // we still defensively strip a markdown fence in case the model wraps
+    // it anyway (and to handle older cached prompts/fallbacks).
     let jsonText = content.trim();
-    const codeBlockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (codeBlockMatch) {
-      jsonText = codeBlockMatch[1].trim();
+    const fenced = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenced) {
+      jsonText = fenced[1].trim();
+    } else {
+      // Strip a leading fence even when the closing fence is missing
+      // (happens when the response is truncated by the token limit).
+      jsonText = jsonText
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```\s*$/i, "")
+        .trim();
     }
     aiResponse = JSON.parse(jsonText);
   } catch (error) {
