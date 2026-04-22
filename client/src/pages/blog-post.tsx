@@ -23,6 +23,33 @@ function extractVideoId(url: string, provider: string): string | null {
   return null;
 }
 
+function looksLikeHtml(content: string): boolean {
+  if (!content) return false;
+  return /<!doctype\s+html|<html[\s>]|<body[\s>]|<p[\s>]|<h[1-6][\s>]|<div[\s>]|<style[\s>]/i.test(content);
+}
+
+function prepareHtmlForRender(raw: string): { html: string; styles: string } {
+  if (!raw) return { html: "", styles: "" };
+
+  const styleBlocks: string[] = [];
+  let html = raw.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (_match, css) => {
+    styleBlocks.push(String(css));
+    return "";
+  });
+
+  const bodyMatch = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) {
+    html = bodyMatch[1];
+  } else {
+    html = html
+      .replace(/<!doctype[^>]*>/gi, "")
+      .replace(/<\/?html\b[^>]*>/gi, "")
+      .replace(/<head\b[^>]*>[\s\S]*?<\/head>/gi, "");
+  }
+
+  return { html: html.trim(), styles: styleBlocks.join("\n") };
+}
+
 function parseTextWithLinks(text: string): (string | JSX.Element)[] {
   const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
   const urlRegex = /(https?:\/\/[^\s<]+[^\s<.,;:!?'"\])>])/g;
@@ -267,8 +294,16 @@ export default function BlogPostPage() {
         </header>
 
         <div className="prose prose-neutral dark:prose-invert max-w-none" data-testid="text-post-content">
-          {post.contentFormat === "html" ? (
-            <div dangerouslySetInnerHTML={{ __html: post.content }} />
+          {(post.contentFormat === "html" || looksLikeHtml(post.content)) ? (
+            (() => {
+              const { html, styles } = prepareHtmlForRender(post.content);
+              return (
+                <>
+                  {styles && <style dangerouslySetInnerHTML={{ __html: styles }} />}
+                  <div dangerouslySetInnerHTML={{ __html: html }} />
+                </>
+              );
+            })()
           ) : (
             <div className="whitespace-pre-line">
               {parseTextWithLinks(post.content)}
