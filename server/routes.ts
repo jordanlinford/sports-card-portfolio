@@ -8804,6 +8804,34 @@ RULES:
         return res.status(400).json({ message: "Must request at least one card" });
       }
 
+      // Verify offered cards belong to the sender
+      if (offeredCardIds.length > 0) {
+        const { cards, displayCases } = await import("@shared/schema");
+        const { inArray } = await import("drizzle-orm");
+        const offeredCards = await db
+          .select({ cardId: cards.id, userId: displayCases.userId })
+          .from(cards)
+          .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+          .where(inArray(cards.id, offeredCardIds));
+        if (offeredCards.length !== offeredCardIds.length || offeredCards.some(c => c.userId !== fromUserId)) {
+          return res.status(403).json({ message: "You can only offer cards you own" });
+        }
+      }
+
+      // Verify requested cards belong to the recipient
+      if (requestedCardIds.length > 0) {
+        const { cards, displayCases } = await import("@shared/schema");
+        const { inArray } = await import("drizzle-orm");
+        const requestedCards = await db
+          .select({ cardId: cards.id, userId: displayCases.userId })
+          .from(cards)
+          .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+          .where(inArray(cards.id, requestedCardIds));
+        if (requestedCards.length !== requestedCardIds.length || requestedCards.some(c => c.userId !== toUserId)) {
+          return res.status(403).json({ message: "Requested cards do not belong to the recipient" });
+        }
+      }
+
       const tradeOffer = await storage.createTradeOffer(
         fromUserId,
         toUserId,
