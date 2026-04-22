@@ -362,7 +362,10 @@ export default function BlogPostPage() {
               return (
                 <>
                   {styles && <style dangerouslySetInnerHTML={{ __html: styles }} />}
-                  <div className="blog-html-scope" dangerouslySetInnerHTML={{ __html: html }} />
+                  <div
+                    className="blog-html-scope rounded-xl bg-white text-neutral-900 px-6 py-8 sm:px-10 sm:py-12 shadow-sm"
+                    dangerouslySetInnerHTML={{ __html: html }}
+                  />
                 </>
               );
             })()
