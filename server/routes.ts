@@ -7531,7 +7531,8 @@ RULES:
   // Get user's own support tickets
   app.get("/api/support/tickets", isAuthenticated, async (req: any, res) => {
     try {
-      const tickets = await storage.getSupportTicketsForUser(req.user.id);
+      const userId = req.user.claims.sub;
+      const tickets = await storage.getSupportTicketsForUser(userId);
       res.json(tickets);
     } catch (error) {
       console.error("Error fetching user support tickets:", error);
@@ -7553,8 +7554,9 @@ RULES:
       }
 
       // Check access: must be owner or admin
-      const isAdmin = await storage.isUserAdmin(req.user.id);
-      if (ticket.requesterId !== req.user.id && !isAdmin) {
+      const userId = req.user.claims.sub;
+      const isAdmin = await storage.isUserAdmin(userId);
+      if (ticket.requesterId !== userId && !isAdmin) {
         return res.status(403).json({ message: "Not authorized to view this ticket" });
       }
 
@@ -7578,15 +7580,16 @@ RULES:
         return res.status(400).json({ message: "Subject must be 200 characters or less" });
       }
 
+      const userId = req.user.claims.sub;
       const ticket = await storage.createSupportTicket({
-        requesterId: req.user.id,
+        requesterId: userId,
         subject,
         body,
       });
 
       // Notify all admins about the new ticket
       const adminUsers = await storage.getAdminUsers();
-      const user = await storage.getUser(req.user.id);
+      const user = await storage.getUser(userId);
       for (const admin of adminUsers) {
         await storage.createNotification(admin.id, 'support_ticket_created', {
           ticketId: ticket.id,
@@ -7624,14 +7627,15 @@ RULES:
       }
 
       // Check access: must be owner or admin
-      const isAdmin = await storage.isUserAdmin(req.user.id);
-      if (ticket.requesterId !== req.user.id && !isAdmin) {
+      const userId = req.user.claims.sub;
+      const isAdmin = await storage.isUserAdmin(userId);
+      if (ticket.requesterId !== userId && !isAdmin) {
         return res.status(403).json({ message: "Not authorized to reply to this ticket" });
       }
 
       const message = await storage.addSupportTicketMessage({
         ticketId,
-        senderId: req.user.id,
+        senderId: userId,
         body,
         isAdminReply: isAdmin,
       });
@@ -7646,7 +7650,7 @@ RULES:
       } else {
         // User replied - notify all admins
         const adminUsers = await storage.getAdminUsers();
-        const user = await storage.getUser(req.user.id);
+        const user = await storage.getUser(userId);
         for (const admin of adminUsers) {
           await storage.createNotification(admin.id, 'support_ticket_user_reply', {
             ticketId: ticket.id,
@@ -7690,7 +7694,8 @@ RULES:
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const ticket = await storage.updateSupportTicketStatus(ticketId, status, req.user.id);
+      const userId = req.user.claims.sub;
+      const ticket = await storage.updateSupportTicketStatus(ticketId, status, userId);
       if (!ticket) {
         return res.status(404).json({ message: "Ticket not found" });
       }
