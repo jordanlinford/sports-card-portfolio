@@ -2591,23 +2591,35 @@ Rules:
     else if (realDataMonths < 8 && computedConfidence === "HIGH") computedConfidence = "MEDIUM";
 
     const totalSalesCount = rawPoints.reduce((sum: number, p: MonthlyPricePoint) => sum + (p.salesCount || 0), 0);
-    const hasAnySales = totalSalesCount > 0;
+    // hasAnySales gates whether we render the chart on the frontend.
+    // CRITICAL: gate on the presence of REAL PRICE DATA, not on per-month
+    // salesCount. Gemini often returns real monthly prices without itemizing
+    // sales counts (its knowledge is "card sold for ~$X in March" without
+    // tallying the count). If we required salesCount > 0, every chart
+    // would show "no sold comps found" even when we have 18 months of
+    // genuine price data — exactly the regression the user reported.
+    // realDataMonths counts months with avgPrice > 0, which is the right
+    // signal for "do we have a chart to show."
+    const hasAnySales = realDataMonths >= 2;
+    if (totalSalesCount === 0) {
+      console.log(`[MonthlyPrice] Note: ${rawPoints.length} data points have prices but 0 itemized sales counts — Gemini knows the prices but not exact sale tallies`);
+    }
     if (!hasAnySales) {
-      console.log(`[MonthlyPrice] WARNING: All ${rawPoints.length} data points have 0 sales — prices are estimated/hallucinated`);
+      console.log(`[MonthlyPrice] WARNING: Only ${realDataMonths} months with real price data — not enough to chart`);
       computedConfidence = "LOW";
+    } else if (totalSalesCount === 0 && computedConfidence === "HIGH") {
+      // Prices exist but no sales-count corroboration — slight confidence haircut
+      computedConfidence = "MEDIUM";
     }
 
-    // Decide whether "no sales" really means "card just released" vs.
-    // "we couldn't find sales data for an existing product." A 2021 card
-    // is not too new for trend analysis — it just lacks comp data.
+    // Decide whether "no chart data" really means "card just released" vs.
+    // "we couldn't find any price data for an existing product." A 2021 card
+    // is not too new for trend analysis — it just lacks data.
     let noSalesReason: "too_new" | "no_data_found" | undefined;
     if (!hasAnySales) {
       const yearNum = params.year ? parseInt(String(params.year), 10) : NaN;
       const now = new Date();
       const currentYear = now.getFullYear();
-      // Treat as "too new" only if the card year is the current calendar year
-      // and we're still in the first half of it (i.e. < ~6 months of market
-      // history is plausible). Anything older falls into "no_data_found".
       const isLikelyNew = !isNaN(yearNum) && yearNum >= currentYear && now.getMonth() < 6;
       noSalesReason = isLikelyNew ? "too_new" : "no_data_found";
     }
