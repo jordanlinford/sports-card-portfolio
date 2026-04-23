@@ -1038,12 +1038,20 @@ export async function fetchUnifiedCardAnalysis(card: {
   const isPrizmFamilySet = /\bprizm\b|\bprisma\b/i.test(card.set || "");
   const isStrictBaseVariation = !card.variation || variationLower === "base" || variationLower === "base prizm";
   const isOpticSet = /\boptic\b/i.test(card.set || "");
-  const isBaseOrCommonParallel = !isNumbered && !isPremiumUnnumberedParallel && (
+  // In Donruss Optic, "Holo" is a PREMIUM parallel (~$150–300 PSA 10 for stars),
+  // not a base/common parallel like "Holo" can be in some other product lines.
+  // Excluding it here prevents the AI from being told to search for $1–10 base comps.
+  const isOpticHoloPremium = isOpticSet && /\bholo\b/i.test(variationLower);
+  const isBaseOrCommonParallel = !isNumbered && !isPremiumUnnumberedParallel && !isOpticHoloPremium && (
     !card.variation ||
     variationLower === "base" ||
-    /^(certified\s+)?rookie\s*(card|rc)?\s*(silver|base|prizm|holo|disco)?$/i.test(variationLower) ||
-    /^(silver|base|disco)\s*(prizm|holo)?$/i.test(variationLower) ||
-    /^(prizm|holo|disco\s*prizm)$/i.test(variationLower)
+    /^(certified\s+)?rookie\s*(card|rc)?\s*(silver|base|prizm|disco)?$/i.test(variationLower) ||
+    /^(silver|base|disco)\s*(prizm)?$/i.test(variationLower) ||
+    /^(prizm|disco\s*prizm)$/i.test(variationLower) ||
+    // "Holo" only counts as base when the set is NOT Optic.
+    (!isOpticSet && /^(holo)$/i.test(variationLower)) ||
+    (!isOpticSet && /^(silver|base|disco)\s*holo$/i.test(variationLower)) ||
+    (!isOpticSet && /^(certified\s+)?rookie\s*(card|rc)?\s*holo$/i.test(variationLower))
   );
   const isAutoCardU = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
   const isHatSwatchU = /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.variation || "") || /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.title || "");
