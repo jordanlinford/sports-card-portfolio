@@ -2,10 +2,15 @@ import { doubleCsrf } from "csrf-csrf";
 import type { RequestHandler } from "express";
 
 const {
-  generateToken,
+  generateCsrfToken,
   doubleCsrfProtection,
 } = doubleCsrf({
   getSecret: () => process.env.SESSION_SECRET || "csrf-fallback-secret",
+  getSessionIdentifier: (req) =>
+    (req as any).sessionID ||
+    (req as any).session?.id ||
+    req.ip ||
+    "anonymous",
   cookieName: "__csrf",
   cookieOptions: {
     httpOnly: true,
@@ -13,36 +18,35 @@ const {
     secure: true,
     path: "/",
   },
-  getTokenFromRequest: (req) =>
+  getCsrfTokenFromRequest: (req) =>
     req.headers["x-csrf-token"] as string | undefined,
 });
 
-/**
- * Middleware that generates a CSRF token and sets it in a response header.
- * The frontend should read `x-csrf-token` from the response and send it
- * back on subsequent state-changing requests.
- */
 export const csrfTokenProvider: RequestHandler = (req, res, next) => {
-  const token = generateToken(req, res);
-  res.setHeader("x-csrf-token", token);
+  try {
+    const token = generateCsrfToken(req, res);
+    res.setHeader("x-csrf-token", token);
+  } catch (err) {
+    // Don't fail the request if token generation fails
+    console.warn("[CSRF] token generation failed:", (err as Error).message);
+  }
   next();
 };
 
-/**
- * Middleware that validates the CSRF token on state-changing requests.
- * Skips GET, HEAD, OPTIONS requests and webhook endpoints.
- */
 export const csrfProtection: RequestHandler = (req, res, next) => {
-  // Skip safe methods
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     return next();
   }
-  // Skip Stripe webhooks (they use signature verification instead)
-  if (req.path === "/api/stripe/webhook" || req.path === "/api/webhooks/stripe") {
+  // Skip Stripe webhooks (use signature verification instead)
+  if (req.path.startsWith("/api/stripe/webhook") || req.path === "/api/webhooks/stripe") {
     return next();
   }
-  // Skip auth callback routes (redirects from OAuth providers)
+  // Skip OAuth callbacks (POST from external providers)
   if (req.path === "/api/callback" || req.path === "/api/auth/google/callback") {
+    return next();
+  }
+  // Skip QA login (used by automated tests with header token instead)
+  if (req.path === "/api/auth/qa-login") {
     return next();
   }
   return doubleCsrfProtection(req, res, next);
