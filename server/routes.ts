@@ -1570,6 +1570,10 @@ Sitemap: ${origin}/sitemap.xml
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
       }
 
+      const { sanitizeText } = await import("./sanitize");
+      if (parsed.data.name) parsed.data.name = sanitizeText(parsed.data.name);
+      if (parsed.data.description) parsed.data.description = sanitizeText(parsed.data.description);
+
       const displayCase = await storage.createDisplayCase(userId, parsed.data);
       
       logActivity("case_create", {
@@ -6037,7 +6041,8 @@ RULES:
         return res.status(404).json({ error: "Display case not found" });
       }
 
-      const comment = await storage.createComment(id, userId, content.trim(), userId ? undefined : guestName?.trim());
+      const { sanitizeText } = await import("./sanitize");
+      const comment = await storage.createComment(id, userId, sanitizeText(content), userId ? undefined : guestName ? sanitizeText(guestName) : undefined);
       
       if (displayCase.userId !== userId) {
         let commenterName = 'Someone';
@@ -7603,10 +7608,11 @@ RULES:
       }
 
       const userId = req.user.claims.sub;
+      const { sanitizeText } = await import("./sanitize");
       const ticket = await storage.createSupportTicket({
         requesterId: userId,
-        subject,
-        body,
+        subject: sanitizeText(subject),
+        body: sanitizeText(body),
       });
 
       // Notify all admins about the new ticket

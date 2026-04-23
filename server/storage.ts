@@ -263,15 +263,15 @@ export interface IStorage {
   findSimilarCards(userId: string, title: string, excludeCardId?: number): Promise<Card[]>;
 
   // Bookmark operations
-  getBookmarks(userId: string): Promise<BookmarkWithCard[]>;
+  getBookmarks(userId: string, limit?: number, offset?: number): Promise<BookmarkWithCard[]>;
   addBookmark(userId: string, cardId: number): Promise<Bookmark>;
   removeBookmark(userId: string, cardId: number): Promise<void>;
   hasUserBookmarked(userId: string, cardId: number): Promise<boolean>;
   getCardBookmarkCount(cardId: number): Promise<number>;
 
   // Offer operations
-  getReceivedOffers(userId: string): Promise<OfferWithUsers[]>;
-  getSentOffers(userId: string): Promise<OfferWithUsers[]>;
+  getReceivedOffers(userId: string, limit?: number, offset?: number): Promise<OfferWithUsers[]>;
+  getSentOffers(userId: string, limit?: number, offset?: number): Promise<OfferWithUsers[]>;
   createOffer(fromUserId: string, toUserId: string, data: InsertOffer): Promise<Offer>;
   updateOfferStatus(offerId: number, status: string): Promise<Offer | undefined>;
   getOffer(id: number): Promise<Offer | undefined>;
@@ -2145,21 +2145,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Bookmark operations
-  async getBookmarks(userId: string): Promise<BookmarkWithCard[]> {
-    const userBookmarks = await db
-      .select()
+  async getBookmarks(userId: string, limit: number = 50, offset: number = 0): Promise<BookmarkWithCard[]> {
+    const rows = await db
+      .select({ bookmark: bookmarks, card: cards })
       .from(bookmarks)
+      .innerJoin(cards, eq(bookmarks.cardId, cards.id))
       .where(eq(bookmarks.userId, userId))
-      .orderBy(desc(bookmarks.createdAt));
+      .orderBy(desc(bookmarks.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    const result: BookmarkWithCard[] = [];
-    for (const bookmark of userBookmarks) {
-      const [card] = await db.select().from(cards).where(eq(cards.id, bookmark.cardId));
-      if (card) {
-        result.push({ ...bookmark, card });
-      }
-    }
-    return result;
+    return rows.map(row => ({ ...row.bookmark, card: row.card }));
   }
 
   async addBookmark(userId: string, cardId: number): Promise<Bookmark> {
@@ -2193,46 +2189,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Offer operations
-  async getReceivedOffers(userId: string): Promise<OfferWithUsers[]> {
-    const receivedOffers = await db
-      .select()
+  async getReceivedOffers(userId: string, limit: number = 50, offset: number = 0): Promise<OfferWithUsers[]> {
+    const rows = await db
+      .select({
+        offer: offers,
+        fromUser: { id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl },
+        card: cards,
+      })
       .from(offers)
+      .innerJoin(users, eq(offers.fromUserId, users.id))
+      .innerJoin(cards, eq(offers.cardId, cards.id))
       .where(eq(offers.toUserId, userId))
-      .orderBy(desc(offers.createdAt));
+      .orderBy(desc(offers.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    const result: OfferWithUsers[] = [];
-    for (const offer of receivedOffers) {
-      const [fromUser] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
-        .from(users)
-        .where(eq(users.id, offer.fromUserId));
-      const [card] = await db.select().from(cards).where(eq(cards.id, offer.cardId));
-      if (fromUser && card) {
-        result.push({ ...offer, fromUser, card });
-      }
-    }
-    return result;
+    return rows.map(row => ({ ...row.offer, fromUser: row.fromUser, card: row.card }));
   }
 
-  async getSentOffers(userId: string): Promise<OfferWithUsers[]> {
-    const sentOffers = await db
-      .select()
+  async getSentOffers(userId: string, limit: number = 50, offset: number = 0): Promise<OfferWithUsers[]> {
+    const rows = await db
+      .select({
+        offer: offers,
+        fromUser: { id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl },
+        card: cards,
+      })
       .from(offers)
+      .innerJoin(users, eq(offers.fromUserId, users.id))
+      .innerJoin(cards, eq(offers.cardId, cards.id))
       .where(eq(offers.fromUserId, userId))
-      .orderBy(desc(offers.createdAt));
+      .orderBy(desc(offers.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    const result: OfferWithUsers[] = [];
-    for (const offer of sentOffers) {
-      const [fromUser] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
-        .from(users)
-        .where(eq(users.id, offer.fromUserId));
-      const [card] = await db.select().from(cards).where(eq(cards.id, offer.cardId));
-      if (fromUser && card) {
-        result.push({ ...offer, fromUser, card });
-      }
-    }
-    return result;
+    return rows.map(row => ({ ...row.offer, fromUser: row.fromUser, card: row.card }));
   }
 
   async createOffer(fromUserId: string, toUserId: string, data: InsertOffer): Promise<Offer> {
