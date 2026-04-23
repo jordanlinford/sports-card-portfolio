@@ -2801,8 +2801,24 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        // Store current result as first card and enter comparison mode
-                        setFirstCardResult(result);
+                        // Store current result as first card and enter comparison mode.
+                        // IMPORTANT: merge in trendCorrectedValue so the comparison shows
+                        // the same price the user just saw on the single-card view
+                        // (the single view overlays trend-corrected sold-comp data on top
+                        // of the raw Gemini estimate; without merging it, compare would
+                        // display the stale raw estimate instead).
+                        const resultForCompare = trendCorrectedValue && trendCorrectedValue > 0
+                          ? {
+                              ...result,
+                              market: {
+                                ...result.market,
+                                value: trendCorrectedValue,
+                                min: Math.round(trendCorrectedValue * 0.75),
+                                max: Math.round(trendCorrectedValue * 1.35),
+                              },
+                            }
+                          : result;
+                        setFirstCardResult(resultForCompare);
                         // Capture whichever image URL is available (could be from scan or manual upload)
                         setFirstCardPreviewUrl(previewUrl || scanPreviewUrl || result.tempCard.imagePath || null);
                         setComparisonMode(true);
