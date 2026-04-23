@@ -1,6 +1,8 @@
+import "./sentry"; // Initialize Sentry early (before other imports)
 import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { timingSafeEqual } from "crypto";
+import { Sentry } from "./sentry";
 import { registerRoutes } from "./routes";
 import { startScanWorker } from "./scanWorker";
 import { serveStatic } from "./static";
@@ -45,23 +47,28 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
 
   res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
+    if (!path.startsWith("/api")) return;
 
-      log(logLine);
+    const duration = Date.now() - start;
+    const slow = duration > 2000;
+    const entry = {
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      path,
+      status: res.statusCode,
+      duration,
+      userId: (req as any).user?.claims?.sub ?? null,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"]?.slice(0, 100) ?? null,
+      ...(slow ? { slow: true } : {}),
+    };
+
+    if (slow) {
+      console.warn(JSON.stringify(entry));
+    } else {
+      console.log(JSON.stringify(entry));
     }
   });
 
@@ -150,6 +157,11 @@ app.use((req, res, next) => {
         app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
           const status = err.status || err.statusCode || 500;
           const message = err.message || "Internal Server Error";
+
+          // Report server errors to Sentry
+          if (status >= 500) {
+            Sentry.captureException(err);
+          }
 
           res.status(status).json({ message });
           throw err;

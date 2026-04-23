@@ -13,6 +13,15 @@ const aiOperationLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many requests, please slow down" },
 });
+
+// Rate limiter for resource creation endpoints
+const resourceCreationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // 20 creates per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please slow down" },
+});
 import { setupGoogleAuth } from "./googleAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
@@ -958,6 +967,58 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
+  // GDPR/CCPA: Delete user account and all associated data
+  app.delete("/api/account", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      await storage.adminDeleteUser(userId);
+      // Destroy the session after account deletion
+      req.logout(() => {
+        req.session.destroy(() => {
+          res.json({ message: "Account and all associated data have been deleted" });
+        });
+      });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).json({ message: "Failed to delete account" });
+    }
+  });
+
+  // GDPR/CCPA: Export all user data
+  app.get("/api/account/export", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const displayCasesList = await storage.getDisplayCasesByUser(userId);
+      const allCards = await storage.getAllUserCards(userId);
+      const bookmarksList = await storage.getBookmarks(userId);
+      const watchlistItems = await storage.getWatchlist(userId);
+      const unifiedWatchlistItems = await storage.getUnifiedWatchlist(userId);
+
+      // Strip sensitive internal fields
+      const { stripeCustomerId, stripeSubscriptionId, ...safeUser } = user;
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        user: safeUser,
+        displayCases: displayCasesList,
+        cards: allCards,
+        bookmarks: bookmarksList,
+        watchlist: watchlistItems,
+        unifiedWatchlist: unifiedWatchlistItems,
+      };
+
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Content-Disposition", `attachment; filename="sports-card-portfolio-export-${new Date().toISOString().split('T')[0]}.json"`);
+      res.json(exportData);
+    } catch (error) {
+      console.error("Error exporting account data:", error);
+      res.status(500).json({ message: "Failed to export data" });
+    }
+  });
+
   // Trial activation endpoint
   app.post("/api/trial/activate", isAuthenticated, async (req: any, res) => {
     try {
@@ -1555,7 +1616,7 @@ Sitemap: ${origin}/sitemap.xml
     }
   });
 
-  app.post("/api/display-cases", isAuthenticated, async (req: any, res) => {
+  app.post("/api/display-cases", resourceCreationLimiter, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       
@@ -2005,6 +2066,19 @@ Sitemap: ${origin}/sitemap.xml
     } catch (error) {
       console.error("Error deleting card:", error);
       res.status(500).json({ message: "Failed to delete card" });
+    }
+  });
+
+  app.post("/api/cards/:cardId/restore", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const cardId = parseInt(req.params.cardId);
+      if (isNaN(cardId)) return res.status(400).json({ message: "Invalid card ID" });
+      await storage.restoreCard(cardId, userId);
+      res.json({ message: "Card restored" });
+    } catch (error) {
+      console.error("Error restoring card:", error);
+      res.status(500).json({ message: "Failed to restore card" });
     }
   });
 
@@ -6082,7 +6156,7 @@ RULES:
     }
   });
 
-  app.post("/api/display-cases/:id/comments", async (req: any, res) => {
+  app.post("/api/display-cases/:id/comments", resourceCreationLimiter, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       const { content, guestName } = req.body;
@@ -8888,7 +8962,7 @@ RULES:
   });
 
   // Trade offer routes
-  app.post("/api/trades", isAuthenticated, async (req: any, res) => {
+  app.post("/api/trades", resourceCreationLimiter, isAuthenticated, async (req: any, res) => {
     try {
       const fromUserId = req.user.claims.sub;
       const { toUserId, offeredCardIds, requestedCardIds, cashAdjustment, message } = req.body;

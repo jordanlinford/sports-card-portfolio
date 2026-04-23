@@ -199,6 +199,7 @@ export interface IStorage {
     outlookGeneratedAt: Date | null;
   }): Promise<Card | undefined>;
   deleteCard(id: number): Promise<void>;
+  restoreCard(cardId: number, userId: string): Promise<void>;
   getMaxSortOrder(displayCaseId: number): Promise<number>;
 
   // Card Outlook operations (new intelligence system)
@@ -727,7 +728,7 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(cards)
-      .where(eq(cards.displayCaseId, displayCaseId))
+      .where(and(eq(cards.displayCaseId, displayCaseId), isNull(cards.deletedAt)))
       .orderBy(asc(cards.sortOrder));
   }
 
@@ -959,7 +960,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteCard(id: number): Promise<void> {
-    await db.delete(cards).where(eq(cards.id, id));
+    await db.update(cards).set({ deletedAt: new Date() }).where(eq(cards.id, id));
+  }
+
+  async restoreCard(cardId: number, userId: string): Promise<void> {
+    const [card] = await db.select().from(cards)
+      .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+      .where(and(eq(cards.id, cardId), eq(displayCases.userId, userId)));
+    if (!card) throw new Error("Card not found or not owned by user");
+    await db.update(cards).set({ deletedAt: null }).where(eq(cards.id, cardId));
   }
 
   async getMaxSortOrder(displayCaseId: number): Promise<number> {
