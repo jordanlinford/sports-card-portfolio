@@ -1306,37 +1306,48 @@ export class DatabaseStorage implements IStorage {
 
   // Public discovery operations
   private async enrichPublicCases(cases: any[]): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]> {
+    if (cases.length === 0) return [];
+
+    const caseIds = cases.map(c => c.id);
+    const ownerIds = [...new Set(cases.map(c => c.userId))];
+
+    // Batch fetch: all cards, all owners, all like counts in 3 queries total
+    const [allCards, allOwners, allLikeCounts] = await Promise.all([
+      db.select().from(cards).where(inArray(cards.displayCaseId, caseIds)).orderBy(asc(cards.sortOrder)),
+      db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle })
+        .from(users).where(inArray(users.id, ownerIds)),
+      db.select({ displayCaseId: likes.displayCaseId, count: sql<number>`count(*)` })
+        .from(likes).where(inArray(likes.displayCaseId, caseIds)).groupBy(likes.displayCaseId),
+    ]);
+
+    // Index by ID for O(1) lookups
+    const cardsByCase = new Map<number, typeof allCards>();
+    for (const card of allCards) {
+      const list = cardsByCase.get(card.displayCaseId) || [];
+      list.push(card);
+      cardsByCase.set(card.displayCaseId, list);
+    }
+    const ownerMap = new Map(allOwners.map(o => [o.id, o]));
+    const likeCountMap = new Map(allLikeCounts.map(l => [l.displayCaseId, Number(l.count)]));
+
     const enrichedCases: (DisplayCaseWithCards & { ownerName: string; likeCount: number })[] = [];
-
     for (const c of cases) {
-      const caseCards = await db
-        .select()
-        .from(cards)
-        .where(eq(cards.displayCaseId, c.id))
-        .orderBy(asc(cards.sortOrder));
+      const caseCards = cardsByCase.get(c.id) || [];
+      if (caseCards.length === 0) continue;
 
-      const [owner] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle })
-        .from(users)
-        .where(eq(users.id, c.userId));
-
-      const likeCount = await this.getLikeCount(c.id);
-
+      const owner = ownerMap.get(c.userId);
       const ownerName = owner?.handle
         ? `@${owner.handle}`
         : owner
           ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
           : "Anonymous";
 
-      // Only include cases with at least one card
-      if (caseCards.length > 0) {
-        enrichedCases.push({
-          ...c,
-          cards: caseCards,
-          ownerName,
-          likeCount,
-        });
-      }
+      enrichedCases.push({
+        ...c,
+        cards: caseCards,
+        ownerName,
+        likeCount: likeCountMap.get(c.id) || 0,
+      });
     }
 
     return enrichedCases;
@@ -1374,54 +1385,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPopularPublicDisplayCases(limit: number = 20): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]> {
-    const publicCases = await db
-      .select()
+    // Get top cases by like count in a single query instead of fetching all + N+1
+    const topCases = await db
+      .select({
+        displayCase: displayCases,
+        likeCount: sql<number>`count(${likes.id})`,
+      })
       .from(displayCases)
-      .where(eq(displayCases.isPublic, true));
+      .leftJoin(likes, eq(likes.displayCaseId, displayCases.id))
+      .where(eq(displayCases.isPublic, true))
+      .groupBy(displayCases.id)
+      .orderBy(sql`count(${likes.id}) desc`)
+      .limit(limit);
 
-    const casesWithLikes = await Promise.all(
-      publicCases.map(async (c) => ({
-        ...c,
-        likeCount: await this.getLikeCount(c.id),
-      }))
-    );
-
-    casesWithLikes.sort((a, b) => b.likeCount - a.likeCount);
-
-    const topCases = casesWithLikes.slice(0, limit);
-
-    const enrichedCases: (DisplayCaseWithCards & { ownerName: string; likeCount: number })[] = [];
-
-    for (const c of topCases) {
-      const caseCards = await db
-        .select()
-        .from(cards)
-        .where(eq(cards.displayCaseId, c.id))
-        .orderBy(asc(cards.sortOrder));
-
-      const [owner] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle })
-        .from(users)
-        .where(eq(users.id, c.userId));
-
-      const ownerName = owner?.handle
-        ? `@${owner.handle}`
-        : owner
-          ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
-          : "Anonymous";
-
-      // Only include cases with at least one card
-      if (caseCards.length > 0) {
-        enrichedCases.push({
-          ...c,
-          cards: caseCards,
-          ownerName,
-          likeCount: c.likeCount,
-        });
-      }
-    }
-
-    return enrichedCases;
+    const cases = topCases.map(r => ({ ...r.displayCase, likeCount: Number(r.likeCount) }));
+    return this.enrichPublicCases(cases);
   }
 
   async getTrendingDisplayCases(limit: number = 20): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number; trendingScore: number })[]> {
