@@ -1673,54 +1673,17 @@ export async function fetchFocusedCardValue(card: {
   if (cached && Date.now() - cached.cachedAt < FOCUSED_PRICE_TTL_MS) {
     return cached.data;
   }
-  // Build a disambiguation hint for parallels whose name alone is ambiguous to a
-  // text-only Gemini query. The most common one we get wrong: Donruss/Donruss
-  // Optic "Holo" is a specific silver-holographic parallel that's worth 5-10x
-  // base, but Gemini will quietly search base Optic comps without this hint.
-  const variationLower = variation.toLowerCase();
-  const setLower = set.toLowerCase();
-  const disambiguationHints: string[] = [];
-  if (setLower.includes("optic") && variationLower === "holo") {
-    disambiguationHints.push(`"Holo" in Donruss Optic refers to the SILVER HOLO parallel (sometimes listed as "Optic Holo Silver" or "Silver Holo"), NOT the base Optic card. The Silver Holo parallel sells for 5-10x the base Optic price for star rookies.`);
-  }
-  if (setLower.includes("optic") && /prizm|wave|shock|fast break|choice/.test(variationLower)) {
-    disambiguationHints.push(`Donruss Optic prizm parallels (Holo, Hyper, Choice, Shock, Fast Break, Purple/Blue/Pink Wave) are DISTINCT from each other — each has its own price range. Match the EXACT parallel name.`);
-  }
-  const buildSearchTerms = () => {
-    const terms: string[] = [];
-    const gradePart = grader && grade ? `${grader} ${grade}` : grade ? `PSA ${grade}` : "";
-    terms.push(`"${year} ${set} ${playerName} ${variation} ${gradePart}"`.replace(/\s+/g, " ").trim());
-    if (variationLower === "holo" && setLower.includes("optic")) {
-      terms.push(`"${year} Optic ${playerName} Silver Holo ${gradePart}"`.replace(/\s+/g, " ").trim());
-      terms.push(`"${year} Donruss Optic ${playerName} Holo Silver ${gradePart}"`.replace(/\s+/g, " ").trim());
-    }
-    return terms.filter(Boolean).join(" OR ");
-  };
-  const searchTerms = buildSearchTerms();
-
+  // Mirror exactly how a human asks Gemini in the chat app. Short, direct,
+  // no over-coaching. We tested elaborate prompts with disambiguation hints
+  // and multi-step instructions — they consistently underperformed the simple
+  // question. The only structure we add is one line at the end asking for a
+  // parseable price range so we can extract a number.
   try {
-    const prompt = `Find what this EXACT sports card is selling for on eBay right now.
+    const prompt = `What is this card currently worth?
 
-Card: ${desc}
+${desc}
 
-${disambiguationHints.length > 0 ? `IMPORTANT DISAMBIGUATION:\n${disambiguationHints.map(h => `- ${h}`).join("\n")}\n` : ""}
-STEP 1 — Search eBay sold/completed listings using these queries (try each):
-${searchTerms}
-
-Also check 130point.com and PSA Auction Prices for this exact card.
-
-STEP 2 — List 5-10 SPECIFIC recent sold prices you found, each with a date. Format:
-- $XXX on YYYY-MM-DD (source/listing description)
-Only include sales that match the EXACT card variant (year, set, parallel, grade). REJECT any sale where you're not confident it's the exact same parallel — wrong-parallel sales will poison the average.
-
-STEP 3 — From those specific verified sales, compute:
-- Low: lowest verified recent sale
-- High: highest verified recent sale
-- Typical: median of verified recent sales
-
-If you found fewer than 3 verified exact-match sales, respond with "INSUFFICIENT_DATA" instead of guessing.
-
-End your response with this exact line:
+Give me the current market value based on recent eBay sold listings. End your response with this single line in this exact format:
 PRICE_RANGE: $LOW - $HIGH (typical: $MID)`;
     const resp = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
