@@ -263,15 +263,15 @@ export interface IStorage {
   findSimilarCards(userId: string, title: string, excludeCardId?: number): Promise<Card[]>;
 
   // Bookmark operations
-  getBookmarks(userId: string): Promise<BookmarkWithCard[]>;
+  getBookmarks(userId: string, limit?: number, offset?: number): Promise<BookmarkWithCard[]>;
   addBookmark(userId: string, cardId: number): Promise<Bookmark>;
   removeBookmark(userId: string, cardId: number): Promise<void>;
   hasUserBookmarked(userId: string, cardId: number): Promise<boolean>;
   getCardBookmarkCount(cardId: number): Promise<number>;
 
   // Offer operations
-  getReceivedOffers(userId: string): Promise<OfferWithUsers[]>;
-  getSentOffers(userId: string): Promise<OfferWithUsers[]>;
+  getReceivedOffers(userId: string, limit?: number, offset?: number): Promise<OfferWithUsers[]>;
+  getSentOffers(userId: string, limit?: number, offset?: number): Promise<OfferWithUsers[]>;
   createOffer(fromUserId: string, toUserId: string, data: InsertOffer): Promise<Offer>;
   updateOfferStatus(offerId: number, status: string): Promise<Offer | undefined>;
   getOffer(id: number): Promise<Offer | undefined>;
@@ -1230,39 +1230,26 @@ export class DatabaseStorage implements IStorage {
 
   // Comment operations
   async getComments(displayCaseId: number): Promise<CommentWithUser[]> {
-    const commentsData = await db
-      .select()
+    const rows = await db
+      .select({
+        comment: comments,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          handle: users.handle,
+          profileImageUrl: users.profileImageUrl,
+        },
+      })
       .from(comments)
+      .leftJoin(users, eq(comments.userId, users.id))
       .where(eq(comments.displayCaseId, displayCaseId))
       .orderBy(desc(comments.createdAt));
 
-    const commentsWithUsers: CommentWithUser[] = [];
-    for (const comment of commentsData) {
-      if (comment.userId) {
-        const [user] = await db
-          .select({
-            id: users.id,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            handle: users.handle,
-            profileImageUrl: users.profileImageUrl,
-          })
-          .from(users)
-          .where(eq(users.id, comment.userId));
-
-        commentsWithUsers.push({
-          ...comment,
-          user: user || { id: comment.userId, firstName: null, lastName: null, handle: null, profileImageUrl: null },
-        });
-      } else {
-        commentsWithUsers.push({
-          ...comment,
-          user: null,
-        });
-      }
-    }
-
-    return commentsWithUsers;
+    return rows.map(row => ({
+      ...row.comment,
+      user: row.user?.id ? row.user : null,
+    }));
   }
 
   async createComment(displayCaseId: number, userId: string | null, content: string, guestName?: string): Promise<Comment> {
@@ -1286,11 +1273,11 @@ export class DatabaseStorage implements IStorage {
 
   // Like operations
   async getLikeCount(displayCaseId: number): Promise<number> {
-    const likesList = await db
-      .select()
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
       .from(likes)
       .where(eq(likes.displayCaseId, displayCaseId));
-    return likesList.length;
+    return Number(result.count);
   }
 
   async hasUserLiked(displayCaseId: number, userId: string): Promise<boolean> {
@@ -1319,37 +1306,48 @@ export class DatabaseStorage implements IStorage {
 
   // Public discovery operations
   private async enrichPublicCases(cases: any[]): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]> {
+    if (cases.length === 0) return [];
+
+    const caseIds = cases.map(c => c.id);
+    const ownerIds = [...new Set(cases.map(c => c.userId))];
+
+    // Batch fetch: all cards, all owners, all like counts in 3 queries total
+    const [allCards, allOwners, allLikeCounts] = await Promise.all([
+      db.select().from(cards).where(inArray(cards.displayCaseId, caseIds)).orderBy(asc(cards.sortOrder)),
+      db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle })
+        .from(users).where(inArray(users.id, ownerIds)),
+      db.select({ displayCaseId: likes.displayCaseId, count: sql<number>`count(*)` })
+        .from(likes).where(inArray(likes.displayCaseId, caseIds)).groupBy(likes.displayCaseId),
+    ]);
+
+    // Index by ID for O(1) lookups
+    const cardsByCase = new Map<number, typeof allCards>();
+    for (const card of allCards) {
+      const list = cardsByCase.get(card.displayCaseId) || [];
+      list.push(card);
+      cardsByCase.set(card.displayCaseId, list);
+    }
+    const ownerMap = new Map(allOwners.map(o => [o.id, o]));
+    const likeCountMap = new Map(allLikeCounts.map(l => [l.displayCaseId, Number(l.count)]));
+
     const enrichedCases: (DisplayCaseWithCards & { ownerName: string; likeCount: number })[] = [];
-
     for (const c of cases) {
-      const caseCards = await db
-        .select()
-        .from(cards)
-        .where(eq(cards.displayCaseId, c.id))
-        .orderBy(asc(cards.sortOrder));
+      const caseCards = cardsByCase.get(c.id) || [];
+      if (caseCards.length === 0) continue;
 
-      const [owner] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle })
-        .from(users)
-        .where(eq(users.id, c.userId));
-
-      const likeCount = await this.getLikeCount(c.id);
-
+      const owner = ownerMap.get(c.userId);
       const ownerName = owner?.handle
         ? `@${owner.handle}`
         : owner
           ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
           : "Anonymous";
 
-      // Only include cases with at least one card
-      if (caseCards.length > 0) {
-        enrichedCases.push({
-          ...c,
-          cards: caseCards,
-          ownerName,
-          likeCount,
-        });
-      }
+      enrichedCases.push({
+        ...c,
+        cards: caseCards,
+        ownerName,
+        likeCount: likeCountMap.get(c.id) || 0,
+      });
     }
 
     return enrichedCases;
@@ -1387,54 +1385,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPopularPublicDisplayCases(limit: number = 20): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number })[]> {
-    const publicCases = await db
-      .select()
+    // Get top cases by like count in a single query instead of fetching all + N+1
+    const topCases = await db
+      .select({
+        displayCase: displayCases,
+        likeCount: sql<number>`count(${likes.id})`,
+      })
       .from(displayCases)
-      .where(eq(displayCases.isPublic, true));
+      .leftJoin(likes, eq(likes.displayCaseId, displayCases.id))
+      .where(eq(displayCases.isPublic, true))
+      .groupBy(displayCases.id)
+      .orderBy(sql`count(${likes.id}) desc`)
+      .limit(limit);
 
-    const casesWithLikes = await Promise.all(
-      publicCases.map(async (c) => ({
-        ...c,
-        likeCount: await this.getLikeCount(c.id),
-      }))
-    );
-
-    casesWithLikes.sort((a, b) => b.likeCount - a.likeCount);
-
-    const topCases = casesWithLikes.slice(0, limit);
-
-    const enrichedCases: (DisplayCaseWithCards & { ownerName: string; likeCount: number })[] = [];
-
-    for (const c of topCases) {
-      const caseCards = await db
-        .select()
-        .from(cards)
-        .where(eq(cards.displayCaseId, c.id))
-        .orderBy(asc(cards.sortOrder));
-
-      const [owner] = await db
-        .select({ firstName: users.firstName, lastName: users.lastName, handle: users.handle })
-        .from(users)
-        .where(eq(users.id, c.userId));
-
-      const ownerName = owner?.handle
-        ? `@${owner.handle}`
-        : owner
-          ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || "Anonymous"
-          : "Anonymous";
-
-      // Only include cases with at least one card
-      if (caseCards.length > 0) {
-        enrichedCases.push({
-          ...c,
-          cards: caseCards,
-          ownerName,
-          likeCount: c.likeCount,
-        });
-      }
-    }
-
-    return enrichedCases;
+    const cases = topCases.map(r => ({ ...r.displayCase, likeCount: Number(r.likeCount) }));
+    return this.enrichPublicCases(cases);
   }
 
   async getTrendingDisplayCases(limit: number = 20): Promise<(DisplayCaseWithCards & { ownerName: string; likeCount: number; trendingScore: number })[]> {
@@ -1933,73 +1898,77 @@ export class DatabaseStorage implements IStorage {
   }
 
   async adminDeleteUser(userId: string): Promise<void> {
-    // Get all display cases for this user
-    const userCases = await db.select({ id: displayCases.id }).from(displayCases).where(eq(displayCases.userId, userId));
-    const caseIds = userCases.map(c => c.id);
+    await db.transaction(async (tx) => {
+      // Get all display cases for this user
+      const userCases = await tx.select({ id: displayCases.id }).from(displayCases).where(eq(displayCases.userId, userId));
+      const caseIds = userCases.map(c => c.id);
 
-    // Delete related data in order (respecting foreign key constraints)
-    if (caseIds.length > 0) {
-      // Get all cards for these cases
-      const userCards = await db.select({ id: cards.id }).from(cards).where(inArray(cards.displayCaseId, caseIds));
-      const cardIds = userCards.map(c => c.id);
+      // Delete related data in order (respecting foreign key constraints)
+      if (caseIds.length > 0) {
+        // Get all cards for these cases
+        const userCards = await tx.select({ id: cards.id }).from(cards).where(inArray(cards.displayCaseId, caseIds));
+        const cardIds = userCards.map(c => c.id);
 
-      if (cardIds.length > 0) {
-        // Delete card-related data
-        await db.delete(cardOutlooks).where(inArray(cardOutlooks.cardId, cardIds));
-        await db.delete(bookmarks).where(inArray(bookmarks.cardId, cardIds));
-        await db.delete(priceAlerts).where(inArray(priceAlerts.cardId, cardIds));
-        await db.delete(priceHistory).where(inArray(priceHistory.cardId, cardIds));
-        // Delete cards
-        await db.delete(cards).where(inArray(cards.id, cardIds));
+        if (cardIds.length > 0) {
+          // Delete card-related data
+          await tx.delete(cardOutlooks).where(inArray(cardOutlooks.cardId, cardIds));
+          await tx.delete(bookmarks).where(inArray(bookmarks.cardId, cardIds));
+          await tx.delete(priceAlerts).where(inArray(priceAlerts.cardId, cardIds));
+          await tx.delete(priceHistory).where(inArray(priceHistory.cardId, cardIds));
+          // Delete cards
+          await tx.delete(cards).where(inArray(cards.id, cardIds));
+        }
+
+        // Delete display case related data
+        await tx.delete(comments).where(inArray(comments.displayCaseId, caseIds));
+        await tx.delete(likes).where(inArray(likes.displayCaseId, caseIds));
+        // Delete display cases
+        await tx.delete(displayCases).where(inArray(displayCases.id, caseIds));
       }
 
-      // Delete display case related data
-      await db.delete(comments).where(inArray(comments.displayCaseId, caseIds));
-      await db.delete(likes).where(inArray(likes.displayCaseId, caseIds));
-      // Delete display cases
-      await db.delete(displayCases).where(inArray(displayCases.id, caseIds));
-    }
+      // Delete user-related data
+      await tx.delete(offers).where(or(eq(offers.fromUserId, userId), eq(offers.toUserId, userId)));
+      await tx.delete(tradeOffers).where(or(eq(tradeOffers.fromUserId, userId), eq(tradeOffers.toUserId, userId)));
+      await tx.delete(notifications).where(eq(notifications.userId, userId));
+      await tx.delete(userBadges).where(eq(userBadges.userId, userId));
+      await tx.delete(follows).where(or(eq(follows.followerId, userId), eq(follows.followedId, userId)));
+      await tx.delete(messages).where(eq(messages.senderId, userId));
+      await tx.delete(conversations).where(or(eq(conversations.participantAId, userId), eq(conversations.participantBId, userId)));
+      await tx.delete(outlookUsage).where(eq(outlookUsage.userId, userId));
+      await tx.delete(playerWatchlist).where(eq(playerWatchlist.userId, userId));
+      await tx.delete(userAlertSettings).where(eq(userAlertSettings.userId, userId));
+      await tx.delete(promoCodeRedemptions).where(eq(promoCodeRedemptions.userId, userId));
+      await tx.delete(watchlist).where(eq(watchlist.userId, userId));
+      await tx.delete(sharedSnapshots).where(eq(sharedSnapshots.userId, userId));
 
-    // Delete user-related data
-    await db.delete(offers).where(or(eq(offers.fromUserId, userId), eq(offers.toUserId, userId)));
-    await db.delete(tradeOffers).where(or(eq(tradeOffers.fromUserId, userId), eq(tradeOffers.toUserId, userId)));
-    await db.delete(notifications).where(eq(notifications.userId, userId));
-    await db.delete(userBadges).where(eq(userBadges.userId, userId));
-    await db.delete(follows).where(or(eq(follows.followerId, userId), eq(follows.followingId, userId)));
-    await db.delete(messages).where(eq(messages.senderId, userId));
-    await db.delete(conversations).where(or(eq(conversations.user1Id, userId), eq(conversations.user2Id, userId)));
-    await db.delete(outlookUsage).where(eq(outlookUsage.userId, userId));
-    await db.delete(playerWatchlist).where(eq(playerWatchlist.userId, userId));
-    await db.delete(userAlertSettings).where(eq(userAlertSettings.userId, userId));
-    await db.delete(promoCodeRedemptions).where(eq(promoCodeRedemptions.userId, userId));
-    await db.delete(watchlist).where(eq(watchlist.userId, userId));
-    await db.delete(sharedSnapshots).where(eq(sharedSnapshots.userId, userId));
-
-    // Finally delete the user
-    await db.delete(users).where(eq(users.id, userId));
+      // Finally delete the user
+      await tx.delete(users).where(eq(users.id, userId));
+    });
   }
 
   async adminDeleteDisplayCase(displayCaseId: number): Promise<void> {
-    // Get all cards in this display case
-    const caseCards = await db.select({ id: cards.id }).from(cards).where(eq(cards.displayCaseId, displayCaseId));
-    const cardIds = caseCards.map(c => c.id);
+    await db.transaction(async (tx) => {
+      // Get all cards in this display case
+      const caseCards = await tx.select({ id: cards.id }).from(cards).where(eq(cards.displayCaseId, displayCaseId));
+      const cardIds = caseCards.map(c => c.id);
 
-    if (cardIds.length > 0) {
-      // Delete card-related data
-      await db.delete(cardOutlooks).where(inArray(cardOutlooks.cardId, cardIds));
-      await db.delete(bookmarks).where(inArray(bookmarks.cardId, cardIds));
-      await db.delete(priceAlerts).where(inArray(priceAlerts.cardId, cardIds));
-      await db.delete(priceHistory).where(inArray(priceHistory.cardId, cardIds));
-      // Delete cards
-      await db.delete(cards).where(inArray(cards.id, cardIds));
-    }
+      if (cardIds.length > 0) {
+        // Delete card-related data
+        await tx.delete(cardOutlooks).where(inArray(cardOutlooks.cardId, cardIds));
+        await tx.delete(bookmarks).where(inArray(bookmarks.cardId, cardIds));
+        await tx.delete(priceAlerts).where(inArray(priceAlerts.cardId, cardIds));
+        await tx.delete(priceHistory).where(inArray(priceHistory.cardId, cardIds));
+        // Delete cards
+        await tx.delete(cards).where(inArray(cards.id, cardIds));
+      }
 
-    // Delete display case related data
-    await db.delete(comments).where(eq(comments.displayCaseId, displayCaseId));
-    await db.delete(likes).where(eq(likes.displayCaseId, displayCaseId));
+      // Delete display case related data
+      await tx.delete(comments).where(eq(comments.displayCaseId, displayCaseId));
+      await tx.delete(likes).where(eq(likes.displayCaseId, displayCaseId));
 
-    // Delete the display case
-    await db.delete(displayCases).where(eq(displayCases.id, displayCaseId));
+      // Delete the display case
+      await tx.delete(displayCases).where(eq(displayCases.id, displayCaseId));
+    });
   }
 
   async incrementViewCount(displayCaseId: number): Promise<void> {
@@ -2176,21 +2145,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Bookmark operations
-  async getBookmarks(userId: string): Promise<BookmarkWithCard[]> {
-    const userBookmarks = await db
-      .select()
+  async getBookmarks(userId: string, limit: number = 50, offset: number = 0): Promise<BookmarkWithCard[]> {
+    const rows = await db
+      .select({ bookmark: bookmarks, card: cards })
       .from(bookmarks)
+      .innerJoin(cards, eq(bookmarks.cardId, cards.id))
       .where(eq(bookmarks.userId, userId))
-      .orderBy(desc(bookmarks.createdAt));
+      .orderBy(desc(bookmarks.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    const result: BookmarkWithCard[] = [];
-    for (const bookmark of userBookmarks) {
-      const [card] = await db.select().from(cards).where(eq(cards.id, bookmark.cardId));
-      if (card) {
-        result.push({ ...bookmark, card });
-      }
-    }
-    return result;
+    return rows.map(row => ({ ...row.bookmark, card: row.card }));
   }
 
   async addBookmark(userId: string, cardId: number): Promise<Bookmark> {
@@ -2224,46 +2189,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Offer operations
-  async getReceivedOffers(userId: string): Promise<OfferWithUsers[]> {
-    const receivedOffers = await db
-      .select()
+  async getReceivedOffers(userId: string, limit: number = 50, offset: number = 0): Promise<OfferWithUsers[]> {
+    const rows = await db
+      .select({
+        offer: offers,
+        fromUser: { id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl },
+        card: cards,
+      })
       .from(offers)
+      .innerJoin(users, eq(offers.fromUserId, users.id))
+      .innerJoin(cards, eq(offers.cardId, cards.id))
       .where(eq(offers.toUserId, userId))
-      .orderBy(desc(offers.createdAt));
+      .orderBy(desc(offers.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    const result: OfferWithUsers[] = [];
-    for (const offer of receivedOffers) {
-      const [fromUser] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
-        .from(users)
-        .where(eq(users.id, offer.fromUserId));
-      const [card] = await db.select().from(cards).where(eq(cards.id, offer.cardId));
-      if (fromUser && card) {
-        result.push({ ...offer, fromUser, card });
-      }
-    }
-    return result;
+    return rows.map(row => ({ ...row.offer, fromUser: row.fromUser, card: row.card }));
   }
 
-  async getSentOffers(userId: string): Promise<OfferWithUsers[]> {
-    const sentOffers = await db
-      .select()
+  async getSentOffers(userId: string, limit: number = 50, offset: number = 0): Promise<OfferWithUsers[]> {
+    const rows = await db
+      .select({
+        offer: offers,
+        fromUser: { id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl },
+        card: cards,
+      })
       .from(offers)
+      .innerJoin(users, eq(offers.fromUserId, users.id))
+      .innerJoin(cards, eq(offers.cardId, cards.id))
       .where(eq(offers.fromUserId, userId))
-      .orderBy(desc(offers.createdAt));
+      .orderBy(desc(offers.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    const result: OfferWithUsers[] = [];
-    for (const offer of sentOffers) {
-      const [fromUser] = await db
-        .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, handle: users.handle, profileImageUrl: users.profileImageUrl })
-        .from(users)
-        .where(eq(users.id, offer.fromUserId));
-      const [card] = await db.select().from(cards).where(eq(cards.id, offer.cardId));
-      if (fromUser && card) {
-        result.push({ ...offer, fromUser, card });
-      }
-    }
-    return result;
+    return rows.map(row => ({ ...row.offer, fromUser: row.fromUser, card: row.card }));
   }
 
   async createOffer(fromUserId: string, toUserId: string, data: InsertOffer): Promise<Offer> {
@@ -2823,45 +2782,51 @@ export class DatabaseStorage implements IStorage {
   }
 
   async redeemPromoCode(code: string, userId: string): Promise<{ success: boolean; message: string }> {
-    const promoCode = await this.getPromoCode(code);
-    
-    if (!promoCode) {
-      return { success: false, message: "Invalid promo code" };
-    }
+    // Perform all checks and redemption inside a transaction with row-level locking
+    // to prevent race conditions on usedCount
+    return await db.transaction(async (tx) => {
+      // Lock the promo code row to prevent concurrent redemptions
+      const [promoCode] = await tx.execute(
+        sql`SELECT * FROM promo_codes WHERE code = ${code} FOR UPDATE`
+      ) as any[];
 
-    if (!promoCode.isActive) {
-      return { success: false, message: "This promo code is no longer active" };
-    }
+      if (!promoCode) {
+        return { success: false, message: "Invalid promo code" };
+      }
 
-    if (promoCode.expiresAt && new Date() > promoCode.expiresAt) {
-      return { success: false, message: "This promo code has expired" };
-    }
+      if (!promoCode.is_active) {
+        return { success: false, message: "This promo code is no longer active" };
+      }
 
-    if (promoCode.usedCount >= promoCode.maxUses) {
-      return { success: false, message: "This promo code has reached its maximum uses" };
-    }
+      if (promoCode.expires_at && new Date() > new Date(promoCode.expires_at)) {
+        return { success: false, message: "This promo code has expired" };
+      }
 
-    // Check if user already redeemed this code
-    const alreadyRedeemed = await this.hasUserRedeemedPromoCode(userId, promoCode.id);
-    if (alreadyRedeemed) {
-      return { success: false, message: "You have already used this promo code" };
-    }
+      if (promoCode.used_count >= promoCode.max_uses) {
+        return { success: false, message: "This promo code has reached its maximum uses" };
+      }
 
-    // Check if user already has PRO
-    const user = await this.getUser(userId);
-    if (user?.subscriptionStatus === 'PRO') {
-      return { success: false, message: "You already have a Pro subscription" };
-    }
+      // Check if user already redeemed this code
+      const [existing] = await tx
+        .select()
+        .from(promoCodeRedemptions)
+        .where(and(eq(promoCodeRedemptions.promoCodeId, promoCode.id), eq(promoCodeRedemptions.userId, userId)));
+      if (existing) {
+        return { success: false, message: "You have already used this promo code" };
+      }
 
-    // Redeem the code - update user to PRO and track redemption
-    await db.transaction(async (tx) => {
-      // Update user subscription status
+      // Check if user already has PRO
+      const [user] = await tx.select().from(users).where(eq(users.id, userId));
+      if (user?.subscriptionStatus === 'PRO') {
+        return { success: false, message: "You already have a Pro subscription" };
+      }
+
+      // Redeem: update user, track redemption, increment count
       await tx
         .update(users)
         .set({ subscriptionStatus: 'PRO' })
         .where(eq(users.id, userId));
 
-      // Track redemption
       await tx
         .insert(promoCodeRedemptions)
         .values({
@@ -2869,32 +2834,28 @@ export class DatabaseStorage implements IStorage {
           userId,
         });
 
-      // Increment used count
       await tx
         .update(promoCodes)
-        .set({ usedCount: promoCode.usedCount + 1 })
+        .set({ usedCount: sql`${promoCodes.usedCount} + 1` })
         .where(eq(promoCodes.id, promoCode.id));
-    });
 
-    return { success: true, message: "Promo code redeemed! You now have Pro access." };
+      return { success: true, message: "Promo code redeemed! You now have Pro access." };
+    });
   }
 
   // Price alert operations
   async getPriceAlerts(userId: string): Promise<PriceAlertWithCard[]> {
-    const alerts = await db
-      .select()
+    const rows = await db
+      .select({
+        alert: priceAlerts,
+        card: cards,
+      })
       .from(priceAlerts)
+      .innerJoin(cards, eq(priceAlerts.cardId, cards.id))
       .where(eq(priceAlerts.userId, userId))
       .orderBy(desc(priceAlerts.createdAt));
-    
-    const alertsWithCards: PriceAlertWithCard[] = [];
-    for (const alert of alerts) {
-      const [card] = await db.select().from(cards).where(eq(cards.id, alert.cardId));
-      if (card) {
-        alertsWithCards.push({ ...alert, card });
-      }
-    }
-    return alertsWithCards;
+
+    return rows.map(row => ({ ...row.alert, card: row.card }));
   }
 
   async getPriceAlert(id: number): Promise<PriceAlert | undefined> {
@@ -2939,20 +2900,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveAlertsForProcessing(): Promise<(PriceAlert & { card: Card; user: User })[]> {
-    const alerts = await db
-      .select()
+    const rows = await db
+      .select({
+        alert: priceAlerts,
+        card: cards,
+        user: users,
+      })
       .from(priceAlerts)
+      .innerJoin(cards, eq(priceAlerts.cardId, cards.id))
+      .innerJoin(users, eq(priceAlerts.userId, users.id))
       .where(eq(priceAlerts.isActive, true));
-    
-    const result: (PriceAlert & { card: Card; user: User })[] = [];
-    for (const alert of alerts) {
-      const [card] = await db.select().from(cards).where(eq(cards.id, alert.cardId));
-      const [user] = await db.select().from(users).where(eq(users.id, alert.userId));
-      if (card && user) {
-        result.push({ ...alert, card, user });
-      }
-    }
-    return result;
+
+    return rows.map(row => ({ ...row.alert, card: row.card, user: row.user }));
   }
 
   async markAlertTriggered(id: number): Promise<void> {

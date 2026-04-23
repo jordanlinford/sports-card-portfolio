@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { timingSafeEqual } from "crypto";
 import { registerRoutes } from "./routes";
 import { startScanWorker } from "./scanWorker";
 import { serveStatic } from "./static";
@@ -104,9 +105,9 @@ app.use((req, res, next) => {
         app.get("/api/admin/run-regression", async (req, res) => {
           const expected = process.env.QA_LOGIN_TOKEN;
           const provided =
-            (req.headers["x-qa-token"] as string | undefined) ||
-            (req.query.token as string | undefined);
-          if (!expected || !provided || provided !== expected) {
+            (req.headers["x-qa-token"] as string | undefined);
+          if (!expected || !provided || provided.length !== expected.length ||
+              !timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) {
             return res.status(401).json({ error: "Unauthorized" });
           }
           try {
@@ -124,9 +125,9 @@ app.use((req, res, next) => {
         app.post("/api/admin/cleanup-bad-variations", async (req, res) => {
           const expected = process.env.QA_LOGIN_TOKEN;
           const provided =
-            (req.headers["x-qa-token"] as string | undefined) ||
-            (req.query.token as string | undefined);
-          if (!expected || !provided || provided !== expected) {
+            (req.headers["x-qa-token"] as string | undefined);
+          if (!expected || !provided || provided.length !== expected.length ||
+              !timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) {
             return res.status(401).json({ error: "Unauthorized" });
           }
           try {
@@ -198,9 +199,9 @@ app.use((req, res, next) => {
         app.get("/api/admin/run-regression", async (req, res) => {
           const expected = process.env.QA_LOGIN_TOKEN;
           const provided =
-            (req.headers["x-qa-token"] as string | undefined) ||
-            (req.query.token as string | undefined);
-          if (!expected || !provided || provided !== expected) {
+            (req.headers["x-qa-token"] as string | undefined);
+          if (!expected || !provided || provided.length !== expected.length ||
+              !timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) {
             return res.status(401).json({ error: "Unauthorized" });
           }
           try {
@@ -295,4 +296,14 @@ app.use((req, res, next) => {
       }
     },
   );
+
+  // Graceful shutdown: drain database pool on termination
+  const shutdown = async () => {
+    console.log("[Server] Shutting down gracefully...");
+    const { pool } = await import("./db");
+    await pool.end();
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 })();

@@ -98,6 +98,8 @@ function Router() {
       <Route path="/alpha" component={AlphaFeedPage} />
       <Route path="/outlook" component={OutlookOverviewPage} />
       <Route path="/watchlist" component={WatchlistPage} />
+      <Route path="/case/:id" component={CaseView} />
+      <Route path="/cases/:id" component={CaseView} />
       {/* Show loading only for auth-dependent routes */}
       {isLoading ? (
         <Route>
@@ -113,8 +115,6 @@ function Router() {
       ) : !isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
-          <Route path="/case/:id" component={CaseView} />
-          <Route path="/cases/:id" component={CaseView} />
         </>
       ) : (
         <>
@@ -134,12 +134,9 @@ function Router() {
           <Route path="/search" component={SearchPage} />
           <Route path="/cases/new" component={CaseNew} />
           <Route path="/cases/:id/edit" component={CaseEdit} />
-          <Route path="/case/:id" component={CaseView} />
-          <Route path="/cases/:id" component={CaseView} />
           <Route path="/scan-history" component={ScanHistoryPage} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/feedback" component={AdminFeedbackPage} />
-          <Route path="/card/:cardId/outlook" component={CardOutlookPage} />
         </>
       )}
       <Route component={NotFound} />

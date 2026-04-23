@@ -1,8 +1,18 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { createHash } from "crypto";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+
+// Rate limiter for expensive AI operations (card scanning, outlooks)
+const aiOperationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please slow down" },
+});
 import { setupGoogleAuth } from "./googleAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
@@ -327,6 +337,14 @@ const portfolioNextBuysCache = new Map<string, {
   expiresAt: number;
 }>();
 
+// Periodic cleanup of stale cache entries (every 30 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of portfolioNextBuysCache.entries()) {
+    if (now > value.expiresAt) portfolioNextBuysCache.delete(key);
+  }
+}, 30 * 60 * 1000);
+
 function checkPortfolioAIRateLimit(userId: string, endpoint: 'outlook' | 'nextbuys' | string): { allowed: boolean; retryAfter?: number } {
   // For portfolio-specific next buys (includes display case ID in key)
   if (endpoint.startsWith('nextbuys-')) {
@@ -450,6 +468,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   // Auth middleware
   await setupAuth(app);
   setupGoogleAuth(app);
+
+  // CSRF protection (after auth, before routes)
+  const { csrfTokenProvider, csrfProtection } = await import("./csrf");
+  app.use(csrfTokenProvider);
+  app.use(csrfProtection);
 
   // Initialize Stripe webhooks and sync
   await initStripe(app);
@@ -924,7 +947,11 @@ Sitemap: ${origin}/sitemap.xml
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json({ ...user, authProvider: req.user.authProvider ?? "replit" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const { stripeCustomerId, stripeSubscriptionId, ...safeUser } = user;
+      res.json({ ...safeUser, authProvider: req.user.authProvider ?? "replit" });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -1547,6 +1574,10 @@ Sitemap: ${origin}/sitemap.xml
       if (!parsed.success) {
         return res.status(400).json({ message: "Invalid data", errors: parsed.error.errors });
       }
+
+      const { sanitizeText } = await import("./sanitize");
+      if (parsed.data.name) parsed.data.name = sanitizeText(parsed.data.name);
+      if (parsed.data.description) parsed.data.description = sanitizeText(parsed.data.description);
 
       const displayCase = await storage.createDisplayCase(userId, parsed.data);
       
@@ -4966,7 +4997,7 @@ Sitemap: ${origin}/sitemap.xml
 
 
   // Scan a card image and get identification + pricing (legacy endpoint)
-  app.post("/api/cards/scan-image", isAuthenticated, async (req: any, res) => {
+  app.post("/api/cards/scan-image", aiOperationLimiter, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { imageData, mimeType } = req.body;
@@ -6083,7 +6114,8 @@ RULES:
         return res.status(404).json({ error: "Display case not found" });
       }
 
-      const comment = await storage.createComment(id, userId, content.trim(), userId ? undefined : guestName?.trim());
+      const { sanitizeText } = await import("./sanitize");
+      const comment = await storage.createComment(id, userId, sanitizeText(content), userId ? undefined : guestName ? sanitizeText(guestName) : undefined);
       
       if (displayCase.userId !== userId) {
         let commenterName = 'Someone';
@@ -6265,7 +6297,7 @@ RULES:
     return resolvedProPriceId;
   }
 
-  app.post("/api/create-checkout-session", isAuthenticated, async (req: any, res) => {
+  app.post("/api/create-checkout-session", aiOperationLimiter, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -7599,7 +7631,8 @@ RULES:
   // Get user's own support tickets
   app.get("/api/support/tickets", isAuthenticated, async (req: any, res) => {
     try {
-      const tickets = await storage.getSupportTicketsForUser(req.user.id);
+      const userId = req.user.claims.sub;
+      const tickets = await storage.getSupportTicketsForUser(userId);
       res.json(tickets);
     } catch (error) {
       console.error("Error fetching user support tickets:", error);
@@ -7621,8 +7654,9 @@ RULES:
       }
 
       // Check access: must be owner or admin
-      const isAdmin = await storage.isUserAdmin(req.user.id);
-      if (ticket.requesterId !== req.user.id && !isAdmin) {
+      const userId = req.user.claims.sub;
+      const isAdmin = await storage.isUserAdmin(userId);
+      if (ticket.requesterId !== userId && !isAdmin) {
         return res.status(403).json({ message: "Not authorized to view this ticket" });
       }
 
@@ -7646,15 +7680,17 @@ RULES:
         return res.status(400).json({ message: "Subject must be 200 characters or less" });
       }
 
+      const userId = req.user.claims.sub;
+      const { sanitizeText } = await import("./sanitize");
       const ticket = await storage.createSupportTicket({
-        requesterId: req.user.id,
-        subject,
-        body,
+        requesterId: userId,
+        subject: sanitizeText(subject),
+        body: sanitizeText(body),
       });
 
       // Notify all admins about the new ticket
       const adminUsers = await storage.getAdminUsers();
-      const user = await storage.getUser(req.user.id);
+      const user = await storage.getUser(userId);
       for (const admin of adminUsers) {
         await storage.createNotification(admin.id, 'support_ticket_created', {
           ticketId: ticket.id,
@@ -7692,14 +7728,15 @@ RULES:
       }
 
       // Check access: must be owner or admin
-      const isAdmin = await storage.isUserAdmin(req.user.id);
-      if (ticket.requesterId !== req.user.id && !isAdmin) {
+      const userId = req.user.claims.sub;
+      const isAdmin = await storage.isUserAdmin(userId);
+      if (ticket.requesterId !== userId && !isAdmin) {
         return res.status(403).json({ message: "Not authorized to reply to this ticket" });
       }
 
       const message = await storage.addSupportTicketMessage({
         ticketId,
-        senderId: req.user.id,
+        senderId: userId,
         body,
         isAdminReply: isAdmin,
       });
@@ -7714,7 +7751,7 @@ RULES:
       } else {
         // User replied - notify all admins
         const adminUsers = await storage.getAdminUsers();
-        const user = await storage.getUser(req.user.id);
+        const user = await storage.getUser(userId);
         for (const admin of adminUsers) {
           await storage.createNotification(admin.id, 'support_ticket_user_reply', {
             ticketId: ticket.id,
@@ -7758,7 +7795,8 @@ RULES:
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const ticket = await storage.updateSupportTicketStatus(ticketId, status, req.user.id);
+      const userId = req.user.claims.sub;
+      const ticket = await storage.updateSupportTicketStatus(ticketId, status, userId);
       if (!ticket) {
         return res.status(404).json({ message: "Ticket not found" });
       }
@@ -8865,6 +8903,34 @@ RULES:
 
       if (requestedCardIds.length === 0) {
         return res.status(400).json({ message: "Must request at least one card" });
+      }
+
+      // Verify offered cards belong to the sender
+      if (offeredCardIds.length > 0) {
+        const { cards, displayCases } = await import("@shared/schema");
+        const { inArray } = await import("drizzle-orm");
+        const offeredCards = await db
+          .select({ cardId: cards.id, userId: displayCases.userId })
+          .from(cards)
+          .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+          .where(inArray(cards.id, offeredCardIds));
+        if (offeredCards.length !== offeredCardIds.length || offeredCards.some(c => c.userId !== fromUserId)) {
+          return res.status(403).json({ message: "You can only offer cards you own" });
+        }
+      }
+
+      // Verify requested cards belong to the recipient
+      if (requestedCardIds.length > 0) {
+        const { cards, displayCases } = await import("@shared/schema");
+        const { inArray } = await import("drizzle-orm");
+        const requestedCards = await db
+          .select({ cardId: cards.id, userId: displayCases.userId })
+          .from(cards)
+          .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
+          .where(inArray(cards.id, requestedCardIds));
+        if (requestedCards.length !== requestedCardIds.length || requestedCards.some(c => c.userId !== toUserId)) {
+          return res.status(403).json({ message: "Requested cards do not belong to the recipient" });
+        }
       }
 
       const tradeOffer = await storage.createTradeOffer(
@@ -10280,6 +10346,14 @@ RULES:
   const breakAuditCache = new Map<string, { data: any; timestamp: number }>();
   const BREAK_AUDIT_CACHE_TTL = 6 * 60 * 60 * 1000;
 
+  // Periodic cleanup of stale break audit cache entries
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of breakAuditCache.entries()) {
+      if (now - value.timestamp > BREAK_AUDIT_CACHE_TTL) breakAuditCache.delete(key);
+    }
+  }, 30 * 60 * 1000);
+
   app.post("/api/market/break-audit", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -10579,6 +10653,17 @@ Return ONLY valid JSON, no markdown.`;
   const SEALED_CACHE_TTL = 6 * 60 * 60 * 1000;
   const sealedShareStore = new Map<string, { data: any; createdAt: number }>();
   const SEALED_SHARE_TTL = 7 * 24 * 60 * 60 * 1000;
+
+  // Periodic cleanup of stale sealed product cache entries
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of sealedProductCache.entries()) {
+      if (now - value.timestamp > SEALED_CACHE_TTL) sealedProductCache.delete(key);
+    }
+    for (const [key, value] of sealedShareStore.entries()) {
+      if (now - value.createdAt > SEALED_SHARE_TTL) sealedShareStore.delete(key);
+    }
+  }, 30 * 60 * 1000);
 
   app.post("/api/market/sealed-product-roi", isAuthenticated, async (req: any, res) => {
     try {
