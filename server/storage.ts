@@ -650,7 +650,7 @@ export class DatabaseStorage implements IStorage {
       const caseCards = await db
         .select()
         .from(cards)
-        .where(eq(cards.displayCaseId, c.id))
+        .where(and(eq(cards.displayCaseId, c.id), isNull(cards.deletedAt)))
         .orderBy(asc(cards.sortOrder));
       casesWithCards.push({ ...c, cards: caseCards });
     }
@@ -670,7 +670,7 @@ export class DatabaseStorage implements IStorage {
     const caseCards = await db
       .select()
       .from(cards)
-      .where(eq(cards.displayCaseId, id))
+      .where(and(eq(cards.displayCaseId, id), isNull(cards.deletedAt)))
       .orderBy(asc(cards.sortOrder));
 
     return { ...displayCase, cards: caseCards };
@@ -733,7 +733,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCard(id: number): Promise<Card | undefined> {
-    const [card] = await db.select().from(cards).where(eq(cards.id, id));
+    const [card] = await db.select().from(cards).where(and(eq(cards.id, id), isNull(cards.deletedAt)));
     return card;
   }
 
@@ -749,7 +749,7 @@ export class DatabaseStorage implements IStorage {
     
     const allCards = await db.select()
       .from(cards)
-      .where(inArray(cards.displayCaseId, caseIds))
+      .where(and(inArray(cards.displayCaseId, caseIds), isNull(cards.deletedAt)))
       .orderBy(asc(cards.displayCaseId), asc(cards.sortOrder));
     
     return allCards.map(card => ({
@@ -772,6 +772,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           inArray(cards.displayCaseId, caseIds),
+          isNull(cards.deletedAt),
           sql`${cards.estimatedValue} IS NOT NULL AND ${cards.estimatedValue} > 0`
         )
       )
@@ -796,6 +797,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           inArray(cards.displayCaseId, caseIds),
+          isNull(cards.deletedAt),
           sql`${tag} = ANY(${cards.tags})`
         )
       )
@@ -819,6 +821,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           inArray(cards.displayCaseId, caseIds),
+          isNull(cards.deletedAt),
           sql`${cards.tags} IS NOT NULL AND array_length(${cards.tags}, 1) > 0`
         )
       );
