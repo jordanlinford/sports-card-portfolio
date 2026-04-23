@@ -1933,73 +1933,77 @@ export class DatabaseStorage implements IStorage {
   }
 
   async adminDeleteUser(userId: string): Promise<void> {
-    // Get all display cases for this user
-    const userCases = await db.select({ id: displayCases.id }).from(displayCases).where(eq(displayCases.userId, userId));
-    const caseIds = userCases.map(c => c.id);
+    await db.transaction(async (tx) => {
+      // Get all display cases for this user
+      const userCases = await tx.select({ id: displayCases.id }).from(displayCases).where(eq(displayCases.userId, userId));
+      const caseIds = userCases.map(c => c.id);
 
-    // Delete related data in order (respecting foreign key constraints)
-    if (caseIds.length > 0) {
-      // Get all cards for these cases
-      const userCards = await db.select({ id: cards.id }).from(cards).where(inArray(cards.displayCaseId, caseIds));
-      const cardIds = userCards.map(c => c.id);
+      // Delete related data in order (respecting foreign key constraints)
+      if (caseIds.length > 0) {
+        // Get all cards for these cases
+        const userCards = await tx.select({ id: cards.id }).from(cards).where(inArray(cards.displayCaseId, caseIds));
+        const cardIds = userCards.map(c => c.id);
 
-      if (cardIds.length > 0) {
-        // Delete card-related data
-        await db.delete(cardOutlooks).where(inArray(cardOutlooks.cardId, cardIds));
-        await db.delete(bookmarks).where(inArray(bookmarks.cardId, cardIds));
-        await db.delete(priceAlerts).where(inArray(priceAlerts.cardId, cardIds));
-        await db.delete(priceHistory).where(inArray(priceHistory.cardId, cardIds));
-        // Delete cards
-        await db.delete(cards).where(inArray(cards.id, cardIds));
+        if (cardIds.length > 0) {
+          // Delete card-related data
+          await tx.delete(cardOutlooks).where(inArray(cardOutlooks.cardId, cardIds));
+          await tx.delete(bookmarks).where(inArray(bookmarks.cardId, cardIds));
+          await tx.delete(priceAlerts).where(inArray(priceAlerts.cardId, cardIds));
+          await tx.delete(priceHistory).where(inArray(priceHistory.cardId, cardIds));
+          // Delete cards
+          await tx.delete(cards).where(inArray(cards.id, cardIds));
+        }
+
+        // Delete display case related data
+        await tx.delete(comments).where(inArray(comments.displayCaseId, caseIds));
+        await tx.delete(likes).where(inArray(likes.displayCaseId, caseIds));
+        // Delete display cases
+        await tx.delete(displayCases).where(inArray(displayCases.id, caseIds));
       }
 
-      // Delete display case related data
-      await db.delete(comments).where(inArray(comments.displayCaseId, caseIds));
-      await db.delete(likes).where(inArray(likes.displayCaseId, caseIds));
-      // Delete display cases
-      await db.delete(displayCases).where(inArray(displayCases.id, caseIds));
-    }
+      // Delete user-related data
+      await tx.delete(offers).where(or(eq(offers.fromUserId, userId), eq(offers.toUserId, userId)));
+      await tx.delete(tradeOffers).where(or(eq(tradeOffers.fromUserId, userId), eq(tradeOffers.toUserId, userId)));
+      await tx.delete(notifications).where(eq(notifications.userId, userId));
+      await tx.delete(userBadges).where(eq(userBadges.userId, userId));
+      await tx.delete(follows).where(or(eq(follows.followerId, userId), eq(follows.followedId, userId)));
+      await tx.delete(messages).where(eq(messages.senderId, userId));
+      await tx.delete(conversations).where(or(eq(conversations.participantAId, userId), eq(conversations.participantBId, userId)));
+      await tx.delete(outlookUsage).where(eq(outlookUsage.userId, userId));
+      await tx.delete(playerWatchlist).where(eq(playerWatchlist.userId, userId));
+      await tx.delete(userAlertSettings).where(eq(userAlertSettings.userId, userId));
+      await tx.delete(promoCodeRedemptions).where(eq(promoCodeRedemptions.userId, userId));
+      await tx.delete(watchlist).where(eq(watchlist.userId, userId));
+      await tx.delete(sharedSnapshots).where(eq(sharedSnapshots.userId, userId));
 
-    // Delete user-related data
-    await db.delete(offers).where(or(eq(offers.fromUserId, userId), eq(offers.toUserId, userId)));
-    await db.delete(tradeOffers).where(or(eq(tradeOffers.fromUserId, userId), eq(tradeOffers.toUserId, userId)));
-    await db.delete(notifications).where(eq(notifications.userId, userId));
-    await db.delete(userBadges).where(eq(userBadges.userId, userId));
-    await db.delete(follows).where(or(eq(follows.followerId, userId), eq(follows.followedId, userId)));
-    await db.delete(messages).where(eq(messages.senderId, userId));
-    await db.delete(conversations).where(or(eq(conversations.participantAId, userId), eq(conversations.participantBId, userId)));
-    await db.delete(outlookUsage).where(eq(outlookUsage.userId, userId));
-    await db.delete(playerWatchlist).where(eq(playerWatchlist.userId, userId));
-    await db.delete(userAlertSettings).where(eq(userAlertSettings.userId, userId));
-    await db.delete(promoCodeRedemptions).where(eq(promoCodeRedemptions.userId, userId));
-    await db.delete(watchlist).where(eq(watchlist.userId, userId));
-    await db.delete(sharedSnapshots).where(eq(sharedSnapshots.userId, userId));
-
-    // Finally delete the user
-    await db.delete(users).where(eq(users.id, userId));
+      // Finally delete the user
+      await tx.delete(users).where(eq(users.id, userId));
+    });
   }
 
   async adminDeleteDisplayCase(displayCaseId: number): Promise<void> {
-    // Get all cards in this display case
-    const caseCards = await db.select({ id: cards.id }).from(cards).where(eq(cards.displayCaseId, displayCaseId));
-    const cardIds = caseCards.map(c => c.id);
+    await db.transaction(async (tx) => {
+      // Get all cards in this display case
+      const caseCards = await tx.select({ id: cards.id }).from(cards).where(eq(cards.displayCaseId, displayCaseId));
+      const cardIds = caseCards.map(c => c.id);
 
-    if (cardIds.length > 0) {
-      // Delete card-related data
-      await db.delete(cardOutlooks).where(inArray(cardOutlooks.cardId, cardIds));
-      await db.delete(bookmarks).where(inArray(bookmarks.cardId, cardIds));
-      await db.delete(priceAlerts).where(inArray(priceAlerts.cardId, cardIds));
-      await db.delete(priceHistory).where(inArray(priceHistory.cardId, cardIds));
-      // Delete cards
-      await db.delete(cards).where(inArray(cards.id, cardIds));
-    }
+      if (cardIds.length > 0) {
+        // Delete card-related data
+        await tx.delete(cardOutlooks).where(inArray(cardOutlooks.cardId, cardIds));
+        await tx.delete(bookmarks).where(inArray(bookmarks.cardId, cardIds));
+        await tx.delete(priceAlerts).where(inArray(priceAlerts.cardId, cardIds));
+        await tx.delete(priceHistory).where(inArray(priceHistory.cardId, cardIds));
+        // Delete cards
+        await tx.delete(cards).where(inArray(cards.id, cardIds));
+      }
 
-    // Delete display case related data
-    await db.delete(comments).where(eq(comments.displayCaseId, displayCaseId));
-    await db.delete(likes).where(eq(likes.displayCaseId, displayCaseId));
+      // Delete display case related data
+      await tx.delete(comments).where(eq(comments.displayCaseId, displayCaseId));
+      await tx.delete(likes).where(eq(likes.displayCaseId, displayCaseId));
 
-    // Delete the display case
-    await db.delete(displayCases).where(eq(displayCases.id, displayCaseId));
+      // Delete the display case
+      await tx.delete(displayCases).where(eq(displayCases.id, displayCaseId));
+    });
   }
 
   async incrementViewCount(displayCaseId: number): Promise<void> {

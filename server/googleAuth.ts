@@ -1,5 +1,6 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20";
+import { timingSafeEqual } from "crypto";
 import type { Express } from "express";
 import { storage } from "./storage";
 import { sendWelcomeEmail, sendNewSignupNotification } from "./email";
@@ -185,6 +186,10 @@ export function setupGoogleAuth(app: Express) {
   //   (or JSON body: { "token": "<QA_LOGIN_TOKEN>" })
   app.post("/api/auth/qa-login", async (req, res) => {
     try {
+      if (process.env.NODE_ENV === "production") {
+        return res.status(404).json({ error: "not found" });
+      }
+
       const expected = process.env.QA_LOGIN_TOKEN;
       if (!expected) {
         return res.status(503).json({ error: "QA login not configured" });
@@ -192,10 +197,10 @@ export function setupGoogleAuth(app: Express) {
 
       const provided =
         (req.headers["x-qa-token"] as string | undefined) ||
-        (typeof req.body === "object" && req.body && (req.body as any).token) ||
-        (typeof req.query.token === "string" ? req.query.token : undefined);
+        (typeof req.body === "object" && req.body && (req.body as any).token);
 
-      if (!provided || provided !== expected) {
+      if (!provided || provided.length !== expected.length ||
+          !timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) {
         return res.status(401).json({ error: "unauthorized" });
       }
 
