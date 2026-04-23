@@ -345,6 +345,11 @@ function normalizeVariation(variation: string): string {
   return v;
 }
 
+// Bump this when scoring/parallel-classification logic changes so that any
+// previously cached Gemini analyses produced by an older code version are not
+// re-served. Any pre-existing rows simply become unreachable and age out.
+const GEMINI_CACHE_VERSION = "v2-opticholo";
+
 export function getGeminiCacheKey(card: {
   title: string;
   playerName?: string | null;
@@ -363,6 +368,7 @@ export function getGeminiCacheKey(card: {
       normalizeVariation(card.variation || ""),
       (card.grade || "").toLowerCase().trim(),
       (card.grader || "").toLowerCase().trim(),
+      GEMINI_CACHE_VERSION,
     ];
     return parts.join("|");
   }
@@ -373,6 +379,7 @@ export function getGeminiCacheKey(card: {
     normalizeVariation(card.variation || ""),
     (card.grade || "").toLowerCase().trim(),
     (card.grader || "").toLowerCase().trim(),
+    GEMINI_CACHE_VERSION,
   ];
   return parts.join("|");
 }
