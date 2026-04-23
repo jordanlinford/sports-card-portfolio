@@ -4066,15 +4066,17 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
-      // FOCUSED PRICE LOOKUP — when the structured pipeline returns zero comps
-      // (which is when Gemini's base-card guess most often leaks through wrong),
-      // ask Gemini one short, web-search-grounded question: "what is this card
-      // worth right now?" — the same way a human asks in the chat app. This
-      // catches premium parallels (Optic Holo, Hyper Prizm, etc.) that the
-      // structured prompt fails to price correctly.
+      // FOCUSED PRICE LOOKUP — for any clearly identified card (player + year +
+      // set), ask Gemini one short, web-search-grounded question: "what is this
+      // card worth right now?" — the same way a human asks in the chat app.
+      // For common, easy-to-find cards this is the most accurate source we have,
+      // so we prefer it over the structured pipeline's price unless it's missing.
+      // Skipped for low-pop /25-and-under cards where the triangulation path
+      // (graded triangulation, low-pop fallback) is more appropriate.
       const lowPopMatch = variation ? variation.match(/\/\s*(\d+)\b/) : null;
       const isLowPopCard = lowPopMatch && parseInt(lowPopMatch[1]) <= 25;
-      if (compCount === 0 && pricingSource === "gemini" && !isLowPopCard && effectivePlayerName) {
+      const hasCleanIdentification = !!(effectivePlayerName && year && set);
+      if (hasCleanIdentification && !isLowPopCard) {
         try {
           const { fetchFocusedCardValue } = await import("./outlookEngine");
           const focused = await fetchFocusedCardValue({
@@ -4088,14 +4090,15 @@ Sitemap: ${origin}/sitemap.xml
           });
           if (focused && focused.avgPrice > 0) {
             const oldValue = marketValue;
+            const oldSource = pricingSource;
             marketValue = focused.avgPrice;
             priceMin = focused.minPrice;
             priceMax = focused.maxPrice;
             pricingSource = "focused";
-            console.log(`[Quick Analyze] FOCUSED PRICE OVERRIDE: $${oldValue} (zero-comp Gemini guess) → $${marketValue} (range $${priceMin}-$${priceMax}) from focused web-search lookup`);
+            console.log(`[Quick Analyze] FOCUSED PRICE (primary): $${marketValue} (range $${priceMin}-$${priceMax}) — replacing ${oldSource} $${oldValue}`);
           }
         } catch (err: any) {
-          console.warn(`[Quick Analyze] Focused price lookup failed: ${err.message} — keeping Gemini estimate`);
+          console.warn(`[Quick Analyze] Focused price lookup failed: ${err.message} — keeping ${pricingSource} estimate $${marketValue}`);
         }
       }
 
