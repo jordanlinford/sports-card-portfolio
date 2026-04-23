@@ -942,7 +942,11 @@ Sitemap: ${origin}/sitemap.xml
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json({ ...user, authProvider: req.user.authProvider ?? "replit" });
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      const { stripeCustomerId, stripeSubscriptionId, ...safeUser } = user;
+      res.json({ ...safeUser, authProvider: req.user.authProvider ?? "replit" });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });

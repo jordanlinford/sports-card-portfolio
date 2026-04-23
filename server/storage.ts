@@ -2814,45 +2814,51 @@ export class DatabaseStorage implements IStorage {
   }
 
   async redeemPromoCode(code: string, userId: string): Promise<{ success: boolean; message: string }> {
-    const promoCode = await this.getPromoCode(code);
-    
-    if (!promoCode) {
-      return { success: false, message: "Invalid promo code" };
-    }
+    // Perform all checks and redemption inside a transaction with row-level locking
+    // to prevent race conditions on usedCount
+    return await db.transaction(async (tx) => {
+      // Lock the promo code row to prevent concurrent redemptions
+      const [promoCode] = await tx.execute(
+        sql`SELECT * FROM promo_codes WHERE code = ${code} FOR UPDATE`
+      ) as any[];
 
-    if (!promoCode.isActive) {
-      return { success: false, message: "This promo code is no longer active" };
-    }
+      if (!promoCode) {
+        return { success: false, message: "Invalid promo code" };
+      }
 
-    if (promoCode.expiresAt && new Date() > promoCode.expiresAt) {
-      return { success: false, message: "This promo code has expired" };
-    }
+      if (!promoCode.is_active) {
+        return { success: false, message: "This promo code is no longer active" };
+      }
 
-    if (promoCode.usedCount >= promoCode.maxUses) {
-      return { success: false, message: "This promo code has reached its maximum uses" };
-    }
+      if (promoCode.expires_at && new Date() > new Date(promoCode.expires_at)) {
+        return { success: false, message: "This promo code has expired" };
+      }
 
-    // Check if user already redeemed this code
-    const alreadyRedeemed = await this.hasUserRedeemedPromoCode(userId, promoCode.id);
-    if (alreadyRedeemed) {
-      return { success: false, message: "You have already used this promo code" };
-    }
+      if (promoCode.used_count >= promoCode.max_uses) {
+        return { success: false, message: "This promo code has reached its maximum uses" };
+      }
 
-    // Check if user already has PRO
-    const user = await this.getUser(userId);
-    if (user?.subscriptionStatus === 'PRO') {
-      return { success: false, message: "You already have a Pro subscription" };
-    }
+      // Check if user already redeemed this code
+      const [existing] = await tx
+        .select()
+        .from(promoCodeRedemptions)
+        .where(and(eq(promoCodeRedemptions.promoCodeId, promoCode.id), eq(promoCodeRedemptions.userId, userId)));
+      if (existing) {
+        return { success: false, message: "You have already used this promo code" };
+      }
 
-    // Redeem the code - update user to PRO and track redemption
-    await db.transaction(async (tx) => {
-      // Update user subscription status
+      // Check if user already has PRO
+      const [user] = await tx.select().from(users).where(eq(users.id, userId));
+      if (user?.subscriptionStatus === 'PRO') {
+        return { success: false, message: "You already have a Pro subscription" };
+      }
+
+      // Redeem: update user, track redemption, increment count
       await tx
         .update(users)
         .set({ subscriptionStatus: 'PRO' })
         .where(eq(users.id, userId));
 
-      // Track redemption
       await tx
         .insert(promoCodeRedemptions)
         .values({
@@ -2860,14 +2866,13 @@ export class DatabaseStorage implements IStorage {
           userId,
         });
 
-      // Increment used count
       await tx
         .update(promoCodes)
-        .set({ usedCount: promoCode.usedCount + 1 })
+        .set({ usedCount: sql`${promoCodes.usedCount} + 1` })
         .where(eq(promoCodes.id, promoCode.id));
-    });
 
-    return { success: true, message: "Promo code redeemed! You now have Pro access." };
+      return { success: true, message: "Promo code redeemed! You now have Pro access." };
+    });
   }
 
   // Price alert operations

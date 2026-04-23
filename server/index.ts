@@ -296,4 +296,14 @@ app.use((req, res, next) => {
       }
     },
   );
+
+  // Graceful shutdown: drain database pool on termination
+  const shutdown = async () => {
+    console.log("[Server] Shutting down gracefully...");
+    const { pool } = await import("./db");
+    await pool.end();
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 })();
