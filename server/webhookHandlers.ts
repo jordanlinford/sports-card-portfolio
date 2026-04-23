@@ -54,6 +54,18 @@ export class WebhookHandlers {
           updateData.trialSource = 'stripe_checkout';
         }
 
+        // Mirror Stripe pause_collection state locally so the UI can show resume button
+        const pauseCollection = subscription.pause_collection;
+        if (pauseCollection) {
+          updateData.subscriptionPaused = true;
+          updateData.pauseResumesAt = pauseCollection.resumes_at
+            ? new Date(pauseCollection.resumes_at * 1000)
+            : null;
+        } else {
+          updateData.subscriptionPaused = false;
+          updateData.pauseResumesAt = null;
+        }
+
         // Find user by Stripe customer ID and update their subscription
         await storage.updateUserByStripeCustomerId(customerId, updateData);
         

@@ -164,7 +164,7 @@ export interface IStorage {
   updateUserHandle(userId: string, handle: string): Promise<User | undefined>;
   isHandleAvailable(handle: string, excludeUserId?: string): Promise<boolean>;
   updateUserSubscription(userId: string, status: string, stripeCustomerId?: string): Promise<User | undefined>;
-  updateUserByStripeCustomerId(stripeCustomerId: string, data: { subscriptionStatus?: string; stripeSubscriptionId?: string | null; trialStart?: Date; trialEnd?: Date; trialSource?: string }): Promise<User | undefined>;
+  updateUserByStripeCustomerId(stripeCustomerId: string, data: { subscriptionStatus?: string; stripeSubscriptionId?: string | null; trialStart?: Date; trialEnd?: Date; trialSource?: string; cancelledAt?: Date | null; subscriptionPaused?: boolean; pauseResumesAt?: Date | null; winBackSentAt?: Date | null }): Promise<User | undefined>;
   activateUserTrial(userId: string, trialStart: Date, trialEnd: Date, source: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   updateGoogleId(userId: string, googleId: string): Promise<User | undefined>;
@@ -610,7 +610,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUserByStripeCustomerId(stripeCustomerId: string, data: { subscriptionStatus?: string; stripeSubscriptionId?: string | null; trialStart?: Date; trialEnd?: Date; trialSource?: string }): Promise<User | undefined> {
+  async updateUserByStripeCustomerId(stripeCustomerId: string, data: { subscriptionStatus?: string; stripeSubscriptionId?: string | null; trialStart?: Date; trialEnd?: Date; trialSource?: string; cancelledAt?: Date | null; subscriptionPaused?: boolean; pauseResumesAt?: Date | null; winBackSentAt?: Date | null }): Promise<User | undefined> {
     const updateData: Record<string, any> = {
       updatedAt: new Date(),
     };
@@ -628,6 +628,18 @@ export class DatabaseStorage implements IStorage {
     }
     if (data.trialSource !== undefined) {
       updateData.trialSource = data.trialSource;
+    }
+    if (data.cancelledAt !== undefined) {
+      updateData.cancelledAt = data.cancelledAt;
+    }
+    if (data.subscriptionPaused !== undefined) {
+      updateData.subscriptionPaused = data.subscriptionPaused;
+    }
+    if (data.pauseResumesAt !== undefined) {
+      updateData.pauseResumesAt = data.pauseResumesAt;
+    }
+    if (data.winBackSentAt !== undefined) {
+      updateData.winBackSentAt = data.winBackSentAt;
     }
     const [user] = await db
       .update(users)
