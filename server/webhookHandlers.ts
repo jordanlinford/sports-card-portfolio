@@ -64,13 +64,15 @@ export class WebhookHandlers {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object;
         const customerId = subscription.customer;
-        
-        // Downgrade user to free tier
+
+        // Downgrade user to free tier and stamp cancelledAt so the win-back
+        // job can find them on day 7
         await storage.updateUserByStripeCustomerId(customerId, {
           subscriptionStatus: 'FREE',
           stripeSubscriptionId: null,
+          cancelledAt: new Date(),
         });
-        
+
         console.log(`Subscription cancelled for customer ${customerId}`);
         break;
       }

@@ -69,9 +69,14 @@ export default function Upgrade() {
     },
   });
 
+  const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
+
   const checkoutMutation = useMutation({
-    mutationFn: async (withTrial: boolean = false) => {
-      const response = await apiRequest("POST", "/api/create-checkout-session", { withTrial });
+    mutationFn: async (opts: { withTrial?: boolean; plan?: "monthly" | "annual" } = {}) => {
+      const response = await apiRequest("POST", "/api/create-checkout-session", {
+        withTrial: opts.withTrial ?? false,
+        plan: opts.plan ?? billingCycle,
+      });
       return response;
     },
     onSuccess: (data: any) => {
@@ -188,9 +193,39 @@ export default function Upgrade() {
               <Crown className="h-5 w-5 text-primary" />
               Pro Plan
             </CardTitle>
-            <div className="text-3xl font-bold">
-              $12<span className="text-lg font-normal text-muted-foreground">/month</span>
+            <div className="inline-flex items-center gap-1 p-1 bg-muted rounded-lg mb-3 mt-2">
+              <button
+                type="button"
+                onClick={() => setBillingCycle("monthly")}
+                className={`px-3 py-1 text-xs rounded-md transition-colors ${billingCycle === "monthly" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+                data-testid="button-billing-monthly"
+              >
+                Monthly
+              </button>
+              <button
+                type="button"
+                onClick={() => setBillingCycle("annual")}
+                className={`px-3 py-1 text-xs rounded-md transition-colors flex items-center gap-1 ${billingCycle === "annual" ? "bg-background shadow-sm font-medium" : "text-muted-foreground"}`}
+                data-testid="button-billing-annual"
+              >
+                Annual
+                <Badge variant="secondary" className="text-[10px] px-1 py-0 h-auto">Save 48%</Badge>
+              </button>
             </div>
+            {billingCycle === "monthly" ? (
+              <div className="text-3xl font-bold">
+                $12<span className="text-lg font-normal text-muted-foreground">/month</span>
+              </div>
+            ) : (
+              <div>
+                <div className="text-3xl font-bold">
+                  $75<span className="text-lg font-normal text-muted-foreground">/year</span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Just $6.25/month — billed annually
+                </div>
+              </div>
+            )}
             <CardDescription>For serious collectors</CardDescription>
           </CardHeader>
           <CardContent>
@@ -227,12 +262,12 @@ export default function Upgrade() {
               </div>
             ) : (
               <div className="space-y-2">
-                {!trialUsed && (
+                {!trialUsed && billingCycle === "monthly" && (
                   <>
                     <Button
                       className="w-full gap-2"
                       size="lg"
-                      onClick={() => checkoutMutation.mutate(true)}
+                      onClick={() => checkoutMutation.mutate({ withTrial: true, plan: "monthly" })}
                       disabled={checkoutMutation.isPending}
                       data-testid="button-upgrade-trial"
                     >
@@ -247,13 +282,19 @@ export default function Upgrade() {
                 <Button
                   className="w-full gap-2"
                   size="lg"
-                  variant={trialUsed ? "default" : "outline"}
-                  onClick={() => checkoutMutation.mutate(false)}
+                  variant={trialUsed || billingCycle === "annual" ? "default" : "outline"}
+                  onClick={() => checkoutMutation.mutate({ withTrial: false, plan: billingCycle })}
                   disabled={checkoutMutation.isPending}
                   data-testid="button-upgrade-checkout"
                 >
                   <Zap className="h-4 w-4" />
-                  {checkoutMutation.isPending ? "Starting checkout..." : trialUsed ? "Subscribe — $12/month" : "Subscribe now (skip trial)"}
+                  {checkoutMutation.isPending
+                    ? "Starting checkout..."
+                    : billingCycle === "annual"
+                      ? "Subscribe — $75/year"
+                      : trialUsed
+                        ? "Subscribe — $12/month"
+                        : "Subscribe now (skip trial)"}
                 </Button>
               </div>
             )}
