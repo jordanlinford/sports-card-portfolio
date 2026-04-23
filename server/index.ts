@@ -11,6 +11,8 @@ import { startPrewarmJob } from "./prewarmJob";
 import { startCareerStageJob } from "./careerStageJob";
 import { startHiddenGemsRefreshJob } from "./hiddenGemsService";
 import { startRegressionTestScheduler, runVerdictRegression } from "./regressionTestJob";
+import { startWinBackScheduler } from "./winBackJob";
+import { startWeeklyReportScheduler } from "./weeklyReportJob";
 
 const app = express();
 const httpServer = createServer(app);
@@ -208,6 +210,12 @@ app.use((req, res, next) => {
 
         // Start the weekly verdict regression test job (every Sunday 2 AM UTC)
         startRegressionTestScheduler();
+
+        // Start the daily win-back email scheduler (10 AM UTC)
+        startWinBackScheduler();
+
+        // Start the weekly "State of the Hobby" auto-post (every Monday 8 AM UTC)
+        startWeeklyReportScheduler();
 
         // Admin endpoint for manual regression run (gated by QA_LOGIN_TOKEN)
         app.get("/api/admin/run-regression", async (req, res) => {

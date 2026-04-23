@@ -26,16 +26,17 @@ import { setupGoogleAuth } from "./googleAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
 import { logActivity, getRecentActivity, getActivityStats } from "./activityLogger";
-import { 
-  insertDisplayCaseSchema, 
-  insertCardSchema, 
-  insertPlayerRegistrySchema, 
+import {
+  insertDisplayCaseSchema,
+  insertCardSchema,
+  insertPlayerRegistrySchema,
   playerRegistry,
   insertPopHistorySchema,
   type InsertPopHistory,
   userFeedback,
   hasProAccess,
   playerOutlookCache,
+  users,
 } from "@shared/schema";
 import { db } from "./db";
 import { desc, eq, sql, isNotNull } from "drizzle-orm";
@@ -6394,8 +6395,15 @@ RULES:
       const stripe = await getUncachableStripeClient();
       const baseUrl = process.env.BASE_URL || `https://${req.hostname}`;
 
-      // Resolve the correct Pro price ID — validates env var or falls back to dynamic lookup
-      const priceId = await getProPriceId(stripe);
+      // Determine which price to use based on the requested plan
+      const { plan } = req.body;
+      let priceId: string;
+      if (plan === "annual" && process.env.STRIPE_ANNUAL_PRICE_ID) {
+        priceId = process.env.STRIPE_ANNUAL_PRICE_ID;
+      } else {
+        // Resolve the correct monthly Pro price ID — validates env var or falls back to dynamic lookup
+        priceId = await getProPriceId(stripe);
+      }
 
       // Create or retrieve customer
       let customerId = user.stripeCustomerId;
@@ -6522,6 +6530,52 @@ RULES:
     }
   });
 
+  // Pause subscription — pauses billing for up to 3 months
+  app.post("/api/subscription/pause", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.stripeSubscriptionId) {
+        return res.status(400).json({ message: "No active subscription" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      // Pause collection for up to 3 months
+      await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        pause_collection: {
+          behavior: "void",
+          resumes_at: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60), // 3 months max
+        },
+      });
+
+      res.json({ message: "Subscription paused. It will auto-resume in 3 months." });
+    } catch (error) {
+      console.error("Error pausing subscription:", error);
+      res.status(500).json({ message: "Failed to pause subscription" });
+    }
+  });
+
+  // Resume a paused subscription
+  app.post("/api/subscription/resume", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.stripeSubscriptionId) {
+        return res.status(400).json({ message: "No active subscription" });
+      }
+
+      const stripe = await getUncachableStripeClient();
+      await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        pause_collection: null, // Remove pause
+      });
+
+      res.json({ message: "Subscription resumed" });
+    } catch (error) {
+      console.error("Error resuming subscription:", error);
+      res.status(500).json({ message: "Failed to resume subscription" });
+    }
+  });
+
   // Promo code redemption route
   app.post("/api/promo/redeem", isAuthenticated, async (req: any, res) => {
     try {
@@ -6542,6 +6596,62 @@ RULES:
     } catch (error) {
       console.error("Error redeeming promo code:", error);
       res.status(500).json({ success: false, message: "Failed to redeem promo code" });
+    }
+  });
+
+  // ===== REFERRAL PROGRAM =====
+
+  // GET /api/referral/code — get or create user's referral code
+  app.get("/api/referral/code", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      let code = user.referralCode;
+      if (!code) {
+        code = "SCP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        await db.update(users).set({ referralCode: code }).where(eq(users.id, userId));
+      }
+
+      // Count referrals
+      const { referrals } = await import("@shared/schema");
+      const stats = await db.select({ count: sql`count(*)` }).from(referrals).where(eq(referrals.referrerId, userId));
+
+      res.json({ code, referralCount: Number(stats[0]?.count || 0) });
+    } catch (error) {
+      console.error("Error getting referral code:", error);
+      res.status(500).json({ message: "Failed to get referral code" });
+    }
+  });
+
+  // POST /api/referral/invite — send referral email
+  app.post("/api/referral/invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { email } = req.body;
+      if (!email) return res.status(400).json({ message: "Email required" });
+
+      const user = await storage.getUser(userId);
+      if (!user?.referralCode) return res.status(400).json({ message: "No referral code" });
+
+      // Create referral record
+      const { referrals } = await import("@shared/schema");
+      await db.insert(referrals).values({
+        referrerId: userId,
+        referredEmail: email,
+        referralCode: user.referralCode,
+      });
+
+      const userName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "A friend";
+      // Send invite email
+      const { sendReferralInviteEmail } = await import("./email");
+      await sendReferralInviteEmail(email, userName, user.referralCode);
+
+      res.json({ message: "Invitation sent" });
+    } catch (error) {
+      console.error("Error sending referral:", error);
+      res.status(500).json({ message: "Failed to send invitation" });
     }
   });
 
@@ -7945,6 +8055,19 @@ RULES:
     }
   });
 
+  // Card of the Day endpoint
+  app.get("/api/market/card-of-day", async (_req, res) => {
+    try {
+      const { getCardOfDay } = await import("./cardOfDayJob");
+      const card = await getCardOfDay();
+      if (!card) return res.status(404).json({ message: "No card of the day available" });
+      res.json(card);
+    } catch (error) {
+      console.error("Error getting card of day:", error);
+      res.status(500).json({ message: "Failed to get card of the day" });
+    }
+  });
+
   // API endpoint for Topps Takeover page live player signals
   app.get("/api/market/topps-takeover-signals", async (req, res) => {
     try {
@@ -8147,9 +8270,63 @@ RULES:
       const advisorTake = advisorOutlook.advisorTake;
       const topReasons = advisorOutlook.topReasons;
 
+      // Extract market data from the outlook for Product structured data
+      const outlookData = outlook.outlookJson as any;
+      const marketMetrics = outlookData?.marketMetrics;
+      const marketSignals = outlookData?.marketSignals;
+      const compsSummary = outlookData?.evidence?.compsSummary;
+      const compositeScore = marketSignals?.composite;
+
+      // Determine price range from market metrics or comps summary
+      const lowPrice = marketMetrics?.priceRangeLow ?? compsSummary?.low;
+      const highPrice = marketMetrics?.priceRangeHigh ?? compsSummary?.high;
+      const soldCount = marketMetrics?.soldCount30d ?? compsSummary?.soldCount;
+
+      // Build the Product JSON-LD for sports card pricing rich results
+      const productJsonLd: Record<string, any> = {
+        "@context": "https://schema.org",
+        "@type": "Product",
+        "name": `${outlook.playerName} Sports Cards`,
+        "description": description,
+        "category": "Sports Trading Cards",
+        "brand": {
+          "@type": "Brand",
+          "name": sportLabel,
+        },
+      };
+
+      // Only add offers if we have price data
+      if (lowPrice != null && highPrice != null && lowPrice > 0 && highPrice > 0) {
+        productJsonLd.offers = {
+          "@type": "AggregateOffer",
+          "priceCurrency": "USD",
+          "lowPrice": lowPrice.toFixed(2),
+          "highPrice": highPrice.toFixed(2),
+          ...(soldCount != null && soldCount > 0 ? { "offerCount": soldCount } : {}),
+        };
+      }
+
+      // Add review with composite score if available
+      if (compositeScore != null && compositeScore > 0) {
+        productJsonLd.review = {
+          "@type": "Review",
+          "reviewRating": {
+            "@type": "Rating",
+            "ratingValue": Math.round(compositeScore).toString(),
+            "bestRating": "100",
+          },
+          "author": {
+            "@type": "Organization",
+            "name": "Sports Card Portfolio",
+          },
+          "reviewBody": `${verdictLabel} - ${description}`,
+        };
+      }
+
       // Generate JSON-LD structured data — Article + Person about the player so AI
       // search engines can attach the verdict/insights directly to the player entity.
       const jsonLd = [
+        productJsonLd,
         {
           "@context": "https://schema.org",
           "@type": "Article",

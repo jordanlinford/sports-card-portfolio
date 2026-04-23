@@ -74,6 +74,8 @@ export const users = pgTable("users", {
   trialSource: varchar("trial_source", { length: 50 }),
   lastLoginAt: timestamp("last_login_at"),
   loginCount: integer("login_count").default(0).notNull(),
+  cancelledAt: timestamp("cancelled_at"),
+  referralCode: varchar("referral_code", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -2839,3 +2841,19 @@ export const insertVerdictRegressionRunSchema = createInsertSchema(verdictRegres
 });
 export type InsertVerdictRegressionRun = z.infer<typeof insertVerdictRegressionRunSchema>;
 export type VerdictRegressionRun = typeof verdictRegressionRuns.$inferSelect;
+
+// Referrals table
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  referrerId: varchar("referrer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  referredEmail: varchar("referred_email", { length: 255 }).notNull(),
+  referredUserId: varchar("referred_user_id").references(() => users.id),
+  referralCode: varchar("referral_code", { length: 20 }).notNull().unique(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, signed_up, converted
+  rewardGranted: boolean("reward_granted").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  convertedAt: timestamp("converted_at"),
+}, (table) => [
+  index("idx_referrals_referrer").on(table.referrerId),
+  index("idx_referrals_code").on(table.referralCode),
+]);

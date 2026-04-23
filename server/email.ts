@@ -461,6 +461,54 @@ export async function sendSplitShippedEmail(
   }
 }
 
+export async function sendWinBackEmail(email: string, userName: string, watchlistMoves: string[]): Promise<void> {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping win-back email");
+    return;
+  }
+
+  const movesList = watchlistMoves.length > 0
+    ? watchlistMoves.map(m => `• ${m}`).join("\n")
+    : "• Several players on your radar had significant price movements";
+
+  const movesHtml = watchlistMoves.length > 0
+    ? watchlistMoves.map(m => `<li>${m}</li>`).join("")
+    : "<li>Several players on your radar had significant price movements</li>";
+
+  try {
+    await transporter.sendMail({
+      from: `"Sports Card Portfolio" <${process.env.ZOHO_EMAIL}>`,
+      to: email,
+      subject: "Your watchlist moved while you were away",
+      text: `Hi ${userName || "there"},\n\nIt's been a week since you left, and here's what happened with players you were tracking:\n\n${movesList}\n\nYour data is still here. Come back and see what you missed:\nhttps://sportscardportfolio.com/\n\nMiss you,\nSports Card Portfolio`,
+      html: `<p>Hi ${userName || "there"},</p><p>It's been a week since you left, and here's what happened with players you were tracking:</p><ul>${movesHtml}</ul><p><a href="https://sportscardportfolio.com/">Come back and see what you missed</a></p><p>Miss you,<br>Sports Card Portfolio</p>`,
+    });
+    console.log(`Win-back email sent to ${email}`);
+  } catch (error) {
+    console.error("Failed to send win-back email:", error);
+  }
+}
+
+export async function sendReferralInviteEmail(toEmail: string, fromName: string, code: string): Promise<void> {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping referral invite email");
+    return;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: `"Sports Card Portfolio" <${process.env.ZOHO_EMAIL}>`,
+      to: toEmail,
+      subject: `${fromName} invited you to Sports Card Portfolio`,
+      text: `${fromName} thinks you'd love Sports Card Portfolio — AI-powered market intelligence for sports card collectors.\n\nSign up with their code to get a free month of Pro: ${code}\n\nhttps://sportscardportfolio.com/?ref=${code}`,
+      html: `<p>${fromName} thinks you'd love <strong>Sports Card Portfolio</strong> — AI-powered market intelligence for sports card collectors.</p><p>Sign up with their code to get a free month of Pro: <strong>${code}</strong></p><p><a href="https://sportscardportfolio.com/?ref=${code}">Get started</a></p>`,
+    });
+    console.log(`Referral invite email sent to ${toEmail}`);
+  } catch (error) {
+    console.error("Failed to send referral invite email:", error);
+  }
+}
+
 export async function sendNewParticipantJoinedEmail(
   userEmail: string,
   userName: string,
