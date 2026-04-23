@@ -1114,7 +1114,21 @@ For common players and bench players, the Prizm paper base sells for under $5. D
 - Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation} sold eBay"
 - Only use comps that match "${card.variation}" — do NOT mix in prices from other parallels (Silver, Gold, Base, etc.)
 - If you cannot find sold comps for this exact parallel, set market.soldCount to 0 and market.confidence to "LOW"
-- With soldCount=0, estimate CONSERVATIVELY — lean toward the LOWER end of what comparable parallels sell for`
+- With soldCount=0, estimate CONSERVATIVELY — lean toward the LOWER end of what comparable parallels sell for${isOpticHoloPremium ? `
+
+⚠️ DONRUSS OPTIC HOLO — PREMIUM PARALLEL — CRITICAL PRICING GUIDANCE ⚠️
+This card is a Donruss Optic "Holo" parallel. In Donruss Optic, "Holo" is NOT the base card — it is a PREMIUM, scarce holographic parallel that commands a SIGNIFICANT premium over the unnumbered base Optic.
+- Optic base (unnumbered): typically $1–$15 for most players
+- Optic Holo (this card): typically 10–30x the base price for the same player. Star rookies in PSA 10 routinely sell for $150–$500+
+- For elite #1-pick rookies (e.g., Cade Cunningham, Anthony Edwards, Paolo Banchero, Victor Wembanyama), Optic Holo PSA 10 sells in the $150–$300+ range and PSA's own grade-fee estimate often exceeds $200
+- DO NOT report unnumbered Optic base prices for this card — that is the WRONG product
+- Every comp MUST contain BOTH "Optic" AND "Holo" in the listing title — exclude any listing that is just "Optic" without "Holo", and exclude any listing that is just "Holo" without "Optic" (could be a different product line)
+- Suggested searches:
+  - "${card.playerName || card.title} ${card.year || ""} Donruss Optic Holo ${card.grade ? `${card.grader || "PSA"} ${card.grade}` : ""} sold"
+  - "${card.playerName || card.title} ${card.year || ""} Optic Holo PSA 10 sold eBay"
+  - "${card.playerName || card.title} Optic Holo Rookie sold"
+- If you find Optic Holo comps, USE them — do not anchor to unrelated Optic-base or Donruss-base comps
+- A PSA 10 Optic Holo of a star rookie selling for under $50 is almost certainly a misidentified comp — re-verify the listing title contains both "Optic" AND "Holo"` : ""}`
         : "");
 
   const hasMissingDetails = !card.set || !card.variation;
