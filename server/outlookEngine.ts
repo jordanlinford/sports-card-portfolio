@@ -345,6 +345,11 @@ function normalizeVariation(variation: string): string {
   return v;
 }
 
+// Bump this when scoring/parallel-classification logic changes so that any
+// previously cached Gemini analyses produced by an older code version are not
+// re-served. Any pre-existing rows simply become unreachable and age out.
+const GEMINI_CACHE_VERSION = "v2-opticholo";
+
 export function getGeminiCacheKey(card: {
   title: string;
   playerName?: string | null;
@@ -363,6 +368,7 @@ export function getGeminiCacheKey(card: {
       normalizeVariation(card.variation || ""),
       (card.grade || "").toLowerCase().trim(),
       (card.grader || "").toLowerCase().trim(),
+      GEMINI_CACHE_VERSION,
     ];
     return parts.join("|");
   }
@@ -373,6 +379,7 @@ export function getGeminiCacheKey(card: {
     normalizeVariation(card.variation || ""),
     (card.grade || "").toLowerCase().trim(),
     (card.grader || "").toLowerCase().trim(),
+    GEMINI_CACHE_VERSION,
   ];
   return parts.join("|");
 }
@@ -1038,12 +1045,20 @@ export async function fetchUnifiedCardAnalysis(card: {
   const isPrizmFamilySet = /\bprizm\b|\bprisma\b/i.test(card.set || "");
   const isStrictBaseVariation = !card.variation || variationLower === "base" || variationLower === "base prizm";
   const isOpticSet = /\boptic\b/i.test(card.set || "");
-  const isBaseOrCommonParallel = !isNumbered && !isPremiumUnnumberedParallel && (
+  // In Donruss Optic, "Holo" is a PREMIUM parallel (~$150–300 PSA 10 for stars),
+  // not a base/common parallel like "Holo" can be in some other product lines.
+  // Excluding it here prevents the AI from being told to search for $1–10 base comps.
+  const isOpticHoloPremium = isOpticSet && /\bholo\b/i.test(variationLower);
+  const isBaseOrCommonParallel = !isNumbered && !isPremiumUnnumberedParallel && !isOpticHoloPremium && (
     !card.variation ||
     variationLower === "base" ||
-    /^(certified\s+)?rookie\s*(card|rc)?\s*(silver|base|prizm|holo|disco)?$/i.test(variationLower) ||
-    /^(silver|base|disco)\s*(prizm|holo)?$/i.test(variationLower) ||
-    /^(prizm|holo|disco\s*prizm)$/i.test(variationLower)
+    /^(certified\s+)?rookie\s*(card|rc)?\s*(silver|base|prizm|disco)?$/i.test(variationLower) ||
+    /^(silver|base|disco)\s*(prizm)?$/i.test(variationLower) ||
+    /^(prizm|disco\s*prizm)$/i.test(variationLower) ||
+    // "Holo" only counts as base when the set is NOT Optic.
+    (!isOpticSet && /^(holo)$/i.test(variationLower)) ||
+    (!isOpticSet && /^(silver|base|disco)\s*holo$/i.test(variationLower)) ||
+    (!isOpticSet && /^(certified\s+)?rookie\s*(card|rc)?\s*holo$/i.test(variationLower))
   );
   const isAutoCardU = /auto(graph)?/i.test(card.variation || "") || /auto(graph)?/i.test(card.set || "") || /auto(graph)?/i.test(card.title || "");
   const isHatSwatchU = /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.variation || "") || /player\s*cap|hat\s*swatch|cap\s*relic|laundry\s*tag/i.test(card.title || "");
@@ -1099,7 +1114,21 @@ For common players and bench players, the Prizm paper base sells for under $5. D
 - Search: "${card.playerName || card.title} ${card.year || ""} ${card.set || ""} ${card.variation} sold eBay"
 - Only use comps that match "${card.variation}" — do NOT mix in prices from other parallels (Silver, Gold, Base, etc.)
 - If you cannot find sold comps for this exact parallel, set market.soldCount to 0 and market.confidence to "LOW"
-- With soldCount=0, estimate CONSERVATIVELY — lean toward the LOWER end of what comparable parallels sell for`
+- With soldCount=0, estimate CONSERVATIVELY — lean toward the LOWER end of what comparable parallels sell for${isOpticHoloPremium ? `
+
+⚠️ DONRUSS OPTIC HOLO — PREMIUM PARALLEL — CRITICAL PRICING GUIDANCE ⚠️
+This card is a Donruss Optic "Holo" parallel. In Donruss Optic, "Holo" is NOT the base card — it is a PREMIUM, scarce holographic parallel that commands a SIGNIFICANT premium over the unnumbered base Optic.
+- Optic base (unnumbered): typically $1–$15 for most players
+- Optic Holo (this card): typically 10–30x the base price for the same player. Star rookies in PSA 10 routinely sell for $150–$500+
+- For elite #1-pick rookies (e.g., Cade Cunningham, Anthony Edwards, Paolo Banchero, Victor Wembanyama), Optic Holo PSA 10 sells in the $150–$300+ range and PSA's own grade-fee estimate often exceeds $200
+- DO NOT report unnumbered Optic base prices for this card — that is the WRONG product
+- Every comp MUST contain BOTH "Optic" AND "Holo" in the listing title — exclude any listing that is just "Optic" without "Holo", and exclude any listing that is just "Holo" without "Optic" (could be a different product line)
+- Suggested searches:
+  - "${card.playerName || card.title} ${card.year || ""} Donruss Optic Holo ${card.grade ? `${card.grader || "PSA"} ${card.grade}` : ""} sold"
+  - "${card.playerName || card.title} ${card.year || ""} Optic Holo PSA 10 sold eBay"
+  - "${card.playerName || card.title} Optic Holo Rookie sold"
+- If you find Optic Holo comps, USE them — do not anchor to unrelated Optic-base or Donruss-base comps
+- A PSA 10 Optic Holo of a star rookie selling for under $50 is almost certainly a misidentified comp — re-verify the listing title contains both "Optic" AND "Holo"` : ""}`
         : "");
 
   const hasMissingDetails = !card.set || !card.variation;
@@ -1613,6 +1642,190 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
 // LOW-POP FALLBACK PRICING — triggered when unified analysis fails for /1-/5 cards
 // Uses a simplified Gemini + Google Search call focused on triangulation
 // ============================================================
+// Direct eBay scraper price lookup. Hits the existing eBay comps service
+// (the dedicated-VPS scraper that powers the comps panel) and returns the
+// median sold price. This is the most reliable source we have — real eBay
+// sold listings, properly filtered. For first-time queries it waits up to
+// ~25 seconds for the background fetch job to complete; subsequent queries
+// hit the cache instantly.
+export async function fetchEbayScrapedPrice(card: {
+  title?: string;
+  playerName?: string;
+  year?: string | number;
+  set?: string;
+  variation?: string;
+  grade?: string;
+  grader?: string;
+}): Promise<{ avgPrice: number; minPrice: number; maxPrice: number; soldCount: number; source: string } | null> {
+  const ebay = await import("./ebayCompsService");
+  const playerName = card.playerName || card.title || "";
+  if (!playerName) return null;
+  const year = card.year ? String(card.year) : "";
+  const set = card.set || "";
+  const variation = card.variation || "";
+  const grade = card.grade || "";
+  const grader = card.grader && card.grader.toLowerCase() !== "raw"
+    ? card.grader
+    : (grade && /^\d+(\.\d+)?$/.test(grade) ? "PSA" : "");
+  const queryStr = [
+    year,
+    set,
+    playerName,
+    variation,
+    grader && grade ? `${grader} ${grade}` : grade,
+  ].filter(Boolean).join(" ").trim();
+  if (!queryStr) return null;
+
+  let normalized;
+  try {
+    normalized = ebay.normalizeEbayQuery(queryStr);
+  } catch (err: any) {
+    console.warn(`[EbayScraper] Failed to normalize query "${queryStr}": ${err.message}`);
+    return null;
+  }
+
+  // Step 1: Check for already-cached comps
+  let cached: any = null;
+  try {
+    const cacheCheck = await ebay.getCachedCompsWithSWR(
+      normalized.queryHash,
+      normalized.canonicalQuery,
+      normalized.filters,
+    );
+    cached = cacheCheck.data;
+  } catch (err: any) {
+    console.warn(`[EbayScraper] Cache check failed: ${err.message}`);
+  }
+
+  // Step 2: If no usable cache, kick off a fetch and poll for completion
+  const hasUsableData = (c: any) => c && c.summaryJson && c.summaryJson.medianPrice > 0 && c.summaryJson.soldCount >= 1;
+  if (!hasUsableData(cached)) {
+    if (!ebay.isJobRunning(normalized.queryHash)) {
+      try {
+        await ebay.enqueueFetchJob(normalized.canonicalQuery, normalized.queryHash, normalized.filters);
+      } catch (err: any) {
+        console.warn(`[EbayScraper] enqueueFetchJob failed: ${err.message}`);
+      }
+    }
+    const POLL_TIMEOUT_MS = 25000;
+    const POLL_INTERVAL_MS = 2000;
+    const start = Date.now();
+    while (Date.now() - start < POLL_TIMEOUT_MS) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+      try {
+        const poll = await ebay.getCachedComps(normalized.queryHash);
+        if (poll && (poll.fetchStatus === "complete" || hasUsableData(poll))) {
+          cached = poll;
+          break;
+        }
+        if (poll && (poll.fetchStatus === "failed" || poll.fetchStatus === "blocked")) {
+          console.log(`[EbayScraper] Fetch job ${poll.fetchStatus} for: ${queryStr}`);
+          break;
+        }
+      } catch {}
+    }
+  }
+
+  if (!hasUsableData(cached)) {
+    console.log(`[EbayScraper] No usable comps for: ${queryStr}`);
+    return null;
+  }
+
+  const s = cached.summaryJson;
+  const result = {
+    avgPrice: Math.round(s.medianPrice * 100) / 100,
+    minPrice: Math.round((s.minPrice || s.medianPrice * 0.7) * 100) / 100,
+    maxPrice: Math.round((s.maxPrice || s.medianPrice * 1.3) * 100) / 100,
+    soldCount: s.soldCount,
+    source: `${s.soldCount} eBay sold comps (median)`,
+  };
+  console.log(`[EbayScraper] ${queryStr} → median $${result.avgPrice} (range $${result.minPrice}-$${result.maxPrice}) from ${s.soldCount} sold comps`);
+  return result;
+}
+
+// Focused web-search-grounded "what is this card worth right now" lookup.
+// This intentionally mirrors how a human would ask Gemini in the chat app:
+// one short, direct question with Google Search enabled, no structured
+// extraction, no parallel detection, no batch processing. Used as a price
+// fallback when the structured pipeline finds zero sold comps and would
+// otherwise return Gemini's unreliable base-card guess.
+const focusedPriceCache = new Map<string, { data: { avgPrice: number; minPrice: number; maxPrice: number; rationale: string } | null; cachedAt: number }>();
+const FOCUSED_PRICE_TTL_MS = 6 * 60 * 60 * 1000;
+
+export async function fetchFocusedCardValue(card: {
+  title?: string;
+  playerName?: string;
+  year?: string | number;
+  set?: string;
+  variation?: string;
+  grade?: string;
+  grader?: string;
+}): Promise<{ avgPrice: number; minPrice: number; maxPrice: number; rationale: string } | null> {
+  const playerName = card.playerName || card.title || "";
+  if (!playerName) return null;
+  const year = card.year ? String(card.year) : "";
+  const set = card.set || "";
+  const variation = card.variation || "";
+  const grade = card.grade || "";
+  const grader = card.grader && card.grader.toLowerCase() !== "raw" ? card.grader : (grade && /^\d+(\.\d+)?$/.test(grade) ? "PSA" : "");
+  const desc = [year, set, playerName, variation, grader && grade ? `${grader} ${grade}` : grade].filter(Boolean).join(" ").trim();
+  const cacheKey = desc.toLowerCase();
+  const cached = focusedPriceCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < FOCUSED_PRICE_TTL_MS) {
+    return cached.data;
+  }
+  // One short disambiguation line for parallels Gemini reliably gets wrong
+  // in text-only form (no image). Kept to a single sentence — multi-step
+  // prompts made things worse.
+  const variationLower = variation.toLowerCase();
+  const setLower = set.toLowerCase();
+  let disambig = "";
+  if (setLower.includes("optic") && variationLower === "holo") {
+    disambig = `\nNote: "Holo" in Donruss Optic is the Silver Holo parallel (also listed as "Optic Holo Silver" / "Holo Prizm"), not the base Optic.`;
+  }
+  try {
+    const prompt = `What is this card currently worth based on recent eBay sold listings?
+
+${desc}${disambig}
+
+End your response with this single line in this exact format (and only this format — no other dollar ranges in the response):
+PRICE_RANGE: $LOW - $HIGH (typical: $MID)`;
+    const resp = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: { tools: [{ googleSearch: {} }] },
+    });
+    const text = (resp.text || "").trim();
+    if (!text || text.length < 30) {
+      focusedPriceCache.set(cacheKey, { data: null, cachedAt: Date.now() });
+      return null;
+    }
+    const m = text.match(/PRICE_RANGE:\s*\$?([\d,]+(?:\.\d+)?)\s*-\s*\$?([\d,]+(?:\.\d+)?)\s*\(?\s*typical:?\s*\$?([\d,]+(?:\.\d+)?)/i);
+    if (!m) {
+      // No structured price line — refuse rather than guessing from stray
+      // dollar mentions in the response text (which often anchored us to
+      // wrong-parallel prices Gemini quoted in passing).
+      focusedPriceCache.set(cacheKey, { data: null, cachedAt: Date.now() });
+      console.log(`[FocusedPrice] ${desc} → no structured PRICE_RANGE line, refusing to guess`);
+      return null;
+    }
+    const lo = parseFloat(m[1].replace(/,/g, ""));
+    const hi = parseFloat(m[2].replace(/,/g, ""));
+    const mid = parseFloat(m[3].replace(/,/g, ""));
+    if (!(lo > 0 && hi > 0 && mid > 0)) {
+      focusedPriceCache.set(cacheKey, { data: null, cachedAt: Date.now() });
+      return null;
+    }
+    const data = { avgPrice: Math.round(mid), minPrice: Math.round(lo), maxPrice: Math.round(hi), rationale: text.slice(0, 500) };
+    focusedPriceCache.set(cacheKey, { data, cachedAt: Date.now() });
+    console.log(`[FocusedPrice] ${desc} → $${data.avgPrice} (range $${data.minPrice}-$${data.maxPrice})`);
+    return data;
+  } catch (err: any) {
+    console.warn(`[FocusedPrice] Failed for ${desc}: ${err.message}`);
+    return null;
+  }
+}
+
 export async function fetchLowPopFallbackPrice(card: {
   title: string;
   playerName?: string;
@@ -2378,23 +2591,35 @@ Rules:
     else if (realDataMonths < 8 && computedConfidence === "HIGH") computedConfidence = "MEDIUM";
 
     const totalSalesCount = rawPoints.reduce((sum: number, p: MonthlyPricePoint) => sum + (p.salesCount || 0), 0);
-    const hasAnySales = totalSalesCount > 0;
+    // hasAnySales gates whether we render the chart on the frontend.
+    // CRITICAL: gate on the presence of REAL PRICE DATA, not on per-month
+    // salesCount. Gemini often returns real monthly prices without itemizing
+    // sales counts (its knowledge is "card sold for ~$X in March" without
+    // tallying the count). If we required salesCount > 0, every chart
+    // would show "no sold comps found" even when we have 18 months of
+    // genuine price data — exactly the regression the user reported.
+    // realDataMonths counts months with avgPrice > 0, which is the right
+    // signal for "do we have a chart to show."
+    const hasAnySales = realDataMonths >= 2;
+    if (totalSalesCount === 0) {
+      console.log(`[MonthlyPrice] Note: ${rawPoints.length} data points have prices but 0 itemized sales counts — Gemini knows the prices but not exact sale tallies`);
+    }
     if (!hasAnySales) {
-      console.log(`[MonthlyPrice] WARNING: All ${rawPoints.length} data points have 0 sales — prices are estimated/hallucinated`);
+      console.log(`[MonthlyPrice] WARNING: Only ${realDataMonths} months with real price data — not enough to chart`);
       computedConfidence = "LOW";
+    } else if (totalSalesCount === 0 && computedConfidence === "HIGH") {
+      // Prices exist but no sales-count corroboration — slight confidence haircut
+      computedConfidence = "MEDIUM";
     }
 
-    // Decide whether "no sales" really means "card just released" vs.
-    // "we couldn't find sales data for an existing product." A 2021 card
-    // is not too new for trend analysis — it just lacks comp data.
+    // Decide whether "no chart data" really means "card just released" vs.
+    // "we couldn't find any price data for an existing product." A 2021 card
+    // is not too new for trend analysis — it just lacks data.
     let noSalesReason: "too_new" | "no_data_found" | undefined;
     if (!hasAnySales) {
       const yearNum = params.year ? parseInt(String(params.year), 10) : NaN;
       const now = new Date();
       const currentYear = now.getFullYear();
-      // Treat as "too new" only if the card year is the current calendar year
-      // and we're still in the first half of it (i.e. < ~6 months of market
-      // history is plausible). Anything older falls into "no_data_found".
       const isLikelyNew = !isNaN(yearNum) && yearNum >= currentYear && now.getMonth() < 6;
       noSalesReason = isLikelyNew ? "too_new" : "no_data_found";
     }

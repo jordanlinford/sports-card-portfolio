@@ -283,7 +283,7 @@ export async function getPortfolioGrowthProjections(userId: string): Promise<Por
   const userCards = await db
     .select()
     .from(cards)
-    .where(inArray(cards.displayCaseId, caseIds));
+    .where(and(inArray(cards.displayCaseId, caseIds), isNull(cards.deletedAt)));
   
   if (userCards.length === 0) {
     return {

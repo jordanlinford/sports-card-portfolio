@@ -190,7 +190,8 @@ async function getTopCardsToPrewarm(): Promise<PrewarmCard[]> {
       and(
         eq(users.subscriptionStatus, "PRO"),
         isNotNull(cards.playerName),
-        isNotNull(cards.year)
+        isNotNull(cards.year),
+        isNull(cards.deletedAt)
       )
     )
     .orderBy(desc(cards.estimatedValue)) // Highest value cards first
@@ -259,7 +260,8 @@ async function getTopCardsToPrewarm(): Promise<PrewarmCard[]> {
     .where(
       and(
         isNotNull(cards.playerName),
-        isNotNull(cards.year)
+        isNotNull(cards.year),
+        isNull(cards.deletedAt)
       )
     )
     .groupBy(cards.title, cards.playerName, cards.year, cards.set, cards.grade)
@@ -314,6 +316,7 @@ async function getUnanalyzedCardsToBackfill(): Promise<PrewarmCard[]> {
           isNull(cards.estimatedValue),
           isNull(cardOutlooks.cardId),
           isNotNull(cards.playerName),
+          isNull(cards.deletedAt),
         ),
       )
       .orderBy(asc(cards.createdAt))

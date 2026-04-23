@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { hiddenGems, playerOutlookCache, cards, displayCases, type HiddenGem, type InsertHiddenGem, type PlayerOutlookResponse, type MarketSignals, type ConvictionData } from "@shared/schema";
-import { eq, desc, and, isNotNull, sql } from "drizzle-orm";
+import { eq, desc, and, isNotNull, isNull, sql } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { getPlayerOutlook } from "./playerOutlookEngine";
 import { SEASONAL_CONFIGS } from "./cardOutlookService";
@@ -404,7 +404,7 @@ async function getPlayersFromPortfolios(): Promise<Array<{ playerName: string; s
       sport: cards.sport,
     })
     .from(cards)
-    .where(isNotNull(cards.playerName));
+    .where(and(isNotNull(cards.playerName), isNull(cards.deletedAt)));
   
   // Deduplicate by player name + sport
   const uniquePlayers = new Map<string, { playerName: string; sport: string }>();
@@ -652,7 +652,7 @@ async function discoverGemsFromUserSignals(existingPlayerKeys: Set<string>): Pro
       })
       .from(cards)
       .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
-      .where(and(isNotNull(cards.playerName), isNotNull(cards.sport)))
+      .where(and(isNotNull(cards.playerName), isNotNull(cards.sport), isNull(cards.deletedAt)))
       .groupBy(cards.playerName, cards.sport)
       .having(sql`COUNT(DISTINCT ${displayCases.userId}) >= 2`);
 

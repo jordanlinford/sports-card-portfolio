@@ -1,5 +1,6 @@
 import "./sentry"; // Initialize Sentry early (before other imports)
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { timingSafeEqual } from "crypto";
 import { Sentry } from "./sentry";
 import { registerRoutes } from "./routes";
@@ -32,6 +33,7 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

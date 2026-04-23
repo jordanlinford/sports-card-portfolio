@@ -109,7 +109,30 @@ function prepareHtmlForRender(raw: string): { html: string; styles: string } {
     .map(css => scopeCss(css, ".blog-html-scope"))
     .join("\n");
 
-  return { html: html.trim(), styles: scopedStyles };
+  // Readability overrides: blog HTML is often authored with a dark-theme
+  // palette (white text, white-ish links). When we render it inside a
+  // forced white card, that turns into white-on-white invisible text.
+  // These rules target the scope wrapper with high specificity so they
+  // override anything the source <style> block set, forcing legible
+  // colors against the white card background.
+  const readabilityOverrides = `
+.blog-html-scope, .blog-html-scope * { color: rgb(23 23 23); }
+.blog-html-scope h1, .blog-html-scope h2, .blog-html-scope h3,
+.blog-html-scope h4, .blog-html-scope h5, .blog-html-scope h6 { color: rgb(23 23 23); }
+.blog-html-scope a, .blog-html-scope a:visited { color: rgb(37 99 235); text-decoration: underline; }
+.blog-html-scope a:hover { color: rgb(29 78 216); text-decoration: none; }
+.blog-html-scope strong, .blog-html-scope b { color: rgb(23 23 23); }
+.blog-html-scope blockquote { color: rgb(64 64 64); border-left: 4px solid rgb(229 229 229); padding-left: 1rem; }
+.blog-html-scope code { color: rgb(23 23 23); background: rgb(245 245 245); padding: 0.1em 0.3em; border-radius: 0.25rem; }
+.blog-html-scope pre { color: rgb(23 23 23); background: rgb(245 245 245); padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+.blog-html-scope pre code { background: transparent; padding: 0; }
+.blog-html-scope hr { border-color: rgb(229 229 229); }
+.blog-html-scope table { border-collapse: collapse; }
+.blog-html-scope th, .blog-html-scope td { border: 1px solid rgb(229 229 229); padding: 0.5rem 0.75rem; color: rgb(23 23 23); }
+.blog-html-scope th { background: rgb(250 250 250); }
+`;
+
+  return { html: html.trim(), styles: scopedStyles + "\n" + readabilityOverrides };
 }
 
 function parseTextWithLinks(text: string): (string | JSX.Element)[] {

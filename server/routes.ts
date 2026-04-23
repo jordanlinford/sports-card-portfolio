@@ -4172,12 +4172,80 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // PRIMARY PRICE: Direct eBay scraper (real eBay sold listings).
+      // For clearly identified non-low-pop cards, hit the existing eBay comps
+      // service — same scraper that powers the comps panel — and use its
+      // median sold price as the truth source. This is the same data eBay,
+      // 130point, and PSA Auction Prices all reference, so our number lines
+      // up with theirs. First lookup for a card waits ~25s for the scraper
+      // to complete; subsequent lookups hit cache instantly.
+      const lowPopMatch = variation ? variation.match(/\/\s*(\d+)\b/) : null;
+      const isLowPopCard = lowPopMatch && parseInt(lowPopMatch[1]) <= 25;
+      const hasCleanIdentification = !!(effectivePlayerName && year && set);
+      let usedEbayScraper = false;
+      if (hasCleanIdentification && !isLowPopCard) {
+        try {
+          const { fetchEbayScrapedPrice } = await import("./outlookEngine");
+          const scraped = await fetchEbayScrapedPrice({
+            title,
+            playerName: effectivePlayerName,
+            year,
+            set,
+            variation,
+            grade,
+            grader,
+          });
+          if (scraped && scraped.avgPrice > 0) {
+            const oldValue = marketValue;
+            const oldSource = pricingSource;
+            marketValue = scraped.avgPrice;
+            priceMin = scraped.minPrice;
+            priceMax = scraped.maxPrice;
+            compCount = scraped.soldCount;
+            pricingSource = "ebay-scraper";
+            usedEbayScraper = true;
+            console.log(`[Quick Analyze] EBAY SCRAPER (primary): $${marketValue} median from ${compCount} sold comps (range $${priceMin}-$${priceMax}) — replacing ${oldSource} $${oldValue}`);
+          }
+        } catch (err: any) {
+          console.warn(`[Quick Analyze] eBay scraper lookup failed: ${err.message} — falling through to focused Gemini`);
+        }
+      }
+
+      // SECONDARY PRICE: Focused Gemini lookup. Only runs when the eBay scraper
+      // didn't return data (new card not yet scraped + scrape didn't complete
+      // in time, or scraper blocked). Same simple "what is this card worth?"
+      // prompt a human would type in the Gemini chat app.
+      if (hasCleanIdentification && !isLowPopCard && !usedEbayScraper) {
+        try {
+          const { fetchFocusedCardValue } = await import("./outlookEngine");
+          const focused = await fetchFocusedCardValue({
+            title,
+            playerName: effectivePlayerName,
+            year,
+            set,
+            variation,
+            grade,
+            grader,
+          });
+          if (focused && focused.avgPrice > 0) {
+            const oldValue = marketValue;
+            const oldSource = pricingSource;
+            marketValue = focused.avgPrice;
+            priceMin = focused.minPrice;
+            priceMax = focused.maxPrice;
+            pricingSource = "focused";
+            console.log(`[Quick Analyze] FOCUSED PRICE (fallback): $${marketValue} (range $${priceMin}-$${priceMax}) — replacing ${oldSource} $${oldValue}`);
+          }
+        } catch (err: any) {
+          console.warn(`[Quick Analyze] Focused price lookup failed: ${err.message} — keeping ${pricingSource} estimate $${marketValue}`);
+        }
+      }
+
       // ZERO-COMP CONSERVATISM — when Gemini found no completed sales,
       // it likely relied on active BIN listings which are typically inflated 30-50%.
       // Apply a discount to bring the estimate closer to reality.
       // EXCEPTION: Skip for low-pop numbered cards (/25 and under) where zero comps are expected due to rarity.
-      const lowPopMatch = variation ? variation.match(/\/\s*(\d+)\b/) : null;
-      const isLowPopCard = lowPopMatch && parseInt(lowPopMatch[1]) <= 25;
+      // EXCEPTION: Skip when focused price lookup succeeded — that lookup already returned real sold prices.
       if (marketValue && marketValue > 0 && compCount === 0 && pricingSource === "gemini" && !isLowPopCard) {
         const originalValue = marketValue;
         marketValue = Math.round(marketValue * 0.7);

@@ -8,7 +8,7 @@ import type {
   InsertPortfolioSnapshot,
   RecommendedAction
 } from "@shared/schema";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, sql, isNull } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { fetchPlayerNews } from "./outlookEngine";
 
@@ -393,7 +393,7 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
     .from(cards)
     .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
     .leftJoin(cardOutlooks, eq(cards.id, cardOutlooks.cardId))
-    .where(eq(displayCases.userId, userId));
+    .where(and(eq(displayCases.userId, userId), isNull(cards.deletedAt)));
 
   // Deduplicate cards that appear in multiple display cases (same imagePath) so
   // this matches the analytics page. For duplicates, keep the entry with the
@@ -1146,7 +1146,7 @@ export async function generateNextBuys(userId: string): Promise<import("@shared/
     .select({ playerName: cards.playerName })
     .from(cards)
     .innerJoin(displayCases, eq(cards.displayCaseId, displayCases.id))
-    .where(eq(displayCases.userId, userId));
+    .where(and(eq(displayCases.userId, userId), isNull(cards.deletedAt)));
   
   for (const card of allOwnedCards) {
     if (card.playerName) {
@@ -1580,7 +1580,7 @@ export async function generatePortfolioNextBuys(
   const caseCards = await db
     .select()
     .from(cards)
-    .where(eq(cards.displayCaseId, displayCaseId));
+    .where(and(eq(cards.displayCaseId, displayCaseId), isNull(cards.deletedAt)));
 
   if (caseCards.length === 0) {
     return {
