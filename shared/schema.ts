@@ -184,11 +184,13 @@ export const cardsRelations = relations(cards, ({ one }) => ({
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
   displayCaseId: integer("display_case_id").notNull().references(() => displayCases.id, { onDelete: "cascade" }),
-  userId: varchar("user_id").references(() => users.id),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
   guestName: varchar("guest_name", { length: 100 }),
   content: text("content").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_comments_user_id").on(table.userId),
+]);
 
 export const commentsRelations = relations(comments, ({ one }) => ({
   displayCase: one(displayCases, {
@@ -205,9 +207,12 @@ export const commentsRelations = relations(comments, ({ one }) => ({
 export const likes = pgTable("likes", {
   id: serial("id").primaryKey(),
   displayCaseId: integer("display_case_id").notNull().references(() => displayCases.id, { onDelete: "cascade" }),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_likes_user_id").on(table.userId),
+  index("idx_likes_display_case_id").on(table.displayCaseId),
+]);
 
 export const likesRelations = relations(likes, ({ one }) => ({
   displayCase: one(displayCases, {
@@ -223,10 +228,12 @@ export const likesRelations = relations(likes, ({ one }) => ({
 // Bookmarks table - for users to save cards they're interested in
 export const bookmarks = pgTable("bookmarks", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_bookmarks_user_id").on(table.userId),
+]);
 
 export const bookmarksRelations = relations(bookmarks, ({ one }) => ({
   user: one(users, {
@@ -243,15 +250,18 @@ export const bookmarksRelations = relations(bookmarks, ({ one }) => ({
 export const offers = pgTable("offers", {
   id: serial("id").primaryKey(),
   cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
-  fromUserId: varchar("from_user_id").notNull().references(() => users.id),
-  toUserId: varchar("to_user_id").notNull().references(() => users.id),
+  fromUserId: varchar("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  toUserId: varchar("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   amount: real("amount").notNull(),
   message: text("message"),
   isAnonymous: boolean("is_anonymous").default(false).notNull(),
   status: varchar("status", { length: 50 }).default("pending").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_offers_from_user_id").on(table.fromUserId),
+  index("idx_offers_to_user_id").on(table.toUserId),
+]);
 
 export const offersRelations = relations(offers, ({ one }) => ({
   card: one(cards, {
@@ -271,12 +281,14 @@ export const offersRelations = relations(offers, ({ one }) => ({
 // Notifications table
 export const notifications = pgTable("notifications", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: varchar("type", { length: 50 }).notNull(),
   data: jsonb("data"),
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("idx_notifications_user_id").on(table.userId),
+]);
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, {
@@ -403,7 +415,7 @@ export const badges = pgTable("badges", {
 // User Badges table - tracks which badges users have earned
 export const userBadges = pgTable("user_badges", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   badgeId: varchar("badge_id", { length: 50 }).notNull().references(() => badges.id),
   earnedAt: timestamp("earned_at").defaultNow(),
   progress: integer("progress").default(0),
@@ -426,8 +438,8 @@ export const userBadgesRelations = relations(userBadges, ({ one }) => ({
 // Trade Offers table - for card-to-card trades
 export const tradeOffers = pgTable("trade_offers", {
   id: serial("id").primaryKey(),
-  fromUserId: varchar("from_user_id").notNull().references(() => users.id),
-  toUserId: varchar("to_user_id").notNull().references(() => users.id),
+  fromUserId: varchar("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  toUserId: varchar("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   offeredCardIds: integer("offered_card_ids").array().notNull(),
   requestedCardIds: integer("requested_card_ids").array().notNull(),
   cashAdjustment: real("cash_adjustment").default(0).notNull(),
@@ -451,8 +463,8 @@ export const tradeOffersRelations = relations(tradeOffers, ({ one }) => ({
 // Follows table - for users to follow other users
 export const follows = pgTable("follows", {
   id: serial("id").primaryKey(),
-  followerId: varchar("follower_id").notNull().references(() => users.id),
-  followedId: varchar("followed_id").notNull().references(() => users.id),
+  followerId: varchar("follower_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  followedId: varchar("followed_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   unique("unique_follow").on(table.followerId, table.followedId),
@@ -517,7 +529,7 @@ export const messagesRelations = relations(messages, ({ one }) => ({
 // Outlook usage tracking - unified tracking for all Market Outlook analyses
 export const outlookUsage = pgTable("outlook_usage", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   cardId: integer("card_id").references(() => cards.id, { onDelete: "set null" }),
   source: varchar("source", { length: 20 }).notNull(), // 'collection' or 'quick'
   cardTitle: text("card_title"),
@@ -667,7 +679,7 @@ export const promoCodes = pgTable("promo_codes", {
 export const promoCodeRedemptions = pgTable("promo_code_redemptions", {
   id: serial("id").primaryKey(),
   promoCodeId: integer("promo_code_id").notNull().references(() => promoCodes.id),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   redeemedAt: timestamp("redeemed_at").defaultNow(),
 }, (table) => [
   unique("promo_code_user_unique").on(table.promoCodeId, table.userId),
@@ -691,7 +703,7 @@ export type CollectorTier = keyof typeof COLLECTOR_TIERS;
 export const priceAlerts = pgTable("price_alerts", {
   id: serial("id").primaryKey(),
   cardId: integer("card_id").notNull().references(() => cards.id, { onDelete: "cascade" }),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   alertType: varchar("alert_type", { length: 20 }).notNull(), // 'above' or 'below'
   threshold: real("threshold").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
@@ -803,7 +815,7 @@ export const cardOutlooksRelations = relations(cardOutlooks, ({ one }) => ({
 // User Alert Settings table - global user preferences for alerts
 export const userAlertSettings = pgTable("user_alert_settings", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
   emailAlertsEnabled: boolean("email_alerts_enabled").default(true).notNull(),
   inAppAlertsEnabled: boolean("in_app_alerts_enabled").default(true).notNull(),
   weeklyDigestEnabled: boolean("weekly_digest_enabled").default(true).notNull(),
@@ -2225,7 +2237,7 @@ export const splitInstancesRelations = relations(splitInstances, ({ one, many })
 export const seats = pgTable("seats", {
   id: serial("id").primaryKey(),
   splitInstanceId: integer("split_instance_id").notNull().references(() => splitInstances.id, { onDelete: "cascade" }),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 30 }).default("INTERESTED").notNull().$type<SeatStatus>(),
   preferences: jsonb("preferences").$type<string[]>().default([]),
   paidAt: timestamp("paid_at"),
@@ -2511,7 +2523,7 @@ export type UserFeedback = typeof userFeedback.$inferSelect;
 // ============================================================================
 export const scanHistory = pgTable("scan_history", {
   id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   playerName: varchar("player_name", { length: 255 }),
   year: integer("year"),
   setName: varchar("set_name", { length: 255 }),
@@ -2548,7 +2560,7 @@ export type ScanHistory = typeof scanHistory.$inferSelect;
 // ============================================================================
 export const scanJobs = pgTable("scan_jobs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
   progress: varchar("progress", { length: 80 }),
   imageHash: varchar("image_hash", { length: 64 }),
