@@ -452,6 +452,37 @@ type CardScanResult = {
   };
 };
 
+// Hook: fetch the trend-chart sold-comp average for a card and return
+// it as the trusted price (matches what the single-card view shows).
+// Falls back to the raw analysis price when no real sales are found.
+function useTrendCorrectedPrice(card: QuickAnalyzeResult): number | null {
+  const playerRequest = card.tempCard.title ? {
+    playerName: card.tempCard.title,
+    sport: "football",
+    year: card.tempCard.year ?? undefined,
+    setName: card.tempCard.set ?? undefined,
+    variation: card.tempCard.variation ?? undefined,
+    grade: card.tempCard.grade ?? undefined,
+    grader: card.tempCard.grader ?? undefined,
+  } : null;
+  const preloaded = card.priceHistory;
+  const query = useQuery<any>({
+    queryKey: ["/api/player-outlook/price-history", playerRequest],
+    queryFn: async () => {
+      if (!playerRequest) return null;
+      return await apiRequest("POST", "/api/player-outlook/price-history", playerRequest);
+    },
+    enabled: !!playerRequest && !preloaded,
+    staleTime: 5 * 60 * 1000,
+  });
+  const history: any = preloaded ?? query.data;
+  if (!history?.dataPoints?.length) return card.market.value ?? null;
+  const recent = history.dataPoints.slice(-3).filter((p: any) => (p.salesCount || 0) > 0);
+  if (recent.length === 0) return card.market.value ?? null;
+  const avg = recent.reduce((s: number, p: any) => s + (p.avgPrice || 0), 0) / recent.length;
+  return avg > 0 ? Math.round(avg * 100) / 100 : (card.market.value ?? null);
+}
+
 // Comparison Verdict Component - shows side-by-side analysis with recommendation
 function ComparisonVerdict({ 
   leftCard, 
@@ -464,6 +495,20 @@ function ComparisonVerdict({
   leftImageUrl: string | null;
   rightImageUrl: string | null;
 }) {
+  // Pull trend-corrected prices for BOTH cards so the comparison shows the same
+  // sold-comp-anchored numbers as the single-card analysis view, regardless of
+  // whether the trend chart was rendered before entering compare mode.
+  const leftTrendPrice = useTrendCorrectedPrice(leftCard);
+  const rightTrendPrice = useTrendCorrectedPrice(rightCard);
+  const effectiveLeft: QuickAnalyzeResult = leftTrendPrice && leftTrendPrice > 0
+    ? { ...leftCard, market: { ...leftCard.market, value: leftTrendPrice, min: Math.round(leftTrendPrice * 0.75), max: Math.round(leftTrendPrice * 1.35) } }
+    : leftCard;
+  const effectiveRight: QuickAnalyzeResult = rightTrendPrice && rightTrendPrice > 0
+    ? { ...rightCard, market: { ...rightCard.market, value: rightTrendPrice, min: Math.round(rightTrendPrice * 0.75), max: Math.round(rightTrendPrice * 1.35) } }
+    : rightCard;
+  // Use effective cards (with trend-corrected prices) throughout this component
+  leftCard = effectiveLeft;
+  rightCard = effectiveRight;
   const calculateScore = (card: QuickAnalyzeResult): number => {
     const actionScore = 
       card.action === "BUY" ? 100 :
@@ -721,19 +766,13 @@ function QuickAnalyzeSection({ canAnalyze, userCases, isPro }: { canAnalyze: boo
   const [result, setResult] = useState<QuickAnalyzeResult | null>(null);
   const [trendCorrectedValue, setTrendCorrectedValue] = useState<number | null>(null);
   const handleTrendPriceLoaded = useCallback((trendAvg: number, hasRealSales?: boolean) => {
-    const currentValue = result?.market?.value;
-    if (!hasRealSales && currentValue && currentValue > 0) {
-      return;
-    }
-    if (currentValue && currentValue > 0 && trendAvg > 0) {
-      const ratio = currentValue / trendAvg;
-      if (ratio < 0.5 || ratio > 2) {
-        setTrendCorrectedValue(trendAvg);
-      }
-    } else if ((!currentValue || currentValue === 0) && trendAvg > 0) {
+    // Trust real sold-comp data unconditionally — it's the most reliable source
+    // and Gemini's estimates are unreliable for premium parallels (Optic Holo, etc.).
+    // No ratio gating: if the trend chart found actual sales, that's the price.
+    if (hasRealSales && trendAvg > 0) {
       setTrendCorrectedValue(trendAvg);
     }
-  }, [result?.market?.value]);
+  }, []);
   const [scanResult, setScanResult] = useState<CardScanResult | null>(null);
   const [title, setTitle] = useState("");
   const [year, setYear] = useState("");
