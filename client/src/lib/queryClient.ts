@@ -1,5 +1,14 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+// CSRF token management — token is returned in response headers
+// and sent back on state-changing requests
+let csrfToken: string | null = null;
+
+function updateCsrfToken(res: Response) {
+  const token = res.headers.get("x-csrf-token");
+  if (token) csrfToken = token;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,15 +21,22 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<any> {
+  const headers: Record<string, string> = {};
+  if (data) headers["Content-Type"] = "application/json";
+  if (csrfToken && !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase())) {
+    headers["x-csrf-token"] = csrfToken;
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
 
+  updateCsrfToken(res);
   await throwIfResNotOk(res);
-  
+
   // Return JSON if response has content
   const text = await res.text();
   if (text) {
@@ -39,6 +55,8 @@ export const getQueryFn: <T>(options: {
       credentials: "include",
     });
 
+    updateCsrfToken(res);
+
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
     }
@@ -54,7 +72,11 @@ export const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000, // 5 minutes
-      retry: false,
+      retry: (failureCount, error) => {
+        // Retry up to 2 times for server errors, not for 4xx
+        if (error instanceof Error && error.message.startsWith("4")) return false;
+        return failureCount < 2;
+      },
     },
     mutations: {
       retry: false,

@@ -469,6 +469,11 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   await setupAuth(app);
   setupGoogleAuth(app);
 
+  // CSRF protection (after auth, before routes)
+  const { csrfTokenProvider, csrfProtection } = await import("./csrf");
+  app.use(csrfTokenProvider);
+  app.use(csrfProtection);
+
   // Initialize Stripe webhooks and sync
   await initStripe(app);
 
