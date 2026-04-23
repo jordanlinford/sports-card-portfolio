@@ -327,6 +327,14 @@ const portfolioNextBuysCache = new Map<string, {
   expiresAt: number;
 }>();
 
+// Periodic cleanup of stale cache entries (every 30 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of portfolioNextBuysCache.entries()) {
+    if (now > value.expiresAt) portfolioNextBuysCache.delete(key);
+  }
+}, 30 * 60 * 1000);
+
 function checkPortfolioAIRateLimit(userId: string, endpoint: 'outlook' | 'nextbuys' | string): { allowed: boolean; retryAfter?: number } {
   // For portfolio-specific next buys (includes display case ID in key)
   if (endpoint.startsWith('nextbuys-')) {
@@ -10245,6 +10253,14 @@ RULES:
   const breakAuditCache = new Map<string, { data: any; timestamp: number }>();
   const BREAK_AUDIT_CACHE_TTL = 6 * 60 * 60 * 1000;
 
+  // Periodic cleanup of stale break audit cache entries
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of breakAuditCache.entries()) {
+      if (now - value.timestamp > BREAK_AUDIT_CACHE_TTL) breakAuditCache.delete(key);
+    }
+  }, 30 * 60 * 1000);
+
   app.post("/api/market/break-audit", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -10544,6 +10560,17 @@ Return ONLY valid JSON, no markdown.`;
   const SEALED_CACHE_TTL = 6 * 60 * 60 * 1000;
   const sealedShareStore = new Map<string, { data: any; createdAt: number }>();
   const SEALED_SHARE_TTL = 7 * 24 * 60 * 60 * 1000;
+
+  // Periodic cleanup of stale sealed product cache entries
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, value] of sealedProductCache.entries()) {
+      if (now - value.timestamp > SEALED_CACHE_TTL) sealedProductCache.delete(key);
+    }
+    for (const [key, value] of sealedShareStore.entries()) {
+      if (now - value.createdAt > SEALED_SHARE_TTL) sealedShareStore.delete(key);
+    }
+  }, 30 * 60 * 1000);
 
   app.post("/api/market/sealed-product-roi", isAuthenticated, async (req: any, res) => {
     try {
