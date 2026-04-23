@@ -1673,17 +1673,21 @@ export async function fetchFocusedCardValue(card: {
   if (cached && Date.now() - cached.cachedAt < FOCUSED_PRICE_TTL_MS) {
     return cached.data;
   }
-  // Mirror exactly how a human asks Gemini in the chat app. Short, direct,
-  // no over-coaching. We tested elaborate prompts with disambiguation hints
-  // and multi-step instructions — they consistently underperformed the simple
-  // question. The only structure we add is one line at the end asking for a
-  // parseable price range so we can extract a number.
+  // One short disambiguation line for parallels Gemini reliably gets wrong
+  // in text-only form (no image). Kept to a single sentence — multi-step
+  // prompts made things worse.
+  const variationLower = variation.toLowerCase();
+  const setLower = set.toLowerCase();
+  let disambig = "";
+  if (setLower.includes("optic") && variationLower === "holo") {
+    disambig = `\nNote: "Holo" in Donruss Optic is the Silver Holo parallel (also listed as "Optic Holo Silver" / "Holo Prizm"), not the base Optic.`;
+  }
   try {
-    const prompt = `What is this card currently worth?
+    const prompt = `What is this card currently worth based on recent eBay sold listings?
 
-${desc}
+${desc}${disambig}
 
-Give me the current market value based on recent eBay sold listings. End your response with this single line in this exact format:
+End your response with this single line in this exact format (and only this format — no other dollar ranges in the response):
 PRICE_RANGE: $LOW - $HIGH (typical: $MID)`;
     const resp = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
@@ -1697,21 +1701,12 @@ PRICE_RANGE: $LOW - $HIGH (typical: $MID)`;
     }
     const m = text.match(/PRICE_RANGE:\s*\$?([\d,]+(?:\.\d+)?)\s*-\s*\$?([\d,]+(?:\.\d+)?)\s*\(?\s*typical:?\s*\$?([\d,]+(?:\.\d+)?)/i);
     if (!m) {
-      const fallbackPrices = Array.from(text.matchAll(/\$\s?([\d,]+(?:\.\d+)?)/g))
-        .map(x => parseFloat(x[1].replace(/,/g, "")))
-        .filter(n => n >= 5 && n <= 100000);
-      if (fallbackPrices.length < 2) {
-        focusedPriceCache.set(cacheKey, { data: null, cachedAt: Date.now() });
-        return null;
-      }
-      fallbackPrices.sort((a, b) => a - b);
-      const lo = fallbackPrices[0];
-      const hi = fallbackPrices[fallbackPrices.length - 1];
-      const mid = fallbackPrices[Math.floor(fallbackPrices.length / 2)];
-      const data = { avgPrice: Math.round(mid), minPrice: Math.round(lo), maxPrice: Math.round(hi), rationale: text.slice(0, 500) };
-      focusedPriceCache.set(cacheKey, { data, cachedAt: Date.now() });
-      console.log(`[FocusedPrice] ${desc} → $${data.avgPrice} (range $${data.minPrice}-$${data.maxPrice}) [parsed from $-mentions]`);
-      return data;
+      // No structured price line — refuse rather than guessing from stray
+      // dollar mentions in the response text (which often anchored us to
+      // wrong-parallel prices Gemini quoted in passing).
+      focusedPriceCache.set(cacheKey, { data: null, cachedAt: Date.now() });
+      console.log(`[FocusedPrice] ${desc} → no structured PRICE_RANGE line, refusing to guess`);
+      return null;
     }
     const lo = parseFloat(m[1].replace(/,/g, ""));
     const hi = parseFloat(m[2].replace(/,/g, ""));
