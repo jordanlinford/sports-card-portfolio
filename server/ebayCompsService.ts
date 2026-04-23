@@ -49,7 +49,7 @@ const PARALLEL_TYPES = [
 const UNAMBIGUOUS_PARALLELS = [
   // Pattern/finish parallels (distinct terms - these alone indicate a parallel)
   "refractor", "xfractor", "superfractor", "atomic",
-  "holographic", "pulsar", "velocity", "scope",
+  "holographic", "holo", "pulsar", "velocity", "scope",
   "speckle", "laser", "reactive", "fluorescent", "marble",
   "cracked ice", "tie-dye", "tie dye", "neon green", "neon orange",
   // Special edition markers
@@ -317,20 +317,17 @@ export function generateQueryLadder(filters: CompsQueryFilters): string[] {
   if (filters.grader && filters.grade) fullParts.push(`${filters.grader} ${filters.grade}`);
   if (fullParts.length > 0) ladder.push(fullParts.join(" ") + rawExclusions);
   
-  // Level 1: Remove parallel (keep player + year + set + grade)
+  // CRITICAL: When a parallel is specified, we ONLY use the level-0 query.
+  // Broadening to drop the parallel would mix in base/wrong-parallel comps
+  // (e.g. base Optic at $36 contaminating a Holo Optic search that should
+  // be ~$200), since eBay's search returns mixed results that the match
+  // filter cannot always distinguish from titles that omit the parallel
+  // word. Better to return zero comps than wrong comps.
   if (filters.parallel) {
-    const parts: string[] = [];
-    if (filters.year) parts.push(String(filters.year));
-    if (filters.set) parts.push(filters.set);
-    if (filters.player) parts.push(filters.player);
-    if (filters.grader && filters.grade) parts.push(`${filters.grader} ${filters.grade}`);
-    const query = parts.join(" ") + rawExclusions;
-    if (parts.length > 0 && query !== ladder[ladder.length - 1]) {
-      ladder.push(query);
-    }
+    return ladder;
   }
   
-  // Level 2: Remove card number (keep player + year + set + grader only, no exact grade)
+  // Level 1: Remove card number (keep player + year + set + grader only, no exact grade)
   if (filters.grader && filters.grade) {
     const parts: string[] = [];
     if (filters.year) parts.push(String(filters.year));
@@ -343,7 +340,7 @@ export function generateQueryLadder(filters: CompsQueryFilters): string[] {
     }
   }
   
-  // Level 3: Remove set (keep player + year + grader)
+  // Level 2: Remove set (keep player + year + grader)
   if (filters.set) {
     const parts: string[] = [];
     if (filters.year) parts.push(String(filters.year));
@@ -355,7 +352,7 @@ export function generateQueryLadder(filters: CompsQueryFilters): string[] {
     }
   }
   
-  // Level 4: Just player + year (broadest useful query)
+  // Level 3: Just player + year (broadest useful query)
   if (filters.player && filters.year) {
     const query = `${filters.year} ${filters.player}${rawExclusions}`;
     if (query !== ladder[ladder.length - 1]) {
@@ -363,7 +360,7 @@ export function generateQueryLadder(filters: CompsQueryFilters): string[] {
     }
   }
   
-  // Level 5: Just player (very broad, last resort)
+  // Level 4: Just player (very broad, last resort)
   if (filters.player) {
     const query = filters.player + rawExclusions;
     if (query !== ladder[ladder.length - 1]) {
