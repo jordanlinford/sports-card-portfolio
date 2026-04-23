@@ -1230,39 +1230,26 @@ export class DatabaseStorage implements IStorage {
 
   // Comment operations
   async getComments(displayCaseId: number): Promise<CommentWithUser[]> {
-    const commentsData = await db
-      .select()
+    const rows = await db
+      .select({
+        comment: comments,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          handle: users.handle,
+          profileImageUrl: users.profileImageUrl,
+        },
+      })
       .from(comments)
+      .leftJoin(users, eq(comments.userId, users.id))
       .where(eq(comments.displayCaseId, displayCaseId))
       .orderBy(desc(comments.createdAt));
 
-    const commentsWithUsers: CommentWithUser[] = [];
-    for (const comment of commentsData) {
-      if (comment.userId) {
-        const [user] = await db
-          .select({
-            id: users.id,
-            firstName: users.firstName,
-            lastName: users.lastName,
-            handle: users.handle,
-            profileImageUrl: users.profileImageUrl,
-          })
-          .from(users)
-          .where(eq(users.id, comment.userId));
-
-        commentsWithUsers.push({
-          ...comment,
-          user: user || { id: comment.userId, firstName: null, lastName: null, handle: null, profileImageUrl: null },
-        });
-      } else {
-        commentsWithUsers.push({
-          ...comment,
-          user: null,
-        });
-      }
-    }
-
-    return commentsWithUsers;
+    return rows.map(row => ({
+      ...row.comment,
+      user: row.user?.id ? row.user : null,
+    }));
   }
 
   async createComment(displayCaseId: number, userId: string | null, content: string, guestName?: string): Promise<Comment> {
@@ -1286,11 +1273,11 @@ export class DatabaseStorage implements IStorage {
 
   // Like operations
   async getLikeCount(displayCaseId: number): Promise<number> {
-    const likesList = await db
-      .select()
+    const [result] = await db
+      .select({ count: sql<number>`count(*)` })
       .from(likes)
       .where(eq(likes.displayCaseId, displayCaseId));
-    return likesList.length;
+    return Number(result.count);
   }
 
   async hasUserLiked(displayCaseId: number, userId: string): Promise<boolean> {
@@ -2885,20 +2872,17 @@ export class DatabaseStorage implements IStorage {
 
   // Price alert operations
   async getPriceAlerts(userId: string): Promise<PriceAlertWithCard[]> {
-    const alerts = await db
-      .select()
+    const rows = await db
+      .select({
+        alert: priceAlerts,
+        card: cards,
+      })
       .from(priceAlerts)
+      .innerJoin(cards, eq(priceAlerts.cardId, cards.id))
       .where(eq(priceAlerts.userId, userId))
       .orderBy(desc(priceAlerts.createdAt));
-    
-    const alertsWithCards: PriceAlertWithCard[] = [];
-    for (const alert of alerts) {
-      const [card] = await db.select().from(cards).where(eq(cards.id, alert.cardId));
-      if (card) {
-        alertsWithCards.push({ ...alert, card });
-      }
-    }
-    return alertsWithCards;
+
+    return rows.map(row => ({ ...row.alert, card: row.card }));
   }
 
   async getPriceAlert(id: number): Promise<PriceAlert | undefined> {
@@ -2943,20 +2927,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveAlertsForProcessing(): Promise<(PriceAlert & { card: Card; user: User })[]> {
-    const alerts = await db
-      .select()
+    const rows = await db
+      .select({
+        alert: priceAlerts,
+        card: cards,
+        user: users,
+      })
       .from(priceAlerts)
+      .innerJoin(cards, eq(priceAlerts.cardId, cards.id))
+      .innerJoin(users, eq(priceAlerts.userId, users.id))
       .where(eq(priceAlerts.isActive, true));
-    
-    const result: (PriceAlert & { card: Card; user: User })[] = [];
-    for (const alert of alerts) {
-      const [card] = await db.select().from(cards).where(eq(cards.id, alert.cardId));
-      const [user] = await db.select().from(users).where(eq(users.id, alert.userId));
-      if (card && user) {
-        result.push({ ...alert, card, user });
-      }
-    }
-    return result;
+
+    return rows.map(row => ({ ...row.alert, card: row.card, user: row.user }));
   }
 
   async markAlertTriggered(id: number): Promise<void> {
