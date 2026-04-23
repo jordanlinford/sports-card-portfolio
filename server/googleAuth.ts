@@ -1,9 +1,27 @@
 import passport from "passport";
 import { Strategy as GoogleStrategy, Profile } from "passport-google-oauth20";
 import { timingSafeEqual } from "crypto";
+import rateLimit from "express-rate-limit";
 import type { Express } from "express";
 import { storage } from "./storage";
 import { sendWelcomeEmail, sendNewSignupNotification } from "./email";
+
+// Rate limiters for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts, please try again later" },
+});
+
+const qaLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts, please try again later" },
+});
 
 export function setupGoogleAuth(app: Express) {
   // To enable Google login:
@@ -120,7 +138,7 @@ export function setupGoogleAuth(app: Express) {
 
   passport.use("google", strategy);
 
-  app.get("/api/auth/google", (req, res, next) => {
+  app.get("/api/auth/google", authLimiter, (req, res, next) => {
     if (req.query.returnTo && typeof req.query.returnTo === "string") {
       const returnTo = req.query.returnTo;
       if (returnTo.startsWith("/") && !returnTo.startsWith("//")) {
@@ -184,7 +202,7 @@ export function setupGoogleAuth(app: Express) {
   //   POST /api/auth/qa-login
   //   Header: x-qa-token: <QA_LOGIN_TOKEN>
   //   (or JSON body: { "token": "<QA_LOGIN_TOKEN>" })
-  app.post("/api/auth/qa-login", async (req, res) => {
+  app.post("/api/auth/qa-login", qaLoginLimiter, async (req, res) => {
     try {
       if (process.env.NODE_ENV === "production") {
         return res.status(404).json({ error: "not found" });

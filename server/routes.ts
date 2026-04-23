@@ -1,8 +1,18 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { createHash } from "crypto";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+
+// Rate limiter for expensive AI operations (card scanning, outlooks)
+const aiOperationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please slow down" },
+});
 import { setupGoogleAuth } from "./googleAuth";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { ObjectPermission } from "./objectAcl";
@@ -4906,7 +4916,7 @@ Sitemap: ${origin}/sitemap.xml
 
 
   // Scan a card image and get identification + pricing (legacy endpoint)
-  app.post("/api/cards/scan-image", isAuthenticated, async (req: any, res) => {
+  app.post("/api/cards/scan-image", aiOperationLimiter, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { imageData, mimeType } = req.body;
@@ -6205,7 +6215,7 @@ RULES:
     return resolvedProPriceId;
   }
 
-  app.post("/api/create-checkout-session", isAuthenticated, async (req: any, res) => {
+  app.post("/api/create-checkout-session", aiOperationLimiter, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
