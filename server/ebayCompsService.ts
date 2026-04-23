@@ -244,14 +244,19 @@ export function normalizeEbayQuery(input: string): NormalizedQuery {
   }
   
   // Extract player name (everything that's not a known keyword)
+  // CRITICAL: Strip ALL known set/brand words (not just the matched set) so
+  // multi-word brand names like "Donruss Optic" don't leak into the player
+  // field as "Donruss Cade Cunningham" — which would garble the eBay query.
   const keywords = [
     ...(filters.year ? [String(filters.year)] : []),
-    ...(filters.set ? [filters.set.toLowerCase()] : []),
+    ...COMMON_SETS, // strip every brand word, not just the one we matched
     ...(filters.parallel ? [filters.parallel] : []),
+    ...PARALLEL_TYPES, // strip parallel finish words ("optic","prizm","wave"...)
+    ...PARALLEL_COLORS, // strip parallel colors ("silver","gold","holo"...)
     ...(filters.grade ? [`${filters.grader?.toLowerCase() || ""} ${filters.grade}`] : []),
     ...(filters.cardNumber ? [`#${filters.cardNumber}`, filters.cardNumber] : []),
     ...GRADERS,
-    "rc", "rookie", "auto", "autograph", "patch", "jersey", "relic"
+    "rc", "rookie", "auto", "autograph", "patch", "jersey", "relic", "holo", "holographic"
   ];
   
   let playerParts = normalized;
