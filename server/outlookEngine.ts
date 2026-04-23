@@ -1642,6 +1642,107 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
 // LOW-POP FALLBACK PRICING — triggered when unified analysis fails for /1-/5 cards
 // Uses a simplified Gemini + Google Search call focused on triangulation
 // ============================================================
+// Direct eBay scraper price lookup. Hits the existing eBay comps service
+// (the dedicated-VPS scraper that powers the comps panel) and returns the
+// median sold price. This is the most reliable source we have — real eBay
+// sold listings, properly filtered. For first-time queries it waits up to
+// ~25 seconds for the background fetch job to complete; subsequent queries
+// hit the cache instantly.
+export async function fetchEbayScrapedPrice(card: {
+  title?: string;
+  playerName?: string;
+  year?: string | number;
+  set?: string;
+  variation?: string;
+  grade?: string;
+  grader?: string;
+}): Promise<{ avgPrice: number; minPrice: number; maxPrice: number; soldCount: number; source: string } | null> {
+  const ebay = await import("./ebayCompsService");
+  const playerName = card.playerName || card.title || "";
+  if (!playerName) return null;
+  const year = card.year ? String(card.year) : "";
+  const set = card.set || "";
+  const variation = card.variation || "";
+  const grade = card.grade || "";
+  const grader = card.grader && card.grader.toLowerCase() !== "raw"
+    ? card.grader
+    : (grade && /^\d+(\.\d+)?$/.test(grade) ? "PSA" : "");
+  const queryStr = [
+    year,
+    set,
+    playerName,
+    variation,
+    grader && grade ? `${grader} ${grade}` : grade,
+  ].filter(Boolean).join(" ").trim();
+  if (!queryStr) return null;
+
+  let normalized;
+  try {
+    normalized = ebay.normalizeEbayQuery(queryStr);
+  } catch (err: any) {
+    console.warn(`[EbayScraper] Failed to normalize query "${queryStr}": ${err.message}`);
+    return null;
+  }
+
+  // Step 1: Check for already-cached comps
+  let cached: any = null;
+  try {
+    const cacheCheck = await ebay.getCachedCompsWithSWR(
+      normalized.queryHash,
+      normalized.canonicalQuery,
+      normalized.filters,
+    );
+    cached = cacheCheck.data;
+  } catch (err: any) {
+    console.warn(`[EbayScraper] Cache check failed: ${err.message}`);
+  }
+
+  // Step 2: If no usable cache, kick off a fetch and poll for completion
+  const hasUsableData = (c: any) => c && c.summaryJson && c.summaryJson.medianPrice > 0 && c.summaryJson.soldCount >= 1;
+  if (!hasUsableData(cached)) {
+    if (!ebay.isJobRunning(normalized.queryHash)) {
+      try {
+        await ebay.enqueueFetchJob(normalized.canonicalQuery, normalized.queryHash, normalized.filters);
+      } catch (err: any) {
+        console.warn(`[EbayScraper] enqueueFetchJob failed: ${err.message}`);
+      }
+    }
+    const POLL_TIMEOUT_MS = 25000;
+    const POLL_INTERVAL_MS = 2000;
+    const start = Date.now();
+    while (Date.now() - start < POLL_TIMEOUT_MS) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+      try {
+        const poll = await ebay.getCachedComps(normalized.queryHash);
+        if (poll && (poll.fetchStatus === "complete" || hasUsableData(poll))) {
+          cached = poll;
+          break;
+        }
+        if (poll && (poll.fetchStatus === "failed" || poll.fetchStatus === "blocked")) {
+          console.log(`[EbayScraper] Fetch job ${poll.fetchStatus} for: ${queryStr}`);
+          break;
+        }
+      } catch {}
+    }
+  }
+
+  if (!hasUsableData(cached)) {
+    console.log(`[EbayScraper] No usable comps for: ${queryStr}`);
+    return null;
+  }
+
+  const s = cached.summaryJson;
+  const result = {
+    avgPrice: Math.round(s.medianPrice * 100) / 100,
+    minPrice: Math.round((s.minPrice || s.medianPrice * 0.7) * 100) / 100,
+    maxPrice: Math.round((s.maxPrice || s.medianPrice * 1.3) * 100) / 100,
+    soldCount: s.soldCount,
+    source: `${s.soldCount} eBay sold comps (median)`,
+  };
+  console.log(`[EbayScraper] ${queryStr} → median $${result.avgPrice} (range $${result.minPrice}-$${result.maxPrice}) from ${s.soldCount} sold comps`);
+  return result;
+}
+
 // Focused web-search-grounded "what is this card worth right now" lookup.
 // This intentionally mirrors how a human would ask Gemini in the chat app:
 // one short, direct question with Google Search enabled, no structured
