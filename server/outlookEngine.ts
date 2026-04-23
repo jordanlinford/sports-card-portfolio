@@ -1642,6 +1642,96 @@ ${needsTriangulation ? `\nIMPORTANT FOR 1/1 AND LOW-POP CARDS:
 // LOW-POP FALLBACK PRICING — triggered when unified analysis fails for /1-/5 cards
 // Uses a simplified Gemini + Google Search call focused on triangulation
 // ============================================================
+// Focused web-search-grounded "what is this card worth right now" lookup.
+// This intentionally mirrors how a human would ask Gemini in the chat app:
+// one short, direct question with Google Search enabled, no structured
+// extraction, no parallel detection, no batch processing. Used as a price
+// fallback when the structured pipeline finds zero sold comps and would
+// otherwise return Gemini's unreliable base-card guess.
+const focusedPriceCache = new Map<string, { data: { avgPrice: number; minPrice: number; maxPrice: number; rationale: string } | null; cachedAt: number }>();
+const FOCUSED_PRICE_TTL_MS = 6 * 60 * 60 * 1000;
+
+export async function fetchFocusedCardValue(card: {
+  title?: string;
+  playerName?: string;
+  year?: string | number;
+  set?: string;
+  variation?: string;
+  grade?: string;
+  grader?: string;
+}): Promise<{ avgPrice: number; minPrice: number; maxPrice: number; rationale: string } | null> {
+  const playerName = card.playerName || card.title || "";
+  if (!playerName) return null;
+  const year = card.year ? String(card.year) : "";
+  const set = card.set || "";
+  const variation = card.variation || "";
+  const grade = card.grade || "";
+  const grader = card.grader && card.grader.toLowerCase() !== "raw" ? card.grader : (grade && /^\d+(\.\d+)?$/.test(grade) ? "PSA" : "");
+  const desc = [year, set, playerName, variation, grader && grade ? `${grader} ${grade}` : grade].filter(Boolean).join(" ").trim();
+  const cacheKey = desc.toLowerCase();
+  const cached = focusedPriceCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < FOCUSED_PRICE_TTL_MS) {
+    return cached.data;
+  }
+  try {
+    const prompt = `What is this exact sports card currently selling for on eBay? Give me the current market value range based on recent sold listings.
+
+Card: ${desc}
+
+Search eBay sold/completed listings and 130point.com for recent sales of this EXACT card variant. Then tell me:
+- Recent low sale price
+- Recent high sale price
+- Typical current market value (midpoint of recent sold range)
+
+CRITICAL: Match the EXACT parallel/variation. Optic Holo (Silver) is NOT base Optic. Hyper Prizm is NOT Purple Wave. If you cannot find sold data for this exact variant, say "no data" — do NOT substitute a different parallel's prices.
+
+After your research, end your response with this single line in this exact format:
+PRICE_RANGE: $LOW - $HIGH (typical: $MID)`;
+    const resp = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+      config: { tools: [{ googleSearch: {} }] },
+    });
+    const text = (resp.text || "").trim();
+    if (!text || text.length < 30) {
+      focusedPriceCache.set(cacheKey, { data: null, cachedAt: Date.now() });
+      return null;
+    }
+    const m = text.match(/PRICE_RANGE:\s*\$?([\d,]+(?:\.\d+)?)\s*-\s*\$?([\d,]+(?:\.\d+)?)\s*\(?\s*typical:?\s*\$?([\d,]+(?:\.\d+)?)/i);
+    if (!m) {
+      const fallbackPrices = Array.from(text.matchAll(/\$\s?([\d,]+(?:\.\d+)?)/g))
+        .map(x => parseFloat(x[1].replace(/,/g, "")))
+        .filter(n => n >= 5 && n <= 100000);
+      if (fallbackPrices.length < 2) {
+        focusedPriceCache.set(cacheKey, { data: null, cachedAt: Date.now() });
+        return null;
+      }
+      fallbackPrices.sort((a, b) => a - b);
+      const lo = fallbackPrices[0];
+      const hi = fallbackPrices[fallbackPrices.length - 1];
+      const mid = fallbackPrices[Math.floor(fallbackPrices.length / 2)];
+      const data = { avgPrice: Math.round(mid), minPrice: Math.round(lo), maxPrice: Math.round(hi), rationale: text.slice(0, 500) };
+      focusedPriceCache.set(cacheKey, { data, cachedAt: Date.now() });
+      console.log(`[FocusedPrice] ${desc} → $${data.avgPrice} (range $${data.minPrice}-$${data.maxPrice}) [parsed from $-mentions]`);
+      return data;
+    }
+    const lo = parseFloat(m[1].replace(/,/g, ""));
+    const hi = parseFloat(m[2].replace(/,/g, ""));
+    const mid = parseFloat(m[3].replace(/,/g, ""));
+    if (!(lo > 0 && hi > 0 && mid > 0)) {
+      focusedPriceCache.set(cacheKey, { data: null, cachedAt: Date.now() });
+      return null;
+    }
+    const data = { avgPrice: Math.round(mid), minPrice: Math.round(lo), maxPrice: Math.round(hi), rationale: text.slice(0, 500) };
+    focusedPriceCache.set(cacheKey, { data, cachedAt: Date.now() });
+    console.log(`[FocusedPrice] ${desc} → $${data.avgPrice} (range $${data.minPrice}-$${data.maxPrice})`);
+    return data;
+  } catch (err: any) {
+    console.warn(`[FocusedPrice] Failed for ${desc}: ${err.message}`);
+    return null;
+  }
+}
+
 export async function fetchLowPopFallbackPrice(card: {
   title: string;
   playerName?: string;

@@ -4066,12 +4066,44 @@ Sitemap: ${origin}/sitemap.xml
         }
       }
 
+      // FOCUSED PRICE LOOKUP — when the structured pipeline returns zero comps
+      // (which is when Gemini's base-card guess most often leaks through wrong),
+      // ask Gemini one short, web-search-grounded question: "what is this card
+      // worth right now?" — the same way a human asks in the chat app. This
+      // catches premium parallels (Optic Holo, Hyper Prizm, etc.) that the
+      // structured prompt fails to price correctly.
+      const lowPopMatch = variation ? variation.match(/\/\s*(\d+)\b/) : null;
+      const isLowPopCard = lowPopMatch && parseInt(lowPopMatch[1]) <= 25;
+      if (compCount === 0 && pricingSource === "gemini" && !isLowPopCard && effectivePlayerName) {
+        try {
+          const { fetchFocusedCardValue } = await import("./outlookEngine");
+          const focused = await fetchFocusedCardValue({
+            title,
+            playerName: effectivePlayerName,
+            year,
+            set,
+            variation,
+            grade,
+            grader,
+          });
+          if (focused && focused.avgPrice > 0) {
+            const oldValue = marketValue;
+            marketValue = focused.avgPrice;
+            priceMin = focused.minPrice;
+            priceMax = focused.maxPrice;
+            pricingSource = "focused";
+            console.log(`[Quick Analyze] FOCUSED PRICE OVERRIDE: $${oldValue} (zero-comp Gemini guess) → $${marketValue} (range $${priceMin}-$${priceMax}) from focused web-search lookup`);
+          }
+        } catch (err: any) {
+          console.warn(`[Quick Analyze] Focused price lookup failed: ${err.message} — keeping Gemini estimate`);
+        }
+      }
+
       // ZERO-COMP CONSERVATISM — when Gemini found no completed sales,
       // it likely relied on active BIN listings which are typically inflated 30-50%.
       // Apply a discount to bring the estimate closer to reality.
       // EXCEPTION: Skip for low-pop numbered cards (/25 and under) where zero comps are expected due to rarity.
-      const lowPopMatch = variation ? variation.match(/\/\s*(\d+)\b/) : null;
-      const isLowPopCard = lowPopMatch && parseInt(lowPopMatch[1]) <= 25;
+      // EXCEPTION: Skip when focused price lookup succeeded — that lookup already returned real sold prices.
       if (marketValue && marketValue > 0 && compCount === 0 && pricingSource === "gemini" && !isLowPopCard) {
         const originalValue = marketValue;
         marketValue = Math.round(marketValue * 0.7);
