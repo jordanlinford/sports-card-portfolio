@@ -255,7 +255,7 @@ export async function generateShareImage(
             font-family="system-ui, -apple-system, sans-serif" 
             font-size="${subtitleFontSize - 2}" 
             fill="rgba(255,255,255,0.7)">
-        SportsCardPortfolio.com
+        hobbyalpha.com
       </text>
     </svg>
   `;
@@ -453,7 +453,7 @@ async function generateBragImage(
         <text x="${width / 2}" y="105" text-anchor="middle"
               font-family="system-ui, -apple-system, sans-serif" 
               font-size="22" fill="rgba(255,255,255,0.7)">
-          Portfolio on Hobby Alpha
+          Portfolio on HobbyAlpha
         </text>
       </svg>
     `;
@@ -583,7 +583,7 @@ async function generateBragImage(
       <text x="${width / 2}" y="50" text-anchor="middle"
             font-family="system-ui, -apple-system, sans-serif" 
             font-size="22" fill="rgba(255,255,255,0.5)">
-        SportsCardPortfolio.com
+        hobbyalpha.com
       </text>
     </svg>
   `;
@@ -842,7 +842,7 @@ export async function generateOutlookShareImage(
       <text x="${width / 2}" y="30" text-anchor="middle"
             font-family="system-ui, -apple-system, sans-serif" 
             font-size="18" fill="rgba(255,255,255,0.4)">
-        SportsCardPortfolio.com
+        hobbyalpha.com
       </text>
     </svg>
   `;

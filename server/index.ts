@@ -41,6 +41,30 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
+// Trust the platform proxy so req.protocol / req.hostname reflect the real
+// public hostname, which is required for the legacy-domain redirect below.
+app.set("trust proxy", true);
+
+// Permanent 301 redirect from the legacy Sports Card Portfolio domain to the
+// new HobbyAlpha domain. Kept indefinitely (at least 12 months per rebrand
+// requirements) so backlinks and search rankings transfer cleanly. The new
+// canonical domain is read from CUSTOM_DOMAIN with a hobbyalpha.com fallback.
+const LEGACY_DOMAINS = new Set([
+  "sportscardportfolio.io",
+  "www.sportscardportfolio.io",
+  "sportscardportfolio.com",
+  "www.sportscardportfolio.com",
+]);
+app.use((req, res, next) => {
+  const host = (req.hostname || "").toLowerCase();
+  if (LEGACY_DOMAINS.has(host)) {
+    const newDomain = process.env.CUSTOM_DOMAIN || "hobbyalpha.com";
+    const target = `https://${newDomain}${req.originalUrl}`;
+    return res.redirect(301, target);
+  }
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",

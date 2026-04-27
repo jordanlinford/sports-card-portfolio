@@ -12,8 +12,7 @@ import {
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 
-import { CardOfDay } from "@/components/card-of-day";
-import playerOutlookImg from "@assets/sportscardportfolio.io_player-outlook_1766201421160.png";
+import playerOutlookImg from "@assets/hobbyalpha-player-outlook-mockup.png";
 
 export default function Landing() {
   return (
@@ -197,13 +196,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* CARD OF THE DAY */}
-      <section className="py-10 md:py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <CardOfDay />
-        </div>
-      </section>
-
       {/* SECTION 4 — CLOSING CTA (DARK) */}
       <section className="py-16 md:py-24 bg-zinc-950 text-zinc-50" data-testid="section-cta-closer">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -211,7 +203,7 @@ export default function Landing() {
             className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-8 leading-tight"
             data-testid="text-cta-closer-headline"
           >
-            1,000+ collectors trust Hobby Alpha to make smarter decisions.
+            1,000+ collectors trust HobbyAlpha to make smarter decisions.
           </h2>
           <Button asChild size="lg" className="gap-2">
             <a href="/api/auth/google" data-testid="button-cta-closer">

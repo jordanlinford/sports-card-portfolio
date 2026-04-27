@@ -130,7 +130,7 @@ export default function PublicPlayerOutlookPage() {
   useEffect(() => {
     if (outlookData) {
       document.title = outlookData.seoTitle || 
-        `${outlookData.playerName} Sports Card Investment Outlook | Hobby Alpha`;
+        `${outlookData.playerName} Sports Card Investment Outlook | HobbyAlpha`;
       
       const metaDescription = document.querySelector('meta[name="description"]');
       if (metaDescription) {

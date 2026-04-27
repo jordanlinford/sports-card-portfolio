@@ -14,7 +14,7 @@ export default function BlogListing() {
   });
 
   useEffect(() => {
-    document.title = "Blog | Hobby Alpha";
+    document.title = "Blog | HobbyAlpha";
     
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
@@ -22,7 +22,7 @@ export default function BlogListing() {
     }
     
     const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) ogTitle.setAttribute("content", "Blog | Hobby Alpha");
+    if (ogTitle) ogTitle.setAttribute("content", "Blog | HobbyAlpha");
     
     const ogDescription = document.querySelector('meta[property="og:description"]');
     if (ogDescription) ogDescription.setAttribute("content", "News, updates, and insights about sports card collecting and investing.");

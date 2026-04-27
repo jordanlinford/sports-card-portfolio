@@ -205,19 +205,20 @@ export async function generatePlayerOGImage(playerSlug: string): Promise<Buffer>
       
       <!-- Logo area -->
       <rect x="60" y="555" width="50" height="50" rx="10" fill="${verdictConfig.bg}"/>
-      <text x="85" y="590" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">SC</text>
+      <text x="85" y="590" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">HA</text>
       
       <!-- Brand name -->
-      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">Hobby Alpha</text>
+      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">HobbyAlpha</text>
       <text x="130" y="600" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#64748B">AI-Powered Investment Intelligence</text>
       
-      <!-- CTA on right -->
+      <!-- CTA on right (only when no real data is available) -->
       ${!hasRealData ? `
-        <rect x="920" y="558" width="220" height="44" rx="22" fill="${verdictConfig.bg}"/>
-        <text x="1030" y="587" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">Get Full Analysis</text>
-      ` : `
-        <text x="1140" y="585" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#64748B" text-anchor="end">hobbyalpha.com</text>
-      `}
+        <rect x="920" y="548" width="220" height="40" rx="20" fill="${verdictConfig.bg}"/>
+        <text x="1030" y="574" font-family="system-ui, -apple-system, sans-serif" font-size="15" font-weight="bold" fill="white" text-anchor="middle">Get Full Analysis</text>
+      ` : ``}
+
+      <!-- Domain corner (always present so the new home is clear on every share) -->
+      <text x="1140" y="612" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#64748B" text-anchor="end">hobbyalpha.com</text>
     </svg>
   `;
 

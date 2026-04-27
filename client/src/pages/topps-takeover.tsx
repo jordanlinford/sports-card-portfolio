@@ -137,7 +137,7 @@ function PlayerSignalCard({ playerName, data, isLoading }: { playerName: string;
 
 export default function ToppsTakeoverPage() {
   useEffect(() => {
-    document.title = "Topps NFL Takeover 2026: What It Means for Card Values | Hobby Alpha";
+    document.title = "Topps NFL Takeover 2026: What It Means for Card Values | HobbyAlpha";
   }, []);
 
   const { data: playerSignals, isLoading } = useQuery<Record<string, any>>({
@@ -377,7 +377,7 @@ export default function ToppsTakeoverPage() {
             Track the Transition with Data, Not Hype
           </h2>
           <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
-            Hobby Alpha gives you independent, AI-powered analysis on every player and card — so you can navigate the Topps takeover with confidence.
+            HobbyAlpha gives you independent, AI-powered analysis on every player and card — so you can navigate the Topps takeover with confidence.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <a href="/api/auth/google" data-testid="button-topps-cta-google">

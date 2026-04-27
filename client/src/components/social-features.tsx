@@ -102,7 +102,7 @@ export function ShareButtons({ displayCaseId, caseName }: ShareButtonsProps) {
   const productionDomain = "https://hobbyalpha.com";
   const shareUrl = `${productionDomain}/case/${displayCaseId}`;
   
-  const shareText = `Check out "${caseName}" on Hobby Alpha!`;
+  const shareText = `Check out "${caseName}" on HobbyAlpha!`;
 
   const handleCopyLink = async () => {
     try {

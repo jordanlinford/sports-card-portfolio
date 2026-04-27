@@ -141,7 +141,7 @@ export default function PublicIntelPage() {
   const entries = data?.entries || [];
 
   useEffect(() => {
-    document.title = "Sports Card Market Intelligence | Hobby Alpha";
+    document.title = "Sports Card Market Intelligence | HobbyAlpha";
     const metaDescription = document.querySelector('meta[name="description"]');
     if (metaDescription) {
       metaDescription.setAttribute("content", "Live sports card market rankings powered by signal-driven analysis. Track demand, momentum, liquidity, and market structure across NBA, NFL, MLB, NHL, and Soccer.");

@@ -1,4 +1,4 @@
-# Hobby Alpha Design Guidelines
+# HobbyAlpha Design Guidelines
 
 ## Design Approach
 

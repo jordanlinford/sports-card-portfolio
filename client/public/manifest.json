@@ -1,8 +1,8 @@
 {
-  "id": "hobby-alpha",
-  "name": "Hobby Alpha",
-  "short_name": "Hobby Alpha",
-  "description": "AI-powered Buy, Hold, and Sell verdicts for sports card collectors. Real eBay sold comps, market intelligence, and beautiful digital portfolios.",
+  "id": "hobbyalpha",
+  "name": "HobbyAlpha",
+  "short_name": "HobbyAlpha",
+  "description": "AI-powered portfolio management for sports card collectors. Real market data, investment insights, and beautiful digital portfolios.",
   "lang": "en",
   "dir": "ltr",
   "start_url": "/",
@@ -87,7 +87,7 @@
       "sizes": "1408x768",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "Hobby Alpha Dashboard"
+      "label": "HobbyAlpha Dashboard"
     },
     {
       "src": "/screenshots/screenshot-narrow.png",

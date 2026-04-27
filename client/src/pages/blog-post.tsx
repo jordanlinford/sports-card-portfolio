@@ -246,7 +246,7 @@ export default function BlogPostPage() {
 
   useEffect(() => {
     if (post) {
-      document.title = `${post.title} | Hobby Alpha`;
+      document.title = `${post.title} | HobbyAlpha`;
       
       const metaDescription = document.querySelector('meta[name="description"]');
       if (metaDescription) {
@@ -286,7 +286,7 @@ export default function BlogPostPage() {
         ...(post.heroImageUrl && { "image": post.heroImageUrl }),
         "publisher": {
           "@type": "Organization",
-          "name": "Hobby Alpha"
+          "name": "HobbyAlpha"
         }
       };
       

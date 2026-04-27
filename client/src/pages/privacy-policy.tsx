@@ -3,9 +3,9 @@ import { ArrowLeft } from "lucide-react";
 
 export default function PrivacyPolicy() {
   const lastUpdated = "December 18, 2024";
-  const companyName = "Hobby Alpha";
+  const companyName = "HobbyAlpha";
   const websiteUrl = "hobbyalpha.com";
-  const contactEmail = "info@hobbyalpha.com";
+  const contactEmail = "hello@hobbyalpha.com";
 
   return (
     <div className="min-h-screen bg-background">

@@ -1,126 +1,58 @@
-# Hobby Alpha
-A web application for sports card collectors to manage, analyze, and grow their collections with AI-powered market intelligence. (Formerly "Sports Card Portfolio".)
+# HobbyAlpha
 
-## Run & Operate
-- **Run Dev Server**: `npm run dev`
-- **Build**: `npm run build`
-- **Typecheck**: `npm run typecheck`
-- **Codegen (Drizzle)**: `npm run generate:drizzle`
-- **DB Push (Drizzle)**: `npm run db:push`
-- **Env Vars**: `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `REPLIT_APP_CLIENT_ID`, `REPLIT_APP_CLIENT_SECRET`, `SESSION_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `GCS_BUCKET_NAME`, `GCS_PROJECT_ID`, `GCS_CLIENT_EMAIL`, `GCS_PRIVATE_KEY`, `GEMINI_API_KEY`, `SERPER_API_KEY`, `QA_LOGIN_TOKEN` (for QA login bypass and regression tests)
+## Overview
+HobbyAlpha is a web application for sports card collectors to manage, analyze, and grow their collections. It leverages AI for market intelligence, real-time eBay comparisons, and investment-focused tools. The platform offers portfolio management, personalized buy recommendations, and collection sharing, with advanced features for Pro users. The project aims to be a comprehensive solution for sports card investment and management, using AI for valuation and market trend analysis to enhance collection value and user insight.
 
-## Stack
-- **Frontend**: React 18, TypeScript, Wouter, shadcn/ui (Radix UI, Tailwind CSS), TanStack Query, React Hook Form, Zod
-- **Backend**: Express.js, TypeScript, Passport.js
-- **Database**: PostgreSQL with Drizzle ORM
-- **Runtime**: Node.js
-- **Build Tool**: Vite (client), esbuild (server)
-
-## Where things live
-- **Frontend Source**: `client/src/`
-- **Backend Source**: `server/src/`
-- **Database Schema**: `server/src/db/schema.ts`
-- **API Routes**: `server/src/routes/api/`
-- **Shared Utilities/Types**: `server/src/common/`
-- **UI Components**: `client/src/components/ui/`
-- **Styling**: `client/src/index.css`, `tailwind.config.cjs`
-
-## Architecture decisions
-- **AI-first Valuation**: Gemini 2.5 Flash is central for vision-based scanning, 1-of-1 valuation, and orchestrating complex market analysis via function calling tools.
-- **Dual-Provider Authentication**: Supports Google OAuth and Replit OpenID Connect with account merging for flexibility.
-- **Robust Market Scoring Engine V2**: Utilizes mathematically consistent continuous formulas, sample-size normalization, tiered volatility dampening, and advanced signal weighting for nuanced market verdicts. Includes specific handling for high-volume players and zero-data scenarios.
-- **Alpha Data Infrastructure**: Granular capture of price observations and interest events, feeding a nightly batch job and signal engine to generate daily buy/sell/hold signals.
-- **Realistic Sealed Product ROI**: EV calculations for sealed products incorporate real-world corrections like transaction friction, illiquidity haircuts, eBay fees, and median sold prices to provide actionable insights.
-- **Verdict Regression Testing**: Automated weekly tests ensure consistency of market verdicts over time, flagging significant changes for review.
-
-## Product
-- **Collection Management**: CRUD for cards and display cases, tagging, duplicate detection.
-- **Market Intelligence**: AI-powered value tracking, real-time eBay comparisons, historical data, price lookups, investment outlooks.
-- **AI Tools**: Card image scanning, 1-of-1 card valuation, Card Advisor for portfolio auditing.
-- **Subscription Model**: Free and Pro tiers with advanced features like batch scanning/analysis and portfolio-specific recommendations.
-- **Social Features**: Liking, commenting, sharing display cases, prestige system.
-- **Reporting & Alerts**: Price trend charts, graded value matrix, supply saturation alerts, watchlist changes.
-- **Market Leaderboards**: Ranked views of player markets (Best, Hype/Sell Candidates, Emerging Opportunities).
-- **Recommendation Engines**: Next Buys, Dual-Source Hidden Gems, Portfolio Alpha Benchmark.
-- **SEO**: Public landing pages with live player signals.
-- **Financial Tools**: Break Value Auditor, Sealed Product ROI Calculator.
-
-## User preferences
+## User Preferences
 Preferred communication style: Simple, everyday language.
 
-## Gotchas
-- **API Response Shape Changes**: Any change in the shape of a backend response field (e.g., string to object) requires an atomic audit and update of all frontend consumers in the same commit to prevent latent crashes.
-- **QA Login Token**: The `QA_LOGIN_TOKEN` is critical for automated testing agents and triggering regression tests. It must be provided as an `x-qa-token` header.
+## System Architecture
 
-## API Response Shape Changes
+### UI/UX Decisions
+The frontend uses React 18, TypeScript, and Wouter, built with `shadcn/ui` components based on Radix UI and Tailwind CSS. The design emphasizes card-focused layouts, clean aesthetics, DM Sans typography, and a dynamic HSL-based color system.
 
-When a backend response field changes shape (primitive ↔ structured type, field added/removed, nullability changed), every frontend consumer reading that field must be audited atomically with the change. Treating shape changes as local fixes ships latent crashes.
+### Technical Implementations
+The application features a full-stack TypeScript architecture. The frontend uses TanStack Query for server state, React Hook Form with Zod for forms, and React Context for theme management. The Express.js backend handles dual-provider authentication (Google OAuth, Replit OpenID Connect) with PostgreSQL-backed session management. Google Cloud Storage (via Replit Object Storage) handles image uploads.
+Key features include:
+- CRUD operations for cards and display cases.
+- Stripe-based subscription model (Free/Pro).
+- AI-powered value tracking, investment outlooks, and market intelligence.
+- Gemini 2.5 Flash vision-based card image scanner for quick analysis and 1-of-1 card valuation.
+- Advanced AI systems like Market Scoring Engine V2 for market phase classification and the Card Advisor (Pro-only) using Gemini 2.5 Flash for portfolio auditing.
+- An Alpha Data Infrastructure supports a nightly Alpha Batch Job and Signal Engine, generating buy/sell/hold signals and a daily Alpha Feed V2 briefing.
+- Features like the Hard-to-Comp Evidence Panel, Market Leaderboard, Relative Percentile Ranking, Signal Agreement & Conviction, and Trade Targets provide detailed market insights and actionable recommendations.
+- A Holder/Buyer Decision UI simplifies complex analysis into clear actions.
+- Prospect Detection identifies and provides specific insights for un-debuted players.
+- Recommendation Engines include Next Buys, Dual-Source Hidden Gems, and Portfolio Alpha Benchmark.
+- A Sealed Product ROI Calculator provides AI-powered expected value analysis for hobby boxes.
 
-Audit pattern:
+### System Design Choices
+- **Database**: PostgreSQL with Drizzle ORM.
+- **API**: RESTful API.
+- **Build**: Vite for client, esbuild for server.
+- **Session Management**: Secure, HttpOnly cookies with PostgreSQL-backed sessions.
+- **AI Integration**: Gemini 2.5 Flash as the primary AI engine for market analysis and pricing.
+- **Caching**: Extensive caching for eBay comps, player news, and Gemini analysis results.
+- **Worker Architecture**: Dedicated-IP VPS for eBay scraper.
+- **Scheduled Jobs**: Weekly auto-refresh for Hidden Gems, nightly player outlook refresh, and weekly Verdict Regression Test.
 
-1. Grep client/src/ for the field name combined with string methods (.replace, .toUpperCase, .split, .toFixed), array methods (.map, .filter where field is assumed iterable), map lookups (MAP[field]), and direct JSX renders ({field})
+## External Dependencies
 
-2. Classify each hit: typed utility function (safe) | API consumer (must audit) | newly-added component (highest risk - test specifically)
+### Third-Party Services
+- **Replit Services**: Replit Auth (OpenID Connect), Replit Object Storage (Google Cloud Storage).
+- **Stripe**: Payment processing.
+- **OpenAI GPT & Serper API**: AI lookups and real-time news.
+- **Yahoo Finance**: S&P 500 market data.
+- **CoinGecko**: Bitcoin market data.
 
-3. Fix all API consumers in the same commit as the shape change. TSC clean before ship.
+### Frontend Libraries
+- **UI & Components**: Radix UI, Uppy, date-fns, Lucide React, shadcn/ui.
+- **Form & Validation**: React Hook Form, Zod, @hookform/resolvers.
+- **Styling**: Tailwind CSS, class-variance-authority, clsx, tailwind-merge.
 
-Today's example: verdict shape changed from string to {verdict, modifier, ...} object. Three components added by parallel work assumed the old string shape. Production crashed site-wide on every page render until rolled back and patched.
-
-## Pointers
-- **Drizzle ORM Docs**: _Populate as you build_
-- **Radix UI Docs**: _Populate as you build_
-- **Tailwind CSS Docs**: _Populate as you build_
-- **React Hook Form Docs**: _Populate as you build_
-- **Zod Docs**: _Populate as you build_
-- **Passport.js Docs**: _Populate as you build_
-- **Gemini API Docs**: _Populate as you build_
-## Shipping Pages Without Backend
-Before merging any commit that adds a new Route in App.tsx or new client-side navigation entry, verify the corresponding server route exists. Quick smoke check:
-
-1. Grep ALL server files (not just routes.ts): grep -rn your-route-path server/
-2. Confirm the route is actually wired into the Express app (registered, not just defined)
-3. Hit the endpoint with curl to confirm it responds (200 or expected error, not 404)
-
-If the route is missing or unwired, either implement it in the same commit or dont ship the page yet.
-
-Todays example: client/src/pages/track-record.tsx initially appeared dead because routes were grepped only in server/routes.ts. The actual registration was in server/index.ts. Routes can be registered in multiple files - check all of server/.
-
-## Destructive Audit Findings Need Higher Verification Bar
-When an audit finding leads to a destructive action (delete code, revert commits, drop data, remove pages), the verification bar is higher than for additive actions. Wrong feature-is-broken investigation is recoverable. Wrong feature-is-dead-delete-it decision often is not.
-
-Before destructive action based on an audit finding:
-1. Verify the finding from at least two angles (different greps, runtime check, log inspection)
-2. Surface the verification evidence, not just the conclusion
-3. Get explicit human approval citing the verified evidence
-
-Todays example: audit concluded /track-record page was dead because routes were not found in server/routes.ts. The route exists in server/index.ts. The agent caught its own false finding before executing the deletion that had been approved based on it.
-
-## Replit Workspace Reset Risk
-
-Replit's workspace can reset to its own deployment SHA, discarding agent-authored commits that haven't been pushed to GitHub origin. This is not a push failure - it's a workspace state mismatch.
-
-**Required workflow for any commit:**
-
-1. `git commit -m "..."`
-2. `git push origin main` IMMEDIATELY (not "later" or "after architect review")
-3. `git log --oneline origin/main | head -3` to verify the commit reached the remote
-4. ONLY THEN proceed to next work item or Replit Publish
-
-The "Publish your App" action may trigger the workspace reset that discards unpushed commits. Push before publish, every time.
-
-**Today's example (May 5 2026):** 8+ work items committed by the Replit Agent were lost when Replit's infrastructure reset the workspace to its own deployment SHA. Bug A, all framework hardening pieces, leaderboard parity, Action 1, Action 3 - all confirmed in reflog but not in origin/main. Recovery via cherry-pick from reflog SHAs is possible because reflog persists 90 days.
-
-## Standing Rules
-
-- Production failures always in scope
-- Source-level fixes over band-aids
-- Calibration before locking thresholds
-- Architect review on every substantive change
-- Evidence over assertion - paste output, never accept "approved" without verification
-- Row-count verification on data-dependent systems
-- Fail-test-first when fixing bugs
-- Measurement systems need known-bad ground truth verification
-- HTTP-layer integration tests required for endpoints with middleware
-- API response shape changes require atomic consumer-wide audit
-- Shipping Pages Without Backend: grep ALL server files, confirm wired, curl-verify
-- Destructive Audit Findings Need Higher Verification Bar: two-angle verification + explicit human approval
+### Backend Libraries
+- **Database & ORM**: `pg`, `drizzle-orm`, `drizzle-zod`.
+- **Authentication & Session**: `passport`, `openid-client`, `express-session`, `connect-pg-simple`.
+- **Cloud Integration**: `@google-cloud/storage`.
+- **Image Processing**: `Sharp`.
+- **Utilities**: `memoizee`.

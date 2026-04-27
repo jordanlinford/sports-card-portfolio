@@ -1,82 +1,31 @@
 import nodemailer from "nodemailer";
 
-type EmailProfile = {
-  provider: "gmail" | "zoho";
-  user: string;
-  pass: string;
-  host: string;
-  port: number;
-};
-
-function parsePort(raw: string | undefined, fallback: number): number {
-  if (!raw) return fallback;
-  const parsed = parseInt(raw, 10);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function resolveEmailProfile(): EmailProfile | null {
-  const gmailUser = process.env.GMAIL_EMAIL;
-  const gmailPass = process.env.GMAIL_APP_PASSWORD;
-  if (gmailUser && gmailPass) {
-    return {
-      provider: "gmail",
-      user: gmailUser,
-      pass: gmailPass,
-      host: process.env.GMAIL_SMTP_HOST || "smtp.gmail.com",
-      port: parsePort(process.env.GMAIL_SMTP_PORT, 465),
-    };
-  }
-
-  const zohoUser = process.env.ZOHO_EMAIL;
-  const zohoPass = process.env.ZOHO_APP_PASSWORD;
-  if (zohoUser && zohoPass) {
-    return {
-      provider: "zoho",
-      user: zohoUser,
-      pass: zohoPass,
-      host: process.env.ZOHO_SMTP_HOST || "smtp.zoho.com",
-      port: parsePort(process.env.ZOHO_SMTP_PORT, 465),
-    };
-  }
-
-  return null;
-}
-
-const emailProfile = resolveEmailProfile();
-
-function isEmailConfigured(): boolean {
-  return emailProfile !== null;
-}
-
-function fromHeader(): string {
-  return `"Hobby Alpha" <${emailProfile?.user ?? ""}>`;
-}
-
 const transporter = nodemailer.createTransport({
-  host: emailProfile?.host ?? "smtp.gmail.com",
-  port: emailProfile?.port ?? 465,
+  host: process.env.ZOHO_SMTP_HOST || "smtp.zoho.com",
+  port: 465,
   secure: true,
-  auth: emailProfile
-    ? { user: emailProfile.user, pass: emailProfile.pass }
-    : undefined,
+  auth: {
+    user: process.env.ZOHO_EMAIL,
+    pass: process.env.ZOHO_APP_PASSWORD,
+  },
 });
 
 export async function sendWelcomeEmail(userEmail: string, userName: string): Promise<void> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping welcome email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping welcome email");
     return;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
-      subject: "Welcome to Hobby Alpha!",
+      subject: "Welcome to HobbyAlpha!",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #f59e0b;">Welcome to Hobby Alpha!</h1>
+          <h1 style="color: #f59e0b;">Welcome to HobbyAlpha!</h1>
           <p>Hi ${userName || "Collector"},</p>
-          <p>Thank you for joining Hobby Alpha! We're excited to help you track and grow your collection.</p>
+          <p>Thank you for joining HobbyAlpha! We're excited to help you track and grow your collection.</p>
           <p>Here's what you can do:</p>
           <ul>
             <li>Create digital display cases to organize your cards</li>
@@ -85,7 +34,7 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
             <li>Get AI-powered price lookups and insights</li>
           </ul>
           <p>Get started by uploading your first card!</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -100,7 +49,7 @@ export async function sendNewSignupNotification(
   newUserEmail: string | null | undefined,
   authMethod: "google" | "replit"
 ): Promise<void> {
-  if (!isEmailConfigured()) return;
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) return;
 
   const displayName = newUserName || "Unknown";
   const displayEmail = newUserEmail || "No email";
@@ -109,8 +58,8 @@ export async function sendNewSignupNotification(
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
-      to: "info@hobbyalpha.com",
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
+      to: "hello@hobbyalpha.com",
       subject: `New signup: ${displayName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
@@ -133,21 +82,21 @@ export async function sendPaymentConfirmationEmail(
   userEmail: string,
   userName: string
 ): Promise<void> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping payment confirmation email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping payment confirmation email");
     return;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
-      subject: "Welcome to Hobby Alpha Pro!",
+      subject: "Welcome to HobbyAlpha Pro!",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h1 style="color: #f59e0b;">You're Now a Pro Member!</h1>
           <p>Hi ${userName || "Collector"},</p>
-          <p>Thank you for upgrading to Hobby Alpha Pro! Your subscription is now active.</p>
+          <p>Thank you for upgrading to HobbyAlpha Pro! Your subscription is now active.</p>
           <p>You now have access to:</p>
           <ul>
             <li>Unlimited display cases</li>
@@ -157,7 +106,7 @@ export async function sendPaymentConfirmationEmail(
             <li>Priority support</li>
           </ul>
           <p>Enjoy your Pro features!</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -175,8 +124,8 @@ export async function sendPriceAlertEmail(
   threshold: number,
   currentPrice: number
 ): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping price alert email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping price alert email");
     return true;
   }
 
@@ -185,7 +134,7 @@ export async function sendPriceAlertEmail(
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: `Price Alert: ${cardTitle} has ${direction} $${threshold}`,
       html: `
@@ -198,8 +147,8 @@ export async function sendPriceAlertEmail(
             <p style="margin: 0 0 10px 0;"><strong>Your Alert:</strong> Notify when price goes ${alertType} $${threshold.toFixed(2)}</p>
             <p style="margin: 0;"><strong>Current Price:</strong> $${currentPrice.toFixed(2)} (${emoji})</p>
           </div>
-          <p>Log in to Hobby Alpha to view your card and take action.</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p>Log in to HobbyAlpha to view your card and take action.</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -231,8 +180,8 @@ export async function sendWeeklyDigestEmail(
   userName: string,
   data: DigestData
 ): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping weekly digest email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping weekly digest email");
     return true;
   }
 
@@ -252,7 +201,7 @@ export async function sendWeeklyDigestEmail(
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: "Your Weekly Collection Digest",
       html: `
@@ -294,8 +243,8 @@ export async function sendWeeklyDigestEmail(
             </table>
           ` : ""}
 
-          <p style="margin-top: 30px;">Log in to Hobby Alpha to explore your full collection.</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p style="margin-top: 30px;">Log in to HobbyAlpha to explore your full collection.</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
           
           <p style="margin-top: 30px; font-size: 12px; color: #9ca3af;">
             To unsubscribe from weekly digests, update your notification preferences in your account settings.
@@ -318,14 +267,14 @@ export async function sendSplitJoinedEmail(
   userName: string,
   splitInfo: { title: string; sport: string; brand: string; year: string; formatType: string; seatPrice: number }
 ): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping split joined email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping split joined email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: `You've joined the ${splitInfo.title} box break!`,
       html: `
@@ -339,7 +288,7 @@ export async function sendSplitJoinedEmail(
             <p style="margin: 0;"><strong>Your Cost:</strong> $${(splitInfo.seatPrice / 100).toFixed(2)}</p>
           </div>
           <p>We'll notify you when the payment window opens. Make sure to set your team preferences before then!</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -356,14 +305,14 @@ export async function sendSplitPaymentOpenEmail(
   userName: string,
   splitInfo: { title: string; sport: string; seatPrice: number; deadline: Date }
 ): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping payment open email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping payment open email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: `Payment Open: ${splitInfo.title} - Act Now!`,
       html: `
@@ -379,8 +328,8 @@ export async function sendSplitPaymentOpenEmail(
             <p style="margin: 0 0 10px 0;"><strong>Amount Due:</strong> $${(splitInfo.seatPrice / 100).toFixed(2)}</p>
             <p style="margin: 0;"><strong>Deadline:</strong> ${splitInfo.deadline.toLocaleString()}</p>
           </div>
-          <p>Log in to Hobby Alpha to complete your payment and set your preferences.</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p>Log in to HobbyAlpha to complete your payment and set your preferences.</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -399,14 +348,14 @@ export async function sendSplitAssignmentEmail(
   assignment: string,
   priorityNumber: number
 ): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping assignment email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping assignment email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: `Your Assignment: ${assignment} - ${splitInfo.title}`,
       html: `
@@ -420,7 +369,7 @@ export async function sendSplitAssignmentEmail(
             <p style="margin: 10px 0 0 0; font-size: 14px; color: #065f46;">Priority #${priorityNumber}</p>
           </div>
           <p>We'll notify you when the box is in hand and ready to break. Stay tuned!</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -439,14 +388,14 @@ export async function sendBreakCompleteEmail(
   assignment: string,
   youtubeUrl: string
 ): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping break complete email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping break complete email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: `Break Complete! Watch Your ${assignment} Hits - ${splitInfo.title}`,
       html: `
@@ -461,7 +410,7 @@ export async function sendBreakCompleteEmail(
             </a>
           </div>
           <p>Your cards will be shipped soon. We'll send tracking info when they're on the way!</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -480,14 +429,14 @@ export async function sendSplitShippedEmail(
   assignment: string,
   trackingInfo?: string
 ): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping shipped email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping shipped email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: `Your ${assignment} Cards Are On The Way! - ${splitInfo.title}`,
       html: `
@@ -500,7 +449,7 @@ export async function sendSplitShippedEmail(
             ${trackingInfo ? `<p style="margin: 0;"><strong>Tracking:</strong> ${trackingInfo}</p>` : '<p style="margin: 0; color: #6b7280;">Tracking info coming soon</p>'}
           </div>
           <p>Once you receive your cards, don't forget to add them to your collection!</p>
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -513,8 +462,8 @@ export async function sendSplitShippedEmail(
 }
 
 export async function sendWinBackEmail(email: string, userName: string, watchlistMoves: string[]): Promise<void> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping win-back email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping win-back email");
     return;
   }
 
@@ -528,11 +477,11 @@ export async function sendWinBackEmail(email: string, userName: string, watchlis
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: email,
       subject: "Your watchlist moved while you were away",
-      text: `Hi ${userName || "there"},\n\nIt's been a week since you left, and here's what happened with players you were tracking:\n\n${movesList}\n\nYour data is still here. Come back and see what you missed:\nhttps://sportscardportfolio.com/\n\nMiss you,\nHobby Alpha`,
-      html: `<p>Hi ${userName || "there"},</p><p>It's been a week since you left, and here's what happened with players you were tracking:</p><ul>${movesHtml}</ul><p><a href="https://sportscardportfolio.com/">Come back and see what you missed</a></p><p>Miss you,<br>Hobby Alpha</p>`,
+      text: `Hi ${userName || "there"},\n\nIt's been a week since you left, and here's what happened with players you were tracking:\n\n${movesList}\n\nYour data is still here. Come back and see what you missed:\nhttps://hobbyalpha.com/\n\nMiss you,\nHobbyAlpha`,
+      html: `<p>Hi ${userName || "there"},</p><p>It's been a week since you left, and here's what happened with players you were tracking:</p><ul>${movesHtml}</ul><p><a href="https://hobbyalpha.com/">Come back and see what you missed</a></p><p>Miss you,<br>HobbyAlpha</p>`,
     });
     console.log(`Win-back email sent to ${email}`);
   } catch (error) {
@@ -541,18 +490,18 @@ export async function sendWinBackEmail(email: string, userName: string, watchlis
 }
 
 export async function sendReferralInviteEmail(toEmail: string, fromName: string, code: string): Promise<void> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping referral invite email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping referral invite email");
     return;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: toEmail,
-      subject: `${fromName} invited you to Hobby Alpha`,
-      text: `${fromName} thinks you'd love Hobby Alpha — AI-powered market intelligence for sports card collectors.\n\nSign up with their code to get a free month of Pro: ${code}\n\nhttps://sportscardportfolio.com/?ref=${code}`,
-      html: `<p>${fromName} thinks you'd love <strong>Hobby Alpha</strong> — AI-powered market intelligence for sports card collectors.</p><p>Sign up with their code to get a free month of Pro: <strong>${code}</strong></p><p><a href="https://sportscardportfolio.com/?ref=${code}">Get started</a></p>`,
+      subject: `${fromName} invited you to HobbyAlpha`,
+      text: `${fromName} thinks you'd love HobbyAlpha — AI-powered market intelligence for sports card collectors.\n\nSign up with their code to get a free month of Pro: ${code}\n\nhttps://hobbyalpha.com/?ref=${code}`,
+      html: `<p>${fromName} thinks you'd love <strong>HobbyAlpha</strong> — AI-powered market intelligence for sports card collectors.</p><p>Sign up with their code to get a free month of Pro: <strong>${code}</strong></p><p><a href="https://hobbyalpha.com/?ref=${code}">Get started</a></p>`,
     });
     console.log(`Referral invite email sent to ${toEmail}`);
   } catch (error) {
@@ -565,14 +514,14 @@ export async function sendNewParticipantJoinedEmail(
   userName: string,
   splitInfo: { title: string; currentCount: number; totalCount: number }
 ): Promise<boolean> {
-  if (!isEmailConfigured()) {
-    console.log("SMTP email not configured, skipping new participant email");
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping new participant email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: fromHeader(),
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: `${splitInfo.title}: ${splitInfo.currentCount}/${splitInfo.totalCount} spots filled!`,
       html: `
@@ -588,7 +537,7 @@ export async function sendNewParticipantJoinedEmail(
             ? '<p style="color: #059669; font-weight: bold;">The split is now full! Payment window will open soon.</p>'
             : `<p>Only ${splitInfo.totalCount - splitInfo.currentCount} more needed to fill this break!</p>`
           }
-          <p style="margin-top: 30px;">Happy collecting,<br>The Hobby Alpha Team</p>
+          <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
         </div>
       `,
     });
@@ -596,6 +545,61 @@ export async function sendNewParticipantJoinedEmail(
     return true;
   } catch (error) {
     console.error("Failed to send new participant email:", error);
+    return false;
+  }
+}
+
+/**
+ * One-time rename announcement email.
+ *
+ * Sent to existing users to inform them that "Sports Card Portfolio" is now
+ * "HobbyAlpha". No action is required from the user — same login, same data.
+ *
+ * Idempotency is enforced by the caller (the admin endpoint records each
+ * recipient in a JSON ledger so re-running the broadcast skips already-sent
+ * addresses).
+ */
+export async function sendRebrandAnnouncementEmail(
+  userEmail: string,
+  userName?: string | null,
+): Promise<boolean> {
+  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+    console.log("Zoho email not configured, skipping rebrand announcement email");
+    return false;
+  }
+
+  const newDomain = process.env.CUSTOM_DOMAIN || "hobbyalpha.com";
+  const greeting = userName ? `Hi ${userName},` : "Hi there,";
+
+  try {
+    await transporter.sendMail({
+      from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
+      to: userEmail,
+      subject: "Sports Card Portfolio is now HobbyAlpha",
+      text:
+        `${greeting}\n\n` +
+        `Quick heads up — Sports Card Portfolio is now HobbyAlpha.\n\n` +
+        `Same app. Same login. Same data. Sharper name.\n\n` +
+        `Visit your collection at https://${newDomain}/\n\n` +
+        `(The old sportscardportfolio.io links still work — they redirect to the new home.)\n\n` +
+        `Thanks for being here,\nThe HobbyAlpha Team`,
+      html:
+        `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">` +
+        `<h1 style="color: #f59e0b;">We have a new name: HobbyAlpha</h1>` +
+        `<p>${greeting}</p>` +
+        `<p>Quick heads up — <strong>Sports Card Portfolio is now HobbyAlpha</strong>.</p>` +
+        `<p>Same app. Same login. Same data. Sharper name.</p>` +
+        `<p style="margin: 24px 0;">` +
+        `<a href="https://${newDomain}/" style="background: #f59e0b; color: #fff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600;">Open HobbyAlpha</a>` +
+        `</p>` +
+        `<p style="color: #6b7280; font-size: 13px;">Your old <code>sportscardportfolio.io</code> links still work — they automatically redirect to the matching page on HobbyAlpha.</p>` +
+        `<p style="margin-top: 30px;">Thanks for being here,<br>The HobbyAlpha Team</p>` +
+        `</div>`,
+    });
+    console.log(`Rebrand announcement email sent to ${userEmail}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to send rebrand announcement email to ${userEmail}:`, error);
     return false;
   }
 }

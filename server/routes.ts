@@ -52,7 +52,10 @@ import { prestigeService } from "./prestigeService";
 import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./cardOutlookService";
 import { 
   sendPaymentConfirmationEmail,
+  sendRebrandAnnouncementEmail,
 } from "./email";
+import * as fs from "fs";
+import * as path from "path";
 import { 
   buildPortfolioProfile, 
   generateRiskSignals, 
@@ -674,7 +677,7 @@ Sitemap: ${origin}/sitemap.xml
         "dateModified": post.updatedAt,
         "mainEntityOfPage": { "@type": "WebPage", "@id": url },
         ...(imageUrl && { "image": imageUrl }),
-        "publisher": { "@type": "Organization", "name": "Hobby Alpha" }
+        "publisher": { "@type": "Organization", "name": "HobbyAlpha" }
       });
 
       // Serve full HTML with actual content (no redirect) for crawlers
@@ -683,7 +686,7 @@ Sitemap: ${origin}/sitemap.xml
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} | Hobby Alpha</title>
+  <title>${title} | HobbyAlpha</title>
   <meta name="description" content="${description}" />
   <meta name="robots" content="index, follow" />
   <meta property="og:title" content="${title}" />
@@ -720,7 +723,7 @@ Sitemap: ${origin}/sitemap.xml
       ${contentHtml}
     </div>
     <footer>
-      <p><a href="${origin}/blog">Back to Blog</a> | <a href="${origin}">Hobby Alpha</a></p>
+      <p><a href="${origin}/blog">Back to Blog</a> | <a href="${origin}">HobbyAlpha</a></p>
     </footer>
   </article>
 </body>
@@ -744,7 +747,7 @@ Sitemap: ${origin}/sitemap.xml
     try {
       const origin = getOriginUrl(req);
       const url = `${origin}/blog`;
-      const title = "Blog | Hobby Alpha";
+      const title = "Blog | HobbyAlpha";
       const description = "News, updates, and insights about sports card collecting and investing. Expert tips on building and growing your card portfolio.";
       
       // Get all published blog posts for the listing
@@ -796,14 +799,14 @@ Sitemap: ${origin}/sitemap.xml
 </head>
 <body>
   <header>
-    <h1>Hobby Alpha Blog</h1>
+    <h1>HobbyAlpha Blog</h1>
     <p>${description}</p>
   </header>
   <main>
     ${posts.length > 0 ? postsHtml : '<p>No blog posts yet. Check back soon!</p>'}
   </main>
   <footer>
-    <p><a href="${origin}">Hobby Alpha</a> - AI-powered portfolio management for sports card collectors.</p>
+    <p><a href="${origin}">HobbyAlpha</a> - AI-powered portfolio management for sports card collectors.</p>
   </footer>
 </body>
 </html>`;
@@ -903,10 +906,10 @@ Sitemap: ${origin}/sitemap.xml
       
       // Build compelling title
       const title = displayCase.name;
-      const fullTitle = `${title} | ${cardCount} Cards | Hobby Alpha`;
+      const fullTitle = `${title} | ${cardCount} Cards | HobbyAlpha`;
       
       // Alt text for image
-      const imageAlt = `${displayCase.name} - Card collection on Hobby Alpha`;
+      const imageAlt = `${displayCase.name} - Card collection on HobbyAlpha`;
 
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -925,7 +928,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="${imageAlt}">
-  <meta property="og:site_name" content="Hobby Alpha">
+  <meta property="og:site_name" content="HobbyAlpha">
   <meta property="og:locale" content="en_US">
   
   <!-- Twitter -->
@@ -1477,7 +1480,7 @@ Sitemap: ${origin}/sitemap.xml
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} | Hobby Alpha</title>
+  <title>${title} | HobbyAlpha</title>
   <meta name="description" content="${description}">
   
   <!-- Open Graph -->
@@ -1488,7 +1491,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:url" content="${pageUrl}">
-  <meta property="og:site_name" content="Hobby Alpha">
+  <meta property="og:site_name" content="HobbyAlpha">
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -1497,7 +1500,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta name="twitter:image" content="${imageUrl}">
 </head>
 <body>
-  <p>Redirecting to Hobby Alpha...</p>
+  <p>Redirecting to HobbyAlpha...</p>
 </body>
 </html>`;
         res.set("Content-Type", "text/html");
@@ -1562,7 +1565,7 @@ Sitemap: ${origin}/sitemap.xml
       
       const pageData = getPageShareData(sanitizedSlug);
       
-      const title = escapeHtml(`${pageData.title} | Hobby Alpha`);
+      const title = escapeHtml(`${pageData.title} | HobbyAlpha`);
       const description = escapeHtml(pageData.description);
       const imageUrl = `${baseUrl}/api/og/page/${sanitizedSlug}.png`;
       const pageUrl = `${baseUrl}/share/${sanitizedSlug}`;
@@ -1595,7 +1598,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:url" content="${pageUrl}">
-  <meta property="og:site_name" content="Hobby Alpha">
+  <meta property="og:site_name" content="HobbyAlpha">
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -1604,7 +1607,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta name="twitter:image" content="${imageUrl}">
 </head>
 <body>
-  <p>Redirecting to Hobby Alpha...</p>
+  <p>Redirecting to HobbyAlpha...</p>
 </body>
 </html>`;
         res.set("Content-Type", "text/html");
@@ -6879,6 +6882,105 @@ RULES:
     }
   });
 
+  // Admin: One-time rebrand announcement email broadcast.
+  //
+  // Sends the "Sports Card Portfolio is now HobbyAlpha" email to every existing
+  // user with a real email address on file. Uses a JSON ledger on disk to track
+  // which addresses have already been emailed so re-running the endpoint is
+  // safe and won't double-send. Supports a dryRun flag and a per-call limit so
+  // operators can ramp the broadcast in batches and verify before going wide.
+  app.post("/api/admin/rebrand-announcement", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const dryRun = req.body?.dryRun === true || req.query?.dryRun === "true";
+      const rawLimit = Number(req.body?.limit ?? req.query?.limit ?? 100);
+      const limit = Math.max(1, Math.min(1000, Number.isFinite(rawLimit) ? rawLimit : 100));
+
+      const ledgerPath = path.resolve(
+        process.env.REBRAND_ANNOUNCEMENT_LEDGER ||
+          ".local/rebrand-announcement-ledger.json",
+      );
+
+      let ledger: { sentEmails: string[]; lastRunAt?: string } = { sentEmails: [] };
+      try {
+        const raw = fs.readFileSync(ledgerPath, "utf8");
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.sentEmails)) {
+          ledger = { sentEmails: parsed.sentEmails, lastRunAt: parsed.lastRunAt };
+        }
+      } catch {
+        // ledger doesn't exist yet — first run
+      }
+      const alreadySent = new Set(ledger.sentEmails.map((e) => e.toLowerCase()));
+
+      const allUsers = await storage.getAllUsers();
+      const candidates = allUsers
+        .filter((u) => !!u.email && u.email.includes("@"))
+        .filter((u) => !alreadySent.has(u.email!.toLowerCase()));
+
+      const batch = candidates.slice(0, limit);
+
+      if (dryRun) {
+        return res.json({
+          dryRun: true,
+          alreadySentCount: alreadySent.size,
+          eligibleCount: candidates.length,
+          wouldSendCount: batch.length,
+          sampleRecipients: batch.slice(0, 5).map((u) => u.email),
+        });
+      }
+
+      try {
+        fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
+      } catch {
+        // ignore mkdir errors — fall through and let the write fail loudly
+      }
+
+      let sentCount = 0;
+      let failedCount = 0;
+      for (const user of batch) {
+        const email = user.email!;
+        const name =
+          user.firstName ||
+          (user.handle ? `@${user.handle}` : null);
+        const ok = await sendRebrandAnnouncementEmail(email, name);
+        if (ok) {
+          alreadySent.add(email.toLowerCase());
+          sentCount += 1;
+        } else {
+          failedCount += 1;
+        }
+        // Persist after every successful send so a crash doesn't double-send.
+        try {
+          fs.writeFileSync(
+            ledgerPath,
+            JSON.stringify(
+              {
+                sentEmails: Array.from(alreadySent),
+                lastRunAt: new Date().toISOString(),
+              },
+              null,
+              2,
+            ),
+          );
+        } catch (writeErr) {
+          console.error("Failed to persist rebrand announcement ledger:", writeErr);
+        }
+      }
+
+      res.json({
+        dryRun: false,
+        alreadySentCount: alreadySent.size,
+        eligibleCount: candidates.length,
+        sentCount,
+        failedCount,
+        remaining: Math.max(0, candidates.length - batch.length),
+      });
+    } catch (error) {
+      console.error("Error broadcasting rebrand announcement:", error);
+      res.status(500).json({ message: "Failed to broadcast rebrand announcement" });
+    }
+  });
+
   // Admin: Delete display case
   app.delete("/api/admin/display-cases/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
@@ -8232,8 +8334,8 @@ RULES:
         "description": description,
         "datePublished": "2026-03-01T00:00:00Z",
         "dateModified": new Date().toISOString(),
-        "author": { "@type": "Organization", "name": "Hobby Alpha", "url": rawOrigin },
-        "publisher": { "@type": "Organization", "name": "Hobby Alpha", "url": rawOrigin },
+        "author": { "@type": "Organization", "name": "HobbyAlpha", "url": rawOrigin },
+        "publisher": { "@type": "Organization", "name": "HobbyAlpha", "url": rawOrigin },
         "mainEntityOfPage": { "@type": "WebPage", "@id": `${rawOrigin}/market/topps-takeover` },
       });
 
@@ -8242,14 +8344,14 @@ RULES:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(title)} | Hobby Alpha</title>
+  <title>${escapeHtml(title)} | HobbyAlpha</title>
   <meta name="description" content="${escapeHtml(description)}" />
   <meta name="robots" content="index, follow" />
   <meta property="og:title" content="${escapeHtml(title)}" />
   <meta property="og:description" content="${escapeHtml(description)}" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${url}" />
-  <meta property="og:site_name" content="Hobby Alpha" />
+  <meta property="og:site_name" content="HobbyAlpha" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(title)}" />
   <meta name="twitter:description" content="${escapeHtml(description)}" />
@@ -8289,7 +8391,7 @@ RULES:
       ${faqItems.map(f => `<h3>${escapeHtml(f.q)}</h3><p>${escapeHtml(f.a)}</p>`).join("\n      ")}
     </div>
     <footer>
-      <p><a href="${origin}/player-outlook">Player Outlooks</a> | <a href="${origin}/hidden-gems">Hidden Gems</a> | <a href="${origin}">Hobby Alpha</a></p>
+      <p><a href="${origin}/player-outlook">Player Outlooks</a> | <a href="${origin}/hidden-gems">Hidden Gems</a> | <a href="${origin}">HobbyAlpha</a></p>
     </footer>
   </article>
 </body>
@@ -8325,7 +8427,7 @@ RULES:
       const currentYear = new Date().getFullYear();
       const sportLabel = (outlook.sport || "").charAt(0).toUpperCase() + (outlook.sport || "").slice(1);
       const title = outlook.seoTitle ||
-        `${outlook.playerName} ${currentYear} Card Value, Prices & Buy/Sell Verdict | Hobby Alpha`;
+        `${outlook.playerName} ${currentYear} Card Value, Prices & Buy/Sell Verdict | HobbyAlpha`;
       const description = outlook.seoDescription ||
         `Should you buy or sell ${outlook.playerName} ${sportLabel.toLowerCase()} cards in ${currentYear}? AI-powered Buy/Hold/Sell verdict, real eBay sold comps, market temperature, and grading recommendations.`;
 
@@ -8384,7 +8486,7 @@ RULES:
           },
           "author": {
             "@type": "Organization",
-            "name": "Hobby Alpha",
+            "name": "HobbyAlpha",
           },
           "reviewBody": `${verdictLabel} - ${description}`,
         };
@@ -8401,12 +8503,12 @@ RULES:
           "description": description,
           "author": {
             "@type": "Organization",
-            "name": "Hobby Alpha",
+            "name": "HobbyAlpha",
             "url": origin,
           },
           "publisher": {
             "@type": "Organization",
-            "name": "Hobby Alpha",
+            "name": "HobbyAlpha",
             "url": origin,
             "logo": {
               "@type": "ImageObject",
@@ -8428,7 +8530,7 @@ RULES:
           "url": url,
           "isPartOf": {
             "@type": "WebSite",
-            "name": "Hobby Alpha",
+            "name": "HobbyAlpha",
             "url": origin,
           },
           "primaryImageOfPage": {
@@ -8471,7 +8573,7 @@ RULES:
   <meta property="og:description" content="${safeDescription}">
   <meta property="og:type" content="article">
   <meta property="og:url" content="${safeUrl}">
-  <meta property="og:site_name" content="Hobby Alpha">
+  <meta property="og:site_name" content="HobbyAlpha">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${safeTitle}">
   <meta name="twitter:description" content="${safeDescription}">
@@ -8497,7 +8599,7 @@ RULES:
       </section>` : ''}
       <section>
         <h2>Get the Full Analysis</h2>
-        <p>Sign up at <a href="${safeOrigin}">Hobby Alpha</a> for real-time market intelligence, price tracking, and personalized investment recommendations.</p>
+        <p>Sign up at <a href="${safeOrigin}">HobbyAlpha</a> for real-time market intelligence, price tracking, and personalized investment recommendations.</p>
       </section>
     </article>
   </main>

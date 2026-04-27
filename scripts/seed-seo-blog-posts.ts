@@ -37,7 +37,7 @@ const posts: SeedPost[] = [
 <h2>2. Look up real eBay <em>sold</em> comps — never asking prices</h2>
 <p>This is where 90% of beginners go wrong. You search the card on eBay, see listings at $500, and think you have $500. Those are <em>asking</em> prices. They mean nothing.</p>
 <p>What matters: <strong>recent sold prices</strong>. On eBay, filter by "Sold Items" and "Completed Items." Ignore the highest and lowest outliers. Look at the median of the last 10–20 sales. That is what your card is actually worth on the open market today.</p>
-<p>If you don't want to do this manually, our <a href="https://sportscardportfolio.io">Sports Card Portfolio</a> tool pulls real eBay sold comps for any card automatically and shows you the median, the high, the low, and the trend.</p>
+<p>If you don't want to do this manually, our <a href="https://hobbyalpha.com">HobbyAlpha</a> tool pulls real eBay sold comps for any card automatically and shows you the median, the high, the low, and the trend.</p>
 
 <h2>3. Check the condition honestly</h2>
 <p>Condition matters more than collectors realize. A "raw" (ungraded) card in PSA 10 condition is worth a fraction of what a graded PSA 10 is worth. The same card in beat-up condition is often worth 10–20% of mint.</p>
@@ -52,11 +52,11 @@ const posts: SeedPost[] = [
 
 <h2>4. Should you grade it? Run the math.</h2>
 <p>Grading costs $17–$75+ per card depending on tier and turnaround. To break even, your card needs to be worth significantly more in PSA 10 than raw. Use a probabilistic EV model: P(PSA 10) × PSA 10 net + P(PSA 9) × PSA 9 net + P(lower) × low value, minus the grading fee and eBay fees.</p>
-<p>Our <a href="https://sportscardportfolio.io">Graded Value Matrix</a> does this math automatically for any card and tells you whether grading is +EV or a money loser.</p>
+<p>Our <a href="https://hobbyalpha.com">Graded Value Matrix</a> does this math automatically for any card and tells you whether grading is +EV or a money loser.</p>
 
 <h2>5. Get an AI-powered Buy/Hold/Sell verdict</h2>
 <p>The hard part of card investing isn't valuation — it's <strong>timing</strong>. Is this player on the way up or coming back to earth? Is the market overheated? Is supply about to flood?</p>
-<p>Our <a href="https://sportscardportfolio.io">Player Outlook</a> engine analyzes 6 weighted signals (demand, momentum, liquidity, supply pressure, hype, volatility) plus confidence and gives you a deterministic Buy / Hold / Trade-the-Hype / Sell / Avoid verdict for any player.</p>
+<p>Our <a href="https://hobbyalpha.com">Player Outlook</a> engine analyzes 6 weighted signals (demand, momentum, liquidity, supply pressure, hype, volatility) plus confidence and gives you a deterministic Buy / Hold / Trade-the-Hype / Sell / Avoid verdict for any player.</p>
 
 <h2>The 30-second valuation checklist</h2>
 <ol>
@@ -67,7 +67,7 @@ const posts: SeedPost[] = [
   <li>Check the player's market verdict before listing or holding.</li>
 </ol>
 
-<p>Want it all done in one click? <a href="https://sportscardportfolio.io">Try Sports Card Portfolio free</a> — scan a card with your phone and get the verdict in seconds.</p>
+<p>Want it all done in one click? <a href="https://hobbyalpha.com">Try HobbyAlpha free</a> — scan a card with your phone and get the verdict in seconds.</p>
 `.trim(),
   },
   {
@@ -100,7 +100,7 @@ const posts: SeedPost[] = [
   <li>~45% PSA 9</li>
   <li>~20% PSA 8 or lower</li>
 </ul>
-<p>That is the default we use in our <a href="https://sportscardportfolio.io">Graded Value Matrix</a>. The expected value of grading is:</p>
+<p>That is the default we use in our <a href="https://hobbyalpha.com">Graded Value Matrix</a>. The expected value of grading is:</p>
 <pre>EV = P(PSA10) × Net(PSA10) + P(PSA9) × Net(PSA9) + P(lower) × Net(lower) − Grading Fee</pre>
 <p>Plug in real eBay sold comps for each grade. If EV is meaningfully higher than your raw value, grade it. If not, sell raw.</p>
 
@@ -122,7 +122,7 @@ const posts: SeedPost[] = [
 </ul>
 
 <h2>Don't ignore the timing signal</h2>
-<p>By the time your card comes back from PSA, the market may have moved. If a player is in a TRADE-THE-HYPE phase, your PSA 10 might be worth 30% less in 8 weeks. Always check the <a href="https://sportscardportfolio.io">Player Outlook verdict</a> before submitting.</p>
+<p>By the time your card comes back from PSA, the market may have moved. If a player is in a TRADE-THE-HYPE phase, your PSA 10 might be worth 30% less in 8 weeks. Always check the <a href="https://hobbyalpha.com">Player Outlook verdict</a> before submitting.</p>
 
 <h2>Quick decision tree</h2>
 <ol>
@@ -132,7 +132,7 @@ const posts: SeedPost[] = [
   <li>Cross-check the player's market verdict — only grade if the trend is Hold or Buy.</li>
 </ol>
 
-<p>Want it automated? <a href="https://sportscardportfolio.io">Sports Card Portfolio</a> runs all this math automatically with live eBay comps and player verdicts. Free to start.</p>
+<p>Want it automated? <a href="https://hobbyalpha.com">HobbyAlpha</a> runs all this math automatically with live eBay comps and player verdicts. Free to start.</p>
 `.trim(),
   },
   {
@@ -170,7 +170,7 @@ const posts: SeedPost[] = [
 
 <h2>Step 6: Volume tells you liquidity</h2>
 <p>Median price is half the story. The other half is <strong>how often the card sells</strong>. A card with 30 sales in 30 days is liquid — you can sell it tomorrow at the median. A card with 1 sale in 90 days might take months to move and the next sale could be 30% lower.</p>
-<p>Our <a href="https://sportscardportfolio.io">liquidity scoring</a> automatically blends sell-through rate with absolute velocity to give you a single 0-100 score.</p>
+<p>Our <a href="https://hobbyalpha.com">liquidity scoring</a> automatically blends sell-through rate with absolute velocity to give you a single 0-100 score.</p>
 
 <h2>Common comp-reading traps</h2>
 <ul>
@@ -182,7 +182,7 @@ const posts: SeedPost[] = [
 </ul>
 
 <h2>The shortcut</h2>
-<p>If you want all of this done automatically — exact card matching, outlier rejection, median calculation, liquidity scoring, trend direction — that is exactly what <a href="https://sportscardportfolio.io">Sports Card Portfolio</a> does. Snap a photo, get the verdict.</p>
+<p>If you want all of this done automatically — exact card matching, outlier rejection, median calculation, liquidity scoring, trend direction — that is exactly what <a href="https://hobbyalpha.com">HobbyAlpha</a> does. Snap a photo, get the verdict.</p>
 
 <p>But even if you use a tool, knowing how to read comps yourself keeps you honest. Trust the data, not the asking prices.</p>
 `.trim(),
@@ -207,13 +207,13 @@ const posts: SeedPost[] = [
 </ol>
 
 <h2>NFL rookies to watch in ${YEAR}</h2>
-<p>The NFL rookie market is the most liquid in the hobby. The classes from the last 2–3 seasons dominate trading volume. Use our <a href="https://sportscardportfolio.io/outlook/football">Football Player Outlook</a> page to filter by current verdict — focus on rookies with ACCUMULATE or HOLD-CORE labels and high conviction.</p>
+<p>The NFL rookie market is the most liquid in the hobby. The classes from the last 2–3 seasons dominate trading volume. Use our <a href="https://hobbyalpha.com/outlook/football">Football Player Outlook</a> page to filter by current verdict — focus on rookies with ACCUMULATE or HOLD-CORE labels and high conviction.</p>
 
 <h2>NBA rookies to watch in ${YEAR}</h2>
-<p>NBA cards have wild volatility but the biggest 10x potential when a player breaks out. Look for second-year players in their first All-Star window — that's when Prizm Silver and Mosaic /25 parallels typically rip. The <a href="https://sportscardportfolio.io/outlook/basketball">Basketball Outlook</a> tool flags these.</p>
+<p>NBA cards have wild volatility but the biggest 10x potential when a player breaks out. Look for second-year players in their first All-Star window — that's when Prizm Silver and Mosaic /25 parallels typically rip. The <a href="https://hobbyalpha.com/outlook/basketball">Basketball Outlook</a> tool flags these.</p>
 
 <h2>MLB rookies to watch in ${YEAR}</h2>
-<p>Baseball rookies are a slower, more patient market. The flagship is <strong>Bowman Chrome</strong> — specifically the 1st Bowman Chrome Auto. International prospects out of Cuba, Venezuela, and Japan often spike before MLB debut. <a href="https://sportscardportfolio.io/outlook/baseball">Baseball Outlook</a> tracks both pre-debut prospects and active MLB rookies.</p>
+<p>Baseball rookies are a slower, more patient market. The flagship is <strong>Bowman Chrome</strong> — specifically the 1st Bowman Chrome Auto. International prospects out of Cuba, Venezuela, and Japan often spike before MLB debut. <a href="https://hobbyalpha.com/outlook/baseball">Baseball Outlook</a> tracks both pre-debut prospects and active MLB rookies.</p>
 
 <h2>The traps that cost investors money</h2>
 <ul>
@@ -226,15 +226,15 @@ const posts: SeedPost[] = [
 <h2>How to actually pick winners</h2>
 <p>Don't pick your own. Use a system:</p>
 <ol>
-  <li>Filter the <a href="https://sportscardportfolio.io">Player Outlook leaderboard</a> by sport and verdict.</li>
+  <li>Filter the <a href="https://hobbyalpha.com">Player Outlook leaderboard</a> by sport and verdict.</li>
   <li>Look for ACCUMULATE rookies with conviction &gt; 60.</li>
   <li>Cross-check the player's news for any injury or role-change red flags.</li>
   <li>Pull the eBay sold comps for the flagship rookie + a low-pop parallel.</li>
-  <li>Run the <a href="https://sportscardportfolio.io">Graded Value Matrix</a> to decide raw vs. graded.</li>
+  <li>Run the <a href="https://hobbyalpha.com">Graded Value Matrix</a> to decide raw vs. graded.</li>
   <li>Set a price alert and wait for a dip.</li>
 </ol>
 
-<p>Try the leaderboard free at <a href="https://sportscardportfolio.io">Sports Card Portfolio</a>.</p>
+<p>Try the leaderboard free at <a href="https://hobbyalpha.com">HobbyAlpha</a>.</p>
 `.trim(),
   },
   {
@@ -283,7 +283,7 @@ ROI = Box EV / Box Price
 
 <h2>Comparing two products head-to-head</h2>
 <p>The hobby is full of "should I rip this or that?" questions. The answer is always: compute realistic EV for both, then pick the one with the higher ROI <em>and</em> better hit ceiling.</p>
-<p>Our <a href="https://sportscardportfolio.io/market/sealed-roi">Sealed Product ROI Calculator</a> does exactly this — head-to-head comparison, realistic EV with all corrections applied, and a Buy / Speculative / Don't-Rip verdict.</p>
+<p>Our <a href="https://hobbyalpha.com/market/sealed-roi">Sealed Product ROI Calculator</a> does exactly this — head-to-head comparison, realistic EV with all corrections applied, and a Buy / Speculative / Don't-Rip verdict.</p>
 
 <h2>The 5 questions to ask before opening any box</h2>
 <ol>
@@ -294,7 +294,7 @@ ROI = Box EV / Box Price
   <li>Could you make more by holding the sealed box and flipping it later?</li>
 </ol>
 
-<p>Run the math at <a href="https://sportscardportfolio.io/market/sealed-roi">Sports Card Portfolio's Sealed ROI tool</a> before your next box purchase.</p>
+<p>Run the math at <a href="https://hobbyalpha.com/market/sealed-roi">HobbyAlpha's Sealed ROI tool</a> before your next box purchase.</p>
 `.trim(),
   },
 ];
