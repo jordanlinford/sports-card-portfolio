@@ -113,3 +113,39 @@ id = "JNV-i92h_9E1TLtAZwjOQ"
 uri = "file://.local/previews/variant-f-diamond.png"
 type = "image"
 title = "Option F — Diamond plate (royal purple + gold, rotated diamond)"
+
+[[outputs]]
+id = "aGazON71OEaZ1h1YqQED-"
+uri = "file://client/src/assets/brand/wordmark-dark.svg"
+type = "image"
+title = "Wordmark — for light backgrounds (dark text + holo Alpha)"
+
+[[outputs]]
+id = "oKFU21oApMQV-yMJfI3D9"
+uri = "file://client/src/assets/brand/wordmark-light.svg"
+type = "image"
+title = "Wordmark — for dark backgrounds (white text + holo Alpha)"
+
+[[outputs]]
+id = "9nwAztS7DDEQh6ZES1mqh"
+uri = "file://client/src/assets/brand/logo-mark.svg"
+type = "image"
+title = "Square mark — refractor card with HA monogram"
+
+[[outputs]]
+id = "yvxiKV2m3tH7vtW0GCf0W"
+uri = "file://client/src/assets/brand/logo-mark-maskable.svg"
+type = "image"
+title = "Square mark — maskable version (for app icons)"
+
+[[outputs]]
+id = "o6nRdxmt8F1iPuu4PQDnB"
+uri = "file://client/public/favicon.png"
+type = "image"
+title = "Favicon / mark as PNG"
+
+[[outputs]]
+id = "X5LUqp7Toad2Zx2LR3zUq"
+uri = "file://client/public/og-default.png"
+type = "image"
+title = "Social share card (1200x630)"
