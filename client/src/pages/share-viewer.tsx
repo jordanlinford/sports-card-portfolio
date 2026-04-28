@@ -7,6 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Loader2, Eye, Calendar, TrendingUp, TrendingDown, Target, AlertTriangle, Sparkles } from "lucide-react";
 import { format } from "date-fns";
+import logoMark from "@/assets/brand/logo-mark.svg";
 
 interface SnapshotResponse {
   snapshotType: string;
@@ -426,9 +427,18 @@ export default function ShareViewer() {
 
         <Separator className="my-8" />
         
-        <div className="text-center text-muted-foreground">
-          <p className="text-sm">Shared from HobbyAlpha</p>
-          <a href="/" className="text-primary hover:underline text-sm">
+        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <img
+              src={logoMark}
+              alt=""
+              aria-hidden="true"
+              className="h-6 w-6 flex-shrink-0"
+              data-testid="img-share-footer-logo"
+            />
+            <p className="text-sm">Shared from HobbyAlpha</p>
+          </div>
+          <a href="/" className="text-primary hover:underline text-sm" data-testid="link-share-create-own">
             Create your own collection
           </a>
         </div>

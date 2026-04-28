@@ -128,18 +128,20 @@ export function Navigation() {
               data-testid="img-logo-mark"
             />
             {/* Desktop: full wordmark, swapped for dark/light theme */}
-            <img
-              src={wordmarkDark}
-              alt="HobbyAlpha"
-              className="h-8 w-auto hidden sm:block dark:hidden"
-              data-testid="img-logo-wordmark-light"
-            />
-            <img
-              src={wordmarkLight}
-              alt="HobbyAlpha"
-              className="h-8 w-auto hidden sm:dark:block"
-              data-testid="img-logo-wordmark-dark"
-            />
+            <span className="hidden sm:contents">
+              <img
+                src={wordmarkDark}
+                alt="HobbyAlpha"
+                className="h-8 w-auto block dark:hidden"
+                data-testid="img-logo-wordmark-light"
+              />
+              <img
+                src={wordmarkLight}
+                alt="HobbyAlpha"
+                className="h-8 w-auto hidden dark:block"
+                data-testid="img-logo-wordmark-dark"
+              />
+            </span>
             <span className="sr-only" data-testid="text-logo">HobbyAlpha</span>
           </Link>
 
