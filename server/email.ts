@@ -1,4 +1,10 @@
 import nodemailer from "nodemailer";
+import {
+  buildListUnsubscribeHeaders,
+  buildUnsubscribeFooterHtml,
+  buildUnsubscribeFooterText,
+} from "./unsubscribe";
+import { buildEmailHeaderHtml, buildEmailHeaderText } from "./emailBranding";
 
 const transporter = nodemailer.createTransport({
   host: process.env.ZOHO_SMTP_HOST || "smtp.zoho.com",
@@ -23,6 +29,7 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
       subject: "Welcome to HobbyAlpha!",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">Welcome to HobbyAlpha!</h1>
           <p>Hi ${userName || "Collector"},</p>
           <p>Thank you for joining HobbyAlpha! We're excited to help you track and grow your collection.</p>
@@ -63,6 +70,7 @@ export async function sendNewSignupNotification(
       subject: `New signup: ${displayName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h2 style="color: #f59e0b; margin-bottom: 4px;">New User Signed Up</h2>
           <p style="color: #6b7280; margin-top: 0;">${time} ET</p>
           <div style="background: #f3f4f6; padding: 16px; border-radius: 8px;">
@@ -94,6 +102,7 @@ export async function sendPaymentConfirmationEmail(
       subject: "Welcome to HobbyAlpha Pro!",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">You're Now a Pro Member!</h1>
           <p>Hi ${userName || "Collector"},</p>
           <p>Thank you for upgrading to HobbyAlpha Pro! Your subscription is now active.</p>
@@ -139,6 +148,7 @@ export async function sendPriceAlertEmail(
       subject: `Price Alert: ${cardTitle} has ${direction} $${threshold}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">Price Alert Triggered</h1>
           <p>Hi ${userName},</p>
           <p>Your price alert for <strong>${cardTitle}</strong> has been triggered.</p>
@@ -178,7 +188,8 @@ interface DigestData {
 export async function sendWeeklyDigestEmail(
   userEmail: string,
   userName: string,
-  data: DigestData
+  data: DigestData,
+  userId: string,
 ): Promise<boolean> {
   if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping weekly digest email");
@@ -204,8 +215,10 @@ export async function sendWeeklyDigestEmail(
       from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: "Your Weekly Collection Digest",
+      headers: buildListUnsubscribeHeaders(userId, "digest"),
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">Weekly Collection Digest</h1>
           <p>Hi ${userName},</p>
           <p>Here's your weekly collection summary:</p>
@@ -245,10 +258,7 @@ export async function sendWeeklyDigestEmail(
 
           <p style="margin-top: 30px;">Log in to HobbyAlpha to explore your full collection.</p>
           <p style="margin-top: 30px;">Happy collecting,<br>The HobbyAlpha Team</p>
-          
-          <p style="margin-top: 30px; font-size: 12px; color: #9ca3af;">
-            To unsubscribe from weekly digests, update your notification preferences in your account settings.
-          </p>
+          ${buildUnsubscribeFooterHtml(userId, "digest")}
         </div>
       `,
     });
@@ -279,6 +289,7 @@ export async function sendSplitJoinedEmail(
       subject: `You've joined the ${splitInfo.title} box break!`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">You're In!</h1>
           <p>Hi ${userName},</p>
           <p>You've successfully joined the <strong>${splitInfo.title}</strong> box break.</p>
@@ -317,6 +328,7 @@ export async function sendSplitPaymentOpenEmail(
       subject: `Payment Open: ${splitInfo.title} - Act Now!`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">Payment Window Is Open!</h1>
           <p>Hi ${userName},</p>
           <p>The <strong>${splitInfo.title}</strong> split is now full and ready for payment!</p>
@@ -360,6 +372,7 @@ export async function sendSplitAssignmentEmail(
       subject: `Your Assignment: ${assignment} - ${splitInfo.title}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">Your Team Is Locked In!</h1>
           <p>Hi ${userName},</p>
           <p>Assignments are in for <strong>${splitInfo.title}</strong>!</p>
@@ -400,6 +413,7 @@ export async function sendBreakCompleteEmail(
       subject: `Break Complete! Watch Your ${assignment} Hits - ${splitInfo.title}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">The Break Is Complete!</h1>
           <p>Hi ${userName},</p>
           <p>The <strong>${splitInfo.title}</strong> break is done! Watch your <strong>${assignment}</strong> hits now.</p>
@@ -441,6 +455,7 @@ export async function sendSplitShippedEmail(
       subject: `Your ${assignment} Cards Are On The Way! - ${splitInfo.title}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">Your Cards Have Shipped!</h1>
           <p>Hi ${userName},</p>
           <p>Great news! Your <strong>${assignment}</strong> cards from <strong>${splitInfo.title}</strong> are on their way!</p>
@@ -461,7 +476,12 @@ export async function sendSplitShippedEmail(
   }
 }
 
-export async function sendWinBackEmail(email: string, userName: string, watchlistMoves: string[]): Promise<void> {
+export async function sendWinBackEmail(
+  email: string,
+  userName: string,
+  watchlistMoves: string[],
+  userId: string,
+): Promise<void> {
   if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping win-back email");
     return;
@@ -480,8 +500,17 @@ export async function sendWinBackEmail(email: string, userName: string, watchlis
       from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: email,
       subject: "Your watchlist moved while you were away",
-      text: `Hi ${userName || "there"},\n\nIt's been a week since you left, and here's what happened with players you were tracking:\n\n${movesList}\n\nYour data is still here. Come back and see what you missed:\nhttps://hobbyalpha.com/\n\nMiss you,\nHobbyAlpha`,
-      html: `<p>Hi ${userName || "there"},</p><p>It's been a week since you left, and here's what happened with players you were tracking:</p><ul>${movesHtml}</ul><p><a href="https://hobbyalpha.com/">Come back and see what you missed</a></p><p>Miss you,<br>HobbyAlpha</p>`,
+      headers: buildListUnsubscribeHeaders(userId, "winback"),
+      text:
+        buildEmailHeaderText() +
+        `Hi ${userName || "there"},\n\nIt's been a week since you left, and here's what happened with players you were tracking:\n\n${movesList}\n\nYour data is still here. Come back and see what you missed:\nhttps://hobbyalpha.com/\n\nMiss you,\nHobbyAlpha` +
+        buildUnsubscribeFooterText(userId, "winback"),
+      html:
+        `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">` +
+        buildEmailHeaderHtml() +
+        `<p>Hi ${userName || "there"},</p><p>It's been a week since you left, and here's what happened with players you were tracking:</p><ul>${movesHtml}</ul><p><a href="https://hobbyalpha.com/">Come back and see what you missed</a></p><p>Miss you,<br>HobbyAlpha</p>` +
+        buildUnsubscribeFooterHtml(userId, "winback") +
+        `</div>`,
     });
     console.log(`Win-back email sent to ${email}`);
   } catch (error) {
@@ -500,8 +529,14 @@ export async function sendReferralInviteEmail(toEmail: string, fromName: string,
       from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: toEmail,
       subject: `${fromName} invited you to HobbyAlpha`,
-      text: `${fromName} thinks you'd love HobbyAlpha — AI-powered market intelligence for sports card collectors.\n\nSign up with their code to get a free month of Pro: ${code}\n\nhttps://hobbyalpha.com/?ref=${code}`,
-      html: `<p>${fromName} thinks you'd love <strong>HobbyAlpha</strong> — AI-powered market intelligence for sports card collectors.</p><p>Sign up with their code to get a free month of Pro: <strong>${code}</strong></p><p><a href="https://hobbyalpha.com/?ref=${code}">Get started</a></p>`,
+      text:
+        buildEmailHeaderText() +
+        `${fromName} thinks you'd love HobbyAlpha — AI-powered market intelligence for sports card collectors.\n\nSign up with their code to get a free month of Pro: ${code}\n\nhttps://hobbyalpha.com/?ref=${code}`,
+      html:
+        `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">` +
+        buildEmailHeaderHtml() +
+        `<p>${fromName} thinks you'd love <strong>HobbyAlpha</strong> — AI-powered market intelligence for sports card collectors.</p><p>Sign up with their code to get a free month of Pro: <strong>${code}</strong></p><p><a href="https://hobbyalpha.com/?ref=${code}">Get started</a></p>` +
+        `</div>`,
     });
     console.log(`Referral invite email sent to ${toEmail}`);
   } catch (error) {
@@ -526,6 +561,7 @@ export async function sendNewParticipantJoinedEmail(
       subject: `${splitInfo.title}: ${splitInfo.currentCount}/${splitInfo.totalCount} spots filled!`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          ${buildEmailHeaderHtml()}
           <h1 style="color: #f59e0b;">New Participant Joined!</h1>
           <p>Hi ${userName},</p>
           <p>Someone just joined <strong>${splitInfo.title}</strong>!</p>
@@ -561,7 +597,8 @@ export async function sendNewParticipantJoinedEmail(
  */
 export async function sendRebrandAnnouncementEmail(
   userEmail: string,
-  userName?: string | null,
+  userName: string | null | undefined,
+  userId: string,
 ): Promise<boolean> {
   if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
     console.log("Zoho email not configured, skipping rebrand announcement email");
@@ -576,15 +613,19 @@ export async function sendRebrandAnnouncementEmail(
       from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
       subject: "Sports Card Portfolio is now HobbyAlpha",
+      headers: buildListUnsubscribeHeaders(userId, "announcements"),
       text:
+        buildEmailHeaderText() +
         `${greeting}\n\n` +
         `Quick heads up — Sports Card Portfolio is now HobbyAlpha.\n\n` +
         `Same app. Same login. Same data. Sharper name.\n\n` +
         `Visit your collection at https://${newDomain}/\n\n` +
         `(The old sportscardportfolio.io links still work — they redirect to the new home.)\n\n` +
-        `Thanks for being here,\nThe HobbyAlpha Team`,
+        `Thanks for being here,\nThe HobbyAlpha Team` +
+        buildUnsubscribeFooterText(userId, "announcements"),
       html:
         `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">` +
+        buildEmailHeaderHtml() +
         `<h1 style="color: #f59e0b;">We have a new name: HobbyAlpha</h1>` +
         `<p>${greeting}</p>` +
         `<p>Quick heads up — <strong>Sports Card Portfolio is now HobbyAlpha</strong>.</p>` +
@@ -594,6 +635,7 @@ export async function sendRebrandAnnouncementEmail(
         `</p>` +
         `<p style="color: #6b7280; font-size: 13px;">Your old <code>sportscardportfolio.io</code> links still work — they automatically redirect to the matching page on HobbyAlpha.</p>` +
         `<p style="margin-top: 30px;">Thanks for being here,<br>The HobbyAlpha Team</p>` +
+        buildUnsubscribeFooterHtml(userId, "announcements") +
         `</div>`,
     });
     console.log(`Rebrand announcement email sent to ${userEmail}`);

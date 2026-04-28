@@ -6,6 +6,8 @@
 //   - client/public/favicon.png
 //   - client/public/icons/icon-{72..1024}.png
 //   - client/public/og-default.png
+//   - client/public/email/hobbyalpha-wordmark-{light,dark}.png  (email headers)
+//   - client/public/email/hobbyalpha-mark.png                   (square email mark)
 //   - client/public/splash/apple-splash-{W}x{H}.png   (iOS PWA launch images)
 //
 // Run with: node scripts/brand/build-brand.mjs
@@ -386,6 +388,29 @@ async function main() {
 
   // 4. Open Graph share card.
   await writeOg(ogCardSvg(), resolve(publicDir, "og-default.png"));
+
+  // 4a. Email header PNGs. Outlook for Windows + a number of mobile mail
+  //     clients still don't render SVG, so we ship pre-rasterized PNGs of the
+  //     wordmarks and the square mark. They live at the SPA static root so
+  //     `server/emailBranding.ts` can reference them by absolute URL via
+  //     `https://<CUSTOM_DOMAIN>/email/...`. Width 960 ≈ retina for the 480px
+  //     wordmark target; the mark is shipped at 256 for compact uses.
+  const emailDir = resolve(publicDir, "email");
+  await ensureDir(emailDir);
+  const wordmarkLight = wordmarkSvg({ variant: "light" });
+  const wordmarkDark = wordmarkSvg({ variant: "dark" });
+  await sharp(Buffer.from(wordmarkLight), { density: 300 })
+    .resize({ width: 960 })
+    .png({ compressionLevel: 9 })
+    .toFile(resolve(emailDir, "hobbyalpha-wordmark-light.png"));
+  await sharp(Buffer.from(wordmarkDark), { density: 300 })
+    .resize({ width: 960 })
+    .png({ compressionLevel: 9 })
+    .toFile(resolve(emailDir, "hobbyalpha-wordmark-dark.png"));
+  await sharp(Buffer.from(markRounded), { density: 300 })
+    .resize({ width: 256 })
+    .png({ compressionLevel: 9 })
+    .toFile(resolve(emailDir, "hobbyalpha-mark.png"));
 
   // 5. iOS PWA splash screens. Each PNG is sized to a real iPhone/iPad
   //    portrait pixel resolution and is referenced from index.html via
