@@ -66,6 +66,9 @@ import {
   Bell
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import logoMark from "@/assets/brand/logo-mark.svg";
+import wordmarkLight from "@/assets/brand/wordmark-light.svg";
+import wordmarkDark from "@/assets/brand/wordmark-dark.svg";
 
 export function Navigation() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -116,13 +119,28 @@ export function Navigation() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <div className="flex items-center gap-2">
-              <LayoutGrid className="h-6 w-6 text-primary" />
-              <span className="text-lg font-semibold hidden sm:inline" data-testid="text-logo">
-                HobbyAlpha
-              </span>
-            </div>
+          <Link href="/" className="flex items-center flex-shrink-0" data-testid="link-home-logo">
+            {/* Mobile: square mark only */}
+            <img
+              src={logoMark}
+              alt="HobbyAlpha"
+              className="h-8 w-8 sm:hidden"
+              data-testid="img-logo-mark"
+            />
+            {/* Desktop: full wordmark, swapped for dark/light theme */}
+            <img
+              src={wordmarkDark}
+              alt="HobbyAlpha"
+              className="h-8 w-auto hidden sm:block dark:hidden"
+              data-testid="img-logo-wordmark-light"
+            />
+            <img
+              src={wordmarkLight}
+              alt="HobbyAlpha"
+              className="h-8 w-auto hidden sm:dark:block"
+              data-testid="img-logo-wordmark-dark"
+            />
+            <span className="sr-only" data-testid="text-logo">HobbyAlpha</span>
           </Link>
 
           {/* Public Navigation - Always visible */}
@@ -580,9 +598,20 @@ export function Navigation() {
             </SheetTrigger>
             <SheetContent side="left" className="w-80 overflow-y-auto">
               <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                  <LayoutGrid className="h-5 w-5 text-primary" />
-                  HobbyAlpha
+                <SheetTitle className="flex items-center">
+                  <img
+                    src={wordmarkDark}
+                    alt="HobbyAlpha"
+                    className="h-7 w-auto block dark:hidden"
+                    data-testid="img-mobile-logo-light"
+                  />
+                  <img
+                    src={wordmarkLight}
+                    alt="HobbyAlpha"
+                    className="h-7 w-auto hidden dark:block"
+                    data-testid="img-mobile-logo-dark"
+                  />
+                  <span className="sr-only">HobbyAlpha</span>
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 mt-6">

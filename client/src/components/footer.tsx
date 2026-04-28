@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { Mail } from "lucide-react";
+import logoMark from "@/assets/brand/logo-mark.svg";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -8,9 +9,18 @@ export function Footer() {
     <footer className="border-t bg-muted/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">
-            {currentYear} HobbyAlpha. All rights reserved.
-          </p>
+          <div className="flex items-center gap-2">
+            <img
+              src={logoMark}
+              alt=""
+              aria-hidden="true"
+              className="h-6 w-6 flex-shrink-0"
+              data-testid="img-footer-logo"
+            />
+            <p className="text-sm text-muted-foreground">
+              © {currentYear} HobbyAlpha. All rights reserved.
+            </p>
+          </div>
           <nav className="flex flex-wrap items-center gap-6">
             <a 
               href="mailto:hello@hobbyalpha.com" 
