@@ -79,13 +79,37 @@ type = "image"
 title = "Splash Screen - Pure Black"
 
 [[outputs]]
-id = "3h8wMkRF686AkbOa51Ub2"
-uri = "file://public/favicon.png"
+id = "OwyqogYptjZ9A-fMTiaBp"
+uri = "file://.local/previews/variant-a-card-on-tile.png"
 type = "image"
-title = "public/favicon.png — eyeball this"
+title = "Option A — Card on tile"
 
 [[outputs]]
-id = "UBBkyyawCiDIlfVPwbiLK"
-uri = "file://public/og-default.png"
+id = "VpNXOijRlKoPqO7yBcBJd"
+uri = "file://.local/previews/variant-b-card-only.png"
 type = "image"
-title = "public/og-default.png — eyeball this"
+title = "Option B — Card-shaped mark"
+
+[[outputs]]
+id = "ENuCDuRnW8SdzUvAGmAEu"
+uri = "file://.local/previews/variant-c-slab-corners.png"
+type = "image"
+title = "Option C — Slab corners"
+
+[[outputs]]
+id = "SAUBcW-rgkcyiP3IDKGY4"
+uri = "file://.local/previews/variant-d-refractor.png"
+type = "image"
+title = "Option D — Refractor card (holo border, white HA)"
+
+[[outputs]]
+id = "U5iQEYSDZZKMLmh4S9CfC"
+uri = "file://.local/previews/variant-e-gemmint.png"
+type = "image"
+title = "Option E — Gem Mint stack (emerald + gold, card stack with chart)"
+
+[[outputs]]
+id = "JNV-i92h_9E1TLtAZwjOQ"
+uri = "file://.local/previews/variant-f-diamond.png"
+type = "image"
+title = "Option F — Diamond plate (royal purple + gold, rotated diamond)"

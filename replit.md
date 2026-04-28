@@ -26,6 +26,9 @@ Key features include:
 - Recommendation Engines include Next Buys, Dual-Source Hidden Gems, and Portfolio Alpha Benchmark.
 - A Sealed Product ROI Calculator provides AI-powered expected value analysis for hobby boxes.
 
+### Brand Assets
+The HobbyAlpha visual identity (square mark, light/dark wordmarks, favicon, full PWA icon ladder, and `og-default.png` share card) is generated from SVG sources in `client/src/assets/brand/` by `scripts/brand/build-brand.mjs`. Re-run with `node scripts/brand/build-brand.mjs` after changing the source SVGs or palette to regenerate every output size at once.
+
 ### System Design Choices
 - **Database**: PostgreSQL with Drizzle ORM.
 - **API**: RESTful API.

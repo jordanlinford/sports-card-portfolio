@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 260" width="1320" height="260">
+  <defs>
+    <linearGradient id="alphaWord" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#22D3EE"/>
+      <stop offset="33%"  stop-color="#A78BFA"/>
+      <stop offset="66%"  stop-color="#F472B6"/>
+      <stop offset="100%" stop-color="#FACC15"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Mark, scaled into a 220x220 box on the left. -->
+  <g transform="translate(0,20) scale(0.215)">
+    <g>
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#070B16"/>
+    </linearGradient>
+    <linearGradient id="cardFace" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0B1220"/>
+    </linearGradient>
+    <!-- Holographic refractor border. Stops cycle the four hobby
+         colors so the gradient reads as "shimmer" at any size. -->
+    <linearGradient id="holoGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#22D3EE"/>
+      <stop offset="33%"  stop-color="#A78BFA"/>
+      <stop offset="66%"  stop-color="#F472B6"/>
+      <stop offset="100%" stop-color="#FACC15"/>
+    </linearGradient>
+    <!-- Soft top-left sheen on the card face, like light hitting plastic. -->
+    <radialGradient id="cardSheen" cx="32%" cy="18%" r="85%">
+      <stop offset="0%"  stop-color="rgba(255,255,255,0.18)"/>
+      <stop offset="60%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <clipPath id="tileClip">
+      <rect x="0" y="0" width="1024" height="1024" rx="225" ry="225"/>
+    </clipPath>
+  </defs>
+
+  
+
+  <!-- Tile background -->
+  <rect x="0" y="0" width="1024" height="1024"
+        rx="225" ry="225" fill="url(#bgGrad)"/>
+
+  <!-- Card group, clipped to the tile so the tilt never bleeds out -->
+  <g clip-path="url(#tileClip)">
+    <g transform="rotate(-7 512 512)">
+      <!-- Soft drop shadow under the card -->
+      <ellipse cx="512" cy="880" rx="203.28" ry="18"
+               fill="rgba(0,0,0,0.55)"/>
+
+      <!-- Refractor border (full card rectangle in holo gradient) -->
+      <rect x="270" y="156" width="484" height="700"
+            rx="44" ry="44" fill="url(#holoGrad)"/>
+
+      <!-- Card face (inset by border thickness) -->
+      <rect x="288" y="174"
+            width="448" height="664"
+            rx="36" ry="36" fill="url(#cardFace)"/>
+
+      <!-- Plastic sheen -->
+      <rect x="288" y="174"
+            width="448" height="664"
+            rx="36" ry="36" fill="url(#cardSheen)"/>
+
+      <!-- Inner thin frame, like a card's photo window -->
+      <rect x="310" y="196"
+            width="404"
+            height="620"
+            rx="26" ry="26"
+            fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="3"/>
+
+      <!-- HA monogram, the "subject" on the card -->
+      <text x="512" y="520"
+            text-anchor="middle" dominant-baseline="middle"
+            font-family="Inter, DejaVu Sans, Arial, sans-serif" font-weight="800"
+            font-size="322"
+            fill="#FFFFFF" letter-spacing="-12">HA</text>
+    </g>
+  </g>
+</g>
+  </g>
+
+  <!-- Wordmark text. Inter is preferred in the browser; DejaVu is the
+       fallback used by sharp/librsvg during server-side rasterization. -->
+  <text font-family="Inter, DejaVu Sans, Arial, sans-serif"
+        font-weight="700"
+        font-size="148"
+        x="260"
+        y="172"
+        letter-spacing="-3">
+    <tspan fill="#0F172A">Hobby</tspan><tspan fill="url(#alphaWord)">Alpha</tspan>
+  </text>
+</svg>
