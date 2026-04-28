@@ -87,14 +87,14 @@
       "sizes": "1408x768",
       "type": "image/png",
       "form_factor": "wide",
-      "label": "HobbyAlpha Dashboard"
+      "label": "Daily Alpha — market intelligence across player markets"
     },
     {
       "src": "/screenshots/screenshot-narrow.png",
       "sizes": "768x1408",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "Mobile Collection View"
+      "label": "Player Outlook on mobile — hold/wait guidance and market signals"
     }
   ],
   "shortcuts": [
