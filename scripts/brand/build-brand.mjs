@@ -6,6 +6,7 @@
 //   - client/public/favicon.png
 //   - client/public/icons/icon-{72..1024}.png
 //   - client/public/og-default.png
+//   - client/public/splash/apple-splash-{W}x{H}.png   (iOS PWA launch images)
 //
 // Run with: node scripts/brand/build-brand.mjs
 
@@ -247,9 +248,97 @@ function ogCardSvg() {
 </svg>`;
 }
 
+// iOS PWA splash screen. Renders the HobbyAlpha mark above a
+// "HobbyAlpha" text wordmark, centered on the navy gradient background
+// so the launch transition matches the home-screen icon and the app's
+// own theme color. Sized to the device's portrait pixel resolution;
+// iOS handles rotation itself by cropping/scaling the portrait splash.
+//
+// We deliberately render the wordmark as plain text here (not the
+// reusable wordmark SVG) because the wordmark SVG embeds a small copy
+// of the mark, which would duplicate the big mark above on the splash.
+function splashSvg({ width, height }) {
+  // Pick a mark size that scales with the shorter device edge so the
+  // splash reads well on small iPhones and large iPads alike.
+  const short = Math.min(width, height);
+  const markSize = Math.round(short * 0.42);
+  const markX = Math.round((width - markSize) / 2);
+  // Sit the mark slightly above center, with the wordmark below it,
+  // so the pair feels visually balanced (not bottom-heavy).
+  const markY = Math.round(height / 2 - markSize * 0.62);
+
+  // Wordmark text below the mark.
+  const wordFontSize = Math.round(short * 0.085);
+  const wordY = markY + markSize + Math.round(short * 0.09);
+
+  // Inline a copy of the rounded mark so the splash rasterizes from a
+  // single self-contained SVG (no external fetches at build time).
+  const markInline = markSvg({ size: 1024, variant: "rounded" })
+    .replace(/^<\?xml.*?\?>\s*/, "")
+    .replace(/<svg [^>]*>/, `<svg x="${markX}" y="${markY}" width="${markSize}" height="${markSize}" viewBox="0 0 1024 1024">`);
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">
+  <defs>
+    <linearGradient id="splashBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${BRAND.navyMid}"/>
+      <stop offset="100%" stop-color="${BRAND.navyDark}"/>
+    </linearGradient>
+    <radialGradient id="splashHalo" cx="50%" cy="42%" r="48%">
+      <stop offset="0%"  stop-color="${BRAND.holo2}" stop-opacity="0.18"/>
+      <stop offset="60%" stop-color="${BRAND.holo3}" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="${BRAND.holo3}" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="splashAlpha" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="${BRAND.holo1}"/>
+      <stop offset="33%"  stop-color="${BRAND.holo2}"/>
+      <stop offset="66%"  stop-color="${BRAND.holo3}"/>
+      <stop offset="100%" stop-color="${BRAND.holo4}"/>
+    </linearGradient>
+  </defs>
+  <rect width="${width}" height="${height}" fill="url(#splashBg)"/>
+  <rect width="${width}" height="${height}" fill="url(#splashHalo)"/>
+  ${markInline}
+  <text x="${width / 2}" y="${wordY}"
+        text-anchor="middle" dominant-baseline="middle"
+        font-family="${FONT}" font-weight="700"
+        font-size="${wordFontSize}"
+        letter-spacing="${-Math.round(wordFontSize * 0.02)}">
+    <tspan fill="${BRAND.paper}">Hobby</tspan><tspan fill="url(#splashAlpha)">Alpha</tspan>
+  </text>
+</svg>`;
+}
+
 // -- Output ------------------------------------------------------------------
 
 const ICON_SIZES = [72, 96, 120, 128, 144, 152, 180, 192, 384, 512, 1024];
+
+// iOS PWA splash sizes. Each entry is { width, height, dWidth, dHeight,
+// ratio } where width/height are the splash PNG resolution (device
+// pixels) and dWidth/dHeight are the matching CSS-pixel device size
+// used in the apple-touch-startup-image media query.
+//
+// Devices covered:
+//   - 12.9" iPad Pro            (2048x2732, @2x)
+//   - 11"   iPad Pro            (1668x2388, @2x)
+//   - 9.7"  iPad / iPad Mini    (1536x2048, @2x)
+//   - iPhone 12/13/14 Pro Max   (1284x2778, @3x)
+//   - iPhone XS Max / 11 Pro Max(1242x2688, @3x)
+//   - iPhone 12/13/14           (1170x2532, @3x)
+//   - iPhone X / XS / 11 Pro    (1125x2436, @3x)
+//   - iPhone XR / 11            (828x1792,  @2x)
+//   - iPhone 6 / 7 / 8          (750x1334,  @2x)
+const SPLASH_SIZES = [
+  { width: 2048, height: 2732, dWidth: 1024, dHeight: 1366, ratio: 2 },
+  { width: 1668, height: 2388, dWidth: 834,  dHeight: 1194, ratio: 2 },
+  { width: 1536, height: 2048, dWidth: 768,  dHeight: 1024, ratio: 2 },
+  { width: 1284, height: 2778, dWidth: 428,  dHeight: 926,  ratio: 3 },
+  { width: 1242, height: 2688, dWidth: 414,  dHeight: 896,  ratio: 3 },
+  { width: 1170, height: 2532, dWidth: 390,  dHeight: 844,  ratio: 3 },
+  { width: 1125, height: 2436, dWidth: 375,  dHeight: 812,  ratio: 3 },
+  { width: 828,  height: 1792, dWidth: 414,  dHeight: 896,  ratio: 2 },
+  { width: 750,  height: 1334, dWidth: 375,  dHeight: 667,  ratio: 2 },
+];
 
 async function ensureDir(p) {
   await mkdir(p, { recursive: true });
@@ -298,7 +387,34 @@ async function main() {
   // 4. Open Graph share card.
   await writeOg(ogCardSvg(), resolve(publicDir, "og-default.png"));
 
-  console.log("Brand assets generated.");
+  // 5. iOS PWA splash screens. Each PNG is sized to a real iPhone/iPad
+  //    portrait pixel resolution and is referenced from index.html via
+  //    a matching apple-touch-startup-image media query. Without these,
+  //    iOS shows a plain white card during PWA launch.
+  const splashDir = resolve(publicDir, "splash");
+  await ensureDir(splashDir);
+  for (const { width, height } of SPLASH_SIZES) {
+    const svg = splashSvg({ width, height });
+    const buf = await sharp(Buffer.from(svg)).png().toBuffer();
+    await writeFile(
+      resolve(splashDir, `apple-splash-${width}x${height}.png`),
+      buf,
+    );
+  }
+
+  // Print the canonical <link> tags derived from SPLASH_SIZES so that
+  // SPLASH_SIZES stays the single source of truth: if the device list
+  // ever changes, copy this output into the iOS PWA splash block in
+  // client/index.html instead of hand-editing media queries.
+  console.log("\nApple touch startup image link tags (paste into client/index.html):");
+  for (const { width, height, dWidth, dHeight, ratio } of SPLASH_SIZES) {
+    console.log(
+      `<link rel="apple-touch-startup-image" href="/splash/apple-splash-${width}x${height}.png"\n` +
+      `      media="(device-width: ${dWidth}px) and (device-height: ${dHeight}px) and (-webkit-device-pixel-ratio: ${ratio}) and (orientation: portrait)" />`
+    );
+  }
+
+  console.log("\nBrand assets generated.");
 }
 
 main().catch((err) => {
