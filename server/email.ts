@@ -54,7 +54,8 @@ export async function sendWelcomeEmail(userEmail: string, userName: string): Pro
 export async function sendNewSignupNotification(
   newUserName: string,
   newUserEmail: string | null | undefined,
-  authMethod: "google" | "replit"
+  authMethod: "google" | "replit",
+  recipientOverride?: string,
 ): Promise<void> {
   if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) return;
 
@@ -66,7 +67,7 @@ export async function sendNewSignupNotification(
   try {
     await transporter.sendMail({
       from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
-      to: "hello@hobbyalpha.com",
+      to: recipientOverride || "hello@hobbyalpha.com",
       subject: `New signup: ${displayName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">

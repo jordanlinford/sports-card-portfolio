@@ -53,6 +53,19 @@ import { generateCardOutlook, generateQuickOutlook, inferCardMetadata } from "./
 import { 
   sendPaymentConfirmationEmail,
   sendRebrandAnnouncementEmail,
+  renderRebrandAnnouncementEmail,
+  sendWelcomeEmail,
+  sendNewSignupNotification,
+  sendPriceAlertEmail,
+  sendWeeklyDigestEmail,
+  sendSplitJoinedEmail,
+  sendSplitPaymentOpenEmail,
+  sendSplitAssignmentEmail,
+  sendBreakCompleteEmail,
+  sendSplitShippedEmail,
+  sendNewParticipantJoinedEmail,
+  sendWinBackEmail,
+  sendReferralInviteEmail,
 } from "./email";
 import * as fs from "fs";
 import * as path from "path";
@@ -6978,6 +6991,260 @@ RULES:
     } catch (error) {
       console.error("Error broadcasting rebrand announcement:", error);
       res.status(500).json({ message: "Failed to broadcast rebrand announcement" });
+    }
+  });
+
+  // Admin: Live status for the in-flight (or most recent) rebrand broadcast.
+  //
+  // The Admin Announcements tab polls this while a job is running so it can
+  // render a progress bar without keeping the original POST request open.
+  // When no job has ever run this returns running=false with zeroed counters
+  // and a null jobId, which the frontend treats as "nothing to show".
+  app.get("/api/admin/rebrand-announcement/status", isAuthenticated, isAdmin, async (_req, res) => {
+    res.json({
+      running: rebrandJobState.running,
+      jobId: rebrandJobState.jobId,
+      startedAt: rebrandJobState.startedAt,
+      lastFinishedAt: rebrandJobState.lastFinishedAt,
+      totalQueued: rebrandJobState.totalQueued,
+      sentCount: rebrandJobState.sentCount,
+      failedCount: rebrandJobState.failedCount,
+      remaining: rebrandJobState.remaining,
+      alreadySentCount: rebrandJobState.alreadySentCount,
+      eligibleCount: rebrandJobState.eligibleCount,
+      error: rebrandJobState.error,
+    });
+  });
+
+  // Admin: Preview the rendered rename announcement email body.
+  //
+  // Returns the exact same subject + HTML + plaintext payload that
+  // sendRebrandAnnouncementEmail produces, rendered against the calling
+  // admin's name + user id (so unsubscribe links resolve to the admin's own
+  // token). Lets admins eyeball the email before kicking off the broadcast.
+  app.get("/api/admin/rebrand-announcement/preview", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const adminUser = await storage.getUser(userId);
+      const name =
+        adminUser?.firstName ||
+        (adminUser?.handle ? `@${adminUser.handle}` : null);
+      const rendered = renderRebrandAnnouncementEmail(name, userId);
+      res.json({
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        previewedAs: {
+          name: name ?? null,
+          email: adminUser?.email ?? null,
+        },
+      });
+    } catch (error) {
+      console.error("Error rendering rebrand announcement preview:", error);
+      res.status(500).json({ message: "Failed to render preview" });
+    }
+  });
+
+  // Admin: Send a test rename announcement email to the calling admin.
+  //
+  // Uses the same sendRebrandAnnouncementEmail path as the real broadcast so
+  // the inbox copy matches what users will receive. Does NOT touch the
+  // rebrand-announcement ledger so admins can re-test as many times as they
+  // want without affecting the production broadcast.
+  app.post("/api/admin/rebrand-announcement/test", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const adminUser = await storage.getUser(userId);
+      if (!adminUser?.email || !adminUser.email.includes("@")) {
+        return res.status(400).json({
+          message: "Your admin account doesn't have an email on file to send the test to.",
+        });
+      }
+      const name =
+        adminUser.firstName ||
+        (adminUser.handle ? `@${adminUser.handle}` : null);
+      const ok = await sendRebrandAnnouncementEmail(adminUser.email, name, userId);
+      if (!ok) {
+        return res.status(502).json({
+          message:
+            "Test send failed. Check that ZOHO_EMAIL / ZOHO_APP_PASSWORD are configured and try again.",
+        });
+      }
+      res.json({ success: true, sentTo: adminUser.email });
+    } catch (error) {
+      console.error("Error sending rebrand announcement test:", error);
+      res.status(500).json({ message: "Failed to send test email" });
+    }
+  });
+
+  // Admin: Spot-check every branded email template by firing one of each
+  // at a target QA inbox. Useful for visually QAing rebrand/header changes
+  // in real clients (Gmail web, iOS Mail, Outlook) without waiting for
+  // weekly digests, win-back jobs, split events, etc. to fire naturally.
+  //
+  // Body: { targetEmail?: string }  — defaults to the admin's own email.
+  app.post("/api/admin/send-email-samples", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const adminUserId = req.user.claims.sub;
+      const adminUser = await storage.getUser(adminUserId);
+
+      const requested = typeof req.body?.targetEmail === "string"
+        ? req.body.targetEmail.trim()
+        : "";
+      const targetEmail = requested || adminUser?.email || "";
+
+      if (!targetEmail || !targetEmail.includes("@")) {
+        return res.status(400).json({
+          message: "Provide a targetEmail in the body, or set an email on your admin account.",
+        });
+      }
+
+      if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
+        return res.status(503).json({
+          message: "Zoho SMTP credentials are not configured (ZOHO_EMAIL / ZOHO_APP_PASSWORD).",
+        });
+      }
+
+      const sampleName = adminUser?.firstName || "Sample Collector";
+      // Use a synthetic userId for unsubscribe-link rendering on QA sends so
+      // we don't accidentally tie sample sends to a real user's unsubscribe
+      // tokens.
+      const sampleUserId = `sample-${adminUserId}`;
+      const sampleSplit = {
+        title: "2024 Topps Chrome Hobby Box",
+        sport: "Baseball",
+        brand: "Topps",
+        year: "2024",
+        formatType: "Team",
+        seatPrice: 4500,
+      };
+
+      // Each sample has a `run` that returns the underlying sender's promise.
+      // `returnsBoolean` flags senders whose contract is `Promise<boolean>` —
+      // those swallow exceptions internally and signal failure via `false`,
+      // so we have to check the resolved value (not just whether it threw).
+      // The `void`-returning senders log internally on failure, which is the
+      // best signal we can surface for them without rewriting their contracts.
+      const samples: Array<{ name: string; returnsBoolean: boolean; run: () => Promise<unknown> }> = [
+        { name: "welcome", returnsBoolean: false, run: () => sendWelcomeEmail(targetEmail, sampleName) },
+        { name: "payment_confirmation", returnsBoolean: false, run: () => sendPaymentConfirmationEmail(targetEmail, sampleName) },
+        {
+          name: "price_alert",
+          returnsBoolean: true,
+          run: () => sendPriceAlertEmail(targetEmail, sampleName, "2018 Bowman Chrome Ronald Acuña Jr. RC PSA 10", "above", 750, 812.5),
+        },
+        {
+          name: "weekly_digest",
+          returnsBoolean: true,
+          run: () => sendWeeklyDigestEmail(targetEmail, sampleName, {
+            totalValue: 12480,
+            totalCards: 142,
+            totalCases: 6,
+            topMovers: [
+              { title: "2020 Topps Chrome Luis Robert RC", currentValue: 185.0, previousValue: 142.0, change: 43.0, changePercent: 30.3 },
+              { title: "2018 Panini Prizm Luka Dončić RC", currentValue: 540.0, previousValue: 612.0, change: -72.0, changePercent: -11.8 },
+              { title: "2022 Topps Chrome Julio Rodríguez RC", currentValue: 96.5, previousValue: 80.0, change: 16.5, changePercent: 20.6 },
+            ],
+          }, sampleUserId),
+        },
+        {
+          name: "win_back",
+          returnsBoolean: false,
+          run: () => sendWinBackEmail(targetEmail, sampleName, [
+            "Shohei Ohtani: prices up 8% this week",
+            "CJ Stroud rookies: 3 large sales above $200",
+            "Caitlin Clark Prizm RC: down 5%, possible buy window",
+          ], sampleUserId),
+        },
+        {
+          name: "rebrand_announcement",
+          returnsBoolean: true,
+          run: () => sendRebrandAnnouncementEmail(targetEmail, sampleName, sampleUserId),
+        },
+        { name: "split_joined", returnsBoolean: true, run: () => sendSplitJoinedEmail(targetEmail, sampleName, sampleSplit) },
+        {
+          name: "split_payment_open",
+          returnsBoolean: true,
+          run: () => sendSplitPaymentOpenEmail(targetEmail, sampleName, {
+            title: sampleSplit.title,
+            sport: sampleSplit.sport,
+            seatPrice: sampleSplit.seatPrice,
+            deadline: new Date(Date.now() + 48 * 60 * 60 * 1000),
+          }),
+        },
+        {
+          name: "split_assignment",
+          returnsBoolean: true,
+          run: () => sendSplitAssignmentEmail(targetEmail, sampleName, { title: sampleSplit.title, sport: sampleSplit.sport }, "New York Yankees", 2),
+        },
+        {
+          name: "break_complete",
+          returnsBoolean: true,
+          run: () => sendBreakCompleteEmail(targetEmail, sampleName, { title: sampleSplit.title, sport: sampleSplit.sport }, "New York Yankees", "https://youtu.be/dQw4w9WgXcQ"),
+        },
+        {
+          name: "split_shipped",
+          returnsBoolean: true,
+          run: () => sendSplitShippedEmail(targetEmail, sampleName, { title: sampleSplit.title, sport: sampleSplit.sport }, "New York Yankees", "1Z999AA10123456784"),
+        },
+        {
+          name: "new_participant_joined",
+          returnsBoolean: true,
+          run: () => sendNewParticipantJoinedEmail(targetEmail, sampleName, { title: sampleSplit.title, currentCount: 4, totalCount: 6 }),
+        },
+        {
+          name: "referral_invite",
+          returnsBoolean: false,
+          run: () => sendReferralInviteEmail(targetEmail, sampleName, "QASAMPLE"),
+        },
+        {
+          name: "signup_notification",
+          returnsBoolean: false,
+          run: () => sendNewSignupNotification(sampleName, "newuser@example.com", "google", targetEmail),
+        },
+      ];
+
+      const results: Array<{ template: string; ok: boolean; error?: string }> = [];
+      for (const sample of samples) {
+        try {
+          const value = await sample.run();
+          if (sample.returnsBoolean && value === false) {
+            results.push({
+              template: sample.name,
+              ok: false,
+              error: "sender returned false (see server logs for the underlying SMTP error)",
+            });
+          } else {
+            results.push({ template: sample.name, ok: true });
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error(`[send-email-samples] ${sample.name} failed:`, err);
+          results.push({ template: sample.name, ok: false, error: message });
+        }
+      }
+
+      const sent = results.filter((r) => r.ok).length;
+      const failed = results.length - sent;
+      console.log(
+        `[send-email-samples] admin=${adminUserId} target=${targetEmail} sent=${sent}/${results.length} failed=${failed}`,
+      );
+      res.json({
+        success: failed === 0,
+        sentTo: targetEmail,
+        total: results.length,
+        sent,
+        failed,
+        // void-returning senders (welcome, payment_confirmation, win_back,
+        // referral_invite, signup_notification) swallow SMTP errors
+        // internally; their `ok: true` here only means no exception bubbled
+        // up. Check server logs for any "Failed to send ..." errors.
+        note: "Templates whose senders return Promise<void> only report ok=true if no exception was thrown; SMTP errors for those are logged server-side.",
+        results,
+      });
+    } catch (error) {
+      console.error("Error sending email samples:", error);
+      res.status(500).json({ message: "Failed to send sample emails" });
     }
   });
 
