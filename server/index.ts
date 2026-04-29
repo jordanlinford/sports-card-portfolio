@@ -131,6 +131,19 @@ app.use((req, res, next) => {
         });
         console.log("[Regression] Admin endpoint registered: GET /api/admin/run-regression");
 
+        // Public track-record endpoint — verdict accuracy backtesting
+        app.get("/api/track-record", async (_req, res) => {
+          try {
+            const { computeVerdictAccuracy } = await import("./backtestService");
+            const summary = await computeVerdictAccuracy();
+            res.json(summary);
+          } catch (error) {
+            console.error("Error computing track record:", error);
+            res.status(500).json({ message: "Failed to compute track record" });
+          }
+        });
+        console.log("[Backtest] Track record endpoint registered: GET /api/track-record");
+
         // Admin endpoint to clean up cards with bad AI-generated variation strings
         // (gated by QA_LOGIN_TOKEN). Must be registered BEFORE setupVite.
         app.post("/api/admin/cleanup-bad-variations", async (req, res) => {
@@ -235,6 +248,19 @@ app.use((req, res, next) => {
           }
         });
         console.log("[Regression] Admin endpoint registered: GET /api/admin/run-regression");
+
+        // Public track-record endpoint — verdict accuracy backtesting
+        app.get("/api/track-record", async (_req, res) => {
+          try {
+            const { computeVerdictAccuracy } = await import("./backtestService");
+            const summary = await computeVerdictAccuracy();
+            res.json(summary);
+          } catch (error) {
+            console.error("Error computing track record:", error);
+            res.status(500).json({ message: "Failed to compute track record" });
+          }
+        });
+        console.log("[Backtest] Track record endpoint registered: GET /api/track-record");
 
         log("All routes registered successfully");
         
