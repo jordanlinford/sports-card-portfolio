@@ -52,6 +52,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { trackEvent } from "@/lib/analytics";
 import { useToast } from "@/hooks/use-toast";
 import { ShareSnapshotButton } from "@/components/share-snapshot-button";
+import { VerdictHistory } from "@/components/verdict-history";
 import { InvestmentCallCard } from "@/components/investment-call-card";
 import { AdvisorSnapshot } from "@/components/outlook/AdvisorSnapshot";
 import { OutlookAccordions } from "@/components/outlook/OutlookAccordions";
@@ -2070,6 +2071,9 @@ export default function PlayerOutlookPage() {
           
           {/* Outlook history - track verdict changes over time */}
           <OutlookHistoryPanel playerKey={playerKey} />
+
+          {/* Verdict regression history - weekly snapshot timeline */}
+          {playerKey && <VerdictHistory playerKey={playerKey} />}
           
           <Card>
             <CardContent className="pt-6">

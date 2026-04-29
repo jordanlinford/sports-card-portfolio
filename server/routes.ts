@@ -37,6 +37,7 @@ import {
   hasProAccess,
   playerOutlookCache,
   users,
+  verdictRegressionRuns,
 } from "@shared/schema";
 import { db } from "./db";
 import { desc, eq, sql, isNotNull } from "drizzle-orm";
@@ -5493,6 +5494,30 @@ Sitemap: ${origin}/sitemap.xml
     } catch (error) {
       console.error("Error getting player outlook history:", error);
       res.status(500).json({ message: "Failed to get outlook history" });
+    }
+  });
+
+  // Get verdict regression history for a player (weekly snapshots)
+  app.get("/api/players/:playerKey/verdict-history", async (req, res) => {
+    try {
+      const playerKey = decodeURIComponent(req.params.playerKey);
+
+      const history = await db
+        .select({
+          verdict: verdictRegressionRuns.currentVerdict,
+          price: verdictRegressionRuns.currentPrice,
+          date: verdictRegressionRuns.runDate,
+          isFlip: verdictRegressionRuns.isFlip,
+        })
+        .from(verdictRegressionRuns)
+        .where(eq(verdictRegressionRuns.playerKey, playerKey))
+        .orderBy(desc(verdictRegressionRuns.runDate))
+        .limit(52); // Up to 1 year of weekly snapshots
+
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching verdict history:", error);
+      res.status(500).json({ message: "Failed to fetch verdict history" });
     }
   });
 

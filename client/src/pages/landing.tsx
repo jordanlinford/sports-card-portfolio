@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 
+import { CardOfDay } from "@/components/card-of-day";
 import playerOutlookImg from "@assets/sportscardportfolio.io_player-outlook_1766201421160.png";
 
 export default function Landing() {
@@ -193,6 +194,13 @@ export default function Landing() {
               </Link>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* CARD OF THE DAY */}
+      <section className="py-10 md:py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <CardOfDay />
         </div>
       </section>
 

@@ -8,7 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { AtSign, Check, X, Loader2, Crown, Pause, Play, Users, Copy, Mail } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { AtSign, Check, X, Loader2, Crown, Pause, Play, Users, Copy, Mail, Download, Trash2, Shield } from "lucide-react";
 import type { User } from "@shared/schema";
 import { hasProAccess } from "@shared/schema";
 
@@ -101,6 +112,40 @@ export default function Settings() {
       setInviteEmail("");
     },
     onError: (e: Error) => toast({ variant: "destructive", title: "Failed to send invite", description: e.message }),
+  });
+
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+
+  const exportData = async () => {
+    setIsExporting(true);
+    try {
+      const res = await fetch("/api/account/export", { credentials: "include" });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "my-data-export.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Export complete", description: "Your data has been downloaded." });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Export failed", description: e.message });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => apiRequest("DELETE", "/api/account"),
+    onSuccess: () => {
+      toast({ title: "Account deleted", description: "Your account and all data have been permanently removed." });
+      window.location.href = "/";
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Failed to delete account", description: e.message }),
   });
 
   const copyReferral = () => {
@@ -205,15 +250,32 @@ export default function Settings() {
                   </a>
                 )}
                 {isPro && !isPaused && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => pauseMutation.mutate()}
-                    disabled={pauseMutation.isPending}
-                    data-testid="button-pause-subscription"
-                  >
-                    {pauseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Pause className="h-4 w-4 mr-1" /> Pause for 90 days</>}
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={pauseMutation.isPending}
+                        data-testid="button-pause-subscription"
+                      >
+                        {pauseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Pause className="h-4 w-4 mr-1" /> Pause for 90 days</>}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Pause your subscription?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Your subscription will be paused for up to 3 months. You'll keep access until the current billing period ends.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => pauseMutation.mutate()}>
+                          Pause Subscription
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 )}
                 {isPro && isPaused && (
                   <Button
@@ -377,6 +439,83 @@ export default function Settings() {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              Data &amp; Privacy
+            </CardTitle>
+            <CardDescription>
+              Export your data or permanently delete your account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Export My Data</p>
+                <p className="text-xs text-muted-foreground">Download a JSON file with all your account data.</p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={exportData}
+                disabled={isExporting}
+                data-testid="button-export-data"
+              >
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Download className="h-4 w-4 mr-1" />}
+                Export
+              </Button>
+            </div>
+
+            <hr className="border-border" />
+
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-destructive">Delete Account</p>
+                <p className="text-xs text-muted-foreground">
+                  This will permanently delete your account and all data. This cannot be undone.
+                </p>
+              </div>
+              <AlertDialog onOpenChange={(open) => { if (!open) setDeleteConfirmText(""); }}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    data-testid="button-delete-account"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Delete Account
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete your account and all data. This cannot be undone.
+                      Type <span className="font-mono font-bold">DELETE</span> below to confirm.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <Input
+                    placeholder='Type "DELETE" to confirm'
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    data-testid="input-delete-confirm"
+                  />
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={deleteConfirmText !== "DELETE" || deleteAccountMutation.isPending}
+                      onClick={() => deleteAccountMutation.mutate()}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {deleteAccountMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+                      Permanently Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </CardContent>
         </Card>
       </main>

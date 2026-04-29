@@ -58,6 +58,7 @@ import SealedRoiPage, { SharedSealedRoiPage } from "@/pages/sealed-roi";
 import AlphaFeedPage from "@/pages/alpha-feed";
 import MarketLeaderboardPage from "@/pages/market-leaderboard";
 import PublicIntelPage from "@/pages/public-intel";
+import TrackRecordPage from "@/pages/track-record";
 import { TrialBanner } from "@/components/trial-banner";
 import { GoogleLinkBanner } from "@/components/google-link-banner";
 import { BatchAnalysisBanner } from "@/components/batch-analysis-banner";
@@ -96,6 +97,7 @@ function Router() {
       <Route path="/intel" component={PublicIntelPage} />
       <Route path="/market/topps-takeover" component={ToppsTakeoverPage} />
       <Route path="/alpha" component={AlphaFeedPage} />
+      <Route path="/track-record" component={TrackRecordPage} />
       <Route path="/outlook" component={OutlookOverviewPage} />
       <Route path="/watchlist" component={WatchlistPage} />
       <Route path="/case/:id" component={CaseView} />

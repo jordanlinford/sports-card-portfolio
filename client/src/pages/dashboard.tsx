@@ -38,6 +38,7 @@ import type { DisplayCaseWithCards } from "@shared/schema";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ProFeatureGate } from "@/components/pro-feature-gate";
+import { CardOfDay } from "@/components/card-of-day";
 
 function DashboardSkeleton() {
   return (
@@ -488,6 +489,8 @@ export default function Dashboard() {
           </Card>
         );
       })()}
+
+      <CardOfDay />
 
       {/* Break Value Auditor CTA */}
       <Card className="mb-8 bg-gradient-to-r from-primary/5 via-primary/10 to-accent/5 border-primary/20">
