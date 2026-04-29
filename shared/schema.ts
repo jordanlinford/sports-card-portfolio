@@ -75,6 +75,9 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
   loginCount: integer("login_count").default(0).notNull(),
   cancelledAt: timestamp("cancelled_at"),
+  subscriptionPaused: boolean("subscription_paused").default(false),
+  pauseResumesAt: timestamp("pause_resumes_at"),
+  winBackSentAt: timestamp("win_back_sent_at"),
   referralCode: varchar("referral_code", { length: 20 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -2848,7 +2851,7 @@ export const referrals = pgTable("referrals", {
   referrerId: varchar("referrer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   referredEmail: varchar("referred_email", { length: 255 }).notNull(),
   referredUserId: varchar("referred_user_id").references(() => users.id),
-  referralCode: varchar("referral_code", { length: 20 }).notNull().unique(),
+  referralCode: varchar("referral_code", { length: 20 }).notNull(),
   status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, signed_up, converted
   rewardGranted: boolean("reward_granted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -2856,4 +2859,5 @@ export const referrals = pgTable("referrals", {
 }, (table) => [
   index("idx_referrals_referrer").on(table.referrerId),
   index("idx_referrals_code").on(table.referralCode),
+  uniqueIndex("uniq_referrals_referrer_email").on(table.referrerId, table.referredEmail),
 ]);

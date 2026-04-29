@@ -43,13 +43,19 @@ export async function submitScanAndWait(opts: SubmitOptions): Promise<any> {
     overallTimeoutMs = 180_000,
   } = opts;
 
+  const { getCsrfToken, captureCsrfToken } = await import("./queryClient");
+  const csrf = getCsrfToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (csrf) headers["x-csrf-token"] = csrf;
+
   const res = await fetch("/api/cards/scan-identify", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     credentials: "include",
     body: JSON.stringify(body),
     signal,
   });
+  captureCsrfToken(res);
 
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

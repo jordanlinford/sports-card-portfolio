@@ -9,6 +9,16 @@ function updateCsrfToken(res: Response) {
   if (token) csrfToken = token;
 }
 
+// Exposed so non-apiRequest fetches (e.g. multipart/scan endpoints) can
+// attach the CSRF header and update the cached token after each response.
+export function getCsrfToken(): string | null {
+  return csrfToken;
+}
+
+export function captureCsrfToken(res: Response) {
+  updateCsrfToken(res);
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;

@@ -1,13 +1,13 @@
 import { db } from "./db";
 import { users, playerWatchlist, playerOutlookCache } from "@shared/schema";
-import { eq, and, lte, gte, isNotNull } from "drizzle-orm";
+import { eq, and, lte, gte, isNotNull, isNull } from "drizzle-orm";
 import { sendWinBackEmail } from "./email";
 
 export async function runWinBackEmails(): Promise<void> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
 
-  // Find users who cancelled exactly 7 days ago (within a 1-day window)
+  // Find users who cancelled ~7 days ago and haven't been emailed yet (idempotent)
   const cancelledUsers = await db
     .select()
     .from(users)
@@ -16,6 +16,7 @@ export async function runWinBackEmails(): Promise<void> {
       gte(users.cancelledAt, eightDaysAgo),
       lte(users.cancelledAt, sevenDaysAgo),
       isNotNull(users.email),
+      isNull(users.winBackSentAt),
     ));
 
   for (const user of cancelledUsers) {
@@ -42,6 +43,7 @@ export async function runWinBackEmails(): Promise<void> {
 
       const userName = [user.firstName, user.lastName].filter(Boolean).join(" ");
       await sendWinBackEmail(user.email!, userName, moves);
+      await db.update(users).set({ winBackSentAt: new Date() }).where(eq(users.id, user.id));
       console.log(`[WinBack] Sent win-back email to ${user.email}`);
     } catch (err) {
       console.error(`[WinBack] Failed for user ${user.id}:`, err);

@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
-import { AtSign, Check, X, Loader2 } from "lucide-react";
+import { AtSign, Check, X, Loader2, Crown, Pause, Play, Users, Copy, Mail } from "lucide-react";
 import type { User } from "@shared/schema";
+import { hasProAccess } from "@shared/schema";
 
 export default function Settings() {
   const { user, isLoading: authLoading } = useAuth();
@@ -60,6 +61,54 @@ export default function Settings() {
 
     return () => clearTimeout(timeoutId);
   }, [handle, currentUser?.handle]);
+
+  const isPro = hasProAccess(currentUser);
+  const isPaused = !!(currentUser as any)?.subscriptionPaused;
+
+  const { data: referralData } = useQuery<{ code: string; referralCount: number }>({
+    queryKey: ["/api/referral/code"],
+    enabled: !!user,
+  });
+
+  const referralUrl = referralData?.code
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/?ref=${referralData.code}`
+    : "";
+
+  const [inviteEmail, setInviteEmail] = useState("");
+
+  const pauseMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/subscription/pause", {}),
+    onSuccess: () => {
+      toast({ title: "Subscription paused", description: "It will auto-resume in 3 months." });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Failed to pause", description: e.message }),
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/subscription/resume", {}),
+    onSuccess: () => {
+      toast({ title: "Subscription resumed", description: "Welcome back!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Failed to resume", description: e.message }),
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (email: string) => apiRequest("POST", "/api/referral/invite", { email }),
+    onSuccess: () => {
+      toast({ title: "Invitation sent!", description: `We emailed ${inviteEmail} your referral link.` });
+      setInviteEmail("");
+    },
+    onError: (e: Error) => toast({ variant: "destructive", title: "Failed to send invite", description: e.message }),
+  });
+
+  const copyReferral = () => {
+    if (referralUrl) {
+      navigator.clipboard.writeText(referralUrl);
+      toast({ title: "Copied!", description: "Referral link copied to clipboard." });
+    }
+  };
 
   const updateHandleMutation = useMutation({
     mutationFn: async (newHandle: string) => {
@@ -124,6 +173,62 @@ export default function Settings() {
     <div className="min-h-screen bg-background">
       <main className="max-w-2xl mx-auto px-4 py-8">
         <h1 className="text-2xl font-bold mb-6" data-testid="text-settings-title">Settings</h1>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-primary" />
+              Subscription
+            </CardTitle>
+            <CardDescription>
+              Manage your Pro subscription. Pause anytime — your data stays put.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <Badge variant={isPro ? "default" : "secondary"} data-testid="badge-subscription-status">
+                  {isPro ? (isPaused ? "Paused" : "Pro") : "Free"}
+                </Badge>
+                <span className="text-sm text-muted-foreground">
+                  {isPro
+                    ? isPaused
+                      ? "Auto-resumes within 90 days"
+                      : "Active — thanks for supporting us!"
+                    : "Upgrade to unlock unlimited cases & Pro features"}
+                </span>
+              </div>
+              <div className="flex gap-2">
+                {!isPro && (
+                  <a href="/upgrade">
+                    <Button size="sm" data-testid="button-upgrade-from-settings">Upgrade</Button>
+                  </a>
+                )}
+                {isPro && !isPaused && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => pauseMutation.mutate()}
+                    disabled={pauseMutation.isPending}
+                    data-testid="button-pause-subscription"
+                  >
+                    {pauseMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Pause className="h-4 w-4 mr-1" /> Pause for 90 days</>}
+                  </Button>
+                )}
+                {isPro && isPaused && (
+                  <Button
+                    size="sm"
+                    onClick={() => resumeMutation.mutate()}
+                    disabled={resumeMutation.isPending}
+                    data-testid="button-resume-subscription"
+                  >
+                    {resumeMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Play className="h-4 w-4 mr-1" /> Resume</>}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -208,6 +313,70 @@ export default function Settings() {
               on comments, messages, follower lists, and in notifications. This helps keep your
               real identity private while still participating in the collector community.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Refer Friends
+            </CardTitle>
+            <CardDescription>
+              Share your link with fellow collectors. Help us grow the community.
+              {referralData?.referralCount ? ` You've referred ${referralData.referralCount} friend${referralData.referralCount === 1 ? "" : "s"} so far.` : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Your referral link</Label>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={referralUrl || "Loading..."}
+                  className="font-mono text-xs"
+                  data-testid="input-referral-link"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={copyReferral}
+                  disabled={!referralUrl}
+                  data-testid="button-copy-referral"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (inviteEmail.trim()) inviteMutation.mutate(inviteEmail.trim());
+              }}
+              className="space-y-2"
+            >
+              <Label htmlFor="invite-email">Email a friend an invitation</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="invite-email"
+                  type="email"
+                  placeholder="friend@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  disabled={inviteMutation.isPending}
+                  data-testid="input-invite-email"
+                />
+                <Button
+                  type="submit"
+                  disabled={!inviteEmail.trim() || inviteMutation.isPending}
+                  data-testid="button-send-invite"
+                >
+                  {inviteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Mail className="h-4 w-4 mr-1" /> Invite</>}
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       </main>

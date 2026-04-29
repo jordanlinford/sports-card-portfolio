@@ -6398,7 +6398,12 @@ RULES:
       // Determine which price to use based on the requested plan
       const { plan } = req.body;
       let priceId: string;
-      if (plan === "annual" && process.env.STRIPE_ANNUAL_PRICE_ID) {
+      if (plan === "annual") {
+        if (!process.env.STRIPE_ANNUAL_PRICE_ID) {
+          return res.status(503).json({
+            error: "Annual plan is not currently configured. Please choose monthly or contact support.",
+          });
+        }
         priceId = process.env.STRIPE_ANNUAL_PRICE_ID;
       } else {
         // Resolve the correct monthly Pro price ID — validates env var or falls back to dynamic lookup
@@ -6540,13 +6545,21 @@ RULES:
       }
 
       const stripe = await getUncachableStripeClient();
+      const resumesAtSec = Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60);
       // Pause collection for up to 3 months
       await stripe.subscriptions.update(user.stripeSubscriptionId, {
         pause_collection: {
           behavior: "void",
-          resumes_at: Math.floor(Date.now() / 1000) + (90 * 24 * 60 * 60), // 3 months max
+          resumes_at: resumesAtSec,
         },
       });
+
+      // Persist local pause state so UI can show resume button
+      await db.update(users).set({
+        subscriptionPaused: true,
+        pauseResumesAt: new Date(resumesAtSec * 1000),
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
 
       res.json({ message: "Subscription paused. It will auto-resume in 3 months." });
     } catch (error) {
@@ -6568,6 +6581,12 @@ RULES:
       await stripe.subscriptions.update(user.stripeSubscriptionId, {
         pause_collection: null, // Remove pause
       });
+
+      await db.update(users).set({
+        subscriptionPaused: false,
+        pauseResumesAt: null,
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
 
       res.json({ message: "Subscription resumed" });
     } catch (error) {
@@ -6625,28 +6644,50 @@ RULES:
     }
   });
 
-  // POST /api/referral/invite — send referral email
-  app.post("/api/referral/invite", isAuthenticated, async (req: any, res) => {
+  // POST /api/referral/invite — send referral email (rate-limited to curb spam)
+  app.post("/api/referral/invite", resourceCreationLimiter, isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const { email } = req.body;
-      if (!email) return res.status(400).json({ message: "Email required" });
+      const rawEmail = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!rawEmail || !emailRegex.test(rawEmail) || rawEmail.length > 254) {
+        return res.status(400).json({ message: "Valid email required" });
+      }
 
       const user = await storage.getUser(userId);
       if (!user?.referralCode) return res.status(400).json({ message: "No referral code" });
+      if (user.email && user.email.toLowerCase() === rawEmail) {
+        return res.status(400).json({ message: "You can't invite yourself" });
+      }
 
-      // Create referral record
+      // Per-user daily quota (soft cap on top of IP rate limit)
       const { referrals } = await import("@shared/schema");
-      await db.insert(referrals).values({
-        referrerId: userId,
-        referredEmail: email,
-        referralCode: user.referralCode,
-      });
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const dailyCount = await db
+        .select({ count: sql`count(*)` })
+        .from(referrals)
+        .where(sql`${referrals.referrerId} = ${userId} AND ${referrals.createdAt} >= ${since}`);
+      if (Number(dailyCount[0]?.count || 0) >= 25) {
+        return res.status(429).json({ message: "Daily invite limit reached (25). Try again tomorrow." });
+      }
+
+      // Idempotent insert: skip if (referrer, email) already exists
+      try {
+        await db.insert(referrals).values({
+          referrerId: userId,
+          referredEmail: rawEmail,
+          referralCode: user.referralCode,
+        });
+      } catch (e: any) {
+        if (e?.code === "23505") {
+          return res.status(200).json({ message: "Invitation already sent to this email" });
+        }
+        throw e;
+      }
 
       const userName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "A friend";
-      // Send invite email
       const { sendReferralInviteEmail } = await import("./email");
-      await sendReferralInviteEmail(email, userName, user.referralCode);
+      await sendReferralInviteEmail(rawEmail, userName, user.referralCode);
 
       res.json({ message: "Invitation sent" });
     } catch (error) {
