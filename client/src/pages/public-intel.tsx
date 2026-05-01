@@ -92,17 +92,17 @@ const SPORTS = [
 function getVerdictStyle(verdict: string) {
   switch (verdict) {
     case "BUY":
-      return { bg: "bg-green-500/10", text: "text-green-700 dark:text-green-400", icon: <ShoppingCart className="h-3 w-3" /> };
+      return { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-400", icon: <ShoppingCart className="h-3 w-3" /> };
     case "HOLD_CORE":
       return { bg: "bg-blue-500/10", text: "text-blue-700 dark:text-blue-400", icon: <Shield className="h-3 w-3" /> };
     case "TRADE_THE_HYPE":
-      return { bg: "bg-orange-500/10", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-3 w-3" /> };
+      return { bg: "bg-rose-500/10", text: "text-rose-700 dark:text-rose-400", icon: <TrendingDown className="h-3 w-3" /> };
     case "AVOID":
-      return { bg: "bg-red-500/10", text: "text-red-700 dark:text-red-400", icon: <Ban className="h-3 w-3" /> };
+      return { bg: "bg-violet-500/10", text: "text-violet-700 dark:text-violet-400", icon: <Ban className="h-3 w-3" /> };
     case "SPECULATIVE":
       return { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-3 w-3" /> };
     default:
-      return { bg: "bg-yellow-500/10", text: "text-yellow-700 dark:text-yellow-400", icon: <Minus className="h-3 w-3" /> };
+      return { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", icon: <Minus className="h-3 w-3" /> };
   }
 }
 

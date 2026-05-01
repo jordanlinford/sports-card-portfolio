@@ -153,7 +153,7 @@ function ValueChangeIndicator({ card }: { card: Card }) {
   const isPositive = change > 0;
   
   return (
-    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
       {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {isPositive ? '+' : ''}{percentChange}%
     </span>
@@ -211,9 +211,9 @@ function CaseStatsStrip({ cards }: { cards: Card[] }) {
   const dominantVerdict = verdictEntries[0]?.[0] || null;
   const dominantShare = dominantVerdict ? Math.round((verdictCounts[dominantVerdict] / totalWithVerdict) * 100) : 0;
   const verdictColor = (v: string) => {
-    if (v === "BUY") return { dot: "bg-green-500", text: "text-green-700 dark:text-green-400" };
-    if (v === "SELL") return { dot: "bg-red-500", text: "text-red-700 dark:text-red-400" };
-    return { dot: "bg-yellow-500", text: "text-yellow-700 dark:text-yellow-400" };
+    if (v === "BUY") return { dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-400" };
+    if (v === "SELL") return { dot: "bg-violet-500", text: "text-violet-700 dark:text-violet-400" };
+    return { dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-400" };
   };
 
   const tier = caseTier(totalValue);
@@ -250,7 +250,7 @@ function CaseStatsStrip({ cards }: { cards: Card[] }) {
           <div className="text-lg font-medium text-muted-foreground leading-none" data-testid="stat-recent-change-empty">—</div>
         ) : (
           <div
-            className={`text-2xl font-semibold leading-none inline-flex items-center gap-1 ${weightedChangePct >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+            className={`text-2xl font-semibold leading-none inline-flex items-center gap-1 ${weightedChangePct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
             data-testid="stat-recent-change"
           >
             {weightedChangePct >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
@@ -299,7 +299,7 @@ function CaseStatsStrip({ cards }: { cards: Card[] }) {
               {topMover.card.title}
             </div>
             <div
-              className={`text-sm font-semibold mt-1 inline-flex items-center gap-0.5 ${topMover.pct >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+              className={`text-sm font-semibold mt-1 inline-flex items-center gap-0.5 ${topMover.pct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}
               data-testid="stat-top-mover-pct"
             >
               {topMover.pct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -560,7 +560,7 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
                 <OutlookBadge action={card.outlookAction} size="sm" />
                 {card.outlookBigMover && (
                   <div
-                    className="bg-purple-500/90 p-1 rounded"
+                    className="bg-pink-500/90 p-1 rounded"
                     title="Big Mover Potential"
                     data-testid={`badge-big-mover-${card.id}`}
                   >
@@ -569,7 +569,7 @@ function CardItem({ card, theme, onClick, featured = false, compact = false }: C
                 )}
                 {card.outlookSupplyGrowth === "surging" && (
                   <div
-                    className="bg-yellow-500/90 p-1 rounded"
+                    className="bg-amber-500/90 p-1 rounded"
                     title="Supply Saturation Alert"
                     data-testid={`badge-supply-alert-${card.id}`}
                   >
@@ -918,7 +918,7 @@ function HeroCenterpiece({ card, theme, onClick }: HeroCenterpieceProps) {
                     <div className="absolute top-2 left-2 flex items-center gap-1">
                       <OutlookBadge action={card.outlookAction} size="sm" />
                       {card.outlookBigMover && (
-                        <div className="bg-purple-500/90 p-1 rounded" title="Big Mover Potential">
+                        <div className="bg-pink-500/90 p-1 rounded" title="Big Mover Potential">
                           <Zap className="h-3 w-3 text-white" />
                         </div>
                       )}
@@ -1674,7 +1674,7 @@ export default function CaseView() {
                       <p className="text-sm text-muted-foreground">{rec.whyItFits}</p>
                     </div>
                     <div className="flex items-start gap-2">
-                      <TrendingUp className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      <TrendingUp className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                       <p className="text-sm text-muted-foreground">{rec.investmentRationale}</p>
                     </div>
                   </CardContent>

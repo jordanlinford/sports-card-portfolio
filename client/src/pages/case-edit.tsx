@@ -177,7 +177,7 @@ function SortableCardTile({ card, onDelete, onClick }: { card: CardType; onDelet
             <OutlookBadge action={card.outlookAction} size="sm" />
             {card.outlookBigMover && (
               <div 
-                className="bg-purple-500/90 p-1 rounded"
+                className="bg-pink-500/90 p-1 rounded"
                 title="Big Mover Potential"
               >
                 <Zap className="h-3 w-3 text-white" />

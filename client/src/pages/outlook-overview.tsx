@@ -3766,7 +3766,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
           <ImageIcon className="h-6 w-6 opacity-30" />
         </div>
         {isBigMover && isPro && (
-          <div className="absolute top-1 right-1 bg-purple-500 rounded-full p-0.5">
+          <div className="absolute top-1 right-1 bg-pink-500 rounded-full p-0.5">
             <Zap className="h-2.5 w-2.5 text-white" />
           </div>
         )}
@@ -3776,7 +3776,7 @@ function CardOutlookRow({ card, isPro, showDetails = true, canAnalyze = false, o
         <div className="flex items-center gap-2 flex-wrap">
           <h3 className="font-medium truncate" data-testid={`text-card-title-${card.id}`}>{card.title}</h3>
           {isBigMover && isPro && (
-            <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 gap-1">
+            <Badge variant="outline" className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20 gap-1">
               <Zap className="h-3 w-3" />
               Big Mover
             </Badge>
@@ -4036,13 +4036,13 @@ export default function OutlookOverviewPage() {
                 </p>
               </CardContent>
             </Card>
-            <Card className={bigMovers.length > 0 ? "border-purple-500/30 bg-purple-500/5" : ""}>
+            <Card className={bigMovers.length > 0 ? "border-pink-500/30 bg-pink-500/5" : ""}>
               <CardHeader className="pb-2">
                 <CardDescription className="flex items-center gap-1">
-                  <Zap className="h-3 w-3 text-purple-500" />
+                  <Zap className="h-3 w-3 text-pink-500" />
                   Big Movers
                 </CardDescription>
-                <CardTitle className="text-2xl text-purple-600 dark:text-purple-400" data-testid="text-big-movers">{bigMovers.length}</CardTitle>
+                <CardTitle className="text-2xl text-pink-600 dark:text-pink-400" data-testid="text-big-movers">{bigMovers.length}</CardTitle>
               </CardHeader>
               <CardContent className="pt-0 pb-3">
                 <p className="text-[10px] text-muted-foreground">
@@ -4100,9 +4100,9 @@ export default function OutlookOverviewPage() {
           {bigMovers.length > 0 && (
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-4">
-                <Zap className="h-5 w-5 text-purple-500" />
+                <Zap className="h-5 w-5 text-pink-500" />
                 <h2 className="text-xl font-semibold">Big Movers</h2>
-                <Badge variant="outline" className="bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20">
+                <Badge variant="outline" className="bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20">
                   {bigMovers.length}
                 </Badge>
               </div>
