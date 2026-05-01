@@ -87,8 +87,8 @@ function getVerdictIcon(verdict: PlayerVerdict) {
 
 function getVerdictColor(verdict: PlayerVerdict) {
   switch (verdict) {
-    case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
-    case "MONITOR": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+    case "BUY": return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+    case "MONITOR": return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
     case "AVOID": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
     default: return "bg-muted text-muted-foreground";
   }
@@ -107,8 +107,8 @@ function getTierIcon(tier: StockTier) {
 
 function getTierColor(tier: StockTier) {
   switch (tier) {
-    case "PREMIUM": return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
-    case "GROWTH": return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20";
+    case "PREMIUM": return "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20";
+    case "GROWTH": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
     case "CORE": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
     case "COMMON": return "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
     case "SPECULATIVE": return "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20";

@@ -224,12 +224,12 @@ const SEALED_PRODUCTS: Record<string, Array<{ name: string; msrp: number; type: 
 
 function VerdictBadge({ verdict }: { verdict: string }) {
   const config: Record<string, { color: string; icon: typeof TrendingUp; label: string }> = {
-    POSITIVE_EV: { color: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30", icon: CheckCircle2, label: "Positive EV" },
+    POSITIVE_EV: { color: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30", icon: CheckCircle2, label: "Positive EV" },
     NEGATIVE_EV: { color: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30", icon: XCircle, label: "Negative EV" },
     SPECULATIVE: { color: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30", icon: AlertTriangle, label: "Speculative" },
     BREAK_EVEN: { color: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30", icon: Scale, label: "Break Even" },
-    WAIT: { color: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30", icon: Pause, label: "Wait" },
-    LOTTERY_PLAY: { color: "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30", icon: Sparkles, label: "Lottery Play" },
+    WAIT: { color: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30", icon: Pause, label: "Wait" },
+    LOTTERY_PLAY: { color: "bg-violet-500/15 text-violet-600 dark:text-violet-400 border-violet-500/30", icon: Sparkles, label: "Lottery Play" },
   };
 
   const c = config[verdict] || config.BREAK_EVEN;
@@ -245,9 +245,9 @@ function VerdictBadge({ verdict }: { verdict: string }) {
 
 function GradingBadge({ recommendation }: { recommendation: string }) {
   const config: Record<string, { color: string; label: string }> = {
-    GRADE_IT: { color: "bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30", label: "Grade It" },
+    GRADE_IT: { color: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30", label: "Grade It" },
     SELL_RAW: { color: "bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30", label: "Sell Raw" },
-    HOLD: { color: "bg-yellow-500/15 text-yellow-600 dark:text-yellow-400 border-yellow-500/30", label: "Hold" },
+    HOLD: { color: "bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30", label: "Hold" },
   };
 
   const c = config[recommendation] || config.HOLD;
@@ -261,7 +261,7 @@ function GradingBadge({ recommendation }: { recommendation: string }) {
 
 function QualityBar({ label, value, maxValue = 100 }: { label: string; value: number; maxValue?: number }) {
   const pct = Math.min((value / maxValue) * 100, 100);
-  const color = pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-yellow-500" : "bg-red-500";
+  const color = pct >= 70 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500";
 
   return (
     <div className="space-y-1">
@@ -728,12 +728,12 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
   return (
     <div className="space-y-4" data-testid="card-results">
       {result.releaseRecency === "new_release" && (
-        <Card className="border-yellow-500/50 bg-yellow-500/5" data-testid="banner-new-release">
+        <Card className="border-amber-500/50 bg-amber-500/5" data-testid="banner-new-release">
           <CardContent className="pt-6">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
+              <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-yellow-600 dark:text-yellow-400">New Release — Prices Volatile</p>
+                <p className="font-semibold text-amber-600 dark:text-amber-400">New Release — Prices Volatile</p>
                 <p className="text-sm text-muted-foreground mt-1">
                   {result.volatilityNote || "This product released recently. Prices are still settling and may drop significantly in the coming weeks. ROI estimates use conservative lower-bound values."}
                 </p>
@@ -781,7 +781,7 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
                 </div>
                 <div className="text-center p-3 bg-muted rounded-lg">
                   <BarChart3 className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                  <p className={`text-xl font-bold ${result.evRatio >= 1 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-ev-ratio">
+                  <p className={`text-xl font-bold ${result.evRatio >= 1 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-ev-ratio">
                     {result.evRatio?.toFixed(2) || "N/A"}x
                   </p>
                   <p className="text-xs text-muted-foreground">EV Ratio</p>
@@ -949,7 +949,7 @@ function ProductResults({ result, isPro }: { result: SealedProductResult; isPro:
                         </div>
                         <div className="flex justify-between text-sm mb-2">
                           <span className="text-muted-foreground">PSA 10:</span>
-                          <span className="font-medium text-green-600 dark:text-green-400">${rookie.currentGradedValue?.toFixed(0)}</span>
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400">${rookie.currentGradedValue?.toFixed(0)}</span>
                         </div>
                         {rookie.outlook && (
                           <p className="text-xs text-muted-foreground italic">{rookie.outlook}</p>
@@ -1215,20 +1215,20 @@ function CompareView({
               </p>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className={`text-center p-4 rounded-lg border-2 ${comparisonResult.winner === "A" ? "border-green-500 bg-green-500/5" : "border-muted"}`}>
+                <div className={`text-center p-4 rounded-lg border-2 ${comparisonResult.winner === "A" ? "border-emerald-500 bg-emerald-500/5" : "border-muted"}`}>
                   <p className="text-sm font-medium mb-1 truncate" data-testid="text-product-a-name">{comparisonResult.productA.productName}</p>
                   <p className="text-3xl font-bold" data-testid="text-score-a">{comparisonResult.productA.computedQualityScore}</p>
                   <p className="text-xs text-muted-foreground">Quality Score</p>
                   {comparisonResult.winner === "A" && (
-                    <Badge className="mt-2 bg-green-500" data-testid="badge-winner-a">Winner</Badge>
+                    <Badge className="mt-2 bg-emerald-500" data-testid="badge-winner-a">Winner</Badge>
                   )}
                 </div>
-                <div className={`text-center p-4 rounded-lg border-2 ${comparisonResult.winner === "B" ? "border-green-500 bg-green-500/5" : "border-muted"}`}>
+                <div className={`text-center p-4 rounded-lg border-2 ${comparisonResult.winner === "B" ? "border-emerald-500 bg-emerald-500/5" : "border-muted"}`}>
                   <p className="text-sm font-medium mb-1 truncate" data-testid="text-product-b-name">{comparisonResult.productB.productName}</p>
                   <p className="text-3xl font-bold" data-testid="text-score-b">{comparisonResult.productB.computedQualityScore}</p>
                   <p className="text-xs text-muted-foreground">Quality Score</p>
                   {comparisonResult.winner === "B" && (
-                    <Badge className="mt-2 bg-green-500" data-testid="badge-winner-b">Winner</Badge>
+                    <Badge className="mt-2 bg-emerald-500" data-testid="badge-winner-b">Winner</Badge>
                   )}
                 </div>
               </div>
@@ -1258,13 +1258,13 @@ function CompareView({
                         <div className="flex-1 flex gap-1">
                           <div className="flex-1 h-3 bg-muted rounded-l-full overflow-hidden flex justify-end">
                             <div
-                              className={`h-full rounded-l-full ${dim.keyA >= dim.keyB ? "bg-green-500" : "bg-blue-400"}`}
+                              className={`h-full rounded-l-full ${dim.keyA >= dim.keyB ? "bg-emerald-500" : "bg-blue-400"}`}
                               style={{ width: `${dim.keyA}%` }}
                             />
                           </div>
                           <div className="flex-1 h-3 bg-muted rounded-r-full overflow-hidden">
                             <div
-                              className={`h-full rounded-r-full ${dim.keyB >= dim.keyA ? "bg-green-500" : "bg-blue-400"}`}
+                              className={`h-full rounded-r-full ${dim.keyB >= dim.keyA ? "bg-emerald-500" : "bg-blue-400"}`}
                               style={{ width: `${dim.keyB}%` }}
                             />
                           </div>
@@ -1284,7 +1284,7 @@ function CompareView({
                         <p className="text-muted-foreground">Box Cost</p>
                       </div>
                       <div className="text-center p-2 bg-muted rounded">
-                        <p className={`font-bold ${comparisonResult.productA.evRatio >= 1 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                        <p className={`font-bold ${comparisonResult.productA.evRatio >= 1 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                           {comparisonResult.productA.evRatio?.toFixed(2)}x
                         </p>
                         <p className="text-muted-foreground">EV Ratio</p>
@@ -1307,7 +1307,7 @@ function CompareView({
                         <p className="text-muted-foreground">Box Cost</p>
                       </div>
                       <div className="text-center p-2 bg-muted rounded">
-                        <p className={`font-bold ${comparisonResult.productB.evRatio >= 1 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                        <p className={`font-bold ${comparisonResult.productB.evRatio >= 1 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                           {comparisonResult.productB.evRatio?.toFixed(2)}x
                         </p>
                         <p className="text-muted-foreground">EV Ratio</p>

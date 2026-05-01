@@ -96,7 +96,7 @@ export default function BookmarksPage() {
                   </div>
                 )}
                 {bookmark.card.openToOffers && (
-                  <Badge className="absolute top-2 right-2 bg-green-600 text-white">
+                  <Badge className="absolute top-2 right-2 bg-emerald-600 text-white">
                     Open to Offers
                   </Badge>
                 )}

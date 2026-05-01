@@ -62,7 +62,7 @@ function ConfidenceBadge({ confidence }: { confidence?: number | null }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge variant="outline" className="gap-1 text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700">
+        <Badge variant="outline" className="gap-1 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
           <Info className="h-3 w-3" />
           Data is thin
         </Badge>
@@ -77,8 +77,8 @@ function ConfidenceBadge({ confidence }: { confidence?: number | null }) {
 }
 
 function ScoreBadge({ score, label }: { score: number; label: string }) {
-  const color = score >= 75 ? "text-green-600 dark:text-green-400" : 
-                score >= 50 ? "text-yellow-600 dark:text-yellow-400" : 
+  const color = score >= 75 ? "text-emerald-600 dark:text-emerald-400" : 
+                score >= 50 ? "text-amber-600 dark:text-amber-400" : 
                 "text-red-600 dark:text-red-400";
   return (
     <div className="text-center">
@@ -112,7 +112,7 @@ function PortfolioImpactLine({ impact }: { impact: NextBuyPortfolioImpact | null
           {typeof item.delta === "number" ? (
             <>
               {item.delta > 0 ? (
-                <ArrowUpRight className="h-3 w-3 text-green-500" />
+                <ArrowUpRight className="h-3 w-3 text-emerald-500" />
               ) : item.delta < 0 ? (
                 <ArrowDownRight className="h-3 w-3 text-blue-500" />
               ) : (
@@ -122,7 +122,7 @@ function PortfolioImpactLine({ impact }: { impact: NextBuyPortfolioImpact | null
             </>
           ) : (
             <>
-              <Sparkles className="h-3 w-3 text-purple-500" />
+              <Sparkles className="h-3 w-3 text-violet-500" />
               {item.delta}
             </>
           )}
@@ -210,7 +210,7 @@ function NextBuyCard({
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge 
                 variant={buy.verdict === "BUY" ? "default" : "secondary"}
-                className={buy.verdict === "BUY" ? "bg-green-600" : ""}
+                className={buy.verdict === "BUY" ? "bg-emerald-600" : ""}
               >
                 {formatEnumLabel(buy.verdict)}
               </Badge>
@@ -486,7 +486,7 @@ export default function NextBuysPage() {
       </div>
 
       <div className="flex items-center gap-4 flex-wrap">
-        <Badge variant="default" className="bg-green-600">
+        <Badge variant="default" className="bg-emerald-600">
           {buyCount} BUY
         </Badge>
         <Badge variant="secondary">

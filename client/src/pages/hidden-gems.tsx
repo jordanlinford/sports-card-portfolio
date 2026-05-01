@@ -162,7 +162,7 @@ function getTierIcon(tier: string) {
 
 function getTierColor(tier: string) {
   switch (tier) {
-    case "PREMIUM": return "text-purple-600 dark:text-purple-400";
+    case "PREMIUM": return "text-violet-600 dark:text-violet-400";
     case "CORE": return "text-blue-600 dark:text-blue-400";
     case "GROWTH": return "text-emerald-600 dark:text-emerald-400";
     case "SPECULATIVE": return "text-amber-600 dark:text-amber-400";
@@ -231,7 +231,7 @@ function GemCard({ gem, isPro }: { gem: GemCandidate; isPro: boolean }) {
             </Badge>
           )}
           {gem.source === "BOTH" && (
-            <Badge variant="outline" className="text-xs bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-300 dark:border-purple-700 flex items-center gap-1">
+            <Badge variant="outline" className="text-xs bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700 flex items-center gap-1">
               <Star className="h-3 w-3" />
               AI + Community
             </Badge>
@@ -250,9 +250,9 @@ function GemCard({ gem, isPro }: { gem: GemCandidate; isPro: boolean }) {
             <span title="Composite Score">{gem.compositeScore}</span>
             {gem.convictionLevel && (
               <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${
-                gem.convictionLevel === "HIGH" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                gem.convictionLevel === "HIGH" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
                 gem.convictionLevel === "MEDIUM" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
-                gem.convictionLevel === "LOW" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                gem.convictionLevel === "LOW" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
                 "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
               }`}>
                 {gem.convictionLevel}
@@ -263,7 +263,7 @@ function GemCard({ gem, isPro }: { gem: GemCandidate; isPro: boolean }) {
             )}
             {gem.percentileRank != null && (
               <span className={`ml-auto font-medium ${
-                gem.percentileRank <= 15 ? "text-green-600 dark:text-green-400" :
+                gem.percentileRank <= 15 ? "text-emerald-600 dark:text-emerald-400" :
                 gem.percentileRank <= 35 ? "text-blue-600 dark:text-blue-400" :
                 "text-muted-foreground"
               }`}>
@@ -625,9 +625,9 @@ export default function HiddenGemsPage() {
           </div>
         )}
         {refreshProgress?.status === "completed" && (
-          <div className="flex items-center gap-2 mt-3 p-3 rounded-md bg-green-500/10 border border-green-500/20" data-testid="refresh-complete">
-            <Gem className="h-4 w-4 text-green-600" />
-            <p className="text-sm text-green-700 dark:text-green-400">{refreshProgress.progress}</p>
+          <div className="flex items-center gap-2 mt-3 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20" data-testid="refresh-complete">
+            <Gem className="h-4 w-4 text-emerald-600" />
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">{refreshProgress.progress}</p>
           </div>
         )}
         {refreshProgress?.status === "failed" && (

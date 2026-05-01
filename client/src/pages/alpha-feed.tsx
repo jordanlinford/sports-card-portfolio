@@ -81,7 +81,7 @@ function getVerdictBadge(verdict: string) {
       return { label: "Hold Core", className: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30" };
     case "HOLD":
     case "MONITOR":
-      return { label: "Hold", className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400 border-yellow-500/30" };
+      return { label: "Hold", className: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30" };
     case "TRADE_THE_HYPE":
       return { label: "Trade Hype", className: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30" };
     case "AVOID":
@@ -91,7 +91,7 @@ function getVerdictBadge(verdict: string) {
     case "LONGSHOT_BET":
         return { label: "Longshot Bet", className: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30" };
     case "SPECULATIVE_FLYER":
-      return { label: "Speculative", className: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30" };
+      return { label: "Speculative", className: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30" };
     default:
       return { label: verdict, className: "bg-muted text-muted-foreground border-border" };
   }
@@ -480,7 +480,7 @@ export default function AlphaFeedPage() {
 
           {speculativePlays.length > 0 && (
             <section className="mb-8" data-testid="section-speculative">
-              <SectionHeader icon={Sparkles} title="Speculative Plays" badge={`${speculativePlays.length}`} iconColor="text-purple-500" />
+              <SectionHeader icon={Sparkles} title="Speculative Plays" badge={`${speculativePlays.length}`} iconColor="text-amber-500" />
               <div className="grid gap-3 sm:grid-cols-2">
                 {speculativePlays.map(p => (
                   <PlayerMarketCard key={p.playerKey} player={p} />
