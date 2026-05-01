@@ -93,34 +93,40 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
-  --background: 20 10% 8%;
-  --foreground: 30 5% 98%;
-  --border: 25 8% 18%;
-  --card: 20 8% 11%;
-  --card-foreground: 30 5% 98%;
-  --card-border: 25 8% 15%;
-  --sidebar: 20 10% 10%;
-  --sidebar-foreground: 30 5% 98%;
-  --sidebar-border: 25 8% 16%;
+  /* FaithfulNeon brand palette (Track A — global token swap).
+     Surfaces shift from the previous warm-brown hue family (~20-25°)
+     to deep purple (~265°) while keeping --primary orange (brand CTA),
+     --destructive red (danger affordance), and --foreground near-white
+     for body-text legibility. Saturation kept modest (12-25%) so surfaces
+     read as on-brand without dominating content. */
+  --background: 265 25% 8%;
+  --foreground: 265 4% 98%;
+  --border: 265 18% 18%;
+  --card: 265 22% 11%;
+  --card-foreground: 265 4% 98%;
+  --card-border: 265 18% 16%;
+  --sidebar: 265 25% 9%;
+  --sidebar-foreground: 265 4% 98%;
+  --sidebar-border: 265 18% 16%;
   --sidebar-primary: 35 92% 55%;
   --sidebar-primary-foreground: 35 10% 98%;
-  --sidebar-accent: 25 8% 16%;
-  --sidebar-accent-foreground: 30 5% 98%;
+  --sidebar-accent: 265 18% 17%;
+  --sidebar-accent-foreground: 265 4% 98%;
   --sidebar-ring: 35 92% 55%;
-  --popover: 20 8% 12%;
-  --popover-foreground: 30 5% 98%;
-  --popover-border: 25 8% 18%;
+  --popover: 265 22% 12%;
+  --popover-foreground: 265 4% 98%;
+  --popover-border: 265 18% 18%;
   --primary: 35 92% 55%;
   --primary-foreground: 35 10% 98%;
-  --secondary: 25 8% 18%;
-  --secondary-foreground: 30 5% 98%;
-  --muted: 20 6% 16%;
-  --muted-foreground: 25 8% 65%;
-  --accent: 35 15% 16%;
-  --accent-foreground: 35 15% 98%;
+  --secondary: 265 18% 19%;
+  --secondary-foreground: 265 4% 98%;
+  --muted: 265 14% 16%;
+  --muted-foreground: 265 12% 70%;
+  --accent: 265 25% 18%;
+  --accent-foreground: 265 5% 97%;
   --destructive: 0 84% 40%;
   --destructive-foreground: 0 84% 98%;
-  --input: 25 8% 26%;
+  --input: 265 18% 28%;
   --ring: 35 92% 55%;
   --chart-1: 35 92% 60%;
   --chart-2: 25 85% 58%;
