@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
@@ -153,14 +152,19 @@ type OutlookData = {
   needsGeneration?: boolean;
 };
 
+// FaithfulNeon verdict palette (6-category collapse documented in replit.md):
+// ACCUMULATE/BUY=emerald, HOLD/HOLD_CORE/LONG_HOLD/LEGACY_HOLD=blue,
+// SPECULATIVE/MONITOR=amber, AVOID/SELL=violet, WATCH=slate.
+// Bg/border use full class names (no string concat) so tailwind's content
+// scanner can statically detect them.
 const ACTION_STYLES: Record<string, { bg: string; border: string; icon: typeof TrendingUp; label: string }> = {
-  BUY: { bg: "bg-green-500/20", border: "border-green-500", icon: TrendingUp, label: "Buy Signal" },
-  MONITOR: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Activity, label: "Monitor" },
-  WATCH: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Eye, label: "Watch" },
-  SELL: { bg: "bg-red-500/20", border: "border-red-500", icon: TrendingDown, label: "Sell Signal" },
+  BUY: { bg: "bg-emerald-500/20", border: "border-emerald-500", icon: TrendingUp, label: "Buy Signal" },
+  MONITOR: { bg: "bg-amber-500/20", border: "border-amber-500", icon: Activity, label: "Monitor" },
+  WATCH: { bg: "bg-slate-500/20", border: "border-slate-500", icon: Eye, label: "Watch" },
+  SELL: { bg: "bg-violet-500/20", border: "border-violet-500", icon: TrendingDown, label: "Sell Signal" },
   LONGSHOT_BET: { bg: "bg-fuchsia-500/20", border: "border-fuchsia-500", icon: Sparkles, label: "Longshot Bet" },
   LONG_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", icon: Clock, label: "Long Hold" },
-  LEGACY_HOLD: { bg: "bg-indigo-500/20", border: "border-indigo-500", icon: Trophy, label: "Legacy Hold" },
+  LEGACY_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", icon: Trophy, label: "Legacy Hold" },
   LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", icon: Info, label: "Low Value" },
 };
 
@@ -179,17 +183,45 @@ function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+// FaithfulNeon tier helpers — mirror player-outlook's getSignalColor /
+// getSignalBarColor so SignalBar fills, score text, and composite-score
+// values agree on the implied verdict tier across both pages. Card Outlook
+// SignalBars carry 0-10 values while CompositeScoreCard carries 0-100, so
+// expose two helpers that share the same five-tier shape (strong/good/
+// neutral/weak/poor) but operate at the matching scale.
+function getSignalScoreColor100(score: number): string {
+  if (score >= 70) return "text-green-600 dark:text-green-400";
+  if (score >= 55) return "text-emerald-600 dark:text-emerald-400";
+  if (score >= 45) return "text-yellow-600 dark:text-yellow-400";
+  if (score >= 30) return "text-orange-600 dark:text-orange-400";
+  return "text-red-600 dark:text-red-400";
+}
+function getSignalBarTier100(score: number): string {
+  if (score >= 70) return "signal-bar-tier-strong";
+  if (score >= 55) return "signal-bar-tier-good";
+  if (score >= 45) return "signal-bar-tier-neutral";
+  if (score >= 30) return "signal-bar-tier-weak";
+  return "signal-bar-tier-poor";
+}
+
 function SignalBar({ label, value, max = 10, color = "primary" }: { label: string; value?: number; max?: number; color?: string }) {
   if (value === undefined || value === null) return null;
   const percentage = (value / max) * 100;
-  
+  const scoreText = getSignalScoreColor100(percentage);
+  const barTier = getSignalBarTier100(percentage);
+
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
-        <span className="font-medium">{value}/{max}</span>
+        <span className={`font-medium ${scoreText}`}>{value}/{max}</span>
       </div>
-      <Progress value={percentage} className="h-2" />
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${barTier}`}
+          style={{ width: `${percentage}%` }}
+        />
+      </div>
     </div>
   );
 }
@@ -202,11 +234,9 @@ function CompositeScoreCard({ label, value, icon: Icon, description, helperText 
   helperText?: string;
 }) {
   if (value === undefined || value === null) return null;
-  
-  let colorClass = "text-muted-foreground";
-  if (value >= 70) colorClass = "text-green-500";
-  else if (value >= 40) colorClass = "text-yellow-500";
-  else colorClass = "text-red-500";
+
+  // Tier color matches SignalBar so a 70+ score looks "strong" everywhere.
+  const colorClass = getSignalScoreColor100(value);
   
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
@@ -645,8 +675,11 @@ export default function CardOutlookPage() {
                     </Badge>
                   )}
                   {outlook.bigMover?.flag && (
+                    // Big Mover swapped purple → pink to (a) echo the brand
+                    // wordmark gradient and (b) stay visually distinct on the
+                    // new dark-purple ground where purple-500 lost contrast.
                     <Badge 
-                      className="bg-purple-500/20 border-purple-500 border text-foreground gap-1"
+                      className="bg-pink-500/20 border-pink-500 border text-foreground gap-1"
                       data-testid="badge-big-mover"
                     >
                       <Zap className="h-3 w-3" />
@@ -654,8 +687,10 @@ export default function CardOutlookPage() {
                     </Badge>
                   )}
                   {outlook.supply?.supplyGrowth === "surging" && (
+                    // Supply Alert swapped yellow → amber to align with the
+                    // FaithfulNeon warning tier (MONITOR / SPECULATIVE).
                     <Badge 
-                      className="bg-yellow-500/20 border-yellow-500 border text-foreground gap-1"
+                      className="bg-amber-500/20 border-amber-500 border text-foreground gap-1"
                       data-testid="badge-supply-alert"
                     >
                       <AlertTriangle className="h-3 w-3" />
@@ -715,11 +750,11 @@ export default function CardOutlookPage() {
       )}
 
       {outlook?.bigMover?.flag && outlook?.bigMover?.reason && (
-        <Card className="mb-6 bg-purple-500/10 border-purple-500/50 border">
+        <Card className="mb-6 bg-pink-500/10 border-pink-500/50 border">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-full bg-purple-500/20">
-                <Zap className="h-5 w-5 text-purple-500" />
+              <div className="p-2 rounded-full bg-pink-500/20">
+                <Zap className="h-5 w-5 text-pink-500" />
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">Big Mover Potential</h3>
@@ -733,11 +768,11 @@ export default function CardOutlookPage() {
       )}
 
       {outlook?.supply?.supplyGrowth === "surging" && (
-        <Card className="mb-6 bg-yellow-500/10 border-yellow-500/50 border">
+        <Card className="mb-6 bg-amber-500/10 border-amber-500/50 border">
           <CardContent className="py-4">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-full bg-yellow-500/20">
-                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <div className="p-2 rounded-full bg-amber-500/20">
+                <AlertTriangle className="h-5 w-5 text-amber-500" />
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1" data-testid="text-supply-alert-title">Supply Saturation Alert</h3>
