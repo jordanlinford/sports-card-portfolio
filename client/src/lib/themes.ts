@@ -108,6 +108,19 @@ export const DISPLAY_CASE_THEMES: ThemeConfig[] = [
     borderColor: "border-purple-800",
     preview: "linear-gradient(135deg, #3b0764 0%, #581c87 50%, #3b0764 100%)",
   },
+  {
+    id: "holo",
+    name: "Holographic",
+    description: "Iridescent shimmer + 3D tilt",
+    isPremium: true,
+    background: "bg-slate-950",
+    cardBackground: "bg-slate-900/80",
+    textColor: "text-slate-50",
+    accentColor: "text-cyan-300",
+    borderColor: "border-slate-800",
+    preview:
+      "conic-gradient(from 210deg at 50% 50%, #06b6d4, #8b5cf6, #ec4899, #f59e0b, #06b6d4)",
+  },
 ];
 
 // Map legacy theme IDs to new ones for backward compatibility
