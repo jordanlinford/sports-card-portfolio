@@ -197,13 +197,17 @@ export default function Landing() {
       </section>
 
       {/* SECTION 4 — CLOSING CTA (DARK) */}
-      <section className="py-16 md:py-24 bg-zinc-950 text-zinc-50" data-testid="section-cta-closer">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <section
+        className="relative py-16 md:py-24 bg-zinc-950 text-zinc-50 dark:bg-[hsl(265_30%_5%)] dark:text-foreground border-t border-border/50 overflow-hidden"
+        data-testid="section-cta-closer"
+      >
+        <div className="absolute inset-0 dark:bg-gradient-to-br dark:from-primary/5 dark:via-transparent dark:to-pink-500/5 pointer-events-none" />
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2
             className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-8 leading-tight"
             data-testid="text-cta-closer-headline"
           >
-            1,000+ collectors trust HobbyAlpha to make smarter decisions.
+            <span className="brand-alpha-gradient">1,000+</span> collectors trust HobbyAlpha to make smarter decisions.
           </h2>
           <Button asChild size="lg" className="gap-2">
             <a href="/api/auth/google" data-testid="button-cta-closer">
