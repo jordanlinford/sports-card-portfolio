@@ -32,11 +32,11 @@ function formatCurrency(value: number | null | undefined): string {
 
 function getActionColor(action: string): string {
   switch (action) {
-    case "BUY": return "bg-green-500/20 text-green-700 dark:text-green-400";
+    case "BUY": return "bg-emerald-500/20 text-emerald-700 dark:text-emerald-400";
     case "SELL": return "bg-red-500/20 text-red-700 dark:text-red-400";
-    case "MONITOR": return "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400";
+    case "MONITOR": return "bg-amber-500/20 text-amber-700 dark:text-amber-400";
     case "LONG_HOLD": return "bg-blue-500/20 text-blue-700 dark:text-blue-400";
-    case "LEGACY_HOLD": return "bg-purple-500/20 text-purple-700 dark:text-purple-400";
+    case "LEGACY_HOLD": return "bg-violet-500/20 text-violet-700 dark:text-violet-400";
     default: return "bg-muted text-muted-foreground";
   }
 }
@@ -57,7 +57,7 @@ function CardOutlookView({ data }: { data: any }) {
       <div className="grid grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4 text-center">
-            <div className="text-3xl font-bold text-green-600">{data.upsideScore || 0}</div>
+            <div className="text-3xl font-bold text-emerald-600">{data.upsideScore || 0}</div>
             <p className="text-sm text-muted-foreground">Upside Score</p>
           </CardContent>
         </Card>
@@ -104,11 +104,11 @@ function CardOutlookView({ data }: { data: any }) {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <div>
                 <p className="text-sm text-muted-foreground">Strong Buy Below</p>
-                <p className="font-semibold text-green-600">{formatCurrency(data.priceTargets.strongBuyBelow)}</p>
+                <p className="font-semibold text-emerald-600">{formatCurrency(data.priceTargets.strongBuyBelow)}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Buy Below</p>
-                <p className="font-semibold text-green-500">{formatCurrency(data.priceTargets.buyBelow)}</p>
+                <p className="font-semibold text-emerald-500">{formatCurrency(data.priceTargets.buyBelow)}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Fair Value</p>
@@ -198,7 +198,7 @@ function PortfolioOutlookView({ data }: { data: any }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
               Risk Signals
             </CardTitle>
           </CardHeader>
@@ -229,7 +229,7 @@ function PortfolioOutlookView({ data }: { data: any }) {
             <div className="space-y-2">
               {data.recommendations.map((rec: string, index: number) => (
                 <div key={index} className="flex items-center gap-2">
-                  <TrendingUp className="h-4 w-4 text-green-500" />
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
                   <span>{rec}</span>
                 </div>
               ))}
@@ -311,7 +311,7 @@ function PlayerOutlookView({ data }: { data: any }) {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
               Market Reality Check
             </CardTitle>
           </CardHeader>
@@ -319,7 +319,7 @@ function PlayerOutlookView({ data }: { data: any }) {
             <div className="space-y-2">
               {data.marketRealityCheck.map((check: string, index: number) => (
                 <div key={index} className="flex items-start gap-2">
-                  <div className="h-2 w-2 rounded-full bg-yellow-500 mt-2 shrink-0" />
+                  <div className="h-2 w-2 rounded-full bg-amber-500 mt-2 shrink-0" />
                   <span className="text-muted-foreground">{check}</span>
                 </div>
               ))}

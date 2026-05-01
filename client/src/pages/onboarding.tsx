@@ -93,8 +93,8 @@ function getVerdictIcon(verdict: PlayerVerdict) {
 
 function getVerdictColor(verdict: PlayerVerdict) {
   switch (verdict) {
-    case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
-    case "MONITOR": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+    case "BUY": return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+    case "MONITOR": return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
     case "AVOID": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
     default: return "bg-muted text-muted-foreground";
   }

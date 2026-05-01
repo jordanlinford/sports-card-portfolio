@@ -59,7 +59,7 @@ function getStatusBadge(status: OfferStatus) {
     case "pending":
       return <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" /> Pending</Badge>;
     case "accepted":
-      return <Badge className="gap-1 bg-green-600"><CheckCircle className="h-3 w-3" /> Accepted</Badge>;
+      return <Badge className="gap-1 bg-emerald-600"><CheckCircle className="h-3 w-3" /> Accepted</Badge>;
     case "declined":
       return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" /> Declined</Badge>;
     case "withdrawn":
@@ -120,7 +120,7 @@ function OfferCard({
             </div>
             
             <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-green-600" />
+              <DollarSign className="h-4 w-4 text-emerald-600" />
               <span className="font-semibold text-lg" data-testid={`text-offer-amount-${offer.id}`}>
                 ${Number(offer.amount).toFixed(2)}
               </span>
