@@ -11,6 +11,14 @@ Preferred communication style: Simple, everyday language.
 ### UI/UX Decisions
 The frontend uses React 18, TypeScript, and Wouter, with `shadcn/ui` components built on Radix UI and Tailwind CSS. The design emphasizes card-centric layouts, a clean aesthetic, DM Sans typography, and a dynamic HSL-based color system.
 
+**FaithfulNeon brand layer (Player Outlook page)**: `client/src/index.css` (lines ~289-394) defines reusable visual primitives that ship the dark-purple brand identity onto `client/src/pages/player-outlook.tsx` without rewriting layout. Primitives:
+- `.brand-alpha-gradient` — pink→orange wordmark gradient.
+- `.faithful-holo-ring` — iridescent conic-gradient border wrapped around the player avatar (and the avatar slot in the loading skeleton, so there's no layout shift when data arrives). Applied via `<span className="inline-block p-[3px] rounded-full faithful-holo-ring">` around the `<Avatar>`.
+- `.signal-caption` — lavender bar-description text scoped to `.dark` only (light mode keeps `text-muted-foreground`).
+- `.signal-bar-tier-{strong|good|neutral|weak|poor}` — gradient + soft glow bar fills, returned by `getSignalBarColor(score)` in MarketSignalsPanel. Tier thresholds match `getSignalColor()` so bar fill and score text always agree on the implied verdict.
+- `.skeleton-lavender` / `.skeleton-bar-lavender` — lavender pulse for `PlayerOutlookSkeleton`. Skeleton mirrors the real layout (header / verdict block / 6 signal bars / two side cards).
+- `.verdict-*` classes exist in CSS for the canvas mockup but the live page uses inline Tailwind tokens via three `getVerdictColor` helpers (page-level + TieredRecommendationsCard + OutlookHistoryPanel) that all map to the same six-category palette: ACCUMULATE/BUY=emerald, HOLD/HOLD_CORE=blue (was yellow), TRADE_THE_HYPE=rose, SPECULATIVE/SPECULATIVE_FLYER/MONITOR=amber, AVOID/SELL=violet (was red), WAIT=orange, WATCH=slate. Verdict text stays distinct (9 keys) while colors collapse to 6 semantic categories. `getVerdictIcon` likewise returns icons for all 9 keys (Minus for HOLD, Zap for TRADE_THE_HYPE, Sparkles for SPECULATIVE, Clock for WAIT, Eye for WATCH/MONITOR).
+
 ### Technical Implementations
 The application features a full-stack TypeScript architecture. The frontend uses TanStack Query for server state, React Hook Form with Zod for forms, and React Context for themes. The Express.js backend handles dual-provider authentication (Google OAuth, Replit OpenID Connect) with PostgreSQL-backed sessions. Image uploads are managed via Google Cloud Storage (through Replit Object Storage).
 

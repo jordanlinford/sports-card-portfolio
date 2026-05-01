@@ -286,3 +286,127 @@
     inset: -1px;
   }
 }
+
+/* =========================================================================
+   FaithfulNeon brand visual layer
+   Graduated from artifacts/mockup-sandbox/.../player-outlook/_group.css
+   These are dark-mode-first; in light mode they degrade to the existing
+   shadcn token system gracefully.
+   ========================================================================= */
+
+/* Wordmark — pink → orange "Alpha" gradient.
+   Use on the inline span around "Alpha" in the brand mark. */
+.brand-alpha-gradient {
+  background: linear-gradient(90deg, #ec4899 0%, #f97316 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Iridescent holo ring — for player avatars on the outlook page.
+   Wrap the Avatar in a span with this class + p-[3px] rounded-full inline-block.
+   The rotating gradient lives on a ::before pseudo-element so the avatar
+   children stay perfectly still while only the ring spins. */
+.faithful-holo-ring {
+  position: relative;
+  isolation: isolate;
+  box-shadow:
+    0 0 18px -2px rgba(236, 72, 153, 0.55),
+    0 0 32px -4px rgba(34, 211, 238, 0.35);
+}
+.faithful-holo-ring::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 0deg,
+    #22d3ee 0%,
+    #ec4899 25%,
+    #fbbf24 50%,
+    #a78bfa 75%,
+    #22d3ee 100%
+  );
+  animation: faithful-holo-spin 14s linear infinite;
+  z-index: -1;
+}
+@keyframes faithful-holo-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .faithful-holo-ring::before { animation: none; }
+}
+
+/* Lavender-tinted caption — for signal-bar descriptions on dark background.
+   Falls back to muted-foreground in light mode. */
+.signal-caption {
+  color: hsl(var(--muted-foreground));
+}
+.dark .signal-caption {
+  color: rgba(196, 181, 253, 0.65);
+}
+
+/* Verdict semantic colors — six categories, nine keys.
+   Aliases on purpose: hold/hold-core share blue, speculative/flyer share yellow.
+   Used by getVerdictColor() in player-outlook.tsx; classes left here for
+   any direct JSX usage (e.g. inline verdict text). */
+.verdict-accumulate  { color: #34d399; } /* emerald     — accumulate / buy */
+.verdict-hold        { color: #60a5fa; } /* trader blue — hold */
+.verdict-hold-core   { color: #60a5fa; } /* trader blue — hold-core (alias) */
+.verdict-trade-hype  { color: #fb7185; } /* orange-red  — trade the hype */
+.verdict-speculative { color: #fbbf24; } /* yellow      — speculative (caution) */
+.verdict-flyer       { color: #fbbf24; } /* yellow      — flyer (alias) */
+.verdict-avoid       { color: #a78bfa; } /* purple      — avoid */
+.verdict-watch       { color: #94a3b8; } /* slate       — watch / monitor */
+.verdict-wait        { color: #fb923c; } /* orange      — wait */
+
+/* Lavender skeleton — replaces shadcn's default Skeleton for the
+   player outlook loading state. Uses a tinted gradient pulse on dark
+   so the loading state stays on-brand. */
+@keyframes faithful-skeleton-pulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.85; }
+}
+.skeleton-lavender {
+  background: linear-gradient(
+    90deg,
+    rgba(167, 139, 250, 0.10) 0%,
+    rgba(196, 181, 253, 0.22) 50%,
+    rgba(167, 139, 250, 0.10) 100%
+  );
+  border-radius: 6px;
+  animation: faithful-skeleton-pulse 1.6s ease-in-out infinite;
+}
+.skeleton-bar-lavender {
+  background: linear-gradient(
+    90deg,
+    rgba(196, 181, 253, 0.30) 0%,
+    rgba(236, 72, 153, 0.30) 50%,
+    rgba(255, 184, 0, 0.30) 100%
+  );
+  border-radius: 999px;
+  animation: faithful-skeleton-pulse 1.6s ease-in-out infinite;
+}
+/* Light-mode fallback — keep the pulse readable without being lavender-loud */
+:root:not(.dark) .skeleton-lavender,
+:root:not(.dark) .skeleton-bar-lavender {
+  background: hsl(var(--muted));
+  animation: faithful-skeleton-pulse 1.6s ease-in-out infinite;
+}
+
+/* Signal bar gradients — for MarketSignalsPanel bars.
+   Matches the tier mapping in getSignalBarColor() so each tier reads as
+   a unique color stop. Gradients render in both themes (the colors come
+   from a unified palette and stay legible on both backgrounds). The soft
+   glow is dark-scoped so it doesn't overpower the lighter UI surface. */
+.signal-bar-tier-strong  { background: linear-gradient(90deg, #34d399 0%, #10b981 100%); }
+.signal-bar-tier-good    { background: linear-gradient(90deg, #34d399 0%, #6ee7b7 100%); }
+.signal-bar-tier-neutral { background: linear-gradient(90deg, #fbbf24 0%, #facc15 100%); }
+.signal-bar-tier-weak    { background: linear-gradient(90deg, #fb923c 0%, #f97316 100%); }
+.signal-bar-tier-poor    { background: linear-gradient(90deg, #fb7185 0%, #f43f5e 100%); }
+.dark .signal-bar-tier-strong  { box-shadow: 0 0 10px rgba(52, 211, 153, 0.45); }
+.dark .signal-bar-tier-good    { box-shadow: 0 0 10px rgba(110, 231, 183, 0.40); }
+.dark .signal-bar-tier-neutral { box-shadow: 0 0 10px rgba(250, 204, 21, 0.40); }
+.dark .signal-bar-tier-weak    { box-shadow: 0 0 10px rgba(249, 115, 22, 0.40); }
+.dark .signal-bar-tier-poor    { box-shadow: 0 0 10px rgba(244, 63, 94, 0.45); }

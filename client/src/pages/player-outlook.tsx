@@ -99,27 +99,76 @@ function getRiskColor(risk: RiskLevel) {
   }
 }
 
-function getVerdictIcon(verdict: PlayerVerdict) {
-  switch (verdict) {
-    case "BUY": return <ShoppingCart className="h-5 w-5" />;
-    case "MONITOR": return <Eye className="h-5 w-5" />;
-    case "AVOID": return <Ban className="h-5 w-5" />;
-    case "WATCH": return <Eye className="h-5 w-5" />;
-    case "SELL": return <TrendingDown className="h-5 w-5" />;
-    case "LONGSHOT_BET": return <Sparkles className="h-5 w-5" />;
-    default: return null;
+function getVerdictIcon(verdict: string) {
+  const v = (verdict || "").toUpperCase();
+  switch (v) {
+    case "ACCUMULATE":
+    case "BUY":
+      return <ShoppingCart className="h-5 w-5" />;
+    case "HOLD":
+    case "HOLD_CORE":
+      return <Minus className="h-5 w-5" />;
+    case "TRADE_THE_HYPE":
+      return <Zap className="h-5 w-5" />;
+    case "SPECULATIVE":
+    case "SPECULATIVE_FLYER":
+    case "FLYER":
+      return <Sparkles className="h-5 w-5" />;
+    case "LONGSHOT_BET":
+      return <Sparkles className="h-5 w-5" />;
+    case "AVOID":
+    case "SELL":
+      return <Ban className="h-5 w-5" />;
+    case "WAIT":
+      return <Clock className="h-5 w-5" />;
+    case "WATCH":
+    case "MONITOR":
+      return <Eye className="h-5 w-5" />;
+    default:
+      return null;
   }
 }
 
-function getVerdictColor(verdict: PlayerVerdict) {
-  switch (verdict) {
-    case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
-    case "MONITOR": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
-    case "AVOID": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
-    case "WATCH": return "bg-muted text-muted-foreground border-border";
-    case "SELL": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
-    case "LONGSHOT_BET": return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
-    default: return "bg-muted text-muted-foreground";
+/**
+ * Verdict color mapping — six semantic categories, nine verdict keys + LONGSHOT_BET (V2).
+ * Aliases on purpose: HOLD/HOLD_CORE share blue; SPECULATIVE/SPECULATIVE_FLYER share amber.
+ * LONGSHOT_BET (V2) gets its own fuchsia category — distinct from SPECULATIVE family.
+ * This keeps verdict TEXT distinct while colors collapse to one semantic category.
+ * Matches the spec defined in client/src/index.css (.verdict-* classes) and the
+ * FaithfulNeon brand mockup at artifacts/mockup-sandbox/.../FaithfulNeon.tsx.
+ *
+ * Typed as `string` (not PlayerVerdict) because real verdict.action values include
+ * extended verdicts beyond the legacy BUY/MONITOR/AVOID/WATCH set.
+ */
+function getVerdictColor(verdict: string) {
+  const v = (verdict || "").toUpperCase();
+  switch (v) {
+    case "ACCUMULATE":
+    case "BUY":
+      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+    case "HOLD":
+    case "HOLD_CORE":
+      return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30";
+    case "TRADE_THE_HYPE":
+      return "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30";
+    case "SPECULATIVE":
+    case "SPECULATIVE_FLYER":
+    case "FLYER":
+    case "MONITOR":
+      return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
+    case "LONGSHOT_BET":
+      return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
+    case "AVOID":
+    case "SELL":
+      return "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/30";
+    case "WAIT":
+      return "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30";
+    case "WATCH":
+      return "bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/30";
+    default:
+      return "bg-muted text-muted-foreground border-border";
+  }
+}
   }
 }
 
@@ -304,25 +353,63 @@ function RelatedSignalsPanel({ playerName, playerVerdict }: { playerName: string
   );
 }
 
+/**
+ * Lavender-themed loading skeleton matching the FaithfulNeon brand mockup.
+ * Uses .skeleton-lavender / .skeleton-bar-lavender (defined in index.css) which
+ * apply a lavender/violet pulse in dark mode and fall back to muted in light.
+ * The avatar slot is wrapped in faithful-holo-ring so the iridescent border is
+ * visible while the data loads — no layout shift when the real avatar arrives.
+ * Layout (header / verdict block / 6 signal bars / two side cards) mirrors the
+ * real outlook so the perceived loading delay feels intentional.
+ */
 function PlayerOutlookSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Skeleton className="h-16 w-16 rounded-full" />
-        <div className="space-y-2">
-          <Skeleton className="h-6 w-48" />
+    <div className="space-y-6" data-testid="skeleton-player-outlook">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <span className="inline-block p-[3px] rounded-full faithful-holo-ring shrink-0">
+          <Skeleton className="h-16 w-16 rounded-full skeleton-lavender" />
+        </span>
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-6 w-48 skeleton-lavender" />
           <div className="flex gap-2">
-            <Skeleton className="h-6 w-16" />
-            <Skeleton className="h-6 w-16" />
-            <Skeleton className="h-6 w-16" />
+            <Skeleton className="h-5 w-16 skeleton-lavender" />
+            <Skeleton className="h-5 w-16 skeleton-lavender" />
+            <Skeleton className="h-5 w-16 skeleton-lavender" />
           </div>
         </div>
       </div>
-      <Skeleton className="h-32 w-full" />
-      <Skeleton className="h-24 w-full" />
+
+      {/* Verdict panel skeleton */}
+      <div className="rounded-lg border border-border p-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-12 w-12 rounded-lg skeleton-lavender" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-5 w-40 skeleton-lavender" />
+            <Skeleton className="h-4 w-24 skeleton-lavender" />
+          </div>
+        </div>
+        <Skeleton className="h-4 w-full skeleton-lavender" />
+        <Skeleton className="h-4 w-3/4 skeleton-lavender" />
+      </div>
+
+      {/* Six signal bars skeleton — matches MarketSignalsPanel layout */}
+      <div className="rounded-lg border border-border p-4 space-y-3">
+        <Skeleton className="h-5 w-32 skeleton-lavender mb-2" />
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="flex justify-between">
+              <Skeleton className="h-4 w-20 skeleton-lavender" />
+              <Skeleton className="h-4 w-8 skeleton-lavender" />
+            </div>
+            <Skeleton className="h-1.5 w-full rounded-full skeleton-bar-lavender" />
+            <Skeleton className="h-3 w-2/3 skeleton-lavender" />
+          </div>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Skeleton className="h-40" />
-        <Skeleton className="h-40" />
+        <Skeleton className="h-40 skeleton-lavender" />
+        <Skeleton className="h-40 skeleton-lavender" />
       </div>
     </div>
   );
@@ -385,14 +472,20 @@ function PlayerHeader({ player, snapshot, marketPhase }: { player: PlayerOutlook
   return (
     <>
       <div className="flex flex-col sm:flex-row sm:items-center gap-4" data-testid="player-header">
-        <Avatar className="h-16 w-16 border-2 border-primary/20">
-          {imageData?.imageUrl && (
-            <AvatarImage src={imageData.imageUrl} alt={player.name} />
-          )}
-          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-xl font-bold text-primary">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
+        {/* faithful-holo-ring (defined in index.css) wraps the avatar with a
+            subtle iridescent gradient border that is visible in both themes
+            but tuned for the dark brand palette. p-[3px] gives the ring its
+            visible thickness without affecting the surrounding flex layout. */}
+        <span className="inline-block p-[3px] rounded-full faithful-holo-ring shrink-0">
+          <Avatar className="h-16 w-16 border-2 border-primary/20">
+            {imageData?.imageUrl && (
+              <AvatarImage src={imageData.imageUrl} alt={player.name} />
+            )}
+            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-xl font-bold text-primary">
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+        </span>
         <div className="flex-1">
           <h1 className="text-2xl font-bold" data-testid="text-player-name">{player.name}</h1>
           <div className="flex flex-wrap items-center gap-2 mt-1 text-sm text-muted-foreground">
@@ -484,12 +577,18 @@ function getSignalColor(score: number): string {
   return "text-red-600 dark:text-red-400";
 }
 
+/**
+ * Signal bar fill — uses .signal-bar-tier-* classes from index.css that
+ * apply a gradient + soft glow per tier (FaithfulNeon brand layer).
+ * Tier thresholds match getSignalColor() so the bar fill and the score
+ * text always agree on the verdict the score implies.
+ */
 function getSignalBarColor(score: number): string {
-  if (score >= 70) return "bg-green-500";
-  if (score >= 55) return "bg-emerald-500";
-  if (score >= 45) return "bg-yellow-500";
-  if (score >= 30) return "bg-orange-500";
-  return "bg-red-500";
+  if (score >= 70) return "signal-bar-tier-strong";
+  if (score >= 55) return "signal-bar-tier-good";
+  if (score >= 45) return "signal-bar-tier-neutral";
+  if (score >= 30) return "signal-bar-tier-weak";
+  return "signal-bar-tier-poor";
 }
 
 function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?: MarketPhase }) {
@@ -565,7 +664,7 @@ function MarketSignalsPanel({ signals, phase }: { signals: MarketSignals; phase?
                       style={{ width: `${score}%` }}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">{description}</p>
+                  <p className="text-xs text-muted-foreground signal-caption">{description}</p>
                 </div>
               );
             })}
@@ -798,22 +897,24 @@ function PeakTimingCard({ peakTiming, teamContext }: { peakTiming?: PeakTimingAs
 function TieredRecommendationsCard({ recommendations }: { recommendations?: TieredRecommendations }) {
   if (!recommendations) return null;
   
+  // Tier verdicts use a narrower BUY/HOLD/SELL set; map to the same color spec
+  // as the page-level getVerdictColor for visual consistency (HOLD=blue, SELL=violet).
   const getVerdictColor = (verdict: string) => {
     switch (verdict) {
-      case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
-      case "HOLD": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
-      case "SELL": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
-        case "LONGSHOT_BET": return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
+      case "BUY": return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+      case "HOLD": return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30";
+      case "SELL": return "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/30";
+      case "LONGSHOT_BET": return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
       default: return "bg-muted text-muted-foreground";
     }
   };
-  
+
   const getVerdictIcon = (verdict: string) => {
     switch (verdict) {
       case "BUY": return <ShoppingCart className="h-4 w-4" />;
-      case "HOLD": return <Eye className="h-4 w-4" />;
-      case "SELL": return <ArrowRight className="h-4 w-4" />;
-        case "LONGSHOT_BET": return <Sparkles className="h-4 w-4" />;
+      case "HOLD": return <Minus className="h-4 w-4" />;
+      case "SELL": return <Ban className="h-4 w-4" />;
+      case "LONGSHOT_BET": return <Sparkles className="h-4 w-4" />;
       default: return null;
     }
   };
@@ -1295,16 +1396,36 @@ function OutlookHistoryPanel({ playerKey }: { playerKey: string | null }) {
   // Don't show panel if no history data after loading
   if (!isLoading && (!history || history.length === 0)) return null;
   
+  // OutlookHistoryPanel verdict colors — matches the page-level spec.
+  // Aliases on purpose: BUY→ACCUMULATE (emerald), MONITOR→SPECULATIVE (amber),
+  // SELL→AVOID (violet) so historical entries from older verdict vocabularies
+  // collapse cleanly into the new six-category palette.
   const getVerdictColor = (verdict: string) => {
     switch (verdict) {
-      case "ACCUMULATE": return "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30";
-      case "BUY": return "bg-green-500/20 text-green-600 dark:text-green-400 border-green-500/30";
-      case "HOLD": return "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30";
-      case "MONITOR": return "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30";
-      case "SELL": return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30";
-      case "AVOID": return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30";
-        case "LONGSHOT_BET": return "bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30";
-      default: return "bg-muted text-muted-foreground";
+      case "ACCUMULATE":
+      case "BUY":
+        return "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30";
+      case "HOLD":
+      case "HOLD_CORE":
+        return "bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30";
+      case "TRADE_THE_HYPE":
+        return "bg-rose-500/20 text-rose-600 dark:text-rose-400 border-rose-500/30";
+      case "SPECULATIVE":
+      case "SPECULATIVE_FLYER":
+      case "FLYER":
+      case "MONITOR":
+        return "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30";
+      case "LONGSHOT_BET":
+        return "bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30";
+      case "SELL":
+      case "AVOID":
+        return "bg-violet-500/20 text-violet-600 dark:text-violet-400 border-violet-500/30";
+      case "WAIT":
+        return "bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-500/30";
+      case "WATCH":
+        return "bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/30";
+      default:
+        return "bg-muted text-muted-foreground border-border";
     }
   };
   
