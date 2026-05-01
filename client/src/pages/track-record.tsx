@@ -1,415 +1,500 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Link } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { hasProAccess } from "@shared/schema";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Separator } from "@/components/ui/separator";
 import {
-  CheckCircle2,
-  XCircle,
-  HelpCircle,
   TrendingUp,
   TrendingDown,
+  Minus,
   Target,
-  ShoppingCart,
-  Shield,
-  Ban,
+  Lock,
+  CheckCircle2,
+  XCircle,
+  Award,
+  BarChart3,
   Sparkles,
 } from "lucide-react";
 
-type VerdictAccuracyResult = {
-  playerName: string;
-  sport: string;
-  verdict: string;
-  priceAtVerdict: number;
-  changeAfter30d: number | null;
-  changeAfter60d: number | null;
-  changeAfter90d: number | null;
-  outcome: "CORRECT" | "INCORRECT" | "INCONCLUSIVE";
-  outcomeReason: string;
+type TopRow = {
+  cardTitle: string | null;
+  signalType: string;
+  pctChange: number | null;
 };
 
-type AccuracySummary = {
-  totalVerdicts: number;
-  correctCount: number;
-  incorrectCount: number;
-  inconclusiveCount: number;
-  accuracyRate: number;
-  byVerdict: Record<
-    string,
-    {
-      total: number;
-      correct: number;
-      incorrect: number;
-      inconclusive: number;
-      accuracy: number;
-    }
-  >;
-  topCorrectCalls: VerdictAccuracyResult[];
-  topIncorrectCalls: VerdictAccuracyResult[];
-  generatedAt: string;
+type Overall = {
+  totalGraded: number;
+  hits: number;
+  misses: number;
+  neutrals: number;
+  insufficient: number;
+  hitRate: number;
+  last90DaysGraded: number;
+  last90DaysHitRate: number;
+  topHits: TopRow[];
+  topMisses: TopRow[];
+  totalSignalsIssued: number;
+  pendingGradeCount: number;
+  windowDays: number;
 };
 
-const VERDICT_META: Record<
-  string,
-  { label: string; icon: React.ReactNode; color: string }
-> = {
-  ACCUMULATE: {
-    label: "Accumulate",
-    icon: <ShoppingCart className="h-4 w-4" />,
-    color: "text-green-700 dark:text-green-400",
-  },
-  HOLD_CORE: {
-    label: "Hold Core",
-    icon: <Shield className="h-4 w-4" />,
-    color: "text-blue-700 dark:text-blue-400",
-  },
-  TRADE_THE_HYPE: {
-    label: "Trade the Hype",
-    icon: <TrendingDown className="h-4 w-4" />,
-    color: "text-orange-700 dark:text-orange-400",
-  },
-  AVOID_NEW_MONEY: {
-    label: "Avoid (New Money)",
-    icon: <Ban className="h-4 w-4" />,
-    color: "text-red-700 dark:text-red-400",
-  },
-  AVOID_STRUCTURAL: {
-    label: "Avoid (Structural)",
-    icon: <Ban className="h-4 w-4" />,
-    color: "text-red-700 dark:text-red-400",
-  },
-  SELL: {
-    label: "Sell",
-    icon: <TrendingDown className="h-4 w-4" />,
-    color: "text-red-600 dark:text-red-400",
-  },
-  LONGSHOT_BET: {
-    label: "Longshot Bet",
-    icon: <Sparkles className="h-4 w-4" />,
-    color: "text-fuchsia-600 dark:text-fuchsia-400",
-  },
+type BreakdownRow = {
+  bucket: string;
+  total: number;
+  hits: number;
+  misses: number;
+  neutrals: number;
+  hitRate: number;
 };
 
-function getVerdictMeta(verdict: string) {
+type Breakdowns = {
+  bySignalType: BreakdownRow[];
+  bySport: BreakdownRow[];
+  byConfidence: BreakdownRow[];
+  byGraded: BreakdownRow[];
+};
+
+const MIN_GRADED_FOR_DETAIL = 10;
+
+function formatPct(n: number | null | undefined, digits = 1): string {
+  if (n === null || n === undefined || !isFinite(n)) return "—";
+  return `${(n * 100).toFixed(digits)}%`;
+}
+
+function signalBadge(signalType: string) {
+  const t = signalType.toUpperCase().replace("_", " ");
+  const isBuy = signalType.toLowerCase().includes("buy");
+  const isSell = signalType.toLowerCase().includes("sell");
   return (
-    VERDICT_META[verdict] ?? {
-      label: verdict.replace(/_/g, " "),
-      icon: <Target className="h-4 w-4" />,
-      color: "text-muted-foreground",
-    }
+    <Badge
+      variant="outline"
+      className={
+        isBuy
+          ? "border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
+          : isSell
+          ? "border-violet-500/40 text-violet-700 dark:text-violet-400"
+          : "border-amber-500/40 text-amber-700 dark:text-amber-400"
+      }
+      data-testid={`badge-signal-${signalType.toLowerCase()}`}
+    >
+      {t}
+    </Badge>
   );
 }
 
-function getBestChange(r: VerdictAccuracyResult): number | null {
-  return r.changeAfter90d ?? r.changeAfter60d ?? r.changeAfter30d;
-}
-
-function formatChange(val: number | null): string {
-  if (val === null) return "--";
-  const sign = val >= 0 ? "+" : "";
-  return `${sign}${val.toFixed(1)}%`;
-}
-
-function HeroSkeleton() {
+function pctChangeChip(pct: number | null) {
+  if (pct === null || !isFinite(pct)) {
+    return <span className="text-muted-foreground text-sm">—</span>;
+  }
+  const positive = pct >= 0;
+  const Icon = pct === 0 ? Minus : positive ? TrendingUp : TrendingDown;
   return (
-    <div className="text-center space-y-3">
-      <Skeleton className="h-16 w-48 mx-auto rounded-lg" />
-      <Skeleton className="h-5 w-64 mx-auto rounded" />
-    </div>
+    <span
+      className={`inline-flex items-center gap-1 text-sm font-medium ${
+        positive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+      }`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {positive ? "+" : ""}
+      {(pct * 100).toFixed(1)}%
+    </span>
   );
 }
 
-function CardsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <Skeleton key={i} className="h-40 w-full rounded-lg" />
-      ))}
-    </div>
-  );
-}
-
-function CallsSkeleton() {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {[0, 1].map((i) => (
-        <div key={i} className="space-y-2">
-          <Skeleton className="h-6 w-32 rounded" />
-          {Array.from({ length: 5 }).map((_, j) => (
-            <Skeleton key={j} className="h-12 w-full rounded-lg" />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function EmptyState() {
-  return (
-    <div className="text-center py-24">
-      <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-      <h2 className="text-xl font-semibold mb-2">
-        We're building our track record.
-      </h2>
-      <p className="text-muted-foreground">
-        Check back soon — verdicts need at least 30 days before they can be
-        scored.
-      </p>
-    </div>
-  );
-}
-
-function CallRow({ call }: { call: VerdictAccuracyResult }) {
-  const meta = getVerdictMeta(typeof call.verdict==="string"?call.verdict:(call.verdict as any)?.verdict??"");
-  const change = getBestChange(call);
-  const isPositive = change !== null && change >= 0;
-
-  return (
-    <div className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-muted/50 transition-colors">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{call.playerName}</p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <Badge
-            variant="secondary"
-            className={`text-[10px] px-1.5 py-0 ${meta.color}`}
-          >
-            {meta.icon}
-            <span className="ml-0.5">{meta.label}</span>
-          </Badge>
-          <span className="text-[10px] text-muted-foreground uppercase">
-            {call.sport}
-          </span>
-        </div>
-      </div>
-      <span
-        className={`text-sm font-semibold tabular-nums ${
-          isPositive
-            ? "text-green-600 dark:text-green-400"
-            : "text-red-600 dark:text-red-400"
-        }`}
-      >
-        {formatChange(change)}
-      </span>
-    </div>
-  );
-}
-
-function AccuracyView({
-  data,
-  isLoading,
-  emptyHint,
+function MetricCard({
+  label,
+  value,
+  hint,
+  testId,
+  icon: Icon,
 }: {
-  data: AccuracySummary | undefined;
-  isLoading: boolean;
-  emptyHint: string;
+  label: string;
+  value: string;
+  hint?: string;
+  testId: string;
+  icon?: any;
 }) {
-  const isEmpty = !isLoading && data && data.totalVerdicts === 0;
-
-  if (isLoading) {
-    return (
-      <div className="space-y-8">
-        <HeroSkeleton />
-        <CardsSkeleton />
-        <CallsSkeleton />
-      </div>
-    );
-  }
-
-  if (isEmpty) {
-    return (
-      <div className="text-center py-24">
-        <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-        <h2 className="text-xl font-semibold mb-2">
-          We're building our track record.
-        </h2>
-        <p className="text-muted-foreground">{emptyHint}</p>
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
   return (
-    <div className="space-y-8">
-      <Card className="text-center py-8" data-testid={`card-accuracy-hero`}>
-        <CardContent className="space-y-2">
-          <p className="text-6xl font-bold tracking-tight" data-testid="text-accuracy-rate">
-            {data.accuracyRate}%
-          </p>
-          <p className="text-lg text-muted-foreground">Overall Accuracy</p>
-          <div className="flex items-center justify-center gap-6 mt-4 text-sm">
-            <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
-              <CheckCircle2 className="h-4 w-4" />
-              {data.correctCount} Correct
-            </span>
-            <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
-              <XCircle className="h-4 w-4" />
-              {data.incorrectCount} Incorrect
-            </span>
-            <span className="flex items-center gap-1.5 text-muted-foreground">
-              <HelpCircle className="h-4 w-4" />
-              {data.inconclusiveCount} Inconclusive
-            </span>
+    <Card data-testid={`card-metric-${testId}`}>
+      <CardContent className="pt-6">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-3xl font-bold mt-1" data-testid={`text-metric-${testId}`}>
+              {value}
+            </p>
+            {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            {data.totalVerdicts} total verdicts evaluated
+          {Icon && <Icon className="h-5 w-5 text-muted-foreground shrink-0" />}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TopList({
+  title,
+  rows,
+  emptyText,
+  variant,
+  testId,
+}: {
+  title: string;
+  rows: TopRow[];
+  emptyText: string;
+  variant: "hit" | "miss";
+  testId: string;
+}) {
+  const Icon = variant === "hit" ? CheckCircle2 : XCircle;
+  const accent =
+    variant === "hit" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+  return (
+    <Card data-testid={`card-${testId}`}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Icon className={`h-4 w-4 ${accent}`} />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground" data-testid={`text-${testId}-empty`}>
+            {emptyText}
           </p>
-        </CardContent>
-      </Card>
-
-      <div>
-        <h2 className="text-lg font-semibold mb-4">Accuracy by Verdict Type</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Object.entries(data.byVerdict).map(([verdict, stats]) => {
-            const meta = getVerdictMeta(verdict);
-            return (
-              <Card key={verdict}>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <span className={meta.color}>{meta.icon}</span>
-                    {meta.label}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-2xl font-bold">{stats.accuracy}%</span>
-                    <span className="text-xs text-muted-foreground">accuracy</span>
-                  </div>
-                  <Progress value={stats.accuracy} className="h-2" />
-                  <div className="flex justify-between text-xs">
-                    <span className="text-green-600 dark:text-green-400">
-                      {stats.correct} correct
-                    </span>
-                    <span className="text-red-600 dark:text-red-400">
-                      {stats.incorrect} wrong
-                    </span>
-                    <span className="text-muted-foreground">
-                      {stats.inconclusive} tbd
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      </div>
-
-      {(data.topCorrectCalls.length > 0 || data.topIncorrectCalls.length > 0) && (
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Top Calls</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <TrendingUp className="h-4 w-4" />
-                  Best Calls
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-2">
-                {data.topCorrectCalls.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No correct calls yet
+        ) : (
+          <ul className="space-y-3">
+            {rows.map((r, i) => (
+              <li
+                key={`${testId}-${i}`}
+                className="flex items-center justify-between gap-3"
+                data-testid={`row-${testId}-${i}`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate" data-testid={`text-${testId}-title-${i}`}>
+                    {r.cardTitle || "Unknown card"}
                   </p>
-                ) : (
-                  data.topCorrectCalls
-                    .slice(0, 5)
-                    .map((call, i) => <CallRow key={i} call={call} />)
-                )}
-              </CardContent>
-            </Card>
+                  <div className="mt-1">{signalBadge(r.signalType)}</div>
+                </div>
+                {pctChangeChip(r.pctChange)}
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2 text-red-600 dark:text-red-400">
-                  <TrendingDown className="h-4 w-4" />
-                  Worst Calls
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-2">
-                {data.topIncorrectCalls.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">
-                    No incorrect calls yet
-                  </p>
-                ) : (
-                  data.topIncorrectCalls
-                    .slice(0, 5)
-                    .map((call, i) => <CallRow key={i} call={call} />)
-                )}
-              </CardContent>
-            </Card>
+function BreakdownTable({
+  title,
+  rows,
+  testId,
+}: {
+  title: string;
+  rows: BreakdownRow[];
+  testId: string;
+}) {
+  return (
+    <Card data-testid={`card-${testId}`}>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No data yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {rows.map((r) => (
+              <div key={`${testId}-${r.bucket}`} data-testid={`row-${testId}-${r.bucket}`}>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="font-medium" data-testid={`text-${testId}-bucket-${r.bucket}`}>
+                    {r.bucket}
+                  </span>
+                  <span className="text-muted-foreground">
+                    <span className="font-medium text-foreground" data-testid={`text-${testId}-rate-${r.bucket}`}>
+                      {formatPct(r.hitRate)}
+                    </span>{" "}
+                    · {r.hits}/{r.total}
+                  </span>
+                </div>
+                <Progress value={r.hitRate * 100} className="h-2" />
+              </div>
+            ))}
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProUpsell() {
+  return (
+    <Card className="border-primary/30 bg-primary/5" data-testid="card-pro-upsell">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Lock className="h-4 w-4 text-primary" />
+          Unlock the breakdowns
+        </CardTitle>
+        <CardDescription>
+          Pro members see hit rates broken down by verdict type, sport, confidence band, and graded
+          vs raw — so you can see exactly where the engine is sharpest.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Link href="/upgrade">
+          <Button data-testid="button-upgrade-pro">
+            <Sparkles className="h-4 w-4 mr-2" />
+            Upgrade to Pro
+          </Button>
+        </Link>
+      </CardContent>
+    </Card>
   );
 }
 
 export default function TrackRecordPage() {
-  const cardSignals = useQuery<AccuracySummary>({
+  const { user, isAuthenticated } = useAuth();
+  const isPro = isAuthenticated && hasProAccess(user as any);
+
+  const overallQuery = useQuery<Overall>({
     queryKey: ["/api/track-record"],
-    queryFn: async () => {
-      const res = await fetch("/api/track-record");
-      if (!res.ok) throw new Error("Failed to fetch track record");
-      return res.json();
-    },
-    staleTime: 10 * 60 * 1000,
   });
 
-  const playerOutlook = useQuery<AccuracySummary>({
-    queryKey: ["/api/track-record/player-outlook"],
-    queryFn: async () => {
-      const res = await fetch("/api/track-record/player-outlook");
-      if (!res.ok) throw new Error("Failed to fetch player-outlook track record");
-      return res.json();
-    },
-    staleTime: 10 * 60 * 1000,
+  const breakdownsQuery = useQuery<Breakdowns>({
+    queryKey: ["/api/track-record/breakdowns"],
+    enabled: isPro,
   });
+
+  const overall = overallQuery.data;
+  const hasMeaningfulData = (overall?.totalGraded ?? 0) >= MIN_GRADED_FOR_DETAIL;
 
   return (
-    <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 py-8 max-w-5xl space-y-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold">Verdict Track Record</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            How our AI-generated verdicts have performed against real market data
-          </p>
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="mb-8">
+        <div className="flex items-center gap-2 mb-2">
+          <Award className="h-6 w-6 text-primary" />
+          <h1 className="text-3xl font-bold" data-testid="heading-track-record">
+            Verdict Track Record
+          </h1>
         </div>
+        <p className="text-muted-foreground max-w-2xl">
+          Every BUY, HOLD, and SELL the engine issues is graded {overall?.windowDays ?? 60} days
+          later against real market prices. This page shows how often the calls are actually right.
+        </p>
+      </div>
 
-        <Tabs defaultValue="card-signals" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto" data-testid="tabs-track-record">
-            <TabsTrigger value="card-signals" data-testid="tab-card-signals">
-              Card Signals
-            </TabsTrigger>
-            <TabsTrigger value="player-outlook" data-testid="tab-player-outlook">
-              Player Outlook
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="card-signals" className="mt-6">
-            <AccuracyView
-              data={cardSignals.data}
-              isLoading={cardSignals.isLoading}
-              emptyHint="Check back soon — verdicts need at least 30 days before they can be scored."
-            />
-          </TabsContent>
-
-          <TabsContent value="player-outlook" className="mt-6">
-            <AccuracyView
-              data={playerOutlook.data}
-              isLoading={playerOutlook.isLoading}
-              emptyHint="Player-outlook history is graded nightly. Snapshots need at least 30 days of post-snapshot price data before they appear here."
-            />
-          </TabsContent>
-        </Tabs>
-
-        <div className="text-center text-xs text-muted-foreground border-t pt-6">
-          <p>
-            Past performance does not guarantee future results. Verdicts are
-            AI-generated analysis, not financial advice.
-          </p>
+      {overallQuery.isLoading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
         </div>
-      </main>
+      ) : overallQuery.error || !overall ? (
+        <Card data-testid="card-error">
+          <CardContent className="pt-6">
+            <p className="text-sm text-destructive">
+              Couldn't load the track record right now. Try refreshing in a moment.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !hasMeaningfulData ? (
+        <Card data-testid="card-empty-state">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              Coming soon
+            </CardTitle>
+            <CardDescription>
+              The engine has issued{" "}
+              <span className="font-semibold text-foreground" data-testid="text-signals-issued">
+                {overall.totalSignalsIssued}
+              </span>{" "}
+              verdicts so far. The first results grade {overall.windowDays} days after each signal
+              is issued — check back soon to see how the calls held up.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <MetricCard
+                label="Verdicts issued"
+                value={overall.totalSignalsIssued.toLocaleString()}
+                testId="signals-issued"
+                icon={BarChart3}
+              />
+              <MetricCard
+                label="Graded so far"
+                value={overall.totalGraded.toLocaleString()}
+                testId="graded-count"
+                icon={CheckCircle2}
+              />
+              <MetricCard
+                label="Awaiting grade"
+                value={overall.pendingGradeCount.toLocaleString()}
+                testId="pending-count"
+                icon={Target}
+              />
+              <MetricCard
+                label="Window"
+                value={`${overall.windowDays}d`}
+                hint="Outcome lookback"
+                testId="window-days"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <MetricCard
+              label="Overall hit rate"
+              value={formatPct(overall.hitRate)}
+              hint={`${overall.hits} of ${overall.totalGraded} graded`}
+              testId="overall-hit-rate"
+              icon={Target}
+            />
+            <MetricCard
+              label="Last 90 days"
+              value={formatPct(overall.last90DaysHitRate)}
+              hint={`${overall.last90DaysGraded} graded recently`}
+              testId="recent-hit-rate"
+              icon={TrendingUp}
+            />
+            <MetricCard
+              label="Verdicts issued"
+              value={overall.totalSignalsIssued.toLocaleString()}
+              testId="signals-issued"
+              icon={BarChart3}
+            />
+            <MetricCard
+              label="Awaiting grade"
+              value={overall.pendingGradeCount.toLocaleString()}
+              hint={`${overall.windowDays}-day window`}
+              testId="pending-count"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
+            <Card data-testid="card-outcome-mix">
+              <CardHeader>
+                <CardTitle className="text-base">Outcome mix</CardTitle>
+                <CardDescription>How {overall.totalGraded} graded verdicts shook out.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium">Hits</span>
+                    <span data-testid="text-outcome-hits">{overall.hits}</span>
+                  </div>
+                  <Progress
+                    value={overall.totalGraded > 0 ? (overall.hits / overall.totalGraded) * 100 : 0}
+                    className="h-2"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium">Misses</span>
+                    <span data-testid="text-outcome-misses">{overall.misses}</span>
+                  </div>
+                  <Progress
+                    value={overall.totalGraded > 0 ? (overall.misses / overall.totalGraded) * 100 : 0}
+                    className="h-2"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium">Neutral</span>
+                    <span data-testid="text-outcome-neutrals">{overall.neutrals}</span>
+                  </div>
+                  <Progress
+                    value={
+                      overall.totalGraded > 0 ? (overall.neutrals / overall.totalGraded) * 100 : 0
+                    }
+                    className="h-2"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <TopList
+              title="Top hits"
+              rows={overall.topHits}
+              emptyText="No graded hits yet."
+              variant="hit"
+              testId="top-hits"
+            />
+            <TopList
+              title="Top misses"
+              rows={overall.topMisses}
+              emptyText="No graded misses yet."
+              variant="miss"
+              testId="top-misses"
+            />
+          </div>
+
+          <Separator className="my-8" />
+
+          <div className="mb-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold" data-testid="heading-breakdowns">
+                Breakdowns
+              </h2>
+              {!isPro && (
+                <Badge variant="outline" className="border-primary/40 text-primary">
+                  <Lock className="h-3 w-3 mr-1" />
+                  Pro
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground text-sm mt-1">
+              Hit rates by verdict type, sport, confidence band, and graded vs raw.
+            </p>
+          </div>
+
+          {!isPro ? (
+            <ProUpsell />
+          ) : breakdownsQuery.isLoading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-48" />
+              ))}
+            </div>
+          ) : breakdownsQuery.error || !breakdownsQuery.data ? (
+            <Card data-testid="card-breakdowns-error">
+              <CardContent className="pt-6">
+                <p className="text-sm text-destructive">Couldn't load breakdowns right now.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <BreakdownTable
+                title="By verdict type"
+                rows={breakdownsQuery.data.bySignalType}
+                testId="breakdown-signal-type"
+              />
+              <BreakdownTable
+                title="By sport"
+                rows={breakdownsQuery.data.bySport}
+                testId="breakdown-sport"
+              />
+              <BreakdownTable
+                title="By confidence"
+                rows={breakdownsQuery.data.byConfidence}
+                testId="breakdown-confidence"
+              />
+              <BreakdownTable
+                title="Graded vs raw"
+                rows={breakdownsQuery.data.byGraded}
+                testId="breakdown-graded"
+              />
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

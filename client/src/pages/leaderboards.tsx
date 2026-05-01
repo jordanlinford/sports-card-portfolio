@@ -230,7 +230,7 @@ export default function Leaderboards() {
               <LeaderboardSection
                 title="Top Value"
                 icon={DollarSign}
-                iconColor="text-green-500"
+                iconColor="text-emerald-500"
                 entries={data?.topValue || []}
                 renderMetric={(e: any) => formatDollarValue(e.totalValue)}
                 testIdPrefix="value"
@@ -246,7 +246,7 @@ export default function Leaderboards() {
               <LeaderboardSection
                 title="Pound for Pound"
                 icon={TrendingUp}
-                iconColor="text-purple-500"
+                iconColor="text-pink-500"
                 entries={data?.poundForPound || []}
                 renderMetric={(e: PoundForPoundEntry) => `${formatDollarValue(e.avgValue)}/card`}
                 renderSubtext={(e: PoundForPoundEntry) => e.bestCardName ? `Best: ${e.bestCardName}` : null}

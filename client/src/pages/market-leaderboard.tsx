@@ -95,20 +95,17 @@ const SPORTS = [
 function getVerdictStyle(verdict: string) {
   switch (verdict) {
     case "BUY":
-      return { bg: "bg-green-500/10", text: "text-green-700 dark:text-green-400", icon: <ShoppingCart className="h-3 w-3" /> };
+      return { bg: "bg-emerald-500/10", text: "text-emerald-700 dark:text-emerald-400", icon: <ShoppingCart className="h-3 w-3" /> };
     case "HOLD_CORE":
       return { bg: "bg-blue-500/10", text: "text-blue-700 dark:text-blue-400", icon: <Shield className="h-3 w-3" /> };
     case "TRADE_THE_HYPE":
-      return { bg: "bg-orange-500/10", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-3 w-3" /> };
-    case "SELL":
-  case "AVOID":
-      return { bg: "bg-red-500/10", text: "text-red-700 dark:text-red-400", icon: <Ban className="h-3 w-3" /> };
-    case "LONGSHOT_BET":
-        return { bg: "bg-fuchsia-500/10", text: "text-fuchsia-700 dark:text-fuchsia-400", icon: <Sparkles className="h-3 w-3" /> };
+      return { bg: "bg-rose-500/10", text: "text-rose-700 dark:text-rose-400", icon: <TrendingDown className="h-3 w-3" /> };
+    case "AVOID":
+      return { bg: "bg-violet-500/10", text: "text-violet-700 dark:text-violet-400", icon: <Ban className="h-3 w-3" /> };
     case "SPECULATIVE":
       return { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-3 w-3" /> };
     default:
-      return { bg: "bg-yellow-500/10", text: "text-yellow-700 dark:text-yellow-400", icon: <Minus className="h-3 w-3" /> };
+      return { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", icon: <Minus className="h-3 w-3" /> };
   }
 }
 
@@ -202,7 +199,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
               </span>
 
               <span className={`hidden lg:block text-[10px] font-medium ${
-                entry.percentile?.startsWith("Top") ? "text-green-600 dark:text-green-400" : "text-muted-foreground"
+                entry.percentile?.startsWith("Top") ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
               }`} data-testid={`text-pctile-${entry.rank}`}>
                 {entry.percentile || "—"}
               </span>
@@ -231,7 +228,7 @@ function LeaderboardTable({ entries, isLoading }: { entries: LeaderboardEntry[];
               </span>
 
               <span className={`hidden md:block text-xs font-medium tabular-nums ${
-                entry.trend7d.startsWith("+") ? "text-green-600 dark:text-green-400" :
+                entry.trend7d.startsWith("+") ? "text-emerald-600 dark:text-emerald-400" :
                 entry.trend7d.startsWith("-") ? "text-red-600 dark:text-red-400" :
                 "text-muted-foreground"
               }`}>
