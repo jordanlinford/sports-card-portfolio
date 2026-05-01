@@ -63,15 +63,15 @@ const FAQ_ITEMS = [
 function getVerdictBadge(verdict: string) {
   const v = verdict?.toUpperCase() || "";
   if (v.includes("ACCUMULATE") || v.includes("BUY"))
-    return { color: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30", icon: <TrendingUp className="h-3 w-3" />, label: "Buy" };
+    return { color: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30", icon: <TrendingUp className="h-3 w-3" />, label: "Buy" };
   if (v.includes("AVOID") || v.includes("SELL"))
     return { color: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30", icon: <TrendingDown className="h-3 w-3" />, label: "Sell" };
   if (v.includes("TRADE") || v.includes("HYPE"))
-    return { color: "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30", icon: <AlertTriangle className="h-3 w-3" />, label: "Trade the Hype" };
+    return { color: "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30", icon: <AlertTriangle className="h-3 w-3" />, label: "Trade the Hype" };
   if (v.includes("HOLD"))
-    return { color: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30", icon: <Minus className="h-3 w-3" />, label: "Hold" };
+    return { color: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30", icon: <Minus className="h-3 w-3" />, label: "Hold" };
   if (v.includes("SPECULATIVE"))
-    return { color: "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30", icon: <Sparkles className="h-3 w-3" />, label: "Speculative" };
+    return { color: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30", icon: <Sparkles className="h-3 w-3" />, label: "Speculative" };
   return { color: "bg-slate-500/10 text-slate-700 dark:text-slate-400 border-slate-500/30", icon: <Eye className="h-3 w-3" />, label: "Monitor" };
 }
 
@@ -202,9 +202,9 @@ export default function ToppsTakeoverPage() {
           </p>
 
           <div className="grid md:grid-cols-2 gap-6 mb-8">
-            <Card className="border-green-500/20 bg-green-500/5" data-testid="card-beneficiaries">
+            <Card className="border-emerald-500/20 bg-emerald-500/5" data-testid="card-beneficiaries">
               <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2 text-green-700 dark:text-green-400">
+                <CardTitle className="text-lg flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
                   <TrendingUp className="h-5 w-5" />
                   Likely Beneficiaries
                 </CardTitle>
@@ -212,15 +212,15 @@ export default function ToppsTakeoverPage() {
               <CardContent>
                 <ul className="space-y-3 text-sm">
                   <li className="flex items-start gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-green-500 mt-2 flex-shrink-0" />
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0" />
                     <span><strong className="text-foreground">Existing Panini rookie cards</strong> — Key Prizm, Select, and National Treasures rookies become the permanent rookie cards for those players. No Topps re-issue.</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-green-500 mt-2 flex-shrink-0" />
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0" />
                     <span><strong className="text-foreground">First Topps NFL releases</strong> — Historical significance as the return of Topps to football. First Topps Chrome NFL cards will be highly collectible.</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <div className="h-1.5 w-1.5 rounded-full bg-green-500 mt-2 flex-shrink-0" />
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 mt-2 flex-shrink-0" />
                     <span><strong className="text-foreground">Graded Panini flagship products</strong> — PSA 10 Prizm Silvers and BGS 9.5 Select rookies are established and won't be replaced.</span>
                   </li>
                 </ul>

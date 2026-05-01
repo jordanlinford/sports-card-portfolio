@@ -187,8 +187,8 @@ export default function PodcastLanding() {
             <Card className="max-w-md mx-auto" data-testid="card-trial-success">
               <CardContent className="pt-6 text-center">
                 <div className="flex items-center justify-center gap-2 mb-3">
-                  <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                    <Check className="h-5 w-5 text-green-600" />
+                  <div className="h-10 w-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                    <Check className="h-5 w-5 text-emerald-600" />
                   </div>
                 </div>
                 <p className="font-semibold mb-1" data-testid="text-trial-success-message">

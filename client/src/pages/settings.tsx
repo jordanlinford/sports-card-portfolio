@@ -321,7 +321,7 @@ export default function Settings() {
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     {isChecking && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
                     {!isChecking && isAvailable === true && handle.length >= 3 && (
-                      <Check className="h-4 w-4 text-green-500" />
+                      <Check className="h-4 w-4 text-emerald-500" />
                     )}
                     {!isChecking && isAvailable === false && handle.length >= 3 && (
                       <X className="h-4 w-4 text-destructive" />
