@@ -448,14 +448,14 @@ export default function Dashboard() {
         );
         return (
           <Card
-            className={`mb-6 border ${fullyHealthy ? "border-green-200 dark:border-green-900 bg-green-50/50 dark:bg-green-950/20" : "border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20"}`}
+            className={`mb-6 border ${fullyHealthy ? "border-emerald-200 dark:border-emerald-900 bg-emerald-50/50 dark:bg-emerald-950/20" : "border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/20"}`}
             data-testid="banner-collection-health"
           >
             <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-4">
               <div className="flex items-start sm:items-center gap-3 flex-1 min-w-0">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${fullyHealthy ? "bg-green-100 dark:bg-green-900/40" : "bg-amber-100 dark:bg-amber-900/40"}`}>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${fullyHealthy ? "bg-emerald-100 dark:bg-emerald-900/40" : "bg-amber-100 dark:bg-amber-900/40"}`}>
                   {fullyHealthy ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                   ) : (
                     <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                   )}

@@ -157,7 +157,7 @@ function InsightCard({ insight }: { insight: GrowthInsight }) {
   };
   
   const colorMap = {
-    opportunity: "text-green-600 dark:text-green-400",
+    opportunity: "text-emerald-600 dark:text-emerald-400",
     risk: "text-red-600 dark:text-red-400",
     trend: "text-blue-600 dark:text-blue-400",
   };
@@ -322,11 +322,11 @@ export default function GrowthProjectionsPage() {
                   </div>
                   <div className="flex items-center gap-1 mt-1">
                     {p.baseCase.valuePct >= 0 ? (
-                      <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     ) : (
                       <TrendingDown className="h-4 w-4 text-red-600 dark:text-red-400" />
                     )}
-                    <span className={`text-sm ${p.baseCase.valuePct >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                    <span className={`text-sm ${p.baseCase.valuePct >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                       {formatPercent(p.baseCase.valuePct)}
                     </span>
                   </div>
@@ -447,7 +447,7 @@ export default function GrowthProjectionsPage() {
                           </div>
                           <div className="text-right">
                             <p className="font-semibold">{formatCurrency(card.currentValue)}</p>
-                            <span className="text-sm text-green-600 dark:text-green-400">
+                            <span className="text-sm text-emerald-600 dark:text-emerald-400">
                               {formatPercent(card.projectedGrowth["12m"])}
                             </span>
                           </div>

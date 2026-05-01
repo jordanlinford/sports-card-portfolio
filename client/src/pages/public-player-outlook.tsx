@@ -89,18 +89,19 @@ function getVerdictColor(verdict?: string) {
   switch (verdict) {
     case "BUY":
     case "ACCUMULATE":
-      return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
+      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
     case "SPECULATIVE_FLYER":
-      return "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30";
-    case "MONITOR":
+      return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
     case "HOLD_CORE":
-      return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+      return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30";
+    case "MONITOR":
+      return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
     case "TRADE_THE_HYPE":
-      return "bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30";
+      return "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30";
     case "AVOID":
     case "AVOID_NEW_MONEY":
     case "AVOID_STRUCTURAL":
-      return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
+      return "bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-500/30";
     default:
       return "bg-muted text-muted-foreground";
   }
@@ -321,7 +322,7 @@ export default function PublicPlayerOutlookPage() {
               <ul className="space-y-2">
                 {advisorOutlook.whatChangesMyMind.map((item, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <AlertTriangle className="h-4 w-4 text-yellow-500 mt-0.5 flex-shrink-0" />
+                    <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
                     <span>{item}</span>
                   </li>
                 ))}

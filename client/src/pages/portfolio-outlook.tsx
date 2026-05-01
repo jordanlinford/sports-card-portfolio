@@ -56,7 +56,7 @@ function ConfidenceBadge({ score, cardCount }: { score?: number | null; cardCoun
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge variant="outline" className="gap-1 text-yellow-600 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700">
+        <Badge variant="outline" className="gap-1 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
           <Info className="h-3 w-3" />
           {isThinData ? "Limited data" : "Low confidence"}
         </Badge>
@@ -91,8 +91,8 @@ function ExposureBar({ label, value, color = "primary" }: { label: string; value
 
 function RiskSignalCard({ signal }: { signal: RiskSignal }) {
   const severityColors = {
-    low: "bg-green-500/10 text-green-700 dark:text-green-400",
-    med: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
+    low: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+    med: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
     high: "bg-red-500/10 text-red-700 dark:text-red-400",
   };
 
@@ -100,7 +100,7 @@ function RiskSignalCard({ signal }: { signal: RiskSignal }) {
     <div className="flex items-start gap-3 p-3 rounded-lg border">
       <AlertTriangle className={`h-5 w-5 shrink-0 mt-0.5 ${
         signal.severity === "high" ? "text-red-500" : 
-        signal.severity === "med" ? "text-yellow-500" : "text-green-500"
+        signal.severity === "med" ? "text-amber-500" : "text-emerald-500"
       }`} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -293,9 +293,9 @@ export default function PortfolioOutlookPage() {
   const actions = (snapshot.recommendedNextActions as RecommendedAction[] | null) || [];
 
   const stanceColors: Record<string, string> = {
-    "Speculative Growth": "bg-purple-500/10 text-purple-700 dark:text-purple-400",
+    "Speculative Growth": "bg-violet-500/10 text-violet-700 dark:text-violet-400",
     "Balanced": "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-    "Value": "bg-green-500/10 text-green-700 dark:text-green-400",
+    "Value": "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
     "Legacy": "bg-amber-500/10 text-amber-700 dark:text-amber-400",
     "Aggressive Speculation": "bg-red-500/10 text-red-700 dark:text-red-400",
     "No Portfolio": "bg-gray-500/10 text-gray-700 dark:text-gray-400",
@@ -483,7 +483,7 @@ export default function PortfolioOutlookPage() {
           <CardContent>
             {riskSignals.length === 0 ? (
               <div className="text-center py-6">
-                <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-green-500" />
+                <CheckCircle2 className="h-12 w-12 mx-auto mb-3 text-emerald-500" />
                 <p className="text-muted-foreground">No major risk signals detected</p>
               </div>
             ) : (
@@ -501,7 +501,7 @@ export default function PortfolioOutlookPage() {
         <Card data-testid="card-opportunities">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-yellow-500" />
+              <Lightbulb className="h-5 w-5 text-amber-500" />
               Opportunities
             </CardTitle>
           </CardHeader>
@@ -512,7 +512,7 @@ export default function PortfolioOutlookPage() {
               <ul className="space-y-2">
                 {opportunities.map((opp, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                     <span>{opp}</span>
                   </li>
                 ))}
@@ -524,7 +524,7 @@ export default function PortfolioOutlookPage() {
         <Card data-testid="card-watchouts">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
               Watchouts
             </CardTitle>
           </CardHeader>
@@ -535,7 +535,7 @@ export default function PortfolioOutlookPage() {
               <ul className="space-y-2">
                 {watchouts.map((wo, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <Target className="h-4 w-4 text-yellow-500 mt-0.5 shrink-0" />
+                    <Target className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                     <span>{wo}</span>
                   </li>
                 ))}
