@@ -919,7 +919,7 @@ function PlayerRegistryTab() {
             <div className="space-y-4 py-2">
               {aiJob.proposals.length === 0 ? (
                 <div className="text-center py-6">
-                  <CheckCircle className="h-10 w-10 mx-auto mb-3 text-green-500" />
+                  <CheckCircle className="h-10 w-10 mx-auto mb-3 text-emerald-500" />
                   <p className="font-medium">All players are up to date</p>
                   <p className="text-sm text-muted-foreground mt-1">No changes needed</p>
                 </div>
@@ -1499,6 +1499,1099 @@ function AlphaEngineTab() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+interface RebrandDryRunResponse {
+  dryRun: true;
+  alreadySentCount: number;
+  eligibleCount: number;
+  wouldSendCount: number;
+  sampleRecipients: Array<string | null>;
+}
+
+interface RebrandSendResponse {
+  dryRun: false;
+  started: true;
+  jobId: string;
+  queued: number;
+  alreadySentCount: number;
+  eligibleCount: number;
+}
+
+interface RebrandStatusResponse {
+  running: boolean;
+  jobId: string | null;
+  startedAt: string | null;
+  lastFinishedAt: string | null;
+  totalQueued: number;
+  sentCount: number;
+  failedCount: number;
+  remaining: number;
+  alreadySentCount: number;
+  eligibleCount: number;
+  error: string | null;
+  // True from the moment an admin clicks "Cancel broadcast" until the worker
+  // notices and exits. Used to disable the Cancel button so it can't be
+  // clicked twice and to show a "stopping..." label while we wait.
+  stopRequested: boolean;
+  // Set on the most recent broadcast only when it ended early due to a cancel
+  // request. The UI uses this to switch the result panel from "Last batch
+  // result" to "Broadcast cancelled".
+  cancelledAt: string | null;
+}
+
+interface RebrandEmailPreviewResponse {
+  subject: string;
+  html: string;
+  text: string;
+  // The hidden inbox-preview snippet (preheader). Surfaced separately so the
+  // UI can display it as a faux Gmail/Apple Mail/Outlook row alongside the
+  // subject — the in-body preheader markup is `display:none` so admins
+  // otherwise have no way to QA what recipients see in their inbox list.
+  preheader: string;
+  previewedAs: {
+    userId: string | null;
+    name: string | null;
+    email: string | null;
+    kind: "admin" | "user" | "next";
+  };
+}
+
+interface ScheduledEmailPreviewResponse {
+  subject: string;
+  html: string;
+  text?: string;
+  preheader: string;
+  previewedAs: { name: string | null; email: string | null };
+}
+
+// Small presentational helper used by every email-preview modal. Renders the
+// faux inbox row Gmail / Apple Mail / Outlook show next to the subject line:
+//   From: HobbyAlpha   <subject>   <preheader>
+// so admins can QA both pieces of inbox real estate (subject + hidden
+// preheader) before sending. Kept as its own component so any future preview
+// (welcome, payment-confirmation, etc.) gets a consistent look.
+function InboxPreviewRow({
+  subject,
+  preheader,
+  testIdPrefix,
+}: {
+  subject: string;
+  preheader: string;
+  testIdPrefix: string;
+}) {
+  return (
+    <div
+      className="rounded-md border bg-background p-3 text-sm"
+      data-testid={`inbox-preview-${testIdPrefix}`}
+    >
+      <div className="text-xs text-muted-foreground mb-1">
+        How this will look in the recipient's inbox list:
+      </div>
+      <div className="flex items-baseline gap-2 min-w-0">
+        <span
+          className="font-semibold shrink-0"
+          data-testid={`inbox-preview-${testIdPrefix}-from`}
+        >
+          HobbyAlpha
+        </span>
+        <span className="text-muted-foreground shrink-0">—</span>
+        <span
+          className="font-medium truncate"
+          data-testid={`inbox-preview-${testIdPrefix}-subject`}
+        >
+          {subject}
+        </span>
+        <span className="text-muted-foreground shrink-0">—</span>
+        <span
+          className="text-muted-foreground truncate"
+          data-testid={`inbox-preview-${testIdPrefix}-preheader`}
+        >
+          {preheader}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Reusable card for the "preview + test send" pattern shared by the weekly
+// digest and win-back announcement panels. The rebrand-announcement panel has
+// its own bespoke flow (batch sizing, ledger, in-flight progress) and is not
+// expressible through this component — these scheduled emails are simpler:
+// no ledger, no batching, just "render against admin" + "send a sample to me".
+function ScheduledEmailPreviewCard({
+  title,
+  description,
+  previewEndpoint,
+  testEndpoint,
+  testIdPrefix,
+  modalTitle,
+  modalDescription,
+}: {
+  title: string;
+  description: string;
+  previewEndpoint: string;
+  testEndpoint: string;
+  testIdPrefix: string;
+  modalTitle: string;
+  modalDescription: string;
+}) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+
+  // Lazy-load the rendered email preview only when the modal is open so we
+  // don't render every panel's email on every Announcements tab visit.
+  const previewQuery = useQuery<ScheduledEmailPreviewResponse>({
+    queryKey: [previewEndpoint],
+    enabled: open,
+    staleTime: 60_000,
+  });
+
+  const testSendMutation = useMutation({
+    mutationFn: async () => {
+      return (await apiRequest("POST", testEndpoint)) as {
+        success: boolean;
+        sentTo: string;
+      };
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Test email sent",
+        description: `Delivered to ${data.sentTo}. Check your inbox.`,
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Test send failed",
+        description: err?.message || "Could not send the test email.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Card data-testid={`card-${testIdPrefix}`}>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Megaphone className="h-5 w-5" />
+          {title}
+        </CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            onClick={() => setOpen(true)}
+            variant="outline"
+            data-testid={`button-${testIdPrefix}-preview-email`}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Preview email
+          </Button>
+        </div>
+      </CardContent>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle data-testid={`text-${testIdPrefix}-preview-title`}>
+              {modalTitle}
+            </DialogTitle>
+            <DialogDescription>
+              {modalDescription} Test sends are clearly labeled in the UI and
+              do not write to any "already sent" ledger — re-send as many
+              times as you need.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewQuery.isLoading && (
+            <div
+              className="flex items-center justify-center py-12"
+              data-testid={`loading-${testIdPrefix}-preview`}
+            >
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {previewQuery.isError && (
+            <div
+              className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm"
+              data-testid={`error-${testIdPrefix}-preview`}
+            >
+              Could not load the email preview.{" "}
+              {(previewQuery.error as any)?.message || "Please try again."}
+            </div>
+          )}
+
+          {previewQuery.data && (
+            <div className="space-y-3">
+              <InboxPreviewRow
+                subject={previewQuery.data.subject}
+                preheader={previewQuery.data.preheader}
+                testIdPrefix={testIdPrefix}
+              />
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Subject:</span>{" "}
+                  <span
+                    className="font-medium"
+                    data-testid={`text-${testIdPrefix}-subject`}
+                  >
+                    {previewQuery.data.subject}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Inbox preview:</span>{" "}
+                  <span
+                    className="font-medium"
+                    data-testid={`text-${testIdPrefix}-preheader`}
+                  >
+                    {previewQuery.data.preheader}
+                  </span>
+                </div>
+                {previewQuery.data.previewedAs.email && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Personalized for{" "}
+                    {previewQuery.data.previewedAs.name || "(no name on file)"} &lt;
+                    {previewQuery.data.previewedAs.email}&gt;
+                  </div>
+                )}
+              </div>
+              <iframe
+                title={modalTitle}
+                srcDoc={previewQuery.data.html}
+                sandbox=""
+                className="w-full h-[480px] rounded-md border bg-white"
+                data-testid={`iframe-${testIdPrefix}-preview`}
+              />
+            </div>
+          )}
+
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+              data-testid={`button-${testIdPrefix}-preview-close`}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => testSendMutation.mutate()}
+              disabled={testSendMutation.isPending || !previewQuery.data}
+              data-testid={`button-${testIdPrefix}-send-test`}
+            >
+              {testSendMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Send test to me
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
+function AnnouncementsTab() {
+  const { toast } = useToast();
+  const [batchSize, setBatchSize] = useState(100);
+  const [preview, setPreview] = useState<RebrandDryRunResponse | null>(null);
+  // The batch size that was used for the most recent preview. The confirm-and-send
+  // step uses this value (NOT the live input) so the admin can never accidentally
+  // confirm a "send 100" preview while actually sending 1000.
+  const [previewedBatch, setPreviewedBatch] = useState<number | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [emailPreviewOpen, setEmailPreviewOpen] = useState(false);
+  // The text the admin types into the "preview as" input. We don't fire a
+  // new preview on every keystroke — only when they click a button or use
+  // the "Use next eligible recipient" shortcut, so previewTarget below is
+  // the *committed* value the query actually requests.
+  const [previewTargetInput, setPreviewTargetInput] = useState("");
+  // What the preview is currently rendered against. `null` means the default
+  // (admin's own account); `{ kind: "user", value }` means a specific
+  // id/email; `{ kind: "next" }` means the "next eligible recipient" shortcut.
+  const [previewTarget, setPreviewTarget] = useState<
+    | { kind: "user"; value: string }
+    | { kind: "next" }
+    | null
+  >(null);
+
+  // Lazy-load the rendered email preview only when the modal is open so we
+  // don't hammer the server on every Announcements tab visit. We use a
+  // custom queryFn so the userId/email/nextEligible query params can be
+  // appended without colliding with the default queryKey-as-path fetcher.
+  const emailPreviewQuery = useQuery<RebrandEmailPreviewResponse>({
+    queryKey: ["/api/admin/rebrand-announcement/preview", previewTarget],
+    enabled: emailPreviewOpen,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (previewTarget?.kind === "user") {
+        // Heuristic: anything containing "@" is treated as an email lookup;
+        // everything else is treated as a user id. Matches what the server
+        // expects (?userId= or ?email=).
+        if (previewTarget.value.includes("@")) {
+          params.set("email", previewTarget.value);
+        } else {
+          params.set("userId", previewTarget.value);
+        }
+      } else if (previewTarget?.kind === "next") {
+        params.set("nextEligible", "1");
+      }
+      const qs = params.toString();
+      const url = qs
+        ? `/api/admin/rebrand-announcement/preview?${qs}`
+        : "/api/admin/rebrand-announcement/preview";
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) {
+        const text = (await res.text()) || res.statusText;
+        throw new Error(`${res.status}: ${text}`);
+      }
+      return (await res.json()) as RebrandEmailPreviewResponse;
+    },
+    retry: false,
+  });
+
+  // After the "next eligible recipient" shortcut resolves on the server,
+  // mirror the resolved user back into the input box so the admin can see
+  // (and copy/edit) which user the preview is rendered against. Without
+  // this the input stays blank after clicking the shortcut, which is
+  // confusing — the task explicitly asks the shortcut to "auto-fill the
+  // next user the broadcast would send to".
+  useEffect(() => {
+    if (
+      emailPreviewQuery.data?.previewedAs.kind === "next" &&
+      emailPreviewQuery.data.previewedAs.email
+    ) {
+      setPreviewTargetInput(emailPreviewQuery.data.previewedAs.email);
+    }
+  }, [emailPreviewQuery.data]);
+
+  const testSendMutation = useMutation({
+    mutationFn: async () => {
+      return (await apiRequest(
+        "POST",
+        "/api/admin/rebrand-announcement/test",
+      )) as { success: boolean; sentTo: string };
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Test email sent",
+        description: `Delivered to ${data.sentTo}. Check your inbox.`,
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Test send failed",
+        description: err?.message || "Could not send the test email.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const clampedBatch = Math.max(1, Math.min(1000, Number.isFinite(batchSize) ? batchSize : 100));
+
+  // If the admin edits the batch size after previewing, the preview is no longer
+  // representative — clear it so a fresh preview is required before sending.
+  useEffect(() => {
+    if (previewedBatch !== null && clampedBatch !== previewedBatch) {
+      setPreview(null);
+      setPreviewedBatch(null);
+    }
+  }, [clampedBatch, previewedBatch]);
+
+  const previewMutation = useMutation({
+    mutationFn: async (limit: number) => {
+      return (await apiRequest("POST", "/api/admin/rebrand-announcement", {
+        dryRun: true,
+        limit,
+      })) as RebrandDryRunResponse;
+    },
+    onSuccess: (data, limit) => {
+      setPreview(data);
+      setPreviewedBatch(limit);
+      // Intentionally do NOT clear lastResult here — we want the post-send result
+      // panel to remain visible after the auto-refresh that follows a send.
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Preview failed",
+        description: err?.message || "Could not load eligible recipients.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Tracks the most recent broadcast we kicked off, so the polling status
+  // query can identify when *our* job finishes (vs. a stale job that was
+  // already running when the tab was opened) and we know when to flip from
+  // "in-flight" UI to "done" UI.
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [hasNotifiedFinish, setHasNotifiedFinish] = useState(false);
+
+  const sendMutation = useMutation({
+    mutationFn: async (limit: number) => {
+      return (await apiRequest("POST", "/api/admin/rebrand-announcement", {
+        dryRun: false,
+        limit,
+      })) as RebrandSendResponse;
+    },
+    onSuccess: (data) => {
+      setActiveJobId(data.jobId);
+      setHasNotifiedFinish(false);
+      setConfirmOpen(false);
+      // Force an immediate status refetch so the progress panel appears
+      // instantly instead of waiting up to 1.5s for the next poll tick.
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/rebrand-announcement/status"],
+      });
+      toast({
+        title: "Broadcast started",
+        description: `${data.queued} email${data.queued === 1 ? "" : "s"} queued. Progress will update live below.`,
+      });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Send failed",
+        description: err?.message || "Could not broadcast the announcement.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Poll the broadcast status. We always poll once on mount so a previously
+  // started job (e.g. admin closed the tab and came back) is still visible.
+  // While a job is running we poll every 1.5s; otherwise the query is idle.
+  const statusQuery = useQuery<RebrandStatusResponse>({
+    queryKey: ["/api/admin/rebrand-announcement/status"],
+    refetchInterval: (query) => (query.state.data?.running ? 1500 : false),
+    refetchOnWindowFocus: true,
+  });
+
+  const status = statusQuery.data;
+  const isJobRunning = status?.running === true;
+  const isStopRequested = status?.stopRequested === true;
+  const wasCancelled = !!status?.cancelledAt && !status?.running;
+
+  // Ask the worker to stop between recipients. Returns 409 if the worker has
+  // already finished (e.g. the admin clicked just as the last send completed),
+  // which we surface as a friendly toast rather than a destructive error.
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      return (await apiRequest(
+        "POST",
+        "/api/admin/rebrand-announcement/cancel",
+      )) as { cancelled: boolean; alreadyRequested: boolean; jobId: string };
+    },
+    onSuccess: (data) => {
+      // Force an immediate poll so the UI flips to "stopping..." right away
+      // instead of waiting up to 1.5s for the next scheduled status tick.
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/rebrand-announcement/status"],
+      });
+      toast({
+        title: data.alreadyRequested ? "Cancel already requested" : "Cancel requested",
+        description: data.alreadyRequested
+          ? "Waiting for the worker to finish the current send and exit."
+          : "The broadcast will stop after the current send finishes.",
+      });
+    },
+    onError: (err: any) => {
+      // The expected race here is the worker finishing the very last send
+      // between the admin's click and the server processing the POST. The
+      // cancel endpoint returns 409 in that case — surface that as a neutral
+      // "already finished" toast rather than a scary destructive error,
+      // since nothing actually went wrong.
+      const message = String(err?.message || "");
+      const isAlreadyDone = message.startsWith("409");
+      // Either way, refresh the status so the UI reflects reality.
+      queryClient.invalidateQueries({
+        queryKey: ["/api/admin/rebrand-announcement/status"],
+      });
+      toast({
+        title: isAlreadyDone ? "Broadcast already finished" : "Cancel failed",
+        description: isAlreadyDone
+          ? "The worker had already processed the last recipient before your cancel reached the server."
+          : message || "Could not cancel the broadcast.",
+        variant: isAlreadyDone ? "default" : "destructive",
+      });
+    },
+  });
+
+  // When the broadcast we kicked off finishes, surface a single toast and
+  // re-fetch the preview so the eligible/already-sent counts reflect the
+  // updated ledger.
+  useEffect(() => {
+    if (!status) return;
+    if (!activeJobId) return;
+    if (status.jobId !== activeJobId) return;
+    if (status.running) return;
+    if (hasNotifiedFinish) return;
+    setHasNotifiedFinish(true);
+    const finishedByCancel = !!status.cancelledAt;
+    toast({
+      title: finishedByCancel ? "Broadcast cancelled" : "Broadcast finished",
+      description: `${status.sentCount} sent, ${status.failedCount} failed${
+        finishedByCancel ? `, ${status.remaining} skipped` : ""
+      }${status.error ? ` — ${status.error}` : ""}.`,
+      variant: status.error || status.failedCount > 0 ? "destructive" : "default",
+    });
+    if (previewedBatch !== null) {
+      previewMutation.mutate(previewedBatch);
+    }
+  }, [status, activeJobId, hasNotifiedFinish, previewedBatch, previewMutation, toast]);
+
+  const eligibleCount = preview?.eligibleCount ?? 0;
+  const wouldSendCount = preview?.wouldSendCount ?? 0;
+
+  const progressTotal = status?.totalQueued ?? 0;
+  const progressDone = (status?.sentCount ?? 0) + (status?.failedCount ?? 0);
+  const progressPct =
+    progressTotal > 0 ? Math.min(100, Math.round((progressDone / progressTotal) * 100)) : 0;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Megaphone className="h-5 w-5" />
+            Rename Announcement
+          </CardTitle>
+          <CardDescription>
+            One-click broadcast of the "Sports Card Portfolio is now HobbyAlpha" email to every user
+            with an email on file. A ledger prevents double-sends, so you can re-run safely in
+            batches.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:gap-4">
+            <div className="flex-1 max-w-[200px]">
+              <Label htmlFor="rebrand-batch-size">Batch size</Label>
+              <Input
+                id="rebrand-batch-size"
+                type="number"
+                min={1}
+                max={1000}
+                value={batchSize}
+                onChange={(e) => setBatchSize(parseInt(e.target.value, 10) || 0)}
+                data-testid="input-rebrand-batch-size"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Between 1 and 1000. Default 100.
+              </p>
+            </div>
+            <Button
+              onClick={() => previewMutation.mutate(clampedBatch)}
+              disabled={previewMutation.isPending}
+              variant="outline"
+              data-testid="button-rebrand-preview"
+            >
+              {previewMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Eye className="h-4 w-4 mr-2" />
+              )}
+              Preview eligible recipients
+            </Button>
+            <Button
+              onClick={() => setEmailPreviewOpen(true)}
+              variant="outline"
+              data-testid="button-rebrand-preview-email"
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Preview email
+            </Button>
+            <Button
+              onClick={() => setConfirmOpen(true)}
+              disabled={
+                !preview ||
+                wouldSendCount === 0 ||
+                sendMutation.isPending ||
+                isJobRunning
+              }
+              data-testid="button-rebrand-send"
+            >
+              {sendMutation.isPending || isJobRunning ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              {isJobRunning ? "Broadcast running..." : "Send to next batch"}
+            </Button>
+            {isJobRunning && (
+              <Button
+                onClick={() => cancelMutation.mutate()}
+                disabled={
+                  cancelMutation.isPending || isStopRequested
+                }
+                variant="destructive"
+                data-testid="button-rebrand-cancel-broadcast"
+              >
+                {cancelMutation.isPending || isStopRequested ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <X className="h-4 w-4 mr-2" />
+                )}
+                {isStopRequested ? "Stopping..." : "Cancel broadcast"}
+              </Button>
+            )}
+          </div>
+
+          {preview && (
+            <div className="rounded-lg border p-4 space-y-3" data-testid="panel-rebrand-preview">
+              <h4 className="font-medium text-sm">Preview</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Already sent:</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-already-sent">
+                    {preview.alreadySentCount}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Eligible (not yet sent):</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-eligible">
+                    {eligibleCount}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Will send this batch:</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-would-send">
+                    {wouldSendCount}
+                  </span>
+                </div>
+              </div>
+              {preview.sampleRecipients.length > 0 ? (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Sample recipients</p>
+                  <ul className="text-sm space-y-1" data-testid="list-rebrand-sample">
+                    {preview.sampleRecipients.map((email, i) => (
+                      <li
+                        key={`${email ?? "unknown"}-${i}`}
+                        className="font-mono text-xs"
+                        data-testid={`text-rebrand-sample-${i}`}
+                      >
+                        {email ?? "(no email)"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No remaining recipients — everyone with an email has already been sent the
+                  announcement.
+                </p>
+              )}
+            </div>
+          )}
+
+          {status && (status.running || status.lastFinishedAt) && (
+            <div
+              className="rounded-lg border p-4 space-y-3 bg-muted/30"
+              data-testid="panel-rebrand-result"
+            >
+              <h4 className="font-medium text-sm flex items-center gap-2">
+                {status.running ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <span data-testid="text-rebrand-status-label">
+                      {isStopRequested ? "Stopping broadcast..." : "Broadcast in progress"}
+                    </span>
+                  </>
+                ) : wasCancelled ? (
+                  <>
+                    <X className="h-4 w-4 text-destructive" />
+                    <span data-testid="text-rebrand-status-label">
+                      Broadcast cancelled
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 text-emerald-600" />
+                    <span data-testid="text-rebrand-status-label">
+                      Last batch result
+                    </span>
+                  </>
+                )}
+              </h4>
+
+              {status.totalQueued > 0 && (
+                <div className="space-y-1" data-testid="panel-rebrand-progress">
+                  <Progress value={progressPct} data-testid="progress-rebrand" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span data-testid="text-rebrand-progress-counts">
+                      {progressDone} of {status.totalQueued} processed
+                    </span>
+                    <span data-testid="text-rebrand-progress-pct">
+                      {progressPct}%
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Sent:</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-sent">
+                    {status.sentCount}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Failed:</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-failed">
+                    {status.failedCount}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Remaining:</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-remaining">
+                    {status.remaining}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total sent overall:</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-overall">
+                    {status.alreadySentCount}
+                  </span>
+                </div>
+              </div>
+
+              {status.lastFinishedAt && !status.running && (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="text-rebrand-finished-at"
+                >
+                  {wasCancelled ? "Cancelled" : "Finished"}{" "}
+                  {format(new Date(status.lastFinishedAt), "MMM d, h:mm:ss a")}
+                </p>
+              )}
+
+              {status.error && (
+                <p
+                  className="text-xs text-destructive"
+                  data-testid="text-rebrand-error"
+                >
+                  Worker error: {status.error}
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send rename announcement?</DialogTitle>
+            <DialogDescription>
+              This will email up to <strong>{wouldSendCount}</strong> recipient
+              {wouldSendCount === 1 ? "" : "s"} from the eligible pool of{" "}
+              <strong>{eligibleCount}</strong>. Already-emailed addresses are skipped automatically.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              disabled={sendMutation.isPending}
+              data-testid="button-rebrand-cancel"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => previewedBatch !== null && sendMutation.mutate(previewedBatch)}
+              disabled={
+                sendMutation.isPending ||
+                wouldSendCount === 0 ||
+                previewedBatch === null ||
+                isJobRunning
+              }
+              data-testid="button-rebrand-confirm"
+            >
+              {sendMutation.isPending || isJobRunning ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Confirm and send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={emailPreviewOpen} onOpenChange={setEmailPreviewOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle data-testid="text-rebrand-email-preview-title">
+              Rename announcement email preview
+            </DialogTitle>
+            <DialogDescription>
+              This is the exact rendered body recipients will receive, using the same
+              template as the live broadcast. Pick a real recipient to confirm the
+              greeting and one-click unsubscribe URL look right for the people who'll
+              actually receive the email — by default the preview is rendered against
+              your admin account.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border bg-muted/20 p-3 space-y-2">
+            <Label htmlFor="rebrand-preview-as" className="text-xs">
+              Preview as user (id or email)
+            </Label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="rebrand-preview-as"
+                placeholder="user-123 or alice@example.com"
+                value={previewTargetInput}
+                onChange={(e) => setPreviewTargetInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const v = previewTargetInput.trim();
+                    if (v) setPreviewTarget({ kind: "user", value: v });
+                  }
+                }}
+                data-testid="input-rebrand-preview-as"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const v = previewTargetInput.trim();
+                  if (v) setPreviewTarget({ kind: "user", value: v });
+                }}
+                disabled={!previewTargetInput.trim() || emailPreviewQuery.isFetching}
+                data-testid="button-rebrand-preview-as-apply"
+              >
+                Preview as user
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPreviewTarget({ kind: "next" })}
+                disabled={emailPreviewQuery.isFetching}
+                data-testid="button-rebrand-preview-as-next"
+              >
+                Use next eligible recipient
+              </Button>
+              {previewTarget !== null && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setPreviewTarget(null);
+                    setPreviewTargetInput("");
+                  }}
+                  disabled={emailPreviewQuery.isFetching}
+                  data-testid="button-rebrand-preview-as-reset"
+                >
+                  Reset to admin
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Validates the chosen user exists and skips users who've opted out of
+              announcement emails.
+            </p>
+          </div>
+
+          {emailPreviewQuery.isLoading && (
+            <div className="flex items-center justify-center py-12" data-testid="loading-rebrand-email-preview">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {emailPreviewQuery.isError && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm" data-testid="error-rebrand-email-preview">
+              Could not load the email preview.{" "}
+              {(emailPreviewQuery.error as any)?.message || "Please try again."}
+            </div>
+          )}
+
+          {emailPreviewQuery.data && (
+            <div className="space-y-3">
+              <InboxPreviewRow
+                subject={emailPreviewQuery.data.subject}
+                preheader={emailPreviewQuery.data.preheader}
+                testIdPrefix="rebrand-email"
+              />
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Subject:</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-email-subject">
+                    {emailPreviewQuery.data.subject}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Inbox preview:</span>{" "}
+                  <span className="font-medium" data-testid="text-rebrand-email-preheader">
+                    {emailPreviewQuery.data.preheader}
+                  </span>
+                </div>
+                <div
+                  className="text-xs text-muted-foreground mt-1"
+                  data-testid="text-rebrand-email-personalized-for"
+                >
+                  {emailPreviewQuery.data.previewedAs.kind === "admin" && (
+                    <>Personalized for your admin account ({emailPreviewQuery.data.previewedAs.name || "(no name on file)"}{emailPreviewQuery.data.previewedAs.email ? <> &lt;{emailPreviewQuery.data.previewedAs.email}&gt;</> : null})</>
+                  )}
+                  {emailPreviewQuery.data.previewedAs.kind === "next" && (
+                    <>Personalized for next eligible recipient: {emailPreviewQuery.data.previewedAs.name || "(no name on file)"}{emailPreviewQuery.data.previewedAs.email ? <> &lt;{emailPreviewQuery.data.previewedAs.email}&gt;</> : null} (id {emailPreviewQuery.data.previewedAs.userId})</>
+                  )}
+                  {emailPreviewQuery.data.previewedAs.kind === "user" && (
+                    <>Personalized for {emailPreviewQuery.data.previewedAs.name || "(no name on file)"}{emailPreviewQuery.data.previewedAs.email ? <> &lt;{emailPreviewQuery.data.previewedAs.email}&gt;</> : null} (id {emailPreviewQuery.data.previewedAs.userId})</>
+                  )}
+                </div>
+              </div>
+              <iframe
+                title="Rename announcement email preview"
+                srcDoc={emailPreviewQuery.data.html}
+                sandbox=""
+                className="w-full h-[480px] rounded-md border bg-white"
+                data-testid="iframe-rebrand-email-preview"
+              />
+            </div>
+          )}
+
+          <DialogFooter className="flex-col-reverse sm:flex-row gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEmailPreviewOpen(false)}
+              data-testid="button-rebrand-email-preview-close"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => testSendMutation.mutate()}
+              disabled={testSendMutation.isPending || !emailPreviewQuery.data}
+              data-testid="button-rebrand-email-send-test"
+            >
+              {testSendMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Send test to me
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ScheduledEmailPreviewCard
+        title="Weekly Digest"
+        description="The weekly collection summary that goes out on schedule. Use this to eyeball the rendered email — top movers, totals, unsubscribe footer — before the next scheduled run."
+        previewEndpoint="/api/admin/weekly-digest/preview"
+        testEndpoint="/api/admin/weekly-digest/test"
+        testIdPrefix="weekly-digest"
+        modalTitle="Weekly digest email preview"
+        modalDescription="This is the exact rendered body recipients will receive, using the same template as the scheduled job. Sample collection data is used for illustration; personalization (greeting, unsubscribe link) is rendered against your admin account."
+      />
+
+      <ScheduledEmailPreviewCard
+        title="Win-Back Email"
+        description="The dormant-user re-engagement email triggered by the win-back job. Preview what users see when their watchlist moves and they haven't logged in for a week."
+        previewEndpoint="/api/admin/win-back/preview"
+        testEndpoint="/api/admin/win-back/test"
+        testIdPrefix="win-back"
+        modalTitle="Win-back email preview"
+        modalDescription="This is the exact rendered body dormant users will receive, using the same template as the scheduled win-back job. Sample watchlist moves are used for illustration; personalization (greeting, unsubscribe link) is rendered against your admin account."
+      />
+    </div>
+  );
+}
+
+function UnsubscribeEventsCard() {
+  const { data: events, isLoading } = useQuery<UnsubscribeEvent[]>({
+    queryKey: ["/api/admin/unsubscribe-events?limit=50"],
+  });
+
+  const formatRecipient = (e: UnsubscribeEvent): string => {
+    if (e.user?.email) return e.user.email;
+    if (e.email) return e.email;
+    if (e.user?.handle) return `@${e.user.handle}`;
+    if (e.userId) return `user ${e.userId.substring(0, 8)}…`;
+    return "(unknown)";
+  };
+
+  const formatCategory = (cat: string | null): string => {
+    if (!cat) return "—";
+    return UNSUBSCRIBE_CATEGORY_LABELS[cat] ?? cat;
+  };
+
+  const formatSource = (src: string | null) => {
+    if (!src) return { label: "—", color: "bg-gray-500" };
+    return UNSUBSCRIBE_SOURCE_LABELS[src] ?? { label: src, color: "bg-gray-500" };
+  };
+
+  return (
+    <Card data-testid="card-unsubscribe-events">
+      <CardHeader>
+        <CardTitle>Unsubscribe Audit Trail</CardTitle>
+        <CardDescription>
+          Recent opt-outs honored across HTTPS one-click links, the
+          mailto fallback inbox, and the support CLI. Use this to
+          answer deliverability disputes and CAN-SPAM compliance
+          questions without querying the database directly.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ScrollArea className="h-[360px]">
+          {isLoading ? (
+            <div className="p-4 space-y-3">
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-10" />
+              ))}
+            </div>
+          ) : events && events.length > 0 ? (
+            <div className="divide-y">
+              {events.map((event) => {
+                const sourceInfo = formatSource(event.source);
+                return (
+                  <div
+                    key={event.id}
+                    className="flex items-center gap-3 p-3 text-sm"
+                    data-testid={`unsubscribe-event-${event.id}`}
+                  >
+                    <div className={`h-2 w-2 rounded-full ${sourceInfo.color}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="font-medium truncate"
+                          data-testid={`text-unsubscribe-recipient-${event.id}`}
+                        >
+                          {formatRecipient(event)}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {formatCategory(event.category)}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {sourceInfo.label}
+                        </Badge>
+                      </div>
+                      {event.ipAddress && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          IP: {event.ipAddress}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                      {event.createdAt &&
+                        format(new Date(event.createdAt), "MMM d, h:mm a")}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">
+              No unsubscribe events recorded yet. They'll appear here as
+              soon as a user opts out of any bulk email category.
+            </div>
+          )}
+        </ScrollArea>
+      </CardContent>
+    </Card>
   );
 }
 
