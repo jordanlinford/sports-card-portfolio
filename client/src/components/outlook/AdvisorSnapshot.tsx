@@ -31,27 +31,28 @@ import { LiquidityBadge } from "@/components/liquidity-badge";
 function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
   switch (verdict) {
     case "BUY":
-      return { bg: "bg-green-500/10", border: "border-green-500/40", text: "text-green-700 dark:text-green-400", icon: <ShoppingCart className="h-4 w-4" /> };
+      return { bg: "bg-emerald-500/10", border: "border-emerald-500/40", text: "text-emerald-700 dark:text-emerald-400", icon: <ShoppingCart className="h-4 w-4" /> };
     case "HOLD_CORE":
       return { bg: "bg-blue-500/10", border: "border-blue-500/40", text: "text-blue-700 dark:text-blue-400", icon: <Shield className="h-4 w-4" /> };
     case "HOLD":
-      return { bg: "bg-yellow-500/10", border: "border-yellow-500/40", text: "text-yellow-700 dark:text-yellow-400", icon: <Minus className="h-4 w-4" /> };
+      return { bg: "bg-amber-500/10", border: "border-amber-500/40", text: "text-amber-700 dark:text-amber-400", icon: <Minus className="h-4 w-4" /> };
     case "TRADE_THE_HYPE":
-      return { bg: "bg-orange-500/10", border: "border-orange-500/40", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-4 w-4" /> };
+      return { bg: "bg-rose-500/10", border: "border-rose-500/40", text: "text-rose-700 dark:text-rose-400", icon: <TrendingDown className="h-4 w-4" /> };
     case "SELL":
-      return { bg: "bg-orange-500/10", border: "border-orange-500/40", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-4 w-4" /> };
+      return { bg: "bg-rose-500/10", border: "border-rose-500/40", text: "text-rose-700 dark:text-rose-400", icon: <TrendingDown className="h-4 w-4" /> };
     case "SPECULATIVE":
       return { bg: "bg-amber-500/10", border: "border-amber-500/40", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-4 w-4" /> };
     case "AVOID":
-      return { bg: "bg-red-500/10", border: "border-red-500/40", text: "text-red-700 dark:text-red-400", icon: <Ban className="h-4 w-4" /> };
+      return { bg: "bg-violet-500/10", border: "border-violet-500/40", text: "text-violet-700 dark:text-violet-400", icon: <Ban className="h-4 w-4" /> };
     default:
       return { bg: "bg-muted", border: "border-muted", text: "text-muted-foreground", icon: <Minus className="h-4 w-4" /> };
   }
 }
 
 function getDecisionColor(action: string): { text: string; bg: string; border: string; iconBg: string } {
-  if (action.includes("BUY") || action.includes("ADD")) return { text: "text-green-700 dark:text-green-300", bg: "bg-green-50 dark:bg-green-950/40", border: "border-green-300/60 dark:border-green-700/60", iconBg: "bg-green-100 dark:bg-green-900/50" };
-  if (action.includes("SELL") || action.includes("EXIT") || action.includes("AVOID") || action.includes("DO NOT")) return { text: "text-red-700 dark:text-red-300", bg: "bg-red-50 dark:bg-red-950/40", border: "border-red-300/60 dark:border-red-700/60", iconBg: "bg-red-100 dark:bg-red-900/50" };
+  if (action.includes("BUY") || action.includes("ADD")) return { text: "text-emerald-700 dark:text-emerald-300", bg: "bg-emerald-50 dark:bg-emerald-950/40", border: "border-emerald-300/60 dark:border-emerald-700/60", iconBg: "bg-emerald-100 dark:bg-emerald-900/50" };
+  if (action.includes("AVOID") || action.includes("DO NOT")) return { text: "text-violet-700 dark:text-violet-300", bg: "bg-violet-50 dark:bg-violet-950/40", border: "border-violet-300/60 dark:border-violet-700/60", iconBg: "bg-violet-100 dark:bg-violet-900/50" };
+  if (action.includes("SELL") || action.includes("EXIT")) return { text: "text-rose-700 dark:text-rose-300", bg: "bg-rose-50 dark:bg-rose-950/40", border: "border-rose-300/60 dark:border-rose-700/60", iconBg: "bg-rose-100 dark:bg-rose-900/50" };
   if (action.includes("WAIT")) return { text: "text-amber-700 dark:text-amber-300", bg: "bg-amber-50 dark:bg-amber-950/40", border: "border-amber-300/60 dark:border-amber-700/60", iconBg: "bg-amber-100 dark:bg-amber-900/50" };
   if (action.includes("HOLD")) return { text: "text-blue-700 dark:text-blue-300", bg: "bg-blue-50 dark:bg-blue-950/40", border: "border-blue-300/60 dark:border-blue-700/60", iconBg: "bg-blue-100 dark:bg-blue-900/50" };
   return { text: "text-muted-foreground", bg: "bg-muted/50", border: "border-border", iconBg: "bg-muted" };
@@ -62,10 +63,10 @@ function getPercentileColor(label: string, inverted: boolean = false): string {
   const isTop = label.startsWith("Top");
   const isGood = inverted ? !isTop : isTop;
   const position = isGood ? num : 100 - num;
-  if (position <= 15) return "text-green-600 border-green-300 dark:text-green-400 dark:border-green-600";
+  if (position <= 15) return "text-emerald-600 border-emerald-300 dark:text-emerald-400 dark:border-emerald-600";
   if (position <= 35) return "text-blue-600 border-blue-300 dark:text-blue-400 dark:border-blue-600";
   if (position <= 60) return "text-muted-foreground";
-  return "text-orange-600 border-orange-300 dark:text-orange-400 dark:border-orange-600";
+  return "text-amber-600 border-amber-300 dark:text-amber-400 dark:border-amber-600";
 }
 
 interface AdvisorSnapshotProps {

@@ -64,9 +64,9 @@ const VERDICT_STYLES = {
     text: "text-emerald-700 dark:text-emerald-300",
   },
   MAYBE: {
-    bg: "bg-yellow-500/10 border-yellow-500/30",
-    badge: "bg-yellow-500 text-white",
-    text: "text-yellow-700 dark:text-yellow-300",
+    bg: "bg-amber-500/10 border-amber-500/30",
+    badge: "bg-amber-500 text-white",
+    text: "text-amber-700 dark:text-amber-300",
   },
   NO: {
     bg: "bg-red-500/10 border-red-500/30",

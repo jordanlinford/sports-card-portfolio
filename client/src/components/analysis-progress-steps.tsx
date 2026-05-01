@@ -61,7 +61,7 @@ export function AnalysisProgressSteps({
               <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">
                 {isDone ? (
                   <CheckCircle2
-                    className="h-5 w-5 text-green-600 dark:text-green-400"
+                    className="h-5 w-5 text-emerald-600 dark:text-emerald-400"
                     data-testid={`progress-step-${i + 1}-done`}
                   />
                 ) : isActive ? (

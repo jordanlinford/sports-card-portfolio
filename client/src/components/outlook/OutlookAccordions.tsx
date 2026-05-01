@@ -92,9 +92,9 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
               <div key={tier.key} className="p-3 rounded-lg border flex flex-col sm:flex-row sm:items-center gap-3">
                 <div className="flex items-center gap-3 flex-1">
                   <Badge className={`min-w-[60px] justify-center ${
-                    tier.data!.verdict === "BUY" ? "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30" :
-                    tier.data!.verdict === "SELL" ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30" :
-                    "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30"
+                    tier.data!.verdict === "BUY" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30" :
+                    tier.data!.verdict === "SELL" ? "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30" :
+                    "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
                   }`}>
                     {tier.data!.verdict === "BUY" ? <ShoppingCart className="h-3 w-3 mr-1" /> :
                      tier.data!.verdict === "SELL" ? <TrendingDown className="h-3 w-3 mr-1" /> :
@@ -145,13 +145,13 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
         <AccordionSection
           title="Risks"
           description="What could change this thesis"
-          icon={<AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />}
+          icon={<AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />}
           testId="accordion-risks"
         >
           <ul className="space-y-2">
             {uniqueRisks.map((item, i) => (
               <li key={i} className="text-sm text-foreground flex items-start gap-2">
-                <span className="text-yellow-600 dark:text-yellow-400 mt-0.5">•</span>
+                <span className="text-amber-600 dark:text-amber-400 mt-0.5">•</span>
                 <span>{item}</span>
               </li>
             ))}
@@ -243,7 +243,7 @@ export function OutlookAccordions({ advisor, outlook }: OutlookAccordionsProps) 
                     <Badge 
                       variant="outline" 
                       className={`text-xs ${
-                        outlook.evidence.compsSummary.volumeTrend === "up" ? "text-green-600" :
+                        outlook.evidence.compsSummary.volumeTrend === "up" ? "text-emerald-600" :
                         outlook.evidence.compsSummary.volumeTrend === "down" ? "text-red-600" : ""
                       }`}
                       data-testid="badge-comps-trend"

@@ -34,9 +34,9 @@ function getVerdictConfig(verdict: InvestmentVerdict) {
     ACCUMULATE: {
       label: "Accumulate",
       icon: ShoppingCart,
-      bgColor: "bg-green-500/10 dark:bg-green-500/20",
-      textColor: "text-green-700 dark:text-green-400",
-      borderColor: "border-green-500/30",
+      bgColor: "bg-emerald-500/10 dark:bg-emerald-500/20",
+      textColor: "text-emerald-700 dark:text-emerald-400",
+      borderColor: "border-emerald-500/30",
       description: "Build your position",
     },
     HOLD_CORE: {
@@ -50,25 +50,25 @@ function getVerdictConfig(verdict: InvestmentVerdict) {
     TRADE_THE_HYPE: {
       label: "Trade the Hype",
       icon: TrendingDown,
-      bgColor: "bg-orange-500/10 dark:bg-orange-500/20",
-      textColor: "text-orange-700 dark:text-orange-400",
-      borderColor: "border-orange-500/30",
+      bgColor: "bg-rose-500/10 dark:bg-rose-500/20",
+      textColor: "text-rose-700 dark:text-rose-400",
+      borderColor: "border-rose-500/30",
       description: "Take profits now",
     },
     AVOID_NEW_MONEY: {
       label: "Avoid",
       icon: Ban,
-      bgColor: "bg-red-500/10 dark:bg-red-500/20",
-      textColor: "text-red-700 dark:text-red-400",
-      borderColor: "border-red-500/30",
+      bgColor: "bg-violet-500/10 dark:bg-violet-500/20",
+      textColor: "text-violet-700 dark:text-violet-400",
+      borderColor: "border-violet-500/30",
       description: "Stay away",
     },
     SPECULATIVE_FLYER: {
       label: "Speculative",
       icon: Zap,
-      bgColor: "bg-purple-500/10 dark:bg-purple-500/20",
-      textColor: "text-purple-700 dark:text-purple-400",
-      borderColor: "border-purple-500/30",
+      bgColor: "bg-amber-500/10 dark:bg-amber-500/20",
+      textColor: "text-amber-700 dark:text-amber-400",
+      borderColor: "border-amber-500/30",
       description: "Lottery ticket only",
     },
     HOLD_ROLE_RISK: {
@@ -82,9 +82,9 @@ function getVerdictConfig(verdict: InvestmentVerdict) {
     HOLD_INJURY_CONTINGENT: {
       label: "Hold (Injury Hedge)",
       icon: Eye,
-      bgColor: "bg-cyan-500/10 dark:bg-cyan-500/20",
-      textColor: "text-cyan-700 dark:text-cyan-400",
-      borderColor: "border-cyan-500/30",
+      bgColor: "bg-blue-500/10 dark:bg-blue-500/20",
+      textColor: "text-blue-700 dark:text-blue-400",
+      borderColor: "border-blue-500/30",
       description: "Value depends on opportunity",
     },
     SPECULATIVE_SUPPRESSED: {
@@ -98,9 +98,9 @@ function getVerdictConfig(verdict: InvestmentVerdict) {
     AVOID_STRUCTURAL: {
       label: "Avoid",
       icon: Ban,
-      bgColor: "bg-red-600/10 dark:bg-red-600/20",
-      textColor: "text-red-800 dark:text-red-400",
-      borderColor: "border-red-600/30",
+      bgColor: "bg-violet-600/10 dark:bg-violet-600/20",
+      textColor: "text-violet-800 dark:text-violet-400",
+      borderColor: "border-violet-600/30",
       description: "Structural decline",
     },
   };
@@ -262,13 +262,13 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
             <div className="grid gap-4 md:grid-cols-3">
               {call.whatToBuy && call.whatToBuy.length > 0 && (
                 <div className="space-y-2" data-testid="section-what-to-buy">
-                  <h4 className="font-semibold text-sm flex items-center gap-2 text-green-700 dark:text-green-400">
+                  <h4 className="font-semibold text-sm flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
                     <ShoppingCart className="h-4 w-4" />
                     Cards to Buy
                   </h4>
                   <div className="flex flex-wrap gap-1.5">
                     {call.whatToBuy.map((card, i) => (
-                      <Badge key={i} variant="outline" className="bg-green-500/5 text-green-700 dark:text-green-400 border-green-500/20 text-xs">
+                      <Badge key={i} variant="outline" className="bg-emerald-500/5 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 text-xs">
                         {card}
                       </Badge>
                     ))}
@@ -278,13 +278,13 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
 
               {call.whatToSell && call.whatToSell.length > 0 && (
                 <div className="space-y-2" data-testid="section-what-to-sell">
-                  <h4 className="font-semibold text-sm flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                  <h4 className="font-semibold text-sm flex items-center gap-2 text-rose-700 dark:text-rose-400">
                     <CircleDollarSign className="h-4 w-4" />
                     Cards to Sell
                   </h4>
                   <div className="flex flex-wrap gap-1.5">
                     {call.whatToSell.map((card, i) => (
-                      <Badge key={i} variant="outline" className="bg-orange-500/5 text-orange-700 dark:text-orange-400 border-orange-500/20 text-xs">
+                      <Badge key={i} variant="outline" className="bg-rose-500/5 text-rose-700 dark:text-rose-400 border-rose-500/20 text-xs">
                         {card}
                       </Badge>
                     ))}
@@ -294,13 +294,13 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
 
               {call.whatToAvoid && call.whatToAvoid.length > 0 && (
                 <div className="space-y-2" data-testid="section-what-to-avoid">
-                  <h4 className="font-semibold text-sm flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <h4 className="font-semibold text-sm flex items-center gap-2 text-violet-700 dark:text-violet-400">
                     <Ban className="h-4 w-4" />
                     Cards to Avoid
                   </h4>
                   <div className="flex flex-wrap gap-1.5">
                     {call.whatToAvoid.map((card, i) => (
-                      <Badge key={i} variant="outline" className="bg-red-500/5 text-red-700 dark:text-red-400 border-red-500/20 text-xs">
+                      <Badge key={i} variant="outline" className="bg-violet-500/5 text-violet-700 dark:text-violet-400 border-violet-500/20 text-xs">
                         {card}
                       </Badge>
                     ))}
@@ -320,15 +320,15 @@ export function InvestmentCallCard({ call, playerName }: InvestmentCallCardProps
             <CollapsibleContent className="pt-4">
               <div className="grid gap-4 md:grid-cols-2">
                 {call.triggersToUpgrade && call.triggersToUpgrade.length > 0 && (
-                  <div className="space-y-2 p-3 rounded-lg bg-green-500/5 border border-green-500/10">
-                    <h5 className="font-medium text-sm flex items-center gap-2 text-green-700 dark:text-green-400">
+                  <div className="space-y-2 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10">
+                    <h5 className="font-medium text-sm flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
                       <ArrowUpCircle className="h-4 w-4" />
                       Upgrade Triggers
                     </h5>
                     <ul className="space-y-1">
                       {call.triggersToUpgrade.map((trigger, i) => (
                         <li key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                          <span className="text-green-600 mt-1">+</span>
+                          <span className="text-emerald-600 mt-1">+</span>
                           <span>{trigger}</span>
                         </li>
                       ))}

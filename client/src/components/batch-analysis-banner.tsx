@@ -68,7 +68,7 @@ export function BatchAnalysisBanner() {
             {isRunning ? (
               <Loader2 className="h-4 w-4 text-primary animate-spin shrink-0" />
             ) : (
-              <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+              <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />
             )}
             <span className="text-sm font-medium">
               {isRunning ? "Analyzing Cards..." : batch.status === "stopped" ? "Analysis Stopped" : "Analysis Complete"}

@@ -161,15 +161,15 @@ function getMarketFrictionHelperText(friction: number, action?: string): string 
 function getActionColor(action: OutlookAction): string {
   switch (action) {
     case "BUY":
-      return "bg-green-600 text-white";
+      return "bg-emerald-600 text-white";
     case "SELL":
-      return "bg-red-600 text-white";
+      return "bg-rose-600 text-white";
     case "MONITOR":
       return "bg-amber-500 text-white";
     case "LONG_HOLD":
       return "bg-blue-600 text-white";
     case "LEGACY_HOLD":
-      return "bg-indigo-600 text-white";
+      return "bg-violet-600 text-white";
     case "LITTLE_VALUE":
       return "bg-slate-500 text-white";
     default:
@@ -306,7 +306,7 @@ function getConditionalTriggers(action: OutlookAction, sport?: string | null): s
 
 function getScoreColor(score: number, inverted = false): string {
   const effectiveScore = inverted ? 100 - score : score;
-  if (effectiveScore >= 70) return "text-green-600";
+  if (effectiveScore >= 70) return "text-emerald-600";
   if (effectiveScore >= 40) return "text-amber-500";
   return "text-red-500";
 }
@@ -334,7 +334,7 @@ function getConfidenceLabel(score: number): string {
 
 function getProgressColor(score: number, inverted = false): string {
   const effectiveScore = inverted ? 100 - score : score;
-  if (effectiveScore >= 70) return "bg-green-600";
+  if (effectiveScore >= 70) return "bg-emerald-600";
   if (effectiveScore >= 40) return "bg-amber-500";
   return "bg-red-500";
 }
@@ -627,9 +627,9 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                     {outlook.projectedOutlook.baseCaseChangePct > 0 ? '+' : ''}{outlook.projectedOutlook.baseCaseChangePct}%
                   </div>
                 </div>
-                <div className="p-2 rounded-md bg-green-500/10">
+                <div className="p-2 rounded-md bg-emerald-500/10">
                   <div className="text-xs text-muted-foreground">Bull Case</div>
-                  <div className="font-medium text-green-600" data-testid="text-bull-case">
+                  <div className="font-medium text-emerald-600" data-testid="text-bull-case">
                     {outlook.projectedOutlook.bullCaseChangePct > 0 ? '+' : ''}{outlook.projectedOutlook.bullCaseChangePct}%
                   </div>
                 </div>
@@ -647,15 +647,15 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                 <span>Price Targets</span>
               </div>
               <div className="grid grid-cols-5 gap-1 text-center text-xs">
-                <div className="p-1.5 rounded-md bg-green-600/20 dark:bg-green-600/10">
+                <div className="p-1.5 rounded-md bg-emerald-600/20 dark:bg-emerald-600/10">
                   <div className="text-muted-foreground text-[10px]">Strong Buy</div>
-                  <div className="font-semibold text-green-600" data-testid="text-strong-buy">
+                  <div className="font-semibold text-emerald-600" data-testid="text-strong-buy">
                     {safeCurrency(outlook.priceTargets.strongBuyBelow)}
                   </div>
                 </div>
-                <div className="p-1.5 rounded-md bg-green-500/10">
+                <div className="p-1.5 rounded-md bg-emerald-500/10">
                   <div className="text-muted-foreground text-[10px]">Buy</div>
-                  <div className="font-semibold text-green-500" data-testid="text-buy-below">
+                  <div className="font-semibold text-emerald-500" data-testid="text-buy-below">
                     {safeCurrency(outlook.priceTargets.buyBelow)}
                   </div>
                 </div>
@@ -671,9 +671,9 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                     {safeCurrency(outlook.priceTargets.sellAbove)}
                   </div>
                 </div>
-                <div className="p-1.5 rounded-md bg-red-500/10">
+                <div className="p-1.5 rounded-md bg-rose-500/10">
                   <div className="text-muted-foreground text-[10px]">Strong Sell</div>
-                  <div className="font-semibold text-red-500" data-testid="text-strong-sell">
+                  <div className="font-semibold text-rose-500" data-testid="text-strong-sell">
                     {safeCurrency(outlook.priceTargets.strongSellAbove)}
                   </div>
                 </div>
@@ -698,7 +698,7 @@ export function CardOutlookPanel({ card, isPro = false, canEdit = false }: CardO
                   </Badge>
                 )}
                 {outlook.seasonalContext.isInSeason && !outlook.seasonalContext.isPlayoffSeason && (
-                  <Badge variant="outline" className="gap-1 text-xs bg-green-500/10 border-green-500/30 text-green-600">
+                  <Badge variant="outline" className="gap-1 text-xs bg-emerald-500/10 border-emerald-500/30 text-emerald-600">
                     <Sun className="h-3 w-3" />
                     In Season
                   </Badge>

@@ -307,7 +307,7 @@ export function PriceTrendChart({
                 variant="outline"
                 className={
                   pctChange >= 0
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                     : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
                 }
               >
@@ -522,7 +522,7 @@ export function ComparisonPriceTrendChart({
                 variant="outline"
                 className={
                   change1 >= 0
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                     : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
                 }
               >
@@ -536,7 +536,7 @@ export function ComparisonPriceTrendChart({
                 variant="outline"
                 className={
                   change2 >= 0
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                     : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
                 }
               >

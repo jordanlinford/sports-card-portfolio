@@ -1266,8 +1266,8 @@ export function CardDetailModal({
                   <Separator />
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <HandCoins className="w-4 h-4 text-green-600" />
-                      <Badge className="bg-green-600 text-white" data-testid="badge-open-to-offers">
+                      <HandCoins className="w-4 h-4 text-emerald-600" />
+                      <Badge className="bg-emerald-600 text-white" data-testid="badge-open-to-offers">
                         Open to Offers
                       </Badge>
                       {card.minOfferAmount && (

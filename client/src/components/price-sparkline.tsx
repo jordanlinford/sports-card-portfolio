@@ -92,7 +92,7 @@ export function PriceSparkline({
       {showTrend && (
         <div
           className={`flex items-center gap-0.5 text-xs font-medium ${
-            isPositive ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500"
+            isPositive ? "text-emerald-600 dark:text-emerald-500" : "text-red-600 dark:text-red-500"
           }`}
         >
           {priceChange === 0 ? (

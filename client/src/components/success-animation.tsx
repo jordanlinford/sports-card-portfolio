@@ -26,7 +26,7 @@ export function SuccessCheckmark({ show, onComplete, size = "md" }: SuccessCheck
           onAnimationComplete={() => {
             setTimeout(() => onComplete?.(), 800);
           }}
-          className={`${sizes[size].container} rounded-full bg-green-500 flex items-center justify-center`}
+          className={`${sizes[size].container} rounded-full bg-emerald-500 flex items-center justify-center`}
         >
           <motion.div
             initial={{ scale: 0 }}
@@ -36,7 +36,7 @@ export function SuccessCheckmark({ show, onComplete, size = "md" }: SuccessCheck
             <Check className={`${sizes[size].icon} text-white stroke-[3]`} />
           </motion.div>
           <motion.div
-            className="absolute inset-0 rounded-full border-4 border-green-400"
+            className="absolute inset-0 rounded-full border-4 border-emerald-400"
             initial={{ scale: 1, opacity: 1 }}
             animate={{ scale: 1.5, opacity: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}

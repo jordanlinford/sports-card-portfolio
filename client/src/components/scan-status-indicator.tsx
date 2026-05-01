@@ -76,7 +76,7 @@ export function ScanStatusIndicator() {
         {/* Green dot briefly after everything finishes */}
         {activeCount === 0 && showGreenFlash && (
           <span
-            className="absolute top-1.5 right-1.5 inline-flex h-2.5 w-2.5 rounded-full bg-green-500"
+            className="absolute top-1.5 right-1.5 inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"
             data-testid="scan-indicator-flash"
           />
         )}
@@ -200,7 +200,7 @@ function ScanJobRow({
         {isActive ? (
           <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
         ) : isComplete ? (
-          <CheckCircle2 className="h-4 w-4 text-green-600" />
+          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
         ) : (
           <XCircle className="h-4 w-4 text-destructive" />
         )}

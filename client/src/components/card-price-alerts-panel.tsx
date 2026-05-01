@@ -206,7 +206,7 @@ export function CardPriceAlertsPanel({ card, isPro }: CardPriceAlertsPanelProps)
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
             {alert.alertType === "above" ? (
-              <TrendingUp className="h-4 w-4 text-green-500 flex-shrink-0" />
+              <TrendingUp className="h-4 w-4 text-emerald-500 flex-shrink-0" />
             ) : (
               <TrendingDown className="h-4 w-4 text-red-500 flex-shrink-0" />
             )}

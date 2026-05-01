@@ -23,9 +23,9 @@ export function CollectorTake({ take }: CollectorTakeProps) {
   const getStyles = () => {
     if (take.type === "CAUTION") {
       return {
-        border: "border-yellow-500/30",
-        bg: "bg-yellow-500/5",
-        iconColor: "text-yellow-500",
+        border: "border-amber-500/30",
+        bg: "bg-amber-500/5",
+        iconColor: "text-amber-500",
       };
     }
     if (take.severity === "STRONG") {
