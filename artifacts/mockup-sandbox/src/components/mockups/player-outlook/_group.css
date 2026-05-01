@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+.faithful-neon-root {
+  font-family: 'Space Grotesk', sans-serif;
+  background: radial-gradient(circle at 50% 0%, #1a103c 0%, #080614 100%);
+  color: #e2e8f0;
+}
+
+.faithful-neon-glow-amber {
+  box-shadow: inset 0 0 20px rgba(255, 122, 26, 0.15), 0 0 15px rgba(255, 122, 26, 0.1);
+  border: 1px solid rgba(255, 122, 26, 0.3);
+}
+
+.faithful-neon-card {
+  background: rgba(18, 14, 38, 0.6);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  backdrop-filter: blur(12px);
+}
+
+.faithful-neon-bar-glow {
+  box-shadow: 0 0 10px currentColor;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Iridescent holo ring for the avatar — borrowed from HoloAurora */
+.faithful-holo-ring {
+  position: relative;
+  display: inline-block;
+  border-radius: 9999px;
+  padding: 3px;
+  background: conic-gradient(
+    from 0deg,
+    #00f0ff 0deg,
+    #ec4899 90deg,
+    #ffb800 180deg,
+    #8b5cf6 270deg,
+    #00f0ff 360deg
+  );
+  box-shadow:
+    0 0 18px rgba(236, 72, 153, 0.35),
+    0 0 30px rgba(0, 240, 255, 0.18);
+}
+.faithful-holo-ring > img {
+  display: block;
+  border-radius: 9999px;
+  background: #080614;
+  border: 2px solid #080614;
+}
+
+/* Brand wordmark gradient — pink → orange */
+.brand-alpha-gradient {
+  background: linear-gradient(90deg, #ec4899 0%, #f97316 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* Verdict semantic colors */
+.verdict-hold { color: #60a5fa; }   /* blue   — hold */
+.verdict-wait { color: #fb923c; }   /* orange — wait */
+.verdict-accumulate { color: #34d399; } /* green — accumulate */
+.verdict-avoid { color: #a78bfa; }      /* purple — avoid */
+.verdict-trade-hype { color: #fb7185; } /* orange-red — trade the hype */
+
+/* Lavender-tinted captions under signal bars */
+.signal-caption {
+  color: rgba(196, 181, 253, 0.55);
+}
