@@ -28,6 +28,8 @@ export function CardOfDay() {
 
   if (isLoading || !data) return null;
 
+  if (typeof data.verdict !== "string" || typeof data.playerKey !== "string") return null;
+
   const style = VERDICT_STYLES[typeof data.verdict==="string"?data.verdict:(data.verdict as any)?.verdict] || { color: "text-gray-700", bg: "bg-gray-50" };
   const [sport, slug] = data.playerKey.split(":");
 
