@@ -56,6 +56,10 @@ Preferred communication style: Simple, everyday language.
 
 When a backend response field changes shape (primitive ↔ structured type, field added/removed, nullability changed), every frontend consumer reading that field must be audited atomically with the change. Treating shape changes as local fixes ships latent crashes.
 
+Audit pattern:
+
+1. Grep client/src/ for the field name combined with string methods (.replace, .toUpperCase, .split, .toFixed), array methods (.map, .filter where field is assumed iterable), map lookups (MAP[field]), and direct JSX renders ({field})
+
 2. Classify each hit: typed utility function (safe) | API consumer (must audit) | newly-added component (highest risk - test specifically)
 
 3. Fix all API consumers in the same commit as the shape change. TSC clean before ship.
