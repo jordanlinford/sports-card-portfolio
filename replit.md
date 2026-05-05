@@ -74,3 +74,23 @@ Today's example: verdict shape changed from string to {verdict, modifier, ...} o
 - **Zod Docs**: _Populate as you build_
 - **Passport.js Docs**: _Populate as you build_
 - **Gemini API Docs**: _Populate as you build_
+## Shipping Pages Without Backend
+Before merging any commit that adds a new Route in App.tsx or new client-side navigation entry, verify the corresponding server route exists. Quick smoke check:
+
+1. Grep ALL server files (not just routes.ts): grep -rn your-route-path server/
+2. Confirm the route is actually wired into the Express app (registered, not just defined)
+3. Hit the endpoint with curl to confirm it responds (200 or expected error, not 404)
+
+If the route is missing or unwired, either implement it in the same commit or dont ship the page yet.
+
+Todays example: client/src/pages/track-record.tsx initially appeared dead because routes were grepped only in server/routes.ts. The actual registration was in server/index.ts. Routes can be registered in multiple files - check all of server/.
+
+## Destructive Audit Findings Need Higher Verification Bar
+When an audit finding leads to a destructive action (delete code, revert commits, drop data, remove pages), the verification bar is higher than for additive actions. Wrong feature-is-broken investigation is recoverable. Wrong feature-is-dead-delete-it decision often is not.
+
+Before destructive action based on an audit finding:
+1. Verify the finding from at least two angles (different greps, runtime check, log inspection)
+2. Surface the verification evidence, not just the conclusion
+3. Get explicit human approval citing the verified evidence
+
+Todays example: audit concluded /track-record page was dead because routes were not found in server/routes.ts. The route exists in server/index.ts. The agent caught its own false finding before executing the deletion that had been approved based on it.
