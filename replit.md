@@ -1,81 +1,62 @@
 # Sports Card Portfolio
+A web application for sports card collectors to manage, analyze, and grow their collections with AI-powered market intelligence.
 
-## Overview
-Sports Card Portfolio is a web application designed for sports card collectors to manage, analyze, and grow their collections. It offers AI-powered market intelligence, real-time eBay comparisons, and investment-focused tools. The platform includes portfolio management, personalized buy recommendations, and collection sharing, with advanced features available for Pro users. The project aims to be a comprehensive solution for sports card investment and management, leveraging AI for valuation and market trend analysis to enhance collection value and user insight.
+## Run & Operate
+- **Run Dev Server**: `npm run dev`
+- **Build**: `npm run build`
+- **Typecheck**: `npm run typecheck`
+- **Codegen (Drizzle)**: `npm run generate:drizzle`
+- **DB Push (Drizzle)**: `npm run db:push`
+- **Env Vars**: `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `REPLIT_APP_CLIENT_ID`, `REPLIT_APP_CLIENT_SECRET`, `SESSION_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `GCS_BUCKET_NAME`, `GCS_PROJECT_ID`, `GCS_CLIENT_EMAIL`, `GCS_PRIVATE_KEY`, `GEMINI_API_KEY`, `SERPER_API_KEY`, `QA_LOGIN_TOKEN` (for QA login bypass and regression tests)
 
-## User Preferences
+## Stack
+- **Frontend**: React 18, TypeScript, Wouter, shadcn/ui (Radix UI, Tailwind CSS), TanStack Query, React Hook Form, Zod
+- **Backend**: Express.js, TypeScript, Passport.js
+- **Database**: PostgreSQL with Drizzle ORM
+- **Runtime**: Node.js
+- **Build Tool**: Vite (client), esbuild (server)
+
+## Where things live
+- **Frontend Source**: `client/src/`
+- **Backend Source**: `server/src/`
+- **Database Schema**: `server/src/db/schema.ts`
+- **API Routes**: `server/src/routes/api/`
+- **Shared Utilities/Types**: `server/src/common/`
+- **UI Components**: `client/src/components/ui/`
+- **Styling**: `client/src/index.css`, `tailwind.config.cjs`
+
+## Architecture decisions
+- **AI-first Valuation**: Gemini 2.5 Flash is central for vision-based scanning, 1-of-1 valuation, and orchestrating complex market analysis via function calling tools.
+- **Dual-Provider Authentication**: Supports Google OAuth and Replit OpenID Connect with account merging for flexibility.
+- **Robust Market Scoring Engine V2**: Utilizes mathematically consistent continuous formulas, sample-size normalization, tiered volatility dampening, and advanced signal weighting for nuanced market verdicts. Includes specific handling for high-volume players and zero-data scenarios.
+- **Alpha Data Infrastructure**: Granular capture of price observations and interest events, feeding a nightly batch job and signal engine to generate daily buy/sell/hold signals.
+- **Realistic Sealed Product ROI**: EV calculations for sealed products incorporate real-world corrections like transaction friction, illiquidity haircuts, eBay fees, and median sold prices to provide actionable insights.
+- **Verdict Regression Testing**: Automated weekly tests ensure consistency of market verdicts over time, flagging significant changes for review.
+
+## Product
+- **Collection Management**: CRUD for cards and display cases, tagging, duplicate detection.
+- **Market Intelligence**: AI-powered value tracking, real-time eBay comparisons, historical data, price lookups, investment outlooks.
+- **AI Tools**: Card image scanning, 1-of-1 card valuation, Card Advisor for portfolio auditing.
+- **Subscription Model**: Free and Pro tiers with advanced features like batch scanning/analysis and portfolio-specific recommendations.
+- **Social Features**: Liking, commenting, sharing display cases, prestige system.
+- **Reporting & Alerts**: Price trend charts, graded value matrix, supply saturation alerts, watchlist changes.
+- **Market Leaderboards**: Ranked views of player markets (Best, Hype/Sell Candidates, Emerging Opportunities).
+- **Recommendation Engines**: Next Buys, Dual-Source Hidden Gems, Portfolio Alpha Benchmark.
+- **SEO**: Public landing pages with live player signals.
+- **Financial Tools**: Break Value Auditor, Sealed Product ROI Calculator.
+
+## User preferences
 Preferred communication style: Simple, everyday language.
 
-## System Architecture
+## Gotchas
+- **API Response Shape Changes**: Any change in the shape of a backend response field (e.g., string to object) requires an atomic audit and update of all frontend consumers in the same commit to prevent latent crashes.
+- **QA Login Token**: The `QA_LOGIN_TOKEN` is critical for automated testing agents and triggering regression tests. It must be provided as an `x-qa-token` header.
 
-### UI/UX Decisions
-The frontend uses React 18, TypeScript, and Wouter for routing, built with `shadcn/ui` components based on Radix UI and Tailwind CSS. The design emphasizes card-focused layouts, clean aesthetics, DM Sans typography, and a dynamic HSL-based color system.
-
-### Technical Implementations
-The application features a full-stack TypeScript architecture. The frontend uses TanStack Query for server state, React Hook Form with Zod for forms, and React Context for theme management. The Express.js backend handles dual-provider authentication via Passport.js (Google OAuth, Replit OpenID Connect) with PostgreSQL-backed session management. Google Cloud Storage (via Replit Object Storage) handles image uploads. Key features include CRUD for cards and display cases, a Stripe-based subscription model (Free/Pro), AI-powered value tracking, and a Gemini 2.5 Flash vision-based card image scanner. Pro features include batch scanning, batch analysis, growth projections, and portfolio-specific buy recommendations. Advanced AI systems include 1-of-1 card valuation, a sophisticated Market Scoring Engine V2 for market phase classification and verdicts based on weighted signals (Demand, Momentum, Liquidity, Supply Pressure, Hype, Volatility, Confidence), and a Card Advisor (Pro-only) that uses Gemini 2.5 Flash with function-calling to orchestrate various tools for portfolio auditing. A robust Alpha Data Infrastructure with `card_price_observations`, `card_market_snapshots`, `card_interest_events`, and `comp_observations` tables supports a nightly Alpha Batch Job and Signal Engine, producing buy/sell/hold signals stored in `card_signals`. The Alpha Feed V2 provides a daily briefing with market pulse, price movers, investment signals, community momentum, and trending cards. A unified pipeline connects Alpha insights to player outlooks and individual cards, providing context-aware recommendations and actions. Historical Comp Accumulation stores every comp found during analysis in `comp_observations` to build an internal pricing database over time, used as anchoring data for future lookups when AI has no fresh comps.
-
-### Feature Specifications
-- **Core Collection Management**: CRUD for cards and display cases, tagging, automatic case generation, duplicate detection, and visibility settings.
-- **Monetization**: Free and Pro subscription tiers via Stripe.
-- **Authentication**: Dual-provider (Google OAuth, Replit OpenID Connect) with account merging. A QA login bypass endpoint (`POST /api/auth/qa-login`, gated by `QA_LOGIN_TOKEN` secret via `x-qa-token` header) signs automated testing agents in as a dedicated `qa-test@sportscardportfolio.io` user (authProvider `"qa"`, whitelisted in `isAuthenticated`) without going through Google's 2FA.
-- **AI & Market Intelligence**: AI-powered value tracking, historical data, price lookups, investment outlooks, Gemini 2.5 Flash card image scanning with daily limits, and 1-of-1 card valuation.
-- **Pro Features**: Batch scanning, batch card analysis, growth projections, and portfolio-specific buy recommendations.
-- **Market Analysis**: Market Scoring Engine V2 with mathematically consistent continuous formulas. Uses sample-size normalization (`log(1+sales)/log(50)`), log-scaled demand, continuous momentum/volatility/supply curves, and price-vs-volume divergence for hype detection. 6 weighted signal contributions (Demand 25%, Momentum 20%, Liquidity 15%, Supply 15%, Anti-Hype 15%, Volatility 10%) plus Confidence. **Signal contribution cap**: individual signal capped at 35% of composite, excess redistributed proportionally. **Market Quality metric**: `(liquidityScore * 0.4) + (volatilityScore * 0.3) + (supplyPressureScore * 0.3)` — separates "good market to participate in" from "active but broken." **High-volume player handling**: Liquidity blends sell-through (30%) with absolute velocity (70%) when sales30d ≥ 100, scaling smoothly from 30-100 sales. Supply uses a volume-based floor (`log(1+velocity*7)/log(50) * 40`) so high-velocity players don't get penalized for deep inventory. Volatility uses tiered log dampening for players with velocity ≥ 5: single-log (`100 - log(1+cv)*45`) for CV 1-5, double-log (`100 - log(1+log(1+cv))*25`) for CV > 5, preventing cross-product-type price spread from flooring the score. **Zero-data guard**: all signals return neutral 50 when sampleFactor = 0. Deterministic phase classification (Accumulation, Breakout, Expansion, Exhaustion, Decline) from price trend, volume trend, and supply ratio with supply dominance penalty (supplyRatio > 10 → Exhaustion override). Phase is **descriptive, not authoritative** — scores drive verdict, phase qualifies it. Verdict boundary ordering: ACCUMULATE (scores-first path with agreement ≥ 4 OR favorable phase) → TRADE_THE_HYPE → HOLD_CORE → AVOID (hype checked before hold). **Confidence gating**: confidenceScore < 40 → SPECULATIVE_FLYER (early exit); 40-49 → downgrades ACCUMULATE→HOLD_CORE, TRADE_THE_HYPE→SPECULATIVE_FLYER. AVOID guardrail prevents AVOID when liquidity > 60 AND demand > 60 (routes to TRADE_THE_HYPE instead). Signal contribution tracking for debugging and UI. **Timing vs Structure**: AdvisorOutlook surfaces `timing` (Overextended/Early/Fair/Late from momentum+hype+acceleration) and `structure` (Strong/Mixed/Weak from market quality) as separate fields.
-- **Advanced AI Tools**: Card Advisor (Pro-only) for portfolio auditing, utilizing Gemini 2.5 Flash with multiple function-calling tools (e.g., portfolio summary, player outlooks, eBay market data, Alpha signals).
-- **Alpha Intelligence**: Alpha Data Infrastructure captures granular price observations and interest events. Alpha Batch Job and Signal Engine generate daily buy/sell/hold signals. Daily Alpha Feed (Alpha Feed V2) presents market pulse, price movers, investment signals, community momentum, and trending cards.
-- **Social & Sharing**: Liking, commenting, prestige system, bookmarking, and shareable display cases.
-- **Reporting & Alerts**: Monthly price trend charts, graded value matrix, supply saturation alerts, pop report history, watchlist change alerts, and liquidity scoring UI.
-- **Market Leaderboard**: 3 ranked views of player markets — Best Markets (weighted by composite+momentum+demand+confidence), Hype/Sell Candidates (hype+momentum-volume divergence), Emerging Opportunities (demand+volume+low-hype+early-phase bonus). Sport filter, computed from player_outlook_cache, in-memory caching with 1hr TTL. Falls back to verdict-based scoring for older cached outlooks without full market signals. Includes percentile column (Top X% / Bottom X%).
-- **Relative Percentile Ranking**: Percentile engine computes rank distributions across all cached players for composite, demand, momentum, hype, and quality scores. Displayed as "Top X%" / "Bottom X%" badges in player outlook header and leaderboard table. Color-coded (green for top 15%, blue for top 35%, neutral for mid, orange for bottom). Sample size disclaimer shown when < 100 players. API at `/api/market-percentiles/:playerKey`. Cached 1hr in-memory.
-- **Signal Agreement & Conviction**: Directional classification of each signal (bullish/bearish/neutral based on thresholds), agreement score (abs(bullish-bearish)/total * 100), and conviction score combining agreement (40%) + confidence (30%) + distance-from-neutral (30%). Four levels: High (75+), Medium (55-74), Low (35-54), Very Low (<35). Conviction badge in player outlook header. Conviction < 40 downgrades ACCUMULATE to HOLD_CORE, TRADE_THE_HYPE to SPECULATIVE_FLYER. Narrative line describes signal alignment pattern.
-- **Trade Targets**: Verdict-aware card-level execution layer on player outlook page. Appears below Action Plan. Shows 1-3 specific card targets with BUY/SELL/WATCH actions, prices from evidence breakdown, liquidity indicators, and contextual tags. Verdict mapping: BUY/HOLD_CORE → entry targets (lagging demand); SELL/AVOID → sell targets (take profits); SPECULATIVE → watch list (asymmetric upside); HOLD → selective exposure. Low conviction (<30) shows "No strong entries" with caveat. Uses tieredRecommendations, exposures, evidence breakdown, and whatToBuy/whatToSell data.
-- **Holder/Buyer Decision UI**: AdvisorSnapshot leads with verdict+conviction, then two prominent decision boxes: "If you own → [action]" and "If you want exposure → [action]". Trade targets split inline under the relevant decision. All secondary analysis (narrative, signals, percentiles, action plan, pack hit, collector tip, badges) collapsed behind "Show analysis" toggle. Deterministic verdict-to-decision mapping: BUY→HOLD/ADD+BUY now, HOLD_CORE→HOLD+WAIT, TRADE_THE_HYPE→SELL into strength+DO NOT BUY, AVOID→SELL/EXIT+AVOID, SPECULATIVE→HOLD small+SMALL BUY only, HOLD→HOLD+WAIT.
-- **Prospect Detection**: Players who haven't debuted in the major/top league (still in minors, academy, pre-draft) are classified as PROSPECT stage. Gemini news prompt distinguishes draft year from debut year via `hasDebuted` field. Frontend shows amber "Prospect" badge with Sprout icon, plus a disclaimer banner warning that signals reflect prospect hype, not proven performance. AdvisorSnapshot decision boxes include a prospect caveat. Classification engine treats PROSPECT as HIGH risk, HIGH volatility, SHORT horizon.
-- **Recommendation Engines**: Next Buys Recommendation Engine (balanced, investment-focused), Dual-Source Hidden Gems (AI and community signals, including Soccer with World Cup focus, **engine-enriched** with Market Scoring Engine composite/conviction/percentile data, blended ranking, AI-vs-engine conflict detection and override), and Portfolio Alpha Benchmark.
-- **SEO & Public Pages**: Public landing pages for podcasts, Pro trials, and a Topps Takeover SEO page with live player signals.
-- **Break Value Auditor**: AI-powered EV analysis for break slot value evaluation.
-- **Sealed Product ROI Calculator**: AI-powered sealed hobby box analysis at `/market/sealed-roi`. **Realistic EV Engine** computes expected value from scratch using hit breakdown with real-world corrections: (1) Transaction friction — cards under $5 are zeroed out (unliquidatable after fees), (2) Illiquidity haircut — hits with <3 sold comps get 50% haircut, (3) eBay fee deduction — 13% fees + $1.50 shipping subtracted from all values, (4) Case hit separation — rare case hits (perBox < 0.2) contribute to "Hit Ceiling" display only, not base EV (avoids survivor bias), (5) Median sold prices (not asking/mean). Verdict thresholds: Negative EV (<0.95x), Speculative (0.95x-1.25x), Positive EV (>1.25x, rare). New release discount (30% additional haircut). Product images, case hit star badges, and example card images. Head-to-head comparison mode. Curated product catalog for Football, Basketball, Baseball, Hockey (current + previous year). Pro/Free gating: free users get summary verdict, Pro gets full breakdown. In-memory cache with 6-hour TTL. Endpoints: POST `/api/market/sealed-product-roi`, POST `/api/market/sealed-product-compare`.
-
-### System Design Choices
-- **Database**: PostgreSQL with Drizzle ORM.
-- **API**: RESTful API.
-- **Build**: Vite for client, esbuild for server.
-- **Session Management**: Secure, HttpOnly cookies with PostgreSQL-backed sessions.
-- **AI Integration**: Gemini 2.5 Flash as the primary AI engine for comprehensive market analysis and pricing, with strategic fallbacks.
-- **Parallel Detection**: Advanced detection and pricing for SSPs, case hits, Chrome inserts, and numbered card parallels.
-- **Caching**: eBay comps caching (stale-while-revalidate), player news caching (in-memory), and persistent caching of Gemini analysis results in PostgreSQL.
-- **Worker Architecture**: Dedicated-IP VPS for eBay scraper.
-- **Scheduled Jobs**: Weekly auto-refresh for Hidden Gems, nightly player outlook refresh, and a weekly Verdict Regression Test (Sundays 02:00 UTC) that snapshots the top 50 cached player outlooks (`player_outlook_cache` ordered by `updatedAt`) into `verdict_regression_runs` and flags `isFlip` when the verdict changes between runs while `|priceChangePct| < 15%`. Manually triggerable via `GET /api/admin/run-regression` (gated by `QA_LOGIN_TOKEN` via `x-qa-token` header — query-param fallback removed for security), registered before Vite's SPA catch-all so the route resolves correctly in dev.
-
-## External Dependencies
-
-### Third-Party Services
-- **Replit Services**: Replit Auth (OpenID Connect), Replit Object Storage (Google Cloud Storage).
-- **Stripe**: Payment processing.
-- **OpenAI GPT & Serper API**: AI lookups and real-time news.
-- **Yahoo Finance**: S&P 500 market data.
-- **CoinGecko**: Bitcoin market data.
-
-### Frontend Libraries
-- **UI & Components**: Radix UI, Uppy, date-fns, Lucide React, shadcn/ui.
-- **Form & Validation**: React Hook Form, Zod, @hookform/resolvers.
-- **Styling**: Tailwind CSS, class-variance-authority, clsx, tailwind-merge.
-
-### Backend Libraries
-- **Database & ORM**: `pg`, `drizzle-orm`, `drizzle-zod`.
-- **Authentication & Session**: `passport`, `openid-client`, `express-session`, `connect-pg-simple`.
-- **Cloud Integration**: `@google-cloud/storage`.
-- **Image Processing**: `Sharp`.
-- **Utilities**: `memoizee`.
-
-## Architectural Rules
-
-### API Response Shape Changes
-When a backend response field changes shape (primitive ↔ structured type), every frontend consumer reading that field must be audited atomically with the change. Treating shape changes as local fixes ships latent crashes.
-
-Audit pattern:
-1. Grep client/src/ for the field name combined with string methods (.replace, .toUpperCase, .split), map lookups (MAP[field]), and direct JSX renders ({field})
-2. Classify each hit: typed utility function (safe) | API consumer (must audit) | newly-added component (highest risk - test specifically)
-3. Fix all API consumers in the same commit as the shape change. TSC clean before ship.
-
-Today's example: verdict shape changed from string to {verdict, modifier, ...} object. Three components added by parallel work assumed the old string shape. Production crashed site-wide on every page render until rolled back and patched.
+## Pointers
+- **Drizzle ORM Docs**: _Populate as you build_
+- **Radix UI Docs**: _Populate as you build_
+- **Tailwind CSS Docs**: _Populate as you build_
+- **React Hook Form Docs**: _Populate as you build_
+- **Zod Docs**: _Populate as you build_
+- **Passport.js Docs**: _Populate as you build_
+- **Gemini API Docs**: _Populate as you build_
