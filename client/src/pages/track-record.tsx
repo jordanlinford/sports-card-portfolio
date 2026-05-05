@@ -149,7 +149,7 @@ function EmptyState() {
 }
 
 function CallRow({ call }: { call: VerdictAccuracyResult }) {
-  const meta = getVerdictMeta(call.verdict);
+  const meta = getVerdictMeta(typeof call.verdict==="string"?call.verdict:(call.verdict as any)?.verdict??"");
   const change = getBestChange(call);
   const isPositive = change !== null && change >= 0;
 

@@ -28,7 +28,7 @@ export function CardOfDay() {
 
   if (isLoading || !data) return null;
 
-  const style = VERDICT_STYLES[data.verdict] || { color: "text-gray-700", bg: "bg-gray-50" };
+  const style = VERDICT_STYLES[typeof data.verdict==="string"?data.verdict:(data.verdict as any)?.verdict] || { color: "text-gray-700", bg: "bg-gray-50" };
   const [sport, slug] = data.playerKey.split(":");
 
   return (
@@ -46,7 +46,7 @@ export function CardOfDay() {
             <h3 className="font-semibold text-base truncate">{data.playerName}</h3>
             <div className="flex items-center gap-2 mt-1">
               <Badge className={`${style.color} bg-background/50 text-xs`}>
-                {data.verdict.replace(/_/g, " ")}
+                {(typeof data.verdict==="string"?data.verdict:(data.verdict as any)?.verdict??"").replace(/_/g," ")}
               </Badge>
               <span className="text-xs text-muted-foreground">{data.confidence}% confidence</span>
             </div>

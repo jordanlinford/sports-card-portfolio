@@ -56,7 +56,7 @@ export function VerdictHistory({ playerKey }: { playerKey: string }) {
                 })
               : "Unknown";
             const price = entry.price != null ? `$${entry.price.toFixed(2)}` : "N/A";
-            const verdict = entry.verdict || "N/A";
+            const verdict = (typeof entry.verdict==="string"?entry.verdict:(entry.verdict as any)?.verdict)||"N/A";
             const colorClass = VERDICT_COLORS[verdict] || "bg-gray-500";
 
             return (
