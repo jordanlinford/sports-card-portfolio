@@ -303,9 +303,52 @@ const PLAYER_TEAM_MAP: Record<string, string> = {
 };
 
 // Player to team lookup cache (populated from hidden gems and other sources)
+// Pre-fetch team data for a batch of player names in a single IN-clause query.
+// Returns a Map<normalizedName, canonicalTeam> and also seeds playerTeamCache
+// so that any subsequent single lookups within the same request are already warm.
+async function prefetchPlayerTeams(playerNames: string[]): Promise<Map<string, string>> {
+  if (playerNames.length === 0) return new Map();
+
+  const t0 = Date.now();
+  const result = new Map<string, string>();
+
+  try {
+    const normalizedNames = playerNames.map(n => n.toLowerCase().trim());
+
+    // Single IN-clause query replaces N serial lookups
+    const gems = await db
+      .select({ playerName: hiddenGems.playerName, team: hiddenGems.team })
+      .from(hiddenGems)
+      .where(sql`LOWER(${hiddenGems.playerName}) = ANY(ARRAY[${sql.join(
+        normalizedNames.map(n => sql`${n}`),
+        sql`, `
+      )}])`);
+
+    for (const gem of gems) {
+      if (!gem.team) continue;
+      const canonicalTeam = TEAM_CANONICAL_NAMES[gem.team] || gem.team;
+      const normalizedName = gem.playerName.toLowerCase().trim();
+      result.set(normalizedName, canonicalTeam);
+      // Warm the runtime cache so cold-start penalty only occurs once per player
+      playerTeamCache[normalizedName] = canonicalTeam;
+    }
+
+    const elapsed = Date.now() - t0;
+    console.info(
+      `[PortfolioIntelligence] Prefetched team data for ${playerNames.length} players` +
+      ` (${gems.length} found) in ${elapsed}ms`
+    );
+  } catch (error) {
+    // Non-fatal: fall back to per-player DB lookups in the loop
+    console.warn('[PortfolioIntelligence] prefetchPlayerTeams failed, falling back to serial lookups:', error);
+  }
+
+  return result;
+}
+
 const playerTeamCache: Record<string, string> = {};
 
-async function lookupPlayerTeam(playerName: string): Promise<string | null> {
+async function lookupPlayerTeam(playerName: string, prefetched?: Map<string, string>): Promise<string | null> {
   if (!playerName) return null;
   
   const normalizedName = playerName.toLowerCase().trim();
@@ -316,6 +359,9 @@ async function lookupPlayerTeam(playerName: string): Promise<string | null> {
   }
   
   // Check cache
+  // Check prefetched batch result (fast path for batch generation)
+  if (prefetched?.has(normalizedName)) return prefetched.get(normalizedName)!;
+
   const cachedTeam = playerTeamCache[normalizedName];
   if (cachedTeam) return cachedTeam;
   
@@ -494,9 +540,17 @@ export async function buildPortfolioProfile(userId: string): Promise<PortfolioPr
   // Sort by combined value so most valuable players get looked up first (for cache efficiency)
   const uniquePlayersToLookup = Object.entries(playerValueTotals)
     .sort(([, a], [, b]) => b - a);
+
+  // Batch-prefetch team data: replace N serial DB queries with 1 IN-clause query.
+  // Filter out players already in PLAYER_TEAM_MAP (zero DB cost for those).
+  const namesToPrefetch = uniquePlayersToLookup
+    .map(([name]) => name)
+    .filter(name => !PLAYER_TEAM_MAP[name.toLowerCase().trim()]);
+  const prefetchedTeams = await prefetchPlayerTeams(namesToPrefetch);
+
   
   for (const [playerName, totalValue] of uniquePlayersToLookup) {
-    const team = await lookupPlayerTeam(playerName);
+    const team = await lookupPlayerTeam(playerName, prefetchedTeams);
     if (team) {
       teamValues[team] = (teamValues[team] || 0) + totalValue;
     }
