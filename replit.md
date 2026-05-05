@@ -67,3 +67,15 @@ The application features a full-stack TypeScript architecture. The frontend uses
 - **Cloud Integration**: `@google-cloud/storage`.
 - **Image Processing**: `Sharp`.
 - **Utilities**: `memoizee`.
+
+## Architectural Rules
+
+### API Response Shape Changes
+When a backend response field changes shape (primitive ↔ structured type), every frontend consumer reading that field must be audited atomically with the change. Treating shape changes as local fixes ships latent crashes.
+
+Audit pattern:
+1. Grep client/src/ for the field name combined with string methods (.replace, .toUpperCase, .split), map lookups (MAP[field]), and direct JSX renders ({field})
+2. Classify each hit: typed utility function (safe) | API consumer (must audit) | newly-added component (highest risk - test specifically)
+3. Fix all API consumers in the same commit as the shape change. TSC clean before ship.
+
+Today's example: verdict shape changed from string to {verdict, modifier, ...} object. Three components added by parallel work assumed the old string shape. Production crashed site-wide on every page render until rolled back and patched.
