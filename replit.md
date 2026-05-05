@@ -52,6 +52,16 @@ Preferred communication style: Simple, everyday language.
 - **API Response Shape Changes**: Any change in the shape of a backend response field (e.g., string to object) requires an atomic audit and update of all frontend consumers in the same commit to prevent latent crashes.
 - **QA Login Token**: The `QA_LOGIN_TOKEN` is critical for automated testing agents and triggering regression tests. It must be provided as an `x-qa-token` header.
 
+## API Response Shape Changes
+
+When a backend response field changes shape (primitive ↔ structured type, field added/removed, nullability changed), every frontend consumer reading that field must be audited atomically with the change. Treating shape changes as local fixes ships latent crashes.
+
+2. Classify each hit: typed utility function (safe) | API consumer (must audit) | newly-added component (highest risk - test specifically)
+
+3. Fix all API consumers in the same commit as the shape change. TSC clean before ship.
+
+Today's example: verdict shape changed from string to {verdict, modifier, ...} object. Three components added by parallel work assumed the old string shape. Production crashed site-wide on every page render until rolled back and patched.
+
 ## Pointers
 - **Drizzle ORM Docs**: _Populate as you build_
 - **Radix UI Docs**: _Populate as you build_
