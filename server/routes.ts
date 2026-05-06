@@ -12468,6 +12468,36 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  // ---------------------------------------------------------------------------
+  // V2 Verdict Migration endpoints (admin only)
+  // ---------------------------------------------------------------------------
+  app.post("/api/admin/migrate-verdicts-v2", isAuthenticated, isAdmin, async (req: any, res: any) => {
+    try {
+      const { triggerV2Migration } = await import("./verdictMigrationJob");
+      const force = req.query.force === "true" || req.body?.force === true;
+      const result = await triggerV2Migration(force);
+      if (!result.queued) {
+        return res.status(409).json({ error: result.reason ?? "Migration already in progress" });
+      }
+      res.json({ queued: true, force, message: force ? "Force migration started -- all 139 entries will be regenerated." : "Migration started -- skipping already-migrated entries." });
+    } catch (err: any) {
+      console.error("[VerdictMigration] Trigger error:", err);
+      res.status(500).json({ error: err.message ?? "Internal server error" });
+    }
+  });
+
+  app.get("/api/admin/migrate-verdicts-v2/status", isAuthenticated, isAdmin, async (req: any, res: any) => {
+    try {
+      const { getV2MigrationStatus } = await import("./verdictMigrationJob");
+      const state = getV2MigrationStatus();
+      res.json(state);
+    } catch (err: any) {
+      console.error("[VerdictMigration] Status error:", err);
+      res.status(500).json({ error: err.message ?? "Internal server error" });
+    }
+  });
+
+
   // Start the Alpha batch scheduler
   import("./alphaEngine").then(({ startBatchScheduler }) => {
     startBatchScheduler();

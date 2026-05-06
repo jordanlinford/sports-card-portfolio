@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { ArrowLeft, Users, LayoutGrid, CreditCard, Image, Crown, UserMinus, Database, Search, Plus, Pencil, Trash2, Upload, RefreshCw, ChevronLeft, ChevronRight, FileText, Eye, EyeOff, Video, Download, Globe, Zap, ExternalLink, MessageCircle, Send, Clock, CheckCircle, AlertCircle, Sparkles, Loader2, ArrowRight, Check, X } from "lucide-react";
@@ -2247,6 +2247,216 @@ function BlogTab() {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// V2 Verdict Migration Tab
+// ---------------------------------------------------------------------------
+interface VMigDistribution {
+  BUY: number; MONITOR: number; WATCH: number;
+  AVOID: number; SELL: number; LONGSHOT_BET: number;
+  total: number;
+}
+interface VMigBandValidation {
+  key: string; actualPct: number; minPct: number; maxPct: number;
+  inTolerance: boolean; delta: number;
+}
+interface VMigProgress {
+  processedCount: number; totalCount: number; currentPlayerName: string;
+  elapsedMs: number; estimatedRemainingMs: number; lastUpdatedAt: string;
+  runningTally: { BUY: number; MONITOR: number; WATCH: number; AVOID: number; SELL: number; LONGSHOT_BET: number; errored: number };
+}
+interface VMigState {
+  status: "idle" | "running" | "complete" | "error";
+  startedAt: string | null; completedAt: string | null; forceMode: boolean;
+  progress: VMigProgress | null;
+  beforeDistribution: VMigDistribution | null;
+  afterDistribution: VMigDistribution | null;
+  bandValidation: VMigBandValidation[] | null;
+  error: string | null; interruptedWarning: string | null;
+}
+
+function fmtDuration(ms: number): string {
+  if (ms < 60000) return Math.round(ms / 1000) + "s";
+  return Math.floor(ms / 60000) + "m " + Math.round((ms % 60000) / 1000) + "s";
+}
+
+function VerdictMigrationTab() {
+  const [migState, setMigState] = useState<VMigState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [triggerError, setTriggerError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/migrate-verdicts-v2/status");
+      if (res.ok) { const d = await res.json(); setMigState(d); return d; }
+    } catch {}
+    return null;
+  }, []);
+
+  useEffect(() => { fetchStatus(); }, [fetchStatus]);
+
+  useEffect(() => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(fetchStatus, migState?.status === "running" ? 5000 : 30000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [migState?.status, fetchStatus]);
+
+  const triggerMigration = async (force: boolean) => {
+    const msg = force
+      ? "Force-regenerate ALL 139 entries? This overwrites all existing verdicts and takes 15-28 minutes."
+      : "Run V2 migration? Already-migrated entries will be skipped. Takes up to 28 minutes.";
+    if (!confirm(msg)) return;
+    setLoading(true); setTriggerError(null);
+    try {
+      const res = await fetch("/api/admin/migrate-verdicts-v2?force=" + String(force), { method: "POST" });
+      const d = await res.json();
+      if (!res.ok) setTriggerError(d.error ?? "Failed to start migration");
+      else await fetchStatus();
+    } catch (e: any) { setTriggerError(e.message ?? "Network error"); }
+    finally { setLoading(false); }
+  };
+
+  const VKEYS = ["BUY", "MONITOR", "WATCH", "AVOID", "SELL", "LONGSHOT_BET"] as const;
+  const isIdle = !migState || migState.status === "idle" || migState.status === "complete" || migState.status === "error";
+
+  return (
+    <div className="p-6 space-y-6 max-w-3xl">
+      <div>
+        <h2 className="text-xl font-bold mb-1">V2 Verdict Migration</h2>
+        <p className="text-sm text-muted-foreground">Reclassify all 139 player_outlook_cache entries under the V2 waterfall engine. Job runs server-side -- closing this tab is safe.</p>
+      </div>
+
+      {migState?.interruptedWarning && (
+        <div className="bg-yellow-50 border border-yellow-300 rounded p-3 text-sm text-yellow-800">
+          <strong>Warning:</strong> {migState.interruptedWarning}
+        </div>
+      )}
+      {triggerError && (
+        <div className="bg-red-50 border border-red-300 rounded p-3 text-sm text-red-700">{triggerError}</div>
+      )}
+
+      {isIdle && (
+        <div className="flex gap-3 flex-wrap items-center">
+          <Button onClick={() => triggerMigration(false)} disabled={loading}>
+            {loading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
+            Run V2 Migration
+          </Button>
+          <Button variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50"
+            onClick={() => triggerMigration(true)} disabled={loading}>
+            Force Regenerate All 139
+          </Button>
+          <span className="text-xs text-muted-foreground">Primary skips already-migrated. Force overwrites all.</span>
+        </div>
+      )}
+
+      {migState?.status === "running" && migState.progress && (
+        <div className="border rounded p-4 space-y-3 bg-blue-50">
+          <div className="flex items-center gap-2 font-semibold text-blue-800">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            Migration running{migState.forceMode ? " (force mode)" : ""}
+          </div>
+          <div className="text-sm text-blue-700">
+            Player <strong>{migState.progress.processedCount}</strong> of <strong>{migState.progress.totalCount}</strong>
+            {migState.progress.currentPlayerName ? <> &mdash; <em>{migState.progress.currentPlayerName}</em></> : null}
+          </div>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div className="bg-blue-600 h-2 rounded-full transition-all"
+              style={{ width: (migState.progress.totalCount > 0 ? Math.round(migState.progress.processedCount / migState.progress.totalCount * 100) : 0) + "%" }} />
+          </div>
+          <div className="flex gap-4 flex-wrap text-xs text-blue-600">
+            <span>Elapsed: {fmtDuration(migState.progress.elapsedMs)}</span>
+            {migState.progress.estimatedRemainingMs > 0 && <span>Remaining ~{fmtDuration(migState.progress.estimatedRemainingMs)}</span>}
+            <span>Updated: {new Date(migState.progress.lastUpdatedAt).toLocaleTimeString()}</span>
+          </div>
+          <div className="text-xs text-blue-700 font-mono">
+            BUY:{migState.progress.runningTally.BUY} MON:{migState.progress.runningTally.MONITOR} WAT:{migState.progress.runningTally.WATCH} AVD:{migState.progress.runningTally.AVOID} SEL:{migState.progress.runningTally.SELL} LONG:{migState.progress.runningTally.LONGSHOT_BET} ERR:{migState.progress.runningTally.errored}
+          </div>
+          <p className="text-xs text-muted-foreground">Safe to close browser -- job continues server-side.</p>
+        </div>
+      )}
+
+      {migState?.status === "complete" && migState.beforeDistribution && migState.afterDistribution && (
+        <div className="space-y-4">
+          <div className="text-green-700 font-semibold">
+            Migration complete -- {migState.completedAt ? new Date(migState.completedAt).toLocaleString() : ""}
+          </div>
+          <div className="border rounded overflow-hidden text-sm">
+            <table className="w-full">
+              <thead className="bg-muted"><tr>
+                <th className="text-left p-2 font-medium">Verdict</th>
+                <th className="text-right p-2 font-medium">Before</th>
+                <th className="text-right p-2 font-medium">After</th>
+                <th className="text-right p-2 font-medium">Delta</th>
+              </tr></thead>
+              <tbody>
+                {VKEYS.map((v) => {
+                  const b = (migState.beforeDistribution as any)[v] as number;
+                  const a = (migState.afterDistribution as any)[v] as number;
+                  const d = a - b;
+                  return (
+                    <tr key={v} className="border-t">
+                      <td className="p-2 font-mono text-xs">{v}</td>
+                      <td className="p-2 text-right">{b}</td>
+                      <td className="p-2 text-right font-semibold">{a}</td>
+                      <td className={"p-2 text-right " + (d > 0 ? "text-green-600" : d < 0 ? "text-red-600" : "text-muted-foreground")}>
+                        {d > 0 ? "+" + d : d}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="border-t bg-muted/50 font-semibold">
+                  <td className="p-2">Total</td>
+                  <td className="p-2 text-right">{migState.beforeDistribution.total}</td>
+                  <td className="p-2 text-right">{migState.afterDistribution.total}</td>
+                  <td className="p-2 text-right text-muted-foreground">--</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {migState.bandValidation && (
+            <div className="border rounded overflow-hidden text-sm">
+              <div className="bg-muted p-2 font-medium">Band Validation (target +/-5pp)</div>
+              <table className="w-full">
+                <thead className="bg-muted/50"><tr>
+                  <th className="text-left p-2">Band</th>
+                  <th className="text-right p-2">Target</th>
+                  <th className="text-right p-2">Actual</th>
+                  <th className="text-center p-2">Status</th>
+                </tr></thead>
+                <tbody>
+                  {migState.bandValidation.map((b) => (
+                    <tr key={b.key} className="border-t">
+                      <td className="p-2 font-mono text-xs">{b.key}</td>
+                      <td className="p-2 text-right text-muted-foreground">{b.minPct}-{b.maxPct}%</td>
+                      <td className="p-2 text-right font-semibold">{b.actualPct}%</td>
+                      <td className="p-2 text-center">
+                        {b.inTolerance
+                          ? <span className="text-green-600 font-bold">&#x2713;</span>
+                          : <span className="text-red-600 font-bold">&#x2717; ({b.delta > 0 ? "+" : ""}{b.delta}pp)</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <Button variant="outline" size="sm" onClick={() => triggerMigration(false)}>Re-run (skip migrated)</Button>
+            <Button variant="outline" size="sm" className="text-orange-600 border-orange-300" onClick={() => triggerMigration(true)}>Force Re-run All</Button>
+          </div>
+        </div>
+      )}
+
+      {migState?.status === "error" && (
+        <div className="bg-red-50 border border-red-300 rounded p-4 text-red-700 text-sm">
+          <strong>Migration failed:</strong> {migState.error}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const { toast } = useToast();
   const [deleteUserConfirm, setDeleteUserConfirm] = useState<{ id: string; name: string } | null>(null);
@@ -2518,6 +2728,9 @@ export default function AdminDashboard() {
               <Zap className="h-4 w-4 mr-1" />
               Alpha Engine
             </TabsTrigger>
+                <TabsTrigger value="migration" data-testid="tab-migration">
+                  V2 Migration
+                </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users">
@@ -2654,6 +2867,9 @@ export default function AdminDashboard() {
           <TabsContent value="alpha">
             <AlphaEngineTab />
           </TabsContent>
+            <TabsContent value="migration">
+              <VerdictMigrationTab />
+            </TabsContent>
         </Tabs>
       </div>
 
