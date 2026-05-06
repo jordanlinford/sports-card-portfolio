@@ -7,6 +7,7 @@ import { registerRoutes } from "./routes";
 import { startScanWorker } from "./scanWorker";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import * as fs from "node:fs";
 import { startPrewarmJob } from "./prewarmJob";
 import { startCareerStageJob } from "./careerStageJob";
 import { startHiddenGemsRefreshJob } from "./hiddenGemsService";
@@ -90,12 +91,110 @@ app.use((req, res, next) => {
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || "5000", 10);
   
+  // --------------------------------------------------------------------------
+  // Piece 3: Pre-listen port eviction.
+  // lsof/ss are unavailable in this Nix environment; we use /proc/net/tcp
+  // (always present on Linux) to find stale tenants on our port and send
+  // SIGTERM only if the process UID matches ours (safety guard).
+  // reusePort has been removed: it masked collisions instead of preventing them.
+  // --------------------------------------------------------------------------
+  async function evictStaleTenant(targetPort: number): Promise<void> {
+    const myUid = process.getuid?.() ?? -1;
+    const hexPort = targetPort.toString(16).toUpperCase().padStart(4, '0');
+
+    // Collect inodes for all TCP sockets bound to targetPort
+    const inodes = new Set<number>();
+    for (const tcpFile of ["/proc/net/tcp", "/proc/net/tcp6"]) {
+      try {
+        const lines = fs.readFileSync(tcpFile, "utf8").split("\n");
+        for (const line of lines) {
+          const parts = line.trim().split(/\s+/);
+          if (parts.length < 10) continue;
+          const localAddr = parts[1];
+          const portHex = localAddr.split(":")[1]?.toUpperCase();
+          if (portHex === hexPort) {
+            const inode = parseInt(parts[9], 10);
+            if (!isNaN(inode) && inode > 0) inodes.add(inode);
+          }
+        }
+      } catch {
+        // /proc/net/tcp may not exist; proceed without eviction
+      }
+    }
+
+    if (inodes.size === 0) return; // port is free
+
+    // Find PIDs that own those inodes
+    const pidsToKill = new Set<number>();
+    let procEntries: string[] = [];
+    try { procEntries = fs.readdirSync("/proc"); } catch { return; }
+    for (const entry of procEntries) {
+      if (!/^\d+$/.test(entry)) continue;
+      const pid = parseInt(entry, 10);
+      if (pid === process.pid) continue; // never kill ourselves
+      // Guard: only evict processes owned by the same UID
+      try {
+        const statusRaw = fs.readFileSync(`/proc/${pid}/status`, "utf8");
+        const uidLine = statusRaw.split("\n").find((l) => l.startsWith("Uid:"));
+        const procUid = uidLine ? parseInt(uidLine.split(/\s+/)[1], 10) : -1;
+        if (procUid !== myUid) continue; // different owner — skip
+      } catch { continue; }
+      try {
+        const fds = fs.readdirSync(`/proc/${pid}/fd`);
+        for (const fd of fds) {
+          try {
+            const link = fs.readlinkSync(`/proc/${pid}/fd/${fd}`);
+            if (link.startsWith("socket:[")) {
+              const inode = parseInt(link.slice(8, -1), 10);
+              if (inodes.has(inode)) { pidsToKill.add(pid); break; }
+            }
+          } catch { /* fd may have vanished */ }
+        }
+      } catch { /* /proc/{pid}/fd unreadable */ }
+    }
+
+    if (pidsToKill.size === 0) return;
+
+    for (const pid of Array.from(pidsToKill)) {
+      console.warn(`[Server] Sending SIGTERM to stale process ${pid} holding port ${targetPort}`);
+      try { process.kill(pid, "SIGTERM"); } catch { /* already gone */ }
+    }
+
+    // Poll up to 5 s for the port to clear
+    const deadline = Date.now() + 5_000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 500));
+      // Re-check /proc/net/tcp
+      let stillHeld = false;
+      for (const tcpFile of ["/proc/net/tcp", "/proc/net/tcp6"]) {
+        try {
+          const lines = fs.readFileSync(tcpFile, "utf8").split("\n");
+          for (const line of lines) {
+            const parts = line.trim().split(/\s+/);
+            if (parts.length < 10) continue;
+            const portHex = parts[1]?.split(":")[1]?.toUpperCase();
+            if (portHex === hexPort) { stillHeld = true; break; }
+          }
+        } catch { /* ignore */ }
+        if (stillHeld) break;
+      }
+      if (!stillHeld) {
+        console.info(`[Server] Port ${targetPort} is now free`);
+        return;
+      }
+    }
+
+    throw new Error(`[Server] Port ${targetPort} still held after 5 s SIGTERM — aborting startup`);
+  }
+
+  await evictStaleTenant(port);
+
   // Start listening IMMEDIATELY so health checks pass
   httpServer.listen(
     {
       port,
       host: "0.0.0.0",
-      reusePort: true,
+      // reusePort removed (Piece 3): was masking EADDRINUSE instead of preventing it
     },
     async () => {
       log(`serving on port ${port}`);
