@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { db } from "./db";
-import { playerOutlookCache, playerOutlookHistory, cardPriceObservations, cardInterestEvents } from "@shared/schema";
+import { playerOutlookCache, playerOutlookHistory, cardPriceObservations, cardInterestEvents, LONGSHOT_CUTOFFS, SKILL_POSITIONS, normalizePosition } from "@shared/schema";
 import { eq, and, gt, lt, desc, sql } from "drizzle-orm";
 import crypto from "crypto";
 import { classifyPlayer, getExposureRecommendations, type ClassificationInput, type ClassificationOutput } from "./playerClassificationEngine";
@@ -149,7 +149,7 @@ const gemini = new GoogleGenAI({
 
 // Prompt version - increment this when making significant prompt changes
 // to auto-invalidate cached outlooks generated with older prompts
-const PROMPT_VERSION = 22; // v22: PROSPECT stage for pre-debut players (hasDebuted field, draft vs debut distinction)
+const PROMPT_VERSION = 23; // v23: PROSPECT stage for pre-debut players (hasDebuted field, draft vs debut distinction)
 
 // Normalize player key for caching
 function normalizePlayerKey(sport: string, playerName: string): string {
@@ -1043,7 +1043,7 @@ Style rules (non-negotiable):
 - Never invent facts, stats, awards, or news. If unknown, say "Unknown" and proceed with conditional reasoning.
 - No fake precision (no percentages, no "72% upside").
 - Every analysis must include one uncomfortable truth under "Market Reality Check."
-- Verdict must be one of: BUY / MONITOR / AVOID, and must include a modifier: (Momentum / Speculative / Value / Long-Term / Late Cycle).
+- Verdict must be one of: BUY / MONITOR / AVOID / SELL / WATCH (5 values only), and must include a modifier: (Momentum / Speculative / Value / Long-Term / Late Cycle).
 - Keep all sections scannable: bullets + short sentences. No long paragraphs.
 
 Reasoning rules:
@@ -1052,6 +1052,19 @@ Reasoning rules:
 
 Output format rules:
 - Return valid JSON only, matching the schema provided. Do not include markdown, commentary, or extra keys.`;
+
+
+const waterfallSystemPrompt = `6-TIER EVIDENCE WATERFALL -- work through these in order, stop at first sufficient tier:
+TIER 1 (compsAvailable>=3): BUY/SELL/HOLD/MONITOR based on comp data. SELL requires comps showing weakness.
+TIER 2 (compsAvailable<3, card data known): BUY/HOLD/MONITOR. Do NOT use SELL at Tier 2.
+TIER 3 (player profile data): BUY/MONITOR/AVOID/SELL if clear decline evidence.
+TIER 4 (sport/position/team context only): MONITOR or AVOID.
+TIER 5 (early career, unproven): Use MONITOR. Engine determines LONGSHOT_BET eligibility post-call.
+TIER 6 (pre-debut ONLY): Use WATCH. Player not yet played pro games. Do NOT use WATCH for thin data.
+
+SELL RULES: requires Tier 1 comp evidence of weakness OR Tier 3 clear decline. NOT Tier 2/4 speculation.
+WATCH RULES: pre-debut only. 1+ year of pro stats = NOT WATCH. Thin data = MONITOR.`;
+
 
   // Calculate current year for context
   const currentYear = new Date().getFullYear();
@@ -1252,6 +1265,7 @@ TONE ENFORCEMENT:
       contents: `${systemMessage}\n\n${prompt}`,
       config: {
         maxOutputTokens: 16384,
+        systemInstruction: waterfallSystemPrompt,
         thinkingConfig: { thinkingBudget: 2048 },
       },
     });
@@ -1443,7 +1457,7 @@ TONE ENFORCEMENT:
         "Collector sentiment can shift quickly without warning",
       ],
       verdict: {
-        action: (["BUY", "MONITOR", "AVOID"].includes(parsed.verdict?.action) 
+        action: (["BUY", "MONITOR", "AVOID", "SELL", "WATCH"].includes(parsed.verdict?.action) 
           ? parsed.verdict.action 
           : "MONITOR") as PlayerVerdict,
         modifier: normalizedModifier as VerdictModifier,
@@ -1593,6 +1607,60 @@ export async function getPlayerOutlook(
 }
 
 // Generate fresh outlook (used for cache miss and background refresh)
+// V2: Longshot eligibility -- ALL 4 conditions must be true
+function isLongshotEligible(params: {
+  sport: string;
+  position: string;
+  yearsInLeague: number | null;
+  careerStage: string;
+  roleStatus: string;
+}): boolean {
+  const { sport, position, yearsInLeague, careerStage, roleStatus } = params;
+  // Condition 1: early career within sport cutoff
+  const cutoff = LONGSHOT_CUTOFFS[sport as keyof typeof LONGSHOT_CUTOFFS];
+  if (!cutoff || yearsInLeague === null || yearsInLeague === undefined || yearsInLeague >= cutoff) return false;
+  // Condition 2: skill position (normalized to handle aliases)
+  const normalizedPos = normalizePosition(position, sport);
+  const skillPos = SKILL_POSITIONS[sport as keyof typeof SKILL_POSITIONS] as readonly string[] | undefined;
+  if (!skillPos || !skillPos.includes(normalizedPos)) return false;
+  // Condition 3: active roster (not out of league)
+  if (roleStatus === "OUT_OF_LEAGUE" || roleStatus === "BUST") return false;
+  // Condition 4: NOT established starter (AND logic -- either signal disqualifies)
+  // Note: MLB POSITION_ALIASES maps ambiguous "pitcher" -> SP by default
+  // If news says "closer/reliever" the normalizePosition call will map to RP which is not in SKILL_POSITIONS
+  const isEstablishedByStage = careerStage === "PRIME" || careerStage === "VETERAN";
+  const isEstablishedByRole = roleStatus === "STARTER";
+  if (isEstablishedByStage || isEstablishedByRole) return false;
+  return true;
+}
+
+// V2: Confidence score formula
+function computeConfidenceScore(params: {
+  compsAvailable: number;
+  dataQuality: string;
+  marketDataConfidence: string;
+  newsCoverageConfidence: string;
+  verdictAction: string;
+  hasTieredRecommendations: boolean;
+  isLongshotEligible: boolean;
+}): number {
+  const { compsAvailable, dataQuality, marketDataConfidence, newsCoverageConfidence, verdictAction, hasTieredRecommendations, isLongshotEligible } = params;
+  let base: number;
+  if (compsAvailable >= 5) { base = 78; }           // Tier 1 strong
+  else if (compsAvailable >= 3) { base = 72; }       // Tier 1 adequate
+  else if (compsAvailable >= 1) { base = 62; }       // Tier 2 sparse comps
+  else if (hasTieredRecommendations) { base = 54; }  // Tier 3 player profile
+  else if (isLongshotEligible) { base = 48; }        // Tier 5 longshot profile
+  else if (verdictAction === "WATCH") { base = 28; } // Tier 6 pre-debut
+  else { base = 44; }                               // Tier 4 context only
+  const qMap: Record<string, number> = { HIGH: 2, MEDIUM: 0, LOW: -3 };
+  const adj = (qMap[dataQuality] ?? 0) + (qMap[marketDataConfidence] ?? 0) + (qMap[newsCoverageConfidence] ?? 0);
+  let verdictAdj = 0;
+  if (verdictAction === "SELL") verdictAdj = -5;        // false sells more harmful
+  if (verdictAction === "LONGSHOT_BET") verdictAdj = -3; // inherently speculative
+  return Math.max(10, Math.min(95, Math.round(base + adj + verdictAdj)));
+}
+
 async function generateFreshOutlook(
   playerName: string,
   sport: string,
@@ -2092,20 +2160,51 @@ async function generateFreshOutlook(
   finalClassification.baseTemperature = marketResult.temperature;
   
   // Step 8.6: Insufficient-data verdict override (Fix C)
-  // When we have almost no internal holdings AND no real comp data, downgrade to WATCH
-  // so the UI doesn't render a confident-sounding verdict (e.g. SPECULATIVE_FLYER) on noise.
-  const internalObsCount = marketMetrics.internalObservationCount ?? 0;
-  const compsAvailable = evidence.compsSummary?.available !== false;
-  const compsSoldCount = evidence.compsSummary?.soldCount ?? 0;
-  const lowDataQuality = evidence.dataQuality === "LOW";
-  const insufficientData = internalObsCount < 3 && (!compsAvailable || lowDataQuality || compsSoldCount === 0);
-  if (insufficientData) {
-    console.log(`[PlayerOutlook] Insufficient data override for ${playerName}: internalObs=${internalObsCount}, compsAvailable=${compsAvailable}, soldCount=${compsSoldCount}, dataQuality=${evidence.dataQuality}`);
-    verdict.action = "WATCH" as PlayerVerdict;
-    verdict.modifier = VERDICT_MODIFIER.INSUFFICIENT_DATA as VerdictModifier;
-    verdict.summary = "Not enough sales data for a confident signal yet. Monitor for more comps before acting.";
-  }
+    // V2: WATCH = pre-debut ONLY (careerStage PROSPECT)
+    // Do NOT use WATCH as thin-data fallback -- thin data = MONITOR
+    const isPreDebut = resolvedCareerStage === "PROSPECT";
+    if (isPreDebut && verdict.action !== "WATCH") {
+      console.log(`[PlayerOutlook] WATCH override: ${playerName} is PROSPECT (pre-debut)`);
+      verdict.action = "WATCH" as PlayerVerdict;
+      verdict.modifier = VERDICT_MODIFIER.INSUFFICIENT_DATA as VerdictModifier;
+      verdict.summary = "Pre-debut prospect. Monitoring until professional debut.";
+    } else if (!isPreDebut && verdict.action === "WATCH") {
+      // Gemini used WATCH for a debuted player -- demote to MONITOR
+      console.log(`[PlayerOutlook] WATCH demoted: ${playerName} has debuted (${resolvedCareerStage})`);
+      verdict.action = "MONITOR" as PlayerVerdict;
+    }
   
+
+    // V2: SELL confidence gate -- SELL requires >=60 confidence (defense in depth)
+    const longshotCheck = isLongshotEligible({
+      sport: effectiveSport,
+      position: enrichedPlayerInfo.position || classification.position || "",
+      yearsInLeague: classification.rookieYear ? (new Date().getFullYear() - classification.rookieYear) : null,
+      careerStage: resolvedCareerStage || "",
+      roleStatus: roleStatus || "UNKNOWN",
+    });
+    const confScore = computeConfidenceScore({
+      compsAvailable: marketData.soldCount30d ?? 0,
+      dataQuality: evidence.dataQuality || "LOW",
+      marketDataConfidence: (["HIGH","MEDIUM","LOW"].includes(marketDataConfidence) ? marketDataConfidence : "LOW") as string,
+      newsCoverageConfidence: (["HIGH","MEDIUM","LOW"].includes(newsCoverageConfidence) ? newsCoverageConfidence : "LOW") as string,
+      verdictAction: verdict.action,
+      hasTieredRecommendations: !!(tieredRecommendations?.baseCards || tieredRecommendations?.midTierParallels),
+      isLongshotEligible: longshotCheck,
+    });
+    // SELL gate: demote to MONITOR if confidence too low
+    if (verdict.action === "SELL" && confScore < 60) {
+      console.log(`[PlayerOutlook] SELL demoted to MONITOR for ${playerName}: confScore=${confScore} < 60`);
+      verdict.action = "MONITOR" as PlayerVerdict;
+    }
+    // LONGSHOT_BET wiring: override MONITOR with LONGSHOT_BET if eligible
+    if (longshotCheck && verdict.action === "MONITOR") {
+      console.log(`[PlayerOutlook] LONGSHOT_BET assigned for ${playerName} (sport=${effectiveSport})`);
+      verdict.action = "LONGSHOT_BET" as PlayerVerdict;
+    }
+    // Attach confidence score
+    (verdict as any).confidenceScore = confScore;
+
   // Step 9: Build response
   const response: PlayerOutlookResponse = {
     player: enrichedPlayerInfo,
