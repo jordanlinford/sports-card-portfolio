@@ -128,3 +128,20 @@ Before or during Bug A recovery, remove from `server/portfolioIntelligenceServic
 - Diagnostic log: `console.log('[PortfolioOutlook] Raw model response (first 500 chars):', content.substring(0, 500))` (~line 844)
 
 These were added during investigation and should not ship to production.
+
+---
+
+## New Findings (May 5 2026 — Evening Session)
+
+### Finding F1 — Card of the Day "View full outlook" link broken
+- **Symptom:** Dashboard widget shows TreVeyon Henderson as Card of the Day. Clicking "View full outlook" leads to a "Player Not Found" page: "We don't have an outlook for this player yet."
+- **Root cause hypothesis:** Routing/slug mismatch or data lookup divergence — Card of the Day generator picked the player, but the outlook page lookup can't resolve the same player.
+- **Two systems disagree:** CardOfDay generator vs. outlook page player lookup.
+- **Status:** Captured. Do not investigate until Bug A + Framework pieces are recovered.
+- **Priority:** Medium — user-facing breakage but not silent data corruption.
+
+### Finding F2 — Card of the Day showing "0% confidence" + boilerplate text
+- **Symptom:** Same widget shows "0% confidence" with generic message "TreVeyon Henderson is showing interesting market activity."
+- **Root cause hypothesis:** Same class of bug as Bug A — Gemini call for CardOfDay generation is failing silently and serving fallback shape as if real output.
+- **Status:** Captured. Likely shares root cause with Bug A (timeout / token limit). May self-resolve after Bug A cherry-pick, or may need a separate fix in the CardOfDay generation path.
+- **Priority:** Medium — directly related to Bug A class; assess after Bug A is confirmed working in production.
