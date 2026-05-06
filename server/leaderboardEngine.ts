@@ -1,9 +1,27 @@
 import { db } from "./db";
-import { playerOutlookCache } from "@shared/schema";
+import { playerOutlookCache, cards } from "@shared/schema";
 import type { PlayerOutlookResponse, MarketSignals, MarketPhase, InvestmentVerdict } from "@shared/schema";
-import { isNotNull } from "drizzle-orm";
+import { isNotNull, sql } from "drizzle-orm";
 import { computeMarketSignals, classifyMarketPhase } from "./marketScoringEngine";
 import type { MarketScoringInput } from "./marketScoringEngine";
+
+// Phase 3 verdict-engine deploy timestamp (commit fb23cf6, 2026-04-17T03:25Z).
+// Outlooks cached before this date were produced by the pre-Phase-3 model and
+// must be excluded from actionable leaderboard surfaces.
+const PHASE_3_LAYERED_MODEL_DEPLOY_CUTOFF = new Date("2026-04-17T03:25:00Z");
+
+// Fix 1 helper: matches the Alpha-feed isInsufficientDataModifier pattern.
+// Normalizes the modifier string (case-insensitive, strips spaces/dashes/underscores)
+// before comparing. The legacy verdict.modifier field stores "Insufficient data"
+// (display casing) while VERDICT_MODIFIER stores "INSUFFICIENT_DATA"; normalizing
+// both to "insufficient_data" makes the check immune to casing drift.
+// Access via (outlook as any).verdict?.modifier to stay compatible with the
+// PlayerVerdictResult legacy path (same pattern as Alpha-feed routes.ts).
+function isInsufficientDataModifier(mod: string | null | undefined): boolean {
+  if (!mod) return false;
+  const norm = String(mod).trim().toLowerCase().replace(/[\s_-]+/g, "_");
+  return norm === "insufficient_data";
+}
 
 export type LeaderboardType = "best" | "hype" | "emerging";
 
@@ -205,15 +223,43 @@ export async function getLeaderboard(
   const VALID_SPORTS = new Set(["football", "basketball", "baseball", "hockey", "soccer"]);
   const scored: ScoredEntry[] = [];
 
+  // Fix 2 (parity with Alpha-feed): build blocking-player set from cards table.
+  // Excludes players who have ANY card in a blocking price state:
+  // pending | needs_review | needs_admin_review | paywalled | insufficient_data.
+  // Join key: LOWER(TRIM(player_name)) — same as Alpha feed, immune to 187-row
+  // playerKey pollution (see polluted-key investigation).
+  // Cost: ~0.3ms (one indexed scan on cards, ~32 rows today).
+  const blockingRows = await db.execute<{ norm_name: string; has_blocking: boolean }>(sql`
+    SELECT LOWER(TRIM(player_name)) AS norm_name,
+           BOOL_OR(price_state IN (
+             'pending','needs_review','needs_admin_review','paywalled','insufficient_data'
+           )) AS has_blocking
+    FROM cards
+    WHERE player_name IS NOT NULL AND player_name <> ''
+    GROUP BY 1
+  `);
+  const blockingPlayerKeys = new Set<string>(
+    (blockingRows.rows as Array<{ norm_name: string; has_blocking: boolean }>)
+      .filter((r) => r.has_blocking)
+      .map((r) => r.norm_name)
+  );
+
   let oldestUpdate: Date | null = null;
   let newestUpdate: Date | null = null;
 
   for (const row of rows) {
     const rowUpdated = row.updatedAt ? new Date(row.updatedAt) : null;
-    if (rowUpdated) {
-      if (!oldestUpdate || rowUpdated < oldestUpdate) oldestUpdate = rowUpdated;
-      if (!newestUpdate || rowUpdated > newestUpdate) newestUpdate = rowUpdated;
-    }
+
+    // Fix 6 (parity with Alpha-feed): exclude pre-Phase-3 cached outlooks.
+    // Any row with updatedAt before the Phase 3 deploy cutoff was scored by
+    // the old model and must not appear on actionable leaderboard surfaces.
+    // dataFreshness (oldestUpdate/newestUpdate) is computed AFTER this guard
+    // so the reported freshness window reflects only the rows actually served.
+    if (!rowUpdated || rowUpdated < PHASE_3_LAYERED_MODEL_DEPLOY_CUTOFF) continue;
+
+    // Track freshness window across all rows that pass the cutoff guard.
+    if (!oldestUpdate || rowUpdated < oldestUpdate) oldestUpdate = rowUpdated;
+    if (!newestUpdate || rowUpdated > newestUpdate) newestUpdate = rowUpdated;
     const rowSport = row.sport.toLowerCase();
     if (!VALID_SPORTS.has(rowSport)) continue;
     if (sport !== "all" && rowSport !== sport.toLowerCase()) continue;
@@ -223,6 +269,16 @@ export async function getLeaderboard(
 
     const outlook = row.outlookJson as PlayerOutlookResponse;
     if (!outlook) continue;
+
+    // Fix 1 (parity with Alpha-feed): exclude INSUFFICIENT_DATA outlooks from
+    // actionable leaderboard buckets. These rows lack reliable signal and must
+    // not influence Buy/Sell/Speculative rankings.
+    if (isInsufficientDataModifier((outlook as any).verdict?.modifier)) continue;
+
+    // Fix 2 (parity with Alpha-feed): exclude players whose cards are in a
+    // blocking price state. blockingPlayerKeys was built above via cross-table
+    // query on cards.player_name (LOWER TRIM), matching Alpha-feed precedent.
+    if (blockingPlayerKeys.has((row.playerName || "").toLowerCase().trim())) continue;
 
     let signals = outlook.marketSignals;
 
@@ -505,6 +561,32 @@ export async function getPlayerPercentiles(playerKey?: string): Promise<Map<stri
     if (!VALID_SPORTS_PCT.has(row.sport.toLowerCase())) continue;
     const outlook = row.outlookJson as PlayerOutlookResponse;
     if (!outlook) continue;
+
+    // Fix 6 (parity with Alpha-feed): exclude pre-Phase-3 cached outlooks from
+    // the percentile denominator. This narrows the comparison population to
+    // rows scored by the current model only.
+    //
+    // TRADEOFF (document for future engineers): filtering the denominator shifts
+    // the semantic meaning of each percentile. A score in the "Top 30%" after
+    // this filter means "better than 70% of *fresh-data peers*" not "better than
+    // 70% of all-time peers." For the leaderboard use case this is the correct
+    // interpretation — we want fresh-data comparisons. However, any consumer
+    // that compares percentile values across time will see a step-change
+    // discontinuity at PHASE_3_LAYERED_MODEL_DEPLOY_CUTOFF (2026-04-17T03:25Z).
+    // This is intentional and not an oversight.
+    const rowUpdatedPct = row.updatedAt ? new Date(row.updatedAt) : null;
+    if (!rowUpdatedPct || rowUpdatedPct < PHASE_3_LAYERED_MODEL_DEPLOY_CUTOFF) continue;
+
+    // Fix 1 (parity with Alpha-feed): exclude INSUFFICIENT_DATA outlooks from
+    // percentile population. These rows lack reliable signal and must not
+    // skew the population distribution used for ranking comparisons.
+    if (isInsufficientDataModifier((outlook as any).verdict?.modifier)) continue;
+
+    // NOTE: Fix 2 (pricing-state guard) intentionally NOT applied to percentile
+    // population. Excluding players by card priceState would skew the scoring
+    // distribution; the population should include all fresh, data-complete rows
+    // regardless of card transactability. Leaderboard rendering (getLeaderboard)
+    // handles the Fix 2 exclusion at display time.
 
     let signals = outlook.marketSignals;
 
