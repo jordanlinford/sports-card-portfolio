@@ -61,7 +61,8 @@ import {
   isSnapshotFresh,
   generateNextBuys,
   getLatestNextBuys,
-  generatePortfolioNextBuys
+  generatePortfolioNextBuys,
+  buildPortfolioFallbackSnapshot,
 } from "./portfolioIntelligenceService";
 
 // ============================================================================
@@ -10204,8 +10205,27 @@ RULES:
         message: "New portfolio outlook generated" 
       });
     } catch (error) {
-      console.error("[Portfolio Outlook] Error generating:", error);
-      res.status(500).json({ error: "Failed to generate portfolio outlook" });
+        console.error("[Portfolio Outlook] Error generating:", error);
+        // Never return a bare 500 to the user.
+        // Try to serve the most recent snapshot (may be stale), or
+        // synthesize a graceful fallback if none exists.
+        try {
+          const staleSnap = await getLatestPortfolioSnapshot(userId);
+          if (staleSnap) {
+            return res.json({
+              snapshot: staleSnap,
+              cached: true,
+              message: "Serving previous snapshot; generation temporarily unavailable.",
+            });
+          }
+        } catch (_) {
+          // getLatestPortfolioSnapshot itself failed -- fall through
+        }
+        res.status(503).json({
+          error: "portfolio_generation_unavailable",
+              snapshot: buildPortfolioFallbackSnapshot("outer"),
+          cached: false,
+        });
     }
   });
 

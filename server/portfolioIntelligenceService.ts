@@ -11,6 +11,7 @@ import type {
 import { eq, desc, and, gte, sql, isNull } from "drizzle-orm";
 import { GoogleGenAI } from "@google/genai";
 import { fetchPlayerNews } from "./outlookEngine";
+import { withTimeout, TimeoutError } from "./lib/withTimeout";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -751,6 +752,57 @@ type AIOutlookResponse = {
   recommendedNextActions: RecommendedAction[];
 };
 
+
+/**
+ * Shared fallback snapshot data used by both the inner Gemini catch
+ * and the outer route-level catch. Edit here once; both callers update.
+ *
+ * context "inner": Gemini timed out / parse failed (profile was available)
+ * context "outer": generatePortfolioOutlook itself threw (no profile data)
+ */
+
+/** Shape returned by buildPortfolioFallbackSnapshot */
+interface PortfolioFallbackData {
+  overallStance: string;
+  confidenceScore: number;
+  primaryDriver: string;
+  summaryShort: string;
+  summaryLong: string;
+  opportunities: string[];
+  watchouts: string[];
+  recommendedNextActions: RecommendedAction[];
+  portfolioValueEstimate: number | null;
+  cardCount: number | null;
+  exposures: Record<string, unknown>;
+}
+
+/**
+ * Shared fallback snapshot data used by both the inner Gemini catch
+ * and the outer route-level catch. Edit here once; both callers update.
+ *
+ * context "inner": Gemini timed out / parse failed (profile was available)
+ * context "outer": generatePortfolioOutlook itself threw (no profile data)
+ */
+export function buildPortfolioFallbackSnapshot(context: "inner" | "outer"): PortfolioFallbackData {
+  const isOuter = context === "outer";
+  return {
+    overallStance: "Balanced",
+    confidenceScore: 50,
+    primaryDriver: "Unable to generate AI insights",
+    summaryShort: "Portfolio analysis temporarily unavailable. Your collection shows interesting patterns.",
+    summaryLong: "We encountered an issue generating your personalized outlook. Based on basic analysis, your portfolio has a mix of positions and career stages. Check back soon for full AI-powered insights.",
+    opportunities: ["Review your top holdings", "Consider diversification", "Monitor player performance"],
+    watchouts: ["Market conditions vary", "Stay informed on player news"],
+    recommendedNextActions: isOuter
+      ? [{ label: "Try Again", why: "Analysis will be available shortly", cta: "Refresh", target: "portfolio" }]
+      : [{ label: "View Cards", why: "Review your collection", cta: "Browse", target: "portfolio" }],
+    portfolioValueEstimate: null,
+    cardCount: null,
+    exposures: {},
+  };
+}
+
+
 export async function generatePortfolioOutlook(userId: string): Promise<PortfolioSnapshot> {
   const profile = await buildPortfolioProfile(userId);
   const riskSignals = generateRiskSignals(profile);
@@ -814,14 +866,20 @@ export async function generatePortfolioOutlook(userId: string): Promise<Portfoli
     const systemPrompt = PORTFOLIO_OUTLOOK_SYSTEM_PROMPT;
     const userPrompt = buildPortfolioOutlookPrompt(profile, riskSignals, playerNews);
     
-    const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `${systemPrompt}\n\n${userPrompt}`,
-      config: {
-        maxOutputTokens: 2000,
-        responseMimeType: "application/json",
-      },
-    });
+    // 25 s hard cap -- fires before Replit's ~30 s infra timeout,
+    // giving the inner catch 5 s of headroom to write the fallback snapshot.
+    const response = await withTimeout(
+      gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `${systemPrompt}\n\n${userPrompt}`,
+        config: {
+          maxOutputTokens: 4096,
+          responseMimeType: "application/json",
+        },
+      }),
+      25_000,
+      'generatePortfolioOutlook'
+    );
 
     const content = response.text || "";
     if (!content) throw new Error("No AI response");
@@ -843,21 +901,19 @@ export async function generatePortfolioOutlook(userId: string): Promise<Portfoli
     }
     aiResponse = JSON.parse(jsonText);
   } catch (error) {
-    console.error("AI portfolio outlook failed:", error);
-    aiResponse = {
-      overallStance: "Balanced",
-      confidenceScore: 50,
-      primaryDriver: "Unable to generate AI insights",
-      summaryShort: "Portfolio analysis temporarily unavailable. Your collection shows interesting patterns.",
-      summaryLong: "We encountered an issue generating your personalized outlook. Based on basic analysis, your portfolio has a mix of positions and career stages. Check back soon for full AI-powered insights.",
-      opportunities: ["Review your top holdings", "Consider diversification", "Monitor player performance"],
-      watchouts: ["Market conditions vary", "Stay informed on player news"],
-      recommendedNextActions: [
-        { label: "View Cards", why: "Review your collection", cta: "Browse", target: "portfolio" },
-      ],
-    };
-  }
-
+      console.error("AI portfolio outlook failed:", error);
+      const fb = buildPortfolioFallbackSnapshot("inner");
+      aiResponse = {
+        overallStance: fb.overallStance,
+        confidenceScore: fb.confidenceScore,
+        primaryDriver: fb.primaryDriver,
+        summaryShort: fb.summaryShort,
+        summaryLong: fb.summaryLong,
+        opportunities: fb.opportunities,
+        watchouts: fb.watchouts,
+        recommendedNextActions: fb.recommendedNextActions,
+      };
+    }
   const snapshot: InsertPortfolioSnapshot = {
     userId,
     asOfDate: new Date(),
