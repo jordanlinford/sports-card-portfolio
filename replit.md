@@ -94,3 +94,33 @@ Before destructive action based on an audit finding:
 3. Get explicit human approval citing the verified evidence
 
 Todays example: audit concluded /track-record page was dead because routes were not found in server/routes.ts. The route exists in server/index.ts. The agent caught its own false finding before executing the deletion that had been approved based on it.
+
+## Replit Workspace Reset Risk
+
+Replit's workspace can reset to its own deployment SHA, discarding agent-authored commits that haven't been pushed to GitHub origin. This is not a push failure - it's a workspace state mismatch.
+
+**Required workflow for any commit:**
+
+1. `git commit -m "..."`
+2. `git push origin main` IMMEDIATELY (not "later" or "after architect review")
+3. `git log --oneline origin/main | head -3` to verify the commit reached the remote
+4. ONLY THEN proceed to next work item or Replit Publish
+
+The "Publish your App" action may trigger the workspace reset that discards unpushed commits. Push before publish, every time.
+
+**Today's example (May 5 2026):** 8+ work items committed by the Replit Agent were lost when Replit's infrastructure reset the workspace to its own deployment SHA. Bug A, all framework hardening pieces, leaderboard parity, Action 1, Action 3 - all confirmed in reflog but not in origin/main. Recovery via cherry-pick from reflog SHAs is possible because reflog persists 90 days.
+
+## Standing Rules
+
+- Production failures always in scope
+- Source-level fixes over band-aids
+- Calibration before locking thresholds
+- Architect review on every substantive change
+- Evidence over assertion - paste output, never accept "approved" without verification
+- Row-count verification on data-dependent systems
+- Fail-test-first when fixing bugs
+- Measurement systems need known-bad ground truth verification
+- HTTP-layer integration tests required for endpoints with middleware
+- API response shape changes require atomic consumer-wide audit
+- Shipping Pages Without Backend: grep ALL server files, confirm wired, curl-verify
+- Destructive Audit Findings Need Higher Verification Bar: two-angle verification + explicit human approval
