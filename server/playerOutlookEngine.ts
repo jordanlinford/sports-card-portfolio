@@ -273,7 +273,8 @@ async function saveToCache(
   sport: string,
   playerName: string,
   classification: ClassificationOutput,
-  outlook: PlayerOutlookResponse
+  outlook: PlayerOutlookResponse,
+  confidenceScore?: number | null
 ): Promise<void> {
   const ttlMs = getTtlMs(classification.baseTemperature);
   const expiresAt = new Date(Date.now() + ttlMs);
@@ -300,6 +301,7 @@ async function saveToCache(
       temperature: classification.baseTemperature,
       lastFetchedAt: new Date(),
       expiresAt,
+        confidenceScore: confidenceScore ?? null,
     })
     .onConflictDoUpdate({
       target: playerOutlookCache.playerKey,
@@ -312,6 +314,7 @@ async function saveToCache(
         lastFetchedAt: new Date(),
         expiresAt,
         updatedAt: new Date(),
+        confidenceScore: confidenceScore ?? null,
       },
     });
 }
@@ -2232,7 +2235,7 @@ async function generateFreshOutlook(
   if (correctedName !== playerName) {
     console.log(`[PlayerOutlook] Name correction: "${playerName}" → "${correctedName}"`);
   }
-  await saveToCache(playerKey, effectiveSport, correctedName, finalClassification, response);
+  await saveToCache(playerKey, effectiveSport, correctedName, finalClassification, response, confScore ?? null);
   
   return response;
 }
