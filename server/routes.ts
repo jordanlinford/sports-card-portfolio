@@ -12311,12 +12311,12 @@ Return ONLY valid JSON, no markdown.`;
         .slice(0, 10);
 
       const sellWarnings = players
-        .filter(p => ["AVOID", "TRADE_THE_HYPE"].includes(p.verdict))
+        .filter(p => ["AVOID", "TRADE_THE_HYPE", "SELL"].includes(p.verdict))
         .sort((a, b) => (a.composite ?? 50) - (b.composite ?? 50))
         .slice(0, 10);
 
       const speculativePlays = players
-        .filter(p => p.verdict === "SPECULATIVE_FLYER")
+        .filter(p => ["SPECULATIVE_FLYER", "LONGSHOT_BET"].includes(p.verdict))
         .sort((a, b) => (b.composite ?? 50) - (a.composite ?? 50))
         .slice(0, 8);
 

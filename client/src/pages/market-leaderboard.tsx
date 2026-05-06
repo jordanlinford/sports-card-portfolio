@@ -100,8 +100,11 @@ function getVerdictStyle(verdict: string) {
       return { bg: "bg-blue-500/10", text: "text-blue-700 dark:text-blue-400", icon: <Shield className="h-3 w-3" /> };
     case "TRADE_THE_HYPE":
       return { bg: "bg-orange-500/10", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-3 w-3" /> };
-    case "AVOID":
+    case "SELL":
+  case "AVOID":
       return { bg: "bg-red-500/10", text: "text-red-700 dark:text-red-400", icon: <Ban className="h-3 w-3" /> };
+    case "LONGSHOT_BET":
+        return { bg: "bg-fuchsia-500/10", text: "text-fuchsia-700 dark:text-fuchsia-400", icon: <Sparkles className="h-3 w-3" /> };
     case "SPECULATIVE":
       return { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-3 w-3" /> };
     default:

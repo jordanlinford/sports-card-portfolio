@@ -1,0 +1,272 @@
+diff --git a/client/src/components/outlook-details.tsx b/client/src/components/outlook-details.tsx
+index 2da9c09..d123190 100644
+--- a/client/src/components/outlook-details.tsx
++++ b/client/src/components/outlook-details.tsx
+@@ -24,6 +24,7 @@ import {
+   ExternalLink,
+   Download,
+   Loader2,
++  Sparkles,
+ } from "lucide-react";
+ import { useToast } from "@/hooks/use-toast";
+ import { useLocation } from "wouter";
+diff --git a/client/src/components/verdict-history.tsx b/client/src/components/verdict-history.tsx
+index 41afa08..5612fc0 100644
+--- a/client/src/components/verdict-history.tsx
++++ b/client/src/components/verdict-history.tsx
+@@ -16,6 +16,8 @@ const VERDICT_COLORS: Record<string, string> = {
+   SPECULATIVE_FLYER: "bg-purple-500",
+   AVOID_NEW_MONEY: "bg-red-500",
+   AVOID_STRUCTURAL: "bg-red-700",
++  SELL: "bg-red-500",
++  LONGSHOT_BET: "bg-fuchsia-500",
+ };
+ 
+ export function VerdictHistory({ playerKey }: { playerKey: string }) {
+diff --git a/client/src/pages/alpha-feed.tsx b/client/src/pages/alpha-feed.tsx
+index b92d1e1..0034acf 100644
+--- a/client/src/pages/alpha-feed.tsx
++++ b/client/src/pages/alpha-feed.tsx
+@@ -87,6 +87,8 @@ function getVerdictBadge(verdict: string) {
+     case "AVOID":
+     case "SELL":
+       return { label: "Avoid", className: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30" };
++    case "LONGSHOT_BET":
++        return { label: "Longshot Bet", className: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30" };
+     case "SPECULATIVE_FLYER":
+       return { label: "Speculative", className: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30" };
+     default:
+diff --git a/client/src/pages/card-outlook.tsx b/client/src/pages/card-outlook.tsx
+index c2cd9f8..8ca2466 100644
+--- a/client/src/pages/card-outlook.tsx
++++ b/client/src/pages/card-outlook.tsx
+@@ -19,6 +19,7 @@ import {
+   BarChart3,
+   Target,
+   Zap,
++  Sparkles,
+   Clock,
+   ChevronDown,
+   ChevronUp,
+@@ -156,6 +157,7 @@ const ACTION_STYLES: Record<string, { bg: string; border: string; icon: typeof T
+   MONITOR: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Activity, label: "Monitor" },
+   WATCH: { bg: "bg-yellow-500/20", border: "border-yellow-500", icon: Eye, label: "Watch" },
+   SELL: { bg: "bg-red-500/20", border: "border-red-500", icon: TrendingDown, label: "Sell Signal" },
++  LONGSHOT_BET: { bg: "bg-fuchsia-500/20", border: "border-fuchsia-500", icon: Sparkles, label: "Longshot Bet" },
+   LONG_HOLD: { bg: "bg-blue-500/20", border: "border-blue-500", icon: Clock, label: "Long Hold" },
+   LEGACY_HOLD: { bg: "bg-indigo-500/20", border: "border-indigo-500", icon: Trophy, label: "Legacy Hold" },
+   LITTLE_VALUE: { bg: "bg-muted", border: "border-muted-foreground/30", icon: Info, label: "Low Value" },
+diff --git a/client/src/pages/hidden-gems.tsx b/client/src/pages/hidden-gems.tsx
+index df22dc9..01b42a0 100644
+--- a/client/src/pages/hidden-gems.tsx
++++ b/client/src/pages/hidden-gems.tsx
+@@ -35,6 +35,7 @@ import {
+   Users,
+   Star,
+   Lock,
++  Sparkles,
+ } from "lucide-react";
+ import type { PlayerVerdict, StockTier, MarketTemperature, HiddenGem } from "@shared/schema";
+ import { hasProAccess } from "@shared/schema";
+@@ -408,6 +409,10 @@ function isAvoidVerdict(verdict: string): boolean {
+   return ["AVOID_NEW_MONEY", "TRADE_THE_HYPE", "AVOID_STRUCTURAL", "AVOID"].includes(verdict);
+ }
+ 
++function isLongshot(verdict: string): boolean {
++  return ["LONGSHOT_BET"].includes(verdict);
++}
++
+ export default function HiddenGemsPage() {
+   const { isLoading: authLoading, user } = useAuth();
+   const { toast } = useToast();
+@@ -529,6 +534,7 @@ export default function HiddenGemsPage() {
+   
+   const isPro = gemsData?.userIsPro ?? hasProAccess(user);
+   const allGems: GemCandidate[] = gemsData?.gems?.map(mapHiddenGemToCandidate) || [];
++  const longshotGems = allGems.filter(g => isLongshot(g.verdict));
+   const lastRefresh = gemsData?.stats?.lastRefresh;
+   const isFallback = gemsData?.isFallback || false;
+   
+@@ -731,6 +737,20 @@ export default function HiddenGemsPage() {
+           <p className="text-sm text-muted-foreground mb-4">
+             Showing {filteredGems.length} {isFallback ? "featured player" : "AI-identified hidden gem"}{filteredGems.length !== 1 ? "s" : ""} across {new Set(filteredGems.map(g => g.sport)).size} sport{new Set(filteredGems.map(g => g.sport)).size !== 1 ? "s" : ""}
+           </p>
++          {longshotGems.length > 0 && (
++            <div className="mb-8">
++              <div className="flex items-center gap-2 mb-3">
++                <Sparkles className="h-4 w-4 text-fuchsia-500" />
++                <h3 className="text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-400">Longshot Bets</h3>
++              </div>
++              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
++                {longshotGems.map((gem) => (
++                  <GemCard key={`${gem.sport}-${gem.playerName}`} gem={gem} isPro={isPro} />
++                ))}
++              </div>
++            </div>
++          )}
++
+           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="grid-gems">
+             {filteredGems.map((gem) => (
+               <GemCard key={`${gem.sport}-${gem.playerName}`} gem={gem} isPro={isPro} />
+diff --git a/client/src/pages/market-leaderboard.tsx b/client/src/pages/market-leaderboard.tsx
+index 174eaa4..58b4111 100644
+--- a/client/src/pages/market-leaderboard.tsx
++++ b/client/src/pages/market-leaderboard.tsx
+@@ -100,8 +100,11 @@ function getVerdictStyle(verdict: string) {
+       return { bg: "bg-blue-500/10", text: "text-blue-700 dark:text-blue-400", icon: <Shield className="h-3 w-3" /> };
+     case "TRADE_THE_HYPE":
+       return { bg: "bg-orange-500/10", text: "text-orange-700 dark:text-orange-400", icon: <TrendingDown className="h-3 w-3" /> };
+-    case "AVOID":
++    case "SELL":
++  case "AVOID":
+       return { bg: "bg-red-500/10", text: "text-red-700 dark:text-red-400", icon: <Ban className="h-3 w-3" /> };
++    case "LONGSHOT_BET":
++        return { bg: "bg-fuchsia-500/10", text: "text-fuchsia-700 dark:text-fuchsia-400", icon: <Sparkles className="h-3 w-3" /> };
+     case "SPECULATIVE":
+       return { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-3 w-3" /> };
+     default:
+diff --git a/client/src/pages/outlook-overview.tsx b/client/src/pages/outlook-overview.tsx
+index ebe7148..8533039 100644
+--- a/client/src/pages/outlook-overview.tsx
++++ b/client/src/pages/outlook-overview.tsx
+@@ -519,6 +519,7 @@ function ComparisonVerdict({
+       card.action === "WATCH" ? 45 :
+       card.action === "MONITOR" ? 40 :
+       card.action === "TRADE_HYPE" ? 30 :
++      card.action === "LONGSHOT_BET" ? 55 :
+       card.action === "SELL" ? 20 :
+       card.action === "LITTLE_VALUE" ? 10 : 50;
+     
+@@ -3912,6 +3913,7 @@ export default function OutlookOverviewPage() {
+ 
+   const buyCards = cardsWithOutlook.filter(c => c.outlookAction === "BUY");
+   const sellCards = cardsWithOutlook.filter(c => c.outlookAction === "SELL");
++  const longshotCards = cardsWithOutlook.filter(c => c.outlookAction === "LONGSHOT_BET");
+   const monitorCards = cardsWithOutlook.filter(c => c.outlookAction === "MONITOR");
+   const holdCards = cardsWithOutlook.filter(c => c.outlookAction === "LONG_HOLD");
+ 
+@@ -4154,6 +4156,30 @@ export default function OutlookOverviewPage() {
+             </div>
+           )}
+ 
++              {longshotCards.length > 0 && (
++                <div className="mb-8">
++                  <Card className={longshotCards.length > 0 ? "border-fuchsia-500/30 bg-fuchsia-500/5" : ""}>
++                    <CardHeader className="pb-2">
++                      <CardDescription className="flex items-center gap-1">
++                        <Sparkles className="h-3 w-3 text-fuchsia-500" />
++                        Longshot Bets
++                      </CardDescription>
++                      <CardTitle className="text-2xl text-fuchsia-600 dark:text-fuchsia-400" data-testid="text-longshot-cards">{longshotCards.length}</CardTitle>
++                    </CardHeader>
++                    <CardContent>
++                      <p className="text-sm text-muted-foreground mb-4">
++                        High-upside speculative plays. Elevated risk with outsized reward potential.
++                      </p>
++                      <div className="space-y-2">
++                        {longshotCards.map(card => (
++                          <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
++                        ))}
++                      </div>
++                    </CardContent>
++                  </Card>
++                </div>
++              )}
++
+           {holdCards.length > 0 && (
+             <div className="mb-8">
+               <div className="flex items-center gap-2 mb-4">
+diff --git a/client/src/pages/player-outlook.tsx b/client/src/pages/player-outlook.tsx
+index befd07c..1c017e7 100644
+--- a/client/src/pages/player-outlook.tsx
++++ b/client/src/pages/player-outlook.tsx
+@@ -104,6 +104,8 @@ function getVerdictIcon(verdict: PlayerVerdict) {
+     case "MONITOR": return <Eye className="h-5 w-5" />;
+     case "AVOID": return <Ban className="h-5 w-5" />;
+     case "WATCH": return <Eye className="h-5 w-5" />;
++    case "SELL": return <TrendingDown className="h-5 w-5" />;
++    case "LONGSHOT_BET": return <Sparkles className="h-5 w-5" />;
+     default: return null;
+   }
+ }
+@@ -114,6 +116,8 @@ function getVerdictColor(verdict: PlayerVerdict) {
+     case "MONITOR": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+     case "AVOID": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
+     case "WATCH": return "bg-muted text-muted-foreground border-border";
++    case "SELL": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
++    case "LONGSHOT_BET": return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
+     default: return "bg-muted text-muted-foreground";
+   }
+ }
+@@ -798,6 +802,7 @@ function TieredRecommendationsCard({ recommendations }: { recommendations?: Tier
+       case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
+       case "HOLD": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
+       case "SELL": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
++        case "LONGSHOT_BET": return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
+       default: return "bg-muted text-muted-foreground";
+     }
+   };
+@@ -807,6 +812,7 @@ function TieredRecommendationsCard({ recommendations }: { recommendations?: Tier
+       case "BUY": return <ShoppingCart className="h-4 w-4" />;
+       case "HOLD": return <Eye className="h-4 w-4" />;
+       case "SELL": return <ArrowRight className="h-4 w-4" />;
++        case "LONGSHOT_BET": return <Sparkles className="h-4 w-4" />;
+       default: return null;
+     }
+   };
+@@ -1296,6 +1302,7 @@ function OutlookHistoryPanel({ playerKey }: { playerKey: string | null }) {
+       case "MONITOR": return "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30";
+       case "SELL": return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30";
+       case "AVOID": return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30";
++        case "LONGSHOT_BET": return "bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30";
+       default: return "bg-muted text-muted-foreground";
+     }
+   };
+diff --git a/client/src/pages/track-record.tsx b/client/src/pages/track-record.tsx
+index 8a99543..6acef8b 100644
+--- a/client/src/pages/track-record.tsx
++++ b/client/src/pages/track-record.tsx
+@@ -13,6 +13,7 @@ import {
+   ShoppingCart,
+   Shield,
+   Ban,
++  Sparkles,
+ } from "lucide-react";
+ 
+ type VerdictAccuracyResult = {
+@@ -77,6 +78,16 @@ const VERDICT_META: Record<
+     icon: <Ban className="h-4 w-4" />,
+     color: "text-red-700 dark:text-red-400",
+   },
++  SELL: {
++    label: "Sell",
++    icon: <TrendingDown className="h-4 w-4" />,
++    color: "text-red-600 dark:text-red-400",
++  },
++  LONGSHOT_BET: {
++    label: "Longshot Bet",
++    icon: <Sparkles className="h-4 w-4" />,
++    color: "text-fuchsia-600 dark:text-fuchsia-400",
++  },
+ };
+ 
+ function getVerdictMeta(verdict: string) {
+diff --git a/server/routes.ts b/server/routes.ts
+index 2796ebe..b017fc8 100644
+--- a/server/routes.ts
++++ b/server/routes.ts
+@@ -12311,12 +12311,12 @@ Return ONLY valid JSON, no markdown.`;
+         .slice(0, 10);
+ 
+       const sellWarnings = players
+-        .filter(p => ["AVOID", "TRADE_THE_HYPE"].includes(p.verdict))
++        .filter(p => ["AVOID", "TRADE_THE_HYPE", "SELL"].includes(p.verdict))
+         .sort((a, b) => (a.composite ?? 50) - (b.composite ?? 50))
+         .slice(0, 10);
+ 
+       const speculativePlays = players
+-        .filter(p => p.verdict === "SPECULATIVE_FLYER")
++        .filter(p => ["SPECULATIVE_FLYER", "LONGSHOT_BET"].includes(p.verdict))
+         .sort((a, b) => (b.composite ?? 50) - (a.composite ?? 50))
+         .slice(0, 8);
+ 

@@ -16,6 +16,8 @@ const VERDICT_COLORS: Record<string, string> = {
   SPECULATIVE_FLYER: "bg-purple-500",
   AVOID_NEW_MONEY: "bg-red-500",
   AVOID_STRUCTURAL: "bg-red-700",
+  SELL: "bg-red-500",
+  LONGSHOT_BET: "bg-fuchsia-500",
 };
 
 export function VerdictHistory({ playerKey }: { playerKey: string }) {

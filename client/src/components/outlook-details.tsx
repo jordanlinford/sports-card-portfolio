@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Download,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";

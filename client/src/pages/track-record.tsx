@@ -13,6 +13,7 @@ import {
   ShoppingCart,
   Shield,
   Ban,
+  Sparkles,
 } from "lucide-react";
 
 type VerdictAccuracyResult = {
@@ -76,6 +77,16 @@ const VERDICT_META: Record<
     label: "Avoid (Structural)",
     icon: <Ban className="h-4 w-4" />,
     color: "text-red-700 dark:text-red-400",
+  },
+  SELL: {
+    label: "Sell",
+    icon: <TrendingDown className="h-4 w-4" />,
+    color: "text-red-600 dark:text-red-400",
+  },
+  LONGSHOT_BET: {
+    label: "Longshot Bet",
+    icon: <Sparkles className="h-4 w-4" />,
+    color: "text-fuchsia-600 dark:text-fuchsia-400",
   },
 };
 

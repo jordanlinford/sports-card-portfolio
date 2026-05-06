@@ -85,8 +85,11 @@ function getVerdictBadge(verdict: string) {
     case "TRADE_THE_HYPE":
       return { label: "Trade Hype", className: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-500/30" };
     case "AVOID":
-    case "SELL":
       return { label: "Avoid", className: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30" };
+    case "SELL":
+      return { label: "Sell", className: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30" };
+    case "LONGSHOT_BET":
+        return { label: "Longshot Bet", className: "bg-fuchsia-500/15 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30" };
     case "SPECULATIVE_FLYER":
       return { label: "Speculative", className: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-500/30" };
     default:

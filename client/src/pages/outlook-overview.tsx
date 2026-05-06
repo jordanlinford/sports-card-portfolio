@@ -89,6 +89,7 @@ function getActionLabel(action: string | null): string {
   switch (action) {
     case "BUY": return "BUY";
     case "SELL": return "SELL";
+    case "LONGSHOT_BET": return "Longshot Bet";
     case "MONITOR": return "MONITOR";
     case "LONG_HOLD": return "LONG HOLD";
     case "LEGACY_HOLD": return "LEGACY HOLD";
@@ -519,6 +520,7 @@ function ComparisonVerdict({
       card.action === "WATCH" ? 45 :
       card.action === "MONITOR" ? 40 :
       card.action === "TRADE_HYPE" ? 30 :
+      card.action === "LONGSHOT_BET" ? 55 :
       card.action === "SELL" ? 20 :
       card.action === "LITTLE_VALUE" ? 10 : 50;
     
@@ -3912,6 +3914,7 @@ export default function OutlookOverviewPage() {
 
   const buyCards = cardsWithOutlook.filter(c => c.outlookAction === "BUY");
   const sellCards = cardsWithOutlook.filter(c => c.outlookAction === "SELL");
+  const longshotCards = cardsWithOutlook.filter(c => c.outlookAction === "LONGSHOT_BET");
   const monitorCards = cardsWithOutlook.filter(c => c.outlookAction === "MONITOR");
   const holdCards = cardsWithOutlook.filter(c => c.outlookAction === "LONG_HOLD");
 
@@ -4153,6 +4156,30 @@ export default function OutlookOverviewPage() {
               </div>
             </div>
           )}
+
+              {longshotCards.length > 0 && (
+                <div className="mb-8">
+                  <Card className={longshotCards.length > 0 ? "border-fuchsia-500/30 bg-fuchsia-500/5" : ""}>
+                    <CardHeader className="pb-2">
+                      <CardDescription className="flex items-center gap-1">
+                        <Sparkles className="h-3 w-3 text-fuchsia-500" />
+                        Longshot Bets
+                      </CardDescription>
+                      <CardTitle className="text-2xl text-fuchsia-600 dark:text-fuchsia-400" data-testid="text-longshot-cards">{longshotCards.length}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        High-upside speculative plays. Elevated risk with outsized reward potential.
+                      </p>
+                      <div className="space-y-2">
+                        {longshotCards.map(card => (
+                          <CardOutlookRow key={card.id} card={card} isPro={isPro} canAnalyze={canAnalyze} />
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
 
           {holdCards.length > 0 && (
             <div className="mb-8">

@@ -104,6 +104,8 @@ function getVerdictIcon(verdict: PlayerVerdict) {
     case "MONITOR": return <Eye className="h-5 w-5" />;
     case "AVOID": return <Ban className="h-5 w-5" />;
     case "WATCH": return <Eye className="h-5 w-5" />;
+    case "SELL": return <TrendingDown className="h-5 w-5" />;
+    case "LONGSHOT_BET": return <Sparkles className="h-5 w-5" />;
     default: return null;
   }
 }
@@ -114,6 +116,8 @@ function getVerdictColor(verdict: PlayerVerdict) {
     case "MONITOR": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
     case "AVOID": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
     case "WATCH": return "bg-muted text-muted-foreground border-border";
+    case "SELL": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
+    case "LONGSHOT_BET": return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
     default: return "bg-muted text-muted-foreground";
   }
 }
@@ -798,6 +802,7 @@ function TieredRecommendationsCard({ recommendations }: { recommendations?: Tier
       case "BUY": return "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30";
       case "HOLD": return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30";
       case "SELL": return "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30";
+        case "LONGSHOT_BET": return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
       default: return "bg-muted text-muted-foreground";
     }
   };
@@ -807,6 +812,7 @@ function TieredRecommendationsCard({ recommendations }: { recommendations?: Tier
       case "BUY": return <ShoppingCart className="h-4 w-4" />;
       case "HOLD": return <Eye className="h-4 w-4" />;
       case "SELL": return <ArrowRight className="h-4 w-4" />;
+        case "LONGSHOT_BET": return <Sparkles className="h-4 w-4" />;
       default: return null;
     }
   };
@@ -1296,6 +1302,7 @@ function OutlookHistoryPanel({ playerKey }: { playerKey: string | null }) {
       case "MONITOR": return "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400 border-yellow-500/30";
       case "SELL": return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30";
       case "AVOID": return "bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/30";
+        case "LONGSHOT_BET": return "bg-fuchsia-500/20 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30";
       default: return "bg-muted text-muted-foreground";
     }
   };

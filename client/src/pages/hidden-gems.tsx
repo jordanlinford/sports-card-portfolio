@@ -35,6 +35,7 @@ import {
   Users,
   Star,
   Lock,
+  Sparkles,
 } from "lucide-react";
 import type { PlayerVerdict, StockTier, MarketTemperature, HiddenGem } from "@shared/schema";
 import { hasProAccess } from "@shared/schema";
@@ -408,6 +409,10 @@ function isAvoidVerdict(verdict: string): boolean {
   return ["AVOID_NEW_MONEY", "TRADE_THE_HYPE", "AVOID_STRUCTURAL", "AVOID"].includes(verdict);
 }
 
+function isLongshot(verdict: string): boolean {
+  return ["LONGSHOT_BET"].includes(verdict);
+}
+
 export default function HiddenGemsPage() {
   const { isLoading: authLoading, user } = useAuth();
   const { toast } = useToast();
@@ -529,6 +534,7 @@ export default function HiddenGemsPage() {
   
   const isPro = gemsData?.userIsPro ?? hasProAccess(user);
   const allGems: GemCandidate[] = gemsData?.gems?.map(mapHiddenGemToCandidate) || [];
+  const longshotGems = allGems.filter(g => isLongshot(g.verdict));
   const lastRefresh = gemsData?.stats?.lastRefresh;
   const isFallback = gemsData?.isFallback || false;
   
@@ -731,6 +737,20 @@ export default function HiddenGemsPage() {
           <p className="text-sm text-muted-foreground mb-4">
             Showing {filteredGems.length} {isFallback ? "featured player" : "AI-identified hidden gem"}{filteredGems.length !== 1 ? "s" : ""} across {new Set(filteredGems.map(g => g.sport)).size} sport{new Set(filteredGems.map(g => g.sport)).size !== 1 ? "s" : ""}
           </p>
+          {longshotGems.length > 0 && (
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <Sparkles className="h-4 w-4 text-fuchsia-500" />
+                <h3 className="text-sm font-semibold text-fuchsia-600 dark:text-fuchsia-400">Longshot Bets</h3>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {longshotGems.map((gem) => (
+                  <GemCard key={`${gem.sport}-${gem.playerName}`} gem={gem} isPro={isPro} />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="grid-gems">
             {filteredGems.map((gem) => (
               <GemCard key={`${gem.sport}-${gem.playerName}`} gem={gem} isPro={isPro} />
