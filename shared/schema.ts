@@ -896,6 +896,8 @@ export const OUTLOOK_ACTIONS = {
   LONG_HOLD: "LONG_HOLD",
   LEGACY_HOLD: "LEGACY_HOLD",
   LITTLE_VALUE: "LITTLE_VALUE",
+  LONGSHOT_BET: "LONGSHOT_BET",
+  WATCH: "WATCH",
 } as const;
 
 export type OutlookAction = keyof typeof OUTLOOK_ACTIONS;
@@ -1185,8 +1187,117 @@ export const PLAYER_VERDICT = {
   MONITOR: "MONITOR",
   AVOID: "AVOID",
   WATCH: "WATCH",
+  SELL: "SELL",
+  LONGSHOT_BET: "LONGSHOT_BET",
 } as const;
 export type PlayerVerdict = keyof typeof PLAYER_VERDICT;
+
+// Longshot cutoffs by sport: max years-in-league to still qualify as a longshot
+export const LONGSHOT_CUTOFFS: Record<string, number> = {
+  NFL: 4,
+  NBA: 6,
+  MLB: 7,
+  NHL: 5,
+  SOCCER: 6,
+} as const;
+
+// Skill (fantasy-relevant) positions per sport -- only these positions are eligible for LONGSHOT_BET.
+// NFL: skill + edge/CB eligible. MLB: RP excluded by design (save stats inflate value, not upside).
+// NHL: G excluded (goalie upside uncorrelated with skater metrics). Soccer: attacking positions only.
+export const SKILL_POSITIONS: Record<string, string[]> = {
+  NFL: ["QB", "RB", "WR", "TE", "DE", "OLB", "CB"],
+  NBA: ["PG", "SG", "SF", "PF", "C"],
+  MLB: ["SP", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"],
+  // Forwards (C/LW/RW) + goalies (G) per spec; defensemen excluded -- spec said "with offensive upside" qualifier we cannot reliably encode
+  NHL: ["C", "LW", "RW", "G"],
+  SOCCER: ["ST", "CF", "CAM", "LW", "RW"],
+} as const;
+
+// Sport-scoped position aliases for normalization.
+// Gemini may return full names, abbreviations, or colloquial terms.
+// Normalize to canonical codes before checking SKILL_POSITIONS.
+export const POSITION_ALIASES: Record<string, Record<string, string>> = {
+  NFL: {
+    "WIDE RECEIVER": "WR",
+    "SLOT RECEIVER": "WR",
+    "OUTSIDE RECEIVER": "WR",
+    "X RECEIVER": "WR",
+    "Z RECEIVER": "WR",
+    "RECEIVER": "WR",
+    "RUNNING BACK": "RB",
+    "HALFBACK": "RB",
+    "HB": "RB",
+    "TAILBACK": "RB",
+    "FULLBACK": "RB",
+    "FB": "RB",
+    "TIGHT END": "TE",
+    "QUARTERBACK": "QB",
+    "DEFENSIVE END": "DE",
+    "EDGE RUSHER": "DE",
+    "EDGE": "DE",
+    "OUTSIDE LINEBACKER": "OLB",
+    "CORNERBACK": "CB",
+    "CORNER": "CB",
+  },
+  NBA: {
+    "POINT GUARD": "PG",
+    "SHOOTING GUARD": "SG",
+    "SMALL FORWARD": "SF",
+    "POWER FORWARD": "PF",
+    "CENTER": "C",
+    "FORWARD": "SF",
+    "GUARD": "SG",
+    "WING": "SF",
+    "BIG": "C",
+    "BIG MAN": "C",
+  },
+  MLB: {
+    "STARTING PITCHER": "SP",
+    "STARTER": "SP",
+    "PITCHER": "SP",
+    "RELIEF PITCHER": "RP",
+    "CLOSER": "RP",
+    "CATCHER": "C",
+    "FIRST BASEMAN": "1B",
+    "SECOND BASEMAN": "2B",
+    "THIRD BASEMAN": "3B",
+    "SHORTSTOP": "SS",
+    "LEFT FIELDER": "LF",
+    "CENTER FIELDER": "CF",
+    "RIGHT FIELDER": "RF",
+    "OUTFIELDER": "CF",
+    "DESIGNATED HITTER": "DH",
+  },
+  NHL: {
+    "CENTER": "C",
+    "LEFT WING": "LW",
+    "RIGHT WING": "RW",
+    "GOALIE": "G",
+    "GOALTENDER": "G",
+    "DEFENSEMAN": "D",
+    "DEFENSE": "D",
+  },
+  SOCCER: {
+    "STRIKER": "ST",
+    "FORWARD": "ST",
+    "CENTER FORWARD": "CF",
+    "ATTACKING MIDFIELDER": "CAM",
+    "LEFT WINGER": "LW",
+    "RIGHT WINGER": "RW",
+    "WINGER": "LW",
+  },
+};
+
+/** Normalize a raw position string to its canonical code for a given sport.
+ *  Canonical codes pass through unchanged. Unknown strings also pass through.
+ *  Use before checking SKILL_POSITIONS[sport].includes(...) in isLongshotEligible.
+ */
+export function normalizePosition(rawPosition: string, sport: string): string {
+  if (!rawPosition) return "";
+  const upper = rawPosition.trim().toUpperCase();
+  const sportAliases = POSITION_ALIASES[sport] ?? {};
+  return sportAliases[upper] ?? upper;
+}
 
 // Posture labels for each verdict (collector-friendly)
 export const VERDICT_POSTURE: Record<InvestmentVerdict, string> = {
@@ -1661,6 +1772,7 @@ export const playerOutlookCache = pgTable("player_outlook_cache", {
   viewCount: integer("view_count").default(0).notNull(),
   lastFetchedAt: timestamp("last_fetched_at"),
   expiresAt: timestamp("expires_at"),
+  confidenceScore: integer("confidence_score"), // 1-100, Gemini model confidence
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
