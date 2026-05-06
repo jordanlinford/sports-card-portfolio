@@ -67,6 +67,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
 import { PriceTrendChart } from "@/components/price-trend-chart";
+import { VerdictTakeaway } from "@/components/verdict-takeaway";
 
 type DisplayCase = {
   id: number;
@@ -320,6 +321,22 @@ export default function CardOutlookPage() {
     queryKey: ["/api/display-cases"],
     enabled: isAuthenticated && showAddToCaseModal,
   });
+
+  // Portfolio query for holder detection on card-outlook
+  const { data: portfolioCardsData } = useQuery<{ cards: Array<{ title?: string | null }> }>({
+    queryKey: ["/api/portfolio/player-cards", outlook?.card?.playerName, "ALL"],
+    queryFn: async () => {
+      if (!outlook?.card?.playerName) throw new Error("No player");
+      const res = await fetch(
+        `/api/portfolio/player-cards/${encodeURIComponent(outlook.card.playerName)}?sport=ALL`
+      );
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!outlook?.card?.playerName && !!user,
+    staleTime: 1000 * 60 * 5,
+  });
+  const isHolder = !!user && (portfolioCardsData?.cards?.length ?? 0) > 0;
 
   const addToCaseMutation = useMutation({
     mutationFn: async ({ caseId, cardData }: { caseId: number; cardData: any }) => {
@@ -672,6 +689,11 @@ export default function CardOutlookPage() {
               </div>
               <div className="flex-1">
                 <h3 className="font-semibold mb-1">{actionStyle.label} Recommendation</h3>
+            <VerdictTakeaway
+              verdict={outlook?.investmentCall?.verdict || outlook?.verdict?.action}
+              isHolder={isHolder}
+              variant="inline"
+            />
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {outlook.actionReasons.map((reason, i) => (
                     <li key={i} className="flex items-start gap-2">

@@ -61,6 +61,7 @@ import PublicIntelPage from "@/pages/public-intel";
 import TrackRecordPage from "@/pages/track-record";
 import { TrialBanner } from "@/components/trial-banner";
 import { GoogleLinkBanner } from "@/components/google-link-banner";
+import { VerdictUpdateBanner } from "@/components/verdict-update-banner";
 import { BatchAnalysisBanner } from "@/components/batch-analysis-banner";
 
 function Router() {
@@ -168,6 +169,7 @@ function App() {
             <Navigation />
             <TrialBanner />
             <GoogleLinkBanner />
+            <VerdictUpdateBanner />
             <main className="flex-1">
               <ErrorBoundary>
                 <Router />

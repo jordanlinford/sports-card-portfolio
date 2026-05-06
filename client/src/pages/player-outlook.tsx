@@ -58,6 +58,7 @@ import { AdvisorSnapshot } from "@/components/outlook/AdvisorSnapshot";
 import { OutlookAccordions } from "@/components/outlook/OutlookAccordions";
 import { PriceTrendChart } from "@/components/price-trend-chart";
 import { transformToAdvisorOutlook, applyVerdictGuardrails } from "@/lib/transformToAdvisorOutlook";
+import { VerdictTakeaway } from "@/components/verdict-takeaway";
 import type { PlayerOutlookResponse, MarketTemperature, VolatilityLevel, RiskLevel, PlayerVerdict, VerdictModifier, DiscountAnalysis, InvestmentCall, PeakTimingAssessment, TieredRecommendations, TeamContext, AdvisorOutlook, MarketPhase, MarketSignals } from "@shared/schema";
 
 function getTemperatureIcon(temp: MarketTemperature) {
@@ -1621,6 +1622,7 @@ export default function PlayerOutlookPage() {
     enabled: !!outlookData?.player?.name && !!user,
     staleTime: 1000 * 60 * 5,
   });
+  const isHolder = !!user && (portfolioContext?.cards?.length ?? 0) > 0;
 
   const addToWatchlistMutation = useMutation({
     mutationFn: async () => {
@@ -2036,6 +2038,11 @@ export default function PlayerOutlookPage() {
             playerStage={outlookData.player.stage}
           />
 
+            {/* Audience-aware action guidance -- shown to both buyers and holders with appropriate copy */}
+            <VerdictTakeaway
+              verdict={outlookData.investmentCall?.verdict || outlookData.verdict?.action}
+              isHolder={isHolder}
+            />
           {portfolioContext && portfolioContext.cardCount > 0 && (
             <PortfolioContextPanel 
               data={portfolioContext} 
