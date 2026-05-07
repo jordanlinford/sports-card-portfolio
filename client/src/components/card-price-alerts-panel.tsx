@@ -18,6 +18,7 @@ import { Bell, Plus, Trash2, TrendingUp, TrendingDown, Crown, Loader2 } from "lu
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { PriceAlert, Card } from "@shared/schema";
+import { AlertDeliveryToggles } from "@/components/alert-delivery-toggles";
 
 interface CardPriceAlertsPanelProps {
   card: Card;
@@ -194,6 +195,8 @@ export function CardPriceAlertsPanel({ card, isPro }: CardPriceAlertsPanelProps)
           Get notified when this card's price goes above or below your target.
         </p>
       )}
+
+      <AlertDeliveryToggles />
 
       {alerts.map((alert) => (
         <div
