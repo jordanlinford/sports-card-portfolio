@@ -1,0 +1,35 @@
+Both clarifications clean. Approved to commit Phase 1.
+Sequence:
+
+Commit Phase 1 (no push). Suggested commit message:
+feat: V2 Phase 1 -- canonical career stages + market-signal Longshot gate + LEGACY_HOLD floor
+
+- Add CANONICAL_CAREER_STAGES enum (PRE_DEBUT/ROOKIE/YEAR_2/RISING/PRIME/VETERAN/AGING/RETIRED/RETIRED_HOF/BUST/UNKNOWN)
+- mapRegistryStage returns canonical: PROSPECT->PRE_DEBUT, YEAR_3/4->RISING, RETIRED_HOF preserved
+- CAREER_STAGE_BOOST table extended with canonical values + back-compat
+- Remove dead code (CAREER_STAGE_BOOST.HOF, ROLE_UPSIDE_DAMPENER.SOLID_STARTER)
+- LEGACY_HOLD floor $50 -> $25 (catches Aikman tier vintage HOFs)
+- RETIRED_HOF acceptance in 3 additional code paths
+- isLongshotEligible Condition 5 added: market signal strength gate (sales30d>=8 + HIGH confidence -> not Longshot)
+- Backfill script for cards.legacy_tier from registry (Josh Allen STAR/SUPERSTAR consistency fix)
+
+Run dry-run backfill against dev:
+tsx scripts/backfill-legacy-tier-from-registry.ts --dry-run
+Surface output. Show me which cards would change tier.
+On approval after dry-run review, run live backfill:
+tsx scripts/backfill-legacy-tier-from-registry.ts
+Surface count of updates.
+Re-run dev verdict migration. Force mode (regenerate all). The 18-min restart cycle resilience patches from earlier should help.
+After migration completes, surface validation report:
+
+Distribution check: verdicts grouped + counts
+Josh Allen consistency: both cards (#39 STAR, #43 SUPERSTAR) should now produce IDENTICAL verdicts (since legacy_tier backfilled from registry)
+Aikman LEGACY_HOLD: card #46 should flip from WATCH to LEGACY_HOLD
+Bowers/Puka: confirm NOT Longshot (Condition 4 STARTER + Condition 5 market established)
+Bagent/Rattler/Ewers: confirm STILL eligible (backup QBs, thin markets)
+Sample LONGSHOT_BET assignments: verify all are appropriate (no false positives)
+
+
+If validation passes: trigger prod migration, ~5 hr background, walk away
+
+Standing by for commit confirmation, then dry-run output.
