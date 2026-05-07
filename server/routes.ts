@@ -12887,6 +12887,22 @@ Return ONLY valid JSON, no markdown.`;
     }
   });
 
+  // Chunked migration endpoint (B-i): admin-driven pull, autoscale-resilient.
+  // Each call processes up to `size` (1-10, default 5) unmigrated entries and returns
+  // when finished. Admin UI loops on this endpoint until {done: true}.
+  app.post("/api/admin/migrate-verdicts-v2/chunk", isAuthenticated, isAdmin, async (req: any, res: any) => {
+    try {
+      const { runMigrationChunk } = await import("./verdictMigrationJob");
+      const sizeRaw = Number(req.query.size ?? req.body?.size ?? 5);
+      const size = Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : 5;
+      const result = await runMigrationChunk(size);
+      res.json(result);
+    } catch (err: any) {
+      console.error("[VerdictMigration] Chunk error:", err);
+      res.status(500).json({ error: err.message ?? "Internal server error" });
+    }
+  });
+
 
   // Start the Alpha batch scheduler
   import("./alphaEngine").then(({ startBatchScheduler }) => {

@@ -393,3 +393,248 @@ async function runMigration(force: boolean): Promise<void> {
 export function getV2MigrationStatus(): MigrationState {
   return state;
 }
+
+// ---------------------------------------------------------------------------
+// Chunked migration (B-i): admin-driven pull, autoscale-resilient
+// ---------------------------------------------------------------------------
+export interface ChunkResult {
+  done: boolean;
+  reason?: string;
+  processedThisBatch: number;
+  regeneratedThisBatch: number;
+  unchangedThisBatch: number;
+  erroredThisBatch: number;
+  remainingCount: number;
+  totalCount: number;
+  cumulativeProcessed: number;
+  runningTally: MigrationProgress["runningTally"];
+  startedAt: string | null;
+  completedAt?: string | null;
+  afterDistribution?: VerdictDistribution | null;
+  bandValidation?: BandValidation[] | null;
+}
+
+export async function runMigrationChunk(batchSize: number): Promise<ChunkResult> {
+  if (isRunning) {
+    return {
+      done: false,
+      reason: "Chunk already running",
+      processedThisBatch: 0,
+      regeneratedThisBatch: 0,
+      unchangedThisBatch: 0,
+      erroredThisBatch: 0,
+      remainingCount: state.progress?.totalCount ?? 0,
+      totalCount: state.progress?.totalCount ?? 0,
+      cumulativeProcessed: state.progress?.processedCount ?? 0,
+      runningTally: state.progress?.runningTally ?? { BUY: 0, MONITOR: 0, WATCH: 0, AVOID: 0, SELL: 0, LONGSHOT_BET: 0, errored: 0 },
+      startedAt: state.startedAt,
+    };
+  }
+
+  isRunning = true;
+  try {
+    const size = Math.max(1, Math.min(10, Math.floor(batchSize)));
+
+    // Initialize state on first chunk of a fresh run
+    const isFreshRun = state.status !== "running" || !state.startedAt;
+    if (isFreshRun) {
+      const beforeDist = await snapshotDistribution();
+      const remaining = await db
+        .select({ playerKey: playerOutlookCache.playerKey })
+        .from(playerOutlookCache)
+        .where(isNull(playerOutlookCache.confidenceScore));
+      const startedAt = new Date().toISOString();
+      state = {
+        status: "running",
+        startedAt,
+        completedAt: null,
+        forceMode: false,
+        progress: {
+          processedCount: 0,
+          totalCount: remaining.length,
+          currentPlayerName: "",
+          elapsedMs: 0,
+          estimatedRemainingMs: 0,
+          lastUpdatedAt: startedAt,
+          runningTally: { BUY: 0, MONITOR: 0, WATCH: 0, AVOID: 0, SELL: 0, LONGSHOT_BET: 0, errored: 0 },
+        },
+        summary: null,
+        beforeDistribution: beforeDist,
+        afterDistribution: null,
+        bandValidation: null,
+        error: null,
+        interruptedWarning: null,
+      };
+      writeMarker({ startedAt, status: "running", forceMode: false });
+      console.log(`[VerdictMigration] Chunked run started. ${remaining.length} unmigrated of ${beforeDist.total} total.`);
+    }
+
+    // Query this chunk's candidates
+    const candidates = await db
+      .select({
+        playerKey: playerOutlookCache.playerKey,
+        playerName: playerOutlookCache.playerName,
+        sport: playerOutlookCache.sport,
+        outlookJson: playerOutlookCache.outlookJson,
+      })
+      .from(playerOutlookCache)
+      .where(isNull(playerOutlookCache.confidenceScore))
+      .limit(size);
+
+    // Zero candidates = migration complete; finalize
+    if (candidates.length === 0) {
+      const afterDist = await snapshotDistribution();
+      const bandValidation = validateBands(afterDist);
+      state.status = "complete";
+      state.completedAt = new Date().toISOString();
+      state.afterDistribution = afterDist;
+      state.bandValidation = bandValidation;
+      state.summary = {
+        label: "v2-migration-chunked",
+        runStart: state.startedAt ?? new Date().toISOString(),
+        runEnd: state.completedAt,
+        completedFully: true,
+        totalConsidered: state.progress?.totalCount ?? 0,
+        processed: state.progress?.processedCount ?? 0,
+      };
+      const tally = state.progress?.runningTally ?? { BUY: 0, MONITOR: 0, WATCH: 0, AVOID: 0, SELL: 0, LONGSHOT_BET: 0, errored: 0 };
+      const cumulativeProcessed = state.progress?.processedCount ?? 0;
+      const totalCount = state.progress?.totalCount ?? 0;
+      clearMarker();
+      console.log(`[VerdictMigration] Chunked migration complete. Cumulative ${cumulativeProcessed}/${totalCount}.`);
+      return {
+        done: true,
+        processedThisBatch: 0,
+        regeneratedThisBatch: 0,
+        unchangedThisBatch: 0,
+        erroredThisBatch: 0,
+        remainingCount: 0,
+        totalCount,
+        cumulativeProcessed,
+        runningTally: tally,
+        startedAt: state.startedAt,
+        completedAt: state.completedAt,
+        afterDistribution: afterDist,
+        bandValidation,
+      };
+    }
+
+    // Process this chunk
+    const { getPlayerOutlook } = await import("./playerOutlookEngine");
+    const extractVerdict = (oj: unknown): string =>
+      (oj as any)?.investmentCall?.verdict ?? "";
+    const tallyKeys = ["BUY", "MONITOR", "WATCH", "AVOID", "SELL", "LONGSHOT_BET"] as const;
+
+    let regeneratedThisBatch = 0;
+    let unchangedThisBatch = 0;
+    let erroredThisBatch = 0;
+    const chunkStart = Date.now();
+
+    for (let i = 0; i < candidates.length; i++) {
+      const row = candidates[i];
+      const oldVerdict = extractVerdict(row.outlookJson);
+      const callStart = Date.now();
+      try {
+        await withTimeout(
+          getPlayerOutlook(
+            { playerName: row.playerName, sport: row.sport },
+            { forceRefresh: true },
+          ),
+          GEMINI_TIMEOUT_MS,
+          `getPlayerOutlook(${row.playerName})`,
+        );
+        const [refreshed] = await db
+          .select({ outlookJson: playerOutlookCache.outlookJson })
+          .from(playerOutlookCache)
+          .where(eq(playerOutlookCache.playerKey, row.playerKey));
+        const newVerdict = extractVerdict(refreshed?.outlookJson);
+        if (newVerdict !== oldVerdict) regeneratedThisBatch++;
+        else unchangedThisBatch++;
+        if (state.progress && newVerdict && tallyKeys.includes(newVerdict as typeof tallyKeys[number])) {
+          state.progress.runningTally[newVerdict as typeof tallyKeys[number]]++;
+        }
+      } catch (err: any) {
+        erroredThisBatch++;
+        console.error(`[VerdictMigration][chunk] Error processing ${row.playerName}: ${err.message}`);
+        if (state.progress) state.progress.runningTally.errored++;
+      }
+      // Update progress incrementally so a mid-chunk kill is recoverable on next click
+      if (state.progress) {
+        state.progress.processedCount++;
+        state.progress.currentPlayerName = row.playerName;
+        state.progress.lastUpdatedAt = new Date().toISOString();
+        state.progress.elapsedMs += Date.now() - callStart;
+      }
+      if (i < candidates.length - 1) {
+        await new Promise((r) => setTimeout(r, DELAY_BETWEEN_CALLS_MS));
+      }
+    }
+
+    // Compute remaining after this chunk
+    const remainingRows = await db
+      .select({ playerKey: playerOutlookCache.playerKey })
+      .from(playerOutlookCache)
+      .where(isNull(playerOutlookCache.confidenceScore));
+    const remainingCount = remainingRows.length;
+
+    if (state.progress) {
+      const avgMs = state.progress.processedCount > 0
+        ? state.progress.elapsedMs / state.progress.processedCount
+        : 0;
+      state.progress.estimatedRemainingMs = Math.round(avgMs * remainingCount);
+    }
+
+    const chunkDurationMs = Date.now() - chunkStart;
+    console.log(`[VerdictMigration][chunk] Processed ${candidates.length} in ${Math.round(chunkDurationMs / 1000)}s. Remaining: ${remainingCount}.`);
+
+    // If remaining is now zero, finalize on this same call (no need to wait for next chunk)
+    if (remainingCount === 0) {
+      const afterDist = await snapshotDistribution();
+      const bandValidation = validateBands(afterDist);
+      state.status = "complete";
+      state.completedAt = new Date().toISOString();
+      state.afterDistribution = afterDist;
+      state.bandValidation = bandValidation;
+      state.summary = {
+        label: "v2-migration-chunked",
+        runStart: state.startedAt ?? new Date().toISOString(),
+        runEnd: state.completedAt,
+        completedFully: true,
+        totalConsidered: state.progress?.totalCount ?? 0,
+        processed: state.progress?.processedCount ?? 0,
+      };
+      clearMarker();
+      console.log(`[VerdictMigration] Chunked migration complete. Cumulative ${state.progress?.processedCount}/${state.progress?.totalCount}.`);
+      return {
+        done: true,
+        processedThisBatch: candidates.length,
+        regeneratedThisBatch,
+        unchangedThisBatch,
+        erroredThisBatch,
+        remainingCount: 0,
+        totalCount: state.progress?.totalCount ?? 0,
+        cumulativeProcessed: state.progress?.processedCount ?? 0,
+        runningTally: state.progress?.runningTally ?? { BUY: 0, MONITOR: 0, WATCH: 0, AVOID: 0, SELL: 0, LONGSHOT_BET: 0, errored: 0 },
+        startedAt: state.startedAt,
+        completedAt: state.completedAt,
+        afterDistribution: afterDist,
+        bandValidation,
+      };
+    }
+
+    return {
+      done: false,
+      processedThisBatch: candidates.length,
+      regeneratedThisBatch,
+      unchangedThisBatch,
+      erroredThisBatch,
+      remainingCount,
+      totalCount: state.progress?.totalCount ?? 0,
+      cumulativeProcessed: state.progress?.processedCount ?? 0,
+      runningTally: state.progress?.runningTally ?? { BUY: 0, MONITOR: 0, WATCH: 0, AVOID: 0, SELL: 0, LONGSHOT_BET: 0, errored: 0 },
+      startedAt: state.startedAt,
+    };
+  } finally {
+    isRunning = false;
+  }
+}

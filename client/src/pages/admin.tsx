@@ -3373,11 +3373,35 @@ function fmtDuration(ms: number): string {
   return Math.floor(ms / 60000) + "m " + Math.round((ms % 60000) / 1000) + "s";
 }
 
+interface VMigChunkResult {
+  done: boolean;
+  reason?: string;
+  processedThisBatch: number;
+  regeneratedThisBatch: number;
+  unchangedThisBatch: number;
+  erroredThisBatch: number;
+  remainingCount: number;
+  totalCount: number;
+  cumulativeProcessed: number;
+  runningTally: VMigProgress["runningTally"];
+  startedAt: string | null;
+  completedAt?: string | null;
+  afterDistribution?: VMigDistribution | null;
+  bandValidation?: VMigBandValidation[] | null;
+}
+
 function VerdictMigrationTab() {
   const [migState, setMigState] = useState<VMigState | null>(null);
   const [loading, setLoading] = useState(false);
   const [triggerError, setTriggerError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Chunked-loop state
+  const [chunkLoopActive, setChunkLoopActive] = useState(false);
+  const [chunkBatchSize, setChunkBatchSize] = useState(5);
+  const [lastChunkResult, setLastChunkResult] = useState<VMigChunkResult | null>(null);
+  const [chunkConsecutiveErrors, setChunkConsecutiveErrors] = useState(0);
+  const loopActiveRef = useRef(false);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -3391,14 +3415,15 @@ function VerdictMigrationTab() {
 
   useEffect(() => {
     if (pollRef.current) clearInterval(pollRef.current);
-    pollRef.current = setInterval(fetchStatus, migState?.status === "running" ? 5000 : 30000);
+    const interval = (migState?.status === "running" || chunkLoopActive) ? 5000 : 30000;
+    pollRef.current = setInterval(fetchStatus, interval);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [migState?.status, fetchStatus]);
+  }, [migState?.status, chunkLoopActive, fetchStatus]);
 
   const triggerMigration = async (force: boolean) => {
     const msg = force
-      ? "Force-regenerate ALL 139 entries? This overwrites all existing verdicts and takes 15-28 minutes."
-      : "Run V2 migration? Already-migrated entries will be skipped. Takes up to 28 minutes.";
+      ? "Force-regenerate ALL entries? This overwrites all existing verdicts and may take hours. May die mid-run on autoscale -- prefer the Chunked button instead."
+      : "Run V2 migration (legacy fire-and-forget mode)? May die mid-run on autoscale -- prefer the Chunked button instead.";
     if (!confirm(msg)) return;
     setLoading(true); setTriggerError(null);
     try {
@@ -3408,14 +3433,82 @@ function VerdictMigrationTab() {
     finally { setLoading(false); }
   };
 
+  const runOneChunk = useCallback(async (size: number): Promise<VMigChunkResult | null> => {
+    try {
+      const res = await fetch(`/api/admin/migrate-verdicts-v2/chunk?size=${size}`, { method: "POST" });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`HTTP ${res.status}: ${text.slice(0, 200)}`);
+      }
+      return (await res.json()) as VMigChunkResult;
+    } catch (err: any) {
+      console.error("[ChunkedMigration] chunk error:", err);
+      return null;
+    }
+  }, []);
+
+  const startChunkedLoop = useCallback(async () => {
+    if (loopActiveRef.current) return;
+    loopActiveRef.current = true;
+    setChunkLoopActive(true);
+    setTriggerError(null);
+    setChunkConsecutiveErrors(0);
+    let consecutiveErrors = 0;
+
+    while (loopActiveRef.current) {
+      const result = await runOneChunk(chunkBatchSize);
+      if (!result) {
+        consecutiveErrors++;
+        setChunkConsecutiveErrors(consecutiveErrors);
+        if (consecutiveErrors >= 3) {
+          setTriggerError("3 consecutive chunk failures -- loop stopped. Click Resume to retry.");
+          loopActiveRef.current = false;
+          setChunkLoopActive(false);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 5000));
+        continue;
+      }
+      consecutiveErrors = 0;
+      setChunkConsecutiveErrors(0);
+      setLastChunkResult(result);
+      await fetchStatus();
+      if (result.done) {
+        loopActiveRef.current = false;
+        setChunkLoopActive(false);
+        break;
+      }
+      if (result.reason === "Chunk already running") {
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
+      }
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }, [chunkBatchSize, runOneChunk, fetchStatus]);
+
+  const pauseChunkedLoop = useCallback(() => {
+    loopActiveRef.current = false;
+    setChunkLoopActive(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      loopActiveRef.current = false;
+    };
+  }, []);
+
   const VKEYS = ["BUY", "MONITOR", "WATCH", "AVOID", "SELL", "LONGSHOT_BET"] as const;
   const isIdle = !migState || migState.status === "idle" || migState.status === "complete" || migState.status === "error";
+  const totalToProcess = migState?.progress?.totalCount ?? lastChunkResult?.totalCount ?? 0;
+  const cumProcessed = migState?.progress?.processedCount ?? lastChunkResult?.cumulativeProcessed ?? 0;
+  const remaining = lastChunkResult?.remainingCount ?? Math.max(0, totalToProcess - cumProcessed);
+  const chunkPct = totalToProcess > 0 ? Math.round((cumProcessed / totalToProcess) * 100) : 0;
 
   return (
     <div className="p-6 space-y-6 max-w-3xl">
       <div>
         <h2 className="text-xl font-bold mb-1">V2 Verdict Migration</h2>
-        <p className="text-sm text-muted-foreground">Reclassify all 139 player_outlook_cache entries under the V2 waterfall engine. Job runs server-side -- closing this tab is safe.</p>
+        <p className="text-sm text-muted-foreground">Reclassify all player_outlook_cache entries under the V2 waterfall engine. <strong>Use Chunked mode</strong> -- it survives autoscale instance kills by processing a few entries per HTTP request.</p>
       </div>
 
       {migState?.interruptedWarning && (
@@ -3427,17 +3520,74 @@ function VerdictMigrationTab() {
         <div className="bg-red-50 border border-red-300 rounded p-3 text-sm text-red-700">{triggerError}</div>
       )}
 
-      {isIdle && (
+      {/* Chunked migration controls (PRIMARY PATH) */}
+      <div className="border-2 border-blue-300 rounded p-4 space-y-3 bg-blue-50/50">
+        <div className="flex items-center justify-between">
+          <div className="font-semibold text-blue-900">Chunked Migration (recommended)</div>
+          <div className="flex items-center gap-2 text-xs">
+            <label className="text-blue-900">Batch size:</label>
+            <select
+              value={chunkBatchSize}
+              onChange={(e) => setChunkBatchSize(Number(e.target.value))}
+              disabled={chunkLoopActive}
+              className="border border-blue-300 rounded px-2 py-1 bg-white"
+              data-testid="select-chunk-batch-size"
+            >
+              {[1,2,3,5,7,10].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        </div>
+        <p className="text-xs text-blue-800">
+          Processes {chunkBatchSize} entries per HTTP request, then loops automatically. Browser tab must stay open. Survives instance kills (next click resumes from DB state).
+        </p>
         <div className="flex gap-3 flex-wrap items-center">
-          <Button onClick={() => triggerMigration(false)} disabled={loading}>
+          {!chunkLoopActive ? (
+            <Button onClick={startChunkedLoop} disabled={loading} data-testid="button-start-chunked-migration">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              {lastChunkResult && !lastChunkResult.done ? "Resume Chunked Migration" : "Start Chunked Migration"}
+            </Button>
+          ) : (
+            <Button onClick={pauseChunkedLoop} variant="outline" data-testid="button-pause-chunked-migration">
+              Pause (current chunk will finish)
+            </Button>
+          )}
+          {chunkConsecutiveErrors > 0 && (
+            <span className="text-xs text-orange-700">Consecutive errors: {chunkConsecutiveErrors}/3</span>
+          )}
+        </div>
+        {(chunkLoopActive || lastChunkResult) && (
+          <div className="space-y-2 text-sm">
+            <div className="flex items-center gap-2 text-blue-900">
+              {chunkLoopActive && <RefreshCw className="h-4 w-4 animate-spin" />}
+              <span>Cumulative <strong>{cumProcessed}</strong> / <strong>{totalToProcess}</strong> ({chunkPct}%) &middot; Remaining: <strong>{remaining}</strong></span>
+            </div>
+            <div className="w-full bg-blue-200 rounded-full h-2">
+              <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: chunkPct + "%" }} />
+            </div>
+            {lastChunkResult && (
+              <div className="text-xs text-blue-700 font-mono">
+                Last batch: regen={lastChunkResult.regeneratedThisBatch} unchanged={lastChunkResult.unchangedThisBatch} errored={lastChunkResult.erroredThisBatch}
+                {" | "}Tally: BUY:{lastChunkResult.runningTally.BUY} MON:{lastChunkResult.runningTally.MONITOR} AVD:{lastChunkResult.runningTally.AVOID} SEL:{lastChunkResult.runningTally.SELL} LONG:{lastChunkResult.runningTally.LONGSHOT_BET} ERR:{lastChunkResult.runningTally.errored}
+              </div>
+            )}
+            {migState?.progress?.currentPlayerName && (
+              <div className="text-xs text-blue-700">Last processed: <em>{migState.progress.currentPlayerName}</em></div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {isIdle && (
+        <div className="flex gap-3 flex-wrap items-center pt-2 border-t">
+          <span className="text-xs text-muted-foreground">Legacy fire-and-forget (may die on autoscale):</span>
+          <Button onClick={() => triggerMigration(false)} disabled={loading} variant="outline" size="sm">
             {loading && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
-            Run V2 Migration
+            Run V2 Migration (legacy)
           </Button>
-          <Button variant="outline" className="text-orange-600 border-orange-300 hover:bg-orange-50"
+          <Button variant="outline" size="sm" className="text-orange-600 border-orange-300 hover:bg-orange-50"
             onClick={() => triggerMigration(true)} disabled={loading}>
-            Force Regenerate All 139
+            Force Regenerate All
           </Button>
-          <span className="text-xs text-muted-foreground">Primary skips already-migrated. Force overwrites all.</span>
         </div>
       )}
 
