@@ -126,11 +126,23 @@ async function main() {
   const { db } = await import("../server/db");
   const { cards } = await import("../shared/schema");
   const { isNotNull, eq } = await import("drizzle-orm");
-  const { lookupPlayer } = await import("../server/playerRegistry");
+  const { lookupPlayer, ensureRegistryLoaded, getRegistrySource } = await import("../server/playerRegistry");
 
   console.log(`[Backfill] Phase 1 verdict migration -- legacy_tier backfill from player registry`);
   console.log(`[Backfill] Target: ${PROD_MODE ? "PRODUCTION" : "development"}`);
   console.log(`[Backfill] Mode: ${DRY_RUN ? "DRY-RUN (no writes)" : "LIVE"}`);
+  console.log(``);
+
+  // Force the registry to load from the (prod) database BEFORE any lookupPlayer
+  // call. lookupPlayer's internal loadRegistry() falls back to CSV synchronously
+  // if we don't await this first.
+  await ensureRegistryLoaded();
+  const regSource = getRegistrySource();
+  console.log(`[Backfill] Registry source: ${regSource}`);
+  if (PROD_MODE && regSource !== "database") {
+    console.error(`[Backfill] FATAL: prod backfill requires database-backed registry, got "${regSource}". Aborting.`);
+    process.exit(1);
+  }
   console.log(``);
 
   // Pull every card with a playerName -- we only backfill rows we can attribute
