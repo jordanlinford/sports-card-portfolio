@@ -1,0 +1,72 @@
+Approved. Run live backfill.
+Sequence:
+
+Live backfill: tsx scripts/backfill-legacy-tier-from-registry.ts
+Surface output. Expect 9 rows updated.
+Spot-verify Josh Allen post-backfill:
+sqlSELECT id, player_name, legacy_tier, card_number 
+FROM cards 
+WHERE id IN (39, 43);
+Both should now show: player_name="Josh Allen", legacy_tier="STAR", card_number="304"
+Re-run dev verdict migration in force mode (regenerate all 140 entries):
+
+Watch first 5 min for [Longshot DEBUG] PASSED logs
+Specifically watch for Bowers, Puka, MHJ - they should now FAIL Longshot eligibility (Condition 4 STARTER + Condition 5 market established)
+Walk away after 5 min health check
+
+
+After migration completes (~90 min plus restart cycles), surface validation report:
+A. Distribution check:
+sqlSELECT outlook_json->'investmentCall'->>'verdict' as verdict, COUNT(*) 
+FROM player_outlook_cache 
+GROUP BY verdict 
+ORDER BY COUNT(*) DESC;
+B. Josh Allen consistency (THE validation principle):
+sqlSELECT player_name,
+       outlook_json->'investmentCall'->>'verdict' as verdict,
+       confidence_score,
+       classification_json->>'stage' as stage
+FROM player_outlook_cache
+WHERE LOWER(player_name) = 'josh allen';
+Should return exactly ONE row (Josh Allen exists once at player level), with appropriate verdict (likely ACCUMULATE or HOLD_CORE).
+C. LONGSHOT_BET sample - quality check:
+sqlSELECT player_name,
+       classification_json->>'stage' as stage,
+       classification_json->>'rookieYear' as rookie_year,
+       classification_json->>'position' as position,
+       confidence_score
+FROM player_outlook_cache
+WHERE outlook_json->'investmentCall'->>'verdict' = 'LONGSHOT_BET';
+Expectations:
+
+Should NOT include: Bowers, Puka, MHJ, CJ Stroud, Caleb Williams, Leo Carlsson
+SHOULD include if present: Shedeur Sanders, Bagent, Rattler, McCarthy (if injured/uncertain), Ewers (if backup)
+
+D. Wemby check:
+sqlSELECT player_name,
+       outlook_json->'investmentCall'->>'verdict' as verdict
+FROM player_outlook_cache
+WHERE LOWER(player_name) = 'victor wembanyama';
+Should be ACCUMULATE/HOLD_CORE/SPECULATIVE_FLYER, NOT LONGSHOT_BET.
+E. Aikman card outlook check (this is card-level, will still be Engine B legacy):
+Note: Aikman is card-level analysis which Phase 2 addresses. Post-Phase 1, Aikman's PLAYER outlook should be RETIRED_HOF appropriate (LEGACY_HOLD from Engine B's $25 floor change, but that fires at card outlook level).
+Skip Aikman validation in Phase 1. Will validate after Phase 2 ships.
+Decision criteria for prod trigger:
+PROCEED if:
+
+LONGSHOT_BET 5-15% of distribution
+Josh Allen produces single sensible verdict (ACCUMULATE or HOLD_CORE)
+LONGSHOT_BET sample contains only appropriate profiles (backup QBs, true unproven players)
+Bowers/Puka/MHJ confirmed NOT Longshot
+Wemby NOT Longshot
+No errored entries
+
+STOP if:
+
+Any established starter (Bowers, Puka, etc.) gets Longshot
+Distribution wildly off bands
+Errored entries
+
+
+
+Standing by for live backfill output.
