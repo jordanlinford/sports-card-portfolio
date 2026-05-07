@@ -2,18 +2,19 @@ import fs from "fs";
 import path from "path";
 import { db } from "./db";
 import { playerOutlookCache } from "@shared/schema";
-import { isNull, eq } from "drizzle-orm";
+import { isNull, eq, lt, or } from "drizzle-orm";
 import { BackfillReporter, DELAY_BETWEEN_CALLS_MS, GEMINI_TIMEOUT_MS } from "./jobs/handlers/cachedOutlookBackfill/core";
 import { withTimeout } from "./lib/withTimeout";
 
 // ---------------------------------------------------------------------------
 // Marker file for interrupt-resilience (persists across workspace resets)
 // ---------------------------------------------------------------------------
-const MARKER_PATH = path.join(process.cwd(), "data", "verdict_migration_state.json");
+const MARKER_PATH = "/tmp/verdict_migration_state.json";
 
 interface MarkerState {
   startedAt: string;
   status: "running" | "complete";
+  forceMode?: boolean;
 }
 
 function readMarker(): MarkerState | null {
@@ -118,11 +119,21 @@ let state: MigrationState = {
   interruptedWarning: null,
 };
 
-// On module load: check if a prior run was interrupted
+// On module load: check if a prior run was interrupted; auto-resume after a short delay
 (function checkInterruptedOnStartup() {
   const marker = readMarker();
   if (marker && marker.status === "running") {
-    state.interruptedWarning = `Previous migration was interrupted at ${marker.startedAt}. In-memory progress is unavailable. Re-run recommended to complete remaining entries.`;
+    state.interruptedWarning = `Previous migration was interrupted at ${marker.startedAt}. Auto-resuming in 30s...`;
+    const resumeForce = marker.forceMode === true;
+    console.log(`[VerdictMigration] Detected interrupted run from ${marker.startedAt} (force=${resumeForce}). Auto-resuming in 30s.`);
+    const resumeStartedAt = marker.startedAt;
+    setTimeout(() => {
+      if (isRunning) return;
+      console.log(`[VerdictMigration] Auto-resume firing now (force=${resumeForce}, preserving startedAt=${resumeStartedAt}).`);
+      void triggerV2Migration(resumeForce, resumeStartedAt).then((r) => {
+        if (!r.queued) console.warn(`[VerdictMigration] Auto-resume not queued: ${r.reason}`);
+      });
+    }, 30_000);
   }
 })();
 
@@ -162,11 +173,11 @@ function validateBands(dist: VerdictDistribution): BandValidation[] {
 // ---------------------------------------------------------------------------
 // Trigger
 // ---------------------------------------------------------------------------
-export async function triggerV2Migration(force = false): Promise<{ queued: boolean; reason?: string }> {
+export async function triggerV2Migration(force = false, resumeFromStartedAt?: string): Promise<{ queued: boolean; reason?: string }> {
   if (isRunning) return { queued: false, reason: "Migration already in progress" };
 
   isRunning = true;
-  const startedAt = new Date().toISOString();
+  const startedAt = resumeFromStartedAt ?? new Date().toISOString();
   state = {
     status: "running",
     startedAt,
@@ -180,7 +191,7 @@ export async function triggerV2Migration(force = false): Promise<{ queued: boole
     error: null,
     interruptedWarning: null,
   };
-  writeMarker({ startedAt, status: "running" });
+  writeMarker({ startedAt, status: "running", forceMode: force });
 
   // Fire-and-forget
   runMigration(force).catch((err: unknown) => {
@@ -218,8 +229,16 @@ async function runMigration(force: boolean): Promise<void> {
       outlookJson: playerOutlookCache.outlookJson,
     })
     .from(playerOutlookCache);
+  // Resilience: in force mode, exclude rows already touched in this run cycle
+  // (lastFetchedAt >= startedAt) so workflow restarts don't redo completed entries.
+  const startedAtDate = new Date(state.startedAt!);
   const candidates = force
-    ? await candidateBaseQuery
+    ? await candidateBaseQuery.where(
+        or(
+          isNull(playerOutlookCache.lastFetchedAt),
+          lt(playerOutlookCache.lastFetchedAt, startedAtDate),
+        ),
+      )
     : await candidateBaseQuery.where(isNull(playerOutlookCache.confidenceScore));
 
   state.progress.totalCount = candidates.length;
