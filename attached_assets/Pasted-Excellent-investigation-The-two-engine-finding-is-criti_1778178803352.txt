@@ -1,0 +1,63 @@
+Excellent investigation. The two-engine finding is critical - completely changes our scope.
+Pull the remaining four files first to complete the picture:
+
+server/outlookEngine.ts:computeAction() - the actual WATCH-emitting function
+server/outlookEngine.ts:computeAllSignals() - careerStageAuto logic
+routes.ts:2870-2950 - head of runCardAnalysisJob
+Engine A middle section (lines 600-700) - enhancement factors
+
+Surface findings. Then we make architectural decisions together.
+My initial decisions on the six design questions (subject to revision based on your code reads):
+
+Engine survival: Collapse to Engine B. Engine A becomes deprecated shim.
+Vocabulary: New CardVerdict enum. Values: BUY / HOLD / SELL / AVOID / TRIM / LONGSHOT_BET / WATCH (pre-debut only).
+Audience differentiation: Single verdict per card + separate explanation strings for buyer vs holder. Same pattern as player outlook holder-vs-buyer messaging.
+LEGACY_HOLD floor: Lower from $50 to $25 (Commit 8.5).
+Player verdict cache freshness: Use if within 14 days. If older, trigger inline refresh.
+Cache invalidation: Add player_verdict_updated_at column on cards. Background job marks dependent cards for re-analysis when player verdict refreshes.
+
+Once you have the four file reads, surface:
+
+Exact computeAction logic (where does WATCH actually get assigned?)
+careerStageAuto computation (how does this relate to legacyTier from cards table - the Josh Allen STAR vs SUPERSTAR discrepancy)
+The signals object structure (what's actually computed before the verdict assignment)
+Engine A's enhancement factors
+
+Then we lock the new architecture together.
+Migration approach for shipping V2:
+Given the scope, propose phased shipping:
+Phase 1: Player outlook foundation (Commit 8.5)
+
+Tighten LONGSHOT_BET eligibility
+Add market signal strength gate
+Fix LEGACY_HOLD floor for Engine A
+Re-run dev migration, validate, trigger prod migration
+Player verdicts in cache are now correct
+
+Phase 2: Card outlook overhaul (Commit 9)
+
+Refactor outlookEngine.ts (Engine B) to consume player verdict
+Implement hierarchical fallback (card data → player verdict → structural reasoning)
+New CardVerdict enum with audience-aware messaging
+Eliminate WATCH except pre-debut
+Engine A deprecated, Hidden Gems / quick outlook redirected to Engine B
+
+Phase 3: Validation
+
+Test card analyses on Bo Nix, Wemby, Puka, Bagent, Rattler, Aikman, Burrow, Josh Allen
+Confirm zero WATCH except pre-debut
+Confirm Josh Allen consistency (no more STAR vs SUPERSTAR splits)
+Confirm hierarchical reasoning produces sensible verdicts
+
+Realistic timeline:
+
+Investigation completion: 30 min
+Architecture design: 60 min
+Phase 1 implementation: 60-90 min
+Phase 1 dev validation: 90 min
+Phase 1 prod migration: 5 hours background
+Phase 2 implementation: 4-6 hours
+Phase 2 testing: 60 min
+
+Total: 1.5-2 days of focused work.
+Pull the four remaining files. Surface findings. Then we lock architecture.
