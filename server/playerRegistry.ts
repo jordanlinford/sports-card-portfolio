@@ -1,5 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
+import type { CanonicalCareerStage } from "@shared/schema";
 
 export interface PlayerRegistryEntry {
   sport: string;
@@ -240,17 +241,23 @@ export function mapRegistryRoleTier(registryRoleTier: string): "FRANCHISE_CORE" 
   return mapping[registryRoleTier] || "UNKNOWN";
 }
 
-export function mapRegistryStage(registryStage: string): string {
-  const mapping: Record<string, string> = {
+// Maps registry vocabulary (admin-managed) to the canonical CareerStage enum.
+// Phase 1 of verdict migration: this is the single source of truth for stage
+// resolution from the player registry. Engine B's CAREER_STAGE_BOOST table is
+// keyed on these returned values.
+export function mapRegistryStage(registryStage: string): CanonicalCareerStage {
+  const mapping: Record<string, CanonicalCareerStage> = {
+    "PROSPECT": "PRE_DEBUT",       // pre-debut prospects map to PRE_DEBUT (was ROOKIE — wrong)
     "ROOKIE": "ROOKIE",
     "YEAR_2": "YEAR_2",
+    "YEAR_3": "RISING",            // was UNKNOWN (silent boost-table miss)
+    "YEAR_4": "RISING",            // was UNKNOWN (silent boost-table miss)
     "PRIME": "PRIME",
     "VETERAN": "VETERAN",
     "AGING": "AGING",
-    "RETIRED_HOF": "LEGEND",
     "RETIRED": "RETIRED",
+    "RETIRED_HOF": "RETIRED_HOF",  // was "LEGEND" — canonical now matches registry
     "BUST": "BUST",
-    "PROSPECT": "ROOKIE",
   };
   
   return mapping[registryStage] || "UNKNOWN";

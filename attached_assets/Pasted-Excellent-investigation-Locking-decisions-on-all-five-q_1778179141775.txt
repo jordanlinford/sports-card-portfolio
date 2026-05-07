@@ -1,0 +1,60 @@
+Excellent investigation. Locking decisions on all five questions plus refining the architecture.
+Decision 1 (MONITOR fate): Keep MONITOR as 8th CardVerdict value. "Monitor" has specific meaning (data fine, signal mixed) distinct from HOLD or WATCH.
+Decision 2 (LEGACY_HOLD/LITTLE_VALUE): Keep both as separate verdicts. Vintage HOF cards have specific collector psychology distinct from generic HOLD. LITTLE_VALUE signals card isn't worth active tracking.
+Decision 3 (cards.legacy_tier deprecation): Yes. Phase 1: backfill from registry. Phase 2: Engine B reads from registry, ignores cards.legacy_tier. Phase 3 later: drop column.
+Decision 4 (cache freshness): Agree with tiered approach. Refinement: don't show "verdict from N days ago" to free users (looks janky). Either Pro-only debug view or silent use.
+Decision 5 (Player→Card mapping): Refined to handle audience differentiation properly.
+Architectural refinement: dual verdicts for buyer/holder.
+The agent's "single verdict + audience copy" works for 80% of cases. But for TRADE_THE_HYPE-tier player verdicts, the actual verdict differs by audience (Buyer MONITOR vs Holder TRIM). Same for AVOID players (Buyer AVOID vs Holder SELL).
+Proposed schema:
+card_outlooks.buyer_verdict (CardVerdict)
+card_outlooks.holder_verdict (CardVerdict)
+card_outlooks.explanation_buyer_short / long
+card_outlooks.explanation_holder_short / long
+In ~80% of cases buyer_verdict === holder_verdict. The mapping function outputs both per the table below.
+Refined Player→Card mapping table:
+Player verdictbuyer_verdictholder_verdictNotesACCUMULATEBUYHOLDBuyer adds, holder maintainsHOLD_COREHOLDHOLDSame for bothHOLD_INJURY_CONTINGENTMONITORHOLDBuyer waits for injury resolutionSPECULATIVE_FLYER (value <$50)LONGSHOT_BETLONGSHOT_BETLottery positionSPECULATIVE_FLYER (value ≥$50)MONITORHOLDThin data warrants cautionMONITORMONITORMONITORSame for bothTRADE_THE_HYPEMONITORTRIMCritical audience splitAVOID / AVOID_NEW_MONEYAVOIDHOLD with caveatBuyer avoids, holder evaluatesAVOID_STRUCTURALAVOIDSELLPlayer declining structurallyLONGSHOT_BETLONGSHOT_BETLONGSHOT_BETPass-throughWATCH (pre-debut)WATCHWATCHOnly path to WATCH
+Final CardVerdict enum (10 values):
+BUY / HOLD / SELL / AVOID / TRIM / LONGSHOT_BET / MONITOR / LEGACY_HOLD / LITTLE_VALUE / WATCH
+Locked Phase 1 scope (Commit 8.5):
+
+LEGACY_HOLD floor $50 → $25
+Player engine: tighten LONGSHOT_BET (no STARTER role, market-signal-strength gate)
+Add canonical CareerStage enum to shared/schema.ts
+Update mapRegistryStage to return canonical enum
+Remove dead-code map entries (CAREER_STAGE_BOOST.HOF, ROLE_UPSIDE_DAMPENER.SOLID_STARTER)
+Backfill cards.legacy_tier from player registry (one-time migration)
+Re-run dev migration validation
+Trigger prod migration (5 hr background)
+
+Locked Phase 2 scope (Commit 9):
+Schema additions:
+
+cards.player_verdict_updated_at (timestamp)
+card_outlooks.buyer_verdict + holder_verdict (CardVerdict enum)
+card_outlooks.explanation_buyer_short / long
+card_outlooks.explanation_holder_short / long
+
+Engine B refactor:
+
+Implement hierarchy: Tier 1 (computeAction) → Tier 2 (player verdict via getPlayerOutlook) → Tier 3 (generalized computeContextualVerdict) → Tier 4 (WATCH only if PRE_DEBUT)
+Remove WATCH escape hatches (Gemini prompt, validVerdicts, INJURED/BACKUP guardrail)
+Wire recordPlayerVerdictDependency
+Add background reconciliation job
+Audience-aware explanation prompts
+Engine A → deprecated shim
+Hidden Gems + Quick Outlook redirected to Engine B
+
+Validation criteria:
+
+Zero WATCH verdicts except careerStage === "PRE_DEBUT"
+Two Josh Allen cards produce IDENTICAL verdicts (registry-based career stage)
+Test players (Bo Nix, Wemby, Puka, Bagent, Rattler, Aikman, Burrow, Josh Allen) produce sensible audience-aware verdicts
+Aikman $46 card produces LEGACY_HOLD (not WATCH)
+
+Confirmed timeline:
+Phase 1: 60-90 min implementation + 90 min dev migration + 5 hr prod migration background
+Phase 2: 4-6 hr implementation + 60 min validation
+Total: 1.5-2 days
+Begin Phase 1 implementation. Surface the Commit 8.5 diff before commit. Don't push until I review.
+Standing by.

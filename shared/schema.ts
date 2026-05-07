@@ -888,6 +888,28 @@ export const CAREER_STAGES = {
 
 export type CareerStage = keyof typeof CAREER_STAGES;
 
+// Canonical career-stage vocabulary (Phase 1 of verdict migration).
+// Single source of truth that supersets the registry vocabulary
+// (ROOKIE/YEAR_2/YEAR_3/YEAR_4/PRIME/VETERAN/RETIRED_HOF/BUST) and the legacy
+// Engine B vocabulary (ROOKIE/RISING/ELITE/VETERAN/RETIRED/LEGEND).
+// mapRegistryStage() returns this type. Engine B's CAREER_STAGE_BOOST table
+// has entries for every value here.
+export const CANONICAL_CAREER_STAGES = {
+  PRE_DEBUT: "PRE_DEBUT",     // has not yet played in top league (was PROSPECT)
+  ROOKIE: "ROOKIE",           // year 1
+  YEAR_2: "YEAR_2",           // sophomore
+  RISING: "RISING",           // years 3-4 (was YEAR_3/YEAR_4 in registry)
+  PRIME: "PRIME",             // peak career window
+  VETERAN: "VETERAN",         // established but past peak
+  AGING: "AGING",             // late career
+  RETIRED: "RETIRED",         // retired, non-HOF
+  RETIRED_HOF: "RETIRED_HOF", // retired Hall of Famer / cultural icon (was LEGEND)
+  BUST: "BUST",               // washed out / failed prospect
+  UNKNOWN: "UNKNOWN",
+} as const;
+
+export type CanonicalCareerStage = keyof typeof CANONICAL_CAREER_STAGES;
+
 // Outlook action enum for type safety
 export const OUTLOOK_ACTIONS = {
   BUY: "BUY",

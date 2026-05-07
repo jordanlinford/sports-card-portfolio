@@ -2673,25 +2673,33 @@ const POSITION_SCORES: Record<string, Record<string, number>> = {
   soccer: { gk: 6, cb: 5, fb: 5, cm: 7, am: 8, fw: 9 },
 };
 
+// Phase 1 of verdict migration: keyed on canonical CareerStage values
+// (see CANONICAL_CAREER_STAGES in shared/schema.ts). LEGEND/ELITE retained
+// for back-compat with detectCareerStage's heuristic fallback path.
 const CAREER_STAGE_BOOST: Record<string, number> = {
-  ROOKIE: 1.3,      // High upside potential
-  RISING: 1.2,      // Growing value
-  ELITE: 1.0,       // Peak value, stable
-  PRIME: 0.95,      // Established but not growing
-  VETERAN: 0.8,     // Declining potential
-  DECLINING: 0.6,   // Active decline / lost role
-  AGING: 0.7,       // End of career
-  RETIRED: 0.5,     // Fixed legacy value
-  LEGEND: 1.1,      // Premium for legends
-  HOF: 1.0,         // Hall of Fame - stable legacy
-  UNKNOWN: 1.0,     // Neutral
+  PRE_DEBUT: 1.4,     // Pre-debut prospects: highest speculative upside
+  ROOKIE: 1.3,        // High upside potential
+  YEAR_2: 1.25,       // Sophomore-year breakout window
+  RISING: 1.2,        // Growing value (years 3-4)
+  PRIME: 0.95,        // Peak career, established
+  VETERAN: 0.8,       // Declining potential
+  AGING: 0.7,         // End of career
+  RETIRED: 0.5,       // Fixed legacy value
+  RETIRED_HOF: 1.1,   // Hall of Famer / cultural icon premium
+  BUST: 0.4,          // Failed prospect / washed
+  UNKNOWN: 1.0,       // Neutral
+  // Back-compat: legacy values still emitted by detectCareerStage heuristic
+  ELITE: 1.0,         // Peak value, stable
+  DECLINING: 0.6,     // Active decline / lost role
+  LEGEND: 1.1,        // Equivalent to RETIRED_HOF
 };
 
-// Role stability affects upside - unstable roles cap growth potential
+// Role stability affects upside - unstable roles cap growth potential.
+// Note: SOLID_STARTER removed (mapRegistryRoleTier collapses it to STARTER
+// before reaching this lookup, so the entry was dead code).
 const ROLE_UPSIDE_DAMPENER: Record<string, number> = {
   FRANCHISE_CORE: 1.0,      // Full upside
   STARTER: 0.95,            // Slight dampening
-  SOLID_STARTER: 0.95,      // Same as starter
   UNCERTAIN_STARTER: 0.7,   // Significant dampening - role at risk
   ROTATIONAL: 0.6,          // Limited upside
   BACKUP: 0.5,              // Very limited
@@ -3111,14 +3119,18 @@ export function computeAction(
     return { action: "LITTLE_VALUE", reasons };
   }
   
-  // LEGACY_HOLD: Vintage cards (25+ years) with HOF/cultural relevance
-  // LEGEND status indicates HOF or cultural icon (detected from title keywords)
-  // Vintage RETIRED with significant value (>$50) also qualifies as collectible legacy piece
+  // LEGACY_HOLD: Vintage cards (20+ years) with HOF/cultural relevance.
+  // LEGEND/RETIRED_HOF status indicates HOF or cultural icon (LEGEND retained for
+  // back-compat with detectCareerStage's heuristic path; canonical = RETIRED_HOF).
+  // Vintage RETIRED with significant value (>= $25) also qualifies as collectible
+  // legacy piece. Floor lowered from $50 -> $25 in Phase 1 of verdict migration so
+  // mid-tier vintage HOFers (e.g. Aikman ~$46) qualify instead of dropping to MONITOR.
   // NOTE: We do NOT gate on volatility - vintage cards have high price variance due to
   // eye appeal, condition subjectivity, and infrequent sales. That's normal, not risky.
   // Only gate on trendScore to detect true parabolic movements (speculative spikes).
-  const hasLegacyRelevance = careerStage === "LEGEND" || 
-    (isVintage && careerStage === "RETIRED" && marketValue !== null && marketValue >= 50);
+  const isHofStage = careerStage === "LEGEND" || careerStage === "RETIRED_HOF";
+  const hasLegacyRelevance = isHofStage || 
+    (isVintage && careerStage === "RETIRED" && marketValue !== null && marketValue >= 25);
   
   // Parabolic detection: only very high trend scores (8+) indicate speculative spike
   const isNotParabolic = trendScore <= 7;
@@ -3126,12 +3138,12 @@ export function computeAction(
   if (isVintage && hasLegacyRelevance && isNotParabolic) {
     reasons.push("Vintage card with proven long-term collector demand");
     reasons.push("Established market - no speculative price spike");
-    if (careerStage === "LEGEND") reasons.push("Hall of Fame / cultural icon status");
+    if (isHofStage) reasons.push("Hall of Fame / cultural icon status");
     reasons.push("Best suited as personal collection hold");
     return { action: "LEGACY_HOLD", reasons };
   }
   
-  if ((careerStage === "RETIRED" || careerStage === "LEGEND") && 
+  if ((careerStage === "RETIRED" || isHofStage) && 
       volatilityScore <= 6 && demandScore >= 35) {
     reasons.push(`${careerStage} player with established legacy`);
     if (volatilityScore <= 4) {
@@ -3139,7 +3151,7 @@ export function computeAction(
     } else {
       reasons.push("Acceptable price variance for established player");
     }
-    if (careerStage === "LEGEND") reasons.push("Hall of Fame premium applies");
+    if (isHofStage) reasons.push("Hall of Fame premium applies");
     return { action: "LONG_HOLD", reasons };
   }
   
@@ -3231,16 +3243,17 @@ function computeContextualVerdict(
   
   const contextScore = (qualityScore * 0.45) + (demandScore * 0.55);
   
-  const isYoungPlayer = careerStage === "ROOKIE" || careerStage === "RISING";
+  const isYoungPlayer = careerStage === "ROOKIE" || careerStage === "YEAR_2" || careerStage === "RISING";
   const isPrimePlayer = careerStage === "PRIME" || careerStage === "ELITE";
-  const isEstablished = careerStage === "RETIRED" || careerStage === "LEGEND" || careerStage === "VETERAN";
+  const isHofStage = careerStage === "LEGEND" || careerStage === "RETIRED_HOF";
+  const isEstablished = careerStage === "RETIRED" || isHofStage || careerStage === "VETERAN";
   const hasSignificantValue = marketValue !== null && marketValue >= 25;
   
   if (isEstablished && cardAge >= 20) {
     if (hasSignificantValue) {
       reasons.push("Established player with meaningful card value");
       reasons.push("Limited market data — hold for long-term collector demand");
-      if (careerStage === "LEGEND") reasons.push("Hall of Fame status supports floor");
+      if (isHofStage) reasons.push("Hall of Fame status supports floor");
       return { action: "LONG_HOLD", reasons };
     }
   }
@@ -3670,7 +3683,7 @@ export function computeAllSignals(
   const currentYear = new Date().getFullYear();
   const cardAge = card.year ? currentYear - card.year : 0;
   const isVintage = cardAge >= 25;
-  const isRetiredOrLegend = careerStageAuto === "RETIRED" || careerStageAuto === "LEGEND";
+  const isRetiredOrLegend = careerStageAuto === "RETIRED" || careerStageAuto === "LEGEND" || careerStageAuto === "RETIRED_HOF";
   
   // For vintage retired/legend cards: cap downside risk at 35 (low-medium)
   // For LEGACY_HOLD specifically: cap at 25 (low)

@@ -1630,7 +1630,11 @@ export async function getPlayerOutlook(
 }
 
 // Generate fresh outlook (used for cache miss and background refresh)
-// V2: Longshot eligibility -- ALL 4 conditions must be true
+// V2: Longshot eligibility -- ALL 5 conditions must be true.
+// Phase 1 of verdict migration adds Condition 5 (market-signal-strength gate):
+// once a player has an established market for their cards, they are no longer
+// a "lottery ticket" -- they are at fair value. The longshot designation is
+// reserved for players whose market the broader hobby has not yet discovered.
 function isLongshotEligible(params: {
   sport: string;
   position: string;
@@ -1638,8 +1642,11 @@ function isLongshotEligible(params: {
   careerStage: string;
   roleStatus: string;
   playerName?: string;
+  // Phase 1 additions: market signal strength
+  soldCount30d?: number | null;
+  marketDataConfidence?: string | null;
 }): boolean {
-  const { sport, position, yearsInLeague, careerStage, roleStatus, playerName } = params;
+  const { sport, position, yearsInLeague, careerStage, roleStatus, playerName, soldCount30d, marketDataConfidence } = params;
   const tag = `[Longshot DEBUG] player=${playerName || "unknown"}`;
   // Condition 1: early career within sport cutoff
   const cutoff = LONGSHOT_CUTOFFS[sport as keyof typeof LONGSHOT_CUTOFFS];
@@ -1666,7 +1673,17 @@ function isLongshotEligible(params: {
     console.log(`${tag} FAILED established_starter: careerStage=${careerStage}, roleStatus=${roleStatus}, byStage=${isEstablishedByStage}, byRole=${isEstablishedByRole}`);
     return false;
   }
-  console.log(`${tag} PASSED: sport=${sport}, years=${yearsInLeague}, position=${position}->${normalizedPos}, careerStage=${careerStage}, roleStatus=${roleStatus}`);
+  // Condition 5: market not yet established for this player.
+  // Threshold: >= 8 sales/30d AND HIGH market data confidence => market is mature.
+  // (Either alone is insufficient -- thin sales with HIGH confidence on a few high-value
+  // sales is still "undiscovered"; many sales with LOW confidence is noise.)
+  const sales30d = soldCount30d ?? 0;
+  const marketIsEstablished = sales30d >= 8 && marketDataConfidence === "HIGH";
+  if (marketIsEstablished) {
+    console.log(`${tag} FAILED market_established: soldCount30d=${sales30d}, marketDataConfidence=${marketDataConfidence}`);
+    return false;
+  }
+  console.log(`${tag} PASSED: sport=${sport}, years=${yearsInLeague}, position=${position}->${normalizedPos}, careerStage=${careerStage}, roleStatus=${roleStatus}, soldCount30d=${sales30d}, marketDataConfidence=${marketDataConfidence}`);
   return true;
 }
 
@@ -2219,6 +2236,9 @@ async function generateFreshOutlook(
       careerStage: resolvedCareerStage || "",
       roleStatus: roleStatus || "UNKNOWN",
       playerName,
+      // Phase 1: market-signal-strength gate -- mature markets disqualify
+      soldCount30d: marketData.soldCount30d ?? 0,
+      marketDataConfidence: (["HIGH","MEDIUM","LOW"].includes(marketDataConfidence) ? marketDataConfidence : "LOW") as string,
     });
     const confScore = computeConfidenceScore({
       compsAvailable: marketData.soldCount30d ?? 0,
