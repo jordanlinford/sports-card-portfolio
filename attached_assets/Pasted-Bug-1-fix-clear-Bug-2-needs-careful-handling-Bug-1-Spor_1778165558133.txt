@@ -1,0 +1,36 @@
+Bug #1 fix: clear. Bug #2 needs careful handling.
+Bug #1 - Sport key casing:
+Use Option A (change schema keys to lowercase to match engine). Before changing, surface what sport names the engine actually uses:
+grep -n "effectiveSport\|normalizeSportName\|case.*sport" server/playerOutlookEngine.ts | head -30
+List all sport keys the engine produces. Then update LONGSHOT_CUTOFFS and SKILL_POSITIONS with matching lowercase keys.
+Bug #2 - Override + Gemini prompt:
+Widen override to catch MONITOR + SPECULATIVE_FLYER. Don't catch BUY or AVOID (those have different semantic meanings).
+typescriptconst longshotConvertibleVerdicts = ["MONITOR", "SPECULATIVE_FLYER"];
+if (longshotCheck && longshotConvertibleVerdicts.includes(verdict.action)) {
+  console.log(`[PlayerOutlook] LONGSHOT_BET assigned for ${playerName} (was ${verdict.action})`);
+  verdict.action = "LONGSHOT_BET" as PlayerVerdict;
+}
+Reasoning: SPECULATIVE_FLYER is V1 vocabulary that semantically means "speculative play with upside" - exact match for LONGSHOT_BET intent. Catching it during transition is correct.
+Also strengthen Gemini prompt for Tier-5:
+Surface the current Tier-5 instruction in the prompt (around line 1083). Propose strengthening to enforce MONITOR output for early-career skill players. Something like:
+TIER 5 - MANDATORY: For early-career (yearsInLeague <= cutoff) skill-position players
+who are not established starters, you MUST return verdict.action = "MONITOR".
+The engine handles LONGSHOT_BET conversion post-call based on structural eligibility.
+Do NOT return BUY, AVOID, or SPECULATIVE_FLYER for these profiles. MONITOR only.
+Surface current prompt text + proposed strengthening. I'll review wording before commit.
+Don't ship yet. Surface:
+
+Sport key list from engine (for Bug #1 schema update)
+Current Tier-5 prompt text (for Bug #2 prompt strengthening)
+Proposed strengthened prompt text
+
+Then I review and we lock Commit 8 changes.
+Migration considerations:
+Once Commit 8 lands, we re-trigger dev migration to validate. Expected outcome:
+
+LONGSHOT_BET count > 0 (should be ~5-15% of 140 = 7-21 players)
+BUY count drops from 56% (since structurally-eligible players now flow to LONGSHOT_BET via SPECULATIVE_FLYER conversion)
+Distribution closer to target bands
+
+If dev re-run produces healthy distribution: trigger prod migration.
+If still off: deeper investigation needed.
