@@ -1,0 +1,50 @@
+/workspace$ bash /tmp/restore_replit_md.sh
+════════════════════════════════════════════════════════════════
+  Restore replit.md operational discipline sections
+════════════════════════════════════════════════════════════════
+
+[1/8] On main with clean working tree?
+  ✓ On main, no uncommitted tracked changes
+
+[2/8] Proposed file present and well-formed?
+  ✓ Proposal at /tmp/replit.md.proposed has both restored sections
+
+[3/8] Proposal is a pure append (no edits to existing sections)?
+  ✓ Pure append: 66 → 97 lines (+31)
+
+[4/8] Applying proposal to replit.md…
+  ✓ replit.md now 97 lines, 6 H2 sections
+
+[5/8] Staging + committing…
+[main c8a8ded] docs(replit.md): restore Workspace Reset Risk + Standing Rules sections
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+  ✓ Committed as c8a8ded
+
+[6/8] Fetching origin/main and verifying FF-able…
+  ✓ Local main is 2 commits ahead of origin/main, 0 behind
+    Commits to push:
+      c8a8ded docs(replit.md): restore Workspace Reset Risk + Standing Rules sections
+      12042e6 Update website branding and revert to previous design
+
+[7/8] Pushing origin main…
+Enumerating objects: 10, done.
+Counting objects: 100% (10/10), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (7/7), done.
+Writing objects: 100% (7/7), 4.67 KiB | 4.67 MiB/s, done.
+Total 7 (delta 4), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (4/4), completed with 3 local objects.
+To https://github.com/jordanlinford/sports-card-portfolio.git
+   6a013b1..c8a8ded  main -> main
+  ✓ Push completed
+
+[8/8] Verifying origin/main landed correctly…
+  ✓ origin/main matches local main at c8a8ded
+
+  Top 5 commits on origin/main:
+    c8a8ded docs(replit.md): restore Workspace Reset Risk + Standing Rules sections
+    12042e6 Update website branding and revert to previous design
+    6a013b1 Update email system to handle unsubscribe links and rebranding
+    6cee08f Update platform branding and assets to reflect new identity
+    c99cda0 Update visual design to match new logo and branding elements
+~/workspace$ 
