@@ -1,0 +1,56 @@
+Applying all four fixes in parallel.
+
+
+6 actions
+All four fixes applied. Now restarting workflow to reload registry from CSV, then re-running dry-run.
+
+
+4 actions
+Updated Dry-Run Results — All Four Fixes Applied Successfully
+Headline Numbers (vs prior dry-run)
+Metric	Before fixes	After fixes	Δ
+Cards scanned	31	31	—
+Registry hits	10	12	+2 (Josh Allen #39, #43)
+Registry misses	21	19	-2
+Already correct	0	2	Aaron Rodgers no-op proof ✅
+Updates planned	9	9	(composition shifted)
+All 9 Planned Updates (Updated)
+Card #	Player	Old legacy_tier	New legacy_tier	Notes
+51	Jordan Love	NULL	STAR	unchanged from prior
+52	CJ Stroud	NULL	STAR	unchanged
+43	Josh Allen	SUPERSTAR	STAR	✅ NEW — Fix A1 worked
+44	Lamar Jackson	SUPERSTAR	STAR	unchanged
+70	Jordan Love	NULL	STAR	unchanged
+53	Puka Nacua	RISING	STAR	unchanged
+41	Lamar Jackson	NULL	STAR	unchanged
+58	Michael Jordan	NULL	HOF	unchanged
+62	Donovan Mitchell	PRIME	STAR	unchanged
+Validation Of Each Fix
+✅ Fix A1 confirmed: Card #43 now appears in plan (Josh Allen → STAR). Card #39 (Josh Allen) shows STAR=STAR no-op so doesn't appear in updates list — but it's now hitting the registry (counted in the +2 hits and the +2 already-correct).
+
+✅ Fix A2 confirmed: No "matched via suffix-strip" log entries appear in this run — meaning Fix A1 cleaned the only dirty data we knew about. The suffix-strip is now defensive code for any future dirty card data we haven't discovered yet.
+
+✅ Fix B confirmed: Aaron Rodgers (card #40) is GONE from the planned updates list. Registry now says RETIRED, card already says RETIRED → no-op (counted in the +2 already-correct). No verdict regression risk.
+
+✅ Fix C confirmed: Tua Tagovailoa not in dev cards as expected, no impact on plan. CSV row now reads VETERAN.
+
+Josh Allen Validation Principle Test
+Pre-backfill state of the two cards:
+
+Card #39: player_name="Josh Allen", legacy_tier="STAR"
+Card #43: player_name="Josh Allen", legacy_tier="SUPERSTAR"
+Post-backfill expected state:
+
+Card #39: player_name="Josh Allen", legacy_tier="STAR" (no-op, already correct)
+Card #43: player_name="Josh Allen", legacy_tier="STAR" (updated)
+→ Both will then have IDENTICAL inputs to Engine B. This is exactly the validation principle test you wanted — if both cards still produce different verdicts after this, the cause is somewhere else (e.g., per-card market data divergence, not vocabulary). If they produce identical verdicts, Phase 1 vocabulary unification is proven. ✅
+
+Standing By for Live Backfill Approval
+On your "go", I will:
+
+Run live backfill: tsx scripts/backfill-legacy-tier-from-registry.ts
+Surface count of updates (expecting 9 rows updated)
+Re-run dev verdict migration in force/regenerate-all mode
+Surface the validation report (verdict distribution, Josh Allen #39 vs #43 identity check, Aikman LEGACY_HOLD flip, Bowers/Puka NOT Longshot, Bagent/Rattler/Ewers still Longshot, sample LONGSHOT_BET assignments)
+On clean validation, trigger prod migration
+Approve live backfill?
