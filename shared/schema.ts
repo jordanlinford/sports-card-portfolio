@@ -1830,7 +1830,14 @@ export const playerOutlookHistory = pgTable("player_outlook_history", {
   
   // Hash of the verdict+modifier+temperature for change detection
   snapshotHash: varchar("snapshot_hash", { length: 64 }).notNull(),
-  
+
+  // Snapshot of the price proxy used to grade this outlook later
+  // (median sold / avg sold price extracted from outlookJson at snapshot time)
+  priceProxyAtSnapshot: real("price_proxy_at_snapshot"),
+
+  // Version of the scoring weights / engine that produced this verdict
+  weightsVersion: varchar("weights_version", { length: 32 }),
+
   snapshotAt: timestamp("snapshot_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
@@ -1841,6 +1848,46 @@ export const playerOutlookHistory = pgTable("player_outlook_history", {
 
 export type PlayerOutlookHistory = typeof playerOutlookHistory.$inferSelect;
 export type InsertPlayerOutlookHistory = typeof playerOutlookHistory.$inferInsert;
+
+// =============================================
+// PLAYER OUTLOOK OUTCOMES — graded results from playerOutlookHistory
+// (parallel to verdict_regression_runs but sourced from richer history table)
+// =============================================
+export const playerOutlookOutcomes = pgTable("player_outlook_outcomes", {
+  id: serial("id").primaryKey(),
+  historyId: integer("history_id").references(() => playerOutlookHistory.id, { onDelete: "cascade" }).notNull(),
+  playerKey: varchar("player_key", { length: 128 }).notNull(),
+  playerName: varchar("player_name", { length: 255 }).notNull(),
+  sport: varchar("sport", { length: 50 }).notNull(),
+  verdict: varchar("verdict", { length: 30 }).notNull(),
+  modifier: varchar("modifier", { length: 50 }),
+  weightsVersion: varchar("weights_version", { length: 32 }),
+
+  snapshotAt: timestamp("snapshot_at").notNull(),
+  priceAtSnapshot: real("price_at_snapshot"),
+  priceAfter30d: real("price_after_30d"),
+  priceAfter60d: real("price_after_60d"),
+  priceAfter90d: real("price_after_90d"),
+  changeAfter30d: real("change_after_30d"),
+  changeAfter60d: real("change_after_60d"),
+  changeAfter90d: real("change_after_90d"),
+
+  outcome: varchar("outcome", { length: 20 }).notNull(), // CORRECT | INCORRECT | INCONCLUSIVE
+  outcomeReason: text("outcome_reason"),
+  gradedAt: timestamp("graded_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("idx_pohistory_outcome_unique").on(table.historyId),
+  index("idx_pohistory_outcome_player").on(table.playerKey),
+  index("idx_pohistory_outcome_verdict").on(table.verdict),
+  index("idx_pohistory_outcome_snapshot_at").on(table.snapshotAt),
+]);
+
+export const insertPlayerOutlookOutcomeSchema = createInsertSchema(playerOutlookOutcomes).omit({
+  id: true,
+  gradedAt: true,
+});
+export type InsertPlayerOutlookOutcome = z.infer<typeof insertPlayerOutlookOutcomeSchema>;
+export type PlayerOutlookOutcome = typeof playerOutlookOutcomes.$inferSelect;
 
 // Watchlist with current outlook (for API response)
 export type WatchlistPlayerWithOutlook = PlayerWatchlist & {

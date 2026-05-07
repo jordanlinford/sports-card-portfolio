@@ -210,6 +210,22 @@ function generateSnapshotHash(verdict: string, modifier: string, temperature: st
   return crypto.createHash('sha256').update(input).digest('hex').substring(0, 16);
 }
 
+// Version tag for the scoring weights / engine that produced the verdict.
+// Bump this whenever the scoring engine changes meaningfully so we can compare
+// accuracy across versions in the track-record.
+export const PLAYER_OUTLOOK_WEIGHTS_VERSION = "v2.1";
+
+// Extract a representative current-market price proxy from an outlook response.
+// Same heuristic used by the regression test job for consistency.
+export function extractPriceProxy(outlookJson: any): number | null {
+  if (!outlookJson || typeof outlookJson !== "object") return null;
+  const avg = outlookJson?.marketMetrics?.avgSoldPrice;
+  if (typeof avg === "number" && Number.isFinite(avg)) return avg;
+  const median = outlookJson?.evidence?.compsSummary?.median;
+  if (typeof median === "number" && Number.isFinite(median)) return median;
+  return null;
+}
+
 // Save outlook history snapshot (only when verdict/modifier/temperature changes)
 async function saveToHistory(
   playerKey: string,
@@ -247,6 +263,8 @@ async function saveToHistory(
       confidence,
       outlookJson: outlook,
       snapshotHash,
+      priceProxyAtSnapshot: extractPriceProxy(outlook),
+      weightsVersion: PLAYER_OUTLOOK_WEIGHTS_VERSION,
       snapshotAt: new Date(),
     });
   } else {

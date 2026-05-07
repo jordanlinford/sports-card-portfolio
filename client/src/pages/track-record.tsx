@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   CheckCircle2,
   XCircle,
@@ -194,8 +195,158 @@ function CallRow({ call }: { call: VerdictAccuracyResult }) {
   );
 }
 
+function AccuracyView({
+  data,
+  isLoading,
+  emptyHint,
+}: {
+  data: AccuracySummary | undefined;
+  isLoading: boolean;
+  emptyHint: string;
+}) {
+  const isEmpty = !isLoading && data && data.totalVerdicts === 0;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <HeroSkeleton />
+        <CardsSkeleton />
+        <CallsSkeleton />
+      </div>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <div className="text-center py-24">
+        <Target className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+        <h2 className="text-xl font-semibold mb-2">
+          We're building our track record.
+        </h2>
+        <p className="text-muted-foreground">{emptyHint}</p>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  return (
+    <div className="space-y-8">
+      <Card className="text-center py-8" data-testid={`card-accuracy-hero`}>
+        <CardContent className="space-y-2">
+          <p className="text-6xl font-bold tracking-tight" data-testid="text-accuracy-rate">
+            {data.accuracyRate}%
+          </p>
+          <p className="text-lg text-muted-foreground">Overall Accuracy</p>
+          <div className="flex items-center justify-center gap-6 mt-4 text-sm">
+            <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+              <CheckCircle2 className="h-4 w-4" />
+              {data.correctCount} Correct
+            </span>
+            <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+              <XCircle className="h-4 w-4" />
+              {data.incorrectCount} Incorrect
+            </span>
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <HelpCircle className="h-4 w-4" />
+              {data.inconclusiveCount} Inconclusive
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">
+            {data.totalVerdicts} total verdicts evaluated
+          </p>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h2 className="text-lg font-semibold mb-4">Accuracy by Verdict Type</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(data.byVerdict).map(([verdict, stats]) => {
+            const meta = getVerdictMeta(verdict);
+            return (
+              <Card key={verdict}>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <span className={meta.color}>{meta.icon}</span>
+                    {meta.label}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-2xl font-bold">{stats.accuracy}%</span>
+                    <span className="text-xs text-muted-foreground">accuracy</span>
+                  </div>
+                  <Progress value={stats.accuracy} className="h-2" />
+                  <div className="flex justify-between text-xs">
+                    <span className="text-green-600 dark:text-green-400">
+                      {stats.correct} correct
+                    </span>
+                    <span className="text-red-600 dark:text-red-400">
+                      {stats.incorrect} wrong
+                    </span>
+                    <span className="text-muted-foreground">
+                      {stats.inconclusive} tbd
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      {(data.topCorrectCalls.length > 0 || data.topIncorrectCalls.length > 0) && (
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Top Calls</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <TrendingUp className="h-4 w-4" />
+                  Best Calls
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-2">
+                {data.topCorrectCalls.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No correct calls yet
+                  </p>
+                ) : (
+                  data.topCorrectCalls
+                    .slice(0, 5)
+                    .map((call, i) => <CallRow key={i} call={call} />)
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <TrendingDown className="h-4 w-4" />
+                  Worst Calls
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="px-2">
+                {data.topIncorrectCalls.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No incorrect calls yet
+                  </p>
+                ) : (
+                  data.topIncorrectCalls
+                    .slice(0, 5)
+                    .map((call, i) => <CallRow key={i} call={call} />)
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TrackRecordPage() {
-  const { data, isLoading } = useQuery<AccuracySummary>({
+  const cardSignals = useQuery<AccuracySummary>({
     queryKey: ["/api/track-record"],
     queryFn: async () => {
       const res = await fetch("/api/track-record");
@@ -205,175 +356,59 @@ export default function TrackRecordPage() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const isEmpty = !isLoading && data && data.totalVerdicts === 0;
+  const playerOutlook = useQuery<AccuracySummary>({
+    queryKey: ["/api/track-record/player-outlook"],
+    queryFn: async () => {
+      const res = await fetch("/api/track-record/player-outlook");
+      if (!res.ok) throw new Error("Failed to fetch player-outlook track record");
+      return res.json();
+    },
+    staleTime: 10 * 60 * 1000,
+  });
 
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-8 max-w-5xl space-y-8">
-        {/* Page header */}
         <div className="text-center">
           <h1 className="text-2xl font-bold">Verdict Track Record</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            How our AI-generated verdicts have performed against real market
-            data
+            How our AI-generated verdicts have performed against real market data
           </p>
         </div>
 
-        {/* Loading state */}
-        {isLoading && (
-          <div className="space-y-8">
-            <HeroSkeleton />
-            <CardsSkeleton />
-            <CallsSkeleton />
-          </div>
-        )}
+        <Tabs defaultValue="card-signals" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto" data-testid="tabs-track-record">
+            <TabsTrigger value="card-signals" data-testid="tab-card-signals">
+              Card Signals
+            </TabsTrigger>
+            <TabsTrigger value="player-outlook" data-testid="tab-player-outlook">
+              Player Outlook
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Empty state */}
-        {isEmpty && <EmptyState />}
+          <TabsContent value="card-signals" className="mt-6">
+            <AccuracyView
+              data={cardSignals.data}
+              isLoading={cardSignals.isLoading}
+              emptyHint="Check back soon — verdicts need at least 30 days before they can be scored."
+            />
+          </TabsContent>
 
-        {/* Data loaded */}
-        {data && data.totalVerdicts > 0 && (
-          <>
-            {/* Hero accuracy */}
-            <Card className="text-center py-8">
-              <CardContent className="space-y-2">
-                <p className="text-6xl font-bold tracking-tight">
-                  {data.accuracyRate}%
-                </p>
-                <p className="text-lg text-muted-foreground">
-                  Overall Accuracy
-                </p>
-                <div className="flex items-center justify-center gap-6 mt-4 text-sm">
-                  <span className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
-                    <CheckCircle2 className="h-4 w-4" />
-                    {data.correctCount} Correct
-                  </span>
-                  <span className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
-                    <XCircle className="h-4 w-4" />
-                    {data.incorrectCount} Incorrect
-                  </span>
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    <HelpCircle className="h-4 w-4" />
-                    {data.inconclusiveCount} Inconclusive
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {data.totalVerdicts} total verdicts evaluated
-                </p>
-              </CardContent>
-            </Card>
+          <TabsContent value="player-outlook" className="mt-6">
+            <AccuracyView
+              data={playerOutlook.data}
+              isLoading={playerOutlook.isLoading}
+              emptyHint="Player-outlook history is graded nightly. Snapshots need at least 30 days of post-snapshot price data before they appear here."
+            />
+          </TabsContent>
+        </Tabs>
 
-            {/* Per-verdict breakdown */}
-            <div>
-              <h2 className="text-lg font-semibold mb-4">
-                Accuracy by Verdict Type
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {Object.entries(data.byVerdict).map(([verdict, stats]) => {
-                  const meta = getVerdictMeta(verdict);
-                  return (
-                    <Card key={verdict}>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <span className={meta.color}>{meta.icon}</span>
-                          {meta.label}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex items-baseline gap-1">
-                          <span className="text-2xl font-bold">
-                            {stats.accuracy}%
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            accuracy
-                          </span>
-                        </div>
-                        <Progress
-                          value={stats.accuracy}
-                          className="h-2"
-                        />
-                        <div className="flex justify-between text-xs">
-                          <span className="text-green-600 dark:text-green-400">
-                            {stats.correct} correct
-                          </span>
-                          <span className="text-red-600 dark:text-red-400">
-                            {stats.incorrect} wrong
-                          </span>
-                          <span className="text-muted-foreground">
-                            {stats.inconclusive} tbd
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Top calls */}
-            {(data.topCorrectCalls.length > 0 ||
-              data.topIncorrectCalls.length > 0) && (
-              <div>
-                <h2 className="text-lg font-semibold mb-4">Top Calls</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Best calls */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2 text-green-600 dark:text-green-400">
-                        <TrendingUp className="h-4 w-4" />
-                        Best Calls
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-2">
-                      {data.topCorrectCalls.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          No correct calls yet
-                        </p>
-                      ) : (
-                        data.topCorrectCalls
-                          .slice(0, 5)
-                          .map((call, i) => (
-                            <CallRow key={i} call={call} />
-                          ))
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  {/* Worst calls */}
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm flex items-center gap-2 text-red-600 dark:text-red-400">
-                        <TrendingDown className="h-4 w-4" />
-                        Worst Calls
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-2">
-                      {data.topIncorrectCalls.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          No incorrect calls yet
-                        </p>
-                      ) : (
-                        data.topIncorrectCalls
-                          .slice(0, 5)
-                          .map((call, i) => (
-                            <CallRow key={i} call={call} />
-                          ))
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-              </div>
-            )}
-
-            {/* Disclaimer */}
-            <div className="text-center text-xs text-muted-foreground border-t pt-6">
-              <p>
-                Past performance does not guarantee future results. Verdicts are
-                AI-generated analysis, not financial advice.
-              </p>
-            </div>
-          </>
-        )}
+        <div className="text-center text-xs text-muted-foreground border-t pt-6">
+          <p>
+            Past performance does not guarantee future results. Verdicts are
+            AI-generated analysis, not financial advice.
+          </p>
+        </div>
       </main>
     </div>
   );

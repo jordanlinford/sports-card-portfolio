@@ -14,6 +14,11 @@ import { startHiddenGemsRefreshJob } from "./hiddenGemsService";
 import { startRegressionTestScheduler, runVerdictRegression } from "./regressionTestJob";
 import { startWinBackScheduler } from "./winBackJob";
 import { startWeeklyReportScheduler } from "./weeklyReportJob";
+import {
+  startPlayerOutlookOutcomesScheduler,
+  runPlayerOutlookOutcomesGrading,
+  computePlayerOutlookAccuracy,
+} from "./playerOutlookOutcomesJob";
 
 const app = express();
 const httpServer = createServer(app);
@@ -243,6 +248,37 @@ app.use((req, res, next) => {
         });
         console.log("[Backtest] Track record endpoint registered: GET /api/track-record");
 
+        // Public track-record endpoint — player-outlook history accuracy
+        // Must be registered BEFORE setupVite so the SPA catch-all doesn't shadow it.
+        app.get("/api/track-record/player-outlook", async (_req, res) => {
+          try {
+            const summary = await computePlayerOutlookAccuracy();
+            res.json(summary);
+          } catch (error) {
+            console.error("Error computing player-outlook track record:", error);
+            res.status(500).json({ message: "Failed to compute player-outlook track record" });
+          }
+        });
+        console.log("[OutlookOutcomes] Track record endpoint registered: GET /api/track-record/player-outlook");
+
+        // Admin endpoint to manually trigger the grading job (gated by QA_LOGIN_TOKEN)
+        app.post("/api/admin/run-outlook-grading", async (req, res) => {
+          const expected = process.env.QA_LOGIN_TOKEN;
+          const provided = (req.headers["x-qa-token"] as string | undefined);
+          if (!expected || !provided || provided.length !== expected.length ||
+              !timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) {
+            return res.status(401).json({ error: "Unauthorized" });
+          }
+          try {
+            const summary = await runPlayerOutlookOutcomesGrading();
+            res.json(summary);
+          } catch (err: any) {
+            console.error("[OutlookOutcomes] Manual run failed:", err);
+            res.status(500).json({ error: err?.message || "Grading run failed" });
+          }
+        });
+        console.log("[OutlookOutcomes] Admin endpoint registered: POST /api/admin/run-outlook-grading");
+
         // Admin endpoint to clean up cards with bad AI-generated variation strings
         // (gated by QA_LOGIN_TOKEN). Must be registered BEFORE setupVite.
         app.post("/api/admin/cleanup-bad-variations", async (req, res) => {
@@ -328,6 +364,9 @@ app.use((req, res, next) => {
 
         // Start the weekly "State of the Hobby" auto-post (every Monday 8 AM UTC)
         startWeeklyReportScheduler();
+
+        // Start the nightly player-outlook outcomes grading job (03:00 UTC)
+        startPlayerOutlookOutcomesScheduler();
 
         // Admin endpoint for manual regression run (gated by QA_LOGIN_TOKEN)
         app.get("/api/admin/run-regression", async (req, res) => {
