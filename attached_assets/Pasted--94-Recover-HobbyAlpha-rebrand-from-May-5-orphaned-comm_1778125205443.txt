@@ -1,0 +1,115 @@
+#94 - Recover HobbyAlpha rebrand from May 5 orphaned commits
+What & Why
+The full HobbyAlpha rebrand (text + assets + branded emails + iOS splash + holographic theme + visual polish) was lost on May 5 2026 when a Replit workspace reset wiped an in-progress rebase. The work survives intact in git reflog as 12 SHAs that never reached origin/main. This task cherry-picks those 12 commits in chronological order onto a new recovery branch, applies pre-locked per-file conflict resolution rules, verifies the build, and surfaces the complete diff for user review BEFORE any merge to main.
+
+Done looks like
+Recovery branch recovery/hobbyalpha-rebrand exists locally with 12 cherry-picked commits on top of current main (5cd6d5e)
+npm run typecheck passes cleanly
+npm run build succeeds
+A complete diff vs current main is surfaced for user review along with a per-file resolution summary
+Task agent STOPS here. Does not push. Does not merge to main. Does not deploy. Awaits user approval gate.
+After user approves outside this task: a follow-up step fast-forwards main to recovery branch and pushes to origin/main
+Out of scope
+Pushing to origin/main
+Merging recovery branch into main
+Triggering Replit Publish / deploy
+Triggering V2 verdict migration job (deferred until step 14 of broader sequence: after recovery deploy + production verification)
+Recovering the May 1 FaithfulNeon dark-mode purple palette (separate scope, not in the 12-commit chain)
+Running blog SQL updates (already done earlier in the parent session)
+Locked per-file conflict resolution rules
+Rebrand version wins (take cherry-pick verbatim, no manual merge)
+All branding text in UI components: headers, footers, navigation, share components, marketing pages, legal pages
+All asset files: client/public/favicon.png, client/public/og-default.png, splash screens, all PWA icons, mockup PNGs (including attached_assets/hobbyalpha-player-outlook-mockup.png)
+Theme/design files: tailwind.config.ts, client/src/index.css, design tokens, holographic theme additions
+Email templates and server/emailBranding.ts module + tests
+HTML head tags: title, meta, og, twitter, JSON-LD
+client/public/manifest.json (PWA manifest)
+All new design components added by rebrand (holographic effects on case-view, etc.)
+replit.md — take recovery version verbatim. Tonight's doc additions (workspace reset rule, standing rules) can be re-added in a follow-up commit after recovery merges. Do NOT attempt to merge.
+V2 work wins (keep current main version, drop cherry-pick changes)
+server/verdictMigrationJob.ts (entire file)
+server/lib/withTimeout.ts (entire file)
+server/playerOutlookEngine.ts (entire file — V2 engine + saveToCache fix)
+shared/schema.ts (V2 additions: SELL, LONGSHOT_BET, confidence_score column, LONGSHOT_CUTOFFS, SKILL_POSITIONS, POSITION_ALIASES, normalizePosition)
+client/src/lib/verdictMessages.ts (entire file — V2 audience messaging)
+client/src/components/verdict-takeaway.tsx (entire file)
+client/src/components/verdict-update-banner.tsx (entire file)
+Mixed-concern files (manual 3-way merge per these instructions)
+server/routes.ts
+
+PRESERVE: V2 migration endpoints (/api/admin/migrate-verdicts-v2 and /api/admin/migrate-verdicts-v2/status)
+PRESERVE: V2 verdict bucket assignments (SELL → bearishHoldings, LONGSHOT_BET → speculativeHoldings)
+APPLY: All branding text changes (sitemap entries, share viewer text, page redirects, JSON-LD publisher name)
+APPLY: Domain swap to hobbyalpha.com if rebrand commits include it
+client/src/pages/admin.tsx
+
+PRESERVE: VerdictMigrationTab component import and all its usages
+PRESERVE: V2 Migration tab in TabsList and TabsContent
+APPLY: All branding text changes
+client/src/pages/player-outlook.tsx
+
+PRESERVE: VerdictTakeaway component import and usage
+PRESERVE: isHolder logic computation
+PRESERVE: V2 verdict switch cases (SELL, LONGSHOT_BET in getVerdictIcon, getVerdictColor, etc.)
+APPLY: Visual/branding updates from rebrand (colors, layout, holographic effects if any)
+client/src/pages/card-outlook.tsx
+
+PRESERVE: VerdictTakeaway component import and usage
+PRESERVE: portfolio query for isHolder
+PRESERVE: V2 verdict cases (SELL, LONGSHOT_BET in ACTION_STYLES, switch statements)
+APPLY: Visual/branding updates from rebrand
+Steps
+Branch setup — Verify clean working tree on main at 5cd6d5e. Create recovery/hobbyalpha-rebrand branch off current main. Configure git user identity if missing.
+
+Cherry-pick chain (12 commits in chronological order) — Apply each commit using git cherry-pick. The chain order is:
+
+a10db5e — Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha" (46 files, ~41 conflicts expected)
+cf79747 — Task #27: Refractor card brand assets (23 files, ~15 binary asset conflicts)
+fab023e — Update navigation to new HobbyAlpha logo (2 files)
+993a18d — New logo asset metadata (1 file)
+aeb1a66 — Task #30: Brand artwork in header/footer/share-viewer (2 files)
+a2f65cf — Refresh PWA install screenshots + take-pwa-screenshots.mjs (4 files)
+37daea5 — iOS PWA splash screens, 8 device sizes (11 files)
+182603e — Carry HobbyAlpha brand into every outbound email (8 files, adds emailBranding.ts module)
+a478e96 — Task #45: PWA splash navy color match (1 file)
+6fe3085 — Admin endpoint to spot-check email templates (2 files, +183 lines routes.ts)
+776b2ab — Holographic theme with tilt/shimmer on case-view (3 files, +213 lines)
+fa700ef — Final visual design pass (1 file)
+Conflict resolution — For each conflict, apply the locked rules above. Do NOT auto-decide outside the rules; if a file is not covered by any rule and has a conflict, HALT with maximum diagnostic context: (a) the conflicted file path, (b) the full conflict markers in that file, (c) the complete list of all other files modified by the same cherry-pick (so user can assess blast radius and decide quickly), (d) the cherry-pick SHA and commit message. Stop the chain at the halted commit. Do not advance past it.
+
+Build verification — After all 12 commits applied, run npm run typecheck and npm run build. If either fails, surface the failure output and STOP. Do not attempt blind fixes.
+
+Hard stop + surface diff — Generate a comprehensive report including:
+
+Final commit count on recovery branch (should be 12 + base = 13 total commits ahead of main's base before recovery)
+git diff --stat 5cd6d5e..recovery/hobbyalpha-rebrand (full file change summary)
+Per-file resolution log: which rule was applied to each conflicted file
+List of any binary file changes (favicons, splash screens, mockup PNGs)
+Build artifact size comparison if available
+Explicit "READY FOR REVIEW — DO NOT MERGE WITHOUT USER APPROVAL" marker
+Stop. Do not push to origin. Do not fast-forward main. Final state hand-off: recovery branch ready, working tree clean, on main again.
+
+Critical constraints
+NO push to origin/main under any circumstances within this task
+NO merge of recovery branch into main within this task
+NO Replit Publish trigger within this task
+NO V2 migration trigger within this task
+The diff review gate is mandatory — user must approve outside this task before any merge happens
+If any cherry-pick produces a conflict in a file not listed in the resolution rules, HALT and surface for human direction rather than guessing
+Relevant files
+server/routes.ts
+client/src/pages/admin.tsx
+client/src/pages/player-outlook.tsx
+client/src/pages/card-outlook.tsx
+server/verdictMigrationJob.ts
+server/lib/withTimeout.ts
+server/playerOutlookEngine.ts
+shared/schema.ts
+client/src/lib/verdictMessages.ts
+client/src/components/verdict-takeaway.tsx
+client/src/components/verdict-update-banner.tsx
+client/src/index.css
+tailwind.config.ts
+client/public/manifest.json
+client/index.html
+replit.md
