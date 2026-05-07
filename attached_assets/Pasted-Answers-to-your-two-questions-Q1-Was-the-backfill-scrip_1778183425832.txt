@@ -1,0 +1,31 @@
+Answers to your two questions
+Q1: Was the backfill script ever run against PROD cards?
+No — DEV only.
+
+The script imports ../server/db, which uses whatever DATABASE_URL is in the running env. In the workspace, that's the dev DB. The script has no prod awareness, no env flag, no safety guard — it operates on whatever DB the env points to.
+
+The 9 row updates earlier (Josh Allen, Lamar, Jordan Love, CJ Stroud, Puka, MJ, Donovan Mitchell) all hit the dev DB only. Production's cards table has not been touched. Given prod has 863 cards vs dev's much smaller set, dirty-data patterns like the Josh Allen #304 case almost certainly exist in prod and would dilute the Phase 1 player-migration benefit if we trigger prod player migration first.
+
+Q2: Is the prod admin panel + V2 trigger working?
+Yes.
+
+GET https://hobbyalpha.com/api/admin/migrate-verdicts-v2/status → HTTP 401
+
+Auth gate is live. CSRF cookie is being issued. HTTPS, HSTS, secure-cookie flags all correct. Endpoint is reachable and properly protected — matches Commit 7 deploy verification.
+
+Recommended sequence
+Backfill prod first, otherwise we burn the 5-hour prod migration on dirty data and have to re-run later. Quick path:
+
+Read-only prod assessment (5 min) — I can use the database skill in environment: "production" mode to count cards with the dirty-data signatures (player_name with trailing card numbers, multi-card players with divergent legacy_tier). This tells us how much benefit the backfill actually buys before we commit to running it.
+Run backfill against prod with --dry-run first (write-out only, surfaces every change), surface the diff for your approval, then live run.
+Trigger prod V2 player migration via admin panel.
+Watch first 10 min of prod logs, then walk away during the ~5 hr background run.
+Validate prod distribution when complete.
+Two things I need from you to proceed:
+
+Approval to run the read-only prod assessment (no writes, just SELECT counts to size the backfill). Or skip straight to the dry-run if you want to move fast.
+How to authorize the prod write. Options:
+You set the workspace's DATABASE_URL secret to prod temporarily (risky — every dev tool/route would also point at prod).
+You give me a one-shot prod DB URL via a separate env var like PROD_DATABASE_URL, and I add a --prod flag to the script that requires both the flag AND the env var to be present (defense-in-depth against accidental prod writes).
+You run the script yourself in your prod shell after I prepare it.
+Which path do you want?
