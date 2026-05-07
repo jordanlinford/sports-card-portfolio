@@ -1,0 +1,78 @@
+Decisions locked. Proceeding with Phase 2b implementation.
+Decision 1 (architecture): Option α - modify computeAction in-place as async. All 4 callsites already async, cleaner than parallel wrapper.
+Decision 2 (HOLD_CORE mapping): Add HOLD to card verdict enum now. LONG_HOLD has different semantics (vintage/retired), HOLD is the right action verb for maintain-position.
+Decision 3 (AVOID_ mapping):* Add AVOID to card verdict enum now. SELL implies exit existing, AVOID means don't enter. Genuinely different for buyers vs holders.
+Decision 4 (LONGSHOT_BET): Add to card verdict enum now. Already touching enum for HOLD + AVOID, batch all enum changes in one commit.
+Decision 5 (Tier 4 WATCH): Re-add WATCH to validVerdicts but STRICTLY gated to PRE_DEBUT only. Career stage check must pass before WATCH is allowed. Phase 2a's removal was about killing lazy defaults, not killing legitimate WATCH for pre-debut. Update validVerdicts to include WATCH again, but enforce the gate at the verdict-assignment site.
+Final card verdict enum for 2b (10 values, TRIM deferred to 2c):
+BUY | HOLD | SELL | AVOID | LONGSHOT_BET | MONITOR | LONG_HOLD | LEGACY_HOLD | LITTLE_VALUE | WATCH
+Final player→card verdict mapping for 2b:
+typescriptconst PLAYER_TO_CARD_VERDICT: Record<string, CardAction> = {
+  ACCUMULATE: "BUY",
+  HOLD_CORE: "HOLD",
+  HOLD_INJURY_CONTINGENT: "MONITOR",
+  HOLD_ROLE_RISK: "MONITOR",
+  SPECULATIVE_FLYER: "MONITOR",  // → LONGSHOT_BET if marketValue < $50
+  SPECULATIVE_SUPPRESSED: "MONITOR",
+  LONGSHOT_BET: "LONGSHOT_BET",
+  AVOID_NEW_MONEY: "AVOID",
+  AVOID_STRUCTURAL: "AVOID",
+  TRADE_THE_HYPE: "MONITOR",  // conservative until 2c
+  BUY: "BUY",
+  MONITOR: "MONITOR",
+  SELL: "SELL",
+  WATCH: "WATCH",  // pass-through pre-debut
+};
+Freshness gate per locked spec:
+
+≤14d: apply player verdict at full confidence
+15-30d: apply player verdict, mark confidence MEDIUM
+
+
+30d: skip player fallback, return Tier 3 result
+
+
+
+Phase 2b implementation order (proposed):
+
+Schema + enum updates:
+
+Add HOLD, AVOID, LONGSHOT_BET to OutlookAction type at outlookEngine.ts:3080
+Update validVerdicts at routes.ts:4363 to add HOLD, AVOID, LONGSHOT_BET, WATCH (with WATCH gated)
+
+
+Helper function:
+
+getPlayerVerdictForCard(playerName, sport) using existing getPlayerOutlookCache
+Use canonical normalizePlayerKey from playerOutlookEngine.ts:156
+Returns { verdict, freshness, confidenceScore } or null
+Freshness tier computation
+
+
+Mapping function:
+
+mapPlayerVerdictToCardVerdict(playerVerdict, marketValue) → CardAction
+Includes SPECULATIVE_FLYER → LONGSHOT_BET if marketValue < $50 logic
+
+
+computeAction async refactor:
+
+Add playerName?: string param
+Existing Tier 1 logic unchanged
+When result is MONITOR variants AND playerName provided AND freshness OK: query player verdict, override result
+Tier 3 (computeContextualVerdict generalization) fires before Tier 2 if no player data
+Tier 4 WATCH only if careerStage === "PRE_DEBUT"
+
+
+Update 4 callsites to pass playerName + await
+Update Phase 2a's INJURED/BACKUP guardrail at routes.ts:4377 - now that we have AVOID and HOLD verdicts, the guardrail should produce one of those instead of MONITOR for clarity
+
+Surface the implementation diff before applying. Don't write code yet - propose the diff for review.
+Phase 2a status: Hold in workspace, will commit + deploy after migration completes alongside Phase 2b.
+Add to RECOVERY_QUEUE.md:
+
+Consolidate 4 inconsistent playerKey normalization formats
+Add TRIM to card verdict enum in 2c
+Audience differentiation work in 2c
+
+Standing by for proposed Phase 2b diff.
