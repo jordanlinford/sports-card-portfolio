@@ -2309,10 +2309,8 @@ function VerdictMigrationTab() {
     if (!confirm(msg)) return;
     setLoading(true); setTriggerError(null);
     try {
-      const res = await fetch("/api/admin/migrate-verdicts-v2?force=" + String(force), { method: "POST" });
-      const d = await res.json();
-      if (!res.ok) setTriggerError(d.error ?? "Failed to start migration");
-      else await fetchStatus();
+      await apiRequest("POST", `/api/admin/migrate-verdicts-v2?force=${String(force)}`);
+      await fetchStatus();
     } catch (e: any) { setTriggerError(e.message ?? "Network error"); }
     finally { setLoading(false); }
   };
