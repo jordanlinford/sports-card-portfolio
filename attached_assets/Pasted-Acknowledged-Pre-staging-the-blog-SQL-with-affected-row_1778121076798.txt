@@ -1,0 +1,52 @@
+Acknowledged. Pre-staging the blog SQL with affected-row count so you can approve in one shot when you come back. Read-only query now, no writes.
+
+
+2 actions
+Pre-staged: blog SQL ready for your approval
+Audit results (read-only):
+
+6 total blog posts; 6 affected (all of them have brand in content; 0 in titles)
+5 posts also reference the old sportscardportfolio.io domain
+Total Sports Card Portfolio occurrences in content: 7 (post #1 has 2, others have 1 each)
+ID	Slug	Hits
+1	how-to-tell-if-sports-card-is-worth-money	2
+2	should-you-grade-your-sports-card-psa-cost-vs-value	1
+3	how-to-read-ebay-sold-comps-sports-cards	1
+4	best-rookie-cards-to-watch-2026	1
+5	hobby-box-roi-sealed-product-break-even-math	1
+6	state-of-the-hobby-2026-04-24	1
+Proposed SQL — exactly what you wrote, will affect 6 rows
+UPDATE blog_posts SET
+  content = REPLACE(content, 'Sports Card Portfolio', 'Hobby Alpha'),
+  title   = REPLACE(title,   'Sports Card Portfolio', 'Hobby Alpha')
+WHERE content LIKE '%Sports Card Portfolio%'
+   OR title   LIKE '%Sports Card Portfolio%';
+-- Expected: UPDATE 6
+
+Bonus question while you're deciding
+The 5 posts also have hardcoded <a href="https://sportscardportfolio.io">…</a> links. If you want me to fix those in the same UPDATE (so blog CTAs point to hobbyalpha.com), the SQL becomes:
+
+UPDATE blog_posts SET
+  content = REPLACE(REPLACE(content,
+              'Sports Card Portfolio', 'Hobby Alpha'),
+              'sportscardportfolio.io', 'hobbyalpha.com'),
+  title   = REPLACE(title, 'Sports Card Portfolio', 'Hobby Alpha')
+WHERE content LIKE '%Sports Card Portfolio%'
+   OR content LIKE '%sportscardportfolio.io%'
+   OR title   LIKE '%Sports Card Portfolio%';
+-- Expected: UPDATE 6 (5 posts get domain swap + 6 get name swap, 5∪6 = 6)
+
+This second variant is consistent with your domain-swap decision (still pending). If domain stays as-is, run only the first SQL.
+
+Standing by
+✅ Branding text swap committed in b9401ee
+✅ Migration unblocked, diagnostic logging in place
+⏳ Your asset eyeball verdict on public/favicon.png + public/og-default.png
+⏳ Your domain-swap decision (sportscardportfolio.io → hobbyalpha.com everywhere?)
+⏳ Your approval on which blog SQL variant to run
+Once you give all three answers, sequence is:
+
+Apply asset swaps (if needed) + domain swap (if approved)
+Run approved blog SQL
+Single commit, you publish, you trigger migration from prod admin
+I watch logs + run the 5-min confidence_score IS NOT NULL write-rate check; abort + diagnose if zero writes after 5 min
