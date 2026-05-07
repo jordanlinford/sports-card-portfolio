@@ -1,0 +1,82 @@
+Both verifications complete. Here's the data — clean answers to both:
+
+Verification 1: InvestmentVerdict does NOT include LONGSHOT_BET
+// shared/schema.ts:1170
+export const INVESTMENT_VERDICT = {
+  ACCUMULATE,           // Buy on dips, build position
+  HOLD_CORE,            // Hold what you have
+  TRADE_THE_HYPE,       // Sell into spikes
+  AVOID_NEW_MONEY,      // Stay away
+  SPECULATIVE_FLYER,    // Small lottery ticket position    ← closest to LONGSHOT_BET
+  HOLD_ROLE_RISK,
+  HOLD_INJURY_CONTINGENT,
+  SPECULATIVE_SUPPRESSED,
+  AVOID_STRUCTURAL,
+}
+// 9 values, NO LONGSHOT_BET
+// PlayerVerdict (legacy/deprecated):
+export const PLAYER_VERDICT = { BUY, MONITOR, AVOID, WATCH, SELL, LONGSHOT_BET }
+// 6 values, INCLUDES LONGSHOT_BET
+
+Schema comment at line 1184 says PlayerVerdict is deprecated, replaced by InvestmentVerdict. So the situation is:
+
+The "displayed" verdict (investmentCall.verdict) uses the new enum, which never had LONGSHOT_BET added.
+The "legacy" verdict (verdict.action) has LONGSHOT_BET but isn't what users see.
+SPECULATIVE_FLYER in the new enum is semantically the same thing ("small lottery ticket position").
+This means Commit 1 (whoever introduced LONGSHOT_BET) was incomplete — it only added the value to the legacy enum, not the canonical one.
+
+Verification 2: Market scoring engine produces verdict deterministically
+server/marketScoringEngine.ts:428–510 — pure deterministic mapping from scores → verdict. No AI, no Gemini call. Key branches:
+
+let verdict: InvestmentVerdict;
+if (careerStage === "BUST")            verdict = "AVOID_STRUCTURAL";
+else if (careerStage === "RETIRED")    verdict = "HOLD_CORE";
+else if (careerStage === "RETIRED_HOF") verdict = composite>=55 ? "ACCUMULATE" : "HOLD_CORE";
+else if (signals.confidenceScore<40)   verdict = "SPECULATIVE_FLYER";  ← thin-data fallback
+else if (composite>=80 && agreement>=4) verdict = "ACCUMULATE";
+else if (composite>=70)                 verdict = "ACCUMULATE";
+else if (overheated)                    verdict = "TRADE_THE_HYPE";
+else if (composite>=50)                 verdict = "HOLD_CORE";
+else if (composite<50 && liquidity low) verdict = "AVOID_NEW_MONEY";
+else if (composite<50 && liquidity high)verdict = "TRADE_THE_HYPE";
+else                                    verdict = "SPECULATIVE_FLYER";  ← mixed-signal fallback
+// Then downgrades for low confidence / low conviction / role risk:
+if (roleStabilityScore<=45 && verdict==="ACCUMULATE") {
+  verdict = early-career ? "SPECULATIVE_FLYER" : "HOLD_ROLE_RISK";
+}
+if (roleStabilityScore<=15 && (VETERAN|AGING)) verdict = "AVOID_STRUCTURAL";
+
+Key observations:
+
+McCarthy got SPECULATIVE_FLYER because either (a) confidenceScore<40 or (b) the "mixed signals" final fallback. This is the correct V2 verdict for his profile — the engine is doing what it's designed to do.
+The market scoring engine has no concept of LONGSHOT_BET. It can only emit values from the InvestmentVerdict enum.
+Career stage is consumed (BUST/RETIRED/RETIRED_HOF/early-career), but no skill-position or yearsInLeague check exists here — those are exclusively in the post-hoc longshot waterfall.
+What this means for your three options
+Option A as I scoped it has a problem: widening the override to write investmentCall.verdict = "LONGSHOT_BET" would write a value that isn't in the InvestmentVerdict enum. Anything that does enum-strict validation downstream (TypeScript narrowing, UI palette lookup, postureLabel map at schema:1303) would break or fall through to default.
+
+Realistic Option A (revised):
+
+1a/1b: Lowercase LONGSHOT_CUTOFFS + SKILL_POSITIONS keys (fixes longshotCheck so it can return true)
+Add LONGSHOT_BET to the InvestmentVerdict enum + update VERDICT_POSTURE map (schema:1303) with a posture string + verify any UI verdict-palette covers it (the verdict palette in replit.md says BUY=emerald, MONITOR=amber etc; LONGSHOT_BET would need a color choice — likely violet/amber per "speculative" semantics)
+Override fires on: longshotCheck && investmentCall.verdict === "SPECULATIVE_FLYER" and writes investmentCall.verdict = "LONGSHOT_BET" AND verdict.action = "LONGSHOT_BET"
+Skip Tier-5 prompt strengthening (Gemini's call is overwritten anyway)
+Defer POSITION_ALIASES casing
+Why this approach:
+
+SPECULATIVE_FLYER is the deterministic verdict for thin-data and mixed-signal early-career players — exactly the LONGSHOT_BET candidates. The market scoring engine is already doing the bulk filtering (confidence, conviction, role stability). The longshot waterfall just adds the structural eligibility gate (skill position + early career).
+We don't need to widen the override to MONITOR because MONITOR doesn't even exist in the InvestmentVerdict enum — the override only needs to catch SPECULATIVE_FLYER.
+The legacy verdict.action === "MONITOR" path can stay as a secondary trigger for any code path that still emits the legacy enum, but the primary trigger is investmentCall.verdict === "SPECULATIVE_FLYER".
+Option B (move LONGSHOT_BET into market scoring engine) is the architecturally clean answer: the market scoring engine should know about skill positions and yearsInLeague and emit LONGSHOT_BET directly. But it requires schema enum addition AND scoring-engine signature change AND probably a careerStage/yearsInLeague pass-through. Bigger change. Agree it's not a today thing.
+
+Option C (prompt strengthening) is genuinely wasted effort — marketResult.verdict overwrites Gemini's verdict.action. Strengthening Gemini's prompt only affects the legacy field that no longer drives display.
+
+Open question I need you to confirm before I draft Commit 8
+Step #2 above — adding LONGSHOT_BET to InvestmentVerdict enum is required for any of this to be visible to users. That's a schema change touching:
+
+INVESTMENT_VERDICT const (1 line)
+VERDICT_POSTURE map (1 entry — probably "Small speculative position")
+UI verdict palette (in components that render verdict pills — a quick rg should show 5–10 files)
+Possibly a Drizzle migration if any column is typed as the enum (need to check)
+Are you OK with that being part of Commit 8, or do you want it separated as well? If separated, Option A degrades to "fix the override but verdict still displays as SPECULATIVE_FLYER" — i.e. the data plumbing works but the user-visible verdict label never says LONGSHOT_BET.
+
+Awaiting confirmation before drafting Commit 8.
