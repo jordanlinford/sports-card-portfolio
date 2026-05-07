@@ -1,0 +1,35 @@
+🔴 Migration is OFF — and never finished
+What the response tells us (definitively)
+status:        "idle"           ← no job running RIGHT NOW
+startedAt:     null             ← in-memory state is empty
+completedAt:   null             ← never reached completion in this process
+interruptedWarning: "Previous migration was interrupted at 2026-05-07T20:49:08.047Z..."
+
+Translation:
+
+A migration started at 20:49:08 UTC (8:49 PM Pacific) — this matches our timeline
+It wrote a "running" marker to disk
+The server process either crashed, was killed, or was redeployed before the migration finished
+The current prod server booted up after that, found the orphaned marker, but its in-memory state has nothing — meaning it can't resume from where it left off
+The text "Re-run recommended to complete remaining entries" comes from a slightly older build than what's in the workspace (current code says "Auto-resuming in 30s..." — different wording proves prod is on a previous deploy that handles this case differently and just gives up)
+Cross-referenced with deployment logs
+Last [InvestmentDecision] migration write: 21:05:23 UTC (~16 minutes into the run)
+All [PlayerOutlook] activity after that = on-demand cache refreshes from user navigation, NOT the migration job
+So the migration ran ~16 minutes, processed an unknown subset of the 139 entries, then died
+What you should click
+✅ Click "Run V2 Migration" (the primary button — NOT Force Regenerate)
+
+Why it's safe:
+
+status: "idle" — no running job to conflict with
+Primary mode skips already-migrated entries (the ones written between 20:49 and 21:05 UTC) and only processes the remaining unmigrated ones
+Server's isRunning guard would reject a duplicate anyway
+Worst case: it starts processing entries that already got V2 verdicts in the partial run → wasted compute, no data corruption
+❌ Do NOT click "Force Regenerate All 139" — that overwrites every entry including the partial-run results, costs another 15-28 min, and gains nothing.
+
+After clicking
+Status will flip to running within 5s (poll interval)
+progress will show {processed: N, total: 139, currentPlayer: "..."}
+When completedAt populates and afterDistribution/bandValidation are non-null → migration done
+Send me the final response JSON (after completion) and I'll produce the locked completion report: distribution %, ±5pp band check, sentinel checks (Wemby/Bowers/Puka/MHJ/Stroud/Caleb must NOT be Longshot; Bagent/Rattler/Ewers/Shedeur/McCarthy likely Longshot), 10 random LONGSHOT_BET samples.
+Go ahead and click "Run V2 Migration".
