@@ -2863,7 +2863,7 @@ Sitemap: ${origin}/sitemap.xml
       }));
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
       console.log(`[Outlook 2.0] Computing signals for card ${cardId}`);
-      const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
+      const signals = await computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
 
       if (geminiMarketData) {
         const activeListings = geminiMarketData.activeListing || 0;
@@ -2902,10 +2902,12 @@ Sitemap: ${origin}/sitemap.xml
         signals.demandScore = Math.round((signals.liquidityScore * 0.4) + (signals.sportScore * 0.3) + (signals.positionScore * 0.3)) * 10;
         const { computeAction } = await import("./outlookEngine");
         const originalAction = signals.action;
-        const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
+        // Phase 2b: pass playerName + sport for player verdict fallback
+        const { action: recomputedAction, reasons: recomputedReasons } = await computeAction(
           signals.qualityScore, signals.demandScore, signals.momentumScore, signals.trendScore,
           signals.volatilityScore, signals.liquidityScore, geminiMarketData.avgPrice,
-          signals.careerStageAuto, card.year ?? undefined
+          signals.careerStageAuto, card.year ?? undefined,
+          card.playerName, card.sport
         );
         signals.action = recomputedAction;
         signals.actionReasons = recomputedReasons;
@@ -3156,7 +3158,7 @@ Sitemap: ${origin}/sitemap.xml
           date: pp.date, price: pp.price, source: pp.source, url: pp.url,
         }));
 
-        const signals = computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
+        const signals = await computeAllSignals(card, priceData.pricePoints, priceData.estimatedValue);
 
         if (geminiMarketData) {
           const bActiveListings = geminiMarketData.activeListing || 0;
@@ -3192,10 +3194,12 @@ Sitemap: ${origin}/sitemap.xml
           else if (bGeminiLiquidity === "HIGH" || bMonthlyVolume >= 100) signals.marketFriction = Math.min(signals.marketFriction, 30);
           else if (bGeminiLiquidity === "MEDIUM" || bMonthlyVolume >= 50) signals.marketFriction = Math.min(signals.marketFriction, 50);
           signals.demandScore = Math.round((signals.liquidityScore * 0.4) + (signals.sportScore * 0.3) + (signals.positionScore * 0.3)) * 10;
-          const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
+          // Phase 2b: pass playerName + sport for player verdict fallback
+          const { action: recomputedAction, reasons: recomputedReasons } = await computeAction(
             signals.qualityScore, signals.demandScore, signals.momentumScore, signals.trendScore,
             signals.volatilityScore, signals.liquidityScore, geminiMarketData.avgPrice,
-            signals.careerStageAuto, card.year ?? undefined
+            signals.careerStageAuto, card.year ?? undefined,
+            card.playerName, card.sport
           );
           signals.action = recomputedAction;
           signals.actionReasons = recomputedReasons;
@@ -3968,7 +3972,7 @@ Sitemap: ${origin}/sitemap.xml
       const filteredPriceData = filterPriceOutliers(priceData.pricePoints);
 
       // Compute deterministic signals from legacy price data
-      const signals = computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
+      const signals = await computeAllSignals(tempCard as any, priceData.pricePoints, priceData.estimatedValue);
       
       // Enhance signals with unified Gemini data (more accurate than legacy alone)
       if (unifiedResult) {
@@ -4024,8 +4028,8 @@ Sitemap: ${origin}/sitemap.xml
           signals.momentumScore = Math.max(0, signals.momentumScore - 15);
         }
         
-        // Recompute action with enhanced signals
-        const { action: recomputedAction, reasons: recomputedReasons } = computeAction(
+        // Recompute action with enhanced signals (Phase 2b: pass playerName + sport for player verdict fallback)
+        const { action: recomputedAction, reasons: recomputedReasons } = await computeAction(
           signals.qualityScore,
           signals.demandScore,
           signals.momentumScore,
@@ -4034,7 +4038,9 @@ Sitemap: ${origin}/sitemap.xml
           signals.liquidityScore,
           uMarket.avgPrice,
           signals.careerStageAuto,
-          tempCard.year ? parseInt(String(tempCard.year)) : undefined
+          tempCard.year ? parseInt(String(tempCard.year)) : undefined,
+          tempCard.playerName,
+          tempCard.sport
         );
         signals.action = recomputedAction;
         signals.actionReasons = recomputedReasons;
@@ -4357,14 +4363,18 @@ Sitemap: ${origin}/sitemap.xml
       const matchConfidence = priceData.matchConfidence;
       
       // Determine final action — prefer unified verdict with deterministic guardrails
-      const validVerdicts = ["BUY", "MONITOR", "SELL", "LONG_HOLD", "LEGACY_HOLD", "LITTLE_VALUE"];
+      // Phase 2b: expanded card verdict enum to 10 values. WATCH re-added (gated to PRE_DEBUT
+      // at the assignment site in computeAction); HOLD/AVOID/LONGSHOT_BET added for player fallback.
+      const validVerdicts = ["BUY", "HOLD", "SELL", "AVOID", "LONGSHOT_BET",
+                             "MONITOR", "LONG_HOLD", "LEGACY_HOLD", "LITTLE_VALUE", "WATCH"];
       let finalAction = signals.action;
       let finalActionReasons = [...signals.actionReasons];
       
       if (unifiedResult) {
         const unifiedVerdict = unifiedResult.analysis.verdict;
         if (validVerdicts.includes(unifiedVerdict)) {
-          finalAction = unifiedVerdict;
+          // Cast: validVerdicts.includes() guards at runtime but TS doesn't narrow string→OutlookAction
+          finalAction = unifiedVerdict as typeof finalAction;
           finalActionReasons = unifiedResult.analysis.verdictReasons;
         }
         
@@ -4374,9 +4384,20 @@ Sitemap: ${origin}/sitemap.xml
           unifiedResult.player.roleStatus === "INJURED_RESERVE" ||
           unifiedResult.player.roleStatus === "BACKUP"
         )) {
-          finalAction = "MONITOR";
-          finalActionReasons = [`Player status (${unifiedResult.player.roleStatus}/${unifiedResult.player.injuryStatus}) adds risk — monitoring for now`, ...finalActionReasons];
-          console.log(`[Quick Analyze] Guardrail: Downgraded BUY → MONITOR due to player status`);
+          // Phase 2b: differentiate BACKUP (structural — never enter) from INJURED (transient — wait it out).
+          // BACKUP = AVOID (don't put new money in until role clarifies).
+          // INJURED/IR = HOLD (existing holders maintain; new buyers see HOLD-not-BUY signal).
+          // NOTE for 2c: HOLD here is a holder-side verdict; buyers may want MONITOR/AVOID until healthy.
+          // That's audience differentiation work, deferred per locked Phase 2c scope.
+          const isStructural = unifiedResult.player.roleStatus === "BACKUP";
+          finalAction = isStructural ? "AVOID" : "HOLD";
+          finalActionReasons = [
+            `Player status (${unifiedResult.player.roleStatus}/${unifiedResult.player.injuryStatus}) — ${
+              isStructural ? "avoid new entry until role clarifies" : "hold existing position; wait for return"
+            }`,
+            ...finalActionReasons
+          ];
+          console.log(`[Quick Analyze] Guardrail: Downgraded BUY → ${finalAction} due to player status`);
         }
         
         // Guardrail: Low confidence data should not get aggressive verdicts

@@ -1,0 +1,30 @@
+Three decisions:
+1. Tier ordering: 2b-Tier-B (Tier 2 before Tier 3). Overriding your recommendation. Reasoning:
+Tier 2 (player verdict) is real Gemini analysis stored in player_outlook_cache. Tier 3 (contextual) is rule-based heuristic. The whole point of the V2 hierarchy is "use available analysis when card data is thin." Player verdict IS analysis - contextual is inference. Analysis trumps inference.
+Concrete: Bo Nix card with thin sales → MONITOR fallthrough → player_outlook_cache says HOLD_CORE → we should USE that, not fall back to contextual heuristic that might say MONITOR-DATA_UNCERTAIN.
+Updated Hunk 5 ordering:
+Tier 1: existing logic (LITTLE_VALUE, LEGACY_HOLD, LONG_HOLD, SELL, BUY)
+Tier 4 check: if careerStage === "PRE_DEBUT" → WATCH (early exit)
+Tier 2: player verdict (if playerName + sport + cache fresh)
+Tier 3: contextual verdict (computeContextualVerdict generalized)
+Tier 1 fallback: MONITOR variants (UNSTABLE_PRICING, COOLING_AFTER_RUN, DATA_UNCERTAIN, WAITING_CATALYST, NEUTRAL)
+2. Guardrail split: APPROVED. BACKUP→AVOID, INJURED→HOLD. Semantic precision over MONITOR punt.
+Note for 2c: HOLD for INJURED is a holder-side verdict. Buyers might want MONITOR/AVOID until healthy. That's audience differentiation work. Acceptable to defer.
+3. Card-table sport field: VERIFY FIRST.
+Run before any code changes:
+grep -n "sport" shared/schema.ts | grep -i "cards" | head -10
+If cards.sport exists: proceed with current Hunk 8-11 plan
+If cards.sport doesn't exist: surface the three options (derive from registry / careerStageAuto context / pass from request). Don't pick - I'll choose based on data flow analysis.
+Sequence:
+
+Verify cards.sport exists
+If yes: apply all 12 hunks with Tier-B ordering
+If no: surface options, await my call, then apply
+Run TypeScript check after edits
+Surface verification grep:
+rg -n '"WATCH"' server/outlookEngine.ts server/routes.ts
+Should return: validVerdicts array, computeAction return statement, Gemini prompt union, prompt bullets
+Surface diff confirmation
+Hold in workspace alongside Phase 2a
+Both deploy together when migration completes
+

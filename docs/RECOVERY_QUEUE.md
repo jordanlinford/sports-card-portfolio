@@ -303,3 +303,22 @@ Categories:
   7 session for the one-shot prod backfill run; rotate via Neon console (or
   Replit deployment secret rotation flow) once we no longer need shell access
   to the prod DB.
+
+## Post-V2 Hygiene — Phase 2b Additions (2026-05-07)
+
+- **Consolidate playerKey normalization formats** — 4 inconsistent variants exist in codebase:
+  - `playerOutlookEngine.normalizePlayerKey(sport, name)` — canonical (used by writer + Phase 2b lookup)
+  - `hiddenGemsService.normalizePlayerKey(name, sport)` — arg-order swapped
+  - `routes.ts:5443` + `demandTierEngine.ts:207` inline strip-non-alphanum
+  - `routes.ts:5784` inline underscore-join (different format entirely)
+  Action: replace all callsites with canonical export; verify no key-format mismatches in cache lookups.
+
+- **Add TRIM to card verdict enum (Phase 2c)** — current 10-value enum lacks "trim partial position" verdict; required for audience differentiation work where holder sees TRIM but buyer sees AVOID.
+
+- **Audience differentiation work (Phase 2c)** — split TRADE_THE_HYPE / SPECULATIVE_FLYER / HOLD_INJURY_CONTINGENT into buyer vs holder card actions. Today all three audiences see MONITOR (or HOLD for INJURED guardrail) with no differentiation. Buyer-side INJURED should be MONITOR/AVOID, holder-side should be HOLD.
+
+- **Cosmetic: hardcoded "139" cache count in admin.tsx** — replace with live count from new `/api/admin/player-cache/count` endpoint (3 sites: lines 3400, 3418, 3438; plus routes.ts:12851 backend message).
+
+- **Migration state durability** — current V2 migration job state is in-process memory. If the prod server restarts mid-job, the resumable in-memory state is lost (DB rows are written incrementally so technically restartable from "max history.snapshot_at after migration trigger", but no UI surfaces this and no auto-resume logic exists). Add DB-backed checkpoint table + auto-resume on server boot.
+
+- **`server/cardOutlookService.ts` has parallel stale OutlookAction type (Phase 2c blocker)** — defines its OWN local `OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE"` (line 12) used by display/explanation helpers (`generateFallbackShort`, `generateFallbackLong`, `validateLegacyExplanation`, `determineAction`). Currently graceful-degrades for the 4 new Phase 2b verdicts (HOLD/AVOID/LONGSHOT_BET/WATCH) — falls through to neutral default text, no runtime crash. Phase 2c needs to: (a) align type with outlookEngine's 10-value union, (b) add per-verdict fallback copy for HOLD/AVOID/LONGSHOT_BET/WATCH, (c) audit `determineAction` in this file (parallel verdict computation path used by hiddenGemsService) to decide whether it should also adopt the player-fallback tier flow or remain a separate score-based heuristic.

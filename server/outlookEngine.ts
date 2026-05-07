@@ -5,6 +5,8 @@ import { GoogleGenAI } from "@google/genai";
 import type { Card, CardOutlook, PricePoint } from "@shared/schema";
 import { lookupPlayer, mapRegistryStage } from "./playerRegistry";
 import { isRawCard } from "./priceService";
+import { storage } from "./storage";
+import { normalizePlayerKey } from "./playerOutlookEngine";
 
 const gemini = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -1427,7 +1429,7 @@ Return ONLY a JSON object with this EXACT structure:
     "injuryStatus": "HEALTHY" | "INJURED" | "RECOVERING" | "UNKNOWN"
   },
   "analysis": {
-    "verdict": "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE",
+    "verdict": "BUY" | "HOLD" | "SELL" | "AVOID" | "LONGSHOT_BET" | "MONITOR" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE" | "WATCH",
     "verdictReasons": ["reason 1", "reason 2", "reason 3"],
     "shortSummary": "<one sentence investment summary>",
     "detailedAnalysis": "<2-3 paragraph detailed analysis for pro users>",
@@ -1445,11 +1447,15 @@ Return ONLY a JSON object with this EXACT structure:
 
 VERDICT GUIDELINES:
 - BUY: Strong upside, good price entry point, healthy demand
+- HOLD: Maintain existing position — fundamentals stable but no new-money case today
 - MONITOR: Uncertain — wait for clearer signals or price stabilization
 - SELL: Declining value, negative momentum, or peak pricing
+- AVOID: Don't enter new money — structural or fundamental risk outweighs current price
+- LONGSHOT_BET: Sub-$50 lottery ticket — high optionality, low conviction, sized small
 - LONG_HOLD: Solid long-term value, hold for appreciation
 - LEGACY_HOLD: Vintage/retired player cards with historical significance
 - LITTLE_VALUE: Card worth under $2-3 with minimal upside potential
+- WATCH: ONLY for pre-debut prospects with no comparable sales — never use as a wait-and-see default
 
 Liquidity: HIGH = 15+ sales/month, MEDIUM = 5-15, LOW = under 5.
 Price stability: STABLE = within 20%, VOLATILE = varies 40%+.
@@ -3076,7 +3082,18 @@ export function detectCareerStage(card: Card): string {
 }
 
 // Deterministic Action Logic
-export type OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE";
+// Phase 2b: expanded enum to 10 values. HOLD/AVOID/LONGSHOT_BET added; WATCH re-added (gated to PRE_DEBUT only).
+export type OutlookAction =
+  | "BUY"
+  | "HOLD"           // NEW (2b): maintain position; from player HOLD_CORE
+  | "SELL"
+  | "AVOID"          // NEW (2b): don't enter; from player AVOID_NEW_MONEY/AVOID_STRUCTURAL
+  | "LONGSHOT_BET"   // NEW (2b): low-value high-upside speculative
+  | "MONITOR"
+  | "LONG_HOLD"      // existing: vintage retired-with-value
+  | "LEGACY_HOLD"    // existing: HOF/cultural-icon vintage
+  | "LITTLE_VALUE"   // existing: <$3 minimal upside
+  | "WATCH";         // RE-ADDED (2b): STRICTLY pre-debut only; gated at assignment site
 
 // MONITOR reason codes - differentiate WHY a card is MONITOR
 export type MonitorReason = 
@@ -3092,7 +3109,89 @@ interface ActionDecision {
   monitorReason?: MonitorReason;
 }
 
-export function computeAction(
+// ─── Phase 2b: Player verdict fallback infrastructure ───────────────────────
+
+type PlayerVerdictFreshness = "FRESH" | "STALE_OK";
+
+interface PlayerVerdictLookup {
+  verdict: string;             // raw player verdict, e.g. "ACCUMULATE"
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  freshness: PlayerVerdictFreshness;
+  ageDays: number;
+}
+
+/**
+ * Phase 2b — fetch the latest cached player verdict for a card's player.
+ * Returns null if no cache row exists, no verdict in the row, or row is >30d stale.
+ * Uses canonical normalizePlayerKey from playerOutlookEngine to match writer's key format.
+ */
+export async function getPlayerVerdictForCard(
+  playerName: string | null | undefined,
+  sport: string | null | undefined
+): Promise<PlayerVerdictLookup | null> {
+  if (!playerName || !sport) return null;
+  try {
+    const playerKey = normalizePlayerKey(sport, playerName);
+    const row = await storage.getCachedPlayerOutlook(playerKey);
+    if (!row || !row.outlookJson) return null;
+
+    const outlook: any = row.outlookJson;
+    const verdict = outlook.investmentCall?.verdict ?? outlook.verdict?.action;
+    const confidence = (outlook.investmentCall?.confidence ?? "LOW") as "HIGH" | "MEDIUM" | "LOW";
+    if (!verdict) return null;
+
+    if (!row.lastFetchedAt) return null;
+    const ageMs = Date.now() - new Date(row.lastFetchedAt).getTime();
+    const ageDays = ageMs / (24 * 60 * 60 * 1000);
+    let freshness: PlayerVerdictFreshness;
+    if (ageDays <= 14) freshness = "FRESH";
+    else if (ageDays <= 30) freshness = "STALE_OK";
+    else return null;  // >30d → skip player fallback per locked spec
+
+    return { verdict, confidence, freshness, ageDays };
+  } catch (err) {
+    console.warn(`[Phase2b] getPlayerVerdictForCard failed for ${playerName}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Phase 2b — map a raw player verdict (from player_outlook_cache) to a card-side verdict.
+ * Special case: SPECULATIVE_FLYER → LONGSHOT_BET if marketValue < $50 (lottery ticket sizing).
+ * Returns null for unknown player verdicts (defensive — falls through to Tier 3).
+ */
+const PLAYER_TO_CARD_VERDICT: Record<string, OutlookAction> = {
+  ACCUMULATE: "BUY",
+  HOLD_CORE: "HOLD",
+  HOLD_INJURY_CONTINGENT: "MONITOR",
+  HOLD_ROLE_RISK: "MONITOR",
+  SPECULATIVE_FLYER: "MONITOR",          // overridden to LONGSHOT_BET if marketValue < $50
+  SPECULATIVE_SUPPRESSED: "MONITOR",
+  LONGSHOT_BET: "LONGSHOT_BET",
+  AVOID_NEW_MONEY: "AVOID",
+  AVOID_STRUCTURAL: "AVOID",
+  TRADE_THE_HYPE: "MONITOR",             // conservative until 2c audience differentiation
+  BUY: "BUY",
+  MONITOR: "MONITOR",
+  SELL: "SELL",
+  WATCH: "WATCH",                        // pre-debut pass-through
+};
+
+export function mapPlayerVerdictToCardVerdict(
+  playerVerdict: string,
+  marketValue: number | null
+): OutlookAction | null {
+  const mapped = PLAYER_TO_CARD_VERDICT[playerVerdict];
+  if (!mapped) return null;
+  if (playerVerdict === "SPECULATIVE_FLYER" && marketValue !== null && marketValue < 50) {
+    return "LONGSHOT_BET";
+  }
+  return mapped;
+}
+
+// ─── End Phase 2b helpers ───────────────────────────────────────────────────
+
+export async function computeAction(
   qualityScore: number,
   demandScore: number,
   momentumScore: number,
@@ -3101,15 +3200,18 @@ export function computeAction(
   liquidityScore: number,
   marketValue: number | null,
   careerStage: string | null | undefined,
-  cardYear?: number | null
-): ActionDecision {
+  cardYear?: number | null,
+  playerName?: string | null,            // NEW (2b): for player verdict fallback
+  sport?: string | null                  // NEW (2b): for player verdict fallback
+): Promise<ActionDecision> {
   const reasons: string[] = [];
   
   const currentYear = new Date().getFullYear();
   const cardAge = cardYear ? currentYear - cardYear : 0;
   const isVintage = cardAge >= 20;
   
-  const isTrendUnavailable = trendScore === 5 && liquidityScore < 4;
+  // Phase 2b: removed isTrendUnavailable gate — Tier 3 contextual now fires
+  // unconditionally after Tier 2 player check (see flow below)
   
   // LITTLE_VALUE: Low quality + low demand + low value
   if (qualityScore < 30 && demandScore < 30 && (marketValue === null || marketValue < 10)) {
@@ -3185,8 +3287,57 @@ export function computeAction(
     return { action: "BUY", reasons };
   }
   
-  if (isTrendUnavailable) {
-    return computeContextualVerdict(qualityScore, demandScore, marketValue, careerStage, cardAge);
+  // ─── Tier 4 (Phase 2b): WATCH gate — STRICTLY pre-debut only ───
+  // Phase 2a removed lazy WATCH defaults; Phase 2b re-adds WATCH for the legitimate
+  // pre-debut case where there are literally no comps to evaluate.
+  if (careerStage === "PRE_DEBUT") {
+    return {
+      action: "WATCH",
+      reasons: [
+        "Pre-debut prospect — no comparable sales yet",
+        "Watch for debut and first-game catalyst",
+      ],
+    };
+  }
+  
+  // ─── Tier 2 (Phase 2b): player verdict fallback ───
+  // Player engine output is real Gemini analysis stored in player_outlook_cache.
+  // Card data may be thin (low liquidity, sparse comps) but player-level analysis
+  // exists — use it. Player verdict trumps Tier 3 contextual (analysis > inference).
+  // Even if player maps to MONITOR (e.g. HOLD_INJURY_CONTINGENT), respect the
+  // player-side reasoning rather than overriding with card-context heuristic.
+  if (playerName && sport) {
+    const playerVerdict = await getPlayerVerdictForCard(playerName, sport);
+    if (playerVerdict) {
+      const mapped = mapPlayerVerdictToCardVerdict(playerVerdict.verdict, marketValue);
+      if (mapped) {
+        const freshnessNote = playerVerdict.freshness === "STALE_OK"
+          ? ` (player view ${Math.round(playerVerdict.ageDays)}d old — confidence reduced)`
+          : "";
+        // If player mapped to MONITOR, attach DATA_UNCERTAIN reason for downstream code
+        const result: ActionDecision = {
+          action: mapped,
+          reasons: [
+            `Player verdict ${playerVerdict.verdict} → card ${mapped}${freshnessNote}`,
+            `Player-level confidence: ${playerVerdict.confidence}`,
+          ],
+        };
+        if (mapped === "MONITOR") {
+          result.monitorReason = "DATA_UNCERTAIN";
+        }
+        return result;
+      }
+    }
+  }
+  
+  // ─── Tier 3 (Phase 2b): generalized contextual verdict ───
+  // Previously gated by isTrendUnavailable (trendScore===5 && liquidityScore<4).
+  // Now fires for any case Tier 1 + Tier 2 didn't resolve. If contextual returns
+  // a confident answer (BUY/LONG_HOLD/LITTLE_VALUE), use it; otherwise fall through
+  // to Tier 1 MONITOR variants below for nuanced MONITOR-reason attribution.
+  const contextual = computeContextualVerdict(qualityScore, demandScore, marketValue, careerStage, cardAge);
+  if (contextual.action !== "MONITOR") {
+    return contextual;
   }
   
   let monitorReason: MonitorReason = "NEUTRAL";
@@ -3623,11 +3774,11 @@ function getMonitorReasonAwareFallback(signals: ComputedOutlookSignals): string 
   }
 }
 
-export function computeAllSignals(
+export async function computeAllSignals(
   card: Card,
   pricePoints: PricePoint[],
   marketValue: number | null
-): ComputedOutlookSignals {
+): Promise<ComputedOutlookSignals> {
   // Compute raw scores
   const liquidityScore = computeLiquidityScore(pricePoints);
   const trendScore = computeTrendScore(pricePoints);
@@ -3652,8 +3803,8 @@ export function computeAllSignals(
   const downsideRisk = computeDownsideRisk(volatilityScore, trendScore, dataConfidence, careerStageAuto);
   const marketFriction = computeMarketFriction(liquidityScore, volatilityScore, pricePoints.length);
   
-  // Compute action (pass cardYear for vintage detection)
-  const { action, reasons: actionReasons, monitorReason } = computeAction(
+  // Compute action (pass cardYear for vintage detection, playerName+sport for Phase 2b player fallback)
+  const { action, reasons: actionReasons, monitorReason } = await computeAction(
     qualityScore,
     demandScore,
     momentumScore,
@@ -3662,7 +3813,9 @@ export function computeAllSignals(
     liquidityScore,
     marketValue,
     careerStageAuto,
-    card.year
+    card.year,
+    card.playerName,
+    card.sport
   );
   
   // Compute Big Mover flag (use downsideRisk instead of old riskScore)
