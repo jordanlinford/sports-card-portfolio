@@ -101,6 +101,8 @@ function getVerdictStyle(verdict: string) {
       return { bg: "bg-violet-500/10", text: "text-violet-700 dark:text-violet-400", icon: <Ban className="h-3 w-3" /> };
     case "SPECULATIVE":
       return { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-3 w-3" /> };
+    case "LONGSHOT_BET":
+      return { bg: "bg-fuchsia-500/10", text: "text-fuchsia-700 dark:text-fuchsia-400", icon: <Sparkles className="h-3 w-3" /> };
     default:
       return { bg: "bg-amber-500/10", text: "text-amber-700 dark:text-amber-400", icon: <Minus className="h-3 w-3" /> };
   }

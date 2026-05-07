@@ -19,6 +19,7 @@ const VERDICT_STYLES: Record<string, { color: string; bg: string }> = {
   TRADE_THE_HYPE: { color: "text-yellow-700 dark:text-yellow-400", bg: "bg-yellow-50 dark:bg-yellow-950" },
   SPECULATIVE_FLYER: { color: "text-purple-700 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-950" },
   AVOID_NEW_MONEY: { color: "text-red-700 dark:text-red-400", bg: "bg-red-50 dark:bg-red-950" },
+  LONGSHOT_BET: { color: "text-fuchsia-700 dark:text-fuchsia-400", bg: "bg-fuchsia-50 dark:bg-fuchsia-950" },
 };
 
 export function CardOfDay() {

@@ -1,0 +1,37 @@
+Option α confirmed. Add LONGSHOT_BET to AdvisorVerdict union, full visual consistency across all surfaces.
+Locked Commit 8 scope (13 files):
+Schema/server (3):
+
+shared/schema.ts - lowercase LONGSHOT_CUTOFFS + SKILL_POSITIONS keys, add LONGSHOT_BET to INVESTMENT_VERDICT, add VERDICT_POSTURE entry "Lottery ticket - hold for potential breakout", add LONGSHOT_BET to AdvisorVerdict union
+server/playerOutlookEngine.ts - widen override condition (longshotCheck && (verdict.action === "MONITOR" || investmentCall.verdict === "SPECULATIVE_FLYER")), write to both verdict.action AND investmentCall.verdict, remove 4 debug log lines (L1646, L2224, L2241, L2245)
+client/src/lib/verdictBuckets.ts - add LONGSHOT_BET to NEUTRAL set
+
+Client palette (10):
+4. client/src/lib/transformToAdvisorOutlook.ts - add LONGSHOT_BET case in mapper
+5. client/src/components/investment-call-card.tsx - add LONGSHOT_BET config entry
+6. client/src/components/outlook-details.tsx - add LONGSHOT_BET config + text-color condition
+7. client/src/components/outlook/AdvisorSnapshot.tsx - add LONGSHOT_BET case (fuchsia)
+8. client/src/components/card-of-day.tsx - add LONGSHOT_BET config
+9. client/src/pages/public-player-outlook.tsx - add LONGSHOT_BET to 2 switches
+10. client/src/pages/public-intel.tsx - add LONGSHOT_BET to getVerdictStyle
+11. client/src/pages/market-leaderboard.tsx - add LONGSHOT_BET to getVerdictStyle
+12. client/src/pages/compare.tsx - add LONGSHOT_BET to label switch + score map
+13. client/src/pages/hidden-gems.tsx - add LONGSHOT_BET to icon/color/label switches
+Color/icon for all UI palette additions:
+
+Color: fuchsia-500 (matching existing locked design)
+Icon: Sparkles (matching existing locked design)
+Label: "Longshot Bet"
+
+Implementation order:
+
+Schema changes first (foundation)
+Server engine changes (logic + debug log removal)
+verdictBuckets safety default
+UI palette additions (client files)
+Run typecheck after schema/server, then again after UI
+Surface complete diff for review BEFORE commit
+After my approval: commit, push, deploy
+
+Don't commit yet. Apply all changes, run typecheck twice (after schema/server, after UI), surface complete diff with file-by-file summary.
+Standing by.

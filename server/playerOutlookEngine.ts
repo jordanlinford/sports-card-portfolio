@@ -136,6 +136,7 @@ import type {
   DataConfidence,
   VerdictModifier,
   InvestmentCall,
+  InvestmentVerdict,
 } from "@shared/schema";
 import { VERDICT_MODIFIER } from "@shared/schema";
 
@@ -1643,14 +1644,12 @@ function isLongshotEligible(params: {
   // Condition 1: early career within sport cutoff
   const cutoff = LONGSHOT_CUTOFFS[sport as keyof typeof LONGSHOT_CUTOFFS];
   if (!cutoff || yearsInLeague === null || yearsInLeague === undefined || yearsInLeague >= cutoff) {
-    console.log(`${tag} FAILED yearsInLeague: sport=${sport}, years=${yearsInLeague}, cutoff=${cutoff}`);
     return false;
   }
   // Condition 2: skill position (normalized to handle aliases)
   const normalizedPos = normalizePosition(position, sport);
   const skillPos = SKILL_POSITIONS[sport as keyof typeof SKILL_POSITIONS] as readonly string[] | undefined;
   if (!skillPos || !skillPos.includes(normalizedPos)) {
-    console.log(`${tag} FAILED position: sport=${sport}, position=${position}, normalized=${normalizedPos}, skillPos=${JSON.stringify(skillPos)}`);
     return false;
   }
   // Condition 3: active roster (not out of league)
@@ -2221,7 +2220,6 @@ async function generateFreshOutlook(
       roleStatus: roleStatus || "UNKNOWN",
       playerName,
     });
-    console.log(`[Longshot DEBUG] player=${playerName} verdict_from_engine=${verdict.action} longshotCheck=${longshotCheck}`);
     const confScore = computeConfidenceScore({
       compsAvailable: marketData.soldCount30d ?? 0,
       dataQuality: evidence.dataQuality || "LOW",
@@ -2236,13 +2234,13 @@ async function generateFreshOutlook(
       console.log(`[PlayerOutlook] SELL demoted to MONITOR for ${playerName}: confScore=${confScore} < 60`);
       verdict.action = "MONITOR" as PlayerVerdict;
     }
-    // LONGSHOT_BET wiring: override MONITOR with LONGSHOT_BET if eligible
-    if (longshotCheck && verdict.action === "MONITOR") {
-      console.log(`[Longshot DEBUG] OVERRIDE FIRED: ${playerName} MONITOR -> LONGSHOT_BET`);
-      console.log(`[PlayerOutlook] LONGSHOT_BET assigned for ${playerName} (sport=${effectiveSport})`);
+    // LONGSHOT_BET wiring: override MONITOR (legacy) or SPECULATIVE_FLYER (V2 canonical) with LONGSHOT_BET if eligible.
+    // Writes to BOTH verdict.action (PlayerVerdict, legacy) and investmentCall.verdict (InvestmentVerdict, displayed)
+    // so the user-visible verdict surface is consistent across all UI consumers.
+    if (longshotCheck && (verdict.action === "MONITOR" || investmentCall.verdict === "SPECULATIVE_FLYER")) {
+      console.log(`[PlayerOutlook] LONGSHOT_BET assigned for ${playerName} (sport=${effectiveSport}, prev verdict.action=${verdict.action}, prev investmentCall.verdict=${investmentCall.verdict})`);
       verdict.action = "LONGSHOT_BET" as PlayerVerdict;
-    } else if (longshotCheck && verdict.action !== "MONITOR") {
-      console.log(`[Longshot DEBUG] ELIGIBLE BUT NO OVERRIDE: ${playerName} got ${verdict.action} from Gemini, override only fires on MONITOR`);
+      investmentCall.verdict = "LONGSHOT_BET" as InvestmentVerdict;
     }
     // Attach confidence score
     (verdict as any).confidenceScore = confScore;

@@ -33,6 +33,7 @@ import {
   BookOpen,
   Share2,
   Check,
+  Sparkles,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -142,6 +143,7 @@ function getVerdictLabel(verdict?: string, postureLabel?: string) {
     case "AVOID_STRUCTURAL": return "Avoid (Declining)";
     case "SPECULATIVE_FLYER": return "Risky Buy";
     case "SPECULATIVE_SUPPRESSED": return "Buy (Undervalued)";
+    case "LONGSHOT_BET": return "Longshot Bet";
     default: return verdict.replace(/_/g, " ");
   }
 }
@@ -154,6 +156,7 @@ const VERDICT_SCORES: Record<string, number> = {
   SPECULATIVE_SUPPRESSED: 85, // Undervalued speculative play
   TRADE_THE_HYPE: 75,        // HOT momentum - valuable but at peak (moved UP from 30)
   SPECULATIVE_FLYER: 70,     // High upside speculative
+  LONGSHOT_BET: 70,          // Early-career skill-position lottery ticket (parity with SPECULATIVE_FLYER)
   HOLD_CORE: 60,             // Established value, stable
   HOLD_INJURY_CONTINGENT: 50, // Uncertain due to injury
   HOLD_ROLE_RISK: 35,        // Uncertain role - risky (moved DOWN from 40)

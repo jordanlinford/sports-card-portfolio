@@ -71,6 +71,14 @@ function getVerdictConfig(verdict: InvestmentVerdict) {
       borderColor: "border-amber-500/30",
       description: "Lottery ticket only",
     },
+    LONGSHOT_BET: {
+      label: "Longshot Bet",
+      icon: Sparkles,
+      bgColor: "bg-fuchsia-500/10 dark:bg-fuchsia-500/20",
+      textColor: "text-fuchsia-700 dark:text-fuchsia-400",
+      borderColor: "border-fuchsia-500/30",
+      description: "Lottery ticket - hold for potential breakout",
+    },
     HOLD_ROLE_RISK: {
       label: "Hold (Role Risk)",
       icon: Eye,

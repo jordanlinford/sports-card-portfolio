@@ -1178,6 +1178,7 @@ export const INVESTMENT_VERDICT = {
   HOLD_INJURY_CONTINGENT: "HOLD_INJURY_CONTINGENT", // Value depends on injury opportunity
   SPECULATIVE_SUPPRESSED: "SPECULATIVE_SUPPRESSED", // Talent there, situation bad - buy low
   AVOID_STRUCTURAL: "AVOID_STRUCTURAL", // True structural decline, no path back
+  LONGSHOT_BET: "LONGSHOT_BET", // Early-career skill-position lottery ticket - hold for potential breakout
 } as const;
 export type InvestmentVerdict = keyof typeof INVESTMENT_VERDICT;
 
@@ -1194,23 +1195,23 @@ export type PlayerVerdict = keyof typeof PLAYER_VERDICT;
 
 // Longshot cutoffs by sport: max years-in-league to still qualify as a longshot
 export const LONGSHOT_CUTOFFS: Record<string, number> = {
-  NFL: 4,
-  NBA: 6,
-  MLB: 7,
-  NHL: 5,
-  SOCCER: 6,
+  football: 4,
+  basketball: 6,
+  baseball: 7,
+  hockey: 5,
+  soccer: 6,
 } as const;
 
 // Skill (fantasy-relevant) positions per sport -- only these positions are eligible for LONGSHOT_BET.
 // NFL: skill + edge/CB eligible. MLB: RP excluded by design (save stats inflate value, not upside).
 // NHL: G excluded (goalie upside uncorrelated with skater metrics). Soccer: attacking positions only.
 export const SKILL_POSITIONS: Record<string, string[]> = {
-  NFL: ["QB", "RB", "WR", "TE", "DE", "OLB", "CB"],
-  NBA: ["PG", "SG", "SF", "PF", "C"],
-  MLB: ["SP", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"],
+  football: ["QB", "RB", "WR", "TE", "DE", "OLB", "CB"],
+  basketball: ["PG", "SG", "SF", "PF", "C"],
+  baseball: ["SP", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"],
   // Forwards (C/LW/RW) + goalies (G) per spec; defensemen excluded -- spec said "with offensive upside" qualifier we cannot reliably encode
-  NHL: ["C", "LW", "RW", "G"],
-  SOCCER: ["ST", "CF", "CAM", "LW", "RW"],
+  hockey: ["C", "LW", "RW", "G"],
+  soccer: ["ST", "CF", "CAM", "LW", "RW"],
 } as const;
 
 // Sport-scoped position aliases for normalization.
@@ -1310,6 +1311,7 @@ export const VERDICT_POSTURE: Record<InvestmentVerdict, string> = {
   HOLD_INJURY_CONTINGENT: "Hold for injury upside",
   SPECULATIVE_SUPPRESSED: "Buy suppressed value",
   AVOID_STRUCTURAL: "Avoid, structural decline",
+  LONGSHOT_BET: "Lottery ticket - hold for potential breakout",
 } as const;
 
 // Verdict Modifier - Adds nuance to the verdict (legacy, kept for compatibility)
@@ -1639,7 +1641,7 @@ export type MarketMetrics = {
 // ============ ADVISOR OUTLOOK - Trusted Advisor Format ============
 // Compact, opinionated summary for the above-the-fold view
 
-export type AdvisorVerdict = "BUY" | "HOLD_CORE" | "HOLD" | "SELL" | "AVOID" | "TRADE_THE_HYPE" | "SPECULATIVE";
+export type AdvisorVerdict = "BUY" | "HOLD_CORE" | "HOLD" | "SELL" | "AVOID" | "TRADE_THE_HYPE" | "SPECULATIVE" | "LONGSHOT_BET";
 export type AdvisorConfidence = "LOW" | "MED" | "HIGH";
 export type AdvisorHorizon = "1-3m" | "3-12m" | "12m+";
 

@@ -11,6 +11,7 @@ const NEUTRAL = new Set([
   "LEGACY_HOLD",
   "LITTLE_VALUE",
   "SPECULATIVE_FLYER",
+  "LONGSHOT_BET",
 ]);
 
 export function bucketVerdict(verdict?: string | null): VerdictBucket | null {

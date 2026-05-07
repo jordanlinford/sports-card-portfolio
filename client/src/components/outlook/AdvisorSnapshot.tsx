@@ -23,6 +23,7 @@ import {
   Briefcase,
   LineChart,
   Info,
+  Sparkles,
 } from "lucide-react";
 import type { AdvisorOutlook, TradeTarget } from "@shared/schema";
 import { formatEnumLabel, enforceCompleteSentences } from "@/lib/formatEnum";
@@ -42,6 +43,8 @@ function getVerdictStyles(verdict: AdvisorOutlook["verdict"]) {
       return { bg: "bg-rose-500/10", border: "border-rose-500/40", text: "text-rose-700 dark:text-rose-400", icon: <TrendingDown className="h-4 w-4" /> };
     case "SPECULATIVE":
       return { bg: "bg-amber-500/10", border: "border-amber-500/40", text: "text-amber-700 dark:text-amber-400", icon: <Zap className="h-4 w-4" /> };
+    case "LONGSHOT_BET":
+      return { bg: "bg-fuchsia-500/10", border: "border-fuchsia-500/40", text: "text-fuchsia-700 dark:text-fuchsia-400", icon: <Sparkles className="h-4 w-4" /> };
     case "AVOID":
       return { bg: "bg-violet-500/10", border: "border-violet-500/40", text: "text-violet-700 dark:text-violet-400", icon: <Ban className="h-4 w-4" /> };
     default:

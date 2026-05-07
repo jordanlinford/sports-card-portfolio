@@ -76,6 +76,7 @@ function getVerdictIcon(verdict: string) {
     case "HOLD_CORE": return <Target className="h-4 w-4" />;
     case "SPECULATIVE_FLYER": return <Zap className="h-4 w-4" />;
     case "SPECULATIVE_SUPPRESSED": return <Zap className="h-4 w-4" />;
+    case "LONGSHOT_BET": return <Sparkles className="h-4 w-4" />;
     // Hold verdicts (neutral)
     case "HOLD_ROLE_RISK": return <EyeIcon className="h-4 w-4" />;
     case "HOLD_INJURY_CONTINGENT": return <EyeIcon className="h-4 w-4" />;
@@ -102,6 +103,8 @@ function getVerdictColor(verdict: string) {
     case "HOLD_INJURY_CONTINGENT": return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
     // Speculative - amber
     case "SPECULATIVE_FLYER": return "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+    // Longshot bet - fuchsia (V2 canonical, distinct from amber speculative family)
+    case "LONGSHOT_BET": return "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/30 dark:text-fuchsia-300";
     // Avoid verdicts - red
     case "TRADE_THE_HYPE": 
     case "AVOID_NEW_MONEY":
@@ -119,6 +122,7 @@ function getVerdictLabel(verdict: string): string {
     case "ACCUMULATE": return "ACCUMULATE";
     case "HOLD_CORE": return "HOLD CORE";
     case "SPECULATIVE_FLYER": return "SPECULATIVE";
+    case "LONGSHOT_BET": return "LONGSHOT BET";
     case "TRADE_THE_HYPE": return "TRADE HYPE";
     case "AVOID_NEW_MONEY": return "AVOID";
     case "HOLD_ROLE_RISK": return "HOLD (ROLE)";

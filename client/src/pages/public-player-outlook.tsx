@@ -72,6 +72,8 @@ function getVerdictIcon(verdict?: string) {
     case "ACCUMULATE":
     case "SPECULATIVE_FLYER":
       return <ShoppingCart className="h-5 w-5" />;
+    case "LONGSHOT_BET":
+      return <Sparkles className="h-5 w-5" />;
     case "MONITOR":
     case "HOLD_CORE":
     case "TRADE_THE_HYPE":
@@ -92,6 +94,8 @@ function getVerdictColor(verdict?: string) {
       return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
     case "SPECULATIVE_FLYER":
       return "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30";
+    case "LONGSHOT_BET":
+      return "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border-fuchsia-500/30";
     case "HOLD_CORE":
       return "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30";
     case "MONITOR":

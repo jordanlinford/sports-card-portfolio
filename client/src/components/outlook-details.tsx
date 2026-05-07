@@ -144,6 +144,7 @@ const ACTION_STYLES: Record<string, { bg: string; border: string; heroBg: string
   HOLD_INJURY_CONTINGENT: { bg: "bg-blue-500/20", border: "border-blue-500", heroBg: "bg-blue-500", icon: Clock, label: "Hold (Injury Hedge)", takeaway: "Backup upside. One injury away from spiking." },
   SPECULATIVE_SUPPRESSED: { bg: "bg-emerald-500/20", border: "border-emerald-500", heroBg: "bg-emerald-500", icon: Target, label: "Speculative Buy", takeaway: "Suppressed value opportunity. Market overcorrected." },
   AVOID_STRUCTURAL: { bg: "bg-violet-700/20", border: "border-violet-700", heroBg: "bg-violet-700", icon: ShieldAlert, label: "Avoid", takeaway: "Structural decline. No path back to relevance." },
+  LONGSHOT_BET: { bg: "bg-fuchsia-500/20", border: "border-fuchsia-500", heroBg: "bg-fuchsia-500", icon: Sparkles, label: "Longshot Bet", takeaway: "Lottery ticket - hold for potential breakout." },
 };
 
 const CONFIDENCE_STYLES: Record<string, { color: string; icon: typeof CheckCircle }> = {

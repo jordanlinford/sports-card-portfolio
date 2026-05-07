@@ -35,6 +35,8 @@ function mapVerdictToAdvisor(
         return { verdict: "BUY", label: "Speculative buy" };
       case "AVOID_STRUCTURAL":
         return { verdict: "AVOID", label: "Avoid, structural decline" };
+      case "LONGSHOT_BET":
+        return { verdict: "LONGSHOT_BET", label: "Longshot bet - lottery ticket" };
       default:
         return { verdict: "HOLD", label: "Hold current position" };
     }
@@ -133,6 +135,8 @@ function extractPackHitReaction(outlook: PlayerOutlookResponse): string | undefi
         return "Don't overthink it—move it fast before you get attached.";
       case "SPECULATIVE_FLYER":
         return "Swing for the fences or cash out now—your call on this one.";
+      case "LONGSHOT_BET":
+        return "Lottery ticket — stash it and forget it. Could pop big if things break right.";
     }
   }
   
