@@ -1,0 +1,59 @@
+Sharp diagnosis. The persistence gap being a red herring is important - the issue is in the live engine logic, not the data layer.
+Run diagnostic #2: temporary verbose logging in isLongshotEligible.
+Add console.log statements inside isLongshotEligible to record why each player failed which condition. Specifically:
+typescriptfunction isLongshotEligible(params: {
+  sport, position, yearsInLeague, careerStage, roleStatus
+}): boolean {
+  const { sport, position, yearsInLeague, careerStage, roleStatus } = params;
+
+  // Existing checks, but log failures
+  if (yearsInLeague === null || yearsInLeague >= LONGSHOT_CUTOFFS[sport]) {
+    console.log(`[Longshot DEBUG] FAILED yearsInLeague: player=${params.playerName || 'unknown'}, years=${yearsInLeague}, cutoff=${LONGSHOT_CUTOFFS[sport]}`);
+    return false;
+  }
+
+  const skillPositions = SKILL_POSITIONS[sport] || [];
+  if (!skillPositions.includes(normalizePosition(position))) {
+    console.log(`[Longshot DEBUG] FAILED position: player=${params.playerName || 'unknown'}, position=${position}, normalized=${normalizePosition(position)}`);
+    return false;
+  }
+
+  if (roleStatus === "OUT_OF_LEAGUE" || roleStatus === "BUST") {
+    console.log(`[Longshot DEBUG] FAILED roleStatus_disqualifier: player=${params.playerName || 'unknown'}, roleStatus=${roleStatus}`);
+    return false;
+  }
+
+  // Established starter check
+  const isEstablished = (
+    (careerStage === "PRIME" || careerStage === "VETERAN") &&
+    roleStatus === "STARTER"
+  );
+  if (isEstablished) {
+    console.log(`[Longshot DEBUG] FAILED established_starter: player=${params.playerName || 'unknown'}, careerStage=${careerStage}, roleStatus=${roleStatus}`);
+    return false;
+  }
+
+  console.log(`[Longshot DEBUG] PASSED: player=${params.playerName || 'unknown'}, years=${yearsInLeague}, position=${position}, careerStage=${careerStage}, roleStatus=${roleStatus}`);
+  return true;
+}
+Also add log at the override site:
+typescriptif (longshotCheck && verdict.action === "MONITOR") {
+  console.log(`[Longshot DEBUG] OVERRIDE FIRED: ${playerName} -> LONGSHOT_BET`);
+  verdict.action = "LONGSHOT_BET" as PlayerVerdict;
+} else if (longshotCheck && verdict.action !== "MONITOR") {
+  console.log(`[Longshot DEBUG] ELIGIBLE BUT NO OVERRIDE: ${playerName} got ${verdict.action} from Gemini, override only fires on MONITOR`);
+}
+Then trigger ONE player refresh in dev to see what the logs say. Pick a player likely to be Longshot-eligible. Surface:
+
+The console.log output for that player
+What verdict.action Gemini returned
+What isLongshotEligible's result was (true/false + which check failed if false)
+
+This tells us conclusively:
+
+Is roleStatus === "STARTER" disqualifying too many players?
+Is Gemini returning BUY when it should return MONITOR?
+Is something else failing?
+
+Don't propose fix yet. Run diagnostic, surface logs, then we lock the fix.
+Note: Don't deploy this debug logging to prod. It's for dev investigation only. After we have findings, remove the logs before any commit that would ship to prod.

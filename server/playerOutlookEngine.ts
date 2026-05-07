@@ -1636,23 +1636,38 @@ function isLongshotEligible(params: {
   yearsInLeague: number | null;
   careerStage: string;
   roleStatus: string;
+  playerName?: string;
 }): boolean {
-  const { sport, position, yearsInLeague, careerStage, roleStatus } = params;
+  const { sport, position, yearsInLeague, careerStage, roleStatus, playerName } = params;
+  const tag = `[Longshot DEBUG] player=${playerName || "unknown"}`;
   // Condition 1: early career within sport cutoff
   const cutoff = LONGSHOT_CUTOFFS[sport as keyof typeof LONGSHOT_CUTOFFS];
-  if (!cutoff || yearsInLeague === null || yearsInLeague === undefined || yearsInLeague >= cutoff) return false;
+  if (!cutoff || yearsInLeague === null || yearsInLeague === undefined || yearsInLeague >= cutoff) {
+    console.log(`${tag} FAILED yearsInLeague: sport=${sport}, years=${yearsInLeague}, cutoff=${cutoff}`);
+    return false;
+  }
   // Condition 2: skill position (normalized to handle aliases)
   const normalizedPos = normalizePosition(position, sport);
   const skillPos = SKILL_POSITIONS[sport as keyof typeof SKILL_POSITIONS] as readonly string[] | undefined;
-  if (!skillPos || !skillPos.includes(normalizedPos)) return false;
+  if (!skillPos || !skillPos.includes(normalizedPos)) {
+    console.log(`${tag} FAILED position: sport=${sport}, position=${position}, normalized=${normalizedPos}, skillPos=${JSON.stringify(skillPos)}`);
+    return false;
+  }
   // Condition 3: active roster (not out of league)
-  if (roleStatus === "OUT_OF_LEAGUE" || roleStatus === "BUST") return false;
+  if (roleStatus === "OUT_OF_LEAGUE" || roleStatus === "BUST") {
+    console.log(`${tag} FAILED roleStatus_disqualifier: roleStatus=${roleStatus}`);
+    return false;
+  }
   // Condition 4: NOT established starter (AND logic -- either signal disqualifies)
   // Note: MLB POSITION_ALIASES maps ambiguous "pitcher" -> SP by default
   // If news says "closer/reliever" the normalizePosition call will map to RP which is not in SKILL_POSITIONS
   const isEstablishedByStage = careerStage === "PRIME" || careerStage === "VETERAN";
   const isEstablishedByRole = roleStatus === "STARTER";
-  if (isEstablishedByStage || isEstablishedByRole) return false;
+  if (isEstablishedByStage || isEstablishedByRole) {
+    console.log(`${tag} FAILED established_starter: careerStage=${careerStage}, roleStatus=${roleStatus}, byStage=${isEstablishedByStage}, byRole=${isEstablishedByRole}`);
+    return false;
+  }
+  console.log(`${tag} PASSED: sport=${sport}, years=${yearsInLeague}, position=${position}->${normalizedPos}, careerStage=${careerStage}, roleStatus=${roleStatus}`);
   return true;
 }
 
@@ -2204,7 +2219,9 @@ async function generateFreshOutlook(
       yearsInLeague: classification.rookieYear ? (new Date().getFullYear() - classification.rookieYear) : null,
       careerStage: resolvedCareerStage || "",
       roleStatus: roleStatus || "UNKNOWN",
+      playerName,
     });
+    console.log(`[Longshot DEBUG] player=${playerName} verdict_from_engine=${verdict.action} longshotCheck=${longshotCheck}`);
     const confScore = computeConfidenceScore({
       compsAvailable: marketData.soldCount30d ?? 0,
       dataQuality: evidence.dataQuality || "LOW",
@@ -2221,8 +2238,11 @@ async function generateFreshOutlook(
     }
     // LONGSHOT_BET wiring: override MONITOR with LONGSHOT_BET if eligible
     if (longshotCheck && verdict.action === "MONITOR") {
+      console.log(`[Longshot DEBUG] OVERRIDE FIRED: ${playerName} MONITOR -> LONGSHOT_BET`);
       console.log(`[PlayerOutlook] LONGSHOT_BET assigned for ${playerName} (sport=${effectiveSport})`);
       verdict.action = "LONGSHOT_BET" as PlayerVerdict;
+    } else if (longshotCheck && verdict.action !== "MONITOR") {
+      console.log(`[Longshot DEBUG] ELIGIBLE BUT NO OVERRIDE: ${playerName} got ${verdict.action} from Gemini, override only fires on MONITOR`);
     }
     // Attach confidence score
     (verdict as any).confidenceScore = confScore;
