@@ -19,16 +19,70 @@
  * canonical CareerStage from the registry directly and stop consulting
  * cards.legacy_tier. Phase 3 drops the column.
  *
- * Run with:  tsx scripts/backfill-legacy-tier-from-registry.ts
- *            tsx scripts/backfill-legacy-tier-from-registry.ts --dry-run
+ * Run with:
+ *   DEV  dry-run:  tsx scripts/backfill-legacy-tier-from-registry.ts --dry-run
+ *   DEV  live:     tsx scripts/backfill-legacy-tier-from-registry.ts
+ *   PROD dry-run:  PROD_DATABASE_URL=... tsx scripts/backfill-legacy-tier-from-registry.ts --prod --dry-run
+ *   PROD live:     PROD_DATABASE_URL=... tsx scripts/backfill-legacy-tier-from-registry.ts --prod
+ *
+ * PROD safety: --prod and PROD_DATABASE_URL are BOTH required. Either one alone
+ * aborts immediately. The script rewrites process.env.DATABASE_URL to the prod
+ * URL BEFORE importing ../server/db so the pool only ever sees the prod string.
  */
 
-import { db } from "../server/db";
-import { cards } from "../shared/schema";
-import { isNotNull, eq, and, ne } from "drizzle-orm";
-import { lookupPlayer } from "../server/playerRegistry";
-
 const DRY_RUN = process.argv.includes("--dry-run");
+const PROD_MODE = process.argv.includes("--prod");
+
+// ---------------------------------------------------------------------------
+// PROD safety gate -- runs BEFORE any import of ../server/db so the pool can
+// never accidentally bind to the dev DATABASE_URL when we intend to hit prod.
+// ---------------------------------------------------------------------------
+if (PROD_MODE) {
+  const prodUrl = process.env.PROD_DATABASE_URL;
+  if (!prodUrl) {
+    console.error("");
+    console.error("===============================================================");
+    console.error("ERROR: --prod flag requires PROD_DATABASE_URL env var to be set.");
+    console.error("Set it with:  export PROD_DATABASE_URL='postgres://...'");
+    console.error("Then re-run.  Aborting.");
+    console.error("===============================================================");
+    process.exit(1);
+  }
+  // Sanity check: refuse to run --prod against an obviously dev-looking URL.
+  if (prodUrl === process.env.DATABASE_URL) {
+    console.error("");
+    console.error("===============================================================");
+    console.error("ERROR: PROD_DATABASE_URL is identical to DATABASE_URL.");
+    console.error("This looks like a misconfiguration -- both env vars point at the");
+    console.error("same database. Refusing to run in --prod mode. Aborting.");
+    console.error("===============================================================");
+    process.exit(1);
+  }
+  console.log("");
+  console.log("===============================================================");
+  console.log("⚠️  PROD MODE -- Will operate on PRODUCTION database");
+  console.log(`⚠️  Mode: ${DRY_RUN ? "DRY-RUN (no writes)" : "LIVE WRITES"}`);
+  console.log("===============================================================");
+  console.log("");
+  // Override DATABASE_URL so the lazily-loaded db module connects to prod.
+  process.env.DATABASE_URL = prodUrl;
+} else if (process.env.PROD_DATABASE_URL && !DRY_RUN) {
+  // Belt-and-suspenders: if PROD_DATABASE_URL is set in the env but --prod was
+  // NOT passed, refuse to run a LIVE backfill. The user almost certainly forgot
+  // the flag and is about to write to dev with a stale prod URL hanging around.
+  console.error("");
+  console.error("===============================================================");
+  console.error("ERROR: PROD_DATABASE_URL is set but --prod flag was NOT passed.");
+  console.error("Refusing to run live writes -- pass --prod to confirm prod intent,");
+  console.error("or unset PROD_DATABASE_URL to run against dev. Aborting.");
+  console.error("===============================================================");
+  process.exit(1);
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic imports -- MUST come after the DATABASE_URL override above so that
+// the db module's pool factory reads the (possibly rewritten) URL.
+// ---------------------------------------------------------------------------
 
 // Fix A2: strip trailing card-number suffixes from dirty player_name values
 // (e.g. "Josh Allen #304" -> "Josh Allen", "Lamar Jackson 8" -> "Lamar Jackson").
@@ -67,7 +121,15 @@ interface UpdatePlan {
 }
 
 async function main() {
+  // Dynamic imports — see header note. Order matters: db must load AFTER any
+  // env mutation above.
+  const { db } = await import("../server/db");
+  const { cards } = await import("../shared/schema");
+  const { isNotNull, eq } = await import("drizzle-orm");
+  const { lookupPlayer } = await import("../server/playerRegistry");
+
   console.log(`[Backfill] Phase 1 verdict migration -- legacy_tier backfill from player registry`);
+  console.log(`[Backfill] Target: ${PROD_MODE ? "PRODUCTION" : "development"}`);
   console.log(`[Backfill] Mode: ${DRY_RUN ? "DRY-RUN (no writes)" : "LIVE"}`);
   console.log(``);
 
@@ -141,21 +203,47 @@ async function main() {
     return;
   }
 
-  // Show first 20 planned changes for visibility
-  console.log(`[Backfill] First ${Math.min(plans.length, 20)} planned updates:`);
-  for (const p of plans.slice(0, 20)) {
-    console.log(`[Backfill]   card #${p.cardId} (${p.playerName}): ${p.oldTier ?? "NULL"} -> ${p.newTier} (registry: ${p.registryStage})`);
-  }
-  if (plans.length > 20) {
-    console.log(`[Backfill]   ... and ${plans.length - 20} more`);
+  // -------------------------------------------------------------------------
+  // Group planned updates for review: NULL fills vs divergent normalizations,
+  // plus a per-player breakdown so multi-card players are easy to scan.
+  // -------------------------------------------------------------------------
+  const nullFills = plans.filter((p) => p.oldTier === null);
+  const divergent = plans.filter((p) => p.oldTier !== null);
+
+  console.log(`[Backfill] === Group 1: NULL fills (${nullFills.length}) ===`);
+  for (const p of nullFills) {
+    console.log(`[Backfill]   card #${p.cardId} (${p.playerName}): NULL -> ${p.newTier} (registry: ${p.registryStage})`);
   }
   console.log(``);
+
+  console.log(`[Backfill] === Group 2: divergent normalizations (${divergent.length}) ===`);
+  // Sort by playerName so multi-card players are grouped visually
+  const divergentSorted = [...divergent].sort((a, b) =>
+    a.playerName.localeCompare(b.playerName) || a.cardId - b.cardId
+  );
+  for (const p of divergentSorted) {
+    console.log(`[Backfill]   card #${p.cardId} (${p.playerName}): ${p.oldTier} -> ${p.newTier} (registry: ${p.registryStage})`);
+  }
+  console.log(``);
+
+  // Highlight notable transitions (HOF/SUPERSTAR/LEGEND collisions etc.)
+  const notableOldValues = new Set(["HOF", "SUPERSTAR", "LEGEND", "RETIRED", "ROOKIE"]);
+  const notable = divergent.filter((p) => p.oldTier && notableOldValues.has(p.oldTier));
+  if (notable.length > 0) {
+    console.log(`[Backfill] === Group 3: notable transitions to eyeball (${notable.length}) ===`);
+    console.log(`[Backfill] (HOF/SUPERSTAR/LEGEND/RETIRED/ROOKIE -> something else)`);
+    for (const p of notable) {
+      console.log(`[Backfill]   card #${p.cardId} (${p.playerName}): ${p.oldTier} -> ${p.newTier} (registry: ${p.registryStage})`);
+    }
+    console.log(``);
+  }
 
   if (DRY_RUN) {
     console.log(`[Backfill] DRY-RUN: no writes performed. Re-run without --dry-run to apply.`);
     return;
   }
 
+  console.log(`[Backfill] Beginning live writes against ${PROD_MODE ? "PRODUCTION" : "development"}...`);
   let updatedCount = 0;
   for (const p of plans) {
     await db.update(cards)
@@ -163,10 +251,12 @@ async function main() {
       .where(eq(cards.id, p.cardId));
     updatedCount++;
   }
-  console.log(`[Backfill] DONE. Updated ${updatedCount} card rows.`);
+  console.log(`[Backfill] DONE. Updated ${updatedCount} card rows on ${PROD_MODE ? "PRODUCTION" : "development"}.`);
 }
 
-main().catch((err) => {
-  console.error(`[Backfill] FATAL:`, err);
-  process.exit(1);
-});
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(`[Backfill] FATAL:`, err);
+    process.exit(1);
+  });

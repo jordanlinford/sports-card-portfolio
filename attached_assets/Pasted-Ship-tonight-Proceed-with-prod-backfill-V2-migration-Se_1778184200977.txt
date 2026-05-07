@@ -1,0 +1,52 @@
+Ship tonight. Proceed with prod backfill + V2 migration.
+Sequence:
+
+Modify scripts/backfill-legacy-tier-from-registry.ts:
+
+Add --prod flag detection
+Add PROD_DATABASE_URL env var requirement when --prod is set
+Defense-in-depth: BOTH must be present, otherwise abort with clear error
+When --prod active, override db connection to PROD_DATABASE_URL instead of dev
+Log "⚠️ PROD MODE" prominently when active
+
+Surface the diff for review before user sets PROD_DATABASE_URL.
+After diff approved, user sets PROD_DATABASE_URL temporarily.
+Run: tsx scripts/backfill-legacy-tier-from-registry.ts --prod --dry-run
+Surface FULL output (not just samples). Group by:
+
+NULL fills (count + sample)
+Divergent normalizations (all 114 cards in 31 player groups)
+Any unexpected/edge cases (Tom Brady HOF/SUPERSTAR resolution, Karl Malone HOF/LEGEND, etc.)
+
+
+User reviews dry-run output carefully. Approves or requests adjustments.
+Run live: tsx scripts/backfill-legacy-tier-from-registry.ts --prod
+Surface row count updated. Spot-verify 5-10 cards post-backfill.
+User unsets PROD_DATABASE_URL immediately after live run completes.
+User triggers prod V2 player migration via https://hobbyalpha.com/admin V2 Migration tab.
+You watch first 10 min of prod logs:
+
+[Longshot DEBUG] PASSED logs (eligibility check working)
+[PlayerOutlook] LONGSHOT_BET assigned logs (override firing for appropriate players)
+Specific watch: Bowers/Puka/MHJ/Stroud should NOT get Longshot
+Any error stack traces
+
+
+After 10 min:
+
+SQL check: count of LONGSHOT_BET assignments in last 10 min
+If healthy: walk away, prod runs background ~5 hours
+If broken: STOP, surface diagnostics
+
+
+After prod migration completes (~5 hours), surface validation report:
+
+Distribution by verdict with percentages
+Validation against ±5pp tolerance bands
+Test player verdicts: Wemby (NOT Longshot), Bo Nix, Bowers (NOT Longshot), Puka (NOT Longshot), Bagent/Rattler/Ewers (Longshot expected if backup status)
+Sample 10 LONGSHOT_BET assignments for quality verification
+Any errored entries
+
+
+
+Standing by for the script modification diff.
