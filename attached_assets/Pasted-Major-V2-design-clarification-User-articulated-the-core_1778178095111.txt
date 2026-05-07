@@ -1,0 +1,63 @@
+Major V2 design clarification. User articulated the core principle:
+Never default to "Watch." Always produce an actionable verdict by walking up the hierarchy.
+When card-specific data is thin, the engine should fall back to player verdict. When player verdict is also thin, fall back to structural reasoning (career stage, role status, league status). "Watch" is reserved EXCLUSIVELY for pre-debut players with literally zero data.
+User's example: "Nobody really buys this card, but this player is an AVOID - he's in jail and no longer in the league." That's the kind of reasoning we want, not "Watch - do not buy aggressively."
+This is bigger than just LONGSHOT_BET. It's the principle that makes V2 actually useful.
+Hold all current work. New scope:
+
+Player outlook engine refinement (Commit 8.5):
+
+Tighten LONGSHOT_BET eligibility (no STARTER role)
+Add market signal strength gate (don't override strong signals)
+Validate hierarchy: market data first, structural overlays only when market data is thin
+
+
+Card outlook engine overhaul (Commit 9):
+
+Import player verdict + signals as inputs
+Implement hierarchical fallback logic:
+Tier 1: Strong card-specific data → card verdict from card signals
+Tier 2: Thin card data + good player verdict → card verdict derived from player verdict
+Tier 3: Thin card + thin player → structural reasoning (career stage, role, league status)
+Tier 4: Pre-debut only → WATCH
+Output card-action verdicts (BUY/HOLD/SELL/AVOID/TRIM with audience differentiation)
+Generate explanations showing which tier drove the verdict
+Eliminate "Watch" except Tier 4
+
+
+
+Investigation needed first:
+
+Surface cardOutlookService.ts current verdict generation logic in full - all 600+ lines if needed. We need complete picture before redesigning.
+Document inputs currently available to card outlook:
+
+Player verdict from cache?
+Card-specific comp data?
+Player signals (careerStage, roleStatus, etc.)?
+Audience context (buyer vs holder)?
+
+
+Identify how often cards currently get "Watch" verdict in production:
+sqlSELECT outlook_action, COUNT(*) 
+FROM cards 
+WHERE last_outlook_at IS NOT NULL
+GROUP BY outlook_action 
+ORDER BY COUNT(*) DESC;
+This shows the magnitude of the "Watch" problem.
+
+Surface findings. Then we design the new card outlook architecture together. Don't write code yet.
+Realistic timeline:
+
+Investigation: 30-60 min
+Design Commit 8.5 + Commit 9 architecture: 60-90 min
+Implementation Commit 8.5: 60 min
+Implementation Commit 9 (substantial - hierarchy logic + player verdict integration + audience differentiation): 4-6 hours
+Test with real cards (Bo Nix, Wemby, Puka, Bagent, Rattler, retired veteran, etc.): 60 min
+Re-run dev migration: 90 min
+Validate: 30 min
+Trigger prod migration: 5 hours background
+Final validation: 30 min
+
+Total: 12-16 hours of focused work spread across 1-2 days.
+This is the work to ship V2 the way it should ship. Triggering prod migration tonight with current logic would deliver "Watch" verdicts on most card analyses and over-apply LONGSHOT_BET on player analyses. Better to delay and ship right.
+Standing by for cardOutlookService surface and current "Watch" frequency data.
