@@ -1,0 +1,90 @@
+Surfacing requested findings — no commits yet
+1. Sport keys the engine actually produces
+normalizeSportName (server/playerOutlookEngine.ts:406–424) maps every input to one of these 5 lowercase canonical values:
+
+football, basketball, baseball, hockey, soccer
+
+Mapping table:
+
+nfl | football → football
+nba | basketball → basketball
+mlb | baseball → baseball
+nhl | hockey → hockey
+soccer | mls | premier league | la liga | epl → soccer
+There's also a hard fallback at line 1746: any unrecognized sport defaults to "football". So the engine guarantees effectiveSport ∈ {football, basketball, baseball, hockey, soccer}.
+
+Schema update needed (lowercase to match):
+
+export const LONGSHOT_CUTOFFS: Record<string, number> = {
+  football: 4,
+  basketball: 6,
+  baseball: 7,
+  hockey: 5,
+  soccer: 6,
+} as const;
+export const SKILL_POSITIONS: Record<string, string[]> = {
+  football: ["QB","RB","WR","TE","DE","OLB","CB"],
+  basketball: ["PG","SG","SF","PF","C"],
+  baseball: ["SP","C","1B","2B","3B","SS","LF","CF","RF","DH"],
+  hockey: ["C","LW","RW","G"],
+  soccer: ["ST","CF","CAM","LW","RW"],
+} as const;
+
+Note: POSITION_ALIASES (shared/schema.ts:1219) is also keyed by uppercase league codes (NFL, NBA, etc.). normalizePosition in the same file consumes those — need to grep the call site to confirm if it gets passed the lowercase sport too. (Quick check: normalizePosition(position, sport) is called at line 1653 with sport=effectiveSport lowercase. So POSITION_ALIASES has the same casing bug — position normalization is silently no-op'ing for every player. That means the engine has been comparing raw Gemini-returned position strings like "Quarterback" directly against ["QB","RB",...] and miraculously matching only when Gemini happened to return the abbreviated form. This is a third place to fix.)
+
+2. Current Tier-5 prompt text (line 1078–1087)
+6-TIER EVIDENCE WATERFALL -- work through these in order, stop at first sufficient tier:
+TIER 1 (compsAvailable>=3): BUY/SELL/HOLD/MONITOR based on comp data. SELL requires comps showing weakness.
+TIER 2 (compsAvailable<3, card data known): BUY/HOLD/MONITOR. Do NOT use SELL at Tier 2.
+TIER 3 (player profile data): BUY/MONITOR/AVOID/SELL if clear decline evidence.
+TIER 4 (sport/position/team context only): MONITOR or AVOID.
+TIER 5 (early career, unproven): Use MONITOR. Engine determines LONGSHOT_BET eligibility post-call.
+TIER 6 (pre-debut ONLY): Use WATCH. Player not yet played pro games. Do NOT use WATCH for thin data.
+SELL RULES: requires Tier 1 comp evidence of weakness OR Tier 3 clear decline. NOT Tier 2/4 speculation.
+WATCH RULES: pre-debut only. 1+ year of pro stats = NOT WATCH. Thin data = MONITOR.
+
+Important caveat — Gemini's response schema (line 1162) only allows "BUY|MONITOR|AVOID":
+
+"verdict": {
+  "action": "BUY|MONITOR|AVOID",
+  ...
+}
+
+So Gemini physically cannot return SPECULATIVE_FLYER or SELL or LONGSHOT_BET from its primary verdict slot. The SPECULATIVE_FLYER McCarthy got must therefore be assigned post-Gemini, by the engine itself (via the INVESTMENT_VERDICT waterfall — that's the richer enum at schema.ts:1175). So the override widening to catch SPECULATIVE_FLYER is correct but it has to fire on investmentCall.verdict, not verdict.action — different field, different enum. Worth confirming this before locking the override fix.
+
+The debug log line verdict_from_engine=AVOID on McCarthy means Tier 5 instruction was overridden by Gemini's Tier-3 AVOID (likely triggered by injury/role uncertainty — injury: RECOVERING, role: UNCERTAIN). Gemini interpreted "uncertainty" as bearish rather than "early-career upside profile."
+
+3. Proposed strengthened Tier-5 prompt
+TIER 5 — MANDATORY OVERRIDE (early-career, unproven):
+For players where ALL of the following are true:
+  • PLAYER DATA "Career Stage" is ROOKIE | YEAR_2 | YEAR_3 | YEAR_4 (NFL ≤4 / NBA ≤6 / MLB ≤7 / NHL ≤5 / Soccer ≤6)
+  • PLAYER DATA "Position" is a skill/fantasy-relevant position
+  • Player is NOT an established starter (role uncertain, backup, rotational, or injured)
+  • There is no Tier 1 comp evidence of structural weakness
+You MUST set verdict.action = "MONITOR".
+Do NOT use BUY for these profiles (engine reserves BUY for established players with comp confirmation).
+Do NOT use AVOID for these profiles. Role uncertainty, recovering injury, and unproven production
+are EXPECTED for this tier — they are NOT bearish signals at this career stage. They are precisely
+why the engine post-processes Tier 5 outputs into LONGSHOT_BET (small lottery-ticket position).
+The engine performs LONGSHOT_BET conversion automatically based on structural eligibility
+(years-in-league cutoff, skill position, role status). Your job is only to return MONITOR so the
+engine can apply the conversion.
+Tier 5 examples:
+  • J.J. McCarthy (Year 2 QB, recovering from injury) → MONITOR
+  • Spencer Rattler (Year 2 QB, backup/uncertain role) → MONITOR
+  • Tyson Bagent (Year 3 QB, backup) → MONITOR
+  • De'Von Achane (Year 3 RB, established starter) → NOT Tier 5; use Tier 1/3 logic (he is established)
+
+I'd also recommend expanding the JSON schema's allowed values at line 1162 to make MONITOR an unambiguous default and remove the temptation to escalate to AVOID. Current schema "BUY|MONITOR|AVOID" is fine for Tier 5 (MONITOR is allowed); the issue is the prompt isn't forceful enough about which tier wins when signals conflict.
+
+Summary table for Commit 8
+Change	File	Risk
+1a	Lowercase keys in LONGSHOT_CUTOFFS	shared/schema.ts:1196
+1b	Lowercase keys in SKILL_POSITIONS	shared/schema.ts:1207
+1c	Lowercase keys in POSITION_ALIASES	shared/schema.ts:1219
+2a	Widen LONGSHOT_BET override	server/playerOutlookEngine.ts:2243
+2b	Strengthen Tier-5 prompt	server/playerOutlookEngine.ts:1083
+Two things I want your call on before drafting Commit 8:
+
+Should #1c (POSITION_ALIASES) be in Commit 8 or held separately? It's the same root cause as #1a/#1b but has wider blast radius.
+Is the override widening targeting verdict.action (PlayerVerdict, ≤6 values) or investmentCall.verdict (InvestmentVerdict, ≥10 values including SPECULATIVE_FLYER)? Looking at the existing code at line 2243, it's verdict.action — but SPECULATIVE_FLYER isn't in PLAYER_VERDICT. So either we widen PLAYER_VERDICT to include it, or the override needs to inspect the investmentCall verdict instead. Want me to read where verdict.action gets populated post-Gemini (since Gemini's JSON schema only emits BUY/MONITOR/AVOID) so we know which field carries SPECULATIVE_FLYER?
