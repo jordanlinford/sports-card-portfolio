@@ -1,0 +1,56 @@
+Cron infrastructure status: NOT WIRED
+Findings
+Check	Result
+CRON_SECRET references in code	Zero
+/api/cron/* endpoint registrations	Zero
+cron-job.org / easycron / external service references	Zero
+CRON_SECRET env var present	Not in available secrets list
+replit.md mention	One sentence only: "External cron endpoints for managing long-running scheduled jobs" — aspirational/documentation-only, not implemented
+Recent /api/cron/* requests in prod logs	None
+What actually exists for scheduling
+All scheduling in the codebase is in-process setInterval (15 instances across alphaEngine.ts, priceAlertJob.ts, weeklyReportJob.ts, playerOutlookOutcomesJob.ts, careerStageJob.ts, regressionTestJob.ts, winBackJob.ts, scanWorker.ts, etc.).
+
+This is exactly the same pattern that just failed for the migration. Every one of these in-process timers dies when the autoscale instance dies. They get re-created when the next request boots a new instance and the module re-evaluates. For frequent jobs (every few minutes) this is mostly fine. For long-running batch work (V2 migration), it's broken — same root cause as today's failure.
+
+The replit.md line about "external cron endpoints" describes a future/intended pattern that was never built. There is no live external cron service hitting prod.
+
+Decision: Lock B-i (admin-driven pull)
+Per your decision tree:
+
+❌ Cron not wired → B-ii blocked
+✅ B-i is faster to ship and depends on zero infrastructure we can't verify
+What B-i looks like (final design before code)
+Server changes (server/verdictMigrationJob.ts + server/routes.ts):
+
+Refactor triggerV2Migration(force) → runMigrationChunk(force, batchSize) that:
+Acquires isRunning mutex (returns {queued: false, reason: "Chunk already running"} if held)
+Queries WHERE confidence_score IS NULL LIMIT batchSize
+If zero rows → finalize: snapshot afterDistribution, validate bands, set status="complete", clear marker, return {done: true, stats}
+Else → process batch with existing per-row try/catch loop, write marker after each row (so a kill mid-batch is recoverable)
+Returns {done: false, processedThisBatch, remainingCount, runningTally, ...} and releases mutex
+New endpoint: POST /api/admin/migrate-verdicts-v2/chunk?size=N — admin-only, calls runMigrationChunk, returns its result. Existing /status endpoint stays for read-only polling.
+Boot auto-resume (checkInterruptedOnStartup) stays as a safety net but is no longer the primary recovery path.
+Client changes (client/src/pages/admin.tsx VerdictMigrationTab):
+
+New "Run Chunked V2 Migration" button. On click, sets loopActive=true and starts a self-rescheduling loop:
+await fetch('/chunk?size=5')
+Update UI with processedThisBatch / remainingCount / runningTally
+If done → stop loop, show completion report
+Else → schedule next chunk via setTimeout(..., 1000) (1s breathing room)
+"Pause" button toggles loopActive=false (current chunk completes, then loop stops). "Resume" picks back up by calling /chunk again.
+Loop survives single chunk failures (logs error, retries with same batch size; if 3 consecutive failures, stops with error banner).
+Batch size choice: Start with batchSize=5. With observed ~30s/entry, that's ~150s per chunk — well under any reasonable Autoscale request timeout (default is 5 minutes for HTTP responses on Replit Autoscale; even 60s cap allows batchSize=1-2). If 5 works smoothly first 2-3 chunks, admin can bump to 10. Conservative default protects against timeout edge cases.
+
+Drain estimate: ~600 remaining × 30s = ~5 hours of compute. With batchSize=5 and 1s gap between chunks, ~600 chunks × ~150s = ~5 hours wall-clock. Admin tab needs to stay open. If browser/network drops, just reopen and re-click — picks up from current DB state automatically.
+
+Concurrency safety: isRunning mutex prevents two chunks running simultaneously even if admin clicks twice or two admin tabs are open. The DB skip-mode query is naturally idempotent (already-migrated rows are excluded).
+
+Standing by for
+✅ Cron status — surfaced (not wired, B-i locked)
+⏳ SQL results from prod Database pane (your queries running now)
+Once SQL results land, I'll start implementing B-i. The combined deploy will be:
+
+Phase 2a + 2b + 4 UI fixes (already in workspace, committed)
+B-i chunking implementation (~45 min new code)
+Single deploy → admin clicks chunked migration → drains over ~5 hours → completion report
+Send the SQL counts when you have them.
