@@ -208,7 +208,7 @@ export async function generatePlayerOGImage(playerSlug: string): Promise<Buffer>
       <text x="85" y="590" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">SC</text>
       
       <!-- Brand name -->
-      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">Sports Card Portfolio</text>
+      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">Hobby Alpha</text>
       <text x="130" y="600" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#64748B">AI-Powered Investment Intelligence</text>
       
       <!-- CTA on right -->

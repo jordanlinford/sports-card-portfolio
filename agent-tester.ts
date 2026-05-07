@@ -95,7 +95,7 @@ async function runFeatureAudit(
   const prompt = `
     ${PERSONAS[persona]}
 
-    You are auditing the "${featureName}" feature of Sports Card Portfolio (${APP_URL}).
+    You are auditing the "${featureName}" feature of Hobby Alpha (${APP_URL}).
     Feature description: ${feature.description}
     Route: ${feature.path}
     Auth required: ${feature.requiresAuth}
@@ -206,7 +206,7 @@ async function runFullAudit(persona: Persona = "whale") {
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 
   console.log(`\n${"=".repeat(60)}`);
-  console.log(`  Sports Card Portfolio — AI QA Audit`);
+  console.log(`  Hobby Alpha — AI QA Audit`);
   console.log(`  Persona: ${persona} | Time: ${new Date().toLocaleString()}`);
   console.log(`  App: ${APP_URL}`);
   console.log(`${"=".repeat(60)}`);

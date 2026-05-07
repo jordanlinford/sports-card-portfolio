@@ -1395,7 +1395,7 @@ export function SharedSealedRoiPage({ shareId }: { shareId: string }) {
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Sealed Product Analysis</h1>
         </div>
         <p className="text-muted-foreground text-sm">
-          Shared analysis from Sports Card Portfolio
+          Shared analysis from Hobby Alpha
         </p>
       </div>
 

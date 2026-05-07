@@ -1,0 +1,24 @@
+Good catches. Answers to your three blocking questions:
+Q1 - Migration intent: Yes, wipe and regenerate all 139 via getPlayerOutlook(forceRefresh: true). V2 engine produces correct verdicts on first generation. The migration design is correct.
+Your hypothesis is the right lead: "0 rows have confidence_score populated means getPlayerOutlook is bailing out before reaching the save." Investigate why forceRefresh isn't producing fresh calls.
+Specific things to check:
+
+Does getPlayerOutlook honor forceRefresh: true? Look at the function signature and the cache-hit logic
+Is there a cache layer in front of saveToCache that returns early?
+When the migration's loop calls getPlayerOutlook, what actually happens? Add console.log at entry to getPlayerOutlook with the forceRefresh value to confirm it's being received
+Check if Gemini is throwing errors that get swallowed silently somewhere in the engine (catch blocks that don't re-throw)
+
+Q2 - Branding assets: Take option (c) + verify. Open public/favicon.png and public/og-default.png in the workspace preview. User will eyeball them and confirm whether they're HobbyAlpha or old SCP-branded.
+User: open these two files. Tell us what you see - HobbyAlpha logo or "Sports Card Portfolio" branding?
+If HobbyAlpha: just text/title swaps needed, no asset replacement.
+If SCP: user re-uploads HobbyAlpha versions via chat.
+Q3 - Order: Yes, kick off branding text/title swaps in parallel. That's no-risk and produces visible progress while migration gets investigated.
+Additional context I should have included in the handoff:
+
+Cache vocabulary is V0-era (SPECULATIVE_FLYER, HOLD_CORE, AVOID_NEW_MONEY, ACCUMULATE, TRADE_THE_HYPE, AVOID_STRUCTURAL). The "V1 to V2" framing was wrong. Treat as "regenerate from scratch under V2 engine."
+The "823" mystery is probably a UI artifact (stale state from prior trigger) not a real iteration count
+The "Jamarr chase tie dye 2021" name might have been from a card-level outlook generation triggered separately, not the migration job - worth confirming via logs if you can
+
+Standing by for findings on Q1 root cause investigation. While you work on that, kick off branding text/title swaps as a parallel commit.
+
+A note for you

@@ -9,7 +9,7 @@ export function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            {currentYear} Sports Card Portfolio. All rights reserved.
+            {currentYear} Hobby Alpha. All rights reserved.
           </p>
           <nav className="flex flex-wrap items-center gap-6">
             <a 

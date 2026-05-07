@@ -453,7 +453,7 @@ async function generateBragImage(
         <text x="${width / 2}" y="105" text-anchor="middle"
               font-family="system-ui, -apple-system, sans-serif" 
               font-size="22" fill="rgba(255,255,255,0.7)">
-          Portfolio on Sports Card Portfolio
+          Portfolio on Hobby Alpha
         </text>
       </svg>
     `;

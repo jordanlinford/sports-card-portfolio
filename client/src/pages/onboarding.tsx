@@ -137,7 +137,7 @@ function PlayerSearchStep({
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm font-medium mb-4">
             <Sparkles className="h-4 w-4" />
-            Welcome to Sports Card Portfolio
+            Welcome to Hobby Alpha
           </div>
           <h1 className="text-3xl md:text-4xl font-bold mb-3" data-testid="text-onboarding-title">
             Who do you want to check out?

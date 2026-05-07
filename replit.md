@@ -1,5 +1,5 @@
-# Sports Card Portfolio
-A web application for sports card collectors to manage, analyze, and grow their collections with AI-powered market intelligence.
+# Hobby Alpha
+A web application for sports card collectors to manage, analyze, and grow their collections with AI-powered market intelligence. (Formerly "Sports Card Portfolio".)
 
 ## Run & Operate
 - **Run Dev Server**: `npm run dev`

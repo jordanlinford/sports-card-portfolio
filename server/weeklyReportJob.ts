@@ -71,7 +71,7 @@ export async function generateWeeklyReport(): Promise<void> {
     content += `## What We're Watching\n\n`;
     content += `The overall market sentiment leans **${buySignals > sellSignals ? "bullish" : buySignals < sellSignals ? "bearish" : "neutral"}** this week. `;
     content += `Stay tuned to the [Alpha Feed](/alpha) for daily updates.\n\n`;
-    content += `*This report is auto-generated from Sports Card Portfolio's market intelligence engine.*\n`;
+    content += `*This report is auto-generated from Hobby Alpha's market intelligence engine.*\n`;
 
     // Check if post for this week already exists
     const existing = await db.select().from(blogPosts).where(sql`${blogPosts.slug} = ${slug}`);

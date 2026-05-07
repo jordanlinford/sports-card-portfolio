@@ -674,7 +674,7 @@ Sitemap: ${origin}/sitemap.xml
         "dateModified": post.updatedAt,
         "mainEntityOfPage": { "@type": "WebPage", "@id": url },
         ...(imageUrl && { "image": imageUrl }),
-        "publisher": { "@type": "Organization", "name": "Sports Card Portfolio" }
+        "publisher": { "@type": "Organization", "name": "Hobby Alpha" }
       });
 
       // Serve full HTML with actual content (no redirect) for crawlers
@@ -683,7 +683,7 @@ Sitemap: ${origin}/sitemap.xml
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} | Sports Card Portfolio</title>
+  <title>${title} | Hobby Alpha</title>
   <meta name="description" content="${description}" />
   <meta name="robots" content="index, follow" />
   <meta property="og:title" content="${title}" />
@@ -720,7 +720,7 @@ Sitemap: ${origin}/sitemap.xml
       ${contentHtml}
     </div>
     <footer>
-      <p><a href="${origin}/blog">Back to Blog</a> | <a href="${origin}">Sports Card Portfolio</a></p>
+      <p><a href="${origin}/blog">Back to Blog</a> | <a href="${origin}">Hobby Alpha</a></p>
     </footer>
   </article>
 </body>
@@ -744,7 +744,7 @@ Sitemap: ${origin}/sitemap.xml
     try {
       const origin = getOriginUrl(req);
       const url = `${origin}/blog`;
-      const title = "Blog | Sports Card Portfolio";
+      const title = "Blog | Hobby Alpha";
       const description = "News, updates, and insights about sports card collecting and investing. Expert tips on building and growing your card portfolio.";
       
       // Get all published blog posts for the listing
@@ -796,14 +796,14 @@ Sitemap: ${origin}/sitemap.xml
 </head>
 <body>
   <header>
-    <h1>Sports Card Portfolio Blog</h1>
+    <h1>Hobby Alpha Blog</h1>
     <p>${description}</p>
   </header>
   <main>
     ${posts.length > 0 ? postsHtml : '<p>No blog posts yet. Check back soon!</p>'}
   </main>
   <footer>
-    <p><a href="${origin}">Sports Card Portfolio</a> - AI-powered portfolio management for sports card collectors.</p>
+    <p><a href="${origin}">Hobby Alpha</a> - AI-powered portfolio management for sports card collectors.</p>
   </footer>
 </body>
 </html>`;
@@ -903,10 +903,10 @@ Sitemap: ${origin}/sitemap.xml
       
       // Build compelling title
       const title = displayCase.name;
-      const fullTitle = `${title} | ${cardCount} Cards | Sports Card Portfolio`;
+      const fullTitle = `${title} | ${cardCount} Cards | Hobby Alpha`;
       
       // Alt text for image
-      const imageAlt = `${displayCase.name} - Card collection on Sports Card Portfolio`;
+      const imageAlt = `${displayCase.name} - Card collection on Hobby Alpha`;
 
       const html = `<!DOCTYPE html>
 <html lang="en">
@@ -925,7 +925,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="${imageAlt}">
-  <meta property="og:site_name" content="Sports Card Portfolio">
+  <meta property="og:site_name" content="Hobby Alpha">
   <meta property="og:locale" content="en_US">
   
   <!-- Twitter -->
@@ -1477,7 +1477,7 @@ Sitemap: ${origin}/sitemap.xml
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} | Sports Card Portfolio</title>
+  <title>${title} | Hobby Alpha</title>
   <meta name="description" content="${description}">
   
   <!-- Open Graph -->
@@ -1488,7 +1488,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:url" content="${pageUrl}">
-  <meta property="og:site_name" content="Sports Card Portfolio">
+  <meta property="og:site_name" content="Hobby Alpha">
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -1497,7 +1497,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta name="twitter:image" content="${imageUrl}">
 </head>
 <body>
-  <p>Redirecting to Sports Card Portfolio...</p>
+  <p>Redirecting to Hobby Alpha...</p>
 </body>
 </html>`;
         res.set("Content-Type", "text/html");
@@ -1562,7 +1562,7 @@ Sitemap: ${origin}/sitemap.xml
       
       const pageData = getPageShareData(sanitizedSlug);
       
-      const title = escapeHtml(`${pageData.title} | Sports Card Portfolio`);
+      const title = escapeHtml(`${pageData.title} | Hobby Alpha`);
       const description = escapeHtml(pageData.description);
       const imageUrl = `${baseUrl}/api/og/page/${sanitizedSlug}.png`;
       const pageUrl = `${baseUrl}/share/${sanitizedSlug}`;
@@ -1595,7 +1595,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:url" content="${pageUrl}">
-  <meta property="og:site_name" content="Sports Card Portfolio">
+  <meta property="og:site_name" content="Hobby Alpha">
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
@@ -1604,7 +1604,7 @@ Sitemap: ${origin}/sitemap.xml
   <meta name="twitter:image" content="${imageUrl}">
 </head>
 <body>
-  <p>Redirecting to Sports Card Portfolio...</p>
+  <p>Redirecting to Hobby Alpha...</p>
 </body>
 </html>`;
         res.set("Content-Type", "text/html");
@@ -8232,8 +8232,8 @@ RULES:
         "description": description,
         "datePublished": "2026-03-01T00:00:00Z",
         "dateModified": new Date().toISOString(),
-        "author": { "@type": "Organization", "name": "Sports Card Portfolio", "url": rawOrigin },
-        "publisher": { "@type": "Organization", "name": "Sports Card Portfolio", "url": rawOrigin },
+        "author": { "@type": "Organization", "name": "Hobby Alpha", "url": rawOrigin },
+        "publisher": { "@type": "Organization", "name": "Hobby Alpha", "url": rawOrigin },
         "mainEntityOfPage": { "@type": "WebPage", "@id": `${rawOrigin}/market/topps-takeover` },
       });
 
@@ -8242,14 +8242,14 @@ RULES:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(title)} | Sports Card Portfolio</title>
+  <title>${escapeHtml(title)} | Hobby Alpha</title>
   <meta name="description" content="${escapeHtml(description)}" />
   <meta name="robots" content="index, follow" />
   <meta property="og:title" content="${escapeHtml(title)}" />
   <meta property="og:description" content="${escapeHtml(description)}" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${url}" />
-  <meta property="og:site_name" content="Sports Card Portfolio" />
+  <meta property="og:site_name" content="Hobby Alpha" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeHtml(title)}" />
   <meta name="twitter:description" content="${escapeHtml(description)}" />
@@ -8289,7 +8289,7 @@ RULES:
       ${faqItems.map(f => `<h3>${escapeHtml(f.q)}</h3><p>${escapeHtml(f.a)}</p>`).join("\n      ")}
     </div>
     <footer>
-      <p><a href="${origin}/player-outlook">Player Outlooks</a> | <a href="${origin}/hidden-gems">Hidden Gems</a> | <a href="${origin}">Sports Card Portfolio</a></p>
+      <p><a href="${origin}/player-outlook">Player Outlooks</a> | <a href="${origin}/hidden-gems">Hidden Gems</a> | <a href="${origin}">Hobby Alpha</a></p>
     </footer>
   </article>
 </body>
@@ -8325,7 +8325,7 @@ RULES:
       const currentYear = new Date().getFullYear();
       const sportLabel = (outlook.sport || "").charAt(0).toUpperCase() + (outlook.sport || "").slice(1);
       const title = outlook.seoTitle ||
-        `${outlook.playerName} ${currentYear} Card Value, Prices & Buy/Sell Verdict | Sports Card Portfolio`;
+        `${outlook.playerName} ${currentYear} Card Value, Prices & Buy/Sell Verdict | Hobby Alpha`;
       const description = outlook.seoDescription ||
         `Should you buy or sell ${outlook.playerName} ${sportLabel.toLowerCase()} cards in ${currentYear}? AI-powered Buy/Hold/Sell verdict, real eBay sold comps, market temperature, and grading recommendations.`;
 
@@ -8384,7 +8384,7 @@ RULES:
           },
           "author": {
             "@type": "Organization",
-            "name": "Sports Card Portfolio",
+            "name": "Hobby Alpha",
           },
           "reviewBody": `${verdictLabel} - ${description}`,
         };
@@ -8401,12 +8401,12 @@ RULES:
           "description": description,
           "author": {
             "@type": "Organization",
-            "name": "Sports Card Portfolio",
+            "name": "Hobby Alpha",
             "url": origin,
           },
           "publisher": {
             "@type": "Organization",
-            "name": "Sports Card Portfolio",
+            "name": "Hobby Alpha",
             "url": origin,
             "logo": {
               "@type": "ImageObject",
@@ -8428,7 +8428,7 @@ RULES:
           "url": url,
           "isPartOf": {
             "@type": "WebSite",
-            "name": "Sports Card Portfolio",
+            "name": "Hobby Alpha",
             "url": origin,
           },
           "primaryImageOfPage": {
@@ -8471,7 +8471,7 @@ RULES:
   <meta property="og:description" content="${safeDescription}">
   <meta property="og:type" content="article">
   <meta property="og:url" content="${safeUrl}">
-  <meta property="og:site_name" content="Sports Card Portfolio">
+  <meta property="og:site_name" content="Hobby Alpha">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${safeTitle}">
   <meta name="twitter:description" content="${safeDescription}">
@@ -8497,7 +8497,7 @@ RULES:
       </section>` : ''}
       <section>
         <h2>Get the Full Analysis</h2>
-        <p>Sign up at <a href="${safeOrigin}">Sports Card Portfolio</a> for real-time market intelligence, price tracking, and personalized investment recommendations.</p>
+        <p>Sign up at <a href="${safeOrigin}">Hobby Alpha</a> for real-time market intelligence, price tracking, and personalized investment recommendations.</p>
       </section>
     </article>
   </main>

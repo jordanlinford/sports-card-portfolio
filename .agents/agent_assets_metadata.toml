@@ -66,3 +66,15 @@ id = "3qCd6pl1i6TQyAN_HWQJ9"
 uri = "file://attached_assets/generated_images/splash_screen_black.png"
 type = "image"
 title = "Splash Screen - Pure Black"
+
+[[outputs]]
+id = "3h8wMkRF686AkbOa51Ub2"
+uri = "file://public/favicon.png"
+type = "image"
+title = "public/favicon.png — eyeball this"
+
+[[outputs]]
+id = "UBBkyyawCiDIlfVPwbiLK"
+uri = "file://public/og-default.png"
+type = "image"
+title = "public/og-default.png — eyeball this"

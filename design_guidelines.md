@@ -1,4 +1,4 @@
-# Sports Card Portfolio Design Guidelines
+# Hobby Alpha Design Guidelines
 
 ## Design Approach
 

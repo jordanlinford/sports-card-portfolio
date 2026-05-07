@@ -427,7 +427,7 @@ export default function ShareViewer() {
         <Separator className="my-8" />
         
         <div className="text-center text-muted-foreground">
-          <p className="text-sm">Shared from Sports Card Portfolio</p>
+          <p className="text-sm">Shared from Hobby Alpha</p>
           <a href="/" className="text-primary hover:underline text-sm">
             Create your own collection
           </a>

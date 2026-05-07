@@ -219,7 +219,7 @@ export async function generatePageOGImage(pageSlug: string): Promise<Buffer> {
       <text x="85" y="590" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">SC</text>
       
       <!-- Brand name -->
-      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">Sports Card Portfolio</text>
+      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">Hobby Alpha</text>
       <text x="130" y="600" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#64748B">AI-Powered Investment Intelligence</text>
       
       <!-- CTA -->
@@ -249,12 +249,12 @@ async function generateDefaultPageImage(pageSlug: string): Promise<Buffer> {
       <rect x="0" y="0" width="6" height="${height}" fill="#3B82F6"/>
       
       <text x="600" y="280" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="bold" fill="white" text-anchor="middle">${escapeXml(title)}</text>
-      <text x="600" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#94A3B8" text-anchor="middle">Sports Card Portfolio</text>
+      <text x="600" y="340" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#94A3B8" text-anchor="middle">Hobby Alpha</text>
       
       <rect x="0" y="530" width="${width}" height="100" fill="#0F172A"/>
       <rect x="60" y="555" width="50" height="50" rx="10" fill="#1E40AF"/>
       <text x="85" y="590" font-family="system-ui, -apple-system, sans-serif" font-size="28" font-weight="bold" fill="white" text-anchor="middle">SC</text>
-      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">Sports Card Portfolio</text>
+      <text x="130" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="white">Hobby Alpha</text>
       <text x="130" y="600" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#64748B">AI-Powered Investment Intelligence</text>
     </svg>
   `;

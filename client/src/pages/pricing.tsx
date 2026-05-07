@@ -100,7 +100,7 @@ export default function PricingPage() {
 
   useEffect(() => {
     const prevTitle = document.title;
-    document.title = "Pricing — Free vs Pro | Sports Card Portfolio";
+    document.title = "Pricing — Free vs Pro | Hobby Alpha";
 
     const setMeta = (selector: string, attr: string, name: string, content: string) => {
       let el = document.head.querySelector<HTMLMetaElement>(selector);
@@ -114,10 +114,10 @@ export default function PricingPage() {
     };
 
     const description =
-      "Compare Sports Card Portfolio Free and Pro plans. Pro is $12/month and unlocks batch analysis, the Card Advisor, growth projections, and the full investor toolkit.";
+      "Compare Hobby Alpha Free and Pro plans. Pro is $12/month and unlocks batch analysis, the Card Advisor, growth projections, and the full investor toolkit.";
 
     const metaDesc = setMeta('meta[name="description"]', "name", "description", description);
-    const ogTitle = setMeta('meta[property="og:title"]', "property", "og:title", "Sports Card Portfolio Pricing");
+    const ogTitle = setMeta('meta[property="og:title"]', "property", "og:title", "Hobby Alpha Pricing");
     const ogDesc = setMeta('meta[property="og:description"]', "property", "og:description", description);
 
     return () => {

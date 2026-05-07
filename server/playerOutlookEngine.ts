@@ -1552,10 +1552,11 @@ export async function getPlayerOutlook(
   // Check cache first
   const { outlook: cachedOutlook, isStale, cacheRecord } = await getCachedOutlook(playerKey);
   
-  // Force refresh mode: always generate fresh (used by prewarm job)
+  // Force refresh mode: always generate fresh (used by prewarm job + V2 migration)
   if (options?.forceRefresh) {
-    console.log(`[PlayerOutlook] Force refresh requested for ${playerName}`);
+    console.log(`[PlayerOutlook] Force refresh requested for ${playerName} (sport=${resolvedSport}, key=${playerKey})`);
     const freshOutlook = await generateFreshOutlook(playerName, resolvedSport, playerKey);
+    console.log(`[PlayerOutlook] Force refresh complete for ${playerName}: verdict=${(freshOutlook as any)?.investmentCall?.verdict ?? "?"} confScore=${(freshOutlook as any)?.verdict?.confidenceScore ?? "?"}`);
     return { ...freshOutlook, cacheStatus: "miss" };
   }
   

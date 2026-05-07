@@ -211,7 +211,7 @@ export default function Landing() {
             className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-8 leading-tight"
             data-testid="text-cta-closer-headline"
           >
-            1,000+ collectors trust Sports Card Portfolio to make smarter decisions.
+            1,000+ collectors trust Hobby Alpha to make smarter decisions.
           </h2>
           <Button asChild size="lg" className="gap-2">
             <a href="/api/auth/google" data-testid="button-cta-closer">

@@ -102,7 +102,7 @@ export function ShareButtons({ displayCaseId, caseName }: ShareButtonsProps) {
   const productionDomain = "https://sportscardportfolio.io";
   const shareUrl = `${productionDomain}/case/${displayCaseId}`;
   
-  const shareText = `Check out "${caseName}" on Sports Card Portfolio!`;
+  const shareText = `Check out "${caseName}" on Hobby Alpha!`;
 
   const handleCopyLink = async () => {
     try {

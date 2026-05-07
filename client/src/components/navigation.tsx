@@ -120,7 +120,7 @@ export function Navigation() {
             <div className="flex items-center gap-2">
               <LayoutGrid className="h-6 w-6 text-primary" />
               <span className="text-lg font-semibold hidden sm:inline" data-testid="text-logo">
-                Sports Card Portfolio
+                Hobby Alpha
               </span>
             </div>
           </Link>
@@ -582,7 +582,7 @@ export function Navigation() {
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   <LayoutGrid className="h-5 w-5 text-primary" />
-                  Sports Card Portfolio
+                  Hobby Alpha
                 </SheetTitle>
               </SheetHeader>
               <nav className="flex flex-col gap-1 mt-6">
