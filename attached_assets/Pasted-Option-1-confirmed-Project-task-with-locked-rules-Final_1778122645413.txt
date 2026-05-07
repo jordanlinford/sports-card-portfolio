@@ -1,0 +1,69 @@
+Option 1 confirmed. Project task with locked rules.
+Final per-file resolution rules:
+Rebrand version wins (take cherry-pick verbatim):
+
+All branding text in UI components (headers, footers, navigation, share components, marketing pages, legal pages)
+All asset files (favicon.png, og-default.png, splash screens, icons, mockup PNGs)
+Theme/design files (tailwind.config.ts, index.css, design tokens, holographic theme)
+Email templates and emailBranding.ts module
+HTML head tags (title, meta, og, twitter, JSON-LD)
+PWA manifest.json
+All new design components added by rebrand (holographic effects, etc.)
+replit.md (take recovery version - tonight's doc additions can be re-added later)
+
+V2 work wins (keep current main version, drop cherry-pick changes):
+
+server/verdictMigrationJob.ts (entire file)
+server/lib/withTimeout.ts (entire file)
+server/playerOutlookEngine.ts (entire file - V2 engine + saveToCache fix)
+shared/schema.ts (V2 additions: SELL, LONGSHOT_BET, confidence_score, LONGSHOT_CUTOFFS, SKILL_POSITIONS, POSITION_ALIASES)
+client/src/lib/verdictMessages.ts (entire file - V2 audience messaging)
+client/src/components/verdict-takeaway.tsx (entire file)
+client/src/components/verdict-update-banner.tsx (entire file)
+
+Mixed-concern files (manual 3-way merge per these instructions):
+server/routes.ts:
+
+PRESERVE: V2 migration endpoints (/api/admin/migrate-verdicts-v2 and /api/admin/migrate-verdicts-v2/status)
+PRESERVE: V2 verdict bucket assignments (SELL → bearishHoldings, LONGSHOT_BET → speculativeHoldings)
+APPLY: All branding text changes (sitemap, share viewer, page redirects, JSON-LD publisher)
+APPLY: Domain swap to hobbyalpha.com if rebrand commits include it
+
+client/src/pages/admin.tsx:
+
+PRESERVE: VerdictMigrationTab component and all its imports
+PRESERVE: V2 Migration tab in TabsList and TabsContent
+APPLY: All branding text changes
+
+client/src/pages/player-outlook.tsx:
+
+PRESERVE: VerdictTakeaway component import and usage
+PRESERVE: isHolder logic computation
+PRESERVE: V2 verdict switch cases (SELL, LONGSHOT_BET in getVerdictIcon, getVerdictColor, etc.)
+APPLY: Visual/branding updates from rebrand
+
+client/src/pages/card-outlook.tsx:
+
+PRESERVE: VerdictTakeaway component import and usage
+PRESERVE: portfolio query for isHolder
+PRESERVE: V2 verdict cases (SELL, LONGSHOT_BET in ACTION_STYLES, switch statements)
+APPLY: Visual/branding updates from rebrand
+
+Sequence:
+
+Create project task with the above rules baked in
+Task agent cherry-picks 12 commits in chronological order:
+
+a10db5e → cf79747 → fab023e → 993a18d → aeb1a66 → a2f65cf → 37daea5 → 182603e → a478e96 → 6fe3085 → 776b2ab → fa700ef
+
+
+Apply per-file resolution rules during conflicts
+After all 12 applied, run npm run typecheck and npm run build
+Surface complete diff vs current main + summary of what was added
+STOP - DO NOT push or merge to main. Wait for user approval.
+After user approves, fast-forward main to recovery branch
+Push to origin/main, verify
+
+Critical: The task agent must NOT auto-merge to main. The diff review gate is mandatory.
+Migration trigger: Deferred until step 14 of the broader sequence (after recovery deploy + production verification).
+Propose the task. Surface the proposed task description before launching it so I can verify the rules are correctly captured.
