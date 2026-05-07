@@ -28,6 +28,10 @@ import {
   Info,
   Sun,
   Trophy,
+  Activity,
+  AlertOctagon,
+  Crown,
+  Eye,
   History
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -84,7 +88,7 @@ interface OutlookData {
   playerName: string | null;
   sport: string | null;
   position: string | null;
-  action: "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
+  action: "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD" | "HOLD" | "AVOID" | "LONGSHOT_BET" | "WATCH";
   upsideScore: number;
   riskScore: number;
   confidenceScore: number;
@@ -116,7 +120,7 @@ interface OutlookData {
   seasonalContext?: SeasonalContext;
 }
 
-type OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD";
+type OutlookAction = "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LITTLE_VALUE" | "LEGACY_HOLD" | "HOLD" | "AVOID" | "LONGSHOT_BET" | "WATCH";
 
 interface OutlookHistoryEntry {
   id: number;
@@ -161,17 +165,25 @@ function getMarketFrictionHelperText(friction: number, action?: string): string 
 function getActionColor(action: OutlookAction): string {
   switch (action) {
     case "BUY":
-      return "bg-emerald-600 text-white";
+      return "bg-emerald-500 text-white";
+    case "HOLD":
+      return "bg-blue-500 text-white";
     case "SELL":
-      return "bg-rose-600 text-white";
+      return "bg-red-500 text-white";
+    case "AVOID":
+      return "bg-red-500 text-white";
+    case "LONGSHOT_BET":
+      return "bg-fuchsia-500 text-white";
     case "MONITOR":
       return "bg-amber-500 text-white";
     case "LONG_HOLD":
-      return "bg-blue-600 text-white";
+      return "bg-indigo-500 text-white";
     case "LEGACY_HOLD":
-      return "bg-violet-600 text-white";
+      return "bg-purple-500 text-white";
     case "LITTLE_VALUE":
-      return "bg-slate-500 text-white";
+      return "bg-gray-500 text-white";
+    case "WATCH":
+      return "bg-amber-500 text-white";
     default:
       return "bg-muted text-muted-foreground";
   }
@@ -180,17 +192,25 @@ function getActionColor(action: OutlookAction): string {
 function getActionIcon(action: OutlookAction) {
   switch (action) {
     case "BUY":
-      return <ArrowUpRight className="h-4 w-4" />;
-    case "SELL":
-      return <ArrowDownRight className="h-4 w-4" />;
-    case "MONITOR":
+      return <TrendingUp className="h-4 w-4" />;
+    case "HOLD":
       return <Minus className="h-4 w-4" />;
+    case "SELL":
+      return <TrendingDown className="h-4 w-4" />;
+    case "AVOID":
+      return <AlertOctagon className="h-4 w-4" />;
+    case "LONGSHOT_BET":
+      return <Sparkles className="h-4 w-4" />;
+    case "MONITOR":
+      return <Activity className="h-4 w-4" />;
     case "LONG_HOLD":
       return <Clock className="h-4 w-4" />;
     case "LEGACY_HOLD":
-      return <Trophy className="h-4 w-4" />;
+      return <Crown className="h-4 w-4" />;
     case "LITTLE_VALUE":
       return <MinusCircle className="h-4 w-4" />;
+    case "WATCH":
+      return <Eye className="h-4 w-4" />;
     default:
       return <Minus className="h-4 w-4" />;
   }
@@ -199,17 +219,25 @@ function getActionIcon(action: OutlookAction) {
 function getActionLabel(action: OutlookAction): string {
   switch (action) {
     case "BUY":
-      return "BUY";
+      return "Buy";
+    case "HOLD":
+      return "Hold";
     case "SELL":
-      return "SELL";
+      return "Sell";
+    case "AVOID":
+      return "Avoid";
+    case "LONGSHOT_BET":
+      return "Longshot Bet";
     case "MONITOR":
-      return "WATCH";
+      return "Monitor";
     case "LONG_HOLD":
-      return "HOLD";
+      return "Long Hold";
     case "LEGACY_HOLD":
-      return "LEGACY HOLD";
+      return "Legacy Hold";
     case "LITTLE_VALUE":
-      return "LOW VALUE";
+      return "Low Value";
+    case "WATCH":
+      return "Watch";
     default:
       return action;
   }
@@ -218,17 +246,25 @@ function getActionLabel(action: OutlookAction): string {
 function getStateDescription(action: OutlookAction): string {
   switch (action) {
     case "BUY":
-      return "Market signals suggest this is a good entry point.";
+      return "Strong upside, healthy entry point.";
+    case "HOLD":
+      return "Maintain position, fundamentals stable.";
     case "SELL":
-      return "Recent price action suggests taking profits.";
+      return "Exit position, fundamentals declining.";
+    case "AVOID":
+      return "Don't enter, structural risk outweighs price.";
+    case "LONGSHOT_BET":
+      return "Lottery ticket - small position, high optionality.";
     case "MONITOR":
-      return "Mixed signals - watch for clearer direction.";
+      return "Wait for clearer signal.";
     case "LONG_HOLD":
-      return "Stable asset for long-term holding.";
+      return "Solid long-term value.";
     case "LEGACY_HOLD":
-      return "Collector piece with established value.";
+      return "Vintage with historical significance.";
     case "LITTLE_VALUE":
-      return "Limited collector interest at current levels.";
+      return "Minimal upside potential.";
+    case "WATCH":
+      return "Pre-debut prospect, no comparable sales yet.";
     default:
       return "";
   }

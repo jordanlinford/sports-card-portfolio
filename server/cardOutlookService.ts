@@ -1352,13 +1352,23 @@ Explain the reasoning behind the scores and end with a plain-language tag like:
   }
 }
 
-function generateFallbackShort(action: OutlookAction, upsideScore: number, riskScore: number): string {
-  if (action === "BUY") {
-    return `Strong upside potential (${upsideScore}/100) with manageable downside. Worth adding to your collection.`;
-  } else if (action === "SELL") {
-    return `Elevated downside risk (${riskScore}/100) relative to upside. Consider selling or trading.`;
+function generateFallbackShort(action: OutlookAction | string, upsideScore: number, riskScore: number): string {
+  switch (action) {
+    case "BUY":
+      return `Strong upside potential (${upsideScore}/100) with manageable downside. Worth adding to your collection.`;
+    case "SELL":
+      return `Elevated downside risk (${riskScore}/100) relative to upside. Consider selling or trading.`;
+    case "HOLD":
+      return `Steady fundamentals support holding existing position. No urgent action required.`;
+    case "AVOID":
+      return `Structural concerns outweigh current pricing. Don't enter new positions here.`;
+    case "LONGSHOT_BET":
+      return `Speculative upside profile. Suitable for small lottery-ticket sizing only.`;
+    case "WATCH":
+      return `Pre-debut prospect with no comparable sales yet. Wait for first-game catalyst.`;
+    default:
+      return `Balanced outlook with moderate upside (${upsideScore}/100). Timing your entry matters here.`;
   }
-  return `Balanced outlook with moderate upside (${upsideScore}/100). Timing your entry matters here.`;
 }
 
 function generateFallbackLong(

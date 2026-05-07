@@ -1,0 +1,37 @@
+Option (a): ship blocking UI fixes pre-deploy.
+Cannot deploy with the WATCH/HOLD label collision in card-outlook-panel.tsx. Active UX regression worse than current state.
+Apply 4 fixes:
+Fix 1 - card-outlook-panel.tsx (BLOCKING):
+Surface current getActionColor, getActionIcon, getActionLabel, getStateDescription functions. Then update all four to handle all 10 OutlookAction values:
+Palette per locked design:
+
+BUY: emerald-500 + TrendingUp + "Buy" + "Strong upside, healthy entry point"
+HOLD: blue-500 + Minus + "Hold" + "Maintain position, fundamentals stable"
+SELL: red-500 + TrendingDown + "Sell" + "Exit position, fundamentals declining"
+AVOID: red-500 + AlertOctagon + "Avoid" + "Don't enter, structural risk outweighs price"
+LONGSHOT_BET: fuchsia-500 + Sparkles + "Longshot Bet" + "Lottery ticket - small position, high optionality"
+MONITOR: amber-500 + Activity + "Monitor" + "Wait for clearer signal"
+LONG_HOLD: indigo-500 + Clock + "Long Hold" + "Solid long-term value"
+LEGACY_HOLD: purple-500 + Crown + "Legacy Hold" + "Vintage with historical significance"
+LITTLE_VALUE: gray-500 + MinusCircle + "Low Value" + "Minimal upside potential"
+WATCH: amber-500 + Eye + "Watch" + "Pre-debut prospect, no comparable sales yet"
+
+Update local OutlookAction type to match the 10 values from outlookEngine.ts.
+Remove the existing re-labels (MONITOR→"WATCH", LONG_HOLD→"HOLD"). Verdicts should self-label.
+Fix 2 - outlook-overview.tsx (BLOCKING):
+Surface current getOutlookIcon/getOutlookColor/getOutlookLabel switches. Add HOLD/AVOID/LONGSHOT_BET/WATCH cases using same palette as Fix 1.
+Fix 3 - verdictMessages.ts (SHOULD-FIX):
+Add HOLD entry to VERDICT_MESSAGES with appropriate label and takeaway. Match existing pattern.
+Fix 4 - cardOutlookService.ts generateFallbackShort (SHOULD-FIX):
+Add per-verdict copy for HOLD/AVOID/LONGSHOT_BET/WATCH. Each should produce text consistent with the verdict (not generic "moderate upside, timing matters" which contradicts AVOID).
+Suggested copy:
+
+HOLD: "Steady fundamentals support holding existing position. No urgent action required."
+AVOID: "Structural concerns outweigh current pricing. Don't enter new positions here."
+LONGSHOT_BET: "Speculative upside profile. Suitable for small lottery-ticket sizing only."
+WATCH: "Pre-debut prospect with no comparable sales yet. Wait for first-game catalyst."
+
+Apply all 4 fixes. Run TypeScript check. Surface diffs.
+Hold deploy until prod migration completes (~9:50 PM Pacific) per existing plan.
+Status check on prod migration: I can hit the status endpoint in DevTools to get exact count when needed. For now, the live verdict-decision logs you saw (Joe Burrow being processed at 21:05) confirm migration is healthy and progressing.
+Standing by for diff surfaces.

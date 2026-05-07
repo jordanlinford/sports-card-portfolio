@@ -8,12 +8,13 @@ export interface VerdictMessage {
   takeaway: string;
 }
 
-type VerdictAction = 'BUY' | 'MONITOR' | 'WATCH' | 'AVOID' | 'SELL' | 'LONGSHOT_BET';
+type VerdictAction = 'BUY' | 'HOLD' | 'MONITOR' | 'WATCH' | 'AVOID' | 'SELL' | 'LONGSHOT_BET';
 
 type AudienceMessages = { buyer: VerdictMessage; holder: VerdictMessage; };
 
 const VERDICT_MESSAGES: Record<VerdictAction, AudienceMessages> = {
   BUY: { buyer: { label: 'BUY', takeaway: 'Good entry point' }, holder: { label: 'BUY', takeaway: 'Consider adding to position' } },
+  HOLD: { buyer: { label: 'HOLD', takeaway: 'Fairly priced, no urgent entry' }, holder: { label: 'HOLD', takeaway: 'Maintain position, fundamentals stable' } },
   MONITOR: { buyer: { label: 'MONITOR', takeaway: 'Neutral, watch for change' }, holder: { label: 'MONITOR', takeaway: 'Hold position' } },
   WATCH: { buyer: { label: 'WATCH', takeaway: 'Wait for clarity' }, holder: { label: 'WATCH', takeaway: 'Hold pending more info' } },
   AVOID: { buyer: { label: 'AVOID', takeaway: "Don't acquire, limited upside" }, holder: { label: 'Low Value Potential', takeaway: 'Hold for collection' } },

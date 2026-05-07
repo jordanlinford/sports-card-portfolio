@@ -21,6 +21,8 @@ import {
   ShoppingCart,
   Clock,
   AlertTriangle,
+  AlertOctagon,
+  Minus,
   Crown,
   ArrowRight,
   RefreshCw,
@@ -64,11 +66,15 @@ type UsageInfo = { used: number; limit: number | null; remaining: number | null;
 function getActionIcon(action: string | null) {
   switch (action) {
     case "BUY": return <ShoppingCart className="h-3 w-3" />;
+    case "HOLD": return <Minus className="h-3 w-3" />;
     case "SELL": return <TrendingDown className="h-3 w-3" />;
+    case "AVOID": return <AlertOctagon className="h-3 w-3" />;
+    case "LONGSHOT_BET": return <Sparkles className="h-3 w-3" />;
     case "MONITOR": return <Eye className="h-3 w-3" />;
     case "LONG_HOLD": return <Clock className="h-3 w-3" />;
     case "LEGACY_HOLD": return <Trophy className="h-3 w-3" />;
     case "LITTLE_VALUE": return <MinusCircle className="h-3 w-3" />;
+    case "WATCH": return <Eye className="h-3 w-3" />;
     default: return null;
   }
 }
@@ -76,24 +82,31 @@ function getActionIcon(action: string | null) {
 function getActionColor(action: string | null) {
   switch (action) {
     case "BUY": return "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20";
+    case "HOLD": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
     case "SELL": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
+    case "AVOID": return "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20";
+    case "LONGSHOT_BET": return "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/20";
     case "MONITOR": return "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/20";
     case "LONG_HOLD": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
     case "LEGACY_HOLD": return "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20";
     case "LITTLE_VALUE": return "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
+    case "WATCH": return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
     default: return "bg-muted text-muted-foreground";
   }
 }
 
 function getActionLabel(action: string | null): string {
   switch (action) {
-    case "BUY": return "BUY";
-    case "SELL": return "SELL";
+    case "BUY": return "Buy";
+    case "HOLD": return "Hold";
+    case "SELL": return "Sell";
+    case "AVOID": return "Avoid";
     case "LONGSHOT_BET": return "Longshot Bet";
-    case "MONITOR": return "MONITOR";
-    case "LONG_HOLD": return "LONG HOLD";
-    case "LEGACY_HOLD": return "LEGACY HOLD";
-    case "LITTLE_VALUE": return "LOW VALUE";
+    case "MONITOR": return "Monitor";
+    case "LONG_HOLD": return "Long Hold";
+    case "LEGACY_HOLD": return "Legacy Hold";
+    case "LITTLE_VALUE": return "Low Value";
+    case "WATCH": return "Watch";
     default: return action ?? "";
   }
 }
