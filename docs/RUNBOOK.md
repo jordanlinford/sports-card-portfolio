@@ -94,3 +94,38 @@ SELECT count(*) FROM bookmarks WHERE card_id NOT IN (SELECT id FROM cards);
 ```sql
 DELETE FROM sessions WHERE expire < NOW();
 ```
+
+---
+
+## Bulk-email deliverability spot check
+
+Outbound transactional and bulk email is sent through Gmail SMTP
+(`smtp.gmail.com:465`) using a Gmail App Password. The credential resolver
+in `server/email.ts` selects a single provider profile atomically: if both
+`GMAIL_EMAIL` and `GMAIL_APP_PASSWORD` are set, the Gmail profile is used
+(host/port default to `smtp.gmail.com:465`); otherwise the resolver falls
+back to the legacy Zoho profile (`ZOHO_EMAIL` + `ZOHO_APP_PASSWORD`, host
+`smtp.zoho.com:465`). Mixing Gmail credentials with a Zoho host (or vice
+versa) is not possible — host/port are derived from whichever profile is
+chosen. New deployments should set the Gmail variants:
+
+- `GMAIL_EMAIL` — the sending Google account (e.g. `info@hobbyalpha.com`)
+- `GMAIL_APP_PASSWORD` — a 16-character Gmail App Password (NOT the account
+  password); generate at https://myaccount.google.com/apppasswords with
+  2-Step Verification enabled
+- `GMAIL_SMTP_HOST` (optional) — defaults to `smtp.gmail.com`
+- `GMAIL_SMTP_PORT` (optional) — defaults to `465` (SSL)
+
+Spot check after rotating the App Password or changing SMTP config:
+
+1. Confirm the secrets are present in Replit Secrets (`GMAIL_EMAIL`,
+   `GMAIL_APP_PASSWORD`).
+2. Trigger a low-risk transactional send (e.g. trigger the welcome email by
+   signing up a fresh test account, or fire the admin email sample suite).
+3. Check the Replit server logs for `Welcome email sent to ...` (success) or
+   `Failed to send ...` / `SMTP email not configured` (misconfiguration).
+4. Confirm the message arrives in the recipient inbox and is not flagged as
+   spam. Gmail rejects with `534-5.7.9 Application-specific password required`
+   means the App Password is missing/wrong.
+5. Once Gmail is verified stable in production, the legacy `ZOHO_*` secrets
+   can be deleted from Replit Secrets.

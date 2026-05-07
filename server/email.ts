@@ -1,24 +1,75 @@
 import nodemailer from "nodemailer";
 
+type EmailProfile = {
+  provider: "gmail" | "zoho";
+  user: string;
+  pass: string;
+  host: string;
+  port: number;
+};
+
+function parsePort(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function resolveEmailProfile(): EmailProfile | null {
+  const gmailUser = process.env.GMAIL_EMAIL;
+  const gmailPass = process.env.GMAIL_APP_PASSWORD;
+  if (gmailUser && gmailPass) {
+    return {
+      provider: "gmail",
+      user: gmailUser,
+      pass: gmailPass,
+      host: process.env.GMAIL_SMTP_HOST || "smtp.gmail.com",
+      port: parsePort(process.env.GMAIL_SMTP_PORT, 465),
+    };
+  }
+
+  const zohoUser = process.env.ZOHO_EMAIL;
+  const zohoPass = process.env.ZOHO_APP_PASSWORD;
+  if (zohoUser && zohoPass) {
+    return {
+      provider: "zoho",
+      user: zohoUser,
+      pass: zohoPass,
+      host: process.env.ZOHO_SMTP_HOST || "smtp.zoho.com",
+      port: parsePort(process.env.ZOHO_SMTP_PORT, 465),
+    };
+  }
+
+  return null;
+}
+
+const emailProfile = resolveEmailProfile();
+
+function isEmailConfigured(): boolean {
+  return emailProfile !== null;
+}
+
+function fromHeader(): string {
+  return `"Hobby Alpha" <${emailProfile?.user ?? ""}>`;
+}
+
 const transporter = nodemailer.createTransport({
-  host: process.env.ZOHO_SMTP_HOST || "smtp.zoho.com",
-  port: 465,
+  host: emailProfile?.host ?? "smtp.gmail.com",
+  port: emailProfile?.port ?? 465,
   secure: true,
-  auth: {
-    user: process.env.ZOHO_EMAIL,
-    pass: process.env.ZOHO_APP_PASSWORD,
-  },
+  auth: emailProfile
+    ? { user: emailProfile.user, pass: emailProfile.pass }
+    : undefined,
 });
 
 export async function sendWelcomeEmail(userEmail: string, userName: string): Promise<void> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping welcome email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping welcome email");
     return;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: "Welcome to Hobby Alpha!",
       html: `
@@ -49,7 +100,7 @@ export async function sendNewSignupNotification(
   newUserEmail: string | null | undefined,
   authMethod: "google" | "replit"
 ): Promise<void> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) return;
+  if (!isEmailConfigured()) return;
 
   const displayName = newUserName || "Unknown";
   const displayEmail = newUserEmail || "No email";
@@ -58,7 +109,7 @@ export async function sendNewSignupNotification(
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: "info@hobbyalpha.com",
       subject: `New signup: ${displayName}`,
       html: `
@@ -82,14 +133,14 @@ export async function sendPaymentConfirmationEmail(
   userEmail: string,
   userName: string
 ): Promise<void> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping payment confirmation email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping payment confirmation email");
     return;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: "Welcome to Hobby Alpha Pro!",
       html: `
@@ -124,8 +175,8 @@ export async function sendPriceAlertEmail(
   threshold: number,
   currentPrice: number
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping price alert email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping price alert email");
     return true;
   }
 
@@ -134,7 +185,7 @@ export async function sendPriceAlertEmail(
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: `Price Alert: ${cardTitle} has ${direction} $${threshold}`,
       html: `
@@ -180,8 +231,8 @@ export async function sendWeeklyDigestEmail(
   userName: string,
   data: DigestData
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping weekly digest email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping weekly digest email");
     return true;
   }
 
@@ -201,7 +252,7 @@ export async function sendWeeklyDigestEmail(
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: "Your Weekly Collection Digest",
       html: `
@@ -267,14 +318,14 @@ export async function sendSplitJoinedEmail(
   userName: string,
   splitInfo: { title: string; sport: string; brand: string; year: string; formatType: string; seatPrice: number }
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping split joined email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping split joined email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: `You've joined the ${splitInfo.title} box break!`,
       html: `
@@ -305,14 +356,14 @@ export async function sendSplitPaymentOpenEmail(
   userName: string,
   splitInfo: { title: string; sport: string; seatPrice: number; deadline: Date }
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping payment open email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping payment open email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: `Payment Open: ${splitInfo.title} - Act Now!`,
       html: `
@@ -348,14 +399,14 @@ export async function sendSplitAssignmentEmail(
   assignment: string,
   priorityNumber: number
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping assignment email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping assignment email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: `Your Assignment: ${assignment} - ${splitInfo.title}`,
       html: `
@@ -388,14 +439,14 @@ export async function sendBreakCompleteEmail(
   assignment: string,
   youtubeUrl: string
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping break complete email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping break complete email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: `Break Complete! Watch Your ${assignment} Hits - ${splitInfo.title}`,
       html: `
@@ -429,14 +480,14 @@ export async function sendSplitShippedEmail(
   assignment: string,
   trackingInfo?: string
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping shipped email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping shipped email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: `Your ${assignment} Cards Are On The Way! - ${splitInfo.title}`,
       html: `
@@ -462,8 +513,8 @@ export async function sendSplitShippedEmail(
 }
 
 export async function sendWinBackEmail(email: string, userName: string, watchlistMoves: string[]): Promise<void> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping win-back email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping win-back email");
     return;
   }
 
@@ -477,7 +528,7 @@ export async function sendWinBackEmail(email: string, userName: string, watchlis
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: email,
       subject: "Your watchlist moved while you were away",
       text: `Hi ${userName || "there"},\n\nIt's been a week since you left, and here's what happened with players you were tracking:\n\n${movesList}\n\nYour data is still here. Come back and see what you missed:\nhttps://sportscardportfolio.com/\n\nMiss you,\nHobby Alpha`,
@@ -490,14 +541,14 @@ export async function sendWinBackEmail(email: string, userName: string, watchlis
 }
 
 export async function sendReferralInviteEmail(toEmail: string, fromName: string, code: string): Promise<void> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping referral invite email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping referral invite email");
     return;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: toEmail,
       subject: `${fromName} invited you to Hobby Alpha`,
       text: `${fromName} thinks you'd love Hobby Alpha — AI-powered market intelligence for sports card collectors.\n\nSign up with their code to get a free month of Pro: ${code}\n\nhttps://sportscardportfolio.com/?ref=${code}`,
@@ -514,14 +565,14 @@ export async function sendNewParticipantJoinedEmail(
   userName: string,
   splitInfo: { title: string; currentCount: number; totalCount: number }
 ): Promise<boolean> {
-  if (!process.env.ZOHO_EMAIL || !process.env.ZOHO_APP_PASSWORD) {
-    console.log("Zoho email not configured, skipping new participant email");
+  if (!isEmailConfigured()) {
+    console.log("SMTP email not configured, skipping new participant email");
     return true;
   }
 
   try {
     await transporter.sendMail({
-      from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
+      from: fromHeader(),
       to: userEmail,
       subject: `${splitInfo.title}: ${splitInfo.currentCount}/${splitInfo.totalCount} spots filled!`,
       html: `
