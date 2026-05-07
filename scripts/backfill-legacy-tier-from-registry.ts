@@ -30,6 +30,14 @@ import { lookupPlayer } from "../server/playerRegistry";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
+// Fix A2: strip trailing card-number suffixes from dirty player_name values
+// (e.g. "Josh Allen #304" -> "Josh Allen", "Lamar Jackson 8" -> "Lamar Jackson").
+// Only applies to lookup; the underlying cards.player_name is not mutated by
+// this script. Card-data hygiene fixes (Fix A1) should still happen separately.
+function stripCardNumberSuffix(name: string): string {
+  return name.replace(/\s*#?\d+\s*$/, "").trim();
+}
+
 // Map registry careerStage -> legacy cards.legacy_tier vocabulary.
 // Engine A (cardOutlookService) and Engine B's LEGACY_HOLD detection both still
 // read this column in Phase 1. Mapping preserves their existing behavior.
@@ -85,7 +93,17 @@ async function main() {
 
   for (const card of allCards) {
     if (!card.playerName) continue;
-    const lookup = lookupPlayer(card.playerName);
+    // Try direct lookup first; fall back to stripped version for dirty data
+    let lookup = lookupPlayer(card.playerName);
+    if (!lookup.found) {
+      const stripped = stripCardNumberSuffix(card.playerName);
+      if (stripped && stripped !== card.playerName) {
+        lookup = lookupPlayer(stripped);
+        if (lookup.found) {
+          console.log(`[Backfill]   matched via suffix-strip: "${card.playerName}" -> "${stripped}" (card #${card.id})`);
+        }
+      }
+    }
     if (!lookup.found || !lookup.entry) {
       registryMisses++;
       continue;
