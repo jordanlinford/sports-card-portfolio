@@ -1,0 +1,116 @@
+Hobby Alpha V2 - Continuation Handoff
+Picking up from a multi-Claude session. Two priorities tonight:
+
+Restore Hobby Alpha branding (currently showing "Sports Card Portfolio")
+Get V2 verdict migration working (failed silently, zero DB writes after multiple attempts)
+
+Current state of V2 work
+Seven commits on origin/main, all deployed:
+
+91c5498 - Schema (SELL + LONGSHOT_BET verdicts, confidence_score column)
+557f2a3 - Engine logic (V2 waterfall, isLongshotEligible)
+0807a51 - UI surfaces (LONGSHOT_BET fuchsia + Sparkles, SELL distinct labeling)
+03714b4 - Audience messaging (holder vs buyer, VerdictTakeaway component, announcement banner)
+fd898b7 - Migration job (admin panel UI, supposed to migrate 139 verdicts)
+a2bd72c - saveToCache fix (persist confidenceScore to DB)
+eb438297 - Migration trigger fix (CSRF + error handling via apiRequest helper)
+
+Plus earlier today: Bug A, Framework Piece 3, Leaderboard Parity (all in origin/main).
+Migration status: BROKEN
+Symptoms:
+
+Migration triggered successfully via admin panel
+UI showed "Player X of 823" (823 doesn't match player_outlook_cache count of 139)
+Player names cycled through real names AND card titles ("Jamarr chase tie dye 2021")
+After 50+ minutes, DB query showed 0 rows had confidence_score populated
+Migration was iterating SOMETHING but writing nothing
+
+Stopped via server restart. Marker file may still indicate "running" - check data/verdict_migration_state.json.
+Diagnostic findings:
+
+Source code in verdictMigrationJob.ts queries player_outlook_cache only (139 rows)
+Cannot explain how 823 candidates appeared
+Hypothesis: second migration trigger used different code path OR Drizzle ORM had schema confusion at runtime
+
+Recommended next step (from prior agent): add diagnostic logging to verdictMigrationJob.ts:
+typescript// After line ~224, after `state.progress.totalCount = candidates.length;`
+console.log(`[VerdictMigration] Candidates query returned ${candidates.length} rows`);
+console.log(`[VerdictMigration] First 5 candidates:`, candidates.slice(0, 5).map(c => ({ playerKey: c.playerKey, playerName: c.playerName, sport: c.sport })));
+Deploy, trigger migration once, surface what the logs show. That identifies the source of 823 definitively.
+Then fix root cause and re-run.
+Branding: needs restoration
+User reports production app currently shows "Sports Card Portfolio" branding instead of "Hobby Alpha." User believes Hobby Alpha branding was previously deployed and got reverted, OR was never fully deployed.
+Project files contain Hobby Alpha branded assets:
+
+/mnt/project/ogdefault.png - HobbyAlpha branded social image
+/mnt/project/favicon.png - HobbyAlpha favicon
+
+Tagline from existing brand work: "AI Buy · Hold · Sell Verdicts"
+Domain: hobbyalpha.com (active)
+Investigation needed:
+
+Check git log for any branding commits: git log --all --oneline --grep -i "brand\|hobby\|alpha" -50
+Check current state of branding in code: client/index.html, manifest.json, App.tsx, layout files
+Check git reflog for reverts: git reflog | head -30
+Determine if branding work needs to be redone from scratch OR recovered from orphaned commits
+
+Then comprehensive branding update:
+
+Replace all "Sports Card Portfolio" instances with "Hobby Alpha"
+Update HTML title tags
+Update manifest.json
+Replace favicon with /mnt/project/favicon.png
+Update og image to /mnt/project/ogdefault.png
+Tagline: "AI Buy · Hold · Sell Verdicts"
+Audit for any other places branding appears (email templates, error pages, etc.)
+
+Ship as a single branding commit. Verify in production.
+Test players (for migration validation)
+When migration successfully completes, verify these three players have expected V2 verdicts:
+
+Victor Wembanyama (NBA Year 2-3) - expect BUY or MONITOR with confidence 70-85, NOT Longshot (he's an established starter)
+Spencer Rattler (NFL Year 2 backup QB, Saints) - expect LONGSHOT_BET, confidence ~48 base
+Larry Fitzgerald (NFL retired, HOF Class of 2026) - expect BUY (HOF momentum) or MONITOR, confidence 60-75
+
+If all three show expected verdicts, V2 logic is working correctly.
+Validation criteria
+After migration completes, verdict distribution should be:
+
+WATCH < 10% (was 56.8% under V1)
+AVOID + SELL combined: 15-25%
+LONGSHOT_BET: 5-15%
+BUY: 15-25%
+MONITOR: 25-40%
+
+Tolerance: ±5 percentage points absolute on each band.
+If outside tolerance: investigate before accepting (likely waterfall prompt needs tuning).
+Standing rules
+
+Production failures always in scope
+Source-level fixes over band-aids
+Evidence over assertion - paste actual data, never accept "merged" without verification
+Replit workspace reset risk - commit/push/verify atomic sequence
+Use -- not em-dash in commit messages
+Dev = Prod for database (helium hostname, single Postgres instance) - migration trigger affects production data
+
+What NOT to re-litigate
+These decisions are locked, don't redesign:
+
+V2 verdict vocabulary (BUY, MONITOR, WATCH, AVOID, SELL, LONGSHOT_BET)
+LONGSHOT_BET criteria (career stage, position, role, year cutoffs by sport)
+Holder vs buyer messaging structure
+Color/icon assignments (LONGSHOT_BET = fuchsia + Sparkles, SELL = red + TrendingDown)
+The ±5pp validation tolerance
+
+Order of operations tonight
+
+Add diagnostic logging to verdictMigrationJob.ts, deploy, trigger migration, surface logs
+Identify and fix root cause of 823 candidates
+Re-trigger migration with fix, wait for completion (~30 min)
+Validate distribution + test players
+Investigate branding state, plan restoration
+Execute branding restoration as single commit
+Deploy, verify branding live
+Done
+
+Push through. Get both done tonight.
