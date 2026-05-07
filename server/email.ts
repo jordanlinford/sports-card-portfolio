@@ -1,9 +1,24 @@
 import nodemailer from "nodemailer";
-import {
-  buildListUnsubscribeHeaders,
-  buildUnsubscribeFooterHtml,
-  buildUnsubscribeFooterText,
-} from "./unsubscribe";
+// Stub functions for unsubscribe feature - real implementation lives in
+// separate recovery task (HMAC signing, audit trail, inbox worker, schema
+// migration for winBackEmailsEnabled / announcementEmailsEnabled). These
+// no-op/fallback versions preserve email branding without breaking the build.
+// TODO(recovery): Restore full unsubscribe module from subrepl branch
+// 7ea53bd after V2 verdict migration is shipped and validated. See
+// docs/RECOVERY_QUEUE.md for the deferred-work tracking.
+type UnsubscribeCategory = "digest" | "winback" | "announcements";
+
+function buildListUnsubscribeHeaders(_userId: string, _category: UnsubscribeCategory): Record<string, string> {
+  return {};
+}
+
+function buildUnsubscribeFooterHtml(_userId: string, _category: UnsubscribeCategory): string {
+  return '<p style="font-size:12px;color:#666;">To manage your email preferences, visit your account settings on hobbyalpha.com.</p>';
+}
+
+function buildUnsubscribeFooterText(_userId: string, _category: UnsubscribeCategory): string {
+  return 'To manage your email preferences, visit your account settings on hobbyalpha.com.';
+}
 import { buildEmailHeaderHtml, buildEmailHeaderText } from "./emailBranding";
 
 const transporter = nodemailer.createTransport({
@@ -587,6 +602,52 @@ export async function sendNewParticipantJoinedEmail(
 }
 
 /**
+ * Pure renderer for the one-time rebrand announcement email body
+ * (subject + html + text + headers). Exposed separately from the sender so
+ * the admin Announcements UI can preview the exact same rendered body that
+ * users will receive without actually sending mail.
+ */
+export function renderRebrandAnnouncementEmail(
+  userName: string | null | undefined,
+  userId: string,
+): { subject: string; html: string; text: string; headers: Record<string, string> } {
+  const newDomain = process.env.CUSTOM_DOMAIN || "hobbyalpha.com";
+  const greeting = userName ? `Hi ${userName},` : "Hi there,";
+
+  const subject = "Sports Card Portfolio is now HobbyAlpha";
+  const text =
+    buildEmailHeaderText() +
+    `${greeting}\n\n` +
+    `Quick heads up — Sports Card Portfolio is now HobbyAlpha.\n\n` +
+    `Same app. Same login. Same data. Sharper name.\n\n` +
+    `Visit your collection at https://${newDomain}/\n\n` +
+    `(The old sportscardportfolio.io links still work — they redirect to the new home.)\n\n` +
+    `Thanks for being here,\nThe HobbyAlpha Team` +
+    buildUnsubscribeFooterText(userId, "announcements");
+  const html =
+    `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">` +
+    buildEmailHeaderHtml() +
+    `<h1 style="color: #f59e0b;">We have a new name: HobbyAlpha</h1>` +
+    `<p>${greeting}</p>` +
+    `<p>Quick heads up — <strong>Sports Card Portfolio is now HobbyAlpha</strong>.</p>` +
+    `<p>Same app. Same login. Same data. Sharper name.</p>` +
+    `<p style="margin: 24px 0;">` +
+    `<a href="https://${newDomain}/" style="background: #f59e0b; color: #fff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600;">Open HobbyAlpha</a>` +
+    `</p>` +
+    `<p style="color: #6b7280; font-size: 13px;">Your old <code>sportscardportfolio.io</code> links still work — they automatically redirect to the matching page on HobbyAlpha.</p>` +
+    `<p style="margin-top: 30px;">Thanks for being here,<br>The HobbyAlpha Team</p>` +
+    buildUnsubscribeFooterHtml(userId, "announcements") +
+    `</div>`;
+
+  return {
+    subject,
+    html,
+    text,
+    headers: buildListUnsubscribeHeaders(userId, "announcements"),
+  };
+}
+
+/**
  * One-time rename announcement email.
  *
  * Sent to existing users to inform them that "Sports Card Portfolio" is now
@@ -606,38 +667,16 @@ export async function sendRebrandAnnouncementEmail(
     return false;
   }
 
-  const newDomain = process.env.CUSTOM_DOMAIN || "hobbyalpha.com";
-  const greeting = userName ? `Hi ${userName},` : "Hi there,";
+  const rendered = renderRebrandAnnouncementEmail(userName, userId);
 
   try {
     await transporter.sendMail({
       from: `"HobbyAlpha" <${process.env.ZOHO_EMAIL}>`,
       to: userEmail,
-      subject: "Sports Card Portfolio is now HobbyAlpha",
-      headers: buildListUnsubscribeHeaders(userId, "announcements"),
-      text:
-        buildEmailHeaderText() +
-        `${greeting}\n\n` +
-        `Quick heads up — Sports Card Portfolio is now HobbyAlpha.\n\n` +
-        `Same app. Same login. Same data. Sharper name.\n\n` +
-        `Visit your collection at https://${newDomain}/\n\n` +
-        `(The old sportscardportfolio.io links still work — they redirect to the new home.)\n\n` +
-        `Thanks for being here,\nThe HobbyAlpha Team` +
-        buildUnsubscribeFooterText(userId, "announcements"),
-      html:
-        `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">` +
-        buildEmailHeaderHtml() +
-        `<h1 style="color: #f59e0b;">We have a new name: HobbyAlpha</h1>` +
-        `<p>${greeting}</p>` +
-        `<p>Quick heads up — <strong>Sports Card Portfolio is now HobbyAlpha</strong>.</p>` +
-        `<p>Same app. Same login. Same data. Sharper name.</p>` +
-        `<p style="margin: 24px 0;">` +
-        `<a href="https://${newDomain}/" style="background: #f59e0b; color: #fff; padding: 12px 20px; border-radius: 6px; text-decoration: none; font-weight: 600;">Open HobbyAlpha</a>` +
-        `</p>` +
-        `<p style="color: #6b7280; font-size: 13px;">Your old <code>sportscardportfolio.io</code> links still work — they automatically redirect to the matching page on HobbyAlpha.</p>` +
-        `<p style="margin-top: 30px;">Thanks for being here,<br>The HobbyAlpha Team</p>` +
-        buildUnsubscribeFooterHtml(userId, "announcements") +
-        `</div>`,
+      subject: rendered.subject,
+      headers: rendered.headers,
+      text: rendered.text,
+      html: rendered.html,
     });
     console.log(`Rebrand announcement email sent to ${userEmail}`);
     return true;

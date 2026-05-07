@@ -145,3 +145,23 @@ These were added during investigation and should not ship to production.
 - **Root cause hypothesis:** Same class of bug as Bug A — Gemini call for CardOfDay generation is failing silently and serving fallback shape as if real output.
 - **Status:** Captured. Likely shares root cause with Bug A (timeout / token limit). May self-resolve after Bug A cherry-pick, or may need a separate fix in the CardOfDay generation path.
 - **Priority:** Medium — directly related to Bug A class; assess after Bug A is confirmed working in production.
+
+---
+
+## New Findings (May 7 2026 — Rebrand Recovery Session)
+
+### Finding F3 — Unsubscribe module stubbed in `server/email.ts`
+- **Symptom:** Rebrand cherry-pick `00d674d` ("Carry the new HobbyAlpha brand into every outbound email") added `import { buildListUnsubscribeHeaders, buildUnsubscribeFooterHtml, buildUnsubscribeFooterText } from "./unsubscribe"` to `server/email.ts`. The `server/unsubscribe.ts` module does NOT exist on `origin/main` — it was authored on subrepl branches (Task #43, Task #55) that never merged.
+- **Resolution applied (May 7):** Replaced the broken import with three local stub functions in `server/email.ts` that return safe defaults:
+  - `buildListUnsubscribeHeaders()` → `{}` (no `List-Unsubscribe` / `List-Unsubscribe-Post` headers)
+  - `buildUnsubscribeFooterHtml()` → static HTML "manage preferences in account settings"
+  - `buildUnsubscribeFooterText()` → static plain-text equivalent
+- **Cost of stub:** Outbound digest / win-back / announcement emails ship without RFC 8058 one-click unsubscribe header and without HMAC-signed per-user opt-out tokens. Manual unsubscribe still works via account settings UI.
+- **Why not the real module:** The real `unsubscribe.ts` (recoverable from subrepl branch `7ea53bd`) depends on two schema fields not on `main` (`winBackEmailsEnabled`, `announcementEmailsEnabled` on `users_alert_settings`). Adopting it would require a schema migration, which is locked off until V2 verdict migration ships.
+- **Recovery plan:** After V2 verdict migration is shipped + validated in production:
+  1. Cherry-pick / port `server/unsubscribe.ts` from subrepl branch `7ea53bd:server/unsubscribe.ts`
+  2. Add the two missing schema columns + `db:push` migration
+  3. Re-add the inbox worker + `scripts/honor-unsubscribe.ts` from the same branch
+  4. Restore the original import line in `server/email.ts` (delete the stub block)
+  5. Add deliverability/compliance tests
+- **Priority:** Medium-High — CAN-SPAM / RFC 8058 compliance gap. Acceptable short-term because unsubscribe is still possible via in-app settings; not acceptable long-term.
