@@ -254,7 +254,7 @@ export default function Upgrade() {
             {shouldHidePayments ? (
               <div className="text-center p-4 bg-muted rounded-lg">
                 <p className="text-sm text-muted-foreground mb-2">
-                  To upgrade to Pro, please visit sportscardportfolio.io in your browser.
+                  To upgrade to Pro, please visit hobbyalpha.com in your browser.
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Subscriptions are managed through our website.

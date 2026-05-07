@@ -216,7 +216,7 @@ export async function generatePlayerOGImage(playerSlug: string): Promise<Buffer>
         <rect x="920" y="558" width="220" height="44" rx="22" fill="${verdictConfig.bg}"/>
         <text x="1030" y="587" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">Get Full Analysis</text>
       ` : `
-        <text x="1140" y="585" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#64748B" text-anchor="end">sportscardportfolio.io</text>
+        <text x="1140" y="585" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#64748B" text-anchor="end">hobbyalpha.com</text>
       `}
     </svg>
   `;

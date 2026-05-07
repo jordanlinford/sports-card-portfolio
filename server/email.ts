@@ -59,7 +59,7 @@ export async function sendNewSignupNotification(
   try {
     await transporter.sendMail({
       from: `"Hobby Alpha" <${process.env.ZOHO_EMAIL}>`,
-      to: "info@sportscardportfolio.io",
+      to: "info@hobbyalpha.com",
       subject: `New signup: ${displayName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">

@@ -82,7 +82,7 @@ export default function Landing() {
                   <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/80" />
                   <span className="h-2.5 w-2.5 rounded-full bg-green-500/80" />
                   <div className="ml-3 flex-1 max-w-xs px-2.5 py-1 rounded-md bg-zinc-700/70 text-[10px] text-zinc-400 truncate">
-                    sportscardportfolio.io / player-outlook
+                    hobbyalpha.com / player-outlook
                   </div>
                 </div>
                 {/* Cropped player outlook screenshot with bottom fade */}

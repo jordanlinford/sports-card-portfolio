@@ -508,14 +508,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   // Helper to get origin URL (prefer HTTPS and deployment domain)
   const getOriginUrl = (req: any) => {
-    const customDomain = process.env.CUSTOM_DOMAIN || "sportscardportfolio.io";
+    const customDomain = process.env.CUSTOM_DOMAIN || "hobbyalpha.com";
     const requestHost = (req.headers.host || "").toString();
     const isReplitAutoDomain = /\.replit\.(app|dev)$/i.test(requestHost);
     const isProd = process.env.NODE_ENV === "production";
 
     // In production, if the request came in on the bare *.replit.app/*.replit.dev
     // domain (or with no host), canonicalize URLs to the custom domain so sitemap,
-    // SSR canonical tags, and OG URLs always point at sportscardportfolio.io.
+    // SSR canonical tags, and OG URLs always point at hobbyalpha.com.
     if (isProd && (isReplitAutoDomain || !requestHost)) {
       return `https://${customDomain}`;
     }
@@ -1441,7 +1441,7 @@ Sitemap: ${origin}/sitemap.xml
       const sanitizedSlug = playerSlug.replace(/[^a-z0-9-]/gi, "").toLowerCase();
       
       // Use custom domain for OG URLs to ensure social previews work correctly
-      const customDomain = process.env.CUSTOM_DOMAIN || "sportscardportfolio.io";
+      const customDomain = process.env.CUSTOM_DOMAIN || "hobbyalpha.com";
       const baseUrl = `https://${customDomain}`;
       
       const data = await getPlayerShareData(sanitizedSlug);

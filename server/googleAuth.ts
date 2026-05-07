@@ -222,7 +222,7 @@ export function setupGoogleAuth(app: Express) {
         return res.status(401).json({ error: "unauthorized" });
       }
 
-      const qaEmail = "qa-test@sportscardportfolio.io";
+      const qaEmail = "qa-test@hobbyalpha.com";
       let user = await storage.getUserByEmail(qaEmail);
 
       if (!user) {
