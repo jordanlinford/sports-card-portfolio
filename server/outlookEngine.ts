@@ -1427,7 +1427,7 @@ Return ONLY a JSON object with this EXACT structure:
     "injuryStatus": "HEALTHY" | "INJURED" | "RECOVERING" | "UNKNOWN"
   },
   "analysis": {
-    "verdict": "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "WATCH" | "LITTLE_VALUE",
+    "verdict": "BUY" | "MONITOR" | "SELL" | "LONG_HOLD" | "LEGACY_HOLD" | "LITTLE_VALUE",
     "verdictReasons": ["reason 1", "reason 2", "reason 3"],
     "shortSummary": "<one sentence investment summary>",
     "detailedAnalysis": "<2-3 paragraph detailed analysis for pro users>",
@@ -1449,7 +1449,6 @@ VERDICT GUIDELINES:
 - SELL: Declining value, negative momentum, or peak pricing
 - LONG_HOLD: Solid long-term value, hold for appreciation
 - LEGACY_HOLD: Vintage/retired player cards with historical significance
-- WATCH: Interesting but not ready to buy yet
 - LITTLE_VALUE: Card worth under $2-3 with minimal upside potential
 
 Liquidity: HIGH = 15+ sales/month, MEDIUM = 5-15, LOW = under 5.

@@ -4357,7 +4357,7 @@ Sitemap: ${origin}/sitemap.xml
       const matchConfidence = priceData.matchConfidence;
       
       // Determine final action — prefer unified verdict with deterministic guardrails
-      const validVerdicts = ["BUY", "MONITOR", "SELL", "LONG_HOLD", "LEGACY_HOLD", "WATCH", "LITTLE_VALUE"];
+      const validVerdicts = ["BUY", "MONITOR", "SELL", "LONG_HOLD", "LEGACY_HOLD", "LITTLE_VALUE"];
       let finalAction = signals.action;
       let finalActionReasons = [...signals.actionReasons];
       
@@ -4374,9 +4374,9 @@ Sitemap: ${origin}/sitemap.xml
           unifiedResult.player.roleStatus === "INJURED_RESERVE" ||
           unifiedResult.player.roleStatus === "BACKUP"
         )) {
-          finalAction = "WATCH";
-          finalActionReasons = [`Player status (${unifiedResult.player.roleStatus}/${unifiedResult.player.injuryStatus}) adds risk — watching for now`, ...finalActionReasons];
-          console.log(`[Quick Analyze] Guardrail: Downgraded BUY → WATCH due to player status`);
+          finalAction = "MONITOR";
+          finalActionReasons = [`Player status (${unifiedResult.player.roleStatus}/${unifiedResult.player.injuryStatus}) adds risk — monitoring for now`, ...finalActionReasons];
+          console.log(`[Quick Analyze] Guardrail: Downgraded BUY → MONITOR due to player status`);
         }
         
         // Guardrail: Low confidence data should not get aggressive verdicts
@@ -4418,7 +4418,7 @@ Sitemap: ${origin}/sitemap.xml
         
         if (verdictWasOverridden) {
           const verdictLabels: Record<string, string> = {
-            BUY: "buy", MONITOR: "monitor", WATCH: "watch", SELL: "sell",
+            BUY: "buy", MONITOR: "monitor", SELL: "sell",
             LONG_HOLD: "long-term hold", LEGACY_HOLD: "legacy hold",
             LITTLE_VALUE: "low value", WATCH_LIST: "watch"
           };
@@ -4428,7 +4428,7 @@ Sitemap: ${origin}/sitemap.xml
           let adjustedShort = unifiedResult.analysis.shortSummary;
           const buyPhrases = /\b(strong\s+['"]?buy['"]?\s+opportunity|presents?\s+a\s+['"]?buy['"]?|is\s+a\s+buy|clear\s+buy|recommend\s+buying|should\s+buy|great\s+buy)\b/gi;
           adjustedShort = adjustedShort.replace(buyPhrases, `presents a '${actionLabel}' opportunity`);
-          if (/\bbuy\b/i.test(adjustedShort) && (finalAction === "WATCH" || finalAction === "MONITOR")) {
+          if (/\bbuy\b/i.test(adjustedShort) && finalAction === "MONITOR") {
             adjustedShort = adjustedShort.replace(/\bbuy\b/gi, actionLabel);
           }
           
