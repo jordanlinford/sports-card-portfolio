@@ -165,3 +165,94 @@ These were added during investigation and should not ship to production.
   4. Restore the original import line in `server/email.ts` (delete the stub block)
   5. Add deliverability/compliance tests
 - **Priority:** Medium-High — CAN-SPAM / RFC 8058 compliance gap. Acceptable short-term because unsubscribe is still possible via in-app settings; not acceptable long-term.
+
+---
+
+## Commit 9 Scope — Card Outlook V2 Verdict Parity (Queued May 7 2026)
+
+**Trigger:** V2 verdict migration shipped to player outlooks (Commit 8 / `c05dc3f`). Card outlooks run on a separate engine that was never updated, so card-level verdicts diverge from player-level verdicts (cards never return `LONGSHOT_BET`, `ACCUMULATE`, `HOLD_CORE`, `SPECULATIVE_FLYER`, etc).
+
+### Files in scope
+- `server/cardOutlookService.ts` (2,111 lines) — primary engine
+- `server/outlookEngine.ts:3072` — duplicate `OutlookAction` type alias (decide: delete or keep)
+- `shared/schema.ts:892–903` — `OUTLOOK_ACTIONS` registry + `OutlookAction` type alias
+- `client/src/components/card-outlook-panel.tsx:119` — duplicate `OutlookAction` type literal (line 119) + `getActionColor`/`getActionIcon`/`getActionLabel`/`getStateDescription`/`getTimeContext`/`getConditionalTriggers` switches
+- `client/src/components/card-detail-modal.tsx:55,75` — `cardOutlookAction` prop + `bucketVerdict()` mapping
+- `client/src/components/VerdictDivergenceNote.tsx` (referenced from card-detail-modal:1248) — compares card verdict vs player verdict; needs to know about new shared values
+
+### Logic to port from `playerOutlookEngine.ts` / `investmentDecisionEngine.ts`
+1. **`isLongshotEligible(card)` gate** — currently lives only in player engine. Port mirror: `isCardLongshotEligible(card)` checking
+   - `legacyTier ∈ {PROSPECT, RISING_STAR}` (cards' equivalent to player career stage)
+   - card year ≤ `LONGSHOT_CUTOFFS[sport]` (rookie-window cutoff per sport)
+   - `normalizePosition(card.position)` ∈ `SKILL_POSITIONS` for NFL/NBA/NHL (MLB exempt)
+   - `marketValue ≥ $25` floor (avoid penny cards triggering longshot)
+2. **`LONGSHOT_BET` override site** — insert in `determineAction()` between the LEGACY block (line 1261) and the standard BUY/SELL/MONITOR cascade (line 1264). Fires when:
+   - `isCardLongshotEligible(card) === true`
+   - `upsideScore ≥ 55` AND `riskScore ≥ 50` (high-upside / high-risk profile)
+   - Skips when card already qualifies for clean BUY (upside ≥ 60, risk ≤ 50)
+3. **Sport-key normalization** — replace ad-hoc lowercase coercion at line 539 with shared `normalizeSportName()` (already exported from `shared/schema.ts` per Commit 8).
+4. **Position normalization** — adopt `normalizePosition()` + `POSITION_ALIASES` from `shared/schema.ts` for any position-based logic.
+
+### Decision: `OutlookAction` enum vs canonical `InvestmentVerdict` union
+
+**Recommendation: extend `OutlookAction`, do NOT collapse into `InvestmentVerdict`.**
+
+Reasoning:
+- `OutlookAction` carries card-specific semantics that don't exist for players: `LEGACY_HOLD` (vintage HOF cards), `LONG_HOLD` (modern retired/HOF), `LITTLE_VALUE` (sub-$10 / sub-30 upside floor). These are card-condition + card-age signals, not player-trajectory signals.
+- `InvestmentVerdict` carries player-specific semantics that don't apply cleanly to a single card: `ACCUMULATE` vs `HOLD_CORE` is a portfolio-strategy distinction; `AVOID_NEW_MONEY` vs `AVOID_STRUCTURAL` is a player-risk distinction; `TRADE_THE_HYPE` is a player-hype-cycle distinction.
+- Forcing one union into the other would either inflate `InvestmentVerdict` with vintage/value semantics that don't apply to active players, or strip `OutlookAction` of its archetype-aware verdicts.
+- Cleaner contract: keep them as **two separate verdict surfaces**, share only the **shared subset** (BUY, MONITOR, SELL, LONGSHOT_BET) by reusing the same string literals and same color/icon/label palette. Frontend `bucketVerdict()` already does this collapse — extend that helper to handle LONGSHOT_BET on the card path.
+
+**Concretely for Commit 9:**
+```ts
+// server/cardOutlookService.ts:12 + server/outlookEngine.ts:3072 + shared/schema.ts:892
+export type OutlookAction =
+  | "BUY"
+  | "MONITOR"
+  | "SELL"
+  | "LONG_HOLD"
+  | "LEGACY_HOLD"
+  | "LITTLE_VALUE"
+  | "LONGSHOT_BET";   // ← new, shared literal with InvestmentVerdict
+```
+- Delete the duplicate type literal at `client/src/components/card-outlook-panel.tsx:119` and import from `@shared/schema` instead — single source of truth.
+- Delete the duplicate at `server/outlookEngine.ts:3072` — re-export from `shared/schema.ts`.
+
+### UI surface area (must add `LONGSHOT_BET` case to each switch)
+- `getActionColor()` — fuchsia (match player surface per Commit 3)
+- `getActionIcon()` — `Sparkles` from lucide-react
+- `getActionLabel()` — "Longshot Bet"
+- `getStateDescription()` — "High-upside speculative card with rookie-window risk profile"
+- `getTimeContext()` — "Multi-month conviction; revisit at season-end milestones"
+- `getConditionalTriggers()` — sport-aware triggers (rookie season production, draft pedigree, scarcity tier)
+- `bucketVerdict()` in card-detail-modal — map LONGSHOT_BET into the existing speculative bucket
+- `VerdictDivergenceNote` — handle the case where card verdict and player verdict are both LONGSHOT_BET (no divergence) and the asymmetric cases (player LONGSHOT, card BUY → "card already proving out the bet")
+
+### Estimated lines changed
+- `server/cardOutlookService.ts`: ~80 lines added
+  - `isCardLongshotEligible()` helper: ~30 lines
+  - LONGSHOT_BET branch in `determineAction()`: ~10 lines
+  - Sport/position normalization swap: ~15 lines
+  - Type literal extension at line 12: ~1 line
+  - Explanation generator branches (`generateExplanation`, `getStateDescription`, etc.): ~25 lines
+- `shared/schema.ts`: ~5 lines (extend `OUTLOOK_ACTIONS` registry with LONGSHOT_BET entry)
+- `server/outlookEngine.ts`: ~3 lines (delete duplicate type, re-export from schema)
+- `client/src/components/card-outlook-panel.tsx`: ~40 lines (6 switches × ~6 lines each + import swap)
+- `client/src/components/card-detail-modal.tsx`: ~5 lines (bucketVerdict extension)
+- `client/src/components/VerdictDivergenceNote.tsx`: ~20 lines (asymmetric LONGSHOT cases)
+
+**Total: ~150 lines, single PR. Low blast radius — additive new branch, no rewrites of existing logic.**
+
+### Migration strategy
+- **No DB migration needed.** Card verdicts are computed on-demand in `server/cardOutlookService.ts:451` and cached in `card_outlook_cache` (TTL-bounded). Once Commit 9 ships, stale cached entries will recompute on next access; force-recompute via existing `/api/admin/refresh-card-outlooks` if instant rollout is desired.
+- **No `priceAtSignal` / accuracy-tracking changes.** Card outlooks don't feed verdict regression test (player-level only).
+
+### Acceptance criteria
+1. Sample of 20 LONGSHOT-eligible rookie cards (Caleb Williams Prizm, Wemby Prizm, Bowers Prizm, etc) returns `LONGSHOT_BET` from `determineAction()` when the player-level verdict is also LONGSHOT_BET.
+2. Vintage HOF cards (Mantle, Jordan rookies) still return `LEGACY_HOLD` — LONGSHOT branch does not regress legacy detection.
+3. Sub-$10 commons still return `LITTLE_VALUE` — LONGSHOT branch does not steal low-value cards.
+4. Card outlook panel renders LONGSHOT_BET with fuchsia + Sparkles, matching player surface (visual parity check on `card-outlook-panel.tsx`).
+5. `VerdictDivergenceNote` renders correct copy when card verdict ≠ player verdict and at least one side is LONGSHOT_BET.
+
+### Priority
+**Medium.** Card verdicts are visibly inconsistent with player verdicts on the same player's cards, but the existing card verdicts (BUY/MONITOR/SELL) are still directionally correct — cards don't surface broken or harmful recommendations, just less granular ones than players. Schedule after V2 prod migration completes + bakes for 48h.
