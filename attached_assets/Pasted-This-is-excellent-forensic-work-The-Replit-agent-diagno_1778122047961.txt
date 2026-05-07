@@ -1,0 +1,82 @@
+This is excellent forensic work. The Replit agent diagnosed the situation completely. Let me translate what they found because there's a lot here and the implications matter.
+What actually happened
+Your redesign was real. It existed and was deployed. The agent found:
+
+36 subrepl-* branches from April 28-29 with the rebrand work
+Including Task #26 ("Rebrand Sports Card Portfolio to HobbyAlpha"), Task #30 ("Show new HobbyAlpha brand artwork in header, footer, share viewer"), and others
+A May 5 rebase attempt to merge the rebrand into main with 12+ commits (Task #26, brand assets, holographic theme, branded emails, iOS splash, etc.)
+9 dangling commits including "Update visual design to match new logo and branding elements"
+
+It got lost on May 5, not today. This is critical. The agent's reflog analysis shows:
+
+May 5 20:34 - rebase attempt with the rebrand commits happened
+May 5 ~workspace reset wiped the in-progress rebase
+Result: rebrand commits never merged to main, became orphaned
+You documented this exact event yesterday in commit 1e317c3
+
+What you've been seeing in production was probably cached. The dist/public/favicon.png file is 23097 bytes - matches the rebranded version. But it hasn't been rebuilt since April 28. Either:
+
+Replit's deploy cached the May 5 rebranded build artifacts
+Your browser cache / PWA service worker showed you the May 5 version for 36 hours
+Replit's deploy infrastructure has its own SHA tracking
+
+Tonight's V2 work didn't wipe anything. The rebrand was already missing from main when the agent's session started at 02:21 today.
+The good news
+Everything is recoverable. The work exists in:
+
+The 36 subrepl-* branches (intact, not orphans)
+Reflog rebase-pick SHAs from May 5
+Dangling commits in git fsck
+
+Three recovery paths available. Each with tradeoffs.
+Three things you need to do RIGHT NOW
+1. Verify what production is currently serving.
+The agent asked you to check this. It matters because:
+
+If prod still shows HobbyAlpha branding right now → cached/stale state, deploy preserved May 5 build
+If prod shows Sports Card Portfolio → cache has cleared, you're seeing the wiped state
+
+Do this now: open hobbyalpha.com in incognito mode (or different browser). What do you see for:
+
+Favicon in the browser tab
+Page title in the browser tab
+Logo in the header
+Branding in the footer
+
+Tell me what you see.
+2. Tell the agent to push the 7 unpushed commits to origin/main IMMEDIATELY.
+This is defensive. The standing rule from your own commit 1e317c3 says: workspace resets can wipe unpushed commits. The agent has 7 commits in working tree that aren't pushed yet. If a workspace reset happens before we push, we lose tonight's branding text swaps AND the migration unblock fix.
+This is non-destructive (push to origin/main). It's the safe action.
+3. Don't recover the rebrand yet. Once we know prod state, we plan recovery carefully.
+What to send the agent
+
+Excellent forensic work. Three immediate actions:
+1. PUSH THE 7 UNPUSHED COMMITS NOW. Standing rule from commit 1e317c3: unpushed work is at risk of workspace reset wipe. Push first, then we proceed.
+git push origin main
+git log --oneline origin/main | head -10
+Surface confirmation. This is defensive only - protects tonight's work (V2 migration unblock + branding text swaps + saveToCache fix) from another reset event.
+2. After push verified, wait for user to confirm production state.
+User is checking incognito browser to see what hobbyalpha.com currently serves (favicon, title, header logo, footer branding).
+Don't take any other action until user reports prod state.
+3. Pre-prepare recovery analysis (read-only).
+While waiting, prepare details for each recovery path:
+Path A (cherry-pick from subrepl-jgqlzd6o chain):
+
+List the exact 4 commits in order
+For each, show what files it touches
+Identify overlap with tonight's commits
+
+Path B (cherry-pick the May 5 rebase chain):
+
+List the 12+ commits from reflog
+Identify the order they were applied in the May 5 rebase
+Identify overlap with tonight's commits
+
+Path C (hard reset + cherry-pick tonight's work on top):
+
+Identify the best subrepl branch tip to reset to
+Identify how tonight's V2 work would be cherry-picked back
+Estimate conflict probability
+
+Surface this analysis but DO NOT EXECUTE any path yet.
+Standing by for user prod state confirmation.
