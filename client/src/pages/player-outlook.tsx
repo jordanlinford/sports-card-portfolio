@@ -169,9 +169,6 @@ function getVerdictColor(verdict: string) {
       return "bg-muted text-muted-foreground border-border";
   }
 }
-  }
-}
-
 
 function getModifierColor(modifier: VerdictModifier) {
   switch (modifier) {
