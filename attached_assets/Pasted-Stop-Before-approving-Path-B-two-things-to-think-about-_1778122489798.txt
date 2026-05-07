@@ -1,0 +1,89 @@
+Stop. Before approving Path B, two things to think about that the agent didn't surface.
+What the agent's analysis is missing
+1. The recovery branch + cherry-pick + force-merge approach has risk the agent isn't naming.
+The agent says "fast-forward main to recovery branch." But if recovery branch has 12 cherry-picked commits on top of current main, that's not a fast-forward - that's a merge. The agent's plan would result in:
+
+Current main: HEAD = 5cd6d5e
+Recovery branch: HEAD = 5cd6d5e + 12 cherry-picks
+After "fast-forward": main = 5cd6d5e + 12 cherry-picks
+
+That's fine actually - it IS a fast-forward if recovery branch is a linear extension of main. So the technical mechanic is correct.
+But the conflict resolution decisions matter a lot. The agent says "prefer the rebrand version unless it would clobber V2 work." That's vague. Specific conflict resolution rules need to be locked before starting:
+
+Files where rebrand wins by default: branding text, asset files, theme files, design system
+Files where V2 work wins by default: verdictMigrationJob.ts, playerOutlookEngine.ts, schema.ts, verdictMessages.ts, verdict-takeaway.tsx
+Files where both might have changed (gray area): routes.ts (migration endpoints + branding text), replit.md (docs), admin.tsx (V2 migration tab + branding text)
+
+Without explicit rules per file category, conflict resolution could be inconsistent and we lose work in subtle ways.
+2. Migration trigger timing matters.
+The agent asked you when to trigger migration: now, after recovery, or defer until you say go.
+Right answer: defer until after recovery is complete AND deployed AND verified working in production. Reasoning:
+
+Migration regenerates 139 verdicts via Gemini calls (~28 minutes, ~$1-2 cost)
+If migration runs now and recovery happens after, recovery cherry-picks might conflict with migration's writes
+Migration needs the V2 engine to be running cleanly without surprises
+Run migration once, in clean state, after everything else stabilizes
+
+Order of operations:
+
+Recovery (Path B cherry-picks)
+Review + approve recovery diff
+Push to origin/main
+Replit Publish
+Verify production shows HobbyAlpha branding (incognito browser check)
+THEN trigger migration
+
+What to send the agent
+
+Approved Path B with specific guardrails. Defer migration trigger until step 6 below.
+Locked conflict resolution rules:
+Before starting cherry-picks, lock these rules and apply consistently:
+Files where rebrand version wins (recovery takes precedence):
+
+Branding text in any UI component (logos, names, taglines, headers, footers)
+Asset files (favicon.png, og-default.png, splash screens, icons, mockup PNGs)
+Theme/design files (tailwind config, index.css, design tokens)
+Email templates and branded email files
+HTML head tags (title, meta, og, twitter)
+PWA manifest
+Any new design components or visual elements added by the rebrand
+
+Files where V2 work wins (tonight's work takes precedence):
+
+server/verdictMigrationJob.ts (entire file - V2 migration job)
+server/lib/withTimeout.ts (V2 dependency)
+server/playerOutlookEngine.ts (V2 engine logic + saveToCache)
+shared/schema.ts (V2 schema additions: SELL, LONGSHOT_BET, confidence_score)
+client/src/lib/verdictMessages.ts (V2 audience messaging)
+client/src/components/verdict-takeaway.tsx (V2 component)
+client/src/components/verdict-update-banner.tsx (V2 banner)
+V2 verdict logic in shared/schema.ts (LONGSHOT_CUTOFFS, SKILL_POSITIONS, etc.)
+
+Files needing case-by-case judgment (mixed concerns):
+
+server/routes.ts: V2 migration endpoints + branding text - merge BOTH (keep V2 migration endpoints, apply rebrand text changes)
+client/src/pages/admin.tsx: V2 Migration tab + branding text - merge BOTH (keep VerdictMigrationTab, apply rebrand text changes)
+replit.md: docs - merge BOTH or take recovery version (rebrand likely had updated docs)
+client/src/pages/player-outlook.tsx, card-outlook.tsx: V2 changes (VerdictTakeaway, isHolder logic) + any rebrand changes - merge BOTH (preserve V2 functionality, apply visual/branding updates)
+
+Surface ALL mixed-concern conflicts before resolving them. Don't auto-decide on the gray-area files. Show me the conflict markers, I make the call per file.
+Sequence:
+
+Create recovery branch off current main
+Cherry-pick commit #1 (a10db5e - 41 file overlap) - surface ALL conflicts before resolving
+I review the conflicts, give per-file resolution direction
+You apply resolutions, complete commit #1
+Cherry-pick commits #2-12 in order
+For each: surface conflicts as they arise, I review if mixed-concern
+After all 12 applied, run npm run typecheck + npm run build
+Surface complete diff vs current main
+I review final state
+Push recovery branch as fast-forward to main
+Verify origin/main updated
+Replit Publish
+User verifies production in incognito (HobbyAlpha branding visible)
+THEN user triggers V2 migration from prod admin
+Watch for migration write activity (5-min check)
+
+Migration timing: deferred to step 14. Don't trigger before recovery + deploy + prod verification.
+Start with commit #1. Surface conflicts. Wait for my review.
