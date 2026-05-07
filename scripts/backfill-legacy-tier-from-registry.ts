@@ -120,6 +120,36 @@ interface UpdatePlan {
   registryStage: string;
 }
 
+interface SkippedDowngrade {
+  cardId: number;
+  playerName: string;
+  currentTier: string;
+  wouldHaveBeen: string;
+  registryStage: string;
+  reason: string;
+}
+
+// Terminal tiers we never silently downgrade. If a card already carries one of
+// these values, the registry-driven backfill skips it (the registry may be more
+// granular than the legacy bucket -- e.g. Eli Manning is VETERAN in registry
+// but already HOF in legacy_tier on a card; preserve the more terminal value).
+// Within the terminal set, we still allow strict upgrades along the ladder
+// RETIRED -> HOF -> LEGEND_DECEASED.
+const TERMINAL_TIERS_NO_DOWNGRADE = new Set(["HOF", "LEGEND_DECEASED", "RETIRED"]);
+
+function isDowngradeFromTerminal(currentTier: string | null, newTier: string): boolean {
+  if (!currentTier) return false; // NULL fills always allowed
+  if (currentTier === newTier) return false;
+  if (!TERMINAL_TIERS_NO_DOWNGRADE.has(currentTier)) return false;
+
+  // Allow strict upgrades within the terminal ladder.
+  const isUpgradeWithinTerminal =
+    (currentTier === "RETIRED" && (newTier === "HOF" || newTier === "LEGEND_DECEASED")) ||
+    (currentTier === "HOF" && newTier === "LEGEND_DECEASED");
+
+  return !isUpgradeWithinTerminal;
+}
+
 async function main() {
   // Dynamic imports — see header note. Order matters: db must load AFTER any
   // env mutation above.
@@ -160,6 +190,7 @@ async function main() {
   console.log(`[Backfill] Scanned ${allCards.length} cards with playerName`);
 
   const plans: UpdatePlan[] = [];
+  const skippedDowngrades: SkippedDowngrade[] = [];
   let registryHits = 0;
   let registryMisses = 0;
   let alreadyCorrect = 0;
@@ -193,6 +224,17 @@ async function main() {
       alreadyCorrect++;
       continue;
     }
+    if (isDowngradeFromTerminal(card.legacyTier ?? null, newTier)) {
+      skippedDowngrades.push({
+        cardId: card.id,
+        playerName: card.playerName,
+        currentTier: card.legacyTier as string,
+        wouldHaveBeen: newTier,
+        registryStage: lookup.entry.careerStage,
+        reason: `preserves terminal tier "${card.legacyTier}"`,
+      });
+      continue;
+    }
     plans.push({
       cardId: card.id,
       playerName: card.playerName,
@@ -207,6 +249,7 @@ async function main() {
   console.log(`[Backfill] Registry misses:      ${registryMisses}`);
   console.log(`[Backfill] Unmapped reg stages:  ${unmappable}`);
   console.log(`[Backfill] Already correct:      ${alreadyCorrect}`);
+  console.log(`[Backfill] Skipped downgrades:   ${skippedDowngrades.length}`);
   console.log(`[Backfill] Updates planned:      ${plans.length}`);
   console.log(``);
 
@@ -246,6 +289,22 @@ async function main() {
     console.log(`[Backfill] (HOF/SUPERSTAR/LEGEND/RETIRED/ROOKIE -> something else)`);
     for (const p of notable) {
       console.log(`[Backfill]   card #${p.cardId} (${p.playerName}): ${p.oldTier} -> ${p.newTier} (registry: ${p.registryStage})`);
+    }
+    console.log(``);
+  }
+
+  // Group 4: skipped downgrades (terminal-tier preservation). Always surface so
+  // we can confirm the no-downgrade rule is firing on the right cards.
+  if (skippedDowngrades.length > 0) {
+    console.log(`[Backfill] === Group 4: skipped downgrades (${skippedDowngrades.length}) ===`);
+    console.log(`[Backfill] (terminal tiers HOF/LEGEND_DECEASED/RETIRED preserved)`);
+    const sorted = [...skippedDowngrades].sort((a, b) =>
+      a.playerName.localeCompare(b.playerName) || a.cardId - b.cardId
+    );
+    for (const s of sorted) {
+      console.log(
+        `[Backfill]   card #${s.cardId} (${s.playerName}): keeping ${s.currentTier} (would have been ${s.wouldHaveBeen}, registry: ${s.registryStage}) -- ${s.reason}`
+      );
     }
     console.log(``);
   }

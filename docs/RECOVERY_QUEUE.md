@@ -256,3 +256,50 @@ export type OutlookAction =
 
 ### Priority
 **Medium.** Card verdicts are visibly inconsistent with player verdicts on the same player's cards, but the existing card verdicts (BUY/MONITOR/SELL) are still directionally correct — cards don't surface broken or harmful recommendations, just less granular ones than players. Schedule after V2 prod migration completes + bakes for 48h.
+
+---
+
+## Post-V2 Hygiene Items (queued during May 7 prod backfill)
+
+Logged during the Phase 1 `cards.legacy_tier` prod backfill dry-run review. None
+block the V2 player migration; address after V2 bakes.
+
+### Registry data corrections
+- **Eli Manning**: registry has him as `VETERAN`. He's retired and Pro Football
+  HoF eligible 2027. After eligibility (or sooner if voted in early), bump to
+  `RETIRED_HOF`. The Phase 1 backfill currently preserves the existing legacy
+  `HOF` tier on his cards via the no-downgrade rule, so card-level data is
+  correct; only the registry stage lags.
+- **Aaron Rodgers**: registry has him as `VETERAN`. After his retirement
+  announcement, update to `RETIRED` (and to `RETIRED_HOF` once eligible
+  ~2031). Same situation as Eli — no card-level urgency, only registry lag.
+
+### Registry expansion opportunities (198 unmatched players in prod backfill)
+The Phase 1 backfill couldn't attribute legacy_tier to 198 cards (150 unique
+player names). These cards retain their existing legacy_tier (or stay NULL).
+Categories:
+- **Retired NBA role players** (late-90s Jazz era + others): Bryon Russell,
+  Felton Spencer, Eric Leckner, Carlos Boozer, Deron Williams, Donyell
+  Marshall, Darrell Griffith, Gail Goodrich, Adrian Dantley, Andrei Kirilenko,
+  Bobby Hansen, Bol Bol, Enes Kanter, Gordon Hayward, etc.
+- **Prospects not yet in registry**: Cedric Coward, Endrick, Gavin McKenna,
+  Brandon Handlogten, Braylon Payne, Brice Sensabaugh, Cody Williams, Dylan
+  Sampson, Eddie Lacy, Elijah Arroyo, Emeka Egbuka, Jaxson Dart (in registry
+  but some variants miss), etc.
+- **Other sports retired**: Bob Griese, Brad Johnson, Doug Williams, Eppa
+  Rixey, Fernando Torres, Ben Rice.
+- **Retired QBs**: Aaron Rodger (typo, missing 's'), Brad Johnson, Doug Williams.
+
+### Card data hygiene
+- **"Aaron Rodger"** typo (missing 's') on at least one card — single-card fix.
+- **Multi-name strings** in `playerName` column ("Bryce Underwood / Tavien St.
+  Clair", "Connor Bedard / Adam Fantilli", "Curry/James/Durant"). Schema
+  doesn't model dual-/multi-subject cards. Future enhancement — consider a
+  `secondaryPlayers: text[]` column or a separate junction table.
+
+### Security follow-up
+- **Rotate Neon database password** after Phase 1 prod backfill + V2 player
+  migration both complete. Password was pasted into agent chat during the May
+  7 session for the one-shot prod backfill run; rotate via Neon console (or
+  Replit deployment secret rotation flow) once we no longer need shell access
+  to the prod DB.

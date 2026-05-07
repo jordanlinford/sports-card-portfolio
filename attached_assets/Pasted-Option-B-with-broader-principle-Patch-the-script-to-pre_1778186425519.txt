@@ -1,0 +1,60 @@
+Option B with broader principle. Patch the script to preserve legitimate HOF/LEGEND/RETIRED tiers when registry suggests something less terminal.
+Patch logic:
+Add a "no-downgrade rule" before applying any update:
+typescriptconst TERMINAL_TIERS_NO_DOWNGRADE = new Set([
+  "HOF",
+  "LEGEND_DECEASED",
+  "RETIRED"
+]);
+
+function isDowngrade(currentTier: string, newTier: string): boolean {
+  if (!currentTier || currentTier === "") return false; // NULL fills always allowed
+  if (currentTier === newTier) return false;
+  
+  // Preserve terminal tiers - don't downgrade them
+  if (TERMINAL_TIERS_NO_DOWNGRADE.has(currentTier)) {
+    // Allow upgrades within terminal tiers (LEGEND_DECEASED > HOF > RETIRED)
+    // Block any other transition
+    const isUpgradeWithinTerminal = (
+      (currentTier === "RETIRED" && (newTier === "HOF" || newTier === "LEGEND_DECEASED")) ||
+      (currentTier === "HOF" && newTier === "LEGEND_DECEASED")
+    );
+    return !isUpgradeWithinTerminal;
+  }
+  
+  return false;
+}
+
+// In the update loop:
+if (isDowngrade(card.legacy_tier, mappedTier)) {
+  skippedDowngrades.push({
+    card_id: card.id,
+    player_name: card.player_name,
+    current_tier: card.legacy_tier,
+    would_have_been: mappedTier,
+    reason: "preserves terminal tier"
+  });
+  continue;
+}
+Add new dry-run output section: Group 4 - Skipped downgrades.
+Surface every card where the no-downgrade rule fires. We need to verify the rule is doing the right thing (Eli preserved as HOF, Rodgers preserved as RETIRED, etc.) and not blocking legitimate normalizations we want.
+Run --prod --dry-run again with the patch.
+Surface:
+
+Updated count (was 278, expect to drop slightly due to skipped downgrades)
+Group 4: skipped downgrades (with reasons)
+Confirm Eli Manning, Aaron Rodgers, and any other terminal-tier cards are now skipped
+Confirm Karl Malone LEGEND → HOF and Brady PRIME → HOF are still proceeding (not blocked)
+
+Then I review and approve live run.
+Also: separately note for post-V2 hygiene work:
+Add to docs/RECOVERY_QUEUE.md:
+
+Eli Manning registry stage update (consider bumping to RETIRED_HOF after Pro Football HOF eligibility 2027)
+Aaron Rodgers registry stage update (currently VETERAN, should be RETIRED after his retirement announcement)
+198 unmatched players in prod backfill (most are retired NBA role players, some prospects not yet in registry, some dirty multi-name strings) - registry expansion opportunity
+"Aaron Rodger" typo card (missing 's') - card data hygiene
+Multi-name strings ("Bryce Underwood / Tavien St. Clair", etc.) - card schema doesn't model dual-subject cards well, future enhancement
+
+Security follow-up: Rotate Neon password after tonight's work completes.
+Standing by for patched dry-run output.
