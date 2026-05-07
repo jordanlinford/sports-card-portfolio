@@ -1,0 +1,146 @@
+~/workspace$ bash /tmp/finalize_recovery.sh
+════════════════════════════════════════════════════════════════
+  Plan #1 — HobbyAlpha Rebrand Recovery: Finalize & Push
+════════════════════════════════════════════════════════════════
+
+[1/6] Sanity checks…
+  ✓ Recovery branch present at 6a013b1
+
+[2/6] Working tree clean?
+  ✓ No uncommitted tracked changes (untracked files OK, ignored)
+
+[3/6] Fetching origin/main and verifying fast-forward eligibility…
+  ✓ Recovery branch is 21 commits ahead of origin/main, 0 behind
+
+[4/6] Checking out main and fast-forwarding to recovery HEAD…
+Switched to branch 'main'
+Your branch is ahead of 'origin/main' by 7 commits.
+  (use "git push" to publish your local commits)
+Updating a248d50..6a013b1
+Fast-forward
+ .agents/agent_assets_metadata.toml                       |  85 ++-
+ .replit                                                  |   2 +-
+ ...-install-screenshots-with-the-rebra_1778127055400.txt | 699 ++++++++++++++++++
+ ...Screenshot_2026-05-01_at_9.59.06_AM_1777651151987.png | Bin 0 -> 252518 bytes
+ .../generated_images/hobbyalpha-icon-1024.png            | Bin 0 -> 672578 bytes
+ .../generated_images/hobbyalpha-og-default.png           | Bin 0 -> 780579 bytes
+ attached_assets/hobbyalpha-player-outlook-mockup.png     | Bin 0 -> 488714 bytes
+ client/index.html                                        |  43 +-
+ client/public/email/hobbyalpha-mark.png                  | Bin 0 -> 21912 bytes
+ client/public/email/hobbyalpha-wordmark-dark.png         | Bin 0 -> 32544 bytes
+ client/public/email/hobbyalpha-wordmark-light.png        | Bin 0 -> 31332 bytes
+ client/public/favicon.png                                | Bin 52616 -> 23097 bytes
+ client/public/icons/icon-1024x1024.png                   | Bin 471178 -> 107574 bytes
+ client/public/icons/icon-120x120.png                     | Bin 16165 -> 8992 bytes
+ client/public/icons/icon-128x128.png                     | Bin 17984 -> 9919 bytes
+ client/public/icons/icon-144x144.png                     | Bin 22015 -> 11522 bytes
+ client/public/icons/icon-152x152.png                     | Bin 24035 -> 12226 bytes
+ client/public/icons/icon-180x180.png                     | Bin 30261 -> 14947 bytes
+ client/public/icons/icon-192x192.png                     | Bin 33264 -> 14709 bytes
+ client/public/icons/icon-384x384.png                     | Bin 97664 -> 35555 bytes
+ client/public/icons/icon-512x512.png                     | Bin 153309 -> 46200 bytes
+ client/public/icons/icon-72x72.png                       | Bin 7690 -> 4567 bytes
+ client/public/icons/icon-96x96.png                       | Bin 11819 -> 6664 bytes
+ client/public/manifest.json                              |  16 +-
+ client/public/og-default.png                             | Bin 160869 -> 124164 bytes
+ client/public/screenshots/screenshot-narrow.png          | Bin 932237 -> 121470 bytes
+ client/public/screenshots/screenshot-wide.png            | Bin 937109 -> 137754 bytes
+ client/public/splash/apple-splash-1125x2436.png          | Bin 0 -> 199690 bytes
+ client/public/splash/apple-splash-1170x2532.png          | Bin 0 -> 213744 bytes
+ client/public/splash/apple-splash-1242x2688.png          | Bin 0 -> 232438 bytes
+ client/public/splash/apple-splash-1284x2778.png          | Bin 0 -> 240841 bytes
+ client/public/splash/apple-splash-1536x2048.png          | Bin 0 -> 230924 bytes
+ client/public/splash/apple-splash-1668x2388.png          | Bin 0 -> 277020 bytes
+ client/public/splash/apple-splash-2048x2732.png          | Bin 0 -> 368991 bytes
+ client/public/splash/apple-splash-750x1334.png           | Bin 0 -> 99148 bytes
+ client/public/splash/apple-splash-828x1792.png           | Bin 0 -> 127756 bytes
+ client/src/assets/brand/logo-mark-maskable.svg           |  72 ++
+ client/src/assets/brand/logo-mark.svg                    |  72 ++
+ client/src/assets/brand/wordmark-dark.svg                |  97 +++
+ client/src/assets/brand/wordmark-light.svg               |  97 +++
+ client/src/components/footer.tsx                         |  18 +-
+ client/src/components/navigation.tsx                     |  51 +-
+ client/src/components/social-features.tsx                |   2 +-
+ client/src/lib/themes.ts                                 |  13 +
+ client/src/pages/blog-post.tsx                           |   4 +-
+ client/src/pages/blog.tsx                                |   4 +-
+ client/src/pages/case-view.tsx                           | 897 ++++++++++++++++++++++--
+ client/src/pages/landing.tsx                             |  12 +-
+ client/src/pages/onboarding.tsx                          |   2 +-
+ client/src/pages/pricing.tsx                             |   6 +-
+ client/src/pages/privacy-policy.tsx                      |   4 +-
+ client/src/pages/public-intel.tsx                        |   2 +-
+ client/src/pages/public-player-outlook.tsx               |   2 +-
+ client/src/pages/sealed-roi.tsx                          |   2 +-
+ client/src/pages/share-viewer.tsx                        |  16 +-
+ client/src/pages/terms-of-service.tsx                    |   4 +-
+ client/src/pages/topps-takeover.tsx                      |   4 +-
+ design_guidelines.md                                     |   2 +-
+ docs/RECOVERY_QUEUE.md                                   |  20 +
+ replit.md                                                | 185 ++---
+ scripts/brand/build-brand.mjs                            | 448 ++++++++++++
+ scripts/brand/preview-variants-v2.mjs                    | 197 ++++++
+ scripts/brand/preview-variants.mjs                       | 174 +++++
+ scripts/seed-seo-blog-posts.ts                           |  34 +-
+ scripts/take-pwa-screenshots.mjs                         | 141 ++++
+ server/__tests__/emailBranding.test.ts                   | 136 ++++
+ server/email.ts                                          | 328 +++++----
+ server/emailBranding.ts                                  |  70 ++
+ server/index.ts                                          |  24 +
+ server/pageShareImageService.ts                          |  20 +-
+ server/playerShareImageService.ts                        |  17 +-
+ server/routes.ts                                         | 423 ++++++++++-
+ server/shareImageService.ts                              |   8 +-
+ server/weeklyReportJob.ts                                |   2 +-
+ 74 files changed, 4001 insertions(+), 454 deletions(-)
+ create mode 100644 attached_assets/Pasted--a2f65cf-Refresh-PWA-install-screenshots-with-the-rebra_1778127055400.txt
+ create mode 100644 attached_assets/Screenshot_2026-05-01_at_9.59.06_AM_1777651151987.png
+ create mode 100644 attached_assets/generated_images/hobbyalpha-icon-1024.png
+ create mode 100644 attached_assets/generated_images/hobbyalpha-og-default.png
+ create mode 100644 attached_assets/hobbyalpha-player-outlook-mockup.png
+ create mode 100644 client/public/email/hobbyalpha-mark.png
+ create mode 100644 client/public/email/hobbyalpha-wordmark-dark.png
+ create mode 100644 client/public/email/hobbyalpha-wordmark-light.png
+ create mode 100644 client/public/splash/apple-splash-1125x2436.png
+ create mode 100644 client/public/splash/apple-splash-1170x2532.png
+ create mode 100644 client/public/splash/apple-splash-1242x2688.png
+ create mode 100644 client/public/splash/apple-splash-1284x2778.png
+ create mode 100644 client/public/splash/apple-splash-1536x2048.png
+ create mode 100644 client/public/splash/apple-splash-1668x2388.png
+ create mode 100644 client/public/splash/apple-splash-2048x2732.png
+ create mode 100644 client/public/splash/apple-splash-750x1334.png
+ create mode 100644 client/public/splash/apple-splash-828x1792.png
+ create mode 100644 client/src/assets/brand/logo-mark-maskable.svg
+ create mode 100644 client/src/assets/brand/logo-mark.svg
+ create mode 100644 client/src/assets/brand/wordmark-dark.svg
+ create mode 100644 client/src/assets/brand/wordmark-light.svg
+ create mode 100644 scripts/brand/build-brand.mjs
+ create mode 100644 scripts/brand/preview-variants-v2.mjs
+ create mode 100644 scripts/brand/preview-variants.mjs
+ create mode 100644 scripts/take-pwa-screenshots.mjs
+ create mode 100644 server/__tests__/emailBranding.test.ts
+ create mode 100644 server/emailBranding.ts
+  ✓ Local main now at 6a013b1
+
+[5/6] Pushing origin main…
+Enumerating objects: 295, done.
+Counting objects: 100% (295/295), done.
+Delta compression using up to 8 threads
+Compressing objects: 100% (221/221), done.
+Writing objects: 100% (229/229), 6.93 MiB | 6.24 MiB/s, done.
+Total 229 (delta 134), reused 46 (delta 7), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (134/134), completed with 46 local objects.
+To https://github.com/jordanlinford/sports-card-portfolio.git
+   5cd6d5e..6a013b1  main -> main
+  ✓ Push completed
+
+[6/6] Verifying origin/main landed correctly…
+  ✓ origin/main matches local main at 6a013b1
+
+  Top 5 commits on origin/main:
+    6a013b1 Update email system to handle unsubscribe links and rebranding
+    6cee08f Update platform branding and assets to reflect new identity
+    c99cda0 Update visual design to match new logo and branding elements
+    354e004 Add a holographic theme with interactive tilt and shimmer effects
+    e59e585 Add admin endpoint to spot-check every branded email template
+~/workspace$ 
