@@ -123,6 +123,18 @@ let state: MigrationState = {
 (function checkInterruptedOnStartup() {
   const marker = readMarker();
   if (marker && marker.status === "running") {
+    // Phase 2 chunking: skip auto-resume if marker is older than 1 hour.
+    // Stale markers usually indicate the legacy fire-and-forget path died from
+    // autoscale termination - resume should be initiated explicitly via chunked mode.
+    const STALE_MARKER_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
+    if (marker.startedAt) {
+      const markerAge = Date.now() - new Date(marker.startedAt).getTime();
+      if (markerAge > STALE_MARKER_THRESHOLD_MS) {
+        console.log(`[VerdictMigration] Skipping auto-resume - marker is ${Math.round(markerAge/60000)}min old (>1hr threshold). Use chunked migration UI to resume.`);
+        state.interruptedWarning = `Previous migration from ${marker.startedAt} was interrupted >1hr ago. Use Chunked Migration to resume.`;
+        return;
+      }
+    }
     state.interruptedWarning = `Previous migration was interrupted at ${marker.startedAt}. Auto-resuming in 30s...`;
     const resumeForce = marker.forceMode === true;
     console.log(`[VerdictMigration] Detected interrupted run from ${marker.startedAt} (force=${resumeForce}). Auto-resuming in 30s.`);
