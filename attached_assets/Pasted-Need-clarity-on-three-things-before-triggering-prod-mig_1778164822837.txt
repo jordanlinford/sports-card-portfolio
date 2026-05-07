@@ -1,0 +1,59 @@
+Need clarity on three things before triggering prod migration:
+1. Verify dev/prod database architecture.
+Earlier in this session we established DATABASE_URL on dev points to helium hostname, same as prod. We proved dev = prod for shared data.
+Now you're reporting dev has 140 entries but prod has 863. Either:
+
+Architecture changed
+There's a filter we missed
+Dev environment swapped to a separate DB at some point
+
+Run:
+echo $DATABASE_URL | sed 's/:[^:]*@/:****@/'  # mask password
+Surface the masked DATABASE_URL.
+Then check how many rows production-context queries return:
+sqlSELECT COUNT(*) FROM player_outlook_cache;
+If this returns 140: dev is using a different DB than prod
+If this returns 863: dev = prod, the "140" was wrong somewhere
+We need to know which DB the migration writes to before triggering anything in production.
+2. Investigate the dev distribution skew.
+Migration ran on 140 entries. Distribution:
+
+BUY 56.4% (target 15-25%)
+LONGSHOT_BET 0% (target 5-15%)
+
+Way too bullish, zero Longshots. Need to investigate before running same engine logic against 863 production entries (5 hours, ~$5-8 Gemini cost) and getting same broken distribution.
+Run diagnostic query against test players:
+sqlSELECT player_name,
+       outlook_json->'investmentCall'->>'verdict' as verdict,
+       confidence_score,
+       classification_json->>'careerStage' as career_stage,
+       classification_json->>'roleStatus' as role_status,
+       classification_json->>'rookieYear' as rookie_year,
+       classification_json->>'position' as position
+FROM player_outlook_cache
+WHERE LOWER(player_name) IN ('victor wembanyama', 'spencer rattler', 'tyson bagent', 'quin ewers', 'larry fitzgerald');
+Surface results. Specifically check Rattler/Bagent/Ewers - if they got BUY or MONITOR instead of LONGSHOT_BET, override logic is too narrow.
+Likely fix:
+typescript// Current (too narrow)
+if (longshotEligible && verdict.action === "MONITOR") {
+  verdict.action = "LONGSHOT_BET"
+}
+
+// Fixed (catches BUY for structurally-eligible players)
+if (longshotEligible && (verdict.action === "MONITOR" || verdict.action === "BUY")) {
+  verdict.action = "LONGSHOT_BET"
+}
+3. Service worker check.
+bashgrep -rn "serviceWorker\|registerServiceWorker\|workbox" client/ | head -20
+grep -n "serviceWorker" client/index.html
+ls -la client/public/sw.js client/public/service-worker.js 2>/dev/null
+Confirm whether a service worker is registered. If yes: stale-bundle issue could affect users for longer. If no: hard reload was a one-time fix.
+Order:
+
+Surface DATABASE_URL + COUNT(*) from local dev shell
+Surface test player diagnostic
+Surface service worker check
+Wait for my review
+Based on findings, we either fix and re-migrate dev OR proceed to prod migration with confidence
+
+Don't trigger prod migration until I confirm distribution issues are resolved.
