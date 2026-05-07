@@ -1,0 +1,699 @@
+
+  a2f65cf Refresh PWA install screenshots with the rebranded HobbyAlpha UI
+  37daea5 Add iOS PWA splash screens with HobbyAlpha branding
+  182603e Carry the new HobbyAlpha brand into every outbound email
+  a478e96 Match PWA install splash colors to HobbyAlpha navy brand (Task #45)
+  6fe3085 Add admin endpoint to spot-check every branded email template
+  776b2ab Add a holographic theme with interactive tilt and shimmer effects
+  fa700ef Update visual design to match new logo and branding elements
+
+=== READY ===
+~/workspace$ cat > /tmp/recovery_helper.sh <<'EOF'
+V2_WINS=(
+  "server/verdictMigrationJob.ts"
+  "server/lib/withTimeout.ts"
+  "server/playerOutlookEngine.ts"
+  "shared/schema.ts"
+  "client/src/lib/verdictMessages.ts"
+  "client/src/components/verdict-takeaway.tsx"
+  "client/src/components/verdict-update-banner.tsx"
+)
+MIXED=(
+  "server/routes.ts"
+  "client/src/pages/admin.tsx"
+  "client/src/pages/player-outlook.tsx"
+  "client/src/pages/card-outlook.tsx"
+)
+contains() { local n="$1"; shift; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
+resolve() {
+  local c; c=$(git diff --name-only --diff-filter=U) 
+  if [ -z "$c" ]; then echo "  (no conflicts)"; return 0; fi
+  echo "  Conflicted files:"; echo "$c" | sed 's/^/    /'
+  local mh=()
+  while IFS= read -r f; do contains "$f" "${MIXED[@]}" && mh+=("$f"); done <<< "$c"
+  if [ ${#mh[@]} -gt 0 ]; then
+    echo "  >
+> 
+> cat > /tmp/recovery_helper.sh <<'HELPER_EOF'
+V2_WINS=( "server/verdictMigrationJob.ts" "server/lib/withTimeout.ts" "server/playerOutlookEngine.ts" "shared/schema.ts" "client/src/lib/verdictMessages.ts" "client/src/components/verdict-takeaway.tsx" "client/src/components/verdict-update-banner.tsx" )
+MIXED=( "server/routes.ts" "client/src/pages/admin.tsx" "client/src/pages/player-outlook.tsx" "client/src/pages/card-outlook.tsx" )
+contains() { local n="$1"; shift; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
+resolve() {
+  local c; c=$(git diff --name-only --diff-filter=U) 
+  if [ -z "$c" ]; then echo "  (no conflicts)"; return 0; fi
+  echo "  Conflicted files:"; echo "$c" | sed 's/^/    /'
+  local mh=()
+  while IFS= read -r f; do contains "$f" "${MIXED[@]}" && mh+=("$f"); done <<< "$c"
+  if [ ${#mh[@]} -gt 0 ]; then
+    echo "  >>> HALT: mixed-concern files (manual merge):"
+    for f in "${mh[@]}"; do echo "      $f"; done
+    return 2
+  fi
+  while IFS= read -r f; do
+    if contains "$f" "${V2_WINS[@]}"; then echo "    V2_WINS  -> ours:    $f"; git checkout --ours -- "$f"
+    else echo "    rebrand  -> theirs:  $f"; git checkout --theirs -- "$f"; fi
+> cat > /tmp/recovery_helper.sh <<'HELPER_EOF'
+V2_WINS=( "server/verdictMigrationJob.ts" "server/lib/withTimeout.ts" "server/playerOutlookEngine.ts" "shared/schema.ts" "client/src/lib/verdictMessages.ts" "client/src/components/verdict-takeaway.tsx" "client/src/components/verdict-update-banner.tsx" )
+MIXED=( "server/routes.ts" "client/src/pages/admin.tsx" "client/src/pages/player-outlook.tsx" "client/src/pages/card-outlook.tsx" )
+contains() { local n="$1"; shift; for x in "$@"; do [ "$x" = "$n" ] && return 0; done; return 1; }
+resolve() {
+  local c; c=$(git diff --name-only --diff-filter=U)
+  if [ -z "$c" ]; then echo "  (no conflicts)"; return 0; fi
+  echo "  Conflicted files:"; echo "$c" | sed 's/^/    /'
+  local mh=()
+  while IFS= read -r f; do contains "$f" "${MIXED[@]}" && mh+=("$f"); done <<< "$c"
+  if [ ${#mh[@]} -gt 0 ]; then
+    echo "  >>> HALT: mixed-concern files (manual merge):"
+    for f in "${mh[@]}"; do echo "      $f"; done
+    return 2
+  fi
+  while IFS= read -r f; do
+    if contains "$f" "${V2_WINS[@]}"; then echo "    V2_WINS  -> ours:    $f"; git checkout --ours -- "$f"
+    else echo "    rebrand  -> theirs:  $f"; git checkout --theirs -- "$f"; fi
+    git add -- "$f"
+  done <<< "$c"
+  local r; r=$(git diff --name-only --diff-filter=U)
+  if [ -n "$r" ]; then echo "  >>> STILL CONFLICTED:"; echo "$r" | sed 's/^/      /'; return 3; fi
+  echo "  All conflicts auto-resolved."
+  return 0
+}
+pick() {
+  local sha="$1"; local n="$2"
+  echo ""; echo "=========================================="
+  echo "Cherry-pick $n/12: $sha"
+  git log -1 --format="  %s" "$sha"
+  echo "=========================================="
+  git cherry-pick "$sha";^C
+~/workspace$ ls -l /tmp/recovery_helper.sh && source /tmp/recovery_helper.sh && echo "Loaded V2_WINS=${#V2_WINS[@]}, MIXED=${#MIXED[@]}" && pick a10db5e 1
+-rw-r--r-- 1 runner runner 1968 May  7 04:03 /tmp/recovery_helper.sh
+Loaded V2_WINS=7, MIXED=4
+
+==========================================
+Cherry-pick 1/12: a10db5e
+  Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"
+==========================================
+Auto-merging .agents/agent_assets_metadata.toml
+Auto-merging client/index.html
+CONFLICT (content): Merge conflict in client/index.html
+warning: Cannot merge binary files: client/public/favicon.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/favicon.png
+CONFLICT (content): Merge conflict in client/public/favicon.png
+warning: Cannot merge binary files: client/public/icons/icon-1024x1024.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-1024x1024.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-1024x1024.png
+warning: Cannot merge binary files: client/public/icons/icon-120x120.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-120x120.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-120x120.png
+warning: Cannot merge binary files: client/public/icons/icon-128x128.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-128x128.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-128x128.png
+warning: Cannot merge binary files: client/public/icons/icon-144x144.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-144x144.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-144x144.png
+warning: Cannot merge binary files: client/public/icons/icon-152x152.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-152x152.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-152x152.png
+warning: Cannot merge binary files: client/public/icons/icon-180x180.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-180x180.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-180x180.png
+warning: Cannot merge binary files: client/public/icons/icon-192x192.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-192x192.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-192x192.png
+warning: Cannot merge binary files: client/public/icons/icon-384x384.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-384x384.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-384x384.png
+warning: Cannot merge binary files: client/public/icons/icon-512x512.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-512x512.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-512x512.png
+warning: Cannot merge binary files: client/public/icons/icon-72x72.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-72x72.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-72x72.png
+warning: Cannot merge binary files: client/public/icons/icon-96x96.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-96x96.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-96x96.png
+Auto-merging client/public/manifest.json
+CONFLICT (content): Merge conflict in client/public/manifest.json
+warning: Cannot merge binary files: client/public/og-default.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/og-default.png
+CONFLICT (content): Merge conflict in client/public/og-default.png
+Auto-merging client/src/components/footer.tsx
+CONFLICT (content): Merge conflict in client/src/components/footer.tsx
+Auto-merging client/src/components/navigation.tsx
+CONFLICT (content): Merge conflict in client/src/components/navigation.tsx
+Auto-merging client/src/components/social-features.tsx
+CONFLICT (content): Merge conflict in client/src/components/social-features.tsx
+Auto-merging client/src/pages/blog-post.tsx
+CONFLICT (content): Merge conflict in client/src/pages/blog-post.tsx
+Auto-merging client/src/pages/blog.tsx
+CONFLICT (content): Merge conflict in client/src/pages/blog.tsx
+Auto-merging client/src/pages/landing.tsx
+CONFLICT (content): Merge conflict in client/src/pages/landing.tsx
+Auto-merging client/src/pages/onboarding.tsx
+CONFLICT (content): Merge conflict in client/src/pages/onboarding.tsx
+Auto-merging client/src/pages/pricing.tsx
+CONFLICT (content): Merge conflict in client/src/pages/pricing.tsx
+Auto-merging client/src/pages/privacy-policy.tsx
+CONFLICT (content): Merge conflict in client/src/pages/privacy-policy.tsx
+Auto-merging client/src/pages/public-intel.tsx
+CONFLICT (content): Merge conflict in client/src/pages/public-intel.tsx
+Auto-merging client/src/pages/public-player-outlook.tsx
+CONFLICT (content): Merge conflict in client/src/pages/public-player-outlook.tsx
+Auto-merging client/src/pages/sealed-roi.tsx
+CONFLICT (content): Merge conflict in client/src/pages/sealed-roi.tsx
+Auto-merging client/src/pages/share-viewer.tsx
+CONFLICT (content): Merge conflict in client/src/pages/share-viewer.tsx
+Auto-merging client/src/pages/terms-of-service.tsx
+CONFLICT (content): Merge conflict in client/src/pages/terms-of-service.tsx
+Auto-merging client/src/pages/topps-takeover.tsx
+CONFLICT (content): Merge conflict in client/src/pages/topps-takeover.tsx
+Auto-merging design_guidelines.md
+CONFLICT (content): Merge conflict in design_guidelines.md
+Auto-merging replit.md
+CONFLICT (content): Merge conflict in replit.md
+Auto-merging server/email.ts
+CONFLICT (content): Merge conflict in server/email.ts
+Auto-merging server/index.ts
+Auto-merging server/pageShareImageService.ts
+CONFLICT (content): Merge conflict in server/pageShareImageService.ts
+Auto-merging server/playerShareImageService.ts
+CONFLICT (content): Merge conflict in server/playerShareImageService.ts
+Auto-merging server/routes.ts
+CONFLICT (content): Merge conflict in server/routes.ts
+Auto-merging server/shareImageService.ts
+CONFLICT (content): Merge conflict in server/shareImageService.ts
+Auto-merging server/weeklyReportJob.ts
+CONFLICT (content): Merge conflict in server/weeklyReportJob.ts
+error: could not apply a10db5e... Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"
+hint: After resolving the conflicts, mark them with
+hint: "git add/rm <pathspec>", then run
+hint: "git cherry-pick --continue".
+hint: You can instead skip this commit with "git cherry-pick --skip".
+hint: To abort and get back to the state before "git cherry-pick",
+hint: run "git cherry-pick --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+  Conflicted files:
+    client/index.html
+    client/public/favicon.png
+    client/public/icons/icon-1024x1024.png
+    client/public/icons/icon-120x120.png
+    client/public/icons/icon-128x128.png
+    client/public/icons/icon-144x144.png
+    client/public/icons/icon-152x152.png
+    client/public/icons/icon-180x180.png
+    client/public/icons/icon-192x192.png
+    client/public/icons/icon-384x384.png
+    client/public/icons/icon-512x512.png
+    client/public/icons/icon-72x72.png
+    client/public/icons/icon-96x96.png
+    client/public/manifest.json
+    client/public/og-default.png
+    client/src/components/footer.tsx
+    client/src/components/navigation.tsx
+    client/src/components/social-features.tsx
+    client/src/pages/blog-post.tsx
+    client/src/pages/blog.tsx
+    client/src/pages/landing.tsx
+    client/src/pages/onboarding.tsx
+    client/src/pages/pricing.tsx
+    client/src/pages/privacy-policy.tsx
+    client/src/pages/public-intel.tsx
+    client/src/pages/public-player-outlook.tsx
+    client/src/pages/sealed-roi.tsx
+    client/src/pages/share-viewer.tsx
+    client/src/pages/terms-of-service.tsx
+    client/src/pages/topps-takeover.tsx
+    design_guidelines.md
+    replit.md
+    server/email.ts
+    server/pageShareImageService.ts
+    server/playerShareImageService.ts
+    server/routes.ts
+    server/shareImageService.ts
+    server/weeklyReportJob.ts
+  >>> HALT: mixed-concern files (manual merge):
+      server/routes.ts
+  >>> STOPPED at a10db5e (rc=2)
+~/workspace$ cd /home/runner/workspace && \
+echo "=== Resolving routes.ts (rebrand text wins on all 26 regions) ===" && \
+sed -i '/^<<<<<<< HEAD$/,/^=======$/d; /^>>>>>>> a10db5e/d' server/routes.ts && \
+echo "Remaining markers in routes.ts: $(grep -cE '^(<<<<<<<|=======|>>>>>>>)' server/routes.ts)" && \
+git add server/routes.ts && \
+echo "" && \
+echo "=== Auto-resolving the other 37 files ===" && \
+resolve && \
+echo "" && \
+echo "=== Continuing cherry-pick ===" && \
+GIT_EDITOR=true git cherry-pick --continue && \
+echo "" && \
+echo "=== Final ===" && \
+git log -1 --oneline && \
+git status -sb | head -5
+=== Resolving routes.ts (rebrand text wins on all 26 regions) ===
+Remaining markers in routes.ts: 0
+
+=== Auto-resolving the other 37 files ===
+  (no conflicts)
+
+=== Continuing cherry-pick ===
+error: no cherry-pick or revert in progress
+fatal: cherry-pick failed
+~/workspace$ bash /tmp/run_recovery.sh 2>&1 | tee /tmp/recovery_run.log
+==========================================
+Reset recovery branch to clean main HEAD
+==========================================
+HEAD is now at a248d50 Task #78: Migrate outbound email from Zoho to Gmail
+
+
+==========================================
+Cherry-pick 1/12: a10db5e
+  Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"
+==========================================
+Auto-merging .agents/agent_assets_metadata.toml
+Auto-merging client/index.html
+CONFLICT (content): Merge conflict in client/index.html
+warning: Cannot merge binary files: client/public/favicon.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/favicon.png
+CONFLICT (content): Merge conflict in client/public/favicon.png
+warning: Cannot merge binary files: client/public/icons/icon-1024x1024.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-1024x1024.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-1024x1024.png
+warning: Cannot merge binary files: client/public/icons/icon-120x120.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-120x120.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-120x120.png
+warning: Cannot merge binary files: client/public/icons/icon-128x128.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-128x128.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-128x128.png
+warning: Cannot merge binary files: client/public/icons/icon-144x144.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-144x144.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-144x144.png
+warning: Cannot merge binary files: client/public/icons/icon-152x152.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-152x152.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-152x152.png
+warning: Cannot merge binary files: client/public/icons/icon-180x180.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-180x180.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-180x180.png
+warning: Cannot merge binary files: client/public/icons/icon-192x192.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-192x192.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-192x192.png
+warning: Cannot merge binary files: client/public/icons/icon-384x384.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-384x384.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-384x384.png
+warning: Cannot merge binary files: client/public/icons/icon-512x512.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-512x512.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-512x512.png
+warning: Cannot merge binary files: client/public/icons/icon-72x72.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-72x72.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-72x72.png
+warning: Cannot merge binary files: client/public/icons/icon-96x96.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/icons/icon-96x96.png
+CONFLICT (content): Merge conflict in client/public/icons/icon-96x96.png
+Auto-merging client/public/manifest.json
+CONFLICT (content): Merge conflict in client/public/manifest.json
+warning: Cannot merge binary files: client/public/og-default.png (HEAD vs. a10db5e (Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"))
+Auto-merging client/public/og-default.png
+CONFLICT (content): Merge conflict in client/public/og-default.png
+Auto-merging client/src/components/footer.tsx
+CONFLICT (content): Merge conflict in client/src/components/footer.tsx
+Auto-merging client/src/components/navigation.tsx
+CONFLICT (content): Merge conflict in client/src/components/navigation.tsx
+Auto-merging client/src/components/social-features.tsx
+CONFLICT (content): Merge conflict in client/src/components/social-features.tsx
+Auto-merging client/src/pages/blog-post.tsx
+CONFLICT (content): Merge conflict in client/src/pages/blog-post.tsx
+Auto-merging client/src/pages/blog.tsx
+CONFLICT (content): Merge conflict in client/src/pages/blog.tsx
+Auto-merging client/src/pages/landing.tsx
+CONFLICT (content): Merge conflict in client/src/pages/landing.tsx
+Auto-merging client/src/pages/onboarding.tsx
+CONFLICT (content): Merge conflict in client/src/pages/onboarding.tsx
+Auto-merging client/src/pages/pricing.tsx
+CONFLICT (content): Merge conflict in client/src/pages/pricing.tsx
+Auto-merging client/src/pages/privacy-policy.tsx
+CONFLICT (content): Merge conflict in client/src/pages/privacy-policy.tsx
+Auto-merging client/src/pages/public-intel.tsx
+CONFLICT (content): Merge conflict in client/src/pages/public-intel.tsx
+Auto-merging client/src/pages/public-player-outlook.tsx
+CONFLICT (content): Merge conflict in client/src/pages/public-player-outlook.tsx
+Auto-merging client/src/pages/sealed-roi.tsx
+CONFLICT (content): Merge conflict in client/src/pages/sealed-roi.tsx
+Auto-merging client/src/pages/share-viewer.tsx
+CONFLICT (content): Merge conflict in client/src/pages/share-viewer.tsx
+Auto-merging client/src/pages/terms-of-service.tsx
+CONFLICT (content): Merge conflict in client/src/pages/terms-of-service.tsx
+Auto-merging client/src/pages/topps-takeover.tsx
+CONFLICT (content): Merge conflict in client/src/pages/topps-takeover.tsx
+Auto-merging design_guidelines.md
+CONFLICT (content): Merge conflict in design_guidelines.md
+Auto-merging replit.md
+CONFLICT (content): Merge conflict in replit.md
+Auto-merging server/email.ts
+CONFLICT (content): Merge conflict in server/email.ts
+Auto-merging server/index.ts
+Auto-merging server/pageShareImageService.ts
+CONFLICT (content): Merge conflict in server/pageShareImageService.ts
+Auto-merging server/playerShareImageService.ts
+CONFLICT (content): Merge conflict in server/playerShareImageService.ts
+Auto-merging server/routes.ts
+CONFLICT (content): Merge conflict in server/routes.ts
+Auto-merging server/shareImageService.ts
+CONFLICT (content): Merge conflict in server/shareImageService.ts
+Auto-merging server/weeklyReportJob.ts
+CONFLICT (content): Merge conflict in server/weeklyReportJob.ts
+error: could not apply a10db5e... Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"
+hint: After resolving the conflicts, mark them with
+hint: "git add/rm <pathspec>", then run
+hint: "git cherry-pick --continue".
+hint: You can instead skip this commit with "git cherry-pick --skip".
+hint: To abort and get back to the state before "git cherry-pick",
+hint: run "git cherry-pick --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+  Conflicted files (38):
+    client/index.html
+    client/public/favicon.png
+    client/public/icons/icon-1024x1024.png
+    client/public/icons/icon-120x120.png
+    client/public/icons/icon-128x128.png
+    client/public/icons/icon-144x144.png
+    client/public/icons/icon-152x152.png
+    client/public/icons/icon-180x180.png
+    client/public/icons/icon-192x192.png
+    client/public/icons/icon-384x384.png
+    client/public/icons/icon-512x512.png
+    client/public/icons/icon-72x72.png
+    client/public/icons/icon-96x96.png
+    client/public/manifest.json
+    client/public/og-default.png
+    client/src/components/footer.tsx
+    client/src/components/navigation.tsx
+    client/src/components/social-features.tsx
+    client/src/pages/blog-post.tsx
+    client/src/pages/blog.tsx
+    client/src/pages/landing.tsx
+    client/src/pages/onboarding.tsx
+    client/src/pages/pricing.tsx
+    client/src/pages/privacy-policy.tsx
+    client/src/pages/public-intel.tsx
+    client/src/pages/public-player-outlook.tsx
+    client/src/pages/sealed-roi.tsx
+    client/src/pages/share-viewer.tsx
+    client/src/pages/terms-of-service.tsx
+    client/src/pages/topps-takeover.tsx
+    design_guidelines.md
+    replit.md
+    server/email.ts
+    server/pageShareImageService.ts
+    server/playerShareImageService.ts
+    server/routes.ts
+    server/shareImageService.ts
+    server/weeklyReportJob.ts
+    rebrand  -> theirs:  client/index.html
+    rebrand  -> theirs:  client/public/favicon.png
+    rebrand  -> theirs:  client/public/icons/icon-1024x1024.png
+    rebrand  -> theirs:  client/public/icons/icon-120x120.png
+    rebrand  -> theirs:  client/public/icons/icon-128x128.png
+    rebrand  -> theirs:  client/public/icons/icon-144x144.png
+    rebrand  -> theirs:  client/public/icons/icon-152x152.png
+    rebrand  -> theirs:  client/public/icons/icon-180x180.png
+    rebrand  -> theirs:  client/public/icons/icon-192x192.png
+    rebrand  -> theirs:  client/public/icons/icon-384x384.png
+    rebrand  -> theirs:  client/public/icons/icon-512x512.png
+    rebrand  -> theirs:  client/public/icons/icon-72x72.png
+    rebrand  -> theirs:  client/public/icons/icon-96x96.png
+    rebrand  -> theirs:  client/public/manifest.json
+    rebrand  -> theirs:  client/public/og-default.png
+    rebrand  -> theirs:  client/src/components/footer.tsx
+    rebrand  -> theirs:  client/src/components/navigation.tsx
+    rebrand  -> theirs:  client/src/components/social-features.tsx
+    rebrand  -> theirs:  client/src/pages/blog-post.tsx
+    rebrand  -> theirs:  client/src/pages/blog.tsx
+    rebrand  -> theirs:  client/src/pages/landing.tsx
+    rebrand  -> theirs:  client/src/pages/onboarding.tsx
+    rebrand  -> theirs:  client/src/pages/pricing.tsx
+    rebrand  -> theirs:  client/src/pages/privacy-policy.tsx
+    rebrand  -> theirs:  client/src/pages/public-intel.tsx
+    rebrand  -> theirs:  client/src/pages/public-player-outlook.tsx
+    rebrand  -> theirs:  client/src/pages/sealed-roi.tsx
+    rebrand  -> theirs:  client/src/pages/share-viewer.tsx
+    rebrand  -> theirs:  client/src/pages/terms-of-service.tsx
+    rebrand  -> theirs:  client/src/pages/topps-takeover.tsx
+    rebrand  -> theirs:  design_guidelines.md
+    rebrand  -> theirs:  replit.md
+    rebrand  -> theirs:  server/email.ts
+    rebrand  -> theirs:  server/pageShareImageService.ts
+    rebrand  -> theirs:  server/playerShareImageService.ts
+    MIXED    -> theirs (no V2 keys): server/routes.ts
+    rebrand  -> theirs:  server/shareImageService.ts
+    rebrand  -> theirs:  server/weeklyReportJob.ts
+[recovery/hobbyalpha-rebrand 256d078] Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Mon Apr 27 17:16:57 2026 +0000
+ 44 files changed, 426 insertions(+), 354 deletions(-)
+ create mode 100644 attached_assets/generated_images/hobbyalpha-icon-1024.png
+ create mode 100644 attached_assets/generated_images/hobbyalpha-og-default.png
+ create mode 100644 attached_assets/hobbyalpha-player-outlook-mockup.png
+  Resolved + committed:
+    256d078 Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"
+
+==========================================
+Cherry-pick 2/12: cf79747
+  Design new HobbyAlpha brand assets — refractor card direction (Task #27)
+==========================================
+Auto-merging .agents/agent_assets_metadata.toml
+CONFLICT (content): Merge conflict in .agents/agent_assets_metadata.toml
+error: could not apply cf79747... Design new HobbyAlpha brand assets — refractor card direction (Task #27)
+hint: After resolving the conflicts, mark them with
+hint: "git add/rm <pathspec>", then run
+hint: "git cherry-pick --continue".
+hint: You can instead skip this commit with "git cherry-pick --skip".
+hint: To abort and get back to the state before "git cherry-pick",
+hint: run "git cherry-pick --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+  Conflicted files (1):
+    .agents/agent_assets_metadata.toml
+    rebrand  -> theirs:  .agents/agent_assets_metadata.toml
+[recovery/hobbyalpha-rebrand ed3949d] Design new HobbyAlpha brand assets — refractor card direction (Task #27)
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Tue Apr 28 04:13:36 2026 +0000
+ 23 files changed, 1050 insertions(+), 7 deletions(-)
+ create mode 100644 client/src/assets/brand/logo-mark-maskable.svg
+ create mode 100644 client/src/assets/brand/logo-mark.svg
+ create mode 100644 client/src/assets/brand/wordmark-dark.svg
+ create mode 100644 client/src/assets/brand/wordmark-light.svg
+ create mode 100644 scripts/brand/build-brand.mjs
+ create mode 100644 scripts/brand/preview-variants-v2.mjs
+ create mode 100644 scripts/brand/preview-variants.mjs
+  Resolved + committed:
+    ed3949d Design new HobbyAlpha brand assets — refractor card direction (Task #27)
+
+==========================================
+Cherry-pick 3/12: fab023e
+  Update website branding to the new HobbyAlpha logo and name
+==========================================
+[recovery/hobbyalpha-rebrand 2df3b59] Update website branding to the new HobbyAlpha logo and name
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Tue Apr 28 04:19:19 2026 +0000
+ 2 files changed, 52 insertions(+), 13 deletions(-)
+  Clean cherry-pick.
+    2df3b59 Update website branding to the new HobbyAlpha logo and name
+
+==========================================
+Cherry-pick 4/12: 993a18d
+  Add new logo assets for the platform branding
+==========================================
+[recovery/hobbyalpha-rebrand 78e4863] Add new logo assets for the platform branding
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Tue Apr 28 04:19:46 2026 +0000
+ 1 file changed, 36 insertions(+)
+  Clean cherry-pick.
+    78e4863 Add new logo assets for the platform branding
+
+==========================================
+Cherry-pick 5/12: aeb1a66
+  Show new HobbyAlpha brand artwork in header, footer, and share viewer (Task #30)
+==========================================
+[recovery/hobbyalpha-rebrand ce39f9a] Show new HobbyAlpha brand artwork in header, footer, and share viewer (Task #30)
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Tue Apr 28 17:46:37 2026 +0000
+ 2 files changed, 27 insertions(+), 15 deletions(-)
+  Clean cherry-pick.
+    ce39f9a Show new HobbyAlpha brand artwork in header, footer, and share viewer (Task #30)
+
+==========================================
+Cherry-pick 6/12: a2f65cf
+  Refresh PWA install screenshots with the rebranded HobbyAlpha UI
+==========================================
+[recovery/hobbyalpha-rebrand 91b5e68] Refresh PWA install screenshots with the rebranded HobbyAlpha UI
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Tue Apr 28 18:12:57 2026 +0000
+ 4 files changed, 143 insertions(+), 2 deletions(-)
+ create mode 100644 scripts/take-pwa-screenshots.mjs
+  Clean cherry-pick.
+    91b5e68 Refresh PWA install screenshots with the rebranded HobbyAlpha UI
+
+==========================================
+Cherry-pick 7/12: 37daea5
+  Add iOS PWA splash screens with HobbyAlpha branding
+==========================================
+Auto-merging client/index.html
+Auto-merging scripts/brand/build-brand.mjs
+[recovery/hobbyalpha-rebrand 72ff61b] Add iOS PWA splash screens with HobbyAlpha branding
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Tue Apr 28 18:36:55 2026 +0000
+ 11 files changed, 142 insertions(+), 1 deletion(-)
+ create mode 100644 client/public/splash/apple-splash-1125x2436.png
+ create mode 100644 client/public/splash/apple-splash-1170x2532.png
+ create mode 100644 client/public/splash/apple-splash-1242x2688.png
+ create mode 100644 client/public/splash/apple-splash-1284x2778.png
+ create mode 100644 client/public/splash/apple-splash-1536x2048.png
+ create mode 100644 client/public/splash/apple-splash-1668x2388.png
+ create mode 100644 client/public/splash/apple-splash-2048x2732.png
+ create mode 100644 client/public/splash/apple-splash-750x1334.png
+ create mode 100644 client/public/splash/apple-splash-828x1792.png
+  Clean cherry-pick.
+    72ff61b Add iOS PWA splash screens with HobbyAlpha branding
+
+==========================================
+Cherry-pick 8/12: 182603e
+  Carry the new HobbyAlpha brand into every outbound email
+==========================================
+Auto-merging replit.md
+CONFLICT (content): Merge conflict in replit.md
+Auto-merging scripts/brand/build-brand.mjs
+Auto-merging server/email.ts
+CONFLICT (content): Merge conflict in server/email.ts
+error: could not apply 182603e... Carry the new HobbyAlpha brand into every outbound email
+hint: After resolving the conflicts, mark them with
+hint: "git add/rm <pathspec>", then run
+hint: "git cherry-pick --continue".
+hint: You can instead skip this commit with "git cherry-pick --skip".
+hint: To abort and get back to the state before "git cherry-pick",
+hint: run "git cherry-pick --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+  Conflicted files (2):
+    replit.md
+    server/email.ts
+    rebrand  -> theirs:  replit.md
+    rebrand  -> theirs:  server/email.ts
+[recovery/hobbyalpha-rebrand 00d674d] Carry the new HobbyAlpha brand into every outbound email
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Tue Apr 28 20:35:28 2026 +0000
+ 8 files changed, 297 insertions(+), 12 deletions(-)
+ create mode 100644 client/public/email/hobbyalpha-mark.png
+ create mode 100644 client/public/email/hobbyalpha-wordmark-dark.png
+ create mode 100644 client/public/email/hobbyalpha-wordmark-light.png
+ create mode 100644 server/__tests__/emailBranding.test.ts
+ create mode 100644 server/emailBranding.ts
+  Resolved + committed:
+    00d674d Carry the new HobbyAlpha brand into every outbound email
+
+==========================================
+Cherry-pick 9/12: a478e96
+  Match PWA install splash colors to HobbyAlpha navy brand (Task #45)
+==========================================
+Auto-merging client/public/manifest.json
+[recovery/hobbyalpha-rebrand 5f913fe] Match PWA install splash colors to HobbyAlpha navy brand (Task #45)
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Wed Apr 29 03:40:08 2026 +0000
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+  Clean cherry-pick.
+    5f913fe Match PWA install splash colors to HobbyAlpha navy brand (Task #45)
+
+==========================================
+Cherry-pick 10/12: 6fe3085
+  Add admin endpoint to spot-check every branded email template
+==========================================
+Auto-merging server/email.ts
+Auto-merging server/routes.ts
+CONFLICT (content): Merge conflict in server/routes.ts
+error: could not apply 6fe3085... Add admin endpoint to spot-check every branded email template
+hint: After resolving the conflicts, mark them with
+hint: "git add/rm <pathspec>", then run
+hint: "git cherry-pick --continue".
+hint: You can instead skip this commit with "git cherry-pick --skip".
+hint: To abort and get back to the state before "git cherry-pick",
+hint: run "git cherry-pick --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+  Conflicted files (1):
+    server/routes.ts
+    MIXED    -> theirs (no V2 keys): server/routes.ts
+[recovery/hobbyalpha-rebrand e59e585] Add admin endpoint to spot-check every branded email template
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Wed Apr 29 18:35:25 2026 +0000
+ 2 files changed, 270 insertions(+), 2 deletions(-)
+  Resolved + committed:
+    e59e585 Add admin endpoint to spot-check every branded email template
+
+==========================================
+Cherry-pick 11/12: 776b2ab
+  Add a holographic theme with interactive tilt and shimmer effects
+==========================================
+Auto-merging client/src/pages/case-view.tsx
+CONFLICT (content): Merge conflict in client/src/pages/case-view.tsx
+Auto-merging replit.md
+CONFLICT (content): Merge conflict in replit.md
+error: could not apply 776b2ab... Add a holographic theme with interactive tilt and shimmer effects
+hint: After resolving the conflicts, mark them with
+hint: "git add/rm <pathspec>", then run
+hint: "git cherry-pick --continue".
+hint: You can instead skip this commit with "git cherry-pick --skip".
+hint: To abort and get back to the state before "git cherry-pick",
+hint: run "git cherry-pick --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+  Conflicted files (2):
+    client/src/pages/case-view.tsx
+    replit.md
+    rebrand  -> theirs:  client/src/pages/case-view.tsx
+    rebrand  -> theirs:  replit.md
+[recovery/hobbyalpha-rebrand 354e004] Add a holographic theme with interactive tilt and shimmer effects
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Fri May 1 04:24:38 2026 +0000
+ 3 files changed, 867 insertions(+), 115 deletions(-)
+  Resolved + committed:
+    354e004 Add a holographic theme with interactive tilt and shimmer effects
+
+==========================================
+Cherry-pick 12/12: fa700ef
+  Update visual design to match new logo and branding elements
+==========================================
+[recovery/hobbyalpha-rebrand c99cda0] Update visual design to match new logo and branding elements
+ Author: jordanlinford <49339926-jordanlinford@users.noreply.replit.com>
+ Date: Fri May 1 16:01:05 2026 +0000
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ create mode 100644 attached_assets/Screenshot_2026-05-01_at_9.59.06_AM_1777651151987.png
+  Clean cherry-pick.
+    c99cda0 Update visual design to match new logo and branding elements
+
+==========================================
+ALL 12 REBRAND CHERRY-PICKS COMPLETE
+==========================================
+
+=== Commits added on recovery branch ===
+c99cda0 Update visual design to match new logo and branding elements
+354e004 Add a holographic theme with interactive tilt and shimmer effects
+e59e585 Add admin endpoint to spot-check every branded email template
+5f913fe Match PWA install splash colors to HobbyAlpha navy brand (Task #45)
+00d674d Carry the new HobbyAlpha brand into every outbound email
+72ff61b Add iOS PWA splash screens with HobbyAlpha branding
+91b5e68 Refresh PWA install screenshots with the rebranded HobbyAlpha UI
+ce39f9a Show new HobbyAlpha brand artwork in header, footer, and share viewer (Task #30)
+78e4863 Add new logo assets for the platform branding
+2df3b59 Update website branding to the new HobbyAlpha logo and name
+ed3949d Design new HobbyAlpha brand assets — refractor card direction (Task #27)
+256d078 Task #26: Rebrand "Sports Card Portfolio" to "HobbyAlpha"
+
+=== Diff stat vs main ===
+ server/__tests__/emailBranding.test.ts             | 136 ++++
+ server/email.ts                                    | 299 ++++---
+ server/emailBranding.ts                            |  70 ++
+ server/index.ts                                    |  24 +
+ server/pageShareImageService.ts                    |  20 +-
+ server/playerShareImageService.ts                  |  17 +-
+ server/routes.ts                                   | 423 +++++++++-
+ server/shareImageService.ts                        |   8 +-
+ server/weeklyReportJob.ts                          |   2 +-
+ 72 files changed, 3248 insertions(+), 459 deletions(-)
+
+=== Branch state ===
+## recovery/hobbyalpha-rebrand
+
+Next: review the diff, then fast-forward main and push.
